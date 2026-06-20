@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent } from "react";
+import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent, useMemo } from "react";
+import type { SlashCommandEntry } from "@/app/api/commands/route";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -16,6 +17,7 @@ interface ModelOption {
 
 interface Props {
   onSend: (message: string, images?: AttachedImage[]) => void;
+  cwd?: string | null;
   onAbort: () => void;
   onSteer?: (message: string, images?: AttachedImage[]) => void;
   onFollowUp?: (message: string, images?: AttachedImage[]) => void;
@@ -50,6 +52,22 @@ const TOOL_PRESET_MAP: Record<"off" | "default" | "full", "none" | "default" | "
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
 
 const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const MAX_SLASH_COMMANDS = 8;
+
+interface SlashCommandMatch {
+  start: number;
+  query: string;
+}
+
+function getSlashCommandMatch(value: string, caretIndex: number): SlashCommandMatch | null {
+  const beforeCursor = value.slice(0, caretIndex);
+  const lineStart = Math.max(beforeCursor.lastIndexOf("\n") + 1, 0);
+  const currentLineBeforeCursor = beforeCursor.slice(lineStart);
+  const match = currentLineBeforeCursor.match(/^(\s*)\/([^\s]*)$/);
+  if (!match) return null;
+  return { start: lineStart + match[1].length, query: match[2] };
+}
+
 const THINKING_LEVEL_DESC: Record<typeof THINKING_LEVELS[number], string> = {
   auto: "沿用 pi 默认设置",
   off: "关闭推理",
@@ -61,13 +79,19 @@ const THINKING_LEVEL_DESC: Record<typeof THINKING_LEVELS[number], string> = {
 };
 
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
-  onSend, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
+  onSend, cwd, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
   onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
   soundEnabled, onSoundToggle,
 }: Props, ref) {
   const [value, setValue] = useState("");
+  const [caretIndex, setCaretIndex] = useState(0);
+  const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
+  const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
+  const [slashCommandsError, setSlashCommandsError] = useState<string | null>(null);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const [slashDismissedKey, setSlashDismissedKey] = useState<string | null>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [modelDropdownRect, setModelDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
@@ -82,6 +106,89 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
+
+  const syncCaretFromTextarea = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    setCaretIndex(ta.selectionStart ?? ta.value.length);
+  }, []);
+
+  const slashMatch = useMemo(() => getSlashCommandMatch(value, caretIndex), [value, caretIndex]);
+  const slashMatchKey = slashMatch ? `${slashMatch.start}:${slashMatch.query}` : null;
+  const filteredSlashCommands = useMemo(() => {
+    if (!slashMatch) return [];
+    const query = slashMatch.query.toLowerCase();
+    const skillOnly = query.length > 0 && ("skill:".startsWith(query) || query.startsWith("skill:"));
+    return slashCommands
+      .filter((command) => (!skillOnly || command.source === "skill") && command.name.toLowerCase().startsWith(query))
+      .slice(0, MAX_SLASH_COMMANDS);
+  }, [slashCommands, slashMatch]);
+  const slashMenuVisible = Boolean(
+    slashMatch &&
+    slashMatchKey !== slashDismissedKey &&
+    (filteredSlashCommands.length > 0 || slashCommandsLoading || slashCommandsError)
+  );
+
+  useEffect(() => {
+    setSlashSelectedIndex(0);
+  }, [slashMatch?.query, filteredSlashCommands.length]);
+
+  useEffect(() => {
+    if (!cwd) {
+      setSlashCommands([]);
+      setSlashCommandsLoading(false);
+      setSlashCommandsError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setSlashCommandsLoading(true);
+    setSlashCommandsError(null);
+    fetch(`/api/commands?cwd=${encodeURIComponent(cwd)}`, { signal: controller.signal })
+      .then(async (res) => {
+        const data = await res.json() as { commands?: SlashCommandEntry[]; error?: string };
+        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+        setSlashCommands(data.commands ?? []);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setSlashCommands([]);
+        setSlashCommandsError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSlashCommandsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [cwd]);
+
+  const resizeTextarea = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  }, []);
+
+  const insertSlashCommand = useCallback((command: SlashCommandEntry) => {
+    const ta = textareaRef.current;
+    const currentValue = ta ? ta.value : value;
+    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
+    const match = getSlashCommandMatch(currentValue, currentCaret);
+    if (!match) return;
+
+    const insertion = `/${command.name} `;
+    const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
+    const nextCaret = match.start + insertion.length;
+    setValue(nextValue);
+    setCaretIndex(nextCaret);
+    setSlashDismissedKey(null);
+    requestAnimationFrame(() => {
+      if (!textareaRef.current) return;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(nextCaret, nextCaret);
+      resizeTextarea();
+    });
+  }, [caretIndex, resizeTextarea, value]);
 
   useImperativeHandle(ref, () => ({
     insertIfEmpty(text: string) {
@@ -167,6 +274,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     if (isStreaming) return;
     onSend(msg, attachedImages.length ? attachedImages : undefined);
     setValue("");
+    setCaretIndex(0);
+    setSlashDismissedKey(null);
     clearImages();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -182,6 +291,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       onFollowUp(msg, attachedImages.length ? attachedImages : undefined);
     }
     setValue("");
+    setCaretIndex(0);
+    setSlashDismissedKey(null);
     clearImages();
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }, [value, attachedImages, onSteer, onFollowUp, clearImages]);
@@ -200,6 +311,32 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         return;
       }
 
+      if (slashMenuVisible && !isComposing) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSlashSelectedIndex((i) => Math.min(i + 1, Math.max(filteredSlashCommands.length - 1, 0)));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSlashSelectedIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+          e.preventDefault();
+          const selected = filteredSlashCommands[Math.min(slashSelectedIndex, filteredSlashCommands.length - 1)];
+          if (selected) {
+            insertSlashCommand(selected);
+          }
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setSlashDismissedKey(slashMatchKey);
+          return;
+        }
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (isStreaming && (onSteer || onFollowUp)) {
@@ -210,15 +347,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         }
       }
     },
-    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend]
+    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend, slashMenuVisible, filteredSlashCommands, slashSelectedIndex, insertSlashCommand, slashMatchKey]
   );
 
   const handleInput = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-  }, []);
+    syncCaretFromTextarea();
+    resizeTextarea();
+  }, [resizeTextarea, syncCaretFromTextarea]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData?.items ?? []);
@@ -348,6 +483,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         {/* Main input */}
         <div
           style={{
+            position: "relative",
             display: "flex",
             gap: 8,
             alignItems: "center",
@@ -361,11 +497,86 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
           } as React.CSSProperties}
         >
+          {slashMenuVisible && slashMatch && (
+            <div
+              style={{
+                position: "absolute",
+                left: 12,
+                right: 12,
+                bottom: "calc(100% + 8px)",
+                zIndex: 450,
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                boxShadow: "0 -4px 18px rgba(15,23,42,0.14)",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ padding: "7px 10px", fontSize: 11, color: "var(--text-dim)", borderBottom: "1px solid var(--border)" }}>
+                Slash commands · skills and prompt templates
+              </div>
+              {slashCommandsLoading ? (
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>Loading commands…</div>
+              ) : slashCommandsError ? (
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "#ef4444" }}>Failed to load commands: {slashCommandsError}</div>
+              ) : filteredSlashCommands.length === 0 ? (
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>No matching skill or template commands</div>
+              ) : (
+                filteredSlashCommands.map((command, index) => {
+                  const selected = index === slashSelectedIndex;
+                  return (
+                    <button
+                      key={`${command.source}:${command.name}:${command.path ?? ""}`}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertSlashCommand(command);
+                      }}
+                      onMouseEnter={() => setSlashSelectedIndex(index)}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        padding: "8px 10px",
+                        border: "none",
+                        borderTop: index > 0 ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : "none",
+                        background: selected ? "var(--bg-selected)" : "transparent",
+                        color: "var(--text)",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 12, whiteSpace: "nowrap" }}>
+                        /{command.name}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {command.description || (command.source === "skill" ? "Pi skill" : "Prompt template")}
+                        </span>
+                        <span style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          {command.source === "skill" ? "skill" : "template"}{command.location ? ` · ${command.location}` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setCaretIndex(e.target.selectionStart ?? e.target.value.length);
+              setSlashDismissedKey(null);
+            }}
             onKeyDown={handleKeyDown}
+            onSelect={syncCaretFromTextarea}
+            onClick={syncCaretFromTextarea}
+            onKeyUp={syncCaretFromTextarea}
             onCompositionStart={() => {
               isComposingRef.current = true;
             }}
