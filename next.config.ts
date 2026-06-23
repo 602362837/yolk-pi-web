@@ -10,7 +10,17 @@ try {
 } catch { /* package not found, use default */ }
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai"],
+  serverExternalPackages: [
+    "@earendil-works/pi-coding-agent",
+    "@earendil-works/pi-ai",
+    "@earendil-works/pi-agent-core",
+    "@earendil-works/pi-tui",
+    "glob",
+  ],
+  outputFileTracingExcludes: {
+    "/*": [".pi/**/*"],
+    "/api/*": [".pi/**/*"],
+  },
   allowedDevOrigins: ['192.168.*.*'],
   env: {
     NEXT_PUBLIC_APP_VERSION: version,

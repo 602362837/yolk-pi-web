@@ -9,14 +9,17 @@ export interface SlashCommandEntry {
   name: string;
   source: SlashCommandSource;
   description?: string;
+  argumentHint?: string;
   location?: "user" | "project" | "temporary";
   path?: string;
 }
 
-// GET /api/commands?cwd=<path>
-// Minimal Web slash-command discovery for Pi skills and prompt templates only.
-// Built-in TUI commands are intentionally excluded; Pi core expands these
-// commands when the selected invocation is sent through AgentSession.prompt().
+/**
+ * 获取当前工作目录可用的 Web 斜杠命令。
+ *
+ * @param req - Next.js 请求对象，必须包含 cwd 查询参数。
+ * @returns skills 与 prompt templates 的命令列表；内置 TUI 命令不在此处暴露。
+ */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const cwd = searchParams.get("cwd");
@@ -41,6 +44,7 @@ export async function GET(req: Request) {
         name: prompt.name,
         source: "prompt" as const,
         description: prompt.description,
+        argumentHint: prompt.argumentHint,
         location: prompt.sourceInfo.scope,
         path: prompt.filePath,
       })),

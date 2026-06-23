@@ -59,6 +59,17 @@ interface SlashCommandMatch {
   query: string;
 }
 
+interface SlashCommandOption extends SlashCommandEntry {
+  priority: number;
+}
+
+/**
+ * 解析光标前是否处于斜杠命令输入状态。
+ *
+ * @param value - 输入框完整文本。
+ * @param caretIndex - 当前光标位置。
+ * @returns 匹配到的命令起点与查询文本；否则返回 null。
+ */
 function getSlashCommandMatch(value: string, caretIndex: number): SlashCommandMatch | null {
   const beforeCursor = value.slice(0, caretIndex);
   const lineStart = Math.max(beforeCursor.lastIndexOf("\n") + 1, 0);
@@ -66,6 +77,41 @@ function getSlashCommandMatch(value: string, caretIndex: number): SlashCommandMa
   const match = currentLineBeforeCursor.match(/^(\s*)\/([^\s]*)$/);
   if (!match) return null;
   return { start: lineStart + match[1].length, query: match[2] };
+}
+
+/**
+ * 按当前查询过滤并排序斜杠命令。
+ *
+ * @param commands - 服务端发现的 skills 与 prompt templates。
+ * @param query - 用户在斜杠后输入的查询文本。
+ * @returns 已排序的候选命令，优先精确前缀，同时保留模板可见性。
+ */
+function filterSlashCommands(commands: SlashCommandEntry[], query: string): SlashCommandOption[] {
+  const normalizedQuery = query.toLowerCase();
+  const skillPrefixQuery = normalizedQuery.startsWith("skill:");
+
+  return commands
+    .map((command): SlashCommandOption | null => {
+      const name = command.name.toLowerCase();
+      const bareSkillName = command.source === "skill" ? name.replace(/^skill:/, "") : name;
+
+      if (!normalizedQuery) return { ...command, priority: command.source === "prompt" ? 0 : 1 };
+      if (skillPrefixQuery) {
+        return name.startsWith(normalizedQuery) ? { ...command, priority: 0 } : null;
+      }
+      if (command.source === "prompt" && name.startsWith(normalizedQuery)) return { ...command, priority: 0 };
+      if (command.source === "skill" && bareSkillName.startsWith(normalizedQuery)) return { ...command, priority: 1 };
+      if (command.source === "prompt" && name.includes(normalizedQuery)) return { ...command, priority: 2 };
+      if (command.source === "skill" && bareSkillName.includes(normalizedQuery)) return { ...command, priority: 3 };
+      return null;
+    })
+    .filter((command): command is SlashCommandOption => command !== null)
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      if (a.source !== b.source) return a.source === "prompt" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, MAX_SLASH_COMMANDS);
 }
 
 const THINKING_LEVEL_DESC: Record<typeof THINKING_LEVELS[number], string> = {
@@ -117,11 +163,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const slashMatchKey = slashMatch ? `${slashMatch.start}:${slashMatch.query}` : null;
   const filteredSlashCommands = useMemo(() => {
     if (!slashMatch) return [];
-    const query = slashMatch.query.toLowerCase();
-    const skillOnly = query.length > 0 && ("skill:".startsWith(query) || query.startsWith("skill:"));
-    return slashCommands
-      .filter((command) => (!skillOnly || command.source === "skill") && command.name.toLowerCase().startsWith(query))
-      .slice(0, MAX_SLASH_COMMANDS);
+    return filterSlashCommands(slashCommands, slashMatch.query);
   }, [slashCommands, slashMatch]);
   const slashMenuVisible = Boolean(
     slashMatch &&
@@ -552,6 +594,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                         <span style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {command.argumentHint && (
+                            <span style={{ color: "var(--text)", fontFamily: "var(--font-mono)", marginRight: 8 }}>{command.argumentHint}</span>
+                          )}
                           {command.description || (command.source === "skill" ? "Pi skill" : "Prompt template")}
                         </span>
                         <span style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
