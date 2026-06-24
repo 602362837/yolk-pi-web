@@ -214,6 +214,12 @@ function chipInsertAtCursor(container: HTMLElement, relativePath: string, lines?
     if (spaceBefore) container.appendChild(document.createTextNode(" "));
     container.appendChild(chip);
     container.appendChild(document.createTextNode(" "));
+    // Move cursor after the newly appended content
+    const r = document.createRange();
+    r.selectNodeContents(container);
+    r.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
   } else {
     // Already had focus: insert at current cursor position
     const range = sel.getRangeAt(0);
@@ -237,8 +243,6 @@ function chipInsertAtCursor(container: HTMLElement, relativePath: string, lines?
     sel.removeAllRanges();
     sel.addRange(range);
   }
-  sel?.removeAllRanges();
-  sel?.addRange(range);
 }
 
 function getTextBeforeCursor(container: Node): string {
@@ -265,11 +269,12 @@ function serializeNodes(nodes: NodeListOf<ChildNode>): string {
       text += node.textContent ?? "";
     } else if (node instanceof HTMLElement && node.dataset.chip === "file-ref") {
       const path = node.dataset.relativePath ?? "";
-      text += `\`${path}\``;
       const start = node.dataset.startLine;
       const end = node.dataset.endLine;
       if (start && end) {
-        text += ` [line ${start}-${end}]`;
+        text += `\`${path} [line ${start}-${end}]\``;
+      } else {
+        text += `\`${path}\``;
       }
     } else if (node instanceof HTMLElement) {
       text += serializeNodes(node.childNodes);
