@@ -30,8 +30,8 @@ interface Props {
   onAbortCompaction?: () => void;
   isCompacting?: boolean;
   compactError?: string | null;
-  toolPreset?: "none" | "default" | "full";
-  onToolPresetChange?: (preset: "none" | "default" | "full") => void;
+  toolPreset?: "none" | "default" | "full" | "subagent";
+  onToolPresetChange?: (preset: "none" | "default" | "full" | "subagent") => void;
   thinkingLevel?: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
   onThinkingLevelChange?: (level: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh") => void;
   availableThinkingLevels?: string[] | null;
@@ -47,8 +47,8 @@ export interface ChatInputHandle {
   addImages: (files: File[]) => void;
 }
 
-const TOOL_PRESETS = ["off", "default", "full"] as const;
-const TOOL_PRESET_MAP: Record<"off" | "default" | "full", "none" | "default" | "full"> = { off: "none", default: "default", full: "full" };
+const TOOL_PRESETS = ["off", "default", "full", "subagent"] as const;
+const TOOL_PRESET_MAP: Record<"off" | "default" | "full" | "subagent", "none" | "default" | "full" | "subagent"> = { off: "none", default: "default", full: "full", subagent: "subagent" };
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
 
 const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -1011,7 +1011,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                     {TOOL_PRESETS.map((lvl) => {
                       const preset = TOOL_PRESET_MAP[lvl];
                       const isActive = (toolPreset ?? "default") === preset;
-                      const desc = lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : "全部内置工具";
+                      const desc = lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : lvl === "subagent" ? "全部工具 + subagent 委派" : "全部内置工具";
                       return (
                         <button
                           key={lvl}

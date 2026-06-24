@@ -8,16 +8,18 @@ export interface ToolEntry {
   active: boolean;
 }
 
-export type ToolPreset = "none" | "default" | "full";
+export type ToolPreset = "none" | "default" | "full" | "subagent";
 export const PRESET_NONE: string[] = [];
 export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write"];
 export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls"];
+export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent"];
 
 export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {
   const active = tools.filter(t => t.active).map(t => t.name).sort().join(",");
   if (active === "") return "none";
   if (active === [...PRESET_DEFAULT].sort().join(",")) return "default";
   if (active === [...PRESET_FULL].sort().join(",")) return "full";
+  if (active === [...PRESET_SUBAGENT].sort().join(",")) return "subagent";
   return "default"; // closest match
 }
 
@@ -31,6 +33,7 @@ const PRESETS: { id: ToolPreset; label: string; desc: string; tools: string[] }[
   { id: "none",    label: "Off",  desc: "No tools",                                tools: PRESET_NONE },
   { id: "default", label: "Low",  desc: "read · bash · edit · write",              tools: PRESET_DEFAULT },
   { id: "full",    label: "High", desc: "read · bash · edit · write · grep · find · ls", tools: PRESET_FULL },
+  { id: "subagent", label: "Agent", desc: "High + subagent delegation", tools: PRESET_SUBAGENT },
 ];
 
 export function ToolPanel({ tools, onPreset, onClose }: Props) {
