@@ -189,10 +189,8 @@ function chipInsertAtCursor(container: HTMLElement, relativePath: string, lines?
   const displayText = `${getFileName(relativePath)}${lines ? `:${lines.startLine}-${lines.endLine}` : ""}`;
   chip.textContent = displayText;
   chip.style.cssText = [
-    "display: inline-flex",
-    "align-items: center",
-    "gap: 2px",
-    "padding: \"0 6px\"",
+    "display: inline-block",
+    "padding: 0 6px",
     "border-radius: 4px",
     "background: var(--accent)",
     "color: #fff",
@@ -201,34 +199,43 @@ function chipInsertAtCursor(container: HTMLElement, relativePath: string, lines?
     "line-height: 1.6",
     "cursor: default",
     "user-select: none",
+    "vertical-align: baseline",
   ].join("; ");
 
+  const wasFocused = document.activeElement === container;
   container.focus();
   const sel = window.getSelection();
-  const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : document.createRange();
-  if (!sel || !sel.rangeCount) {
-    // No selection: append to end
-    if (container.lastChild?.nodeType === Node.TEXT_NODE && (container.lastChild.textContent ?? "").trim().length > 0) {
-      container.appendChild(document.createTextNode(" "));
-    }
+
+  if (!wasFocused || !sel || !sel.rangeCount) {
+    // Container wasn't focused (e.g. Add Chat from file viewer): append to end
+    const spaceBefore = container.lastChild?.nodeType === Node.TEXT_NODE &&
+      (container.lastChild.textContent ?? "").length > 0 &&
+      !(container.lastChild.textContent ?? "").endsWith(" ");
+    if (spaceBefore) container.appendChild(document.createTextNode(" "));
     container.appendChild(chip);
     container.appendChild(document.createTextNode(" "));
-    range.selectNodeContents(container);
-    range.collapse(false);
   } else {
-    // Insert at cursor
+    // Already had focus: insert at current cursor position
+    const range = sel.getRangeAt(0);
+
+    // If the cursor is on a text node, check for a space separator before inserting
     if (range.startContainer.nodeType === Node.TEXT_NODE) {
       const beforeText = (range.startContainer.textContent ?? "").slice(0, range.startOffset);
       if (beforeText.length > 0 && !beforeText.endsWith(" ")) {
-        range.insertNode(document.createTextNode(" "));
-        range.setStartAfter(range.endContainer);
+        const space = document.createTextNode(" ");
+        range.insertNode(space);
+        range.setStartAfter(space);
         range.collapse(true);
       }
     }
+
     range.deleteContents();
     range.insertNode(chip);
     range.setStartAfter(chip);
     range.collapse(true);
+
+    sel.removeAllRanges();
+    sel.addRange(range);
   }
   sel?.removeAllRanges();
   sel?.addRange(range);
@@ -575,9 +582,30 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       return;
     }
 
-    // Insert as a file reference chip (contentEditable=false)
-    const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
-    chipInsertAtCursor(el, relativePath);
+    // Insert as a file reference chip — first remove the @query text
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const text = node.textContent ?? "";
+    const offset = range.startOffset;
+    const atIdx = text.lastIndexOf("@", offset - 1);
+    if (atIdx === -1) {
+      // Fallback: just insert at cursor without removing @
+      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
+      chipInsertAtCursor(el, relativePath);
+    } else {
+      // Remove the @query text first, then insert chip
+      node.textContent = text.slice(0, atIdx) + text.slice(offset);
+      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
+      // Set cursor at the @ position and use chipInsertAtCursor
+      range.setStart(node, atIdx);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      chipInsertAtCursor(el, relativePath);
+    }
     setAtDismissedKey(null);
     syncFromDom();
     resizeInput();
