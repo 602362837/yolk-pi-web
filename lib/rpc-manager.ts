@@ -293,20 +293,14 @@ export async function startRpcSession(
       ? SessionManager.open(sessionFile, undefined)
       : SessionManager.create(cwd, undefined);
 
-    // Determine which tools to pass based on requested toolNames.
-    // Since v0.68.0, createAgentSession expects string[] tool names instead of Tool[] instances.
-    // Pass all built-in coding tool names by default; for "all off", pass empty array.
-    const allCodingToolNames = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-    let toolsOption: string[] | undefined;
-    if (toolNames !== undefined) {
-      toolsOption = toolNames.length === 0 ? [] : allCodingToolNames;
-    }
-
+    // Do NOT pass the `tools` parameter to createAgentSession.
+    // The `tools` param acts as a global allowlist that filters out extension
+    // tools (e.g. `subagent` from pi-subagents). Instead, let all built-in and
+    // extension tools load, then control activation via setActiveToolsByName.
     const { session: inner } = await createAgentSession({
       cwd,
       agentDir,
       sessionManager,
-      ...(toolsOption !== undefined ? { tools: toolsOption } : {}),
     });
 
     // If specific tool names were requested (non-empty), narrow active tools now
@@ -314,10 +308,11 @@ export async function startRpcSession(
       inner.setActiveToolsByName(toolNames);
     }
 
-    // When all tools are disabled, clear the system prompt entirely.
+    // When all tools are disabled, deactivate everything and clear system prompt.
     // pi's buildSystemPrompt always produces a non-empty prompt even with no tools;
     // the only way to truly clear it is to call agent.setSystemPrompt directly.
     if (toolNames?.length === 0) {
+      inner.setActiveToolsByName([]);
       inner.agent.state.systemPrompt = "";
     }
 

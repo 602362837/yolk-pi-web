@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent, useMemo } from "react";
 import type { SlashCommandEntry } from "@/app/api/commands/route";
+import { encodeFilePathForApi, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -30,8 +31,8 @@ interface Props {
   onAbortCompaction?: () => void;
   isCompacting?: boolean;
   compactError?: string | null;
-  toolPreset?: "none" | "default" | "full";
-  onToolPresetChange?: (preset: "none" | "default" | "full") => void;
+  toolPreset?: "none" | "default" | "full" | "subagent";
+  onToolPresetChange?: (preset: "none" | "default" | "full" | "subagent") => void;
   thinkingLevel?: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
   onThinkingLevelChange?: (level: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh") => void;
   availableThinkingLevels?: string[] | null;
@@ -47,8 +48,8 @@ export interface ChatInputHandle {
   addImages: (files: File[]) => void;
 }
 
-const TOOL_PRESETS = ["off", "default", "full"] as const;
-const TOOL_PRESET_MAP: Record<"off" | "default" | "full", "none" | "default" | "full"> = { off: "none", default: "default", full: "full" };
+const TOOL_PRESETS = ["off", "default", "full", "subagent"] as const;
+const TOOL_PRESET_MAP: Record<"off" | "default" | "full" | "subagent", "none" | "default" | "full" | "subagent"> = { off: "none", default: "default", full: "full", subagent: "subagent" };
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
 
 const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -61,6 +62,17 @@ interface SlashCommandMatch {
 
 interface SlashCommandOption extends SlashCommandEntry {
   priority: number;
+}
+
+interface AtMatch {
+  start: number;
+  query: string;
+}
+
+interface FileSuggestion {
+  name: string;
+  fullPath: string;
+  isDir: boolean;
 }
 
 /**
@@ -77,6 +89,44 @@ function getSlashCommandMatch(value: string, caretIndex: number): SlashCommandMa
   const match = currentLineBeforeCursor.match(/^(\s*)\/([^\s]*)$/);
   if (!match) return null;
   return { start: lineStart + match[1].length, query: match[2] };
+}
+
+/**
+ * 解析光标前是否处于 @ 文件引用输入状态。
+ *
+ * @param value - 输入框完整文本。
+ * @param caretIndex - 当前光标位置。
+ * @returns 匹配到的命令起点与查询文本；否则返回 null。
+ */
+function getAtMatch(value: string, caretIndex: number): AtMatch | null {
+  const beforeCursor = value.slice(0, caretIndex);
+  const atIndex = beforeCursor.lastIndexOf("@");
+  if (atIndex === -1) return null;
+
+  // Only trigger when @ is at word boundary (after space, newline, etc.)
+  if (atIndex > 0) {
+    const prev = beforeCursor[atIndex - 1];
+    if (prev !== " " && prev !== "\n" && prev !== "\t" && prev !== "(" && prev !== "[" && prev !== "{" && prev !== ">" && prev !== ":" && prev !== "`") {
+      return null;
+    }
+  }
+
+  const afterAt = beforeCursor.slice(atIndex + 1);
+  const spaceMatch = afterAt.match(/^([^\s\n]*)/);
+  const query = spaceMatch ? spaceMatch[1] : "";
+
+  return { start: atIndex, query };
+}
+
+/**
+ * 按当前查询过滤文件建议：解析 query 中的目录路径与文件名前缀，过滤出匹配的文件。
+ */
+function filterAtSuggestions(entries: FileSuggestion[], query: string): FileSuggestion[] {
+  const lastSlash = query.lastIndexOf("/");
+  const prefix = lastSlash === -1 ? query : query.slice(lastSlash + 1);
+  if (!prefix) return entries;
+  const lowerPrefix = prefix.toLowerCase();
+  return entries.filter((e) => e.name.toLowerCase().includes(lowerPrefix));
 }
 
 /**
@@ -138,6 +188,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [slashCommandsError, setSlashCommandsError] = useState<string | null>(null);
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const [slashDismissedKey, setSlashDismissedKey] = useState<string | null>(null);
+  const [atSuggestions, setAtSuggestions] = useState<FileSuggestion[]>([]);
+  const [atSuggestionsLoading, setAtSuggestionsLoading] = useState(false);
+  const [atSuggestionsError, setAtSuggestionsError] = useState<string | null>(null);
+  const [atSelectedIndex, setAtSelectedIndex] = useState(0);
+  const [atDismissedKey, setAtDismissedKey] = useState<string | null>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [modelDropdownRect, setModelDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
@@ -171,9 +226,22 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     (filteredSlashCommands.length > 0 || slashCommandsLoading || slashCommandsError)
   );
 
+  const atMatch = useMemo(() => getAtMatch(value, caretIndex), [value, caretIndex]);
+  const atMatchKey = atMatch ? `${atMatch.start}:${atMatch.query}` : null;
+  const atMenuVisible = Boolean(
+    atMatch &&
+    atMatchKey !== atDismissedKey &&
+    cwd &&
+    (atSuggestions.length > 0 || atSuggestionsLoading || atSuggestionsError)
+  );
+
   useEffect(() => {
     setSlashSelectedIndex(0);
   }, [slashMatch?.query, filteredSlashCommands.length]);
+
+  useEffect(() => {
+    setAtSelectedIndex(0);
+  }, [atMatch?.query, atSuggestions.length]);
 
   useEffect(() => {
     if (!cwd) {
@@ -204,6 +272,102 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     return () => controller.abort();
   }, [cwd]);
 
+  // @-mention：当 atMatch 变化时获取文件列表
+  // - 查询含 "/" → 目录浏览模式，只列当前目录内容
+  // - 查询为空    → 显示根目录文件
+  // - 查询无 "/"  → 递归搜索整个项目（文件名前缀匹配）
+  useEffect(() => {
+    if (!atMatch || !cwd) {
+      setAtSuggestions([]);
+      setAtSuggestionsLoading(false);
+      setAtSuggestionsError(null);
+      return;
+    }
+
+    setAtSuggestions([]);
+    const query = atMatch.query;
+    const hasSlash = query.includes("/");
+
+    const controller = new AbortController();
+    setAtSuggestionsLoading(true);
+    setAtSuggestionsError(null);
+
+    if (hasSlash) {
+      // ── 目录浏览模式 ──
+      const lastSlash = query.lastIndexOf("/");
+      const targetDir = joinFilePath(cwd, query.slice(0, lastSlash));
+      const encoded = encodeFilePathForApi(targetDir);
+      fetch(`/api/files/${encoded}?type=list`, { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as { entries?: { name: string; isDir: boolean; size: number; modified: string }[] };
+          if (controller.signal.aborted) return;
+          const entries = (data.entries ?? []).map((e) => ({
+            name: e.name,
+            fullPath: joinFilePath(targetDir, e.name),
+            isDir: e.isDir,
+          }));
+          const filtered = filterAtSuggestions(entries, query);
+          setAtSuggestions(filtered);
+        })
+        .catch((err) => {
+          if (controller.signal.aborted) return;
+          setAtSuggestions([]);
+          setAtSuggestionsError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAtSuggestionsLoading(false);
+        });
+    } else if (!query) {
+      // ── 空查询：显示根目录文件 + 文件夹 ──
+      const encoded = encodeFilePathForApi(cwd);
+      fetch(`/api/files/${encoded}?type=list`, { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as { entries?: { name: string; isDir: boolean; size: number; modified: string }[] };
+          if (controller.signal.aborted) return;
+          const entries = (data.entries ?? []).map((e) => ({
+            name: e.name,
+            fullPath: joinFilePath(cwd, e.name),
+            isDir: e.isDir,
+          }));
+          setAtSuggestions(entries);
+        })
+        .catch((err) => {
+          if (controller.signal.aborted) return;
+          setAtSuggestions([]);
+          setAtSuggestionsError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAtSuggestionsLoading(false);
+        });
+    } else {
+      // ── 递归搜索模式：跨目录查找文件名匹配的文件 ──
+      fetch(`/api/files/search?cwd=${encodeURIComponent(cwd)}&prefix=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as { files: { name: string; fullPath: string; relativePath: string }[]; total: number };
+          if (controller.signal.aborted) return;
+          const suggestions = data.files.map((f) => ({
+            name: f.relativePath,  // 显示相对路径，帮助区分同名文件
+            fullPath: f.fullPath,
+            isDir: false,
+          }));
+          setAtSuggestions(suggestions);
+        })
+        .catch((err) => {
+          if (controller.signal.aborted) return;
+          setAtSuggestions([]);
+          setAtSuggestionsError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAtSuggestionsLoading(false);
+        });
+    }
+
+    return () => controller.abort();
+  }, [atMatch, cwd]);
+
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -231,6 +395,45 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       resizeTextarea();
     });
   }, [caretIndex, resizeTextarea, value]);
+
+  const insertAtMention = useCallback((suggestion: FileSuggestion) => {
+    const ta = textareaRef.current;
+    const currentValue = ta ? ta.value : value;
+    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
+    const match = getAtMatch(currentValue, currentCaret);
+    if (!match) return;
+
+    if (suggestion.isDir) {
+      // Navigate into directory: replace @query with @dirname/
+      const insertion = `@${suggestion.name}/`;
+      const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
+      const nextCaret = match.start + insertion.length;
+      setValue(nextValue);
+      setCaretIndex(nextCaret);
+      setAtDismissedKey(null);
+      requestAnimationFrame(() => {
+        if (!textareaRef.current) return;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(nextCaret, nextCaret);
+        resizeTextarea();
+      });
+    } else {
+      // Insert backtick-wrapped relative path for files
+      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
+      const insertion = `\`${relativePath}\``;
+      const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
+      const nextCaret = match.start + insertion.length;
+      setValue(nextValue);
+      setCaretIndex(nextCaret);
+      setAtDismissedKey(null);
+      requestAnimationFrame(() => {
+        if (!textareaRef.current) return;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(nextCaret, nextCaret);
+        resizeTextarea();
+      });
+    }
+  }, [caretIndex, resizeTextarea, value, cwd]);
 
   useImperativeHandle(ref, () => ({
     insertIfEmpty(text: string) {
@@ -318,6 +521,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setValue("");
     setCaretIndex(0);
     setSlashDismissedKey(null);
+    setAtDismissedKey(null);
     clearImages();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -335,6 +539,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setValue("");
     setCaretIndex(0);
     setSlashDismissedKey(null);
+    setAtDismissedKey(null);
     clearImages();
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }, [value, attachedImages, onSteer, onFollowUp, clearImages]);
@@ -351,6 +556,41 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       if (e.key === "Enter" && !e.shiftKey && (isComposing || recentlyComposed)) {
         if (recentlyComposed) e.preventDefault();
         return;
+      }
+
+      // @-mention menu
+      if (atMenuVisible && !isComposing) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setAtSelectedIndex((i) => Math.min(i + 1, Math.max(atSuggestions.length - 1, 0)));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setAtSelectedIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          const selected = atSuggestions[Math.min(atSelectedIndex, atSuggestions.length - 1)];
+          if (selected?.isDir) {
+            insertAtMention(selected);
+          }
+          return;
+        }
+        if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+          e.preventDefault();
+          const selected = atSuggestions[Math.min(atSelectedIndex, atSuggestions.length - 1)];
+          if (selected) {
+            insertAtMention(selected);
+          }
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setAtDismissedKey(atMatchKey);
+          return;
+        }
       }
 
       if (slashMenuVisible && !isComposing) {
@@ -389,7 +629,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         }
       }
     },
-    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend, slashMenuVisible, filteredSlashCommands, slashSelectedIndex, insertSlashCommand, slashMatchKey]
+    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend, atMenuVisible, atSuggestions, atSelectedIndex, insertAtMention, atMatchKey, slashMenuVisible, filteredSlashCommands, slashSelectedIndex, insertSlashCommand, slashMatchKey]
   );
 
   const handleInput = useCallback(() => {
@@ -610,6 +850,84 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </div>
           )}
 
+          {atMenuVisible && atMatch && (
+            <div
+              style={{
+                position: "absolute",
+                left: 12,
+                right: 12,
+                bottom: "calc(100% + 8px)",
+                zIndex: 450,
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                boxShadow: "0 -4px 18px rgba(15,23,42,0.14)",
+                overflow: "hidden",
+                maxHeight: 280,
+                overflowY: "auto",
+              }}
+            >
+              <div style={{ padding: "7px 10px", fontSize: 11, color: "var(--text-dim)", borderBottom: "1px solid var(--border)" }}>
+                @ Files · select to reference in chat
+              </div>
+              {atSuggestionsLoading ? (
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>Loading files…</div>
+              ) : atSuggestionsError ? (
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "#ef4444" }}>Failed to load files: {atSuggestionsError}</div>
+              ) : atSuggestions.length === 0 ? (
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>No matching files</div>
+              ) : (
+                atSuggestions.map((suggestion, index) => {
+                  const selected = index === atSelectedIndex;
+                  return (
+                    <button
+                      key={suggestion.fullPath}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertAtMention(suggestion);
+                      }}
+                      onMouseEnter={() => setAtSelectedIndex(index)}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 10px",
+                        border: "none",
+                        borderTop: index > 0 ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : "none",
+                        background: selected ? "var(--bg-selected)" : "transparent",
+                        color: "var(--text)",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontSize: 12,
+                      }}
+                    >
+                      {suggestion.isDir ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                          <polyline points="13 2 13 9 20 9" />
+                        </svg>
+                      )}
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                        {suggestion.name}
+                      </span>
+                      {suggestion.isDir && (
+                        <span style={{ fontSize: 10, color: "var(--text-dim)", flexShrink: 0 }}>
+                          dir
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={value}
@@ -617,6 +935,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               setValue(e.target.value);
               setCaretIndex(e.target.selectionStart ?? e.target.value.length);
               setSlashDismissedKey(null);
+              setAtDismissedKey(null);
             }}
             onKeyDown={handleKeyDown}
             onSelect={syncCaretFromTextarea}
@@ -1011,7 +1330,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                     {TOOL_PRESETS.map((lvl) => {
                       const preset = TOOL_PRESET_MAP[lvl];
                       const isActive = (toolPreset ?? "default") === preset;
-                      const desc = lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : "全部内置工具";
+                      const desc = lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : lvl === "subagent" ? "全部工具 + subagent 委派" : "全部内置工具";
                       return (
                         <button
                           key={lvl}
