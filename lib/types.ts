@@ -38,6 +38,12 @@ export interface AttachedFile {
   path: string;
 }
 
+export interface FileReference {
+  relativePath: string;
+  startLine?: number;
+  endLine?: number;
+}
+
 export interface ThinkingContent {
   type: "thinking";
   thinking: string;

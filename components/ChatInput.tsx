@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent, useMemo } from "react";
+import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, useMemo } from "react";
 import type { SlashCommandEntry } from "@/app/api/commands/route";
-import type { AttachedFile } from "@/lib/types";
-import { encodeFilePathForApi, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
+import type { AttachedFile, FileReference } from "@/lib/types";
+import { encodeFilePathForApi, getFileName, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -48,6 +48,7 @@ export interface ChatInputHandle {
   insertIfEmpty: (text: string) => void;
   addImages: (files: File[]) => void;
   addFiles: (files: File[]) => void;
+  addFileReference: (relativePath: string, lines?: { startLine: number; endLine: number }) => void;
 }
 
 const TOOL_PRESETS = ["off", "default", "full", "subagent"] as const;
@@ -176,6 +177,118 @@ const THINKING_LEVEL_DESC: Record<typeof THINKING_LEVELS[number], string> = {
   xhigh: "最高强度推理",
 };
 
+function chipInsertAtCursor(container: HTMLElement, relativePath: string, lines?: { startLine: number; endLine: number }): void {
+  const chip = document.createElement("span");
+  chip.contentEditable = "false";
+  chip.dataset.chip = "file-ref";
+  chip.dataset.relativePath = relativePath;
+  if (lines) {
+    chip.dataset.startLine = String(lines.startLine);
+    chip.dataset.endLine = String(lines.endLine);
+  }
+  const displayText = `${getFileName(relativePath)}${lines ? `:${lines.startLine}-${lines.endLine}` : ""}`;
+  chip.textContent = displayText;
+  chip.style.cssText = [
+    "display: inline-block",
+    "padding: 0 6px",
+    "border-radius: 4px",
+    "background: var(--accent)",
+    "color: #fff",
+    "font-size: 12px",
+    "font-family: var(--font-mono)",
+    "line-height: 1.6",
+    "cursor: default",
+    "user-select: none",
+    "vertical-align: baseline",
+  ].join("; ");
+
+  const wasFocused = document.activeElement === container;
+  container.focus();
+  const sel = window.getSelection();
+
+  if (!wasFocused || !sel || !sel.rangeCount) {
+    // Container wasn't focused (e.g. Add Chat from file viewer): append to end
+    const spaceBefore = container.lastChild?.nodeType === Node.TEXT_NODE &&
+      (container.lastChild.textContent ?? "").length > 0 &&
+      !(container.lastChild.textContent ?? "").endsWith(" ");
+    if (spaceBefore) container.appendChild(document.createTextNode(" "));
+    container.appendChild(chip);
+    container.appendChild(document.createTextNode(" "));
+    // Move cursor after the newly appended content
+    const r = document.createRange();
+    r.selectNodeContents(container);
+    r.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+  } else {
+    // Already had focus: insert at current cursor position
+    const range = sel.getRangeAt(0);
+
+    // If the cursor is on a text node, check for a space separator before inserting
+    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+      const beforeText = (range.startContainer.textContent ?? "").slice(0, range.startOffset);
+      if (beforeText.length > 0 && !beforeText.endsWith(" ")) {
+        const space = document.createTextNode(" ");
+        range.insertNode(space);
+        range.setStartAfter(space);
+        range.collapse(true);
+      }
+    }
+
+    range.deleteContents();
+    range.insertNode(chip);
+    range.setStartAfter(chip);
+    range.collapse(true);
+
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+function getTextBeforeCursor(container: Node): string {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return "";
+  const range = sel.getRangeAt(0);
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  let text = "";
+  let node: Node | null;
+  while ((node = walker.nextNode()) !== null) {
+    if (node === range.startContainer) {
+      text += (node.textContent ?? "").slice(0, range.startOffset);
+      break;
+    }
+    text += node.textContent ?? "";
+  }
+  return text;
+}
+
+function serializeNodes(nodes: NodeListOf<ChildNode>): string {
+  let text = "";
+  for (const node of nodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent ?? "";
+    } else if (node instanceof HTMLElement && node.dataset.chip === "file-ref") {
+      const path = node.dataset.relativePath ?? "";
+      const start = node.dataset.startLine;
+      const end = node.dataset.endLine;
+      if (start && end) {
+        text += `\`${path} [line ${start}-${end}]\``;
+      } else {
+        text += `\`${path}\``;
+      }
+    } else if (node instanceof HTMLElement) {
+      text += serializeNodes(node.childNodes);
+    }
+  }
+  return text;
+}
+
+function hasContent(el: HTMLElement): boolean {
+  const text = el.textContent ?? "";
+  if (text.trim().length > 0) return true;
+  return el.querySelector('[data-chip]') !== null;
+}
+
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   onSend, cwd, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
   onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange,
@@ -183,8 +296,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   retryInfo,
   soundEnabled, onSoundToggle,
 }: Props, ref) {
-  const [value, setValue] = useState("");
-  const [caretIndex, setCaretIndex] = useState(0);
   const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
   const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
   const [slashCommandsError, setSlashCommandsError] = useState<string | null>(null);
@@ -203,7 +314,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownPanelRef = useRef<HTMLDivElement>(null);
   const toolDropdownRef = useRef<HTMLDivElement>(null);
@@ -213,13 +324,19 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const isComposingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
 
-  const syncCaretFromTextarea = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    setCaretIndex(ta.selectionStart ?? ta.value.length);
+  // DOM-based: text before cursor, synced on every input/selection change
+  const [beforeCursorText, setBeforeCursorText] = useState("");
+  const [hasEditorContent, setHasEditorContent] = useState(false);
+
+  const syncFromDom = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const beforeText = getTextBeforeCursor(el);
+    setBeforeCursorText(beforeText);
+    setHasEditorContent(hasContent(el));
   }, []);
 
-  const slashMatch = useMemo(() => getSlashCommandMatch(value, caretIndex), [value, caretIndex]);
+  const slashMatch = useMemo(() => getSlashCommandMatch(beforeCursorText, beforeCursorText.length), [beforeCursorText]);
   const slashMatchKey = slashMatch ? `${slashMatch.start}:${slashMatch.query}` : null;
   const filteredSlashCommands = useMemo(() => {
     if (!slashMatch) return [];
@@ -231,7 +348,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     (filteredSlashCommands.length > 0 || slashCommandsLoading || slashCommandsError)
   );
 
-  const atMatch = useMemo(() => getAtMatch(value, caretIndex), [value, caretIndex]);
+  const atMatch = useMemo(() => getAtMatch(beforeCursorText, beforeCursorText.length), [beforeCursorText]);
   const atMatchKey = atMatch ? `${atMatch.start}:${atMatch.query}` : null;
   const atMenuVisible = Boolean(
     atMatch &&
@@ -373,113 +490,162 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     return () => controller.abort();
   }, [atMatch, cwd]);
 
-  const resizeTextarea = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  const resizeInput = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, []);
 
+  /** Insert text into the contentEditable div at the current cursor position. */
+  const insertTextAtCursor = useCallback((text: string, addSpaceSep = true) => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+      el.appendChild(document.createTextNode(text));
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      syncFromDom();
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (addSpaceSep && range.startContainer.nodeType === Node.TEXT_NODE) {
+      const beforeText = (range.startContainer.textContent ?? "").slice(0, range.startOffset);
+      if (beforeText.length > 0 && !beforeText.endsWith(" ")) {
+        range.insertNode(document.createTextNode(" "));
+        range.setStartAfter(range.endContainer);
+        range.collapse(true);
+      }
+    }
+    range.deleteContents();
+    range.insertNode(document.createTextNode(text));
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    syncFromDom();
+    resizeInput();
+  }, [syncFromDom]);
+
   const insertSlashCommand = useCallback((command: SlashCommandEntry) => {
-    const ta = textareaRef.current;
-    const currentValue = ta ? ta.value : value;
-    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
-    const match = getSlashCommandMatch(currentValue, currentCaret);
-    if (!match) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const text = node.textContent ?? "";
+    const offset = range.startOffset;
+    const slashIdx = text.lastIndexOf("/", offset - 1);
+    if (slashIdx === -1) return;
 
     const insertion = `/${command.name} `;
-    const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
-    const nextCaret = match.start + insertion.length;
-    setValue(nextValue);
-    setCaretIndex(nextCaret);
+    node.textContent = text.slice(0, slashIdx) + insertion + text.slice(offset);
+    const newOffset = slashIdx + insertion.length;
+    range.setStart(node, newOffset);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
     setSlashDismissedKey(null);
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return;
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(nextCaret, nextCaret);
-      resizeTextarea();
-    });
-  }, [caretIndex, resizeTextarea, value]);
+    syncFromDom();
+    resizeInput();
+  }, [syncFromDom]);
 
   const insertAtMention = useCallback((suggestion: FileSuggestion) => {
-    const ta = textareaRef.current;
-    const currentValue = ta ? ta.value : value;
-    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
-    const match = getAtMatch(currentValue, currentCaret);
-    if (!match) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
 
     if (suggestion.isDir) {
       // Navigate into directory: replace @query with @dirname/
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      const text = node.textContent ?? "";
+      const offset = range.startOffset;
+      const atIdx = text.lastIndexOf("@", offset - 1);
+      if (atIdx === -1) return;
+
       const insertion = `@${suggestion.name}/`;
-      const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
-      const nextCaret = match.start + insertion.length;
-      setValue(nextValue);
-      setCaretIndex(nextCaret);
+      node.textContent = text.slice(0, atIdx) + insertion + text.slice(offset);
+      const newOffset = atIdx + insertion.length;
+      range.setStart(node, newOffset);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
       setAtDismissedKey(null);
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextCaret, nextCaret);
-        resizeTextarea();
-      });
-    } else {
-      // Insert backtick-wrapped relative path for files
-      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
-      const insertion = `\`${relativePath}\``;
-      const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
-      const nextCaret = match.start + insertion.length;
-      setValue(nextValue);
-      setCaretIndex(nextCaret);
-      setAtDismissedKey(null);
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextCaret, nextCaret);
-        resizeTextarea();
-      });
+      syncFromDom();
+      resizeInput();
+      return;
     }
-  }, [caretIndex, resizeTextarea, value, cwd]);
+
+    // Insert as a file reference chip — first remove the @query text
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const text = node.textContent ?? "";
+    const offset = range.startOffset;
+    const atIdx = text.lastIndexOf("@", offset - 1);
+    if (atIdx === -1) {
+      // Fallback: just insert at cursor without removing @
+      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
+      chipInsertAtCursor(el, relativePath);
+    } else {
+      // Remove the @query text first, then insert chip
+      node.textContent = text.slice(0, atIdx) + text.slice(offset);
+      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
+      // Set cursor at the @ position and use chipInsertAtCursor
+      range.setStart(node, atIdx);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      chipInsertAtCursor(el, relativePath);
+    }
+    setAtDismissedKey(null);
+    syncFromDom();
+    resizeInput();
+  }, [syncFromDom, cwd]);
 
   useImperativeHandle(ref, () => ({
     insertIfEmpty(text: string) {
-      const ta = textareaRef.current;
-      const current = ta ? ta.value : value;
-      if (current.trim()) return;
-      setValue(text);
-      requestAnimationFrame(() => {
-        if (!ta) return;
-        ta.focus();
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-      });
+      const el = inputRef.current;
+      if (!el) return;
+      if (hasContent(el)) return;
+      el.textContent = text;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      syncFromDom();
+      resizeInput();
     },
     insertText(text: string) {
-      const ta = textareaRef.current;
-      if (!ta) {
-        setValue((v) => v + (v ? " " : "") + text);
-        return;
-      }
-      const start = ta.selectionStart ?? ta.value.length;
-      const end = ta.selectionEnd ?? ta.value.length;
-      const before = ta.value.slice(0, start);
-      const after = ta.value.slice(end);
-      const sep = before.length > 0 && !before.endsWith(" ") ? " " : "";
-      const newVal = before + sep + text + after;
-      setValue(newVal);
-      requestAnimationFrame(() => {
-        if (!ta) return;
-        const pos = start + sep.length + text.length;
-        ta.setSelectionRange(pos, pos);
-        ta.focus();
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-      });
+      insertTextAtCursor(text);
     },
     addImages(files: File[]) {
       processImageFiles(files);
     },
     addFiles(files: File[]) {
       processFileUploads(files);
+    },
+    addFileReference(relativePath: string, lines?: { startLine: number; endLine: number }) {
+      const el = inputRef.current;
+      if (!el) return;
+      chipInsertAtCursor(el, relativePath, lines);
+      syncFromDom();
+      resizeInput();
     },
   }));
 
@@ -521,7 +687,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     });
   }, []);
 
-  // ── File attachment ──
+    // ── File attachment ──
 
   const uploadFile = useCallback(async (file: File): Promise<AttachedFile | null> => {
     const formData = new FormData();
@@ -568,54 +734,75 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setAttachedFiles([]);
   }, []);
 
+  const clearInput = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.textContent = "";
+  }, []);
 
-  const buildMessageWithAttachments = useCallback((msg: string): string => {
-    const fileRefs = attachedFiles.map((f) => {
-      const sizeStr = f.size < 1024 ? `${f.size} B` : f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
-      return `📎 ${f.name} (${sizeStr}) — \`${f.path}\``;
-    });
-    if (!fileRefs.length) return msg;
-    const refText = fileRefs.join("\n");
-    return msg ? `${msg}\n\n${refText}` : refText;
+  /** Build the final message: serialize the contentEditable div + append attached files/images. */
+  const buildFinalMessage = useCallback((): string => {
+    const parts: string[] = [];
+
+    // Content from the contentEditable div (text + inline file chips)
+    const el = inputRef.current;
+    if (el) {
+      const inputText = serializeNodes(el.childNodes);
+      if (inputText) parts.push(inputText);
+    }
+
+    // Attached files: name + size + path
+    if (attachedFiles.length > 0) {
+      const fileText = attachedFiles.map((f) => {
+        const sizeStr = f.size < 1024 ? `${f.size} B` : f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+        return `📎 ${f.name} (${sizeStr}) — \`${f.path}\``;
+      }).join("\n");
+      parts.push(fileText);
+    }
+
+    return parts.join("\n\n");
   }, [attachedFiles]);
 
-  const handleSend = useCallback(() => {
-    const msg = value.trim();
-    if (!msg && !attachedImages.length && !attachedFiles.length) return;
-    if (isStreaming) return;
-    const finalMsg = buildMessageWithAttachments(msg);
-    onSend(finalMsg, attachedImages.length ? attachedImages : undefined);
-    setValue("");
-    setCaretIndex(0);
+  const sendActive = useCallback((): boolean => {
+    if (attachedImages.length > 0 || attachedFiles.length > 0) return true;
+    const el = inputRef.current;
+    if (!el) return false;
+    return hasContent(el);
+  }, [attachedImages, attachedFiles]);
+
+  const clearEditor = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.textContent = "";
+    el.style.height = "auto";
     setSlashDismissedKey(null);
     setAtDismissedKey(null);
     clearImages();
     clearFiles();
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-  }, [value, attachedImages, attachedFiles, isStreaming, onSend, clearImages, clearFiles, buildMessageWithAttachments]);
+    syncFromDom();
+  }, [clearImages, clearFiles, syncFromDom]);
+
+  const handleSend = useCallback(() => {
+    if (!sendActive()) return;
+    if (isStreaming) return;
+    const finalMsg = buildFinalMessage();
+    onSend(finalMsg, attachedImages.length ? attachedImages : undefined);
+    clearEditor();
+  }, [sendActive, isStreaming, onSend, attachedImages, buildFinalMessage, clearEditor]);
 
   const sendQueued = useCallback((mode: "steer" | "followup") => {
-    const msg = value.trim();
-    if (!msg && !attachedImages.length && !attachedFiles.length) return;
-    const finalMsg = buildMessageWithAttachments(msg);
+    if (!sendActive()) return;
+    const finalMsg = buildFinalMessage();
     if (mode === "steer" && onSteer) {
       onSteer(finalMsg, attachedImages.length ? attachedImages : undefined);
     } else if (mode === "followup" && onFollowUp) {
       onFollowUp(finalMsg, attachedImages.length ? attachedImages : undefined);
     }
-    setValue("");
-    setCaretIndex(0);
-    setSlashDismissedKey(null);
-    setAtDismissedKey(null);
-    clearImages();
-    clearFiles();
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [value, attachedImages, attachedFiles, onSteer, onFollowUp, clearImages, clearFiles, buildMessageWithAttachments]);
+    clearEditor();
+  }, [syncFromDom, onSteer, onFollowUp, attachedImages, attachedFiles, buildFinalMessage, clearEditor]);
 
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    (e: React.KeyboardEvent) => {
       const nativeEvent = e.nativeEvent;
       const recentlyComposed = Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_ENTER_GRACE_MS;
       const isComposing =
@@ -703,9 +890,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   );
 
   const handleInput = useCallback(() => {
-    syncCaretFromTextarea();
-    resizeTextarea();
-  }, [resizeTextarea, syncCaretFromTextarea]);
+    syncFromDom();
+    resizeInput();
+  }, [syncFromDom, resizeInput]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData?.items ?? []);
@@ -1062,19 +1249,17 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </div>
           )}
 
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setCaretIndex(e.target.selectionStart ?? e.target.value.length);
-              setSlashDismissedKey(null);
-              setAtDismissedKey(null);
-            }}
+          <div
+            ref={inputRef}
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-multiline="true"
             onKeyDown={handleKeyDown}
-            onSelect={syncCaretFromTextarea}
-            onClick={syncCaretFromTextarea}
-            onKeyUp={syncCaretFromTextarea}
+            onInput={handleInput}
+            onKeyUp={syncFromDom}
+            onMouseUp={syncFromDom}
+            onPaste={handlePaste}
             onCompositionStart={() => {
               isComposingRef.current = true;
             }}
@@ -1082,19 +1267,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               isComposingRef.current = false;
               lastCompositionEndAtRef.current = Date.now();
             }}
-            onInput={handleInput}
-            onPaste={handlePaste}
-            placeholder={
+            className="ce-input"
+            data-placeholder={
               isStreaming && (onSteer || onFollowUp)
                 ? "Steer 立即注入 / Follow-up 排队…"
                 : isStreaming ? "Agent is running…"
                 : "Message…"
             }
-            rows={1}
             style={{
               flex: 1,
-              background: "none",
-              border: "none",
               outline: "none",
               resize: "none",
               color: "var(--text)",
@@ -1104,6 +1285,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               minHeight: 24,
               maxHeight: 200,
               overflow: "auto",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              caretColor: "var(--text)",
             }}
           />
 
@@ -1112,16 +1296,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               {onSteer && (
                 <button
                   onClick={() => sendQueued("steer")}
-                  disabled={!value.trim() && !attachedImages.length && !attachedFiles.length}
+                  disabled={!hasEditorContent && !attachedImages.length && !attachedFiles.length}
                   title="打断 Agent 当前运行，立即注入消息"
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
                     padding: "7px 12px",
-                    background: (value.trim() || attachedImages.length || attachedFiles.length) ? "rgba(234,179,8,0.12)" : "none",
+                    background: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "rgba(234,179,8,0.12)" : "none",
                     border: "1px solid rgba(234,179,8,0.35)",
                     borderRadius: 8,
-                    color: (value.trim() || attachedImages.length || attachedFiles.length) ? "rgba(180,130,0,1)" : "var(--text-dim)",
-                    cursor: (value.trim() || attachedImages.length || attachedFiles.length) ? "pointer" : "not-allowed",
+                    color: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "rgba(180,130,0,1)" : "var(--text-dim)",
+                    cursor: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "pointer" : "not-allowed",
                     fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em",
                     transition: "background 0.12s",
                   }}
@@ -1135,16 +1319,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               {onFollowUp && (
                 <button
                   onClick={() => sendQueued("followup")}
-                  disabled={!value.trim() && !attachedImages.length && !attachedFiles.length}
+                  disabled={!hasEditorContent && !attachedImages.length && !attachedFiles.length}
                   title="在 Agent 完成后排队发送"
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
                     padding: "7px 12px",
-                    background: (value.trim() || attachedImages.length || attachedFiles.length) ? "rgba(129,140,248,0.12)" : "none",
+                    background: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "rgba(129,140,248,0.12)" : "none",
                     border: "1px solid rgba(129,140,248,0.35)",
                     borderRadius: 8,
-                    color: (value.trim() || attachedImages.length || attachedFiles.length) ? "rgba(99,102,241,1)" : "var(--text-dim)",
-                    cursor: (value.trim() || attachedImages.length || attachedFiles.length) ? "pointer" : "not-allowed",
+                    color: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "rgba(99,102,241,1)" : "var(--text-dim)",
+                    cursor: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "pointer" : "not-allowed",
                     fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em",
                     transition: "background 0.12s",
                   }}
@@ -1160,21 +1344,21 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           ) : (
             <button
               onClick={handleSend}
-              disabled={!value.trim() && !attachedImages.length && !attachedFiles.length}
+              disabled={!hasEditorContent && !attachedImages.length && !attachedFiles.length}
               style={{
                 flexShrink: 0,
                 alignSelf: "flex-end",
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "7px 14px",
-                background: (value.trim() || attachedImages.length || attachedFiles.length) ? "var(--accent)" : "var(--bg-panel)",
+                background: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "var(--accent)" : "var(--bg-panel)",
                 border: "none",
                 borderRadius: 8,
-                color: (value.trim() || attachedImages.length || attachedFiles.length) ? "#fff" : "var(--text-dim)",
-                cursor: (value.trim() || attachedImages.length || attachedFiles.length) ? "pointer" : "not-allowed",
+                color: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "#fff" : "var(--text-dim)",
+                cursor: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "pointer" : "not-allowed",
                 fontSize: 13,
                 fontWeight: 600,
                 letterSpacing: "-0.01em",
-                boxShadow: (value.trim() || attachedImages.length || attachedFiles.length) ? "0 1px 3px rgba(37,99,235,0.25)" : "none",
+                boxShadow: (hasEditorContent || attachedImages.length || attachedFiles.length) ? "0 1px 3px rgba(37,99,235,0.25)" : "none",
                 transition: "background 0.15s, box-shadow 0.15s",
               }}
             >

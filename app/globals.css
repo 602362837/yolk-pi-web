@@ -356,3 +356,10 @@ span.linenumber {
     display: none !important;
   }
 }
+
+/* ContentEditable input placeholder */
+.ce-input:empty:before {
+  content: attr(data-placeholder);
+  color: var(--text-dim);
+  pointer-events: none;
+}

@@ -59,3 +59,4 @@ handoff/
 # .pi/ contains shared agent definitions, skills, and extensions (tracked)
 # .trellis/spec/ .trellis/tasks/ .trellis/workflow.md etc. are team-shared (tracked)
 # The .trellis/.gitignore already excludes developer/runtime artifacts
+.idea/
