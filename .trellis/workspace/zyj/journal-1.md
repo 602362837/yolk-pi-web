@@ -243,3 +243,36 @@ Grouped WorkTree rows under their main workspace and removed stale/deleted WorkT
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: ChatGPT account switching
+
+**Date**: 2026-06-25
+**Task**: ChatGPT account switching
+**Branch**: `pi/20260625-142741`
+
+### Summary
+
+Implemented ChatGPT Plus/Pro saved-account management, activation, live auth reload, and stale Codex WebSocket cleanup for existing sessions.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5408f36` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Verify frontend changes against project frontend guidelines"}
+{"file": ".trellis/spec/guides/index.md", "reason": "Verify cross-layer auth account flow and code reuse"}
