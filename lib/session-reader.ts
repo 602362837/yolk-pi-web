@@ -3,6 +3,7 @@ import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, Assist
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
 import { getWorktreeMetadataForCwd } from "./git-worktree";
+import { canonicalizeCwd } from "./cwd";
 
 export { getAgentDir };
 
@@ -15,8 +16,13 @@ export async function listAllSessions(): Promise<SessionInfo[]> {
   const pathToId = new Map<string, string>();
   for (const s of piSessions) pathToId.set(s.path, s.id);
 
+  const canonicalCwdBySessionId = new Map<string, string>();
+  for (const s of piSessions) {
+    if (s.cwd) canonicalCwdBySessionId.set(s.id, canonicalizeCwd(s.cwd));
+  }
+
   const worktreeByCwd = new Map<string, SessionInfo["worktree"]>();
-  await Promise.all([...new Set(piSessions.map((s) => s.cwd).filter(Boolean))].map(async (cwd) => {
+  await Promise.all([...new Set(canonicalCwdBySessionId.values())].map(async (cwd) => {
     try {
       const metadata = await getWorktreeMetadataForCwd(cwd);
       if (metadata) worktreeByCwd.set(cwd, metadata);
@@ -27,19 +33,20 @@ export async function listAllSessions(): Promise<SessionInfo[]> {
 
   const cache = getPathCache();
   return piSessions.map((s) => {
+    const cwd = canonicalCwdBySessionId.get(s.id) ?? s.cwd;
     // Populate path cache so resolveSessionPath works without a full scan
     cache.set(s.id, s.path);
     return {
       path: s.path,
       id: s.id,
-      cwd: s.cwd,
+      cwd,
       name: s.name,
       created: s.created instanceof Date ? s.created.toISOString() : String(s.created),
       modified: s.modified instanceof Date ? s.modified.toISOString() : String(s.modified),
       messageCount: s.messageCount,
       firstMessage: s.firstMessage || "(no messages)",
       parentSessionId: s.parentSessionPath ? pathToId.get(s.parentSessionPath) : undefined,
-      worktree: worktreeByCwd.get(s.cwd),
+      worktree: cwd ? worktreeByCwd.get(cwd) : undefined,
     };
   });
 }
