@@ -210,3 +210,36 @@ Added WorkTree archive/delete flows, clearer dirty-worktree prompts, hook-safe a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Clean up deleted WorkTree sessions
+
+**Date**: 2026-06-25
+**Task**: Clean up deleted WorkTree sessions
+**Branch**: `fix/worktree-session-cleanup`
+
+### Summary
+
+Grouped WorkTree rows under their main workspace and removed stale/deleted WorkTree sessions from the sidebar/session store.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5feb6f4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

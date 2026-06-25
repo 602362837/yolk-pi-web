@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
+- **Total Sessions**: 7
 - **Last Active**: 2026-06-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~212 | Active |
+| `journal-1.md` | ~245 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-06-25 | Clean up deleted WorkTree sessions | `5feb6f4` | `fix/worktree-session-cleanup` |
 | 6 | 2026-06-25 | Worktree archive and deletion safeguards | `586ace4` | `pi/20260625-121412` |
 | 5 | 2026-06-25 | Dynamic WorkTree settings | `89dc998` | `pi/20260625-104704` |
 | 4 | 2026-06-25 | Workspace titles include Git context | `1ebc25a` | `pi/20260625-101043` |
