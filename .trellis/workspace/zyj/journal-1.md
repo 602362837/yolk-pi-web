@@ -78,3 +78,36 @@ Added New WorkTree flow with configurable worktree defaults, backend Git worktre
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Canonicalize cwd symlink paths
+
+**Date**: 2026-06-25
+**Task**: Canonicalize cwd symlink paths
+**Branch**: `main`
+
+### Summary
+
+Investigated duplicate pi-agent-web project entries caused by symlink and realpath cwd variants. Added shared cwd canonicalization and applied it to session listing, cwd validation, and new-session creation; merged and pushed the fix to main.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c1940eb` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
