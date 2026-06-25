@@ -1,4 +1,4 @@
-# Workspace Index - zyj
+# Workspace Index - lichong
 
 > Journal tracking for AI development sessions.
 

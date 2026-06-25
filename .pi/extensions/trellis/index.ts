@@ -866,7 +866,7 @@ function sessionOverview(root: string, key: string | null): string {
   const script = join(root, ".trellis", "scripts", "get_context.py");
   if (!exists(script)) return "";
   try {
-    const py = process.platform === "win32" ? "python" : "python3";
+    const py = process.platform === "win32" ? "python" : "python";
     const result = spawnSync(py, [script], {
       cwd: root,
       env: key ? { ...process.env, TRELLIS_CONTEXT_ID: key } : process.env,
