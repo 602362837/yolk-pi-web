@@ -144,3 +144,36 @@ Added dynamic browser and sidebar workspace titles backed by Git metadata, inclu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Dynamic WorkTree settings
+
+**Date**: 2026-06-25
+**Task**: Dynamic WorkTree settings
+**Branch**: `pi/20260625-104704`
+
+### Summary
+
+Added a generic Settings modal with WorkTree configuration, persisted pi-web.json through /api/web-config, wired the sidebar Settings entry, documented the new route/component, and validated with lint/type-check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `89dc998` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

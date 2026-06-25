@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-06-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~146 | Active |
+| `journal-1.md` | ~179 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-06-25 | Dynamic WorkTree settings | `89dc998` | `pi/20260625-104704` |
 | 4 | 2026-06-25 | Workspace titles include Git context | `1ebc25a` | `pi/20260625-101043` |
 | 3 | 2026-06-25 | Canonicalize cwd symlink paths | `c1940eb` | `main` |
 | 2 | 2026-06-25 | New WorkTree session flow | `e4594a9` | `main` |

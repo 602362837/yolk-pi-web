@@ -45,7 +45,7 @@ PORT=8080 pi-web                 # 也支持环境变量
 
 - **数据目录** — 默认读取 `~/.pi/agent/sessions` 下的会话文件。可通过环境变量 `PI_CODING_AGENT_DIR` 指定其他目录。
 - **模型配置** — 从智能体数据目录下的 `models.json` 读取可用模型，可在侧边栏的「Models」面板中编辑。
-- **Web 配置** — 可通过智能体数据目录下的 `pi-web.json` 配置 New WorkTree 默认行为。
+- **Web 配置** — 可在侧边栏底部「Settings」中动态配置 New WorkTree 默认行为，配置保存到智能体数据目录下的 `pi-web.json`。
 - **文件浏览** — 侧边栏内置文件浏览器，可在标签页中查看当前工作目录下的文件。
 
 ## 开发
@@ -64,6 +64,7 @@ app/
     agent/         # 发送命令、SSE 事件流
     files/         # 文件内容读取
     git/worktrees/ # 创建 Git worktree
+    web-config/    # 读写 pi-web.json Web 配置
     models/        # 可用模型列表与默认模型
     models-config/ # 读写 models.json
 components/        # UI 组件

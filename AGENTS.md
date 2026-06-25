@@ -93,6 +93,7 @@ Browser                Next.js Server              AgentSession (in-process)
 | `cwd/validate/` | POST | Validate a candidate workspace path |
 | `git/worktrees/` | POST | Create a Git worktree from the selected cwd and allow immediate file browsing |
 | `git/info/` | GET | Return best-effort Git metadata (branch/worktree info) for a cwd |
+| `web-config/` | GET/PUT | Read/write `~/.pi/agent/pi-web.json` for web UI settings, including WorkTree defaults |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>` |
 | `home/` | GET | Return `os.homedir()` |
 | `usage/` | GET | Aggregate token/cost stats across sessions |
@@ -120,6 +121,7 @@ Browser                Next.js Server              AgentSession (in-process)
 | `subscription-quota.ts` | `getOAuthProviderSubscriptionQuota()` — query OpenAI Codex usage tiers |
 | `npx.ts` | `runNpx()` — cross-platform `npx` wrapper (avoids shell, finds npx-cli.js directly) |
 | `usage-stats.ts` | `getUsageStats()` — aggregate token/cost by day, model, provider, session |
+| `pi-web-config.ts` | Read/write `~/.pi/agent/pi-web.json` and validate WorkTree web settings |
 | `workspace-title.ts` | Shared browser/sidebar workspace title formatting from cwd + Git metadata |
 
 ### Components (`components/`)
@@ -136,6 +138,7 @@ Browser                Next.js Server              AgentSession (in-process)
 | `ToolPanel.tsx` | Exports `PRESET_NONE`, `PRESET_DEFAULT`, `PRESET_FULL`, `PRESET_SUBAGENT` + `getPresetFromTools()` |
 | `ModelsConfig.tsx` | Modal for editing `models.json` (opened from sidebar bottom) |
 | `SkillsConfig.tsx` | Modal for browsing and installing skills (opened from sidebar bottom) |
+| `SettingsConfig.tsx` | Generic Settings modal; currently edits WorkTree defaults in `pi-web.json` |
 | `UsageStatsModal.tsx` | Modal showing token/cost usage statistics |
 | `FileExplorer.tsx` | File tree inside sidebar |
 | `FileViewer.tsx` | File content viewer in a tab |
