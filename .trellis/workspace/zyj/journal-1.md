@@ -111,3 +111,36 @@ Investigated duplicate pi-agent-web project entries caused by symlink and realpa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Workspace titles include Git context
+
+**Date**: 2026-06-25
+**Task**: Workspace titles include Git context
+**Branch**: `pi/20260625-101043`
+
+### Summary
+
+Added dynamic browser and sidebar workspace titles backed by Git metadata, including branch and worktree source details; added /api/git/info and shared title formatting.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1ebc25a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

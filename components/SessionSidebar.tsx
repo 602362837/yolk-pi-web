@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { SessionInfo, WorktreeInfo } from "@/lib/types";
+import type { GitInfo, SessionInfo, WorktreeInfo } from "@/lib/types";
+import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
 import { FileExplorer } from "./FileExplorer";
 
 interface Props {
@@ -100,6 +101,7 @@ interface WorktreeCreateResponse {
   worktree?: WorktreeInfo;
   branchName?: string;
   mainWorktreePath?: string;
+  mainWorktreeBranch?: string;
 }
 
 interface CwdPickerRow {
@@ -148,6 +150,69 @@ interface SessionTreeNode {
   children: SessionTreeNode[];
 }
 
+function WorkspaceHeaderLine({
+  text,
+  detail,
+  strong = false,
+}: {
+  text: string;
+  detail: string;
+  strong?: boolean;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  return (
+    <div
+      style={{ position: "relative", minWidth: 0 }}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div
+        tabIndex={0}
+        onFocus={() => setShowTooltip(true)}
+        onBlur={() => setShowTooltip(false)}
+        title={detail}
+        style={{
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          color: strong ? "var(--text)" : "var(--text-dim)",
+          fontSize: strong ? 13 : 11,
+          fontWeight: strong ? 800 : 400,
+          lineHeight: 1.25,
+          letterSpacing: strong ? "-0.02em" : undefined,
+          outline: "none",
+        }}
+      >
+        {text}
+      </div>
+      {showTooltip && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            zIndex: 150,
+            maxWidth: 280,
+            padding: "5px 7px",
+            borderRadius: 6,
+            background: "var(--bg)",
+            border: "1px solid var(--border)",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.14)",
+            color: "var(--text)",
+            fontSize: 11,
+            lineHeight: 1.35,
+            overflowWrap: "anywhere",
+            pointerEvents: "none",
+          }}
+        >
+          {detail}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
   const byId = new Map<string, SessionTreeNode>();
   for (const s of sessions) {
@@ -192,94 +257,6 @@ function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
   return roots;
 }
 
-const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-
-function useScramble(target: string, running: boolean): string {
-  const [display, setDisplay] = useState(target);
-  const frameRef = useRef<number | null>(null);
-  const iterRef = useRef(0);
-
-  useEffect(() => {
-    if (!running) {
-      setDisplay(target);
-      return;
-    }
-    iterRef.current = 0;
-    const totalFrames = target.length * 4;
-
-    const step = () => {
-      iterRef.current += 1;
-      const progress = iterRef.current / totalFrames;
-      const resolved = Math.floor(progress * target.length);
-
-      setDisplay(
-        target
-          .split("")
-          .map((char, i) => {
-            if (char === " ") return " ";
-            if (i < resolved) return char;
-            return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-          })
-          .join("")
-      );
-
-      if (iterRef.current < totalFrames) {
-        frameRef.current = requestAnimationFrame(step);
-      } else {
-        setDisplay(target);
-      }
-    };
-
-    frameRef.current = requestAnimationFrame(step);
-    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
-  }, [target, running]);
-
-  return display;
-}
-
-function PiAgentTitle() {
-  const [showVersion, setShowVersion] = useState(false);
-  const [scrambling, setScrambling] = useState(false);
-  const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const target = showVersion ? `${process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}p${process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}` : "Pi Agent Web";
-  const display = useScramble(target, scrambling);
-
-  const triggerScramble = useCallback((toVersion: boolean) => {
-    setShowVersion(toVersion);
-    setScrambling(true);
-    setTimeout(() => setScrambling(false), (toVersion ? 6 : 8) * 4 * (1000 / 60) + 100);
-  }, []);
-
-  const handleClick = useCallback(() => {
-    if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
-
-    const next = !showVersion;
-    triggerScramble(next);
-
-    if (next) {
-      revertTimerRef.current = setTimeout(() => triggerScramble(false), 3000);
-    }
-  }, [showVersion, triggerScramble]);
-
-  useEffect(() => () => { if (revertTimerRef.current) clearTimeout(revertTimerRef.current); }, []);
-
-  return (
-    <button
-      onClick={handleClick}
-      style={{
-        background: "none", border: "none", padding: 0, cursor: "default",
-        fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em",
-        color: showVersion ? "var(--accent)" : "var(--text)",
-        fontFamily: "var(--font-mono)",
-        minWidth: "6ch",
-      }}
-    >
-      {display}
-    </button>
-  );
-}
-
 export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -300,6 +277,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [creatingWorktree, setCreatingWorktree] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
   const [ephemeralWorktrees, setEphemeralWorktrees] = useState<Record<string, WorktreeInfo>>({});
+  const [selectedCwdGit, setSelectedCwdGit] = useState<GitInfo | undefined>(undefined);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const explorerRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -345,6 +323,25 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   useEffect(() => {
     onCwdChange?.(selectedCwd);
   }, [selectedCwd, onCwdChange]);
+
+  useEffect(() => {
+    if (!selectedCwd) {
+      setSelectedCwdGit(undefined);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`/api/git/info?cwd=${encodeURIComponent(selectedCwd)}`, { signal: controller.signal })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { git?: GitInfo } | null) => {
+        if (!controller.signal.aborted) setSelectedCwdGit(data?.git);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSelectedCwdGit(undefined);
+      });
+
+    return () => controller.abort();
+  }, [selectedCwd]);
 
   // Auto-select cwd and restore session from URL on first load
   useEffect(() => {
@@ -452,6 +449,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         isWorktree: true,
         branch: data.branchName,
         mainWorktreePath: data.mainWorktreePath,
+        mainWorktreeBranch: data.mainWorktreeBranch,
         repoRoot: data.cwd,
       };
       setEphemeralWorktrees((prev) => ({ ...prev, [data.cwd!]: worktree }));
@@ -477,6 +475,18 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }
   for (const [cwd, worktree] of Object.entries(ephemeralWorktrees)) worktreeByCwd.set(cwd, worktree);
+  const selectedWorktree = selectedCwd ? worktreeByCwd.get(selectedCwd) : undefined;
+  const sessionGit = selectedCwd ? allSessions.find((s) => s.cwd === selectedCwd)?.git : undefined;
+  const currentGit: GitInfo | undefined = sessionGit ?? selectedCwdGit ?? (selectedWorktree ? {
+    isWorktree: true,
+    branch: selectedWorktree.branch,
+    repoRoot: selectedWorktree.repoRoot,
+    mainWorktreePath: selectedWorktree.mainWorktreePath,
+    mainWorktreeBranch: selectedWorktree.mainWorktreeBranch,
+  } : undefined);
+  const workspaceTitle = formatWorkspaceHeaderTitle(selectedCwd, currentGit);
+  const workspaceTitleDetail = formatWorkspaceTitle(selectedCwd, currentGit);
+  const workspaceSubtitle = formatWorkspaceSubtitle(selectedCwd, currentGit);
   const cwdRows = buildCwdPickerRows(recentCwds, worktreeByCwd);
   const filteredSessions = selectedCwd
     ? allSessions.filter((s) => s.cwd === selectedCwd)
@@ -495,9 +505,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <PiAgentTitle />
-          <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ marginBottom: 10, minWidth: 0 }}>
+          <WorkspaceHeaderLine text={workspaceTitle} detail={workspaceTitleDetail} strong />
+          <div style={{ marginTop: 2 }}>
+            <WorkspaceHeaderLine text={workspaceSubtitle} detail={workspaceSubtitle} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             <button
               onClick={handleNewSession}
               disabled={!selectedCwd}
@@ -615,7 +629,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 </svg>
               )}
             </button>
-          </div>
         </div>
 
         {worktreeError && (

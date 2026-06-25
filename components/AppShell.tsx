@@ -11,8 +11,9 @@ import { SkillsConfig } from "./SkillsConfig";
 import { UsageStatsModal } from "./UsageStatsModal";
 import { BranchNavigator } from "./BranchNavigator";
 import { getRelativeFilePath } from "@/lib/file-paths";
+import { formatWorkspaceTitle } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
-import type { SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { ChatInputHandle } from "./ChatInput";
 
 export function AppShell() {
@@ -98,6 +99,7 @@ export function AppShell() {
 
   const [initialSessionId] = useState<string | null>(() => searchParams.get("session"));
   const [activeCwd, setActiveCwd] = useState<string | null>(null);
+  const [activeCwdGit, setActiveCwdGit] = useState<GitInfo | undefined>(undefined);
   // True once the initial ?session= URL param has been resolved (or confirmed absent)
   const [initialSessionRestored, setInitialSessionRestored] = useState<boolean>(() => !searchParams.get("session"));
   // Suppresses sessionKey bump in handleCwdChange during the initial URL restore
@@ -238,6 +240,46 @@ export function AppShell() {
   const showPlaceholder = initialSessionRestored && !showChat;
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
+  const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
+  const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
+
+  useEffect(() => {
+    if (!activeCwd) {
+      setActiveCwdGit(undefined);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`/api/git/info?cwd=${encodeURIComponent(activeCwd)}`, { signal: controller.signal })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { git?: GitInfo } | null) => {
+        if (!controller.signal.aborted) setActiveCwdGit(data?.git);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setActiveCwdGit(undefined);
+      });
+
+    return () => controller.abort();
+  }, [activeCwd]);
+
+  useEffect(() => {
+    const title = formatWorkspaceTitle(browserTitleCwd, browserTitleGit);
+    const applyTitle = () => {
+      if (document.title !== title) document.title = title;
+    };
+
+    applyTitle();
+    const animationFrame = requestAnimationFrame(applyTitle);
+    const timeout = window.setTimeout(applyTitle, 0);
+    const observer = new MutationObserver(applyTitle);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+      observer.disconnect();
+    };
+  }, [browserTitleCwd, browserTitleGit]);
 
   const sidebarContent = (
     <>

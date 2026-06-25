@@ -6,11 +6,16 @@ import type { PiWebWorktreeConfig } from "./pi-web-config";
 
 const execFileAsync = promisify(execFile);
 
-export interface WorktreeMetadata {
-  isWorktree: true;
+export interface GitMetadata {
+  isWorktree?: boolean;
   branch?: string;
   repoRoot?: string;
   mainWorktreePath?: string;
+  mainWorktreeBranch?: string;
+}
+
+export interface WorktreeMetadata extends GitMetadata {
+  isWorktree: true;
 }
 
 export interface CreateWorktreeOptions {
@@ -129,28 +134,41 @@ async function validateBranchName(repoRoot: string, branchName: string): Promise
   await git(["-C", repoRoot, "check-ref-format", "--branch", branchName]);
 }
 
-export async function getWorktreeMetadataForCwd(cwd: string): Promise<WorktreeMetadata | undefined> {
+export async function getGitMetadataForCwd(cwd: string): Promise<GitMetadata | undefined> {
   const repoRoot = await discoverGitRoot(cwd);
   const worktrees = await listGitWorktrees(repoRoot);
-  const mainWorktreePath = worktrees[0]?.path;
+  const mainWorktree = worktrees[0];
+  const mainWorktreePath = mainWorktree?.path;
   const record = worktrees.find((w) => resolve(w.path) === resolve(repoRoot));
+  if (!record) return undefined;
 
-  if (!record || !mainWorktreePath || resolve(repoRoot) === resolve(mainWorktreePath)) {
-    return undefined;
-  }
-
+  const isWorktree = Boolean(mainWorktreePath && resolve(repoRoot) !== resolve(mainWorktreePath));
   return {
-    isWorktree: true,
+    isWorktree,
     branch: record.branch,
     repoRoot,
     mainWorktreePath,
+    mainWorktreeBranch: mainWorktree?.branch,
+  };
+}
+
+export async function getWorktreeMetadataForCwd(cwd: string): Promise<WorktreeMetadata | undefined> {
+  const metadata = await getGitMetadataForCwd(cwd);
+  if (!metadata?.isWorktree) return undefined;
+  return {
+    isWorktree: true,
+    branch: metadata.branch,
+    repoRoot: metadata.repoRoot,
+    mainWorktreePath: metadata.mainWorktreePath,
+    mainWorktreeBranch: metadata.mainWorktreeBranch,
   };
 }
 
 export async function createGitWorktree(options: CreateWorktreeOptions): Promise<CreateWorktreeResult> {
   const repoRoot = await discoverGitRoot(options.cwd);
   const worktrees = await listGitWorktrees(repoRoot);
-  const mainWorktreePath = worktrees[0]?.path;
+  const mainWorktree = worktrees[0];
+  const mainWorktreePath = mainWorktree?.path;
   const baseRef = options.baseRef?.trim() || options.config.baseRef;
 
   const repoParent = dirname(repoRoot);
@@ -196,6 +214,7 @@ export async function createGitWorktree(options: CreateWorktreeOptions): Promise
     branch: branchName,
     repoRoot: targetPath,
     mainWorktreePath,
+    mainWorktreeBranch: mainWorktree?.branch,
   };
 
   return {

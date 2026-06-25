@@ -184,11 +184,20 @@ export interface SessionTreeNode {
   label?: string;
 }
 
+export interface GitInfo {
+  branch?: string;
+  repoRoot?: string;
+  mainWorktreePath?: string;
+  mainWorktreeBranch?: string;
+  isWorktree?: boolean;
+}
+
 export interface WorktreeInfo {
   isWorktree: true;
   branch?: string;
   repoRoot?: string;
   mainWorktreePath?: string;
+  mainWorktreeBranch?: string;
 }
 
 export interface SessionInfo {
@@ -202,6 +211,7 @@ export interface SessionInfo {
   firstMessage: string;
   parentSessionId?: string; // set if this session was forked from another
   worktree?: WorktreeInfo;
+  git?: GitInfo;
 }
 
 export interface SessionContext {

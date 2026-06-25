@@ -2,7 +2,7 @@ import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentD
 import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
-import { getWorktreeMetadataForCwd } from "./git-worktree";
+import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd } from "./cwd";
 
 export { getAgentDir };
@@ -21,13 +21,25 @@ export async function listAllSessions(): Promise<SessionInfo[]> {
     if (s.cwd) canonicalCwdBySessionId.set(s.id, canonicalizeCwd(s.cwd));
   }
 
+  const gitByCwd = new Map<string, SessionInfo["git"]>();
   const worktreeByCwd = new Map<string, SessionInfo["worktree"]>();
   await Promise.all([...new Set(canonicalCwdBySessionId.values())].map(async (cwd) => {
     try {
-      const metadata = await getWorktreeMetadataForCwd(cwd);
-      if (metadata) worktreeByCwd.set(cwd, metadata);
+      const metadata = await getGitMetadataForCwd(cwd);
+      if (metadata) {
+        gitByCwd.set(cwd, metadata);
+        if (metadata.isWorktree) {
+          worktreeByCwd.set(cwd, {
+            isWorktree: true,
+            branch: metadata.branch,
+            repoRoot: metadata.repoRoot,
+            mainWorktreePath: metadata.mainWorktreePath,
+            mainWorktreeBranch: metadata.mainWorktreeBranch,
+          });
+        }
+      }
     } catch {
-      // Worktree metadata is best-effort; normal session listing must still work.
+      // Git metadata is best-effort; normal session listing must still work.
     }
   }));
 
@@ -47,6 +59,7 @@ export async function listAllSessions(): Promise<SessionInfo[]> {
       firstMessage: s.firstMessage || "(no messages)",
       parentSessionId: s.parentSessionPath ? pathToId.get(s.parentSessionPath) : undefined,
       worktree: cwd ? worktreeByCwd.get(cwd) : undefined,
+      git: cwd ? gitByCwd.get(cwd) : undefined,
     };
   });
 }

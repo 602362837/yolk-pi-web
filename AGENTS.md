@@ -92,6 +92,7 @@ Browser                Next.js Server              AgentSession (in-process)
 | `commands/` | GET | List slash commands from skills for a cwd |
 | `cwd/validate/` | POST | Validate a candidate workspace path |
 | `git/worktrees/` | POST | Create a Git worktree from the selected cwd and allow immediate file browsing |
+| `git/info/` | GET | Return best-effort Git metadata (branch/worktree info) for a cwd |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>` |
 | `home/` | GET | Return `os.homedir()` |
 | `usage/` | GET | Aggregate token/cost stats across sessions |
@@ -119,6 +120,7 @@ Browser                Next.js Server              AgentSession (in-process)
 | `subscription-quota.ts` | `getOAuthProviderSubscriptionQuota()` — query OpenAI Codex usage tiers |
 | `npx.ts` | `runNpx()` — cross-platform `npx` wrapper (avoids shell, finds npx-cli.js directly) |
 | `usage-stats.ts` | `getUsageStats()` — aggregate token/cost by day, model, provider, session |
+| `workspace-title.ts` | Shared browser/sidebar workspace title formatting from cwd + Git metadata |
 
 ### Components (`components/`)
 
