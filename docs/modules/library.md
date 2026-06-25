@@ -14,6 +14,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/cwd.ts` | Cwd validation and normalization helpers. |
 | `lib/git-worktree.ts` | Git worktree creation, status, archive, and removal helpers. |
 | `lib/deepseek-balance.ts` | Query DeepSeek account balance. |
+| `lib/oauth-accounts.ts` | Persist, sanitize, sync, and activate saved `openai-codex` OAuth accounts without exposing tokens. |
 | `lib/subscription-quota.ts` | Query OpenAI Codex subscription quota. |
 | `lib/npx.ts` | Cross-platform `npx` wrapper that avoids shell quoting issues. |
 | `lib/usage-stats.ts` | Aggregate token/cost by day, model, provider, and session. |

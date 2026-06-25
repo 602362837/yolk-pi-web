@@ -91,6 +91,23 @@ interface OAuthProvider {
   loggedIn: boolean;
 }
 
+interface OAuthAccountSummary {
+  accountId: string;
+  label?: string;
+  displayName: string;
+  maskedAccountId: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastActivatedAt: string | null;
+}
+
+interface OAuthAccountsResponse {
+  provider: string;
+  activeAccountId: string | null;
+  accounts: OAuthAccountSummary[];
+}
+
 interface ApiKeyProvider {
   id: string;
   displayName: string;
@@ -107,7 +124,7 @@ type OAuthLoginState =
   | { phase: "prompt"; message: string; placeholder: string | null; token: string }
   | { phase: "select"; message: string; options: { id: string; label: string }[]; token: string }
   | { phase: "progress"; message: string }
-  | { phase: "success" }
+  | { phase: "success"; message?: string }
   | { phase: "error"; message: string };
 
 type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
@@ -864,11 +881,86 @@ function OAuthQuotaView({
   );
 }
 
+function OAuthAccountsView({
+  accounts,
+  loading,
+  error,
+  activatingAccountId,
+  onRefresh,
+  onActivate,
+}: {
+  accounts: OAuthAccountSummary[];
+  loading: boolean;
+  error: string | null;
+  activatingAccountId: string | null;
+  onRefresh: () => void;
+  onActivate: (accountId: string) => void;
+}) {
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Accounts</span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{loading ? "Loading…" : `${accounts.length} saved`}</span>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh accounts"
+          aria-label="Refresh accounts"
+          style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+            <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+            <path d="M3 4v8h8" />
+            <path d="M21 20v-8h-8" />
+          </svg>
+        </button>
+      </div>
+
+      {error && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{error}</div>}
+      {!loading && !error && accounts.length === 0 && (
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>No saved accounts yet.</div>
+      )}
+
+      {accounts.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {accounts.map((account) => (
+            <div key={account.accountId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: account.active ? "#4ade80" : "var(--border)", flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
+              </div>
+              {account.active ? (
+                <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>active</span>
+              ) : (
+                <button
+                  onClick={() => onActivate(account.accountId)}
+                  disabled={Boolean(activatingAccountId)}
+                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: activatingAccountId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                >
+                  {activatingAccountId === account.accountId ? "Activating…" : "Activate"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
   const [quota, setQuota] = useState<SubscriptionQuota | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
+  const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -884,6 +976,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setInputValue("");
     setQuota(null);
     setQuotaLoading(false);
+    setAccounts([]);
+    setAccountsLoading(false);
+    setAccountsError(null);
+    setActivatingAccountId(null);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
   }, [provider.id]);
@@ -892,8 +988,30 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     return () => { eventSourceRef.current?.close(); };
   }, []);
 
-  const loadQuota = useCallback(async () => {
-    if (provider.id !== "openai-codex" || !provider.loggedIn) return;
+  const loadAccounts = useCallback(async () => {
+    if (provider.id !== "openai-codex") return;
+    setAccountsLoading(true);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`);
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+    } catch (error) {
+      setAccountsError(error instanceof Error ? error.message : "Failed to load accounts");
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, [provider.id]);
+
+  useEffect(() => {
+    if (provider.id === "openai-codex") {
+      void loadAccounts();
+    }
+  }, [provider.id, provider.loggedIn, loadAccounts]);
+
+  const loadQuota = useCallback(async (force = false) => {
+    if (provider.id !== "openai-codex" || (!provider.loggedIn && !force)) return;
     setQuotaLoading(true);
     try {
       const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}`);
@@ -920,12 +1038,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, loadQuota]);
 
-  const handleLogin = useCallback(() => {
+  const handleLogin = useCallback((accountMode: "login" | "add" = "login") => {
     eventSourceRef.current?.close();
     setLoginState({ phase: "connecting" });
     setInputValue("");
 
-    const es = new EventSource(`/api/auth/login/${encodeURIComponent(provider.id)}`);
+    const loginUrl = `/api/auth/login/${encodeURIComponent(provider.id)}${accountMode === "add" ? "?accountMode=add" : ""}`;
+    const es = new EventSource(loginUrl);
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
@@ -934,6 +1053,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         token?: string; message?: string; placeholder?: string | null;
         userCode?: string; verificationUri?: string; intervalSeconds?: number | null; expiresInSeconds?: number | null;
         options?: { id: string; label: string }[];
+        account?: OAuthAccountSummary; activeAccountId?: string | null;
       };
       if (data.type === "auth") {
         setLoginState({ phase: "auth", url: data.url!, instructions: data.instructions ?? null, token: data.token! });
@@ -955,8 +1075,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         setLoginState({ phase: "progress", message: data.message! });
       } else if (data.type === "success") {
         es.close();
-        setLoginState({ phase: "success" });
+        setLoginState({ phase: "success", message: data.message ?? (accountMode === "add" ? "Account saved successfully." : "Connected successfully.") });
         onRefresh();
+        void loadAccounts();
+        if (provider.loggedIn) void loadQuota();
       } else if (data.type === "error") {
         es.close();
         setLoginState({ phase: "error", message: data.message! });
@@ -969,13 +1091,15 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       es.close();
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "Connection lost" });
     };
-  }, [provider.id, onRefresh]);
+  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota]);
 
   const handleLogout = useCallback(async () => {
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
+    setQuota(null);
     onRefresh();
-  }, [provider.id, onRefresh]);
+    void loadAccounts();
+  }, [provider.id, onRefresh, loadAccounts]);
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
@@ -1014,6 +1138,30 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       setLoginState({ phase: "error", message: e instanceof Error ? e.message : "Network error" });
     }
   }, [provider.id]);
+
+  const handleActivateAccount = useCallback(async (accountId: string) => {
+    setActivatingAccountId(accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setLoginState({ phase: "success", message: "Account activated." });
+      onRefresh();
+      await loadQuota(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to activate account";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setActivatingAccountId(null);
+    }
+  }, [provider.id, onRefresh, loadQuota]);
 
   const isWorking = loginState.phase === "connecting" || loginState.phase === "progress" ||
     loginState.phase === "auth" || loginState.phase === "device_code" ||
@@ -1114,7 +1262,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>Connected successfully.</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{loginState.message ?? "Connected successfully."}</p>
         )}
         {loginState.phase === "error" && (
           <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
@@ -1133,11 +1281,19 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         ) : (
           <>
             <button
-              onClick={handleLogin}
+              onClick={() => handleLogin()}
               style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {provider.loggedIn ? "Re-login" : "Login"}
             </button>
+            {provider.id === "openai-codex" && provider.loggedIn && (
+              <button
+                onClick={() => handleLogin("add")}
+                style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                Add Account
+              </button>
+            )}
             {provider.loggedIn && (
               <button
                 onClick={handleLogout}
@@ -1152,6 +1308,17 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
       {provider.id === "openai-codex" && provider.loggedIn && (
         <OAuthQuotaView quota={quota} loading={quotaLoading} onRefresh={loadQuota} />
+      )}
+
+      {provider.id === "openai-codex" && (
+        <OAuthAccountsView
+          accounts={accounts}
+          loading={accountsLoading}
+          error={accountsError}
+          activatingAccountId={activatingAccountId}
+          onRefresh={loadAccounts}
+          onActivate={handleActivateAccount}
+        />
       )}
     </div>
   );
