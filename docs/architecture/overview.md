@@ -59,6 +59,7 @@ Browser                Next.js Server              AgentSession (in-process)
 - `GET /api/models` returns `defaultModel` from `~/.pi/agent/settings.json`.
 - New-session tool names are passed to `POST /api/agent/new` as `toolNames[]`.
 - Existing sessions infer presets via `get_tools` and `getPresetFromTools()`.
+- Auth changes call `reloadRpcAuthState()` so live AgentSessions reload auth/model state. The same path also cleans pi-ai session resources because OpenAI Codex keeps reusable WebSockets keyed by session id, and those sockets must reconnect after ChatGPT account activation to pick up new auth headers.
 - When all tools are disabled, `lib/rpc-manager.ts` clears the agent system prompt.
 
 ## Session File Format

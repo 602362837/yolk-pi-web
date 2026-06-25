@@ -1,4 +1,5 @@
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath } from "./session-reader";
 import { canonicalizeCwd } from "./cwd";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
@@ -233,6 +234,11 @@ export class AgentSessionWrapper {
     this._alive = false;
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.unsubscribe?.();
+    try {
+      this.inner.dispose?.();
+    } catch {
+      // Dispose is best-effort; registry cleanup must still run.
+    }
     this.onDestroyCallback?.();
   }
 }
@@ -264,6 +270,31 @@ function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSes
 
 export function getRpcSession(sessionId: string): AgentSessionWrapper | undefined {
   return getRegistry().get(sessionId);
+}
+
+export function reloadRpcAuthState(): number {
+  let count = 0;
+  for (const wrapper of getRegistry().values()) {
+    if (!wrapper.isAlive()) continue;
+    try {
+      wrapper.inner.modelRegistry.authStorage?.reload?.();
+      wrapper.inner.modelRegistry.refresh?.();
+      count += 1;
+    } catch {
+      // Keep account activation best-effort for live wrappers; new requests/sessions
+      // still read the updated auth.json through fresh AuthStorage instances.
+    }
+  }
+
+  try {
+    // OpenAI Codex keeps reusable WebSockets keyed by session id. After account
+    // activation, old sessions must reconnect so the new token/account headers apply.
+    cleanupSessionResources();
+  } catch {
+    // Auth reload should remain best-effort; stale resources expire on their own.
+  }
+
+  return count;
 }
 
 export function destroyRpcSessionsForCwd(cwd: string): string[] {

@@ -1,4 +1,6 @@
 import { AuthStorage } from "@earendil-works/pi-coding-agent";
+import { OPENAI_CODEX_PROVIDER_ID, saveOAuthAccountCredential, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
+import { reloadRpcAuthState } from "@/lib/rpc-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,8 @@ export async function GET(
   { params }: { params: Promise<{ provider: string }> }
 ) {
   const { provider } = await params;
+  const accountMode = new URL(req.url).searchParams.get("accountMode");
+  const addAccountMode = accountMode === "add";
 
   const encoder = new TextEncoder();
   const send = (controller: ReadableStreamDefaultController, data: unknown) => {
@@ -57,7 +61,18 @@ export async function GET(
 
   const stream = new ReadableStream({
     async start(controller) {
-      const authStorage = AuthStorage.create();
+      if (accountMode && accountMode !== "add") {
+        send(controller, { type: "error", message: `Unsupported account mode: ${accountMode}` });
+        controller.close();
+        return;
+      }
+      if (addAccountMode && provider !== OPENAI_CODEX_PROVIDER_ID) {
+        send(controller, { type: "error", message: `Account add mode is only supported for ${OPENAI_CODEX_PROVIDER_ID}` });
+        controller.close();
+        return;
+      }
+
+      const authStorage = addAccountMode ? AuthStorage.inMemory() : AuthStorage.create();
       const providers = authStorage.getOAuthProviders();
       const providerInfo = providers.find((p) => p.id === provider);
       if (!providerInfo) {
@@ -170,7 +185,16 @@ export async function GET(
           signal: abort.signal,
         });
 
-        send(controller, { type: "success" });
+        if (addAccountMode) {
+          const account = await saveOAuthAccountCredential(provider, authStorage.get(provider));
+          send(controller, { type: "success", account, message: "Account saved successfully." });
+        } else {
+          if (provider === OPENAI_CODEX_PROVIDER_ID) {
+            await syncActiveOAuthAccountCredential(provider, authStorage).catch(() => {});
+          }
+          reloadRpcAuthState();
+          send(controller, { type: "success" });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg !== "Login cancelled") {

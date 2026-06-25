@@ -1,4 +1,5 @@
 import { AuthStorage } from "@earendil-works/pi-coding-agent";
+import { extractOpenAICodexAccountId, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
 
 export type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
 
@@ -82,29 +83,6 @@ function quotaError(tool: string, status: CredentialStatus, message: string): Su
     error: message,
     queriedAt: nowMillis(),
   };
-}
-
-/**
- * 从 ChatGPT access token 中提取账号 ID。
- *
- * @param token ChatGPT OAuth access token。
- * @returns token 内的 ChatGPT 账号 ID，无法解析时返回 null。
- */
-function extractChatGptAccountId(token: string): string | null {
-  const [, payload] = token.split(".");
-  if (!payload) return null;
-
-  try {
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const decoded = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as {
-      "https://api.openai.com/auth"?: { chatgpt_account_id?: unknown };
-    };
-    const accountId = decoded["https://api.openai.com/auth"]?.chatgpt_account_id;
-    return typeof accountId === "string" && accountId.length > 0 ? accountId : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -212,7 +190,8 @@ export async function getOAuthProviderSubscriptionQuota(provider: string): Promi
   if (!accessToken) return quotaError(provider, "expired", "OAuth token unavailable. Please re-login.");
 
   const refreshedCredential = authStorage.get(provider) as StoredOAuthCredential | undefined;
-  const accountId = refreshedCredential?.accountId ?? storedCredential.accountId ?? extractChatGptAccountId(accessToken);
+  await syncActiveOAuthAccountCredential(provider, authStorage).catch(() => {});
+  const accountId = refreshedCredential?.accountId ?? storedCredential.accountId ?? extractOpenAICodexAccountId(accessToken);
 
   try {
     return await queryOpenAICodexQuota(accessToken, accountId);

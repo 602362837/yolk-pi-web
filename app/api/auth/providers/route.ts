@@ -1,4 +1,5 @@
 import { AuthStorage } from "@earendil-works/pi-coding-agent";
+import { OPENAI_CODEX_PROVIDER_ID, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ export async function GET() {
     providers
       .filter((p) => !EXCLUDED.has(p.id))
       .map(async (p) => {
+        if (p.id === OPENAI_CODEX_PROVIDER_ID) {
+          await syncActiveOAuthAccountCredential(p.id, authStorage).catch(() => {});
+        }
         const loggedIn = authStorage.has(p.id);
         return {
           id: p.id,

@@ -32,8 +32,10 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `usage/` | GET | Aggregate token/cost usage across sessions. |
 | `auth/providers/` | GET | List configured auth provider statuses. |
 | `auth/all-providers/` | GET | List all known provider ids. |
-| `auth/login/[provider]/` | GET | Initiate OAuth login for a provider. |
-| `auth/logout/[provider]/` | GET | Clear OAuth tokens for a provider. |
+| `auth/accounts/[provider]/` | GET | List saved OAuth accounts for supported providers (`openai-codex`). |
+| `auth/accounts/[provider]/activate/` | POST | Activate a saved OAuth account and reload live RPC auth state. |
+| `auth/login/[provider]/` | GET/POST | Initiate OAuth login for a provider; `openai-codex?accountMode=add` saves another account without replacing active auth. |
+| `auth/logout/[provider]/` | POST | Clear OAuth tokens for a provider. |
 | `auth/api-key/[provider]/` | GET | Get masked API-key status for a provider. |
 | `auth/balance/[provider]/` | GET | Query DeepSeek account balance. |
 | `auth/quota/[provider]/` | GET | Query OpenAI Codex subscription quota. |
