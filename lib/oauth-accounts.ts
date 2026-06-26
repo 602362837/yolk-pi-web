@@ -59,6 +59,8 @@ export interface OAuthAccountsList {
   accounts: OAuthAccountSummary[];
 }
 
+export type OAuthAccountImportMode = "raw" | "cpa" | "sub2api";
+
 interface SaveAccountOptions {
   markActive?: boolean;
   recordActivation?: boolean;
@@ -213,23 +215,45 @@ function normalizeEmail(value: unknown): string | null {
   return email.includes("@") ? email : null;
 }
 
+function normalizePhone(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const phone = String(value).trim();
+  const digitCount = phone.replace(/\D/g, "").length;
+  return digitCount >= 6 ? phone : null;
+}
+
+const EMAIL_KEYS = ["email", "email_address", "emailAddress"];
+const PHONE_KEYS = ["phone", "phone_number", "phoneNumber", "mobile", "mobile_number", "mobileNumber"];
+const NESTED_ACCOUNT_INFO_KEYS = ["https://api.openai.com/profile", "https://api.openai.com/auth", "user", "account", "profile"];
+
 function findEmailInRecord(value: unknown): string | null {
   if (!isRecord(value)) return null;
 
-  const directEmail = normalizeEmail(value.email);
-  if (directEmail) return directEmail;
+  for (const key of EMAIL_KEYS) {
+    const email = normalizeEmail(value[key]);
+    if (email) return email;
+  }
 
-  const nestedProfileEmail = findEmailInRecord(value["https://api.openai.com/profile"]);
-  if (nestedProfileEmail) return nestedProfileEmail;
+  for (const key of NESTED_ACCOUNT_INFO_KEYS) {
+    const nestedEmail = findEmailInRecord(value[key]);
+    if (nestedEmail) return nestedEmail;
+  }
 
-  const nestedAuthEmail = findEmailInRecord(value["https://api.openai.com/auth"]);
-  if (nestedAuthEmail) return nestedAuthEmail;
+  return null;
+}
 
-  const nestedUserEmail = findEmailInRecord(value.user);
-  if (nestedUserEmail) return nestedUserEmail;
+function findPhoneInRecord(value: unknown): string | null {
+  if (!isRecord(value)) return null;
 
-  const nestedAccountEmail = findEmailInRecord(value.account);
-  if (nestedAccountEmail) return nestedAccountEmail;
+  for (const key of PHONE_KEYS) {
+    const phone = normalizePhone(value[key]);
+    if (phone) return phone;
+  }
+
+  for (const key of NESTED_ACCOUNT_INFO_KEYS) {
+    const nestedPhone = findPhoneInRecord(value[key]);
+    if (nestedPhone) return nestedPhone;
+  }
 
   return null;
 }
@@ -240,9 +264,12 @@ export function extractOpenAICodexAccountId(accessToken: string): string | null 
   return typeof accountId === "string" && accountId.length > 0 ? accountId : null;
 }
 
-async function fetchOpenAICodexEmail(accessToken: string, accountId: string): Promise<string | null> {
-  const claimsEmail = findEmailInRecord(decodeJwtPayload(accessToken));
+async function fetchOpenAICodexAccountLabel(accessToken: string, accountId: string): Promise<string | null> {
+  const claims = decodeJwtPayload(accessToken);
+  const claimsEmail = findEmailInRecord(claims);
   if (claimsEmail) return claimsEmail;
+  const claimsPhone = findPhoneInRecord(claims);
+  if (claimsPhone) return claimsPhone;
 
   const results = await Promise.all(OPENAI_USERINFO_URLS.map(async (url) => {
     try {
@@ -258,18 +285,20 @@ async function fetchOpenAICodexEmail(accessToken: string, accountId: string): Pr
       if (!response.ok) return null;
 
       const body = await response.json().catch(() => null) as unknown;
-      return findEmailInRecord(body);
+      return { email: findEmailInRecord(body), phone: findPhoneInRecord(body) };
     } catch {
       // Best-effort label backfill must not make account listing fail.
       return null;
     }
   }));
 
-  return results.find((email): email is string => Boolean(email)) ?? null;
+  return results.find((result): result is { email: string; phone: string | null } => Boolean(result?.email))?.email
+    ?? results.find((result): result is { email: string | null; phone: string } => Boolean(result?.phone))?.phone
+    ?? null;
 }
 
-async function resolveOpenAICodexAccountEmail(credential: NormalizedOpenAICodexCredential): Promise<string | null> {
-  return fetchOpenAICodexEmail(credential.access, credential.accountId);
+async function resolveOpenAICodexAccountLabel(credential: NormalizedOpenAICodexCredential): Promise<string | null> {
+  return fetchOpenAICodexAccountLabel(credential.access, credential.accountId);
 }
 
 function deriveAccountId(credential: StoredOpenAICodexCredential): string {
@@ -327,7 +356,7 @@ function accountSummary(metadata: OAuthAccountStoreMetadata, entry: OAuthAccount
   return {
     accountId: entry.accountId,
     label: entry.label,
-    displayName: entry.label ?? `Account ${maskedAccountId}`,
+    displayName: entry.label ?? entry.accountId,
     maskedAccountId,
     active: metadata.activeAccountId === entry.accountId,
     createdAt: entry.createdAt,
@@ -345,7 +374,7 @@ function sortAccountSummaries(accounts: OAuthAccountSummary[]): OAuthAccountSumm
   });
 }
 
-async function backfillMissingEmailLabels(provider: string, accounts: OAuthAccountMetadataEntry[]): Promise<{ accounts: OAuthAccountMetadataEntry[]; changed: boolean }> {
+async function backfillMissingAccountLabels(provider: string, accounts: OAuthAccountMetadataEntry[]): Promise<{ accounts: OAuthAccountMetadataEntry[]; changed: boolean }> {
   let changed = false;
   const nextAccounts: OAuthAccountMetadataEntry[] = [];
 
@@ -361,13 +390,13 @@ async function backfillMissingEmailLabels(provider: string, accounts: OAuthAccou
       continue;
     }
 
-    const email = await resolveOpenAICodexAccountEmail(normalizeCredentialAccountId(credential));
-    if (!email) {
+    const label = await resolveOpenAICodexAccountLabel(normalizeCredentialAccountId(credential));
+    if (!label) {
       nextAccounts.push(entry);
       continue;
     }
 
-    nextAccounts.push({ ...entry, label: email, updatedAt: new Date().toISOString() });
+    nextAccounts.push({ ...entry, label, updatedAt: new Date().toISOString() });
     changed = true;
   }
 
@@ -431,6 +460,27 @@ export async function syncActiveOAuthAccountCredential(
   return saveOAuthAccountCredential(provider, credential, { markActive: true });
 }
 
+export async function importOAuthAccountCredential(
+  provider: string,
+  mode: OAuthAccountImportMode,
+  credential: unknown,
+): Promise<OAuthAccountsList> {
+  assertSupportedProvider(provider);
+
+  if (mode === "cpa" || mode === "sub2api") {
+    throw new OAuthAccountStoreError(`${mode.toUpperCase()} account import is not supported yet`, 501);
+  }
+  if (mode !== "raw") {
+    throw new OAuthAccountStoreError("Unsupported OAuth account import mode", 400);
+  }
+  if (!isStoredOpenAICodexCredential(credential)) {
+    throw new OAuthAccountStoreError("Expected raw OAuth credential JSON with type, access, refresh, and expires", 400);
+  }
+
+  await saveOAuthAccountCredential(provider, credential);
+  return listOAuthAccounts(provider);
+}
+
 export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {
   assertSupportedProvider(provider);
   await syncActiveOAuthAccountCredential(provider);
@@ -447,7 +497,7 @@ export async function listOAuthAccounts(provider: string): Promise<OAuthAccounts
     }
   }
 
-  const backfilled = await backfillMissingEmailLabels(provider, existingAccounts);
+  const backfilled = await backfillMissingAccountLabels(provider, existingAccounts);
   if (backfilled.changed) changed = true;
 
   const activeAccountId = metadata.activeAccountId && backfilled.accounts.some((entry) => entry.accountId === metadata.activeAccountId)

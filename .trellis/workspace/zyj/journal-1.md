@@ -342,3 +342,36 @@ Added ChatGPT Plus/Pro saved-account remarks, best-effort email label backfill, 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: Add ChatGPT account JSON import
+
+**Date**: 2026-06-26
+**Task**: Add ChatGPT account JSON import
+**Branch**: `pi/20260626-095856`
+
+### Summary
+
+Added ChatGPT Plus/Pro Add Account method selection with existing Codex authorization and new raw OAuth credential JSON import, including backend import route, account label backfill priority email/phone/accountId, Chinese UI copy, docs updates, validation, commit, and push.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c7a1ed0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
