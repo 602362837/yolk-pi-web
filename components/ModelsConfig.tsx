@@ -116,6 +116,8 @@ interface ApiKeyProvider {
   modelCount: number;
 }
 
+type OAuthAccountImportMode = "raw" | "cpa" | "sub2api";
+
 type OAuthLoginState =
   | { phase: "idle" }
   | { phase: "connecting" }
@@ -976,6 +978,166 @@ function OAuthAccountsView({
   );
 }
 
+const RAW_ACCOUNT_JSON_EXAMPLE = `{
+  "type": "oauth",
+  "access": "eyJ...",
+  "refresh": "...",
+  "expires": 1780000000000,
+  "accountId": "optional-chatgpt-account-id"
+}`;
+
+function AddAccountDialog({
+  provider,
+  view,
+  onViewChange,
+  onCodexAuth,
+  onImported,
+  onClose,
+}: {
+  provider: OAuthProvider;
+  view: "method" | "json";
+  onViewChange: (view: "method" | "json") => void;
+  onCodexAuth: () => void;
+  onImported: (accounts: OAuthAccountSummary[]) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<OAuthAccountImportMode>("raw");
+  const [jsonText, setJsonText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (view === "json") setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [view]);
+
+  const submitRawJson = useCallback(async () => {
+    if (mode !== "raw" || submitting) return;
+    setError(null);
+
+    let credential: unknown;
+    try {
+      credential = JSON.parse(jsonText);
+    } catch (parseError) {
+      setError(parseError instanceof Error ? `JSON 格式无效：${parseError.message}` : "JSON 格式无效");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, credential }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      onImported(data.accounts ?? []);
+      onClose();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "导入账号失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [jsonText, mode, onClose, onImported, provider.id, submitting]);
+
+  const modeButton = (value: OAuthAccountImportMode, label: string, disabled = false) => {
+    const active = mode === value;
+    return (
+      <button
+        type="button"
+        disabled={disabled || submitting}
+        onClick={() => { if (!disabled) setMode(value); }}
+        style={{
+          padding: "6px 9px",
+          borderRadius: 6,
+          border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+          background: active ? "rgba(59,130,246,0.12)" : "var(--bg-panel)",
+          color: disabled ? "var(--text-dim)" : active ? "var(--accent)" : "var(--text-muted)",
+          cursor: disabled ? "not-allowed" : "pointer",
+          fontSize: 12,
+          fontWeight: active ? 600 : 500,
+          opacity: disabled ? 0.55 : 1,
+        }}
+      >
+        {label}{disabled ? " · 后续支持" : ""}
+      </button>
+    );
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+    >
+      <div style={{ width: view === "json" ? 920 : 560, maxWidth: "calc(100vw - 32px)", maxHeight: "min(82vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <ProviderIcon id={provider.id} size={18} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>添加 {provider.name} 账号</div>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>选择一种账号添加方式。</div>
+            </div>
+          </div>
+          <button type="button" disabled={submitting} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: submitting ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+        </div>
+
+        {view === "method" ? (
+          <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 10 }}>
+            <button type="button" onClick={onCodexAuth} style={{ padding: 14, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>Codex 授权</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>打开现有浏览器登录授权流程，并保存授权后的账号。</div>
+            </button>
+            <button type="button" onClick={() => onViewChange("json")} style={{ padding: 14, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>输入授权 JSON</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>粘贴与账号原始保存文件一致的 OAuth credential JSON。</div>
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  请粘贴原始 credential 对象。必填字段为 <code style={{ fontFamily: "var(--font-mono)" }}>type</code>、<code style={{ fontFamily: "var(--font-mono)" }}>access</code>、<code style={{ fontFamily: "var(--font-mono)" }}>refresh</code> 和 <code style={{ fontFamily: "var(--font-mono)" }}>expires</code>。账号会被保存，但不会自动切换为当前激活账号。
+                </div>
+                <pre style={{ margin: 0, padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11, lineHeight: 1.5, overflow: "auto", fontFamily: "var(--font-mono)" }}>{RAW_ACCOUNT_JSON_EXAMPLE}</pre>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+                  如果省略 <code style={{ fontFamily: "var(--font-mono)" }}>accountId</code>，pi-web 会尝试从 access token 中解析，失败时使用稳定 fallback。账号显示名会按邮箱、手机号、accountId 的顺序自动补全。
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {modeButton("raw", "原文 JSON")}
+                  {modeButton("cpa", "CPA 格式", true)}
+                  {modeButton("sub2api", "SUB2API 格式", true)}
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  value={jsonText}
+                  onChange={(e) => { setJsonText(e.target.value); setError(null); }}
+                  placeholder={RAW_ACCOUNT_JSON_EXAMPLE}
+                  spellCheck={false}
+                  style={{ minHeight: 260, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
+                />
+                {error && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{error}</div>}
+              </div>
+            </div>
+
+            <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <button type="button" disabled={submitting} onClick={() => onViewChange("method")} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: submitting ? "not-allowed" : "pointer", fontSize: 12 }}>返回</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" disabled={submitting} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: submitting ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+                <button type="button" disabled={submitting || !jsonText.trim()} onClick={submitRawJson} style={{ padding: "6px 14px", background: !submitting && jsonText.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 6, color: !submitting && jsonText.trim() ? "#fff" : "var(--text-dim)", cursor: !submitting && jsonText.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 700 }}>{submitting ? "保存中…" : "保存账号"}</button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
@@ -987,6 +1149,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
   const [savingLabelAccountId, setSavingLabelAccountId] = useState<string | null>(null);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+  const [addAccountDialogView, setAddAccountDialogView] = useState<"method" | "json" | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1008,6 +1171,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setActivatingAccountId(null);
     setSavingLabelAccountId(null);
     setDeletingAccountId(null);
+    setAddAccountDialogView(null);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
   }, [provider.id]);
@@ -1365,7 +1529,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             </button>
             {provider.id === "openai-codex" && provider.loggedIn && (
               <button
-                onClick={() => handleLogin("add")}
+                onClick={() => setAddAccountDialogView("method")}
                 style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               >
                 Add Account
@@ -1399,6 +1563,22 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           onActivate={handleActivateAccount}
           onEditLabel={handleEditAccountLabel}
           onDelete={handleDeleteAccount}
+        />
+      )}
+
+      {provider.id === "openai-codex" && addAccountDialogView && (
+        <AddAccountDialog
+          provider={provider}
+          view={addAccountDialogView}
+          onViewChange={setAddAccountDialogView}
+          onCodexAuth={() => { setAddAccountDialogView(null); handleLogin("add"); }}
+          onImported={(nextAccounts) => {
+            setAccounts(nextAccounts);
+            setLoginState({ phase: "success", message: "账号保存成功。" });
+            onRefresh();
+            if (provider.loggedIn) void loadQuota();
+          }}
+          onClose={() => setAddAccountDialogView(null)}
         />
       )}
     </div>
