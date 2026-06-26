@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AuthStorage, getAgentDir, type OAuthCredential } from "@earendil-works/pi-coding-agent";
 
@@ -9,6 +9,12 @@ const ACCOUNT_STORE_DIR = "auth-accounts";
 const METADATA_FILE = "accounts.json";
 const JSON_FILE_MODE = 0o600;
 const ACCOUNT_DIR_MODE = 0o700;
+const DELETED_ACCOUNT_DIR = "deleted";
+const OPENAI_USERINFO_URLS = [
+  "https://auth.openai.com/oauth/userinfo",
+  "https://auth.openai.com/userinfo",
+  "https://chatgpt.com/backend-api/me",
+];
 
 interface StoredOpenAICodexCredential extends OAuthCredential {
   type: "oauth";
@@ -24,6 +30,7 @@ type NormalizedOpenAICodexCredential = StoredOpenAICodexCredential & { accountId
 interface OAuthAccountMetadataEntry {
   accountId: string;
   label?: string;
+  labelBackfillDisabledAt?: string;
   createdAt: string;
   updatedAt: string;
   lastActivatedAt?: string;
@@ -87,8 +94,21 @@ function metadataPath(provider: string): string {
   return join(accountStorePath(provider), METADATA_FILE);
 }
 
+function encodedCredentialFileName(accountId: string): string {
+  return `${encodeURIComponent(accountId)}.json`;
+}
+
 function credentialPath(provider: string, accountId: string): string {
-  return join(accountStorePath(provider), `${encodeURIComponent(accountId)}.json`);
+  return join(accountStorePath(provider), encodedCredentialFileName(accountId));
+}
+
+function deletedAccountStorePath(provider: string): string {
+  return join(accountStorePath(provider), DELETED_ACCOUNT_DIR);
+}
+
+function deletedCredentialPath(provider: string, accountId: string): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return join(deletedAccountStorePath(provider), `${timestamp}_${encodedCredentialFileName(accountId)}`);
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -103,6 +123,12 @@ async function pathExists(path: string): Promise<boolean> {
 
 async function ensureAccountStoreDir(provider: string): Promise<void> {
   const dir = accountStorePath(provider);
+  await mkdir(dir, { recursive: true, mode: ACCOUNT_DIR_MODE });
+  await chmod(dir, ACCOUNT_DIR_MODE).catch(() => {});
+}
+
+async function ensureDeletedAccountStoreDir(provider: string): Promise<void> {
+  const dir = deletedAccountStorePath(provider);
   await mkdir(dir, { recursive: true, mode: ACCOUNT_DIR_MODE });
   await chmod(dir, ACCOUNT_DIR_MODE).catch(() => {});
 }
@@ -133,6 +159,7 @@ function normalizeAccountEntry(value: unknown): OAuthAccountMetadataEntry | null
     updatedAt: value.updatedAt,
   };
   if (typeof value.label === "string" && value.label.trim()) entry.label = value.label.trim();
+  if (typeof value.labelBackfillDisabledAt === "string" && value.labelBackfillDisabledAt.trim()) entry.labelBackfillDisabledAt = value.labelBackfillDisabledAt;
   if (typeof value.lastActivatedAt === "string" && value.lastActivatedAt.trim()) entry.lastActivatedAt = value.lastActivatedAt;
   return entry;
 }
@@ -166,21 +193,83 @@ function isStoredOpenAICodexCredential(value: unknown): value is StoredOpenAICod
     && typeof value.expires === "number";
 }
 
-export function extractOpenAICodexAccountId(accessToken: string): string | null {
+function decodeJwtPayload(accessToken: string): Record<string, unknown> | null {
   const [, payload] = accessToken.split(".");
   if (!payload) return null;
 
   try {
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const decoded = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as {
-      "https://api.openai.com/auth"?: { chatgpt_account_id?: unknown };
-    };
-    const accountId = decoded["https://api.openai.com/auth"]?.chatgpt_account_id;
-    return typeof accountId === "string" && accountId.length > 0 ? accountId : null;
+    const decoded = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as unknown;
+    return isRecord(decoded) ? decoded : null;
   } catch {
     return null;
   }
+}
+
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const email = value.trim();
+  return email.includes("@") ? email : null;
+}
+
+function findEmailInRecord(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+
+  const directEmail = normalizeEmail(value.email);
+  if (directEmail) return directEmail;
+
+  const nestedProfileEmail = findEmailInRecord(value["https://api.openai.com/profile"]);
+  if (nestedProfileEmail) return nestedProfileEmail;
+
+  const nestedAuthEmail = findEmailInRecord(value["https://api.openai.com/auth"]);
+  if (nestedAuthEmail) return nestedAuthEmail;
+
+  const nestedUserEmail = findEmailInRecord(value.user);
+  if (nestedUserEmail) return nestedUserEmail;
+
+  const nestedAccountEmail = findEmailInRecord(value.account);
+  if (nestedAccountEmail) return nestedAccountEmail;
+
+  return null;
+}
+
+export function extractOpenAICodexAccountId(accessToken: string): string | null {
+  const decoded = decodeJwtPayload(accessToken) as { "https://api.openai.com/auth"?: { chatgpt_account_id?: unknown } } | null;
+  const accountId = decoded?.["https://api.openai.com/auth"]?.chatgpt_account_id;
+  return typeof accountId === "string" && accountId.length > 0 ? accountId : null;
+}
+
+async function fetchOpenAICodexEmail(accessToken: string, accountId: string): Promise<string | null> {
+  const claimsEmail = findEmailInRecord(decodeJwtPayload(accessToken));
+  if (claimsEmail) return claimsEmail;
+
+  const results = await Promise.all(OPENAI_USERINFO_URLS.map(async (url) => {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+          "ChatGPT-Account-Id": accountId,
+          "User-Agent": "pi-web",
+        },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!response.ok) return null;
+
+      const body = await response.json().catch(() => null) as unknown;
+      return findEmailInRecord(body);
+    } catch {
+      // Best-effort label backfill must not make account listing fail.
+      return null;
+    }
+  }));
+
+  return results.find((email): email is string => Boolean(email)) ?? null;
+}
+
+async function resolveOpenAICodexAccountEmail(credential: NormalizedOpenAICodexCredential): Promise<string | null> {
+  return fetchOpenAICodexEmail(credential.access, credential.accountId);
 }
 
 function deriveAccountId(credential: StoredOpenAICodexCredential): string {
@@ -256,6 +345,35 @@ function sortAccountSummaries(accounts: OAuthAccountSummary[]): OAuthAccountSumm
   });
 }
 
+async function backfillMissingEmailLabels(provider: string, accounts: OAuthAccountMetadataEntry[]): Promise<{ accounts: OAuthAccountMetadataEntry[]; changed: boolean }> {
+  let changed = false;
+  const nextAccounts: OAuthAccountMetadataEntry[] = [];
+
+  for (const entry of accounts) {
+    if (entry.label || entry.labelBackfillDisabledAt) {
+      nextAccounts.push(entry);
+      continue;
+    }
+
+    const credential = await readJsonFile(credentialPath(provider, entry.accountId), "OAuth account credential");
+    if (!isStoredOpenAICodexCredential(credential)) {
+      nextAccounts.push(entry);
+      continue;
+    }
+
+    const email = await resolveOpenAICodexAccountEmail(normalizeCredentialAccountId(credential));
+    if (!email) {
+      nextAccounts.push(entry);
+      continue;
+    }
+
+    nextAccounts.push({ ...entry, label: email, updatedAt: new Date().toISOString() });
+    changed = true;
+  }
+
+  return { accounts: nextAccounts, changed };
+}
+
 async function clearActiveAccount(provider: string): Promise<void> {
   const path = metadataPath(provider);
   if (!(await pathExists(path))) return;
@@ -329,19 +447,75 @@ export async function listOAuthAccounts(provider: string): Promise<OAuthAccounts
     }
   }
 
-  const activeAccountId = metadata.activeAccountId && existingAccounts.some((entry) => entry.accountId === metadata.activeAccountId)
+  const backfilled = await backfillMissingEmailLabels(provider, existingAccounts);
+  if (backfilled.changed) changed = true;
+
+  const activeAccountId = metadata.activeAccountId && backfilled.accounts.some((entry) => entry.accountId === metadata.activeAccountId)
     ? metadata.activeAccountId
     : undefined;
   if (activeAccountId !== metadata.activeAccountId) changed = true;
 
-  const nextMetadata = { version: 1 as const, activeAccountId, accounts: existingAccounts };
+  const nextMetadata = { version: 1 as const, activeAccountId, accounts: backfilled.accounts };
   if (changed) await writeMetadata(provider, nextMetadata);
 
   return {
     provider,
     activeAccountId: activeAccountId ?? null,
-    accounts: sortAccountSummaries(existingAccounts.map((entry) => accountSummary(nextMetadata, entry))),
+    accounts: sortAccountSummaries(backfilled.accounts.map((entry) => accountSummary(nextMetadata, entry))),
   };
+}
+
+export async function updateOAuthAccountLabel(provider: string, accountId: string, label: unknown): Promise<OAuthAccountsList> {
+  assertSupportedProvider(provider);
+  const normalizedAccountId = accountId.trim();
+  if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
+  if (!(await pathExists(credentialPath(provider, normalizedAccountId)))) {
+    throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
+  }
+
+  const normalizedLabel = typeof label === "string" ? label.trim() : "";
+  const metadata = await readMetadata(provider);
+  let found = false;
+  const now = new Date().toISOString();
+  const accounts = metadata.accounts.map((entry) => {
+    if (entry.accountId !== normalizedAccountId) return entry;
+    found = true;
+    const nextEntry: OAuthAccountMetadataEntry = { ...entry, updatedAt: now };
+    if (normalizedLabel) {
+      nextEntry.label = normalizedLabel;
+      delete nextEntry.labelBackfillDisabledAt;
+    } else {
+      delete nextEntry.label;
+      nextEntry.labelBackfillDisabledAt = now;
+    }
+    return nextEntry;
+  });
+
+  if (!found) throw new OAuthAccountStoreError("Saved OAuth account metadata not found", 404);
+  await writeMetadata(provider, { ...metadata, accounts });
+  return listOAuthAccounts(provider);
+}
+
+export async function deleteOAuthAccount(provider: string, accountId: string): Promise<OAuthAccountsList> {
+  assertSupportedProvider(provider);
+  const normalizedAccountId = accountId.trim();
+  if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
+
+  await syncActiveOAuthAccountCredential(provider);
+  const metadata = await readMetadata(provider);
+  if (metadata.activeAccountId === normalizedAccountId) {
+    throw new OAuthAccountStoreError("Active OAuth account cannot be deleted", 409);
+  }
+
+  const sourcePath = credentialPath(provider, normalizedAccountId);
+  if (!(await pathExists(sourcePath))) throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
+
+  await ensureDeletedAccountStoreDir(provider);
+  await rename(sourcePath, deletedCredentialPath(provider, normalizedAccountId));
+
+  const accounts = metadata.accounts.filter((entry) => entry.accountId !== normalizedAccountId);
+  await writeMetadata(provider, { ...metadata, accounts });
+  return listOAuthAccounts(provider);
 }
 
 export async function activateOAuthAccount(provider: string, accountId: string): Promise<OAuthAccountsList> {

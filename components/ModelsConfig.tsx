@@ -886,15 +886,23 @@ function OAuthAccountsView({
   loading,
   error,
   activatingAccountId,
+  savingLabelAccountId,
+  deletingAccountId,
   onRefresh,
   onActivate,
+  onEditLabel,
+  onDelete,
 }: {
   accounts: OAuthAccountSummary[];
   loading: boolean;
   error: string | null;
   activatingAccountId: string | null;
+  savingLabelAccountId: string | null;
+  deletingAccountId: string | null;
   onRefresh: () => void;
   onActivate: (accountId: string) => void;
+  onEditLabel: (account: OAuthAccountSummary) => void;
+  onDelete: (account: OAuthAccountSummary) => void;
 }) {
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -933,16 +941,32 @@ function OAuthAccountsView({
                 <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
                 <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
               </div>
+              <button
+                onClick={() => onEditLabel(account)}
+                disabled={savingLabelAccountId === account.accountId}
+                style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingLabelAccountId === account.accountId ? "var(--text-dim)" : "var(--text-muted)", cursor: savingLabelAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+              >
+                {savingLabelAccountId === account.accountId ? "Saving…" : "Remark"}
+              </button>
               {account.active ? (
                 <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>active</span>
               ) : (
-                <button
-                  onClick={() => onActivate(account.accountId)}
-                  disabled={Boolean(activatingAccountId)}
-                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: activatingAccountId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
-                >
-                  {activatingAccountId === account.accountId ? "Activating…" : "Activate"}
-                </button>
+                <>
+                  <button
+                    onClick={() => onActivate(account.accountId)}
+                    disabled={Boolean(activatingAccountId) || deletingAccountId === account.accountId}
+                    style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: activatingAccountId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId || deletingAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                  >
+                    {activatingAccountId === account.accountId ? "Activating…" : "Activate"}
+                  </button>
+                  <button
+                    onClick={() => onDelete(account)}
+                    disabled={Boolean(deletingAccountId) || Boolean(activatingAccountId)}
+                    style={{ padding: "4px 9px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: deletingAccountId === account.accountId ? "var(--text-dim)" : "#ef4444", cursor: deletingAccountId || activatingAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                  >
+                    {deletingAccountId === account.accountId ? "Deleting…" : "Delete"}
+                  </button>
+                </>
               )}
             </div>
           ))}
@@ -961,6 +985,8 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
+  const [savingLabelAccountId, setSavingLabelAccountId] = useState<string | null>(null);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -980,6 +1006,8 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setAccountsLoading(false);
     setAccountsError(null);
     setActivatingAccountId(null);
+    setSavingLabelAccountId(null);
+    setDeletingAccountId(null);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
   }, [provider.id]);
@@ -1163,6 +1191,55 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, onRefresh, loadQuota]);
 
+  const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
+    const nextLabel = window.prompt("Account remark (leave empty to clear):", account.label ?? "");
+    if (nextLabel === null) return;
+
+    setSavingLabelAccountId(account.accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: account.accountId, label: nextLabel }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setLoginState({ phase: "success", message: nextLabel.trim() ? "Account remark saved." : "Account remark cleared." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save account remark";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setSavingLabelAccountId(null);
+    }
+  }, [provider.id]);
+
+  const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
+    if (!window.confirm(`Delete saved credentials for ${account.displayName}?\n\nThe account must be added again to restore it.`)) return;
+
+    setDeletingAccountId(account.accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: account.accountId }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setLoginState({ phase: "success", message: "Account deleted." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete account";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setDeletingAccountId(null);
+    }
+  }, [provider.id]);
+
   const isWorking = loginState.phase === "connecting" || loginState.phase === "progress" ||
     loginState.phase === "auth" || loginState.phase === "device_code" ||
     loginState.phase === "prompt" || loginState.phase === "select";
@@ -1316,8 +1393,12 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           loading={accountsLoading}
           error={accountsError}
           activatingAccountId={activatingAccountId}
+          savingLabelAccountId={savingLabelAccountId}
+          deletingAccountId={deletingAccountId}
           onRefresh={loadAccounts}
           onActivate={handleActivateAccount}
+          onEditLabel={handleEditAccountLabel}
+          onDelete={handleDeleteAccount}
         />
       )}
     </div>

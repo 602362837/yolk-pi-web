@@ -309,3 +309,36 @@ Implemented session archiving across backend APIs, session archive storage, side
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: ChatGPT account management polish
+
+**Date**: 2026-06-26
+**Task**: ChatGPT account management polish
+**Branch**: `pi/20260626-085608`
+
+### Summary
+
+Added ChatGPT Plus/Pro saved-account remarks, best-effort email label backfill, inactive account soft deletion, API/UI support, and docs updates. Verified tsc passes and lint has only existing ChatInput warnings.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a4ef952` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
