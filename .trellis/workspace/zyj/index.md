@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
+- **Total Sessions**: 14
 - **Last Active**: 2026-06-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~443 | Active |
+| `journal-1.md` | ~476 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-06-26 | subagent status panel with recursive tree child display | `b131640` | `pi/20260626-134020` |
 | 13 | 2026-06-26 | Support SUB2API account JSON conversion | `062c996` | `pi/20260626-103030` |
 | 12 | 2026-06-26 | CPA JSON conversion support | `db6d393` | `pi/20260626-103030` |
 | 11 | 2026-06-26 | Add ChatGPT account JSON import | `c7a1ed0` | `pi/20260626-095856` |

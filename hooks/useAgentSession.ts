@@ -49,10 +49,29 @@ interface AgentEvent {
   [key: string]: unknown;
 }
 
+export interface SubagentRun {
+  id: string;
+  agent: string;
+  task: string;
+  status: "running" | "completed" | "failed";
+  partialOutput: string;
+  result?: string;
+  startedAt: number;
+  depth: number;
+  parentId?: string;
+  /** Path to this subagent's own session JSONL (for recursive child lookup) */
+  sessionFile?: string;
+  /** Lazily-loaded nested children */
+  children?: SubagentRun[];
+  loaded?: boolean;
+}
+
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_tools"; tools: { id: string; name: string }[] }
   | null;
+
+export type OnSubagentChange = (runs: SubagentRun[]) => void;
 
 export interface UseAgentSessionOptions {
   session: SessionInfo | null;
@@ -64,6 +83,7 @@ export interface UseAgentSessionOptions {
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
+  onSubagentChange?: OnSubagentChange;
   setNewSessionModel?: (model: { provider: string; modelId: string } | null) => void;
   setToolPreset?: (preset: "none" | "default" | "full" | "subagent") => void;
 }
@@ -83,10 +103,80 @@ export interface AttachedImage {
   previewUrl: string;
 }
 
+/** Extract SubagentRun(s) from a subagent tool call's args.
+ *  Handles single-agent, parallel (tasks[]), and chain modes. */
+function extractSubagentRuns(
+  toolCallId: string,
+  args: Record<string, unknown>,
+  fallbackAgent: string,
+): SubagentRun[] {
+  const depth = (args.parentDepth ?? 0) as number;
+  const parentId = (args.parentRunId as string) ?? undefined;
+  const now = Date.now();
+
+  // Parallel mode: { tasks: [{ agent, task }, ...] }
+  const tasks = args.tasks;
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    return tasks.map((t: unknown, i: number) => {
+      const taskObj = t as Record<string, unknown> | undefined;
+      const agent = String(taskObj?.agent ?? "?");
+      const task = String(taskObj?.task ?? taskObj?.prompt ?? "");
+      return {
+        id: `${toolCallId}-${i}`,
+        agent,
+        task: task.slice(0, 200),
+        status: "running" as const,
+        partialOutput: "",
+        startedAt: now + i,
+        depth,
+        parentId,
+      };
+    });
+  }
+
+  // Chain mode: { chain: [{ agent, task }, ...] }
+  const chain = args.chain;
+  if (Array.isArray(chain) && chain.length > 0) {
+    return chain.map((t: unknown, i: number) => {
+      const step = t as Record<string, unknown> | undefined;
+      const agent = String(step?.agent ?? "?");
+      const task = String(step?.task ?? step?.prompt ?? "");
+      return {
+        id: `${toolCallId}-c${i}`,
+        agent,
+        task: task.slice(0, 200),
+        status: "running" as const,
+        partialOutput: "",
+        startedAt: now + i,
+        depth,
+        parentId,
+      };
+    });
+  }
+
+  // Single-agent mode: { agent, task/prompt }
+  const agent = (args.agent ?? args.prompt ?? "") as string;
+  if (agent) {
+    const task = (args.task ?? args.prompt ?? "") as string;
+    return [{
+      id: toolCallId,
+      agent: String(agent),
+      task: typeof task === "string" ? task.slice(0, 200) : "",
+      status: "running" as const,
+      partialOutput: "",
+      startedAt: now,
+      depth,
+      parentId,
+    }];
+  }
+
+  return [];
+}
+
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange,
+    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -115,6 +205,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
+  const [subagentRuns, setSubagentRuns] = useState<SubagentRun[]>([]);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
@@ -243,11 +334,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunningRef.current = agentRunning;
   }, [agentRunning]);
 
+  // Flush subagent runs upward on every change
+  const prevRunsJsonRef = useRef("");
+  useEffect(() => {
+    const json = JSON.stringify(subagentRuns.map((r) => ({ id: r.id, agent: r.agent, status: r.status })));
+    if (json !== prevRunsJsonRef.current) {
+      prevRunsJsonRef.current = json;
+      onSubagentChange?.(subagentRuns);
+    }
+  });
+
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
       case "agent_start":
         setAgentRunning(true);
         setAgentPhase({ kind: "waiting_model" });
+        setSubagentRuns([]);
         dispatch({ type: "start" });
         break;
       case "agent_end":
@@ -291,6 +393,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "tool_execution_start": {
         const id = event.toolCallId as string;
         const name = event.toolName as string;
+        const isSubagent = name === "subagent" || name === "trellis_subagent";
+        if (isSubagent) {
+          const args = event.args as Record<string, unknown> | undefined;
+          // Skip management actions (list, get, doctor, etc.) — only track execution calls
+          if (args && !("action" in args)) {
+            const runs = extractSubagentRuns(id, args, name);
+            if (runs.length > 0) {
+              setSubagentRuns((prev) => [...prev, ...runs]);
+            }
+          }
+        }
         setAgentPhase((prev) => {
           const tools = prev?.kind === "running_tools" ? [...prev.tools] : [];
           if (!tools.some((t) => t.id === id)) tools.push({ id, name });
@@ -298,11 +411,54 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
         break;
       }
+      case "tool_execution_update": {
+        const updateId = event.toolCallId as string;
+        const partial = event.partialResult as { content?: { text?: string }[] } | undefined;
+        if (partial?.content?.length) {
+          const text = partial.content.map((c) => c.text ?? "").join("");
+          if (text) {
+            setSubagentRuns((prev) =>
+              prev.map((r) =>
+                r.id === updateId
+                  ? { ...r, partialOutput: r.partialOutput + text }
+                  : r,
+              ),
+            );
+          }
+        }
+        break;
+      }
       case "tool_execution_end": {
-        const id = event.toolCallId as string;
+        const endId = event.toolCallId as string;
+        const isError = !!event.isError;
+        const resultText =
+          (event.result as { content?: { text?: string }[] } | undefined)
+            ?.content?.map((c) => c.text ?? "")
+            .join("") ?? undefined;
+        // Extract sessionFile from details.results for subagent tool calls
+        const details = (event.result as { details?: { results?: { agent?: string; sessionFile?: string }[] } } | undefined)?.details;
+        const childSessions = details?.results?.map((r: { agent?: string; sessionFile?: string }) => r.sessionFile).filter(Boolean) ?? [];
+        setSubagentRuns((prev) =>
+          prev.map((r) => {
+            if (r.id === endId || r.id.startsWith(endId + "-")) {
+              // For parallel mode, suffixes like -0, -1 map to results[] indices
+              let sessionFile: string | undefined;
+              if (r.id === endId && childSessions.length === 1) {
+                sessionFile = childSessions[0];
+              } else if (r.id.startsWith(endId + "-")) {
+                const idx = parseInt(r.id.slice(endId.length + 1), 10);
+                if (!isNaN(idx) && idx < childSessions.length) {
+                  sessionFile = childSessions[idx];
+                }
+              }
+              return { ...r, status: isError ? "failed" : "completed", result: resultText, partialOutput: "", sessionFile: sessionFile ?? r.sessionFile };
+            }
+            return r;
+          }),
+        );
         setAgentPhase((prev) => {
           if (prev?.kind !== "running_tools") return prev;
-          const tools = prev.tools.filter((t) => t.id !== id);
+          const tools = prev.tools.filter((t) => t.id !== endId);
           if (tools.length === 0) return { kind: "waiting_model" };
           return { kind: "running_tools", tools };
         });
@@ -644,7 +800,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
-    agentPhase,
+    agentPhase, subagentRuns,
     isNew,
     // Refs
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,
