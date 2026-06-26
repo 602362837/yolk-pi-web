@@ -9,6 +9,7 @@ import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { UsageStatsModal } from "./UsageStatsModal";
+import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
 import { BranchNavigator } from "./BranchNavigator";
 import { getRelativeFilePath } from "@/lib/file-paths";
@@ -70,11 +71,17 @@ export function AppShell() {
     setContextUsage(usage);
   }, []);
 
+  // Subagent runs — populated by ChatWindow, displayed in top bar panel
+  const [subagentRuns, setSubagentRuns] = useState<import("@/hooks/useAgentSession").SubagentRun[]>([]);
+  const handleSubagentChange = useCallback((runs: import("@/hooks/useAgentSession").SubagentRun[]) => {
+    setSubagentRuns(runs);
+  }, []);
+
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | null>(null);
+  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "subagents" | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  const toggleTopPanel = useCallback((panel: "branches" | "system") => {
+  const toggleTopPanel = useCallback((panel: "branches" | "system" | "subagents") => {
     setActiveTopPanel((cur) => cur === panel ? null : panel);
   }, []);
 
@@ -552,6 +559,51 @@ export function AppShell() {
                 </svg>
                 <span>System</span>
               </button>
+              <button
+                onClick={() => toggleTopPanel("subagents")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  height: "100%", padding: "0 12px",
+                  background: activeTopPanel === "subagents" ? "var(--bg-selected)" : "none",
+                  border: "none",
+                  borderTop: activeTopPanel === "subagents" ? "2px solid var(--accent)" : "2px solid transparent",
+                  borderRight: "1px solid var(--border)",
+                  cursor: "pointer",
+                  color: activeTopPanel === "subagents" ? "var(--text)" : "var(--text-muted)",
+                  fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "subagents" ? "var(--text)" : "var(--text-muted)"; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Subagents</span>
+                {(() => {
+                  const running = subagentRuns.filter((r) => r.status === "running").length;
+                  const completed = subagentRuns.filter((r) => r.status === "completed" || r.status === "failed").length;
+                  if (running > 0) {
+                    return (
+                      <span style={{
+                        position: "absolute", top: 4, right: 4,
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: "#f59e0b",
+                      }} />
+                    );
+                  }
+                  if (completed > 0) {
+                    return (
+                      <span style={{
+                        fontSize: 10, color: "#22c55e",
+                        marginLeft: 2,
+                      }}>✓</span>
+                    );
+                  }
+                  return null;
+                })()}
+              </button>
             </div>
           )}
           {/* Session stats — right-aligned in top bar */}
@@ -676,6 +728,14 @@ export function AppShell() {
                   )}
                 </div>
               )}
+              {activeTopPanel === "subagents" && (
+                <div style={{
+                  background: "var(--bg-panel)",
+                  borderBottom: "1px solid var(--border)",
+                }}>
+                  <SubagentPanel runs={subagentRuns} />
+                </div>
+              )}
             </div>
           )}
 
@@ -697,6 +757,7 @@ export function AppShell() {
               onSystemPromptChange={handleSystemPromptChange}
               onSessionStatsChange={handleSessionStatsChange}
               onContextUsageChange={handleContextUsageChange}
+              onSubagentChange={handleSubagentChange}
             />
           ) : showPlaceholder ? (
             activeCwd ? (

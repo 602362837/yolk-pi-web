@@ -441,3 +441,36 @@ Extracted OAuth account import converters into a shared library, enabled SUB2API
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: subagent status panel with recursive tree child display
+
+**Date**: 2026-06-26
+**Task**: subagent status panel with recursive tree child display
+**Branch**: `pi/20260626-134020`
+
+### Summary
+
+Add subagent status bar/panel in Pi Agent Web UI. V1: top bar button with badge indicator, dropdown panel showing running/completed subagents. V2: recursive tree display — expand a subagent to see nested children loaded from its session JSONL via new API endpoint. Supports both subagent (pi-subagents) and trellis_subagent tools, parallel/chain/single modes, management action filtering.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b131640` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
