@@ -474,3 +474,36 @@ Add subagent status bar/panel in Pi Agent Web UI. V1: top bar button with badge 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 🇨🇳 Localize Trellis panel UI to Chinese
+
+**Date**: 2026-06-26
+**Task**: 🇨🇳 Localize Trellis panel UI to Chinese
+**Branch**: `pi/20260626-151440`
+
+### Summary
+
+Translated all TrellisPanel UI labels, tooltips, empty states, progress descriptions, metadata cards, and library progress/phase labels to Chinese. Kept professional terms (Trellis, PRD, Design, Implement, Worktree, Commit, PR) in English. Also localized AppShell toggle button tooltips.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8461cb8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

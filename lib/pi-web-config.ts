@@ -10,8 +10,19 @@ export interface PiWebWorktreeConfig {
   sessionDisplay: "separate" | "tag";
 }
 
+export interface PiWebTrellisConfig {
+  enabled: boolean;
+  includeArchived: boolean;
+}
+
 export interface PiWebConfig {
   worktree: PiWebWorktreeConfig;
+  trellis: PiWebTrellisConfig;
+}
+
+export interface PiWebConfigPatch {
+  worktree?: unknown;
+  trellis?: unknown;
 }
 
 export interface PiWebConfigReadResult {
@@ -37,6 +48,10 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     pathTemplate: "{baseDir}/{branchSlug}",
     sessionDisplay: "separate",
   },
+  trellis: {
+    enabled: false,
+    includeArchived: false,
+  },
 };
 
 export function getPiWebConfigPath(): string {
@@ -47,6 +62,10 @@ function readString(value: unknown, fallback: string): string {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
 function readSessionDisplay(value: unknown, fallback: "separate" | "tag"): "separate" | "tag" {
   return value === "separate" || value === "tag" ? value : fallback;
 }
@@ -55,6 +74,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const defaults = DEFAULT_PI_WEB_CONFIG;
   const root = isRecord(raw) ? raw : {};
   const worktree = isRecord(root.worktree) ? root.worktree : {};
+  const trellis = isRecord(root.trellis) ? root.trellis : {};
   return {
     worktree: {
       baseRef: readString(worktree.baseRef, defaults.worktree.baseRef),
@@ -62,6 +82,10 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       baseDirTemplate: readString(worktree.baseDirTemplate, defaults.worktree.baseDirTemplate),
       pathTemplate: readString(worktree.pathTemplate, defaults.worktree.pathTemplate),
       sessionDisplay: readSessionDisplay(worktree.sessionDisplay, defaults.worktree.sessionDisplay),
+    },
+    trellis: {
+      enabled: readBoolean(trellis.enabled, defaults.trellis.enabled),
+      includeArchived: readBoolean(trellis.includeArchived, defaults.trellis.includeArchived),
     },
   };
 }
@@ -123,19 +147,56 @@ export function validatePiWebWorktreeConfig(value: unknown): PiWebWorktreeConfig
   };
 }
 
-export function writePiWebWorktreeConfig(worktree: unknown): PiWebConfigReadResult {
-  const normalizedWorktree = validatePiWebWorktreeConfig(worktree);
+function requireBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new PiWebConfigValidationError(`${field} must be a boolean`);
+  }
+  return value;
+}
+
+export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("trellis config must be an object");
+  }
+  return {
+    enabled: requireBoolean(value.enabled, "trellis.enabled"),
+    includeArchived: requireBoolean(value.includeArchived, "trellis.includeArchived"),
+  };
+}
+
+export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadResult {
+  if (!isRecord(patch)) {
+    throw new PiWebConfigValidationError("config patch must be an object");
+  }
+
+  const hasWorktree = Object.prototype.hasOwnProperty.call(patch, "worktree");
+  const hasTrellis = Object.prototype.hasOwnProperty.call(patch, "trellis");
+  if (!hasWorktree && !hasTrellis) {
+    throw new PiWebConfigValidationError("no supported config sections provided");
+  }
+
+  const normalizedWorktree = hasWorktree ? validatePiWebWorktreeConfig(patch.worktree) : undefined;
+  const normalizedTrellis = hasTrellis ? validatePiWebTrellisConfig(patch.trellis) : undefined;
   const path = getPiWebConfigPath();
   const current = readRawConfigFile(path);
   const raw = current.parseError ? {} : current.raw;
-  const previousWorktree = isRecord(raw.worktree) ? raw.worktree : {};
-  const nextRaw: Record<string, unknown> = {
-    ...raw,
-    worktree: {
+  const nextRaw: Record<string, unknown> = { ...raw };
+
+  if (normalizedWorktree) {
+    const previousWorktree = isRecord(raw.worktree) ? raw.worktree : {};
+    nextRaw.worktree = {
       ...previousWorktree,
       ...normalizedWorktree,
-    },
-  };
+    };
+  }
+
+  if (normalizedTrellis) {
+    const previousTrellis = isRecord(raw.trellis) ? raw.trellis : {};
+    nextRaw.trellis = {
+      ...previousTrellis,
+      ...normalizedTrellis,
+    };
+  }
 
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(nextRaw, null, 2)}\n`, "utf8");
@@ -146,4 +207,8 @@ export function writePiWebWorktreeConfig(worktree: unknown): PiWebConfigReadResu
     path,
     exists: true,
   };
+}
+
+export function writePiWebWorktreeConfig(worktree: unknown): PiWebConfigReadResult {
+  return writePiWebConfigPatch({ worktree });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 
 const IGNORED_NAMES = new Set([
   "node_modules", ".git", ".next", "dist", "build", "__pycache__",
@@ -11,50 +12,6 @@ const IGNORED_NAMES = new Set([
 const IGNORED_SUFFIXES = [".pyc"];
 
 const MAX_RESULTS = 24;
-
-declare global {
-  var __piAllowedRootsCache: { roots: Set<string>; expiresAt: number } | undefined;
-}
-
-const ALLOWED_ROOTS_TTL_MS = 5_000;
-
-async function getAllowedRoots(): Promise<Set<string>> {
-  const now = Date.now();
-  const cached = globalThis.__piAllowedRootsCache;
-  if (cached && cached.expiresAt > now) return cached.roots;
-
-  const { listAllSessions } = await import("@/lib/session-reader");
-  const sessions = await listAllSessions();
-  const roots = new Set<string>();
-  for (const s of sessions) {
-    if (s.cwd) roots.add(s.cwd);
-  }
-  const home = (await import("os")).homedir();
-  const { readdirSync } = await import("fs");
-  try {
-    for (const name of readdirSync(home)) {
-      if (/^pi-cwd-\d{8}$/.test(name)) {
-        roots.add(path.join(home, name));
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  globalThis.__piAllowedRootsCache = { roots, expiresAt: now + ALLOWED_ROOTS_TTL_MS };
-  return roots;
-}
-
-function isPathAllowed(target: string, allowedRoots: Set<string>): boolean {
-  for (const root of allowedRoots) {
-    const normalized = path.resolve(target);
-    const normalizedRoot = path.resolve(root);
-    if (normalized === normalizedRoot || normalized.startsWith(normalizedRoot + path.sep)) {
-      return true;
-    }
-  }
-  return false;
-}
 
 export async function GET(request: NextRequest) {
   try {

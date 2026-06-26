@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { statSync } from "fs";
 import { startRpcSession } from "@/lib/rpc-manager";
 import { canonicalizeCwd } from "@/lib/cwd";
+import { registerAllowedRoot } from "@/lib/allowed-roots";
 
 // POST /api/agent/new  body: { cwd: string; type: string; message: string; ... }
 // Spawns a brand-new pi session and immediately sends the first command.
@@ -29,10 +30,9 @@ export async function POST(req: Request) {
     const tempKey = `__new__${Date.now()}`;
     const { session, realSessionId } = await startRpcSession(tempKey, "", canonicalCwd, toolNames);
 
-    // Keep the files-route allowed-roots cache (see app/api/files/[...path]/route.ts)
-    // in sync so the new cwd is immediately readable via /api/files. Without this,
-    // a file request under a brand-new cwd would 403 for up to the cache TTL.
-    globalThis.__piAllowedRootsCache?.roots.add(canonicalCwd);
+    // Keep allowed workspace roots in sync so brand-new cwd file/Trellis
+    // requests do not have to wait for a session-list cache refresh.
+    registerAllowedRoot(canonicalCwd);
     // Apply pre-selected model before sending the prompt
     if (provider && modelId) {
       await session.send({ type: "set_model", provider, modelId });

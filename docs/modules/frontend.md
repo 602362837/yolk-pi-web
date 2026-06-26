@@ -4,7 +4,7 @@
 
 | File | Purpose |
 | --- | --- |
-| `components/AppShell.tsx` | Top-level layout, URL state, tab management. |
+| `components/AppShell.tsx` | Top-level layout, URL state, tab management, and right drawer mode switching between files and optional Trellis tasks. |
 | `components/SessionSidebar.tsx` | Session tree sidebar, workspace/WorkTree picker actions grouped by main workspace, archive/unarchive actions, archived section, multi-select batch archive, and integrated file explorer. |
 | `components/ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic. Shows archived banner and disables input for archived sessions. |
 | `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload. |
@@ -14,7 +14,8 @@
 | `components/ToolPanel.tsx` | Tool presets and preset inference helpers. |
 | `components/ModelsConfig.tsx` | Modal for editing `models.json`, OAuth/API-key auth, and ChatGPT Plus/Pro saved-account add/import, activation, remarks, inactive-account deletion, and raw/CPA/SUB2API account JSON import via shared converters. |
 | `components/SkillsConfig.tsx` | Modal for browsing/installing skills. |
-| `components/SettingsConfig.tsx` | Settings modal, currently WorkTree defaults in `pi-web.json`. |
+| `components/SettingsConfig.tsx` | Settings modal for WorkTree defaults and optional Trellis panel settings in `pi-web.json`. |
+| `components/TrellisPanel.tsx` | Read-only Trellis task drawer: task list, filters, details, artifacts, hierarchy, and derived phase/progress. |
 | `components/UsageStatsModal.tsx` | Token/cost usage statistics modal. |
 | `components/FileExplorer.tsx` | File tree inside the sidebar. |
 | `components/FileViewer.tsx` | File content viewer in a tab. |

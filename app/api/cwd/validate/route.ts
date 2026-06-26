@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { statSync, type Stats } from "fs";
 import { canonicalizeCwd } from "@/lib/cwd";
+import { registerAllowedRoot } from "@/lib/allowed-roots";
 
 // POST /api/cwd/validate  body: { cwd: string }
 // Validates a candidate workspace before the UI selects it.
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Path is not a directory: ${cwd}` }, { status: 400 });
     }
 
+    registerAllowedRoot(canonicalCwd);
     return NextResponse.json({ success: true, cwd: canonicalCwd });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

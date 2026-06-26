@@ -3,21 +3,9 @@ import { createGitWorktree, getWorktreeStatus, removeGitWorktree, WorktreeUserEr
 import { readPiWebConfig } from "@/lib/pi-web-config";
 import { destroyRpcSessionsForCwd } from "@/lib/rpc-manager";
 import { deleteSessionsForCwd } from "@/lib/session-reader";
+import { registerAllowedRoot } from "@/lib/allowed-roots";
 
 export const dynamic = "force-dynamic";
-
-declare global {
-  var __piAllowedRootsCache: { roots: Set<string>; expiresAt: number } | undefined;
-}
-
-function addAllowedRoot(cwd: string): void {
-  const now = Date.now();
-  if (!globalThis.__piAllowedRootsCache) {
-    globalThis.__piAllowedRootsCache = { roots: new Set(), expiresAt: now + 5_000 };
-  }
-  globalThis.__piAllowedRootsCache.roots.add(cwd);
-  globalThis.__piAllowedRootsCache.expiresAt = Math.max(globalThis.__piAllowedRootsCache.expiresAt, now + 5_000);
-}
 
 export async function GET(req: NextRequest) {
   const cwd = req.nextUrl.searchParams.get("cwd")?.trim();
@@ -56,7 +44,7 @@ export async function POST(req: Request) {
       targetPath: typeof body.targetPath === "string" ? body.targetPath : undefined,
     });
 
-    addAllowedRoot(result.cwd);
+    registerAllowedRoot(result.cwd);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

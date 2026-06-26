@@ -11,11 +11,13 @@ import { SkillsConfig } from "./SkillsConfig";
 import { UsageStatsModal } from "./UsageStatsModal";
 import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
+import { TrellisPanel } from "./TrellisPanel";
 import { BranchNavigator } from "./BranchNavigator";
 import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
 import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { ChatInputHandle } from "./ChatInput";
 
 export function AppShell() {
@@ -33,9 +35,27 @@ export function AppShell() {
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [usageStatsOpen, setUsageStatsOpen] = useState(false);
   const [settingsConfigOpen, setSettingsConfigOpen] = useState(false);
+  const [webConfig, setWebConfig] = useState<PiWebConfig | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
+
+  const loadWebConfig = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/web-config", { signal });
+      const data = await res.json() as { config?: PiWebConfig; error?: string };
+      if (res.ok && data.config && !data.error) setWebConfig(data.config);
+      else setWebConfig(null);
+    } catch (error) {
+      if ((error as { name?: string }).name !== "AbortError") setWebConfig(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadWebConfig(controller.signal);
+    return () => controller.abort();
+  }, [loadWebConfig]);
 
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
@@ -97,10 +117,11 @@ export function AppShell() {
     return () => ro.disconnect();
   }, [activeTopPanel]);
 
-  // Right panel — file tabs only
+  // Right panel — file tabs and optional Trellis task drawer
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [rightPanelMode, setRightPanelMode] = useState<"files" | "trellis">("files");
 
   const handleAtMention = useCallback((relativePath: string) => {
     chatInputRef.current?.addFileReference(relativePath);
@@ -221,13 +242,14 @@ export function AppShell() {
       return [...prev, { id: tabId, label: fileName, filePath }];
     });
     setActiveFileTabId(tabId);
+    setRightPanelMode("files");
     setRightPanelOpen(true);
   }, []);
 
   const handleCloseFileTab = useCallback((tabId: string) => {
     setFileTabs((prev) => {
       const next = prev.filter((t) => t.id !== tabId);
-      if (next.length === 0) setRightPanelOpen(false);
+      if (next.length === 0 && rightPanelMode === "files") setRightPanelOpen(false);
       return next;
     });
     setActiveFileTabId((cur) => {
@@ -235,7 +257,7 @@ export function AppShell() {
       const remaining = fileTabs.filter((t) => t.id !== tabId);
       return remaining.length > 0 ? remaining[remaining.length - 1].id : null;
     });
-  }, [fileTabs]);
+  }, [fileTabs, rightPanelMode]);
 
   const handleExportSession = useCallback(() => {
     if (!selectedSession) return;
@@ -249,8 +271,18 @@ export function AppShell() {
   const showPlaceholder = initialSessionRestored && !showChat;
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
+  const trellisEnabled = webConfig?.trellis.enabled ?? false;
+  const trellisIncludeArchivedDefault = webConfig?.trellis.includeArchived ?? false;
+  const trellisCwd = activeCwd ?? selectedSession?.cwd ?? newSessionCwd;
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
+
+  useEffect(() => {
+    if (!trellisEnabled && rightPanelMode === "trellis") {
+      setRightPanelMode("files");
+      if (fileTabs.length === 0) setRightPanelOpen(false);
+    }
+  }, [trellisEnabled, rightPanelMode, fileTabs.length]);
 
   useEffect(() => {
     if (!activeCwd) {
@@ -643,7 +675,7 @@ export function AppShell() {
                   marginLeft: "auto",
                   display: "flex", alignItems: "center", gap: 10,
                   paddingLeft: 12,
-                  paddingRight: rightPanelOpen ? 12 : 48,
+                  paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48),
                   height: "100%",
                   fontSize: 11, color: "var(--text-muted)",
                   whiteSpace: "nowrap", cursor: "default",
@@ -762,7 +794,7 @@ export function AppShell() {
           ) : showPlaceholder ? (
             activeCwd ? (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 15 }}>
-                Select a session from the sidebar
+                请从侧边栏选择会话
               </div>
             ) : (
               <div style={{ position: "absolute", top: 12, left: 12, display: "flex", alignItems: "flex-start", gap: 8, userSelect: "none", pointerEvents: "none" }}>
@@ -782,7 +814,7 @@ export function AppShell() {
         </div>
       </div>
 
-      {/* Right panel: file viewer — always mounted, width animated via CSS */}
+      {/* Right panel: file viewer or Trellis — always mounted, width animated via CSS */}
       <div
         className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}`}
         style={{
@@ -792,50 +824,97 @@ export function AppShell() {
           background: "var(--bg)",
         }}
       >
-        {/* Right panel tab bar */}
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <TabBar
-              tabs={fileTabs}
-              activeTabId={activeFileTabId ?? ""}
-              onSelectTab={setActiveFileTabId}
-              onCloseTab={handleCloseFileTab}
-            />
-          </div>
-
-        </div>
-
-        {/* File content */}
-        <div style={{ flex: 1, overflow: "hidden" }}>
-          {activeFileTab?.filePath ? (
-            <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} onAddChat={handleAddChat} />
-          ) : (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
-              No file open
+        {rightPanelMode === "files" ? (
+          <>
+            {/* Right panel tab bar */}
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
+              <div style={{ flex: 1, overflow: "hidden" }}>
+                <TabBar
+                  tabs={fileTabs}
+                  activeTabId={activeFileTabId ?? ""}
+                  onSelectTab={setActiveFileTabId}
+                  onCloseTab={handleCloseFileTab}
+                />
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* File content */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              {activeFileTab?.filePath ? (
+                <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} onAddChat={handleAddChat} />
+              ) : (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
+                  没有打开文件
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36, padding: "0 12px", gap: 8 }}>
+              <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>Trellis</span>
+              {trellisCwd && <span title={trellisCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{trellisCwd}</span>}
+            </div>
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <TrellisPanel cwd={trellisCwd} includeArchivedDefault={trellisIncludeArchivedDefault} onOpenFile={handleOpenFile} />
+            </div>
+          </>
+        )}
       </div>
     </div>
-    {/* File panel toggle — always visible at top-right */}
-    <button
-      onClick={() => setRightPanelOpen((v) => !v)}
-      title={rightPanelOpen ? "Hide file panel" : "Show file panel"}
-      style={{
-        position: "fixed", top: 0, right: 0, zIndex: 300,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        width: 36, height: 36, padding: 0,
-        background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
-        color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
-        cursor: "pointer", transition: "color 0.12s",
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen ? "var(--text)" : "var(--text-muted)"; }}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
-      </svg>
-    </button>
+    {/* Right panel mode toggles — Preview first, optional Trellis to its right. */}
+    <div style={{ position: "fixed", top: 0, right: 0, zIndex: 300, display: "flex", flexDirection: "row" }}>
+      <button
+        onClick={() => {
+          if (rightPanelOpen && rightPanelMode === "files") setRightPanelOpen(false);
+          else {
+            setRightPanelMode("files");
+            setRightPanelOpen(true);
+          }
+        }}
+        title={rightPanelOpen && rightPanelMode === "files" ? "隐藏预览面板" : "显示预览面板"}
+        aria-label={rightPanelOpen && rightPanelMode === "files" ? "隐藏预览面板" : "显示预览面板"}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, padding: 0,
+          background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+          color: rightPanelOpen && rightPanelMode === "files" ? "var(--text)" : "var(--text-muted)",
+          cursor: "pointer", transition: "color 0.12s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen && rightPanelMode === "files" ? "var(--text)" : "var(--text-muted)"; }}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      {trellisEnabled && (
+        <button
+          onClick={() => {
+            if (rightPanelOpen && rightPanelMode === "trellis") setRightPanelOpen(false);
+            else {
+              setRightPanelMode("trellis");
+              setRightPanelOpen(true);
+            }
+          }}
+          title={rightPanelOpen && rightPanelMode === "trellis" ? "隐藏 Trellis 面板" : "显示 Trellis 面板"}
+          aria-label={rightPanelOpen && rightPanelMode === "trellis" ? "隐藏 Trellis 面板" : "显示 Trellis 面板"}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 36, height: 36, padding: 0,
+            background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+            color: rightPanelOpen && rightPanelMode === "trellis" ? "var(--accent)" : "var(--text-muted)",
+            cursor: "pointer", transition: "color 0.12s",
+            fontSize: 12, fontWeight: 800,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen && rightPanelMode === "trellis" ? "var(--accent)" : "var(--text-muted)"; }}
+        >
+          T
+        </button>
+      )}
+    </div>
     {modelsConfigOpen && <ModelsConfig onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }} />}
     {skillsConfigOpen && (activeCwd ?? selectedSession?.cwd ?? newSessionCwd) && (
       <SkillsConfig cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!} onClose={() => setSkillsConfigOpen(false)} />
@@ -843,7 +922,7 @@ export function AppShell() {
     {usageStatsOpen && (
       <UsageStatsModal cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} onClose={() => setUsageStatsOpen(false)} />
     )}
-    {settingsConfigOpen && <SettingsConfig onClose={() => setSettingsConfigOpen(false)} />}
+    {settingsConfigOpen && <SettingsConfig onClose={() => { setSettingsConfigOpen(false); void loadWebConfig(); }} />}
     </>
   );
 }
