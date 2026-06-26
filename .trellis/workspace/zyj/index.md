@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
-- **Last Active**: 2026-06-25
+- **Total Sessions**: 10
+- **Last Active**: 2026-06-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~311 | Active |
+| `journal-1.md` | ~344 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-06-26 | ChatGPT account management polish | `a4ef952` | `pi/20260626-085608` |
 | 9 | 2026-06-25 | Session archive feature | `bf31191` | `feat/session-archive` |
 | 8 | 2026-06-25 | ChatGPT account switching | `5408f36` | `pi/20260625-142741` |
 | 7 | 2026-06-25 | Clean up deleted WorkTree sessions | `5feb6f4` | `fix/worktree-session-cleanup` |
