@@ -38,6 +38,8 @@ interface PiRunConfig {
   model?: string;
   thinking?: string;
   routing?: SubagentRoutingDecision;
+  fallbackModels?: string[];
+  finalFallbackModel?: string;
 }
 
 type SubagentModelMode = "followMain" | "piDefault" | "specific" | "unset";
@@ -342,6 +344,10 @@ function applyRunConfig(r: RunState, cfg: PiRunConfig) {
   r.model = parsed.model;
   r.thinking = parsed.thinking;
   r.routing = cfg.routing;
+}
+function withFallbackModels(cfg: PiRunConfig, agentCfg: AgentConfig, parentModel?: ParentModelRef | null): PiRunConfig {
+  const finalFallbackModel = parentModel ? `${parentModel.provider}/${parentModel.modelId}` : undefined;
+  return { ...cfg, fallbackModels: agentCfg.fallbackModels, finalFallbackModel };
 }
 function runElapsed(d: ProgressDetails, r: RunState) {
   const start = r.startedAt ?? d.startedAt;
@@ -1497,6 +1503,55 @@ function runPi(
   });
 }
 
+async function runPiWithFallback(
+  root: string,
+  prompt: string,
+  cfg: PiRunConfig,
+  state: RunState,
+  emit: (force?: boolean) => void,
+  key?: string | null,
+  signal?: AbortSignal,
+): Promise<{ output: string; failed: boolean }> {
+  const fallbackModels = (cfg.fallbackModels ?? []).filter(Boolean);
+  const seen = new Set<string>();
+  const fallbackAttempts = [
+    ...fallbackModels.map((model) => ({ model, reason: "fallback retry" })),
+    ...(cfg.finalFallbackModel ? [{ model: cfg.finalFallbackModel, reason: "final fallback to main model" }] : []),
+  ].filter(({ model }) => {
+    const key = model.replace(suffixRe, "");
+    if (key === cfg.model?.replace(suffixRe, "") || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const attempts: PiRunConfig[] = [
+    cfg,
+    ...fallbackAttempts.map(({ model, reason }) => ({
+      ...cfg,
+      model,
+      routing: {
+        ...cfg.routing,
+        model,
+        fallbackReason: reason,
+      },
+    })),
+  ];
+  let last: { output: string; failed: boolean } = { output: "", failed: true };
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i]!;
+    if (i > 0) {
+      state.status = "pending";
+      state.finishedAt = undefined;
+      state.errorMessage = undefined;
+      state.stderrTail = appendTail(state.stderrTail, `\nRetrying with fallback model: ${attempt.model}\n`, MAX_TAIL);
+      applyRunConfig(state, attempt);
+      emit(true);
+    }
+    last = await runPi(root, prompt, attempt, state, emit, key, signal);
+    if (!last.failed || state.status === "cancelled") return last;
+  }
+  return last;
+}
+
 // ── runSubagent: orchestrate single/parallel/chain via native partial updates ──
 async function runSubagent(
   root: string,
@@ -1511,7 +1566,7 @@ async function runSubagent(
   const agentRaw = readText(join(root, ".pi", "agents", `${agentName}.md`));
   const agentCfg = parseAgentFM(agentRaw);
   const routingConfig = readSubagentRoutingConfig();
-  const runCfg = resolveRunCfg(root, input, agentCfg, inheritedThinking, routingConfig, parentModel ?? null, agentName);
+  const runCfg = withFallbackModels(resolveRunCfg(root, input, agentCfg, inheritedThinking, routingConfig, parentModel ?? null, agentName), agentCfg, parentModel);
   const mode = input.mode ?? "single";
   const startedAt = Date.now();
   const details: ProgressDetails = {
@@ -1563,7 +1618,7 @@ async function runSubagent(
       emit(true);
       const results = await Promise.all(
         prompts.map((p, i) =>
-          runPi(
+          runPiWithFallback(
             root,
             buildPrompt(root, { ...input, prompt: p }, key),
             runCfg,
@@ -1588,7 +1643,7 @@ async function runSubagent(
         applyRunConfig(rs, runCfg);
         details.runs.push(rs);
         emit(true);
-        const result = await runPi(
+        const result = await runPiWithFallback(
           root,
           buildPrompt(
             root,
@@ -1614,7 +1669,7 @@ async function runSubagent(
     applyRunConfig(rs, runCfg);
     details.runs = [rs];
     emit(true);
-    const result = await runPi(
+    const result = await runPiWithFallback(
       root,
       buildPrompt(root, input, key),
       runCfg,
