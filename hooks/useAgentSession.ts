@@ -59,6 +59,12 @@ export interface SubagentRun {
   startedAt: number;
   depth: number;
   parentId?: string;
+  routing?: {
+    source?: string;
+    model?: string;
+    thinking?: string;
+    fallbackReason?: string;
+  };
   /** Path to this subagent's own session JSONL (for recursive child lookup) */
   sessionFile?: string;
   /** Lazily-loaded nested children */
@@ -155,7 +161,7 @@ function extractSubagentRuns(
   }
 
   // Single-agent mode: { agent, task/prompt }
-  const agent = (args.agent ?? args.prompt ?? "") as string;
+  const agent = (args.agent ?? fallbackAgent) as string;
   if (agent) {
     const task = (args.task ?? args.prompt ?? "") as string;
     return [{
@@ -413,18 +419,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       case "tool_execution_update": {
         const updateId = event.toolCallId as string;
-        const partial = event.partialResult as { content?: { text?: string }[] } | undefined;
-        if (partial?.content?.length) {
-          const text = partial.content.map((c) => c.text ?? "").join("");
-          if (text) {
-            setSubagentRuns((prev) =>
-              prev.map((r) =>
-                r.id === updateId
-                  ? { ...r, partialOutput: r.partialOutput + text }
-                  : r,
-              ),
-            );
-          }
+        const partial = event.partialResult as { content?: { text?: string }[]; details?: { routing?: SubagentRun["routing"]; runs?: { routing?: SubagentRun["routing"] }[] } } | undefined;
+        const text = partial?.content?.map((c) => c.text ?? "").join("") ?? "";
+        const routing = partial?.details?.routing ?? partial?.details?.runs?.find((run) => run.routing)?.routing;
+        if (text || routing) {
+          setSubagentRuns((prev) =>
+            prev.map((r) =>
+              r.id === updateId || r.id.startsWith(updateId + "-")
+                ? { ...r, partialOutput: text ? r.partialOutput + text : r.partialOutput, routing: routing ?? r.routing }
+                : r,
+            ),
+          );
         }
         break;
       }
@@ -435,9 +440,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           (event.result as { content?: { text?: string }[] } | undefined)
             ?.content?.map((c) => c.text ?? "")
             .join("") ?? undefined;
-        // Extract sessionFile from details.results for subagent tool calls
-        const details = (event.result as { details?: { results?: { agent?: string; sessionFile?: string }[] } } | undefined)?.details;
+        // Extract sessionFile/routing metadata from subagent tool-call details.
+        const details = (event.result as { details?: { results?: { agent?: string; sessionFile?: string }[]; routing?: SubagentRun["routing"]; runs?: { routing?: SubagentRun["routing"] }[] } } | undefined)?.details;
         const childSessions = details?.results?.map((r: { agent?: string; sessionFile?: string }) => r.sessionFile).filter(Boolean) ?? [];
+        const routing = details?.routing ?? details?.runs?.find((run) => run.routing)?.routing;
         setSubagentRuns((prev) =>
           prev.map((r) => {
             if (r.id === endId || r.id.startsWith(endId + "-")) {
@@ -451,7 +457,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
                   sessionFile = childSessions[idx];
                 }
               }
-              return { ...r, status: isError ? "failed" : "completed", result: resultText, partialOutput: "", sessionFile: sessionFile ?? r.sessionFile };
+              return { ...r, status: isError ? "failed" : "completed", result: resultText, partialOutput: "", sessionFile: sessionFile ?? r.sessionFile, routing: routing ?? r.routing };
             }
             return r;
           }),

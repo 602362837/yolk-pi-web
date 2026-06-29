@@ -10,11 +10,38 @@ export interface PiWebWorktreeConfig {
   sessionDisplay: "separate" | "tag";
 }
 
+export type PiWebSubagentModelMode = "followMain" | "piDefault" | "specific" | "unset";
+export type PiWebSubagentThinking = "inherit" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type PiWebSubagentAgentStrategy = "default" | "fixed" | "disabled";
+
+export interface PiWebSubagentModelRef {
+  mode: PiWebSubagentModelMode;
+  provider?: string;
+  modelId?: string;
+}
+
+export interface PiWebSubagentRunPolicy {
+  model: PiWebSubagentModelRef;
+  thinking: PiWebSubagentThinking;
+}
+
+export interface PiWebSubagentAgentConfig {
+  strategy: PiWebSubagentAgentStrategy;
+  fixed?: PiWebSubagentRunPolicy;
+}
+
+export interface PiWebTrellisSubagentsConfig {
+  enabled: boolean;
+  defaultPolicy: PiWebSubagentRunPolicy;
+  agents: Record<string, PiWebSubagentAgentConfig>;
+}
+
 export interface PiWebTrellisConfig {
   enabled: boolean;
   includeArchived: boolean;
   proxyEnabled: boolean;
   proxyUrl: string;
+  subagents: PiWebTrellisSubagentsConfig;
 }
 
 export interface PiWebConfig {
@@ -55,6 +82,18 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     includeArchived: false,
     proxyEnabled: false,
     proxyUrl: "",
+    subagents: {
+      enabled: true,
+      defaultPolicy: {
+        model: { mode: "followMain" },
+        thinking: "inherit",
+      },
+      agents: {
+        "trellis-implement": { strategy: "default" },
+        "trellis-check": { strategy: "default" },
+        "trellis-research": { strategy: "default" },
+      },
+    },
   },
 };
 
@@ -72,6 +111,66 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 
 function readSessionDisplay(value: unknown, fallback: "separate" | "tag"): "separate" | "tag" {
   return value === "separate" || value === "tag" ? value : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readSubagentModelRef(value: unknown, fallback: PiWebSubagentModelRef): PiWebSubagentModelRef {
+  if (!isRecord(value)) return fallback;
+  const mode = value.mode;
+  if (mode === "followMain" || mode === "piDefault" || mode === "unset") return { mode };
+  if (mode === "specific") {
+    const provider = typeof value.provider === "string" ? value.provider.trim() : "";
+    const modelId = typeof value.modelId === "string" ? value.modelId.trim() : "";
+    if (provider && modelId) return { mode, provider, modelId };
+  }
+  return fallback;
+}
+
+function readSubagentThinking(value: unknown, fallback: PiWebSubagentThinking): PiWebSubagentThinking {
+  return value === "inherit" || value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh"
+    ? value
+    : fallback;
+}
+
+function readSubagentPolicy(value: unknown, fallback: PiWebSubagentRunPolicy): PiWebSubagentRunPolicy {
+  const root = isRecord(value) ? value : {};
+  return {
+    model: readSubagentModelRef(root.model, fallback.model),
+    thinking: readSubagentThinking(root.thinking, fallback.thinking),
+  };
+}
+
+function readSubagentAgentConfig(value: unknown, fallback: PiWebSubagentAgentConfig): PiWebSubagentAgentConfig {
+  const root = isRecord(value) ? value : {};
+  const strategy = root.strategy === "default" || root.strategy === "fixed" || root.strategy === "disabled" ? root.strategy : fallback.strategy;
+  const fixedFallback = fallback.fixed ?? DEFAULT_PI_WEB_CONFIG.trellis.subagents.defaultPolicy;
+  return {
+    strategy,
+    fixed: root.fixed || fallback.fixed ? readSubagentPolicy(root.fixed, fixedFallback) : undefined,
+  };
+}
+
+function readSubagentAgents(value: unknown, fallback: Record<string, PiWebSubagentAgentConfig>): Record<string, PiWebSubagentAgentConfig> {
+  const out: Record<string, PiWebSubagentAgentConfig> = { ...fallback };
+  if (!isRecord(value)) return out;
+  for (const [agent, rawConfig] of Object.entries(value)) {
+    const cleanAgent = agent.trim();
+    if (!cleanAgent) continue;
+    out[cleanAgent] = readSubagentAgentConfig(rawConfig, out[cleanAgent] ?? { strategy: "default" });
+  }
+  return out;
+}
+
+function readTrellisSubagentsConfig(value: unknown, fallback: PiWebTrellisSubagentsConfig): PiWebTrellisSubagentsConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    defaultPolicy: readSubagentPolicy(root.defaultPolicy, fallback.defaultPolicy),
+    agents: readSubagentAgents(root.agents, fallback.agents),
+  };
 }
 
 function normalizePiWebConfig(raw: unknown): PiWebConfig {
@@ -92,12 +191,9 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       includeArchived: readBoolean(trellis.includeArchived, defaults.trellis.includeArchived),
       proxyEnabled: readBoolean(trellis.proxyEnabled, defaults.trellis.proxyEnabled),
       proxyUrl: typeof trellis.proxyUrl === "string" ? trellis.proxyUrl.trim() : defaults.trellis.proxyUrl,
+      subagents: readTrellisSubagentsConfig(trellis.subagents, defaults.trellis.subagents),
     },
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function readRawConfigFile(path: string): { raw: Record<string, unknown>; exists: boolean; parseError?: string } {
@@ -178,6 +274,59 @@ function validateProxyUrl(value: unknown, enabled: boolean): string {
   return proxyUrl;
 }
 
+function validateSubagentModelRef(value: unknown, field: string): PiWebSubagentModelRef {
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field}.model must be an object`);
+  const mode = value.mode;
+  if (mode === "followMain" || mode === "piDefault" || mode === "unset") return { mode };
+  if (mode !== "specific") throw new PiWebConfigValidationError(`${field}.model.mode is invalid`);
+  return {
+    mode,
+    provider: requireNonEmptyString(value.provider, `${field}.model.provider`),
+    modelId: requireNonEmptyString(value.modelId, `${field}.model.modelId`),
+  };
+}
+
+function validateSubagentThinking(value: unknown, field: string): PiWebSubagentThinking {
+  if (value === "inherit" || value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh") return value;
+  throw new PiWebConfigValidationError(`${field}.thinking is invalid`);
+}
+
+function validateSubagentPolicy(value: unknown, field: string): PiWebSubagentRunPolicy {
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field} must be an object`);
+  return {
+    model: validateSubagentModelRef(value.model, field),
+    thinking: validateSubagentThinking(value.thinking, field),
+  };
+}
+
+function validateSubagentAgentConfig(value: unknown, field: string): PiWebSubagentAgentConfig {
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field} must be an object`);
+  const strategy = value.strategy;
+  if (strategy !== "default" && strategy !== "fixed" && strategy !== "disabled") {
+    throw new PiWebConfigValidationError(`${field}.strategy is invalid`);
+  }
+  return {
+    strategy,
+    fixed: value.fixed === undefined ? undefined : validateSubagentPolicy(value.fixed, `${field}.fixed`),
+  };
+}
+
+function validateTrellisSubagentsConfig(value: unknown): PiWebTrellisSubagentsConfig {
+  if (!isRecord(value)) throw new PiWebConfigValidationError("trellis.subagents must be an object");
+  const agentsRaw = isRecord(value.agents) ? value.agents : {};
+  const agents: Record<string, PiWebSubagentAgentConfig> = {};
+  for (const [agent, rawConfig] of Object.entries(agentsRaw)) {
+    const cleanAgent = agent.trim();
+    if (!cleanAgent) throw new PiWebConfigValidationError("trellis.subagents.agents keys must be non-empty");
+    agents[cleanAgent] = validateSubagentAgentConfig(rawConfig, `trellis.subagents.agents.${cleanAgent}`);
+  }
+  return {
+    enabled: requireBoolean(value.enabled, "trellis.subagents.enabled"),
+    defaultPolicy: validateSubagentPolicy(value.defaultPolicy, "trellis.subagents.defaultPolicy"),
+    agents,
+  };
+}
+
 export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("trellis config must be an object");
@@ -189,6 +338,9 @@ export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
     includeArchived: requireBoolean(value.includeArchived, "trellis.includeArchived"),
     proxyEnabled,
     proxyUrl: validateProxyUrl(proxyUrl, proxyEnabled),
+    subagents: value.subagents === undefined
+      ? DEFAULT_PI_WEB_CONFIG.trellis.subagents
+      : validateTrellisSubagentsConfig(value.subagents),
   };
 }
 

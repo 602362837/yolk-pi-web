@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PiWebConfig, PiWebTrellisConfig, PiWebWorktreeConfig } from "@/lib/pi-web-config";
+import type {
+  PiWebConfig,
+  PiWebSubagentAgentConfig,
+  PiWebSubagentModelRef,
+  PiWebSubagentRunPolicy,
+  PiWebTrellisConfig,
+  PiWebWorktreeConfig,
+} from "@/lib/pi-web-config";
 import type { TrellisCommandResponse, TrellisSetupStatus } from "@/lib/trellis-setup-types";
 
 interface WebConfigResponse {
@@ -20,6 +27,18 @@ interface TrellisStatusResponse {
 
 interface TrellisActionResponse extends TrellisCommandResponse {
   config?: PiWebConfig;
+}
+
+interface ModelListItem {
+  id: string;
+  name: string;
+  provider: string;
+}
+
+interface ModelsResponse {
+  modelList?: ModelListItem[];
+  defaultModel?: { provider: string; modelId: string } | null;
+  error?: string;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -45,6 +64,24 @@ const TEMPLATE_VARIABLES = [
 ];
 
 type SettingsSection = "worktree" | "trellis";
+type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
+
+const SUBAGENT_AGENT_NAMES = ["trellis-implement", "trellis-check", "trellis-research"];
+const SUBAGENT_THINKING_OPTIONS: SubagentThinkingOption[] = ["inherit", "off", "minimal", "low", "medium", "high", "xhigh"];
+
+function formatModelValue(model: PiWebSubagentModelRef): string {
+  if (model.mode !== "specific") return model.mode;
+  return `specific:${model.provider ?? ""}/${model.modelId ?? ""}`;
+}
+
+function parseModelValue(value: string): PiWebSubagentModelRef {
+  if (value === "followMain" || value === "piDefault" || value === "unset") return { mode: value };
+  if (value.startsWith("specific:")) {
+    const [provider, modelId] = value.slice("specific:".length).split("/");
+    if (provider && modelId) return { mode: "specific", provider, modelId };
+  }
+  return { mode: "unset" };
+}
 
 function Field({
   label,
@@ -84,6 +121,60 @@ function TextInput({
       spellCheck={false}
       style={{ ...inputStyle, fontFamily: "var(--font-mono)", opacity: disabled ? 0.6 : 1, cursor: disabled ? "not-allowed" : "text" }}
     />
+  );
+}
+
+function ModelPolicySelect({
+  value,
+  onChange,
+  models,
+  disabled = false,
+}: {
+  value: PiWebSubagentModelRef;
+  onChange: (value: PiWebSubagentModelRef) => void;
+  models: ModelListItem[];
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      value={formatModelValue(value)}
+      onChange={(e) => onChange(parseModelValue(e.target.value))}
+      disabled={disabled}
+      style={{ ...inputStyle, opacity: disabled ? 0.6 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+    >
+      <option value="followMain">跟随主会话模型</option>
+      <option value="piDefault">使用 Pi 默认模型</option>
+      <option value="unset">本层不指定</option>
+      {models.length > 0 && <option disabled>──────────</option>}
+      {models.map((model) => (
+        <option key={`${model.provider}/${model.id}`} value={`specific:${model.provider}/${model.id}`}>
+          {model.name} · {model.provider}/{model.id}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ThinkingSelect({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: SubagentThinkingOption;
+  onChange: (value: SubagentThinkingOption) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as SubagentThinkingOption)}
+      disabled={disabled}
+      style={{ ...inputStyle, opacity: disabled ? 0.6 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+    >
+      {SUBAGENT_THINKING_OPTIONS.map((option) => (
+        <option key={option} value={option}>{option === "inherit" ? "继承主会话 thinking" : option}</option>
+      ))}
+    </select>
   );
 }
 
@@ -194,10 +285,7 @@ function worktreeConfigsEqual(a: PiWebWorktreeConfig | null, b: PiWebWorktreeCon
 
 function trellisConfigsEqual(a: PiWebTrellisConfig | null, b: PiWebTrellisConfig | null): boolean {
   if (!a || !b) return a === b;
-  return a.enabled === b.enabled
-    && a.includeArchived === b.includeArchived
-    && a.proxyEnabled === b.proxyEnabled
-    && a.proxyUrl === b.proxyUrl;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string | null; onClose: () => void; onConfigChange?: () => void }) {
@@ -218,6 +306,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [trellisStatusError, setTrellisStatusError] = useState<string | null>(null);
   const [trellisAction, setTrellisAction] = useState<"init" | "update" | null>(null);
   const [trellisOutput, setTrellisOutput] = useState<string | null>(null);
+  const [modelList, setModelList] = useState<ModelListItem[]>([]);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [developerName, setDeveloperName] = useState("");
   const [developerNameTouched, setDeveloperNameTouched] = useState(false);
 
@@ -249,6 +339,20 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadModels = useCallback(async (signal?: AbortSignal) => {
+    setModelsError(null);
+    try {
+      const res = await fetch("/api/models", { signal });
+      const data = await res.json() as ModelsResponse;
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setModelList(data.modelList ?? []);
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") return;
+      setModelsError(err instanceof Error ? err.message : String(err));
+      setModelList([]);
     }
   }, []);
 
@@ -293,8 +397,9 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     if (section !== "trellis") return;
     const controller = new AbortController();
     void loadTrellisStatus(controller.signal);
+    void loadModels(controller.signal);
     return () => controller.abort();
-  }, [section, loadTrellisStatus]);
+  }, [section, loadModels, loadTrellisStatus]);
 
   const updateWorktree = useCallback((patch: Partial<PiWebWorktreeConfig>) => {
     setWorktree((prev) => prev ? { ...prev, ...patch } : prev);
@@ -303,6 +408,43 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
 
   const updateTrellis = useCallback((patch: Partial<PiWebTrellisConfig>) => {
     setTrellis((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateDefaultSubagentPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
+    setTrellis((prev) => prev ? {
+      ...prev,
+      subagents: {
+        ...prev.subagents,
+        defaultPolicy: { ...prev.subagents.defaultPolicy, ...patch },
+      },
+    } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateSubagentConfig = useCallback((patch: Partial<PiWebTrellisConfig["subagents"]>) => {
+    setTrellis((prev) => prev ? {
+      ...prev,
+      subagents: { ...prev.subagents, ...patch },
+    } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateSubagentAgent = useCallback((agent: string, patch: Partial<PiWebSubagentAgentConfig>) => {
+    setTrellis((prev) => {
+      if (!prev) return prev;
+      const current = prev.subagents.agents[agent] ?? { strategy: "default" as const };
+      return {
+        ...prev,
+        subagents: {
+          ...prev.subagents,
+          agents: {
+            ...prev.subagents.agents,
+            [agent]: { ...current, ...patch },
+          },
+        },
+      };
+    });
     setNotice(null);
   }, []);
 
@@ -572,6 +714,73 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                       <Field label="代理地址" description="示例：https://127.0.0.1:7890。启用代理时会写入 HTTP_PROXY / HTTPS_PROXY / npm_config_proxy 等子进程环境变量。">
                         <TextInput value={trellis.proxyUrl} onChange={(proxyUrl) => updateTrellis({ proxyUrl })} placeholder="http://127.0.0.1:7890" disabled={!trellis.proxyEnabled} />
                       </Field>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>Subagent 模型</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
+                          配置 Trellis subagent 子进程使用的模型。默认跟随主会话模型；显式工具入参仍然拥有最高优先级。
+                        </div>
+                      </div>
+                      {modelsError && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 11 }}>{modelsError}</div>}
+                      <ToggleField
+                        label="启用 Subagent 模型策略"
+                        description="关闭后保持当前行为：仅使用工具入参、agent frontmatter 或 Pi CLI 默认模型。自动路由仍需后续高级开关单独启用。"
+                        checked={trellis.subagents.enabled}
+                        onChange={(enabled) => updateSubagentConfig({ enabled })}
+                      />
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+                        <Field label="默认模型策略" description="未命中 per-agent 固定策略时使用。">
+                          <ModelPolicySelect
+                            value={trellis.subagents.defaultPolicy.model}
+                            onChange={(model) => updateDefaultSubagentPolicy({ model })}
+                            models={modelList}
+                            disabled={!trellis.subagents.enabled}
+                          />
+                        </Field>
+                        <Field label="默认 Thinking" description="inherit 表示继承主会话 thinking。">
+                          <ThinkingSelect
+                            value={trellis.subagents.defaultPolicy.thinking}
+                            onChange={(thinking) => updateDefaultSubagentPolicy({ thinking })}
+                            disabled={!trellis.subagents.enabled}
+                          />
+                        </Field>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 700 }}>内置 Trellis Agent 覆盖</div>
+                        {SUBAGENT_AGENT_NAMES.map((agent) => {
+                          const agentConfig = trellis.subagents.agents[agent] ?? { strategy: "default" as const };
+                          const fixed = agentConfig.fixed ?? trellis.subagents.defaultPolicy;
+                          const fixedDisabled = !trellis.subagents.enabled || agentConfig.strategy !== "fixed";
+                          return (
+                            <div key={agent} style={{ display: "grid", gridTemplateColumns: "150px 120px minmax(180px, 1fr) 120px", gap: 8, alignItems: "center" }}>
+                              <code style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis" }}>{agent}</code>
+                              <select
+                                value={agentConfig.strategy}
+                                onChange={(e) => updateSubagentAgent(agent, { strategy: e.target.value as PiWebSubagentAgentConfig["strategy"] })}
+                                disabled={!trellis.subagents.enabled}
+                                style={{ ...inputStyle, opacity: trellis.subagents.enabled ? 1 : 0.6 }}
+                              >
+                                <option value="default">默认策略</option>
+                                <option value="fixed">固定模型</option>
+                                <option value="disabled">禁用策略</option>
+                              </select>
+                              <ModelPolicySelect
+                                value={fixed.model}
+                                onChange={(model) => updateSubagentAgent(agent, { fixed: { ...fixed, model } })}
+                                models={modelList}
+                                disabled={fixedDisabled}
+                              />
+                              <ThinkingSelect
+                                value={fixed.thinking}
+                                onChange={(thinking) => updateSubagentAgent(agent, { fixed: { ...fixed, thinking } })}
+                                disabled={fixedDisabled}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div style={{ padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 10 }}>

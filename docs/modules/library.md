@@ -19,7 +19,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/subscription-quota.ts` | Query OpenAI Codex subscription quota. |
 | `lib/npx.ts` | Cross-platform `npx` wrapper that avoids shell quoting issues. |
 | `lib/usage-stats.ts` | Aggregate token/cost by day, model, provider, and session. |
-| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree and Trellis panel settings, including Trellis install/update proxy options. |
+| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree and Trellis panel settings, including Trellis install/update proxy options and Trellis subagent model policy. |
 | `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs. |
 | `lib/trellis-manager.ts` | Trellis setup/status/update helper: prerequisite checks, CLI/version inspection, proxy-scoped child-process environment, and fixed Trellis/npm command execution. |
 | `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, optional `meta.lastCheck` quality-check state, and phase/progress derivation. |

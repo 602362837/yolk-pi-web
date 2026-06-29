@@ -16,6 +16,7 @@ interface PiExtensionContext {
     getSessionId?: () => string;
     getSessionFile?: () => string | undefined;
   };
+  model?: { id?: string; provider?: string };
   ui?: {
     notify?: (msg: string, type?: "info" | "warning" | "error") => void;
   };
@@ -36,6 +37,39 @@ interface AgentConfig {
 interface PiRunConfig {
   model?: string;
   thinking?: string;
+  routing?: SubagentRoutingDecision;
+}
+
+type SubagentModelMode = "followMain" | "piDefault" | "specific" | "unset";
+type SubagentThinking = "inherit" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type SubagentAgentStrategy = "default" | "fixed" | "disabled";
+interface SubagentModelRef {
+  mode: SubagentModelMode;
+  provider?: string;
+  modelId?: string;
+}
+interface SubagentRunPolicy {
+  model: SubagentModelRef;
+  thinking: SubagentThinking;
+}
+interface SubagentAgentOverride {
+  strategy: SubagentAgentStrategy;
+  fixed?: SubagentRunPolicy;
+}
+interface SubagentRoutingConfig {
+  enabled: boolean;
+  defaultPolicy: SubagentRunPolicy;
+  agents: Record<string, SubagentAgentOverride>;
+}
+interface ParentModelRef {
+  provider: string;
+  modelId: string;
+}
+interface SubagentRoutingDecision {
+  source: "toolInput" | "agentFixed" | "defaultPolicy" | "agentFrontmatter" | "followMain" | "piDefault" | "disabled";
+  model?: string;
+  thinking?: string;
+  fallbackReason?: string;
 }
 
 // ── Lazy-load pi-tui (avoid failing top-level imports) ─────────────────
@@ -119,6 +153,7 @@ interface RunState {
   usage: Usage;
   model?: string;
   thinking?: string;
+  routing?: SubagentRoutingDecision;
   errorMessage?: string;
 }
 interface ProgressDetails {
@@ -128,6 +163,7 @@ interface ProgressDetails {
   startedAt: number;
   updatedAt: number;
   final: boolean;
+  routing?: SubagentRoutingDecision;
   runs: RunState[];
 }
 
@@ -288,6 +324,7 @@ function applyRunConfig(r: RunState, cfg: PiRunConfig) {
   const parsed = splitModelThinking(cfg.model, cfg.thinking);
   r.model = parsed.model;
   r.thinking = parsed.thinking;
+  r.routing = cfg.routing;
 }
 function runElapsed(d: ProgressDetails, r: RunState) {
   const start = r.startedAt ?? d.startedAt;
@@ -295,9 +332,17 @@ function runElapsed(d: ProgressDetails, r: RunState) {
     r.finishedAt ?? (r.status === "running" ? Date.now() : d.updatedAt);
   return fmtDur(Math.max(0, end - start));
 }
+function routingLabel(r: RunState) {
+  const decision = r.routing;
+  if (!decision) return undefined;
+  const target = decision.model ?? (decision.source === "piDefault" ? "Pi default" : undefined);
+  const thinking = decision.thinking && decision.thinking !== "off" ? `:${decision.thinking}` : "";
+  return target ? `${decision.source}→${target}${thinking}` : decision.source;
+}
 function runHeader(d: ProgressDetails, r: RunState) {
   const usage = fmtUsage(r.usage, modelLabel(r)) || fmtUsage(totalUsage(d));
-  return `${r.agent} · ${progressDone(d)}/${d.runs.length} done · ${progressState(d)} · ${runElapsed(d, r)}${usage ? ` · ${usage}` : ""}`;
+  const routing = routingLabel(r);
+  return `${r.agent} · ${progressDone(d)}/${d.runs.length} done · ${progressState(d)} · ${runElapsed(d, r)}${routing ? ` · ${routing}` : ""}${usage ? ` · ${usage}` : ""}`;
 }
 function renderRunBlock(
   lines: string[],
@@ -630,32 +675,141 @@ function resolvePiCli(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const suffixRe = /:(off|minimal|low|medium|high|xhigh)$/i;
+function normalizeThinking(v: unknown): string | undefined {
+  const s = typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "";
+  return THINKING_LEVELS.includes(s) ? s : undefined;
+}
+function normalizePolicyThinking(v: unknown, fallback: SubagentThinking): SubagentThinking {
+  return v === "inherit" || THINKING_LEVELS.includes(String(v)) ? (v as SubagentThinking) : fallback;
+}
+function defaultSubagentRoutingConfig(): SubagentRoutingConfig {
+  return {
+    enabled: true,
+    defaultPolicy: { model: { mode: "followMain" }, thinking: "inherit" },
+    agents: {
+      "trellis-implement": { strategy: "default" },
+      "trellis-check": { strategy: "default" },
+      "trellis-research": { strategy: "default" },
+    },
+  };
+}
+function readPolicyModel(value: unknown, fallback: SubagentModelRef): SubagentModelRef {
+  if (!isObj(value)) return fallback;
+  if (value.mode === "followMain" || value.mode === "piDefault" || value.mode === "unset") return { mode: value.mode };
+  if (value.mode === "specific") {
+    const provider = str(value.provider);
+    const modelId = str(value.modelId);
+    if (provider && modelId) return { mode: "specific", provider, modelId };
+  }
+  return fallback;
+}
+function readPolicy(value: unknown, fallback: SubagentRunPolicy): SubagentRunPolicy {
+  const root = isObj(value) ? value : {};
+  return {
+    model: readPolicyModel(root.model, fallback.model),
+    thinking: normalizePolicyThinking(root.thinking, fallback.thinking),
+  };
+}
+function normalizeRoutingConfig(raw: unknown): SubagentRoutingConfig {
+  const fallback = defaultSubagentRoutingConfig();
+  const root = isObj(raw) ? raw : {};
+  const agents: Record<string, SubagentAgentOverride> = { ...fallback.agents };
+  const rawAgents = isObj(root.agents) ? root.agents : {};
+  for (const [agent, rawConfig] of Object.entries(rawAgents)) {
+    if (!isObj(rawConfig)) continue;
+    const strategy = rawConfig.strategy === "default" || rawConfig.strategy === "fixed" || rawConfig.strategy === "disabled" ? rawConfig.strategy : "default";
+    agents[agent] = {
+      strategy,
+      fixed: rawConfig.fixed ? readPolicy(rawConfig.fixed, fallback.defaultPolicy) : undefined,
+    };
+  }
+  return {
+    enabled: typeof root.enabled === "boolean" ? root.enabled : fallback.enabled,
+    defaultPolicy: readPolicy(root.defaultPolicy, fallback.defaultPolicy),
+    agents,
+  };
+}
+function agentDirFromRuntime(): string | null {
+  try {
+    const mod = require("@earendil-works/pi-coding-agent") as { getAgentDir?: () => string };
+    const dir = mod.getAgentDir?.();
+    if (dir) return dir;
+  } catch {}
+  const home = process.env.HOME || process.env.USERPROFILE;
+  return home ? join(home, ".pi", "agent") : null;
+}
+function readSubagentRoutingConfig(): SubagentRoutingConfig | null {
+  const dir = agentDirFromRuntime();
+  if (!dir) return null;
+  const path = join(dir, "pi-web.json");
+  if (!exists(path)) return defaultSubagentRoutingConfig();
+  try {
+    const parsed = JSON.parse(readText(path)) as JsonObject;
+    const trellis = isObj(parsed.trellis) ? parsed.trellis : {};
+    return normalizeRoutingConfig(trellis.subagents);
+  } catch {
+    return null;
+  }
+}
+function parentModelFromCtx(ctx?: PiExtensionContext): ParentModelRef | null {
+  const provider = str(ctx?.model?.provider);
+  const modelId = str(ctx?.model?.id);
+  return provider && modelId ? { provider, modelId } : null;
+}
+function modelRefToCli(model: SubagentModelRef, parent: ParentModelRef | null): { model?: string; source: SubagentRoutingDecision["source"]; fallbackReason?: string } {
+  if (model.mode === "specific" && model.provider && model.modelId) return { model: `${model.provider}/${model.modelId}`, source: "defaultPolicy" };
+  if (model.mode === "followMain") {
+    if (parent) return { model: `${parent.provider}/${parent.modelId}`, source: "followMain" };
+    return { source: "piDefault", fallbackReason: "main session model unavailable" };
+  }
+  if (model.mode === "piDefault") return { source: "piDefault" };
+  return { source: "disabled" };
+}
+function resolvePolicyCfg(policy: SubagentRunPolicy, inheritedThinking: string | undefined, parent: ParentModelRef | null, source: SubagentRoutingDecision["source"]): PiRunConfig | null {
+  if (policy.model.mode === "unset") return null;
+  const model = modelRefToCli(policy.model, parent);
+  const thinking = policy.thinking === "inherit" ? normalizeThinking(inheritedThinking) : normalizeThinking(policy.thinking);
+  const decision: SubagentRoutingDecision = { source: model.source === "defaultPolicy" ? source : model.source, model: model.model, thinking, fallbackReason: model.fallbackReason };
+  return { model: model.model, thinking, routing: decision };
+}
 function resolveRunCfg(
   input: SubagentInput,
   agentCfg: AgentConfig,
   inheritedThinking?: string,
+  routingConfig?: SubagentRoutingConfig | null,
+  parentModel?: ParentModelRef | null,
+  agentName?: string,
 ): PiRunConfig {
-  const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
-  const normalize = (v: unknown): string | undefined => {
-    const s = typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "";
-    return THINKING_LEVELS.includes(s) ? s : undefined;
-  };
-  const suffixRe = /:(off|minimal|low|medium|high|xhigh)$/i;
   const inputModel = str(input.model);
+  if (inputModel || input.thinking) {
+    const inputSuffixThinking = normalizeThinking(inputModel?.match(suffixRe)?.[1]);
+    const baseModel = inputModel?.replace(suffixRe, "");
+    const thinking = normalizeThinking(input.thinking) ?? inputSuffixThinking ?? normalizeThinking(inheritedThinking);
+    const model = baseModel || inputModel;
+    return { model: model && thinking && thinking !== "off" ? `${model}:${thinking}` : model, thinking, routing: { source: "toolInput", model, thinking } };
+  }
+
+  if (routingConfig?.enabled) {
+    const override = agentName ? routingConfig.agents[agentName] : undefined;
+    if (override?.strategy !== "disabled") {
+      if (override?.strategy === "fixed" && override.fixed) {
+        const fixed = resolvePolicyCfg(override.fixed, inheritedThinking, parentModel ?? null, "agentFixed");
+        if (fixed) return fixed;
+      }
+      const policy = resolvePolicyCfg(routingConfig.defaultPolicy, inheritedThinking, parentModel ?? null, "defaultPolicy");
+      if (policy) return policy;
+    }
+  }
+
   const agentModel = agentCfg.model;
-  const rawModel = inputModel ?? agentModel;
-  const inputSuffixThinking = normalize(inputModel?.match(suffixRe)?.[1]);
-  const agentSuffixThinking = normalize(agentModel?.match(suffixRe)?.[1]);
-  const baseModel = rawModel?.replace(suffixRe, "");
-  const thinking =
-    normalize(input.thinking) ??
-    inputSuffixThinking ??
-    normalize(agentCfg.thinking) ??
-    agentSuffixThinking ??
-    normalize(inheritedThinking);
+  const agentSuffixThinking = normalizeThinking(agentModel?.match(suffixRe)?.[1]);
+  const baseModel = agentModel?.replace(suffixRe, "");
+  const thinking = normalizeThinking(agentCfg.thinking) ?? agentSuffixThinking ?? normalizeThinking(inheritedThinking);
   if (baseModel && thinking && thinking !== "off")
-    return { model: `${baseModel}:${thinking}`, thinking };
-  return { model: baseModel || rawModel, thinking };
+    return { model: `${baseModel}:${thinking}`, thinking, routing: { source: "agentFrontmatter", model: baseModel, thinking } };
+  return { model: baseModel || agentModel, thinking, routing: { source: agentModel ? "agentFrontmatter" : "piDefault", model: baseModel || agentModel, thinking } };
 }
 
 function buildPiArgs(cfg: PiRunConfig): string[] {
@@ -1198,11 +1352,13 @@ async function runSubagent(
   signal?: AbortSignal,
   onUpdate?: (r: PiToolResult) => void,
   inheritedThinking?: string,
+  parentModel?: ParentModelRef | null,
 ): Promise<{ output: string; details: ProgressDetails; failed: boolean }> {
   const agentName = normalizeAgent(input.agent);
   const agentRaw = readText(join(root, ".pi", "agents", `${agentName}.md`));
   const agentCfg = parseAgentFM(agentRaw);
-  const runCfg = resolveRunCfg(input, agentCfg, inheritedThinking);
+  const routingConfig = readSubagentRoutingConfig();
+  const runCfg = resolveRunCfg(input, agentCfg, inheritedThinking, routingConfig, parentModel ?? null, agentName);
   const mode = input.mode ?? "single";
   const startedAt = Date.now();
   const details: ProgressDetails = {
@@ -1212,6 +1368,7 @@ async function runSubagent(
     startedAt,
     updatedAt: startedAt,
     final: false,
+    routing: runCfg.routing,
     runs: [],
   };
   let lastEmit = 0;
@@ -1487,6 +1644,7 @@ export default function trellisExtension(pi: {
       };
       const key = getKey(cleanInput, ctx);
       const inheritedThinking = pi.getThinkingLevel?.();
+      const parentModel = parentModelFromCtx(ctx);
       const result = await runSubagent(
         root,
         cleanInput,
@@ -1494,6 +1652,7 @@ export default function trellisExtension(pi: {
         signal,
         onUpdate,
         inheritedThinking,
+        parentModel,
       );
       return {
         content: [{ type: "text", text: result.output }],

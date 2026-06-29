@@ -72,6 +72,7 @@ The archive directory is scanned separately from `SessionManager.listAll()` (whi
 - New-session tool names are passed to `POST /api/agent/new` as `toolNames[]`.
 - Existing sessions infer presets via `get_tools` and `getPresetFromTools()`.
 - Auth changes call `reloadRpcAuthState()` so live AgentSessions reload auth/model state. The same path also cleans pi-ai session resources because OpenAI Codex keeps reusable WebSockets keyed by session id, and those sockets must reconnect after ChatGPT account activation to pick up new auth headers.
+- Trellis subagent child processes resolve model policy from `pi-web.json` `trellis.subagents`: explicit tool input wins, then per-agent fixed policy, then default policy, then `.pi/agents/*` frontmatter, then Pi CLI defaults. The default policy follows the main session model when the Pi extension context exposes it; otherwise it safely falls back to Pi default.
 - When all tools are disabled, `lib/rpc-manager.ts` clears the agent system prompt.
 
 ## Session File Format
