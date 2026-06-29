@@ -573,3 +573,36 @@ Added a Git commit graph API and Git panel visualization with branch lanes, fork
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: Fix Git panel main branch lane
+
+**Date**: 2026-06-29
+**Task**: Fix Git panel main branch lane
+**Branch**: `pi/20260629-084420`
+
+### Summary
+
+Fixed CommitGraph so current branch equal to main/master does not reserve a duplicate current-branch lane, verified lint/type-check, archived the Trellis task in the work commit, and pushed branch pi/20260629-084420.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9460b32` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

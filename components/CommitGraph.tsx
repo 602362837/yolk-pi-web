@@ -42,6 +42,30 @@ const LANE_COLORS_PALETTE = [
 ];
 const MAIN_BRANCH_NAMES = new Set(["main", "master"]);
 
+function isMainBranchName(name: string | null | undefined): boolean {
+  return Boolean(name && MAIN_BRANCH_NAMES.has(name));
+}
+
+function getTipBranchName(
+  refs: GitGraphCommit["refs"],
+  currentBranch: string | null,
+): string | undefined {
+  const branchRefs = refs.filter((r) => r.type === "head" || r.type === "branch");
+  const defaultBranchName =
+    branchRefs.find((r) => r.type === "head")?.name ??
+    branchRefs.find((r) => r.type === "branch")?.name;
+
+  if (isMainBranchName(currentBranch)) {
+    return (
+      branchRefs.find((r) => r.name === currentBranch)?.name ??
+      branchRefs.find((r) => isMainBranchName(r.name))?.name ??
+      defaultBranchName
+    );
+  }
+
+  return defaultBranchName;
+}
+
 // ─── Layout algorithm ─────────────────────────────────────────────
 
 function buildGraphLayout(
@@ -72,9 +96,7 @@ function buildGraphLayout(
   const commitBranch = new Map<string, string>();
 
   for (const tip of tipOrder) {
-    const branchName =
-      tip.refs.find((r) => r.type === "head")?.name ??
-      tip.refs.find((r) => r.type === "branch")?.name;
+    const branchName = getTipBranchName(tip.refs, currentBranch);
     if (!branchName) continue;
 
     for (
@@ -271,7 +293,7 @@ export function CommitGraph({ commits, currentBranch, maxDisplay = 50 }: Props) 
 
     const layout = buildGraphLayout(display, currentBranch);
 
-    const currentLaneIdx = currentBranch
+    const currentLaneIdx = currentBranch && !isMainBranchName(currentBranch)
       ? layout.lanes.findIndex((l) => l.branchName === currentBranch)
       : -1;
     const mainLaneIdx = layout.lanes.findIndex((l) => l.isMain);
