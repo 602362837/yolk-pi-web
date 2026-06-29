@@ -14,7 +14,7 @@
 | `components/ChatMinimap.tsx` | Scroll minimap beside message list. |
 | `components/ToolPanel.tsx` | Tool presets and preset inference helpers. |
 | `components/ModelsConfig.tsx` | Modal for editing `models.json`, OAuth/API-key auth, and ChatGPT Plus/Pro saved-account add/import, activation, remarks, extra-info dialog, cached quota reset display with inline mini usage pies, manual quota refresh, inactive-account deletion, and raw/CPA/SUB2API account JSON import via shared converters. |
-| `components/GitPanel.tsx` | Git status dropdown panel showing branch, commits, staged/unstaged changes, untracked files, stash, and local branch switching with an explicit Switch button. |
+| `components/GitPanel.tsx` | Git status dropdown panel showing branch, previewable commit graph by selected local branch, staged/unstaged changes, untracked files, stash, and local branch switching with an explicit Switch button. |
 | `components/SkillsConfig.tsx` | Modal for browsing/installing skills. |
 | `components/SettingsConfig.tsx` | Settings modal for WorkTree defaults, Usage scan scope, ChatGPT usage panel settings, and optional Trellis panel settings in `pi-web.json`, including Trellis docs guidance, prerequisite/status inspection, install/init, update, proxy controls, and Trellis subagent model policy controls. |
 | `components/SubagentPanel.tsx` | Top-bar subagent activity panel, including nested subagent inspection and compact model/thinking metadata chips when subagent routing or result metadata is available. |

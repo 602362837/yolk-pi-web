@@ -135,12 +135,23 @@ export async function GET(req: NextRequest) {
     }
 
     const maxCount = parseInt(req.nextUrl.searchParams.get("maxCount") || "50", 10);
+    const branch = req.nextUrl.searchParams.get("branch")?.trim() ?? "";
+
+    if (branch) {
+      try {
+        await git(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], cwd);
+      } catch {
+        return NextResponse.json({ data: null, error: `Local branch not found: ${branch}` }, { status: 404 });
+      }
+    }
+
+    const logTargetArgs = branch ? [`refs/heads/${branch}`] : ["--all"];
 
     // Fetch all data in parallel
     const [logOutput, branchOutput] = await Promise.all([
       // Custom format that's easy to parse: hash|||parents|||decorations|||author|||relativeDate|||isoDate|||subject
       git([
-        "log", "--all", "--decorate=full",
+        "log", ...logTargetArgs, "--decorate=full",
         `--max-count=${maxCount}`,
         "--format=%H|||%P|||%D|||%an|||%ar|||%ai|||%s",
       ], cwd).catch(() => ""),

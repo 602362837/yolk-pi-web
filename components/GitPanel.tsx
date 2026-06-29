@@ -64,11 +64,13 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
   const fetchAll = useCallback(async () => {
     if (!cwd) return;
     const id = ++fetchIdRef.current;
+    const graphParams = new URLSearchParams({ cwd, maxCount: "50" });
+    if (selectedBranch) graphParams.set("branch", selectedBranch);
     setLoading(true);
     try {
       const [statusRes, graphRes] = await Promise.all([
         fetch(`/api/git/status?cwd=${encodeURIComponent(cwd)}`),
-        fetch(`/api/git/graph?cwd=${encodeURIComponent(cwd)}&maxCount=50`),
+        fetch(`/api/git/graph?${graphParams.toString()}`),
       ]);
       const statusData = await statusRes.json() as { status: GitStatusInfo | null; error?: string };
       const graphData_ = await graphRes.json() as { data: GitGraphData | null; error?: string };
@@ -96,7 +98,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
     } finally {
       if (id === fetchIdRef.current) setLoading(false);
     }
-  }, [cwd, onDirtyChange]);
+  }, [cwd, onDirtyChange, selectedBranch]);
 
   useEffect(() => {
     void fetchAll();
@@ -116,8 +118,10 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
 
     setSelectedBranch((current) => {
       if (current && branches.some((branch) => branch.name === current)) return current;
-      const nextBranch = branches.find((branch) => !branch.isCurrent && branch.name !== status?.branch);
-      return nextBranch?.name ?? branches[0]?.name ?? "";
+      const currentBranch = status?.branch
+        ? branches.find((branch) => branch.name === status.branch)
+        : branches.find((branch) => branch.isCurrent);
+      return currentBranch?.name ?? branches[0]?.name ?? "";
     });
   }, [graphData?.branches, status?.branch]);
 
@@ -180,6 +184,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
   if (!status) return null;
 
   const branchOptions = graphData?.branches ?? [];
+  const previewBranch = selectedBranch || status.branch;
   const selectedIsCurrent = selectedBranch === status.branch || branchOptions.some((branch) => branch.name === selectedBranch && branch.isCurrent);
   const canSwitchBranch = Boolean(selectedBranch) && branchOptions.length > 0 && !loading && !switching && !status.isDirty && !selectedIsCurrent;
   const switchDisabledReason = status.isDirty
@@ -197,7 +202,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
         <button
           onClick={() => void fetchAll()}
           disabled={loading}
-          title="Refresh git status"
+          title="Refresh git status and selected branch graph"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 24, height: 24, padding: 0,
@@ -269,7 +274,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
 
         <div style={{ marginTop: 8, padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 6 }}>
           <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>
-            Switch local branch
+            Preview / switch local branch
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <select
@@ -323,6 +328,9 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
               {switching ? "Switching..." : "Switch"}
             </button>
           </div>
+          <div style={{ marginTop: 5, fontSize: 10, color: "var(--text-dim)" }}>
+            Selecting a branch previews its commit graph. Switch changes the checkout.
+          </div>
           {switchDisabledReason && (
             <div style={{ marginTop: 5, fontSize: 10, color: status.isDirty ? "#f59e0b" : "var(--text-dim)" }}>
               {switchDisabledReason}
@@ -338,11 +346,18 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
 
       {/* Commit Graph — replaces flat Recent Commits */}
       <div style={{ padding: "0 8px 8px 8px" }}>
-        <div style={{ ...sectionTitleStyle, padding: "0 8px", marginBottom: 6 }}>Commit Graph</div>
+        <div style={{ ...sectionTitleStyle, padding: "0 8px", marginBottom: 6 }}>
+          Commit Graph
+          {previewBranch && (
+            <span style={{ marginLeft: 6, fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>
+              preview: {previewBranch}
+            </span>
+          )}
+        </div>
         {graphData && graphData.commits && graphData.commits.length > 0 ? (
           <CommitGraph
             commits={graphData.commits}
-            currentBranch={status.branch}
+            currentBranch={previewBranch}
             maxDisplay={30}
           />
         ) : status.recentCommits.length > 0 ? (
