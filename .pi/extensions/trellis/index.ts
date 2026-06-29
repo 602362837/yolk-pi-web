@@ -16,6 +16,7 @@ interface PiExtensionContext {
     getSessionId?: () => string;
     getSessionFile?: () => string | undefined;
   };
+  model?: { id?: string; provider?: string };
   ui?: {
     notify?: (msg: string, type?: "info" | "warning" | "error") => void;
   };
@@ -36,6 +37,58 @@ interface AgentConfig {
 interface PiRunConfig {
   model?: string;
   thinking?: string;
+  routing?: SubagentRoutingDecision;
+  fallbackModels?: string[];
+  finalFallbackModel?: string;
+}
+
+type SubagentModelMode = "followMain" | "piDefault" | "specific" | "unset";
+type SubagentThinking = "inherit" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type SubagentAgentStrategy = "default" | "route" | "fixed" | "disabled";
+type SubagentModality = "text" | "multimodal";
+type SubagentDifficultyTier = "simple" | "standard" | "complex" | "critical";
+interface SubagentModelRef {
+  mode: SubagentModelMode;
+  provider?: string;
+  modelId?: string;
+}
+interface SubagentRunPolicy {
+  model: SubagentModelRef;
+  thinking: SubagentThinking;
+}
+interface SubagentAgentOverride {
+  strategy: SubagentAgentStrategy;
+  fixed?: SubagentRunPolicy;
+  minimumTier?: SubagentDifficultyTier;
+  maximumTier?: SubagentDifficultyTier;
+}
+interface SubagentRouterConfig {
+  enabled: boolean;
+  model: SubagentModelRef;
+  thinking: SubagentThinking;
+  fallbackOnError: { modality: SubagentModality; tier: SubagentDifficultyTier };
+}
+type SubagentRouteTable = Record<SubagentModality, Record<SubagentDifficultyTier, SubagentRunPolicy>>;
+interface SubagentRoutingConfig {
+  enabled: boolean;
+  defaultPolicy: SubagentRunPolicy;
+  router: SubagentRouterConfig;
+  routes: SubagentRouteTable;
+  agents: Record<string, SubagentAgentOverride>;
+}
+interface ParentModelRef {
+  provider: string;
+  modelId: string;
+}
+interface SubagentRoutingDecision {
+  source: "toolInput" | "agentFixed" | "route" | "defaultPolicy" | "agentFrontmatter" | "followMain" | "piDefault" | "disabled";
+  model?: string;
+  thinking?: string;
+  modality?: SubagentModality;
+  tier?: SubagentDifficultyTier;
+  routerModel?: string;
+  confidence?: number;
+  fallbackReason?: string;
 }
 
 // ── Lazy-load pi-tui (avoid failing top-level imports) ─────────────────
@@ -119,6 +172,7 @@ interface RunState {
   usage: Usage;
   model?: string;
   thinking?: string;
+  routing?: SubagentRoutingDecision;
   errorMessage?: string;
 }
 interface ProgressDetails {
@@ -128,6 +182,7 @@ interface ProgressDetails {
   startedAt: number;
   updatedAt: number;
   final: boolean;
+  routing?: SubagentRoutingDecision;
   runs: RunState[];
 }
 
@@ -288,6 +343,11 @@ function applyRunConfig(r: RunState, cfg: PiRunConfig) {
   const parsed = splitModelThinking(cfg.model, cfg.thinking);
   r.model = parsed.model;
   r.thinking = parsed.thinking;
+  r.routing = cfg.routing;
+}
+function withFallbackModels(cfg: PiRunConfig, agentCfg: AgentConfig, parentModel?: ParentModelRef | null): PiRunConfig {
+  const finalFallbackModel = parentModel ? `${parentModel.provider}/${parentModel.modelId}` : undefined;
+  return { ...cfg, fallbackModels: agentCfg.fallbackModels, finalFallbackModel };
 }
 function runElapsed(d: ProgressDetails, r: RunState) {
   const start = r.startedAt ?? d.startedAt;
@@ -295,9 +355,17 @@ function runElapsed(d: ProgressDetails, r: RunState) {
     r.finishedAt ?? (r.status === "running" ? Date.now() : d.updatedAt);
   return fmtDur(Math.max(0, end - start));
 }
+function routingLabel(r: RunState) {
+  const decision = r.routing;
+  if (!decision) return undefined;
+  const target = decision.model ?? (decision.source === "piDefault" ? "Pi default" : undefined);
+  const thinking = decision.thinking && decision.thinking !== "off" ? `:${decision.thinking}` : "";
+  return target ? `${decision.source}→${target}${thinking}` : decision.source;
+}
 function runHeader(d: ProgressDetails, r: RunState) {
   const usage = fmtUsage(r.usage, modelLabel(r)) || fmtUsage(totalUsage(d));
-  return `${r.agent} · ${progressDone(d)}/${d.runs.length} done · ${progressState(d)} · ${runElapsed(d, r)}${usage ? ` · ${usage}` : ""}`;
+  const routing = routingLabel(r);
+  return `${r.agent} · ${progressDone(d)}/${d.runs.length} done · ${progressState(d)} · ${runElapsed(d, r)}${routing ? ` · ${routing}` : ""}${usage ? ` · ${usage}` : ""}`;
 }
 function renderRunBlock(
   lines: string[],
@@ -630,32 +698,277 @@ function resolvePiCli(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const suffixRe = /:(off|minimal|low|medium|high|xhigh)$/i;
+function normalizeThinking(v: unknown): string | undefined {
+  const s = typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "";
+  return THINKING_LEVELS.includes(s) ? s : undefined;
+}
+function normalizePolicyThinking(v: unknown, fallback: SubagentThinking): SubagentThinking {
+  return v === "inherit" || THINKING_LEVELS.includes(String(v)) ? (v as SubagentThinking) : fallback;
+}
+function defaultRouteTable(): SubagentRouteTable {
+  return {
+    text: {
+      simple: { model: { mode: "followMain" }, thinking: "inherit" },
+      standard: { model: { mode: "followMain" }, thinking: "inherit" },
+      complex: { model: { mode: "followMain" }, thinking: "high" },
+      critical: { model: { mode: "followMain" }, thinking: "xhigh" },
+    },
+    multimodal: {
+      simple: { model: { mode: "followMain" }, thinking: "inherit" },
+      standard: { model: { mode: "followMain" }, thinking: "medium" },
+      complex: { model: { mode: "followMain" }, thinking: "high" },
+      critical: { model: { mode: "followMain" }, thinking: "xhigh" },
+    },
+  };
+}
+function defaultSubagentRoutingConfig(): SubagentRoutingConfig {
+  return {
+    enabled: true,
+    defaultPolicy: { model: { mode: "followMain" }, thinking: "inherit" },
+    router: {
+      enabled: false,
+      model: { mode: "piDefault" },
+      thinking: "minimal",
+      fallbackOnError: { modality: "text", tier: "standard" },
+    },
+    routes: defaultRouteTable(),
+    agents: {
+      "trellis-implement": { strategy: "default", minimumTier: "complex" },
+      "trellis-check": { strategy: "default", minimumTier: "standard" },
+      "trellis-research": { strategy: "default" },
+    },
+  };
+}
+function readPolicyModel(value: unknown, fallback: SubagentModelRef): SubagentModelRef {
+  if (!isObj(value)) return fallback;
+  if (value.mode === "followMain" || value.mode === "piDefault" || value.mode === "unset") return { mode: value.mode };
+  if (value.mode === "specific") {
+    const provider = str(value.provider);
+    const modelId = str(value.modelId);
+    if (provider && modelId) return { mode: "specific", provider, modelId };
+  }
+  return fallback;
+}
+function readRouteModality(value: unknown, fallback: SubagentModality): SubagentModality {
+  return value === "text" || value === "multimodal" ? value : fallback;
+}
+function readRouteTier(value: unknown, fallback?: SubagentDifficultyTier): SubagentDifficultyTier | undefined {
+  return value === "simple" || value === "standard" || value === "complex" || value === "critical" ? value : fallback;
+}
+function readPolicy(value: unknown, fallback: SubagentRunPolicy): SubagentRunPolicy {
+  const root = isObj(value) ? value : {};
+  return {
+    model: readPolicyModel(root.model, fallback.model),
+    thinking: normalizePolicyThinking(root.thinking, fallback.thinking),
+  };
+}
+function readRouterConfig(value: unknown, fallback: SubagentRouterConfig): SubagentRouterConfig {
+  const root = isObj(value) ? value : {};
+  const fb = isObj(root.fallbackOnError) ? root.fallbackOnError : {};
+  return {
+    enabled: typeof root.enabled === "boolean" ? root.enabled : fallback.enabled,
+    model: readPolicyModel(root.model, fallback.model),
+    thinking: normalizePolicyThinking(root.thinking, fallback.thinking),
+    fallbackOnError: {
+      modality: readRouteModality(fb.modality, fallback.fallbackOnError.modality),
+      tier: readRouteTier(fb.tier, fallback.fallbackOnError.tier) ?? fallback.fallbackOnError.tier,
+    },
+  };
+}
+function readRouteTable(value: unknown, fallback: SubagentRouteTable): SubagentRouteTable {
+  const root = isObj(value) ? value : {};
+  const out = defaultRouteTable();
+  for (const modality of ["text", "multimodal"] as const) {
+    const rawModality = isObj(root[modality]) ? root[modality] : {};
+    for (const tier of ["simple", "standard", "complex", "critical"] as const) {
+      out[modality][tier] = readPolicy(rawModality[tier], fallback[modality][tier]);
+    }
+  }
+  return out;
+}
+
+function normalizeRoutingConfig(raw: unknown): SubagentRoutingConfig {
+  const fallback = defaultSubagentRoutingConfig();
+  const root = isObj(raw) ? raw : {};
+  const agents: Record<string, SubagentAgentOverride> = { ...fallback.agents };
+  const rawAgents = isObj(root.agents) ? root.agents : {};
+  for (const [agent, rawConfig] of Object.entries(rawAgents)) {
+    if (!isObj(rawConfig)) continue;
+    const strategy = rawConfig.strategy === "default" || rawConfig.strategy === "fixed" || rawConfig.strategy === "disabled" ? rawConfig.strategy : "default";
+    agents[agent] = {
+      strategy,
+      fixed: rawConfig.fixed ? readPolicy(rawConfig.fixed, fallback.defaultPolicy) : undefined,
+      minimumTier: readRouteTier(rawConfig.minimumTier),
+      maximumTier: readRouteTier(rawConfig.maximumTier),
+    };
+  }
+  return {
+    enabled: typeof root.enabled === "boolean" ? root.enabled : fallback.enabled,
+    defaultPolicy: readPolicy(root.defaultPolicy, fallback.defaultPolicy),
+    router: readRouterConfig(root.router, fallback.router),
+    routes: readRouteTable(root.routes, fallback.routes),
+    agents,
+  };
+}
+function agentDirFromRuntime(): string | null {
+  try {
+    const mod = require("@earendil-works/pi-coding-agent") as { getAgentDir?: () => string };
+    const dir = mod.getAgentDir?.();
+    if (dir) return dir;
+  } catch {}
+  const home = process.env.HOME || process.env.USERPROFILE;
+  return home ? join(home, ".pi", "agent") : null;
+}
+function readSubagentRoutingConfig(): SubagentRoutingConfig | null {
+  const dir = agentDirFromRuntime();
+  if (!dir) return null;
+  const path = join(dir, "pi-web.json");
+  if (!exists(path)) return defaultSubagentRoutingConfig();
+  try {
+    const parsed = JSON.parse(readText(path)) as JsonObject;
+    const trellis = isObj(parsed.trellis) ? parsed.trellis : {};
+    return normalizeRoutingConfig(trellis.subagents);
+  } catch {
+    return null;
+  }
+}
+function parentModelFromCtx(ctx?: PiExtensionContext): ParentModelRef | null {
+  const provider = str(ctx?.model?.provider);
+  const modelId = str(ctx?.model?.id);
+  return provider && modelId ? { provider, modelId } : null;
+}
+function modelRefToCli(model: SubagentModelRef, parent: ParentModelRef | null): { model?: string; source: SubagentRoutingDecision["source"]; fallbackReason?: string } {
+  if (model.mode === "specific" && model.provider && model.modelId) return { model: `${model.provider}/${model.modelId}`, source: "defaultPolicy" };
+  if (model.mode === "followMain") {
+    if (parent) return { model: `${parent.provider}/${parent.modelId}`, source: "followMain" };
+    return { source: "piDefault", fallbackReason: "main session model unavailable" };
+  }
+  if (model.mode === "piDefault") return { source: "piDefault" };
+  return { source: "disabled" };
+}
+function resolvePolicyCfg(policy: SubagentRunPolicy, inheritedThinking: string | undefined, parent: ParentModelRef | null, source: SubagentRoutingDecision["source"], route?: Partial<SubagentRoutingDecision>): PiRunConfig | null {
+  if (policy.model.mode === "unset") return null;
+  const model = modelRefToCli(policy.model, parent);
+  const thinking = policy.thinking === "inherit" ? normalizeThinking(inheritedThinking) : normalizeThinking(policy.thinking);
+  const decision: SubagentRoutingDecision = { ...route, source: model.source === "defaultPolicy" ? source : model.source, model: model.model, thinking, fallbackReason: route?.fallbackReason ?? model.fallbackReason };
+  return { model: model.model, thinking, routing: decision };
+}
+const TIER_ORDER: SubagentDifficultyTier[] = ["simple", "standard", "complex", "critical"];
+function clampTier(tier: SubagentDifficultyTier, override?: SubagentAgentOverride): SubagentDifficultyTier {
+  let idx = TIER_ORDER.indexOf(tier);
+  const min = override?.minimumTier ? TIER_ORDER.indexOf(override.minimumTier) : -1;
+  const max = override?.maximumTier ? TIER_ORDER.indexOf(override.maximumTier) : -1;
+  if (min >= 0) idx = Math.max(idx, min);
+  if (max >= 0) idx = Math.min(idx, max);
+  return TIER_ORDER[Math.max(0, idx)] ?? tier;
+}
+function promptTextForRouting(input: SubagentInput): string {
+  return [input.prompt, ...(input.prompts ?? [])].filter(Boolean).join("\n\n---\n\n").slice(0, 12000);
+}
+function heuristicRoute(input: SubagentInput, agentName: string, override?: SubagentAgentOverride): { modality: SubagentModality; tier: SubagentDifficultyTier; confidence: number; fallbackReason?: string } {
+  const text = promptTextForRouting(input).toLowerCase();
+  const modality: SubagentModality = /image|screenshot|diagram|视觉|图片|截图|多模态|multimodal/.test(text) ? "multimodal" : "text";
+  let tier: SubagentDifficultyTier = "standard";
+  if (/critical|security|migration|architecture|cross-layer|全局|架构|安全|迁移/.test(text)) tier = "critical";
+  else if (/implement|refactor|design|config|runtime|api|ui|实现|重构|配置|设计/.test(text) || agentName === "trellis-implement") tier = "complex";
+  else if (/fix|review|check|test|验证|检查|修复/.test(text) || agentName === "trellis-check") tier = "standard";
+  else if (text.length < 600) tier = "simple";
+  return { modality, tier: clampTier(tier, override), confidence: 0.45, fallbackReason: "heuristic route" };
+}
+function parseRouterJson(text: string): { modality?: SubagentModality; tier?: SubagentDifficultyTier; confidence?: number; reason?: string } | null {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[0]) as JsonObject;
+    const modality = readRouteModality(parsed.modality, "text");
+    const tier = readRouteTier(parsed.tier);
+    if (!tier) return null;
+    const confidence = typeof parsed.confidence === "number" ? Math.max(0, Math.min(1, parsed.confidence)) : undefined;
+    return { modality, tier, confidence, reason: str(parsed.reason) };
+  } catch {
+    return null;
+  }
+}
+function classifyRoute(root: string, input: SubagentInput, agentName: string, cfg: SubagentRoutingConfig, parent: ParentModelRef | null, inheritedThinking?: string, override?: SubagentAgentOverride): SubagentRoutingDecision {
+  const heuristic = heuristicRoute(input, agentName, override);
+  if (!cfg.router.enabled) return { source: "route", modality: heuristic.modality, tier: heuristic.tier, confidence: heuristic.confidence, fallbackReason: heuristic.fallbackReason };
+  const routerModel = modelRefToCli(cfg.router.model, parent);
+  const thinking = cfg.router.thinking === "inherit" ? normalizeThinking(inheritedThinking) : normalizeThinking(cfg.router.thinking);
+  const prompt = [
+    "Classify a Trellis subagent task. Return ONLY compact JSON with keys: modality, tier, confidence, reason.",
+    "modality must be one of: text, multimodal.",
+    "tier must be one of: simple, standard, complex, critical.",
+    `agent: ${agentName}`,
+    `mode: ${input.mode ?? "single"}`,
+    "task:",
+    promptTextForRouting(input),
+  ].join("\n");
+  try {
+    const inv = resolvePiCli();
+    const result = spawnSync(inv.command, [...inv.args, ...buildPiArgs({ model: routerModel.model, thinking })], {
+      cwd: root,
+      input: prompt,
+      encoding: "utf8",
+      timeout: 30000,
+      env: { ...process.env, TRELLIS_SUBAGENT_CHILD: "1" },
+      windowsHide: true,
+    });
+    const parsed = parseRouterJson(formatPiOutput(result.stdout || "", result.stderr || ""));
+    if (parsed?.modality && parsed.tier) {
+      return { source: "route", modality: parsed.modality, tier: clampTier(parsed.tier, override), confidence: parsed.confidence, routerModel: routerModel.model, fallbackReason: parsed.reason };
+    }
+    const fb = cfg.router.fallbackOnError;
+    return { source: "route", modality: fb.modality, tier: clampTier(fb.tier, override), routerModel: routerModel.model, fallbackReason: result.error?.message || "router returned invalid JSON" };
+  } catch (e) {
+    const fb = cfg.router.fallbackOnError;
+    return { source: "route", modality: fb.modality, tier: clampTier(fb.tier, override), routerModel: routerModel.model, fallbackReason: e instanceof Error ? e.message : String(e) };
+  }
+}
 function resolveRunCfg(
+  root: string,
   input: SubagentInput,
   agentCfg: AgentConfig,
   inheritedThinking?: string,
+  routingConfig?: SubagentRoutingConfig | null,
+  parentModel?: ParentModelRef | null,
+  agentName?: string,
 ): PiRunConfig {
-  const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
-  const normalize = (v: unknown): string | undefined => {
-    const s = typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "";
-    return THINKING_LEVELS.includes(s) ? s : undefined;
-  };
-  const suffixRe = /:(off|minimal|low|medium|high|xhigh)$/i;
   const inputModel = str(input.model);
+  if (inputModel || input.thinking) {
+    const inputSuffixThinking = normalizeThinking(inputModel?.match(suffixRe)?.[1]);
+    const baseModel = inputModel?.replace(suffixRe, "");
+    const thinking = normalizeThinking(input.thinking) ?? inputSuffixThinking ?? normalizeThinking(inheritedThinking);
+    const model = baseModel || inputModel;
+    return { model: model && thinking && thinking !== "off" ? `${model}:${thinking}` : model, thinking, routing: { source: "toolInput", model, thinking } };
+  }
+
+  if (routingConfig?.enabled) {
+    const override = agentName ? routingConfig.agents[agentName] : undefined;
+    if (override?.strategy !== "disabled") {
+      if (override?.strategy === "fixed" && override.fixed) {
+        const fixed = resolvePolicyCfg(override.fixed, inheritedThinking, parentModel ?? null, "agentFixed");
+        if (fixed) return fixed;
+      }
+      if (routingConfig.router.enabled || override?.strategy === "route") {
+        const route = classifyRoute(root, input, agentName ?? "trellis-implement", routingConfig, parentModel ?? null, inheritedThinking, override);
+        const policy = routingConfig.routes[route.modality ?? "text"]?.[route.tier ?? "standard"];
+        const routed = policy ? resolvePolicyCfg(policy, inheritedThinking, parentModel ?? null, "route", route) : null;
+        if (routed) return routed;
+      }
+      const policy = resolvePolicyCfg(routingConfig.defaultPolicy, inheritedThinking, parentModel ?? null, "defaultPolicy");
+      if (policy) return policy;
+    }
+  }
+
   const agentModel = agentCfg.model;
-  const rawModel = inputModel ?? agentModel;
-  const inputSuffixThinking = normalize(inputModel?.match(suffixRe)?.[1]);
-  const agentSuffixThinking = normalize(agentModel?.match(suffixRe)?.[1]);
-  const baseModel = rawModel?.replace(suffixRe, "");
-  const thinking =
-    normalize(input.thinking) ??
-    inputSuffixThinking ??
-    normalize(agentCfg.thinking) ??
-    agentSuffixThinking ??
-    normalize(inheritedThinking);
+  const agentSuffixThinking = normalizeThinking(agentModel?.match(suffixRe)?.[1]);
+  const baseModel = agentModel?.replace(suffixRe, "");
+  const thinking = normalizeThinking(agentCfg.thinking) ?? agentSuffixThinking ?? normalizeThinking(inheritedThinking);
   if (baseModel && thinking && thinking !== "off")
-    return { model: `${baseModel}:${thinking}`, thinking };
-  return { model: baseModel || rawModel, thinking };
+    return { model: `${baseModel}:${thinking}`, thinking, routing: { source: "agentFrontmatter", model: baseModel, thinking } };
+  return { model: baseModel || agentModel, thinking, routing: { source: agentModel ? "agentFrontmatter" : "piDefault", model: baseModel || agentModel, thinking } };
 }
 
 function buildPiArgs(cfg: PiRunConfig): string[] {
@@ -1190,6 +1503,55 @@ function runPi(
   });
 }
 
+async function runPiWithFallback(
+  root: string,
+  prompt: string,
+  cfg: PiRunConfig,
+  state: RunState,
+  emit: (force?: boolean) => void,
+  key?: string | null,
+  signal?: AbortSignal,
+): Promise<{ output: string; failed: boolean }> {
+  const fallbackModels = (cfg.fallbackModels ?? []).filter(Boolean);
+  const seen = new Set<string>();
+  const fallbackAttempts = [
+    ...fallbackModels.map((model) => ({ model, reason: "fallback retry" })),
+    ...(cfg.finalFallbackModel ? [{ model: cfg.finalFallbackModel, reason: "final fallback to main model" }] : []),
+  ].filter(({ model }) => {
+    const key = model.replace(suffixRe, "");
+    if (key === cfg.model?.replace(suffixRe, "") || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const attempts: PiRunConfig[] = [
+    cfg,
+    ...fallbackAttempts.map(({ model, reason }) => ({
+      ...cfg,
+      model,
+      routing: {
+        ...cfg.routing,
+        model,
+        fallbackReason: reason,
+      },
+    })),
+  ];
+  let last: { output: string; failed: boolean } = { output: "", failed: true };
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i]!;
+    if (i > 0) {
+      state.status = "pending";
+      state.finishedAt = undefined;
+      state.errorMessage = undefined;
+      state.stderrTail = appendTail(state.stderrTail, `\nRetrying with fallback model: ${attempt.model}\n`, MAX_TAIL);
+      applyRunConfig(state, attempt);
+      emit(true);
+    }
+    last = await runPi(root, prompt, attempt, state, emit, key, signal);
+    if (!last.failed || state.status === "cancelled") return last;
+  }
+  return last;
+}
+
 // ── runSubagent: orchestrate single/parallel/chain via native partial updates ──
 async function runSubagent(
   root: string,
@@ -1198,11 +1560,13 @@ async function runSubagent(
   signal?: AbortSignal,
   onUpdate?: (r: PiToolResult) => void,
   inheritedThinking?: string,
+  parentModel?: ParentModelRef | null,
 ): Promise<{ output: string; details: ProgressDetails; failed: boolean }> {
   const agentName = normalizeAgent(input.agent);
   const agentRaw = readText(join(root, ".pi", "agents", `${agentName}.md`));
   const agentCfg = parseAgentFM(agentRaw);
-  const runCfg = resolveRunCfg(input, agentCfg, inheritedThinking);
+  const routingConfig = readSubagentRoutingConfig();
+  const runCfg = withFallbackModels(resolveRunCfg(root, input, agentCfg, inheritedThinking, routingConfig, parentModel ?? null, agentName), agentCfg, parentModel);
   const mode = input.mode ?? "single";
   const startedAt = Date.now();
   const details: ProgressDetails = {
@@ -1212,6 +1576,7 @@ async function runSubagent(
     startedAt,
     updatedAt: startedAt,
     final: false,
+    routing: runCfg.routing,
     runs: [],
   };
   let lastEmit = 0;
@@ -1253,7 +1618,7 @@ async function runSubagent(
       emit(true);
       const results = await Promise.all(
         prompts.map((p, i) =>
-          runPi(
+          runPiWithFallback(
             root,
             buildPrompt(root, { ...input, prompt: p }, key),
             runCfg,
@@ -1278,7 +1643,7 @@ async function runSubagent(
         applyRunConfig(rs, runCfg);
         details.runs.push(rs);
         emit(true);
-        const result = await runPi(
+        const result = await runPiWithFallback(
           root,
           buildPrompt(
             root,
@@ -1304,7 +1669,7 @@ async function runSubagent(
     applyRunConfig(rs, runCfg);
     details.runs = [rs];
     emit(true);
-    const result = await runPi(
+    const result = await runPiWithFallback(
       root,
       buildPrompt(root, input, key),
       runCfg,
@@ -1487,6 +1852,7 @@ export default function trellisExtension(pi: {
       };
       const key = getKey(cleanInput, ctx);
       const inheritedThinking = pi.getThinkingLevel?.();
+      const parentModel = parentModelFromCtx(ctx);
       const result = await runSubagent(
         root,
         cleanInput,
@@ -1494,6 +1860,7 @@ export default function trellisExtension(pi: {
         signal,
         onUpdate,
         inheritedThinking,
+        parentModel,
       );
       return {
         content: [{ type: "text", text: result.output }],

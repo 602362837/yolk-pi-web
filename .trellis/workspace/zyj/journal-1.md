@@ -738,3 +738,40 @@ Added ChatGPT Plus/Pro account extra-info metadata, cached per-account quota res
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: Trellis subagent model routing
+
+**Date**: 2026-06-29
+**Task**: Trellis subagent model routing
+**Branch**: `pi/20260629-111145`
+
+### Summary
+
+Designed and implemented Trellis subagent model policy, automatic routing by modality/difficulty, Chinese settings UI labels, fallback retry through agent fallbackModels, and final fallback to the main session model. Validated with TypeScript, lint, extension TS check, and Trellis task validation.
+
+### Main Changes
+
+- Added `trellis.subagents` model policy, routing table, and per-agent settings.
+- Added runtime model routing and fallback retry for Trellis subagents.
+- Updated settings UI and documentation for subagent model routing.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f457293` | (see git log) |
+| `e01302c` | (see git log) |
+| `8582312` | (see git log) |
+
+### Testing
+
+- [OK] TypeScript, lint, extension TS check, and Trellis validation passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
