@@ -13,10 +13,18 @@ export const PRESET_NONE: string[] = [];
 export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write"];
 export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls"];
 export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent"];
+const BUILTIN_TOOL_NAMES = new Set(PRESET_SUBAGENT);
 
 export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {
-  const active = tools.filter(t => t.active).map(t => t.name).sort().join(",");
-  if (active === "") return "none";
+  const activeTools = tools.filter(t => t.active);
+  if (activeTools.length === 0) return "none";
+
+  const active = activeTools
+    .map(t => t.name)
+    .filter(name => BUILTIN_TOOL_NAMES.has(name))
+    .sort()
+    .join(",");
+
   if (active === [...PRESET_DEFAULT].sort().join(",")) return "default";
   if (active === [...PRESET_FULL].sort().join(",")) return "full";
   if (active === [...PRESET_SUBAGENT].sort().join(",")) return "subagent";
@@ -74,7 +82,7 @@ export function ToolPanel({ tools, onPreset, onClose }: Props) {
       {/* Segmented control */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr",
+        gridTemplateColumns: `repeat(${PRESETS.length}, 1fr)`,
         background: "var(--bg-panel)",
         borderRadius: 8,
         padding: 3,

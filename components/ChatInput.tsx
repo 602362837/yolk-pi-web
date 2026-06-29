@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent, useMemo } from "react";
-import type { SlashCommandEntry } from "@/app/api/commands/route";
+import type { BuiltinSlashCommandResult, CompactResultInfo, SlashCommandInfo } from "@/hooks/useAgentSession";
 import { encodeFilePathForApi, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 
 export interface AttachedImage {
@@ -22,8 +22,10 @@ interface Props {
   onAbort: () => void;
   onSteer?: (message: string, images?: AttachedImage[]) => void;
   onFollowUp?: (message: string, images?: AttachedImage[]) => void;
+  onPromptWithStreamingBehavior?: (message: string, behavior: "steer" | "followUp", images?: AttachedImage[]) => void;
   isStreaming: boolean;
   model?: { provider: string; modelId: string } | null;
+  isAutoModelSelection?: boolean;
   modelNames?: Record<string, string>;
   modelList?: { id: string; name: string; provider: string }[];
   onModelChange?: (provider: string, modelId: string) => void;
@@ -31,6 +33,7 @@ interface Props {
   onAbortCompaction?: () => void;
   isCompacting?: boolean;
   compactError?: string | null;
+  compactResult?: CompactResultInfo | null;
   toolPreset?: "none" | "default" | "full" | "subagent";
   onToolPresetChange?: (preset: "none" | "default" | "full" | "subagent") => void;
   thinkingLevel?: "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -38,6 +41,10 @@ interface Props {
   availableThinkingLevels?: string[] | null;
   thinkingLevelMap?: Record<string, string | null> | null;
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
+  slashCommands?: SlashCommandInfo[];
+  slashCommandsLoading?: boolean;
+  onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
+  onBuiltinCommand?: (message: string) => Promise<BuiltinSlashCommandResult>;
   soundEnabled?: boolean;
   onSoundToggle?: () => void;
 }
@@ -51,17 +58,29 @@ export interface ChatInputHandle {
 const TOOL_PRESETS = ["off", "default", "full", "subagent"] as const;
 const TOOL_PRESET_MAP: Record<"off" | "default" | "full" | "subagent", "none" | "default" | "full" | "subagent"> = { off: "none", default: "default", full: "full", subagent: "subagent" };
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
+const MODEL_OPTION_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
-const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
-const MAX_SLASH_COMMANDS = 8;
-
-interface SlashCommandMatch {
-  start: number;
-  query: string;
+function compareModelOptions(a: ModelOption, b: ModelOption): number {
+  return MODEL_OPTION_COLLATOR.compare(a.name || a.modelId, b.name || b.modelId)
+    || MODEL_OPTION_COLLATOR.compare(a.provider, b.provider)
+    || MODEL_OPTION_COLLATOR.compare(a.modelId, b.modelId);
 }
 
-interface SlashCommandOption extends SlashCommandEntry {
-  priority: number;
+const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const THINKING_LEVEL_DESC: Record<typeof THINKING_LEVELS[number], string> = {
+  auto: "沿用 pi 默认设置",
+  off: "关闭推理",
+  minimal: "最少推理",
+  low: "低强度推理",
+  medium: "中等推理",
+  high: "高强度推理",
+  xhigh: "最高强度推理",
+};
+
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}k`;
+  return tokens.toLocaleString();
 }
 
 interface AtMatch {
@@ -75,35 +94,11 @@ interface FileSuggestion {
   isDir: boolean;
 }
 
-/**
- * 解析光标前是否处于斜杠命令输入状态。
- *
- * @param value - 输入框完整文本。
- * @param caretIndex - 当前光标位置。
- * @returns 匹配到的命令起点与查询文本；否则返回 null。
- */
-function getSlashCommandMatch(value: string, caretIndex: number): SlashCommandMatch | null {
-  const beforeCursor = value.slice(0, caretIndex);
-  const lineStart = Math.max(beforeCursor.lastIndexOf("\n") + 1, 0);
-  const currentLineBeforeCursor = beforeCursor.slice(lineStart);
-  const match = currentLineBeforeCursor.match(/^(\s*)\/([^\s]*)$/);
-  if (!match) return null;
-  return { start: lineStart + match[1].length, query: match[2] };
-}
-
-/**
- * 解析光标前是否处于 @ 文件引用输入状态。
- *
- * @param value - 输入框完整文本。
- * @param caretIndex - 当前光标位置。
- * @returns 匹配到的命令起点与查询文本；否则返回 null。
- */
 function getAtMatch(value: string, caretIndex: number): AtMatch | null {
   const beforeCursor = value.slice(0, caretIndex);
   const atIndex = beforeCursor.lastIndexOf("@");
   if (atIndex === -1) return null;
 
-  // Only trigger when @ is at word boundary (after space, newline, etc.)
   if (atIndex > 0) {
     const prev = beforeCursor[atIndex - 1];
     if (prev !== " " && prev !== "\n" && prev !== "\t" && prev !== "(" && prev !== "[" && prev !== "{" && prev !== ">" && prev !== ":" && prev !== "`") {
@@ -113,81 +108,70 @@ function getAtMatch(value: string, caretIndex: number): AtMatch | null {
 
   const afterAt = beforeCursor.slice(atIndex + 1);
   const spaceMatch = afterAt.match(/^([^\s\n]*)/);
-  const query = spaceMatch ? spaceMatch[1] : "";
-
-  return { start: atIndex, query };
+  return { start: atIndex, query: spaceMatch ? spaceMatch[1] : "" };
 }
 
-/**
- * 按当前查询过滤文件建议：解析 query 中的目录路径与文件名前缀，过滤出匹配的文件。
- */
 function filterAtSuggestions(entries: FileSuggestion[], query: string): FileSuggestion[] {
   const lastSlash = query.lastIndexOf("/");
   const prefix = lastSlash === -1 ? query : query.slice(lastSlash + 1);
   if (!prefix) return entries;
   const lowerPrefix = prefix.toLowerCase();
-  return entries.filter((e) => e.name.toLowerCase().includes(lowerPrefix));
+  return entries.filter((entry) => entry.name.toLowerCase().includes(lowerPrefix));
 }
 
-/**
- * 按当前查询过滤并排序斜杠命令。
- *
- * @param commands - 服务端发现的 skills 与 prompt templates。
- * @param query - 用户在斜杠后输入的查询文本。
- * @returns 已排序的候选命令，优先精确前缀，同时保留模板可见性。
- */
-function filterSlashCommands(commands: SlashCommandEntry[], query: string): SlashCommandOption[] {
-  const normalizedQuery = query.toLowerCase();
-  const skillPrefixQuery = normalizedQuery.startsWith("skill:");
-
-  return commands
-    .map((command): SlashCommandOption | null => {
-      const name = command.name.toLowerCase();
-      const bareSkillName = command.source === "skill" ? name.replace(/^skill:/, "") : name;
-
-      if (!normalizedQuery) return { ...command, priority: command.source === "prompt" ? 0 : 1 };
-      if (skillPrefixQuery) {
-        return name.startsWith(normalizedQuery) ? { ...command, priority: 0 } : null;
-      }
-      if (command.source === "prompt" && name.startsWith(normalizedQuery)) return { ...command, priority: 0 };
-      if (command.source === "skill" && bareSkillName.startsWith(normalizedQuery)) return { ...command, priority: 1 };
-      if (command.source === "prompt" && name.includes(normalizedQuery)) return { ...command, priority: 2 };
-      if (command.source === "skill" && bareSkillName.includes(normalizedQuery)) return { ...command, priority: 3 };
-      return null;
-    })
-    .filter((command): command is SlashCommandOption => command !== null)
-    .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      if (a.source !== b.source) return a.source === "prompt" ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    })
-    .slice(0, MAX_SLASH_COMMANDS);
-}
-
-const THINKING_LEVEL_DESC: Record<typeof THINKING_LEVELS[number], string> = {
-  auto: "沿用 pi 默认设置",
-  off: "关闭推理",
-  minimal: "最少推理",
-  low: "低强度推理",
-  medium: "中等推理",
-  high: "高强度推理",
-  xhigh: "最高强度推理",
+type SlashCommandPaletteItem = SlashCommandInfo | {
+  name: string;
+  description: string;
+  source: "builtin";
 };
 
+type SlashCommandSource = SlashCommandPaletteItem["source"];
+
+const BUILTIN_SLASH_COMMANDS: SlashCommandPaletteItem[] = [
+  { name: "compact", description: "Compress context, optionally with instructions", source: "builtin" },
+  { name: "name", description: "Set the session display name", source: "builtin" },
+  { name: "session", description: "Show session message, token, and cost stats", source: "builtin" },
+  { name: "copy", description: "Copy the last assistant message", source: "builtin" },
+];
+
+const SLASH_SOURCES: SlashCommandSource[] = ["builtin", "extension", "prompt", "skill"];
+
+const SLASH_SOURCE_GROUP_LABEL: Record<SlashCommandSource, string> = {
+  builtin: "Built-in",
+  extension: "Extensions",
+  prompt: "Prompts",
+  skill: "Skills",
+};
+
+const SLASH_SOURCE_ORDER: Record<SlashCommandSource, number> = {
+  builtin: 0,
+  extension: 1,
+  prompt: 2,
+  skill: 3,
+};
+
+function slashMatchRank(command: SlashCommandPaletteItem, query: string): number {
+  const name = command.name.toLowerCase();
+  const description = command.description?.toLowerCase() ?? "";
+  if (name === query) return 0;
+  if (name.startsWith(query)) return 1;
+  if (name.includes(query)) return 2;
+  if (description.includes(query)) return 3;
+  return 4;
+}
+
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
-  onSend, cwd, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
-  onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange,
+  onSend, cwd, onAbort, onSteer, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, onModelChange,
+  onCompact, onAbortCompaction, isCompacting, compactError, compactResult, toolPreset, onToolPresetChange,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
+  slashCommands, slashCommandsLoading, onLoadSlashCommands,
+  onBuiltinCommand,
   soundEnabled, onSoundToggle,
+  onPromptWithStreamingBehavior,
 }: Props, ref) {
   const [value, setValue] = useState("");
   const [caretIndex, setCaretIndex] = useState(0);
-  const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
-  const [slashCommandsLoading, setSlashCommandsLoading] = useState(false);
-  const [slashCommandsError, setSlashCommandsError] = useState<string | null>(null);
-  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
-  const [slashDismissedKey, setSlashDismissedKey] = useState<string | null>(null);
   const [atSuggestions, setAtSuggestions] = useState<FileSuggestion[]>([]);
   const [atSuggestionsLoading, setAtSuggestionsLoading] = useState(false);
   const [atSuggestionsError, setAtSuggestionsError] = useState<string | null>(null);
@@ -198,6 +182,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
   const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashActiveIndex, setSlashActiveIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -207,233 +193,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
+  const slashCommandsRequestedRef = useRef(false);
+  const slashItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const syncCaretFromTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     setCaretIndex(ta.selectionStart ?? ta.value.length);
   }, []);
-
-  const slashMatch = useMemo(() => getSlashCommandMatch(value, caretIndex), [value, caretIndex]);
-  const slashMatchKey = slashMatch ? `${slashMatch.start}:${slashMatch.query}` : null;
-  const filteredSlashCommands = useMemo(() => {
-    if (!slashMatch) return [];
-    return filterSlashCommands(slashCommands, slashMatch.query);
-  }, [slashCommands, slashMatch]);
-  const slashMenuVisible = Boolean(
-    slashMatch &&
-    slashMatchKey !== slashDismissedKey &&
-    (filteredSlashCommands.length > 0 || slashCommandsLoading || slashCommandsError)
-  );
-
-  const atMatch = useMemo(() => getAtMatch(value, caretIndex), [value, caretIndex]);
-  const atMatchKey = atMatch ? `${atMatch.start}:${atMatch.query}` : null;
-  const atMenuVisible = Boolean(
-    atMatch &&
-    atMatchKey !== atDismissedKey &&
-    cwd &&
-    (atSuggestions.length > 0 || atSuggestionsLoading || atSuggestionsError)
-  );
-
-  useEffect(() => {
-    setSlashSelectedIndex(0);
-  }, [slashMatch?.query, filteredSlashCommands.length]);
-
-  useEffect(() => {
-    setAtSelectedIndex(0);
-  }, [atMatch?.query, atSuggestions.length]);
-
-  useEffect(() => {
-    if (!cwd) {
-      setSlashCommands([]);
-      setSlashCommandsLoading(false);
-      setSlashCommandsError(null);
-      return;
-    }
-
-    const controller = new AbortController();
-    setSlashCommandsLoading(true);
-    setSlashCommandsError(null);
-    fetch(`/api/commands?cwd=${encodeURIComponent(cwd)}`, { signal: controller.signal })
-      .then(async (res) => {
-        const data = await res.json() as { commands?: SlashCommandEntry[]; error?: string };
-        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-        setSlashCommands(data.commands ?? []);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setSlashCommands([]);
-        setSlashCommandsError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setSlashCommandsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [cwd]);
-
-  // @-mention：当 atMatch 变化时获取文件列表
-  // - 查询含 "/" → 目录浏览模式，只列当前目录内容
-  // - 查询为空    → 显示根目录文件
-  // - 查询无 "/"  → 递归搜索整个项目（文件名前缀匹配）
-  useEffect(() => {
-    if (!atMatch || !cwd) {
-      setAtSuggestions([]);
-      setAtSuggestionsLoading(false);
-      setAtSuggestionsError(null);
-      return;
-    }
-
-    setAtSuggestions([]);
-    const query = atMatch.query;
-    const hasSlash = query.includes("/");
-
-    const controller = new AbortController();
-    setAtSuggestionsLoading(true);
-    setAtSuggestionsError(null);
-
-    if (hasSlash) {
-      // ── 目录浏览模式 ──
-      const lastSlash = query.lastIndexOf("/");
-      const targetDir = joinFilePath(cwd, query.slice(0, lastSlash));
-      const encoded = encodeFilePathForApi(targetDir);
-      fetch(`/api/files/${encoded}?type=list`, { signal: controller.signal })
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json() as { entries?: { name: string; isDir: boolean; size: number; modified: string }[] };
-          if (controller.signal.aborted) return;
-          const entries = (data.entries ?? []).map((e) => ({
-            name: e.name,
-            fullPath: joinFilePath(targetDir, e.name),
-            isDir: e.isDir,
-          }));
-          const filtered = filterAtSuggestions(entries, query);
-          setAtSuggestions(filtered);
-        })
-        .catch((err) => {
-          if (controller.signal.aborted) return;
-          setAtSuggestions([]);
-          setAtSuggestionsError(err instanceof Error ? err.message : String(err));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setAtSuggestionsLoading(false);
-        });
-    } else if (!query) {
-      // ── 空查询：显示根目录文件 + 文件夹 ──
-      const encoded = encodeFilePathForApi(cwd);
-      fetch(`/api/files/${encoded}?type=list`, { signal: controller.signal })
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json() as { entries?: { name: string; isDir: boolean; size: number; modified: string }[] };
-          if (controller.signal.aborted) return;
-          const entries = (data.entries ?? []).map((e) => ({
-            name: e.name,
-            fullPath: joinFilePath(cwd, e.name),
-            isDir: e.isDir,
-          }));
-          setAtSuggestions(entries);
-        })
-        .catch((err) => {
-          if (controller.signal.aborted) return;
-          setAtSuggestions([]);
-          setAtSuggestionsError(err instanceof Error ? err.message : String(err));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setAtSuggestionsLoading(false);
-        });
-    } else {
-      // ── 递归搜索模式：跨目录查找文件名匹配的文件 ──
-      fetch(`/api/files/search?cwd=${encodeURIComponent(cwd)}&prefix=${encodeURIComponent(query)}`, { signal: controller.signal })
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json() as { files: { name: string; fullPath: string; relativePath: string }[]; total: number };
-          if (controller.signal.aborted) return;
-          const suggestions = data.files.map((f) => ({
-            name: f.relativePath,  // 显示相对路径，帮助区分同名文件
-            fullPath: f.fullPath,
-            isDir: false,
-          }));
-          setAtSuggestions(suggestions);
-        })
-        .catch((err) => {
-          if (controller.signal.aborted) return;
-          setAtSuggestions([]);
-          setAtSuggestionsError(err instanceof Error ? err.message : String(err));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setAtSuggestionsLoading(false);
-        });
-    }
-
-    return () => controller.abort();
-  }, [atMatch, cwd]);
-
-  const resizeTextarea = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
-  }, []);
-
-  const insertSlashCommand = useCallback((command: SlashCommandEntry) => {
-    const ta = textareaRef.current;
-    const currentValue = ta ? ta.value : value;
-    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
-    const match = getSlashCommandMatch(currentValue, currentCaret);
-    if (!match) return;
-
-    const insertion = `/${command.name} `;
-    const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
-    const nextCaret = match.start + insertion.length;
-    setValue(nextValue);
-    setCaretIndex(nextCaret);
-    setSlashDismissedKey(null);
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return;
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(nextCaret, nextCaret);
-      resizeTextarea();
-    });
-  }, [caretIndex, resizeTextarea, value]);
-
-  const insertAtMention = useCallback((suggestion: FileSuggestion) => {
-    const ta = textareaRef.current;
-    const currentValue = ta ? ta.value : value;
-    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
-    const match = getAtMatch(currentValue, currentCaret);
-    if (!match) return;
-
-    if (suggestion.isDir) {
-      // Navigate into directory: replace @query with @dirname/
-      const insertion = `@${suggestion.name}/`;
-      const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
-      const nextCaret = match.start + insertion.length;
-      setValue(nextValue);
-      setCaretIndex(nextCaret);
-      setAtDismissedKey(null);
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextCaret, nextCaret);
-        resizeTextarea();
-      });
-    } else {
-      // Insert backtick-wrapped relative path for files
-      const relativePath = getRelativeFilePath(suggestion.fullPath, cwd ?? undefined);
-      const insertion = `\`${relativePath}\``;
-      const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
-      const nextCaret = match.start + insertion.length;
-      setValue(nextValue);
-      setCaretIndex(nextCaret);
-      setAtDismissedKey(null);
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextCaret, nextCaret);
-        resizeTextarea();
-      });
-    }
-  }, [caretIndex, resizeTextarea, value, cwd]);
 
   useImperativeHandle(ref, () => ({
     insertIfEmpty(text: string) {
@@ -513,36 +280,180 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     });
   }, []);
 
-  const handleSend = useCallback(() => {
-    const msg = value.trim();
-    if (!msg && !attachedImages.length) return;
-    if (isStreaming) return;
-    onSend(msg, attachedImages.length ? attachedImages : undefined);
+  const clearInput = useCallback(() => {
     setValue("");
-    setCaretIndex(0);
-    setSlashDismissedKey(null);
-    setAtDismissedKey(null);
     clearImages();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [value, attachedImages, isStreaming, onSend, clearImages]);
+  }, [clearImages]);
+
+  const handleSend = useCallback(async () => {
+    const msg = value.trim();
+    if (!msg && !attachedImages.length) return;
+    if (isStreaming) return;
+    if (!attachedImages.length && msg.startsWith("/") && onBuiltinCommand) {
+      const result = await onBuiltinCommand(msg);
+      if (result.handled) {
+        if (!result.error) clearInput();
+        return;
+      }
+    }
+    onSend(msg, attachedImages.length ? attachedImages : undefined);
+    clearInput();
+  }, [value, attachedImages, isStreaming, onBuiltinCommand, onSend, clearInput]);
+
+  const slashQuery = value.startsWith("/") && !/\s/.test(value.slice(1))
+    ? value.slice(1).toLowerCase()
+    : null;
+
+  const filteredSlashCommands = (() => {
+    if (slashQuery === null) return [];
+    const commands = [...(isStreaming ? [] : BUILTIN_SLASH_COMMANDS), ...(slashCommands ?? [])];
+    return [...commands]
+      .filter((command) => {
+        const name = command.name.toLowerCase();
+        const description = command.description?.toLowerCase() ?? "";
+        return name.includes(slashQuery) || description.includes(slashQuery);
+      })
+      .sort((a, b) => {
+        const rankDelta = slashMatchRank(a, slashQuery) - slashMatchRank(b, slashQuery);
+        if (rankDelta !== 0) return rankDelta;
+        return SLASH_SOURCE_ORDER[a.source] - SLASH_SOURCE_ORDER[b.source]
+          || MODEL_OPTION_COLLATOR.compare(a.name, b.name);
+      });
+  })();
+
+  const groupedSlashCommands = (() => {
+    const groups = new Map<SlashCommandSource, { source: SlashCommandSource; items: { command: SlashCommandPaletteItem; index: number }[] }>();
+    for (const source of SLASH_SOURCES) {
+      groups.set(source, { source, items: [] });
+    }
+    filteredSlashCommands.forEach((command, index) => {
+      groups.get(command.source)?.items.push({ command, index });
+    });
+    return SLASH_SOURCES
+      .map((source) => groups.get(source)!)
+      .filter((group) => group.items.length > 0);
+  })();
+
+  const slashCommandCountLabel = filteredSlashCommands.length === 1
+    ? (slashQuery ? "1 match" : "1 command")
+    : `${filteredSlashCommands.length} ${slashQuery ? "matches" : "commands"}`;
+
+  const atMatch = useMemo(() => getAtMatch(value, caretIndex), [value, caretIndex]);
+  const atMatchKey = atMatch ? `${atMatch.start}:${atMatch.query}` : null;
+  const atMenuVisible = Boolean(
+    atMatch &&
+    atMatchKey !== atDismissedKey &&
+    cwd &&
+    (atSuggestions.length > 0 || atSuggestionsLoading || atSuggestionsError)
+  );
+
+  const applySlashCommand = useCallback((command: SlashCommandPaletteItem) => {
+    const nextValue = `/${command.name} `;
+    setValue(nextValue);
+    setCaretIndex(nextValue.length);
+    setSlashMenuOpen(false);
+    setSlashActiveIndex(0);
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(nextValue.length, nextValue.length);
+      ta.style.height = "auto";
+      ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+    });
+  }, []);
+
+  const insertAtMention = useCallback((suggestion: FileSuggestion) => {
+    const ta = textareaRef.current;
+    const currentValue = ta ? ta.value : value;
+    const currentCaret = ta ? (ta.selectionStart ?? currentValue.length) : caretIndex;
+    const match = getAtMatch(currentValue, currentCaret);
+    if (!match) return;
+
+    const insertion = suggestion.isDir
+      ? `@${suggestion.name}/`
+      : `\`${getRelativeFilePath(suggestion.fullPath, cwd ?? undefined)}\``;
+    const nextValue = currentValue.slice(0, match.start) + insertion + currentValue.slice(currentCaret);
+    const nextCaret = match.start + insertion.length;
+    setValue(nextValue);
+    setCaretIndex(nextCaret);
+    setAtDismissedKey(null);
+    requestAnimationFrame(() => {
+      const currentTextarea = textareaRef.current;
+      if (!currentTextarea) return;
+      currentTextarea.focus();
+      currentTextarea.setSelectionRange(nextCaret, nextCaret);
+      currentTextarea.style.height = "auto";
+      currentTextarea.style.height = `${Math.min(currentTextarea.scrollHeight, 200)}px`;
+    });
+  }, [caretIndex, cwd, value]);
 
   const sendQueued = useCallback((mode: "steer" | "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length) return;
+    const streamingBehavior = mode === "steer" ? "steer" : "followUp";
+    if (msg.startsWith("/") && onPromptWithStreamingBehavior) {
+      onPromptWithStreamingBehavior(msg, streamingBehavior, attachedImages.length ? attachedImages : undefined);
+      setValue("");
+      clearImages();
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
     if (mode === "steer" && onSteer) {
       onSteer(msg, attachedImages.length ? attachedImages : undefined);
     } else if (mode === "followup" && onFollowUp) {
       onFollowUp(msg, attachedImages.length ? attachedImages : undefined);
     }
     setValue("");
-    setCaretIndex(0);
-    setSlashDismissedKey(null);
-    setAtDismissedKey(null);
     clearImages();
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [value, attachedImages, onSteer, onFollowUp, clearImages]);
+  }, [value, attachedImages, onPromptWithStreamingBehavior, onSteer, onFollowUp, clearImages]);
+
+  const getNextSlashIndex = useCallback((direction: "up" | "down" | "left" | "right") => {
+    const lastIndex = filteredSlashCommands.length - 1;
+    if (lastIndex < 0) return 0;
+
+    if (direction === "left") return Math.max(0, slashActiveIndex - 1);
+    if (direction === "right") return Math.min(lastIndex, slashActiveIndex + 1);
+
+    const currentNode = slashItemRefs.current[slashActiveIndex];
+    if (!currentNode) {
+      return direction === "down"
+        ? Math.min(lastIndex, slashActiveIndex + 1)
+        : Math.max(0, slashActiveIndex - 1);
+    }
+
+    const currentRect = currentNode.getBoundingClientRect();
+    const currentX = currentRect.left + currentRect.width / 2;
+    const currentY = currentRect.top + currentRect.height / 2;
+    let bestIndex = -1;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let index = 0; index <= lastIndex; index += 1) {
+      if (index === slashActiveIndex) continue;
+      const node = slashItemRefs.current[index];
+      if (!node) continue;
+      const rect = node.getBoundingClientRect();
+      const candidateY = rect.top + rect.height / 2;
+      const verticalDelta = candidateY - currentY;
+      if (direction === "down" ? verticalDelta <= 4 : verticalDelta >= -4) continue;
+
+      const candidateX = rect.left + rect.width / 2;
+      const score = Math.abs(verticalDelta) * 1000 + Math.abs(candidateX - currentX);
+      if (score < bestScore) {
+        bestIndex = index;
+        bestScore = score;
+      }
+    }
+
+    if (bestIndex >= 0) return bestIndex;
+    return direction === "down"
+      ? Math.min(lastIndex, slashActiveIndex + 1)
+      : Math.max(0, slashActiveIndex - 1);
+  }, [filteredSlashCommands.length, slashActiveIndex]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -558,32 +469,27 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         return;
       }
 
-      // @-mention menu
       if (atMenuVisible && !isComposing) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setAtSelectedIndex((i) => Math.min(i + 1, Math.max(atSuggestions.length - 1, 0)));
+          setAtSelectedIndex((index) => Math.min(index + 1, Math.max(atSuggestions.length - 1, 0)));
           return;
         }
         if (e.key === "ArrowUp") {
           e.preventDefault();
-          setAtSelectedIndex((i) => Math.max(i - 1, 0));
+          setAtSelectedIndex((index) => Math.max(index - 1, 0));
           return;
         }
         if (e.key === "ArrowRight") {
           e.preventDefault();
           const selected = atSuggestions[Math.min(atSelectedIndex, atSuggestions.length - 1)];
-          if (selected?.isDir) {
-            insertAtMention(selected);
-          }
+          if (selected?.isDir) insertAtMention(selected);
           return;
         }
         if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
           e.preventDefault();
           const selected = atSuggestions[Math.min(atSelectedIndex, atSuggestions.length - 1)];
-          if (selected) {
-            insertAtMention(selected);
-          }
+          if (selected) insertAtMention(selected);
           return;
         }
         if (e.key === "Escape") {
@@ -593,28 +499,35 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         }
       }
 
-      if (slashMenuVisible && !isComposing) {
+      if (slashMenuOpen && slashQuery !== null) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setSlashSelectedIndex((i) => Math.min(i + 1, Math.max(filteredSlashCommands.length - 1, 0)));
+          setSlashActiveIndex(getNextSlashIndex("down"));
           return;
         }
         if (e.key === "ArrowUp") {
           e.preventDefault();
-          setSlashSelectedIndex((i) => Math.max(i - 1, 0));
+          setSlashActiveIndex(getNextSlashIndex("up"));
           return;
         }
-        if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+        if (e.key === "ArrowRight") {
           e.preventDefault();
-          const selected = filteredSlashCommands[Math.min(slashSelectedIndex, filteredSlashCommands.length - 1)];
-          if (selected) {
-            insertSlashCommand(selected);
-          }
+          setSlashActiveIndex(getNextSlashIndex("right"));
+          return;
+        }
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setSlashActiveIndex(getNextSlashIndex("left"));
           return;
         }
         if (e.key === "Escape") {
           e.preventDefault();
-          setSlashDismissedKey(slashMatchKey);
+          setSlashMenuOpen(false);
+          return;
+        }
+        if ((e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) && filteredSlashCommands[slashActiveIndex]) {
+          e.preventDefault();
+          applySlashCommand(filteredSlashCommands[slashActiveIndex]);
           return;
         }
       }
@@ -629,13 +542,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         }
       }
     },
-    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend, atMenuVisible, atSuggestions, atSelectedIndex, insertAtMention, atMatchKey, slashMenuVisible, filteredSlashCommands, slashSelectedIndex, insertSlashCommand, slashMatchKey]
+    [isStreaming, onSteer, onFollowUp, atMenuVisible, atSuggestions, atSelectedIndex, insertAtMention, atMatchKey, slashMenuOpen, slashQuery, filteredSlashCommands, slashActiveIndex, applySlashCommand, sendQueued, handleSend, getNextSlashIndex]
   );
 
   const handleInput = useCallback(() => {
-    syncCaretFromTextarea();
-    resizeTextarea();
-  }, [resizeTextarea, syncCaretFromTextarea]);
+    const ta = textareaRef.current;
+    if (!ta) return;
+    setCaretIndex(ta.selectionStart ?? ta.value.length);
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  }, []);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData?.items ?? []);
@@ -646,18 +562,128 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     processImageFiles(files);
   }, [processImageFiles]);
 
+  useEffect(() => {
+    if (slashQuery === null) {
+      setSlashMenuOpen(false);
+      setSlashActiveIndex(0);
+      slashCommandsRequestedRef.current = false;
+      return;
+    }
+    setSlashMenuOpen(true);
+    setSlashActiveIndex(0);
+    if (!slashCommandsRequestedRef.current && onLoadSlashCommands) {
+      slashCommandsRequestedRef.current = true;
+      Promise.resolve(onLoadSlashCommands()).catch(() => {
+        slashCommandsRequestedRef.current = false;
+      });
+    }
+  }, [slashQuery, onLoadSlashCommands]);
 
+  useEffect(() => {
+    if (slashActiveIndex >= filteredSlashCommands.length) {
+      setSlashActiveIndex(Math.max(0, filteredSlashCommands.length - 1));
+    }
+  }, [filteredSlashCommands.length, slashActiveIndex]);
+
+  useEffect(() => {
+    slashItemRefs.current.length = filteredSlashCommands.length;
+  }, [filteredSlashCommands.length]);
+
+  useEffect(() => {
+    if (!slashMenuOpen) return;
+    slashItemRefs.current[slashActiveIndex]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [slashActiveIndex, slashMenuOpen]);
+
+  useEffect(() => {
+    setAtSelectedIndex(0);
+  }, [atMatch?.query, atSuggestions.length]);
+
+  useEffect(() => {
+    if (!atMatch || !cwd) {
+      setAtSuggestions([]);
+      setAtSuggestionsLoading(false);
+      setAtSuggestionsError(null);
+      return;
+    }
+
+    setAtSuggestions([]);
+    const query = atMatch.query;
+    const hasSlash = query.includes("/");
+    const controller = new AbortController();
+    setAtSuggestionsLoading(true);
+    setAtSuggestionsError(null);
+
+    const handleError = (err: unknown) => {
+      if (controller.signal.aborted) return;
+      setAtSuggestions([]);
+      setAtSuggestionsError(err instanceof Error ? err.message : String(err));
+    };
+    const finish = () => {
+      if (!controller.signal.aborted) setAtSuggestionsLoading(false);
+    };
+
+    if (hasSlash) {
+      const lastSlash = query.lastIndexOf("/");
+      const targetDir = joinFilePath(cwd, query.slice(0, lastSlash));
+      const encoded = encodeFilePathForApi(targetDir);
+      fetch(`/api/files/${encoded}?type=list`, { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as { entries?: { name: string; isDir: boolean }[] };
+          if (controller.signal.aborted) return;
+          const entries = (data.entries ?? []).map((entry) => ({
+            name: entry.name,
+            fullPath: joinFilePath(targetDir, entry.name),
+            isDir: entry.isDir,
+          }));
+          setAtSuggestions(filterAtSuggestions(entries, query));
+        })
+        .catch(handleError)
+        .finally(finish);
+    } else if (!query) {
+      const encoded = encodeFilePathForApi(cwd);
+      fetch(`/api/files/${encoded}?type=list`, { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as { entries?: { name: string; isDir: boolean }[] };
+          if (controller.signal.aborted) return;
+          setAtSuggestions((data.entries ?? []).map((entry) => ({
+            name: entry.name,
+            fullPath: joinFilePath(cwd, entry.name),
+            isDir: entry.isDir,
+          })));
+        })
+        .catch(handleError)
+        .finally(finish);
+    } else {
+      fetch(`/api/files/search?cwd=${encodeURIComponent(cwd)}&prefix=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as { files: { name: string; fullPath: string; relativePath: string }[] };
+          if (controller.signal.aborted) return;
+          setAtSuggestions(data.files.map((file) => ({
+            name: file.relativePath,
+            fullPath: file.fullPath,
+            isDir: false,
+          })));
+        })
+        .catch(handleError)
+        .finally(finish);
+    }
+
+    return () => controller.abort();
+  }, [atMatch, cwd]);
 
   // Build model options: prefer modelList (has provider info), fallback to modelNames
   const modelOptions: ModelOption[] = (() => {
     if (modelList && modelList.length > 0) {
-      return modelList.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }));
+      return modelList.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name })).sort(compareModelOptions);
     }
     return Object.entries(modelNames ?? {}).map(([modelId, name]) => ({
       provider: model?.provider ?? "unknown",
       modelId,
       name,
-    }));
+    })).sort(compareModelOptions);
   })();
 
   // Group options by provider, preserving insertion order
@@ -668,12 +694,20 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     else modelsByProvider.push({ provider: opt.provider, options: [opt] });
   }
 
-  const currentModelOption = model
-    ? modelOptions.find((o) => o.modelId === model.modelId && o.provider === model.provider)
-    : modelOptions[0];
-  const currentModelLabel = currentModelOption
-    ? `${currentModelOption.provider}/${currentModelOption.name}`
-    : model ? `${model.provider}/${model.modelId}` : null;
+  const displayModelName = model
+    ? (modelOptions.find((o) => o.modelId === model.modelId && o.provider === model.provider)?.name ?? model.modelId)
+    : null;
+  const currentName = displayModelName;
+
+  const compactSavedTokens = compactResult
+    ? Math.max(0, compactResult.tokensBefore - compactResult.estimatedTokensAfter)
+    : 0;
+  const compactVerb = compactResult?.reason && compactResult.reason !== "manual"
+    ? `${compactResult.reason[0].toUpperCase()}${compactResult.reason.slice(1)} compacted`
+    : "Compacted";
+  const compactResultText = compactResult
+    ? `${compactVerb} ${formatTokenCount(compactResult.tokensBefore)} -> ${formatTokenCount(compactResult.estimatedTokensAfter)} tokens (${formatTokenCount(compactSavedTokens)} saved)`
+    : null;
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -735,6 +769,19 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             Retrying ({retryInfo.attempt}/{retryInfo.maxAttempts})…{retryInfo.errorMessage && <span style={{ opacity: 0.7, marginLeft: 4 }}>— {retryInfo.errorMessage}</span>}
           </div>
         )}
+        {compactResultText && (
+          <div style={{
+            marginBottom: 8, padding: "5px 10px",
+            background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.24)",
+            borderRadius: 6, fontSize: 12, color: "rgba(5,150,105,0.95)",
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            {compactResultText}
+          </div>
+        )}
         {/* Image previews */}
         {attachedImages.length > 0 && (
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
@@ -766,105 +813,148 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         )}
 
         {/* Main input */}
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            background: "var(--bg)",
-            border: `1px solid ${isStreaming && (onSteer || onFollowUp)
-              ? "rgba(234,179,8,0.4)"
-              : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
-            borderRadius: 14,
-            padding: "10px 10px 10px 14px",
-            boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-            transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
-          } as React.CSSProperties}
-        >
-          {slashMenuVisible && slashMatch && (
+        <div style={{ position: "relative" }}>
+          {slashMenuOpen && slashQuery !== null && (
             <div
               style={{
                 position: "absolute",
-                left: 12,
-                right: 12,
+                left: 0,
+                right: 0,
                 bottom: "calc(100% + 8px)",
-                zIndex: 450,
+                zIndex: 120,
                 background: "var(--bg)",
                 border: "1px solid var(--border)",
-                borderRadius: 10,
-                boxShadow: "0 -4px 18px rgba(15,23,42,0.14)",
+                borderRadius: 8,
+                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
                 overflow: "hidden",
+                maxHeight: "min(56vh, 460px)",
               }}
             >
-              <div style={{ padding: "7px 10px", fontSize: 11, color: "var(--text-dim)", borderBottom: "1px solid var(--border)" }}>
-                Slash commands · skills and prompt templates
+              <div
+                style={{
+                  padding: "8px 10px",
+                  borderBottom: "1px solid var(--border)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontSize: 11,
+                  color: "var(--text-dim)",
+                }}
+              >
+                <span>{slashCommandsLoading ? "Loading commands..." : `Slash commands · ${slashCommandCountLabel}`}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>Tab / Enter</span>
               </div>
-              {slashCommandsLoading ? (
-                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>Loading commands…</div>
-              ) : slashCommandsError ? (
-                <div style={{ padding: "10px 12px", fontSize: 12, color: "#ef4444" }}>Failed to load commands: {slashCommandsError}</div>
-              ) : filteredSlashCommands.length === 0 ? (
-                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>No matching skill or template commands</div>
-              ) : (
-                filteredSlashCommands.map((command, index) => {
-                  const selected = index === slashSelectedIndex;
-                  return (
-                    <button
-                      key={`${command.source}:${command.name}:${command.path ?? ""}`}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        insertSlashCommand(command);
-                      }}
-                      onMouseEnter={() => setSlashSelectedIndex(index)}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 10,
-                        padding: "8px 10px",
-                        border: "none",
-                        borderTop: index > 0 ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : "none",
-                        background: selected ? "var(--bg-selected)" : "transparent",
-                        color: "var(--text)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <span style={{ color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 12, whiteSpace: "nowrap" }}>
-                        /{command.name}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {command.argumentHint && (
-                            <span style={{ color: "var(--text)", fontFamily: "var(--font-mono)", marginRight: 8 }}>{command.argumentHint}</span>
-                          )}
-                          {command.description || (command.source === "skill" ? "Pi skill" : "Prompt template")}
-                        </span>
-                        <span style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          {command.source === "skill" ? "skill" : "template"}{command.location ? ` · ${command.location}` : ""}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })
-              )}
+              <div style={{ maxHeight: "calc(min(56vh, 460px) - 34px)", overflowY: "auto", padding: 10 }}>
+                {!slashCommandsLoading && filteredSlashCommands.length === 0 ? (
+                  <div style={{ padding: "2px 2px 4px", fontSize: 12, color: "var(--text-dim)" }}>
+                    No extension, prompt, or skill commands found
+                  </div>
+                ) : (
+                  groupedSlashCommands.map((group) => (
+                    <section key={group.source} style={{ marginBottom: 12 }}>
+                      <div
+                        style={{
+                          position: "sticky",
+                          top: -10,
+                          zIndex: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          padding: "4px 0 6px",
+                          background: "var(--bg)",
+                          color: "var(--text-dim)",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        <span>{SLASH_SOURCE_GROUP_LABEL[group.source]}</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{group.items.length}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                          gap: 8,
+                        }}
+                      >
+                        {group.items.map(({ command, index }) => {
+                          const active = index === slashActiveIndex;
+                          return (
+                            <button
+                              key={`${command.source}:${command.name}`}
+                              ref={(node) => {
+                                slashItemRefs.current[index] = node;
+                              }}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                applySlashCommand(command);
+                              }}
+                              onMouseEnter={() => setSlashActiveIndex(index)}
+                              style={{
+                                width: "100%",
+                                minWidth: 0,
+                                minHeight: 58,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 4,
+                                justifyContent: "center",
+                                padding: "9px 10px",
+                                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                                borderRadius: 7,
+                                background: active ? "var(--bg-selected)" : "var(--bg-panel)",
+                                color: "var(--text)",
+                                cursor: "pointer",
+                                textAlign: "left",
+                                boxShadow: active ? "0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)" : "none",
+                              }}
+                            >
+                              <span style={{
+                                fontSize: 13,
+                                fontFamily: "var(--font-mono)",
+                                overflowWrap: "anywhere",
+                                wordBreak: "break-word",
+                              }}>
+                                /{command.name}
+                              </span>
+                              {command.description && (
+                                <span style={{
+                                  display: "-webkit-box",
+                                  WebkitBoxOrient: "vertical",
+                                  WebkitLineClamp: 2,
+                                  overflow: "hidden",
+                                  fontSize: 11,
+                                  lineHeight: 1.35,
+                                  color: "var(--text-dim)",
+                                }}>
+                                  {command.description}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))
+                )}
+              </div>
             </div>
           )}
-
           {atMenuVisible && atMatch && (
             <div
               style={{
                 position: "absolute",
-                left: 12,
-                right: 12,
+                left: 0,
+                right: 0,
                 bottom: "calc(100% + 8px)",
-                zIndex: 450,
+                zIndex: 130,
                 background: "var(--bg)",
                 border: "1px solid var(--border)",
-                borderRadius: 10,
-                boxShadow: "0 -4px 18px rgba(15,23,42,0.14)",
+                borderRadius: 8,
+                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
                 overflow: "hidden",
                 maxHeight: 280,
                 overflowY: "auto",
@@ -919,25 +1009,34 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                         {suggestion.name}
                       </span>
-                      {suggestion.isDir && (
-                        <span style={{ fontSize: 10, color: "var(--text-dim)", flexShrink: 0 }}>
-                          dir
-                        </span>
-                      )}
+                      {suggestion.isDir && <span style={{ fontSize: 10, color: "var(--text-dim)", flexShrink: 0 }}>dir</span>}
                     </button>
                   );
                 })
               )}
             </div>
           )}
-
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              background: "var(--bg)",
+              border: `1px solid ${isStreaming && (onSteer || onFollowUp)
+                ? "rgba(234,179,8,0.4)"
+                : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              borderRadius: 14,
+              padding: "10px 10px 10px 14px",
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
+              transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
+            } as React.CSSProperties}
+          >
           <textarea
             ref={textareaRef}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
               setCaretIndex(e.target.selectionStart ?? e.target.value.length);
-              setSlashDismissedKey(null);
               setAtDismissedKey(null);
             }}
             onKeyDown={handleKeyDown}
@@ -957,7 +1056,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               isStreaming && (onSteer || onFollowUp)
                 ? "Steer 立即注入 / Follow-up 排队…"
                 : isStreaming ? "Agent is running…"
-                : "Message…"
+                : "Message… Type / for commands, @ for files"
             }
             rows={1}
             style={{
@@ -1054,6 +1153,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               Send
             </button>
           )}
+          </div>
         </div>
 
         {/* Bottom bar: left | center (context) | right */}
@@ -1092,7 +1192,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </svg>
             </button>
             {/* Model selector — visible always, disabled during streaming */}
-            {modelOptions.length > 0 && currentModelLabel && onModelChange && (
+            {modelOptions.length > 0 && currentName && onModelChange && (
                 <div ref={dropdownRef} style={{ position: "relative" }}>
                   <button
                     onClick={(e) => {
@@ -1133,20 +1233,20 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                       <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
                       <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
                     </svg>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{currentModelLabel}</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{currentName}</span>
                   </button>
                   {modelDropdownOpen && modelDropdownRect && (() => {
                     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
                     const bottom = viewportHeight - modelDropdownRect.top + 6;
                     const maxH = Math.max(120, Math.min(modelDropdownRect.top - 8, viewportHeight * 0.6));
                     return (
-                    <div ref={modelDropdownPanelRef} style={{
+                      <div ref={modelDropdownPanelRef} style={{
                       position: "fixed",
                       bottom, left: modelDropdownRect.left,
                       zIndex: 500, background: "var(--bg)", border: "1px solid var(--border)",
                       borderRadius: 8, boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
                       overflow: "hidden", width: "max-content", minWidth: modelDropdownRect.width, maxHeight: maxH, overflowY: "auto",
-                    }}>
+                      }}>
                       {modelsByProvider.map((group, gi) => (
                         <div key={group.provider}>
                           {(modelsByProvider.length > 1) && (
@@ -1164,7 +1264,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                             return (
                               <button
                                 key={`${opt.provider}:${opt.modelId}`}
-                                onClick={() => { setModelDropdownOpen(false); if (!isActive) onModelChange(opt.provider, opt.modelId); }}
+                                onClick={() => { setModelDropdownOpen(false); if (!isActive || isAutoModelSelection) onModelChange(opt.provider, opt.modelId); }}
                                 style={{
                                   display: "flex", alignItems: "center", gap: 8,
                                   width: "100%", padding: "7px 12px",
@@ -1333,7 +1433,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                     {TOOL_PRESETS.map((lvl) => {
                       const preset = TOOL_PRESET_MAP[lvl];
                       const isActive = (toolPreset ?? "default") === preset;
-                      const desc = lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : lvl === "subagent" ? "全部工具 + subagent 委派" : "全部内置工具";
+                      const desc = lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : lvl === "subagent" ? "内置工具 + subagent" : "全部内置工具";
                       return (
                         <button
                           key={lvl}
