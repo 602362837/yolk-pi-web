@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-06-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~810 | Active |
+| `journal-1.md` | ~843 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-06-29 | Show subagent model metadata | `a509276` | `pi/20260629-151227` |
 | 24 | 2026-06-29 | Usage stats archived sessions | `fbef798` | `pi/20260629-144056` |
 | 23 | 2026-06-29 | Trellis subagent model routing | `f457293`, `e01302c`, `8582312` | `pi/20260629-111145` |
 | 22 | 2026-06-29 | ChatGPT account metadata and quota display | `2d3615f` | `pi/20260629-113404` |
