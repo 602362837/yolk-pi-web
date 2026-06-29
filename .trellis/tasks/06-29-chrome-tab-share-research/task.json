@@ -1,0 +1,31 @@
+{
+  "id": "chrome-tab-share-research",
+  "name": "chrome-tab-share-research",
+  "title": "Research Chrome tab sharing to chat",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "zyj",
+  "assignee": "zyj",
+  "createdAt": "2026-06-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "pi/20260629-162657",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-29-piweb-browser-control-bridge",
+    "06-29-chrome-debugger-relay-extension",
+    "06-29-browser-control-protocol-tools",
+    "06-29-browser-attached-ui-safety"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
