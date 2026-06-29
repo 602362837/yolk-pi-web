@@ -35,6 +35,9 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `web-config/` | GET/PUT | Read/write `~/.pi/agent/pi-web.json` for WorkTree defaults and optional Trellis panel settings. |
 | `trellis/tasks/` | GET | List read-only Trellis task summaries for an authorized workspace cwd when the Trellis panel setting is enabled. |
 | `trellis/tasks/[taskKey]/` | GET | Read one Trellis task detail, artifacts, manifest counts, hierarchy, and derived phase/progress. |
+| `trellis/setup/status/` | GET | Inspect Trellis prerequisites, CLI availability, and selected-workspace initialization state without requiring the panel setting to be enabled. |
+| `trellis/setup/init/` | POST | Install/ensure the Trellis CLI, run `trellis init -u <developer> --pi` for an authorized uninitialized workspace, and auto-enable the Trellis drawer setting on success. |
+| `trellis/setup/update/` | POST | Upgrade/install the Trellis CLI and run `trellis update` for an authorized workspace that already has `.trellis`. |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>`. |
 | `home/` | GET | Return `os.homedir()`. |
 | `usage/` | GET | Aggregate token/cost usage across sessions. |

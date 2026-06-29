@@ -970,7 +970,13 @@ export function AppShell() {
     {usageStatsOpen && (
       <UsageStatsModal cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} onClose={() => setUsageStatsOpen(false)} />
     )}
-    {settingsConfigOpen && <SettingsConfig onClose={() => { setSettingsConfigOpen(false); void loadWebConfig(); }} />}
+    {settingsConfigOpen && (
+      <SettingsConfig
+        cwd={trellisCwd}
+        onConfigChange={() => { void loadWebConfig(); }}
+        onClose={() => { setSettingsConfigOpen(false); void loadWebConfig(); }}
+      />
+    )}
     </>
   );
 }

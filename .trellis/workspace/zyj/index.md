@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
+- **Total Sessions**: 20
 - **Last Active**: 2026-06-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~641 | Active |
+| `journal-1.md` | ~674 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-06-29 | Trellis settings setup controls | `8f49dfd` | `pi/20260629-093756` |
 | 19 | 2026-06-29 | Trellis task detail panel fixes | `5c01e62` | `pi/20260629-085447` |
 | 18 | 2026-06-29 | Fix Git panel main branch lane | `9460b32` | `pi/20260629-084420` |
 | 17 | 2026-06-26 | Add Git commit graph visualization | `02e1cfe` | `pi/20260626-170826` |

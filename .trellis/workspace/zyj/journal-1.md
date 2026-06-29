@@ -639,3 +639,36 @@ Clarified Trellis task detail metadata and progress semantics: recorded task met
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: Trellis settings setup controls
+
+**Date**: 2026-06-29
+**Task**: Trellis settings setup controls
+**Branch**: `pi/20260629-093756`
+
+### Summary
+
+Added Trellis settings guidance, prerequisite/status inspection APIs, setup/update actions, proxy config, and automatic drawer enablement after successful initialization.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8f49dfd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -15,7 +15,7 @@
 | `components/ModelsConfig.tsx` | Modal for editing `models.json`, OAuth/API-key auth, and ChatGPT Plus/Pro saved-account add/import, activation, remarks, inactive-account deletion, and raw/CPA/SUB2API account JSON import via shared converters. |
 | `components/GitPanel.tsx` | Git status dropdown panel showing branch, commits, staged/unstaged changes, untracked files, and stash. |
 | `components/SkillsConfig.tsx` | Modal for browsing/installing skills. |
-| `components/SettingsConfig.tsx` | Settings modal for WorkTree defaults and optional Trellis panel settings in `pi-web.json`. |
+| `components/SettingsConfig.tsx` | Settings modal for WorkTree defaults and optional Trellis panel settings in `pi-web.json`, including Trellis docs guidance, prerequisite/status inspection, install/init, update, and proxy controls. |
 | `components/TrellisPanel.tsx` | Read-only Trellis task drawer: task list, filters, details, artifacts, hierarchy, manifest/context counts, recorded task metadata, optional check-run state, and derived phase/progress. |
 | `components/UsageStatsModal.tsx` | Token/cost usage statistics modal. |
 | `components/FileExplorer.tsx` | File tree inside the sidebar. |

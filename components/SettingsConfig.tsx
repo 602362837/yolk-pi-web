@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PiWebConfig, PiWebTrellisConfig, PiWebWorktreeConfig } from "@/lib/pi-web-config";
+import type { TrellisCommandResponse, TrellisSetupStatus } from "@/lib/trellis-setup-types";
 
 interface WebConfigResponse {
   config: PiWebConfig;
@@ -10,6 +11,15 @@ interface WebConfigResponse {
   exists: boolean;
   parseError?: string;
   error?: string;
+}
+
+interface TrellisStatusResponse {
+  status?: TrellisSetupStatus;
+  error?: string;
+}
+
+interface TrellisActionResponse extends TrellisCommandResponse {
+  config?: PiWebConfig;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -58,18 +68,21 @@ function TextInput({
   value,
   onChange,
   placeholder,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      disabled={disabled}
       spellCheck={false}
-      style={{ ...inputStyle, fontFamily: "var(--font-mono)" }}
+      style={{ ...inputStyle, fontFamily: "var(--font-mono)", opacity: disabled ? 0.6 : 1, cursor: disabled ? "not-allowed" : "text" }}
     />
   );
 }
@@ -79,16 +92,21 @@ function ToggleField({
   description,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   description: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
       style={{
         width: "100%",
         display: "flex",
@@ -100,7 +118,8 @@ function ToggleField({
         border: "1px solid var(--border)",
         background: "var(--bg-subtle)",
         color: "var(--text)",
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.65 : 1,
         textAlign: "left",
       }}
     >
@@ -138,6 +157,32 @@ function ToggleField({
   );
 }
 
+function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
+  return (
+    <span style={{ padding: "2px 7px", borderRadius: 999, background: ok ? "rgba(34,197,94,0.14)" : "rgba(239,68,68,0.14)", color: ok ? "#22c55e" : "#f87171", fontSize: 11, fontWeight: 700 }}>
+      {label ?? (ok ? "通过" : "需处理")}
+    </span>
+  );
+}
+
+function StatusRow({ label, value, ok, detail }: { label: string; value: string; ok: boolean; detail?: string }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr max-content", gap: 10, alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--border)" }}>
+      <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{label}</span>
+      <span title={detail} style={{ color: "var(--text)", fontSize: 12, overflowWrap: "anywhere" }}>{value}</span>
+      <StatusBadge ok={ok} />
+    </div>
+  );
+}
+
+function formatRecommendedAction(status: TrellisSetupStatus): string {
+  if (status.recommendedAction === "fix-prerequisites") return "请先完成系统前置要求，然后再安装或更新 Trellis。";
+  if (status.recommendedAction === "initialize") return "当前工作区还没有 Trellis，可安装并初始化 Pi Agent 支持。";
+  if (status.recommendedAction === "update") return "当前工作区已有 Trellis，请使用更新操作同步 CLI 和项目模板。";
+  if (status.recommendedAction === "ready") return "当前工作区已启用 Trellis，可直接使用面板，也可以执行更新。";
+  return "请选择工作区。";
+}
+
 function worktreeConfigsEqual(a: PiWebWorktreeConfig | null, b: PiWebWorktreeConfig | null): boolean {
   if (!a || !b) return a === b;
   return a.baseRef === b.baseRef
@@ -149,10 +194,13 @@ function worktreeConfigsEqual(a: PiWebWorktreeConfig | null, b: PiWebWorktreeCon
 
 function trellisConfigsEqual(a: PiWebTrellisConfig | null, b: PiWebTrellisConfig | null): boolean {
   if (!a || !b) return a === b;
-  return a.enabled === b.enabled && a.includeArchived === b.includeArchived;
+  return a.enabled === b.enabled
+    && a.includeArchived === b.includeArchived
+    && a.proxyEnabled === b.proxyEnabled
+    && a.proxyUrl === b.proxyUrl;
 }
 
-export function SettingsConfig({ onClose }: { onClose: () => void }) {
+export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string | null; onClose: () => void; onConfigChange?: () => void }) {
   const [section, setSection] = useState<SettingsSection>("worktree");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -165,6 +213,13 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
   const [savedTrellis, setSavedTrellis] = useState<PiWebTrellisConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [trellisStatus, setTrellisStatus] = useState<TrellisSetupStatus | null>(null);
+  const [trellisStatusLoading, setTrellisStatusLoading] = useState(false);
+  const [trellisStatusError, setTrellisStatusError] = useState<string | null>(null);
+  const [trellisAction, setTrellisAction] = useState<"init" | "update" | null>(null);
+  const [trellisOutput, setTrellisOutput] = useState<string | null>(null);
+  const [developerName, setDeveloperName] = useState("");
+  const [developerNameTouched, setDeveloperNameTouched] = useState(false);
 
   const dirty = useMemo(
     () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis),
@@ -197,11 +252,49 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
+  const loadTrellisStatus = useCallback(async (signal?: AbortSignal) => {
+    if (!cwd) {
+      setTrellisStatus(null);
+      setTrellisStatusError(null);
+      setTrellisStatusLoading(false);
+      return;
+    }
+    setTrellisStatusLoading(true);
+    setTrellisStatusError(null);
+    try {
+      const res = await fetch(`/api/trellis/setup/status?cwd=${encodeURIComponent(cwd)}`, { signal });
+      const data = await res.json() as TrellisStatusResponse;
+      if (!res.ok || data.error || !data.status) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const status = data.status;
+      setTrellisStatus(status);
+      setDeveloperName((prev) => (!developerNameTouched || !prev.trim()) ? status.suggestedDeveloperName : prev);
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") return;
+      setTrellisStatus(null);
+      setTrellisStatusError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrellisStatusLoading(false);
+    }
+  }, [cwd, developerNameTouched]);
+
   useEffect(() => {
     const controller = new AbortController();
     void loadConfig(controller.signal);
     return () => controller.abort();
   }, [loadConfig]);
+
+  useEffect(() => {
+    setDeveloperName("");
+    setDeveloperNameTouched(false);
+    setTrellisOutput(null);
+  }, [cwd]);
+
+  useEffect(() => {
+    if (section !== "trellis") return;
+    const controller = new AbortController();
+    void loadTrellisStatus(controller.signal);
+    return () => controller.abort();
+  }, [section, loadTrellisStatus]);
 
   const updateWorktree = useCallback((patch: Partial<PiWebWorktreeConfig>) => {
     setWorktree((prev) => prev ? { ...prev, ...patch } : prev);
@@ -213,8 +306,19 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
     setNotice(null);
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!worktree || !trellis) return;
+  const applyLoadedConfig = useCallback((config: PiWebConfig, path: string, configExists: boolean, nextDefaults?: PiWebConfig) => {
+    if (nextDefaults) setDefaults(nextDefaults);
+    setWorktree(config.worktree);
+    setSavedWorktree(config.worktree);
+    setTrellis(config.trellis);
+    setSavedTrellis(config.trellis);
+    setConfigPath(path);
+    setExists(configExists);
+    onConfigChange?.();
+  }, [onConfigChange]);
+
+  const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
+    if (!worktree || !trellis) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -226,20 +330,20 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setDefaults(data.defaults);
-      setWorktree(data.config.worktree);
-      setSavedWorktree(data.config.worktree);
-      setTrellis(data.config.trellis);
-      setSavedTrellis(data.config.trellis);
-      setConfigPath(data.path);
-      setExists(data.exists);
-      setNotice("设置已保存。Trellis 面板开关会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+      applyLoadedConfig(data.config, data.path, data.exists, data.defaults);
+      if (successNotice) setNotice(successNotice);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      return false;
     } finally {
       setSaving(false);
     }
-  }, [worktree, trellis]);
+  }, [applyLoadedConfig, worktree, trellis]);
+
+  const handleSave = useCallback(async () => {
+    await saveConfig("设置已保存。Trellis 面板开关会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+  }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
     if (!defaults) return;
@@ -247,6 +351,42 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
     setTrellis(defaults.trellis);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
+
+  const runTrellisSetupAction = useCallback(async (action: "init" | "update") => {
+    if (!cwd || !trellis) return;
+    if (dirty) {
+      const saved = await saveConfig();
+      if (!saved) return;
+    }
+    setTrellisAction(action);
+    setError(null);
+    setNotice(null);
+    setTrellisOutput(null);
+    try {
+      const res = await fetch(`/api/trellis/setup/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "init" ? { cwd, developerName: developerName.trim() } : { cwd }),
+      });
+      const data = await res.json() as TrellisActionResponse;
+      if (!res.ok || data.error || !data.status) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setTrellisStatus(data.status);
+      setTrellisOutput(data.output || "操作完成。");
+      if (data.config) {
+        setWorktree(data.config.worktree);
+        setSavedWorktree(data.config.worktree);
+        setTrellis(data.config.trellis);
+        setSavedTrellis(data.config.trellis);
+        onConfigChange?.();
+      }
+      setNotice(action === "init" ? "Trellis 已初始化，右侧抽屉已自动启用。" : "Trellis 已更新。");
+      void loadTrellisStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrellisAction(null);
+    }
+  }, [cwd, developerName, dirty, loadTrellisStatus, onConfigChange, saveConfig, trellis]);
 
   const renderSectionButton = (id: SettingsSection, label: string, description: string) => {
     const active = section === id;
@@ -272,6 +412,17 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
       </button>
     );
   };
+
+  const trellisBusy = !!trellisAction || saving;
+  const trellisBlockingReason = !cwd
+    ? "请先选择工作区。"
+    : trellisStatusError
+      ? trellisStatusError
+      : !developerName.trim()
+        ? "请输入 Trellis 开发者名称。"
+        : trellisStatus?.blockingReasons[0] ?? null;
+  const canInitializeTrellis = !!cwd && !!trellisStatus?.canInitialize && !!developerName.trim() && !trellisBusy && !trellisStatusLoading;
+  const canUpdateTrellis = !!cwd && !!trellisStatus?.canUpdate && !trellisBusy && !trellisStatusLoading;
 
   return (
     <div
@@ -381,29 +532,113 @@ export function SettingsConfig({ onClose }: { onClose: () => void }) {
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    <div>
-                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Trellis 面板</h3>
-                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-                        从当前工作区的 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)" }}>.trellis/tasks</code> 读取任务，只读展示任务列表、详情和阶段进度。
-                      </p>
+                    <div style={{ padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div>
+                        <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Trellis 面板</h3>
+                        <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                          面板从当前工作区的 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)" }}>.trellis/tasks</code> 读取任务；使用前需要在项目中安装并初始化 Trellis。
+                        </p>
+                      </div>
+                      <a href="https://docs.trytrellis.app/" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+                        打开 Trellis 官方文档 ↗
+                      </a>
+                      <div style={{ color: "var(--text-dim)", fontSize: 11, overflowWrap: "anywhere" }}>
+                        当前工作区：{cwd ? <code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>{cwd}</code> : "未选择"}
+                      </div>
                     </div>
 
-                    <ToggleField
-                      label="启用 Trellis 右侧抽屉"
-                      description="开启后，主界面右上角会显示 Trellis 按钮；关闭时 UI 入口和 Trellis API 都不可用。"
-                      checked={trellis.enabled}
-                      onChange={(enabled) => updateTrellis({ enabled })}
-                    />
-                    <ToggleField
-                      label="默认包含已归档任务"
-                      description="开启后，Trellis 面板初次打开会同时读取 .trellis/tasks/archive 下的任务；面板内仍可临时切换。"
-                      checked={trellis.includeArchived}
-                      onChange={(includeArchived) => updateTrellis({ includeArchived })}
-                    />
-
-                    <div style={{ padding: 12, borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>
-                      <strong style={{ color: "var(--text)" }}>首版范围：</strong>只读查看，不创建、启动、完成或归档任务；阶段进度根据 task.json、PRD/Design/Implement 文档和 context manifests 保守推断。
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <ToggleField
+                        label="启用 Trellis 右侧抽屉"
+                        description="开启后，主界面右上角会显示 Trellis 按钮；关闭时 UI 入口和 Trellis 任务 API 都不可用。"
+                        checked={trellis.enabled}
+                        onChange={(enabled) => updateTrellis({ enabled })}
+                      />
+                      <ToggleField
+                        label="默认包含已归档任务"
+                        description="开启后，Trellis 面板初次打开会同时读取 .trellis/tasks/archive 下的任务；面板内仍可临时切换。"
+                        checked={trellis.includeArchived}
+                        onChange={(includeArchived) => updateTrellis({ includeArchived })}
+                      />
                     </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <ToggleField
+                        label="安装/更新 Trellis 时使用代理"
+                        description="只会应用到安装、初始化、更新 Trellis 的子进程，不会修改 pi-web 服务本身的环境变量。建议使用 HTTP(S) 代理地址。"
+                        checked={trellis.proxyEnabled}
+                        onChange={(proxyEnabled) => updateTrellis({ proxyEnabled })}
+                      />
+                      <Field label="代理地址" description="示例：https://127.0.0.1:7890。启用代理时会写入 HTTP_PROXY / HTTPS_PROXY / npm_config_proxy 等子进程环境变量。">
+                        <TextInput value={trellis.proxyUrl} onChange={(proxyUrl) => updateTrellis({ proxyUrl })} placeholder="http://127.0.0.1:7890" disabled={!trellis.proxyEnabled} />
+                      </Field>
+                    </div>
+
+                    <div style={{ padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                        <div>
+                          <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>Trellis 巡检</div>
+                          <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3 }}>{trellisStatus ? formatRecommendedAction(trellisStatus) : (cwd ? "正在检查当前工作区…" : "选择工作区后可检查和初始化 Trellis。")}</div>
+                        </div>
+                        <button
+                          onClick={() => void loadTrellisStatus()}
+                          disabled={!cwd || trellisStatusLoading || trellisBusy}
+                          style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: !cwd || trellisStatusLoading || trellisBusy ? "not-allowed" : "pointer", fontSize: 12 }}
+                        >
+                          {trellisStatusLoading ? "巡检中…" : "重新巡检"}
+                        </button>
+                      </div>
+
+                      {trellisStatusError && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{trellisStatusError}</div>}
+                      {trellisStatus && (
+                        <div>
+                          <StatusRow label="操作系统" value={`${trellisStatus.platform}${trellisStatus.supportedOs ? "" : "（不支持）"}`} ok={trellisStatus.supportedOs} />
+                          <StatusRow label="Node.js" value={trellisStatus.node.version ?? "未检测到"} ok={trellisStatus.node.ok} detail={trellisStatus.node.required} />
+                          <StatusRow label="Python" value={trellisStatus.python.version ? `${trellisStatus.python.version} (${trellisStatus.python.command ?? "python"})` : (trellisStatus.python.error ?? "未检测到")} ok={trellisStatus.python.ok} detail={trellisStatus.python.required} />
+                          <StatusRow label="Trellis CLI" value={trellisStatus.cli.installed ? (trellisStatus.cli.version ?? "已安装") : "未安装，初始化/更新时会自动安装"} ok={trellisStatus.cli.installed} detail={trellisStatus.cli.error} />
+                          <StatusRow label="项目 .trellis" value={trellisStatus.project.hasTrellisDir ? `已存在${trellisStatus.project.version ? ` · ${trellisStatus.project.version}` : ""}` : "未初始化"} ok={trellisStatus.project.hasTrellisDir} />
+                          <StatusRow label="任务目录" value={trellisStatus.project.hasTasksDir ? ".trellis/tasks 已存在" : "尚未创建"} ok={trellisStatus.project.hasTasksDir} />
+                          <StatusRow label="开发者身份" value={trellisStatus.project.developerName ?? "未写入 .trellis/.developer"} ok={trellisStatus.project.hasDeveloperIdentity} />
+                        </div>
+                      )}
+                    </div>
+
+                    <Field label="Trellis 开发者名称" description="用于 trellis init -u；默认来自已检测到的 Trellis 身份，否则使用系统用户名。可编辑，不能为空。">
+                      <TextInput
+                        value={developerName}
+                        onChange={(value) => {
+                          setDeveloperNameTouched(true);
+                          setDeveloperName(value);
+                        }}
+                        placeholder="your-name"
+                      />
+                    </Field>
+
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => void runTrellisSetupAction("init")}
+                        disabled={!canInitializeTrellis}
+                        title={canInitializeTrellis ? "安装并初始化 Trellis" : trellisBlockingReason ?? "当前工作区已安装 Trellis，请使用更新"}
+                        style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: canInitializeTrellis ? "var(--accent)" : "var(--border)", color: "white", cursor: canInitializeTrellis ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 700 }}
+                      >
+                        {trellisAction === "init" ? "正在初始化…" : "安装并初始化 Trellis"}
+                      </button>
+                      <button
+                        onClick={() => void runTrellisSetupAction("update")}
+                        disabled={!canUpdateTrellis}
+                        title={canUpdateTrellis ? "更新 Trellis" : trellisBlockingReason ?? "当前工作区还没有 Trellis，请先初始化"}
+                        style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: canUpdateTrellis ? "var(--text)" : "var(--text-dim)", cursor: canUpdateTrellis ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 700 }}
+                      >
+                        {trellisAction === "update" ? "正在更新…" : "更新 Trellis"}
+                      </button>
+                      {!canInitializeTrellis && !canUpdateTrellis && trellisBlockingReason && <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{trellisBlockingReason}</span>}
+                    </div>
+
+                    {trellisOutput && (
+                      <pre style={{ margin: 0, maxHeight: 180, overflow: "auto", padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", fontSize: 11, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                        {trellisOutput}
+                      </pre>
+                    )}
                   </div>
                 )}
               </div>

@@ -13,6 +13,8 @@ export interface PiWebWorktreeConfig {
 export interface PiWebTrellisConfig {
   enabled: boolean;
   includeArchived: boolean;
+  proxyEnabled: boolean;
+  proxyUrl: string;
 }
 
 export interface PiWebConfig {
@@ -51,6 +53,8 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   trellis: {
     enabled: false,
     includeArchived: false,
+    proxyEnabled: false,
+    proxyUrl: "",
   },
 };
 
@@ -86,6 +90,8 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     trellis: {
       enabled: readBoolean(trellis.enabled, defaults.trellis.enabled),
       includeArchived: readBoolean(trellis.includeArchived, defaults.trellis.includeArchived),
+      proxyEnabled: readBoolean(trellis.proxyEnabled, defaults.trellis.proxyEnabled),
+      proxyUrl: typeof trellis.proxyUrl === "string" ? trellis.proxyUrl.trim() : defaults.trellis.proxyUrl,
     },
   };
 }
@@ -154,13 +160,35 @@ function requireBoolean(value: unknown, field: string): boolean {
   return value;
 }
 
+function validateProxyUrl(value: unknown, enabled: boolean): string {
+  if (typeof value !== "string") {
+    throw new PiWebConfigValidationError("trellis.proxyUrl must be a string");
+  }
+  const proxyUrl = value.trim();
+  if (!enabled || !proxyUrl) return proxyUrl;
+  try {
+    const parsed = new URL(proxyUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new PiWebConfigValidationError("trellis.proxyUrl must use http:// or https://");
+    }
+  } catch (error) {
+    if (error instanceof PiWebConfigValidationError) throw error;
+    throw new PiWebConfigValidationError("trellis.proxyUrl must be a valid URL");
+  }
+  return proxyUrl;
+}
+
 export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("trellis config must be an object");
   }
+  const proxyEnabled = typeof value.proxyEnabled === "boolean" ? value.proxyEnabled : DEFAULT_PI_WEB_CONFIG.trellis.proxyEnabled;
+  const proxyUrl = typeof value.proxyUrl === "string" ? value.proxyUrl : DEFAULT_PI_WEB_CONFIG.trellis.proxyUrl;
   return {
     enabled: requireBoolean(value.enabled, "trellis.enabled"),
     includeArchived: requireBoolean(value.includeArchived, "trellis.includeArchived"),
+    proxyEnabled,
+    proxyUrl: validateProxyUrl(proxyUrl, proxyEnabled),
   };
 }
 
