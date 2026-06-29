@@ -1,8 +1,6 @@
 # Pi Agent Web — Agent Guide
 
-This file is the AI working entrypoint, documentation map, and project contract for the pi coding agent web UI. Keep detailed material in `docs/`; this file only tells agents where to read, where to archive, and which rules must be followed.
-
----
+This file is the AI working entrypoint, documentation map, and project contract for the pi coding agent web UI. Keep detailed material in `docs/`; this file only says where to read, where to archive, and which rules must be followed.
 
 ## Quick Start
 
@@ -13,316 +11,141 @@ npm run dev     # http://localhost:30141
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start dev server (port 30141, for dev work) |
-| `npm run build` | Production build (only for publish, **not during dev**) |
-| `npm run start` | Start production server (port 30141, for deployed instances) |
-| `npm run lint` | Run ESLint |
-| `node_modules/.bin/tsc --noEmit` | Type-check without emitting |
+| `npm run dev` | Start the dev server on port 30141. |
+| `npm run lint` | Run ESLint. |
+| `node_modules/.bin/tsc --noEmit` | Type-check without emitting. |
+| `npm run build` | Production/release build through `scripts/build-next.js`. Do not use for routine dev work. |
+| `npm run start` | Start the production server on port 30141. |
 
-> **Never run `next build` during dev** — pollutes `.next/` and breaks `npm run dev`.
-
-**npm-published binary**: `npx @agegr/pi-web@latest` or `npm install -g @agegr/pi-web && pi-web`
-Supports `--port`, `--hostname`, and `PORT` env var. Entrypoint: `bin/pi-web.js`.
-
----
+> Never run `next build` directly during development. It pollutes `.next/` and can break `npm run dev`; use `npm run build` only for release/publish validation.
 
 ## Reading Order
 
 | Task | Read first | Then inspect |
 | --- | --- | --- |
-| Understand the product | `README.md` | Architecture below |
-| Locate source code | This file's Project Structure | Relevant source dirs |
-| Change API behavior | This file's API routes | `app/api/` route file + RPC manager |
-| Change UI component | This file's Components section | `components/` relevant file |
-| Adjust business logic in lib | This file's Library section | `lib/` relevant file |
-| Add/modify an API route | Existing `app/api/` routes | `lib/rpc-manager.ts` for agent routes |
-| Debug session lifecycle | `lib/rpc-manager.ts` | This file's Project Invariants |
-| Debug session file parsing | `lib/session-reader.ts` | Session File Format below |
-| Add new hook | Existing `hooks/` | Nearby component that consumes it |
-| Deploy / update production | This file's Deployment & Operations | `ecosystem.config.cjs`, proxy scripts |
-| Configure CI / publish | `scripts/build-next.js`, `package.json` scripts | Git history |
-| Understand session file format | This file's Session File Format | `lib/session-reader.ts`, `lib/types.ts` |
-
----
-
-## Architecture
-
-```
-Browser                Next.js Server              AgentSession (in-process)
-  │                        │                               │
-  ├─ GET /api/sessions ────▶ reads ~/.pi/agent/sessions/   │
-  ├─ GET /api/sessions/[id] reads .jsonl file directly     │
-  │                        │                               │
-  ├─ send message ─────────▶ POST /api/agent/[id]          │
-  │                        │   startRpcSession() ─────────▶│ createAgentSession()
-  │                        │   session.send(cmd) ─────────▶│ session.prompt()
-  │                        │                               │
-  ├─ SSE connect ──────────▶ GET /api/agent/[id]/events    │
-  │                        │   session.onEvent() ◀─────────│ session.subscribe()
-  │◀── data: {...} ─────────│                               │
-```
-
-**Session browsing** (read-only): reads `.jsonl` files directly via `lib/session-reader.ts` — no AgentSession created.
-
-**Sending a message**: `startRpcSession()` in `lib/rpc-manager.ts` creates an AgentSession in-process.
-
----
+| Understand the product | `README.md` | `docs/architecture/overview.md` |
+| Locate code | This file's project structure | `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
+| Change API behavior | `docs/modules/api.md` | Relevant `app/api/**/route.ts`, then `lib/rpc-manager.ts` or `lib/session-reader.ts` |
+| Change UI behavior | `docs/modules/frontend.md` | Relevant file in `components/` or `hooks/` |
+| Change shared logic | `docs/modules/library.md` | Relevant file in `lib/` and all callers |
+| Change session lifecycle, branching, JSONL, or SSE | `docs/architecture/overview.md` | `lib/rpc-manager.ts`, `lib/session-reader.ts`, `hooks/useAgentSession.ts` |
+| Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code and `.trellis/spec/` if Trellis is active |
+| Deploy, publish, or debug runtime | `docs/deployment/README.md` | `docs/operations/troubleshooting.md`, `ecosystem.config.cjs`, proxy scripts |
+| Change dependencies or pi SDK integration | `docs/integrations/README.md` | `package.json`, installed pi docs under `node_modules/@earendil-works/pi-coding-agent/` |
 
 ## Project Structure
 
-### API Routes (`app/api/`)
-
-| Route | Methods | Purpose |
+| Path | Purpose | Details |
 | --- | --- | --- |
-| `sessions/` | GET | List all sessions grouped by cwd |
-| `sessions/[id]/` | GET/PATCH/DELETE | Read session detail; rename; delete |
-| `sessions/[id]/context/` | GET | Get context for a specific leafId |
-| `sessions/[id]/export/` | GET | Export session as Markdown |
-| `sessions/new/` | (410) | No longer used |
-| `agent/new/` | POST | Create new session and send first message |
-| `agent/[id]/` | GET/POST | Get agent state; send any command |
-| `agent/[id]/events/` | GET | SSE event stream |
-| `files/[...path]/` | GET | Read file contents for viewer |
-| `models/` | GET | List available models + default model |
-| `models-config/` | GET/POST | Read/write `~/.pi/agent/models.json` |
-| `models-config/test/` | POST | Test a model config (sends a test completion) |
-| `skills/` | GET | List installed skills for a given cwd |
-| `skills/search/` | GET | Search skills.sh for available skills |
-| `skills/install/` | POST | Install a skill via `npx skills add` |
-| `commands/` | GET | List slash commands from skills for a cwd |
-| `cwd/validate/` | POST | Validate a candidate workspace path |
-| `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>` |
-| `home/` | GET | Return `os.homedir()` |
-| `usage/` | GET | Aggregate token/cost stats across sessions |
-| `auth/providers/` | GET | List auth provider config statuses |
-| `auth/all-providers/` | GET | List all known provider IDs |
-| `auth/login/[provider]/` | GET | Initiate OAuth login for a provider |
-| `auth/logout/[provider]/` | GET | Clear OAuth tokens for a provider |
-| `auth/api-key/[provider]/` | GET | Get masked API key status for a provider |
-| `auth/balance/[provider]/` | GET | Query DeepSeek account balance |
-| `auth/quota/[provider]/` | GET | Query OpenAI Codex subscription quota |
+| `app/` | Next.js app routes, layout, global styles. | `README.md`, `docs/modules/api.md` |
+| `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, Git/worktrees, and config. | `docs/modules/api.md` |
+| `components/` | React UI components. | `docs/modules/frontend.md` |
+| `hooks/` | Client hooks for session state, theme, drag/drop, audio. | `docs/modules/frontend.md` |
+| `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers. | `docs/modules/library.md` |
+| `bin/` | npm-published `pi-web` entrypoint. | `docs/deployment/README.md` |
+| `scripts/` | Build and operational helpers. | `docs/deployment/README.md` |
+| `public/` | Static assets. | Inspect files directly. |
+| `docs/` | Project knowledge base and archive target. | This file's archive rules. |
+| `.trellis/`, `.pi/` | Local workflow/runtime state; gitignored and not project docs. | Read only when the active workflow/skill requires it. |
 
-### Library (`lib/`)
+## Module Entry Points
 
-| File | Purpose |
-| --- | --- |
-| `rpc-manager.ts` | AgentSessionWrapper + registry + `startRpcSession()`. Manages lifecycle via `globalThis.__piSessions` |
-| `session-reader.ts` | Parse `.jsonl` session files; `getModelNameMap`, `getModelList`, `getDefaultModel`, `resolveSessionPath` |
-| `types.ts` | Shared TypeScript types (`AgentMessage`, `AssistantMessage`, `SessionEntry`, `SessionInfo`, etc.) |
-| `pi-types.ts` | Wrapper interface `AgentSessionLike` — the contract expected by hooks/components from agent sessions |
-| `normalize.ts` | `normalizeToolCalls()` — bridges pi's `{type:"toolCall",id,name,arguments}` to `{toolCallId,toolName,input}` |
-| `agent-client.ts` | `sendAgentCommand()` — client-side fetch helper for `POST /api/agent/[id]` |
-| *(in rpc-manager.ts)* | When all tools disabled, agent system prompt is cleared (line ~316) |
-| `file-paths.ts` | Path normalization utilities for file viewer |
-| `deepseek-balance.ts` | `getDeepSeekProviderBalance()` — query DeepSeek API balance |
-| `subscription-quota.ts` | `getOAuthProviderSubscriptionQuota()` — query OpenAI Codex usage tiers |
-| `npx.ts` | `runNpx()` — cross-platform `npx` wrapper (avoids shell, finds npx-cli.js directly) |
-| `usage-stats.ts` | `getUsageStats()` — aggregate token/cost by day, model, provider, session |
-
-### Components (`components/`)
-
-| File | Purpose |
-| --- | --- |
-| `AppShell.tsx` | Top-level layout; URL state management; tab management |
-| `SessionSidebar.tsx` | Session tree sidebar + integrated `FileExplorer` |
-| `ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic |
-| `ChatInput.tsx` | Input bar with model dropdown, thinking level, tool preset, compact controls, image upload |
-| `MessageView.tsx` | Render one message (user/assistant/toolCall/toolResult) |
-| `BranchNavigator.tsx` | In-session branch switcher UI |
-| `ChatMinimap.tsx` | Scroll minimap alongside message list |
-| `ToolPanel.tsx` | Exports `PRESET_NONE`, `PRESET_DEFAULT`, `PRESET_FULL`, `PRESET_SUBAGENT` + `getPresetFromTools()` |
-| `ModelsConfig.tsx` | Modal for editing `models.json` (opened from sidebar bottom) |
-| `SkillsConfig.tsx` | Modal for browsing and installing skills (opened from sidebar bottom) |
-| `UsageStatsModal.tsx` | Modal showing token/cost usage statistics |
-| `FileExplorer.tsx` | File tree inside sidebar |
-| `FileViewer.tsx` | File content viewer in a tab |
-| `FileIcons.tsx` | Monochrome SVG icons for file/folder types |
-| `MarkdownBody.tsx` | Markdown + KaTeX + syntax highlighting renderer |
-| `TabBar.tsx` | Tab bar (Chat + open file tabs) |
-
-### Hooks (`hooks/`)
-
-| File | Purpose |
-| --- | --- |
-| `useAgentSession.ts` | Central session hook — manages session data, SSE, streaming state, all agent commands (send, fork, navigate, steer, compact, etc.), tools, models, thinking levels |
-| `useTheme.ts` | Dark/light theme toggle with view-transition animation |
-| `useDragDrop.ts` | Drag-and-drop handler for image attachments |
-| `useAudio.ts` | Sound toggle + "done" chime playback via Web Audio API |
-
-### Root Configuration & Scripts
-
-| File | Purpose |
-| --- | --- |
-| `bin/pi-web.js` | npm-published entrypoint — resolves `next` bin, spawns `next start` with port/hostname CLI args, auto-opens browser on "Ready" |
-| `scripts/build-next.js` | Production build helper — sets `HOME` to `.next-build-home/` to avoid protected Windows home junctions |
-| `ecosystem.config.cjs` | PM2 process config — auto-restart, max 1GB memory, logs to `logs/` |
-| `start-pi-web-proxy.sh` | Launch wrapper — sets `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` + `NODE_OPTIONS=--use-env-proxy` |
-| `update-pi-web.sh` | Self-update script — `git pull --rebase --autostash`, `npm run build`, then relaunch with proxy |
-| `eslint.config.mjs` | ESLint flat config — extends Next.js core-web-vitals + typescript, with relaxed hook rules |
-| `tsconfig.json` | TypeScript config — `@/*` path alias, ES2017 target, bundler module resolution |
-| `tailwind.config.ts` | Tailwind CSS v4 configuration |
-| `postcss.config.mjs` | PostCSS config |
-| `next.config.ts` | Next.js configuration |
-
----
+| Area | Source entry | Documentation |
+| --- | --- | --- |
+| Session browsing/parsing | `lib/session-reader.ts`, `app/api/sessions/**` | `docs/architecture/overview.md`, `docs/modules/api.md` |
+| Agent command lifecycle | `lib/rpc-manager.ts`, `app/api/agent/**` | `docs/architecture/overview.md` |
+| Chat/session UI state | `hooks/useAgentSession.ts`, `components/ChatWindow.tsx`, `components/ChatInput.tsx` | `docs/modules/frontend.md` |
+| Tool-call normalization | `lib/normalize.ts` | `docs/architecture/overview.md`, `docs/modules/library.md` |
+| Workspace files and Git context | `app/api/files/**`, `app/api/git/**`, `lib/file-paths.ts`, `lib/git-worktree.ts`, `lib/workspace-title.ts` | `docs/modules/api.md`, `docs/modules/library.md` |
+| Models, skills, auth, usage | `app/api/models*`, `app/api/skills/**`, `app/api/auth/**`, `app/api/usage/route.ts` | `docs/modules/api.md`, `docs/integrations/README.md` |
 
 ## Project Invariants
 
-### AgentSession Lifecycle (`lib/rpc-manager.ts`)
+Keep this section short and operational; detailed rationale belongs in `docs/architecture/overview.md`.
 
-- One `AgentSessionWrapper` per session id, keyed in `globalThis.__piSessions` (survives hot-reload; plain module-level Map does not)
-- Idle timeout: 10 minutes. Concurrent `startRpcSession()` calls share a single start Promise (`globalThis.__piStartLocks`)
-- After a fork, the wrapper **must be destroyed immediately** — `AgentSession.fork()` mutates the wrapper's `inner.sessionId` in-place to the *new* id. If the wrapper stays alive under the old id, subsequent forks corrupt the `parentSession` chain. Pattern: `send("fork")` → capture `newSessionId` → `this.destroy()`.
+- Keep one `AgentSessionWrapper` per session id in `globalThis.__piSessions`; use `globalThis.__piStartLocks` for concurrent starts.
+- After a fork, capture the new session id and destroy the old wrapper immediately.
+- Distinguish forked sessions (new JSONL file) from in-session branches (`navigate_tree` in the same file).
+- Normalize pi tool calls through `lib/normalize.ts`; do not hand-roll tool-call field mapping in components/routes.
+- Treat session header `parentSession` as display metadata only; content comes from JSONL entries.
+- When changing event kinds, JSONL records, RPC payloads, config fields, or shared constants, search for all consumers first and update docs/tests/validation notes.
+- Do not reset or overwrite unrelated user changes.
 
-### Two Kinds of Branching
+## Standards and Validation
 
-- **Fork** (Fork button on user message): creates a new independent `.jsonl` file. Shown as a child in sidebar tree via `parentSession` header field.
-- **In-session branch** (Continue button / BranchNavigator): calls `navigate_tree` within the same file. Multiple entries share the same `parentId`. Switching calls `/api/sessions/[id]/context?leafId=`.
+| Topic | Entry point |
+| --- | --- |
+| Code style, comments, validation commands | `docs/standards/code-style.md` |
+| TypeScript config | `tsconfig.json` |
+| ESLint config | `eslint.config.mjs` |
+| Package scripts and dependencies | `package.json` |
+| Trellis coding specs, when active | `.trellis/spec/frontend/index.md`, `.trellis/spec/guides/index.md` |
 
-### Session Files Are Fully Rewritable
-
-`parentSession` in the header is **display metadata only** — zero effect on chat content. Safe to `writeFileSync` the entire file. Used when cascade-reparenting children on delete.
-
-### ToolCall Field Normalization
-
-Pi stores: `{type:"toolCall", id, name, arguments}`  
-Our types use: `{toolCallId, toolName, input}`  
-Normalize via `normalizeToolCalls()` in `lib/normalize.ts` — called in `session-reader.ts` (file load) and `ChatWindow.handleAgentEvent()` (streaming).
-
-### New Session Tool Preset
-
-Tool names are passed at creation (`POST /api/agent/new` → `toolNames[]`). For existing sessions, preset is inferred on mount via `get_tools` → `getPresetFromTools()`. When all tools disabled (`toolNames = []`), `rpc-manager.ts` clears the agent system prompt (line ~316).
-
-### Model Defaults
-
-`GET /api/models` returns `defaultModel` from `~/.pi/agent/settings.json`. Pre-selected on mount for new sessions.
-
-### SSE Reconnect on Page Refresh Mid-Stream
-
-On mount, `GET /api/agent/[id]` is called. If `state.isStreaming === true`, SSE reconnects automatically. `thinkingLevel` and `isCompacting` are also synced from this response.
-
-### Compaction SSE Events
-
-Newer pi emits `compaction_start` / `compaction_end`; older emits `auto_compaction_start` / `auto_compaction_end`. Both sets are handled in `handleAgentEvent`. Manual compact is a blocking POST — button disabled until response returns.
-
-### Orphaned Sessions
-
-Sessions whose first line can't be parsed as a valid header are marked `orphaned: true` in API — displayed with "incomplete" badge, not clickable.
-
----
-
-## Session File Format
-
-Location: `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`
-
-```jsonl
-{"type":"session","version":3,"id":"<uuid>","timestamp":"...","cwd":"/path","parentSession":"/abs/path/to/parent.jsonl"}
-{"type":"model_change","id":"<8hex>","parentId":null,"provider":"zenmux","modelId":"claude-sonnet-4-6","timestamp":"..."}
-{"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"user","content":"..."}}
-{"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"assistant","content":[...],...}}
-{"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"toolResult","toolCallId":"...","content":[...]}}
-{"type":"compaction","id":"<8hex>","parentId":"<8hex>","summary":"...","firstKeptEntryId":"<8hex>","tokensBefore":N}
-{"type":"session_info","id":"...","parentId":"...","name":"user-defined name"}
-```
-
-`entryIds[]` in `SessionContext` is a parallel array to `messages[]` — maps each displayed message back to its `.jsonl` entry id, used for fork and `navigate_tree` calls.
-
----
-
-## CSS Variables (`app/globals.css`)
-
-Available for components to reference directly:
-
-```
---bg                    --bg-panel              --bg-hover
---bg-selected           --bg-subtle             --border
---text                  --text-muted            --text-dim
---accent                --accent-hover
---user-bg               --assistant-bg          --tool-bg
---font-mono             (set via Noto_Sans_Mono font)
-```
-
-These are mapped to CSS utility `--color-*` aliases as well. Theme toggles dark/light via `document.documentElement.classList.toggle("dark")`.
-
----
-
-## Deployment & Operations
-
-### Local Dev
+Minimum validation for code changes:
 
 ```bash
-npm run dev       # http://localhost:30141
+npm run lint
+node_modules/.bin/tsc --noEmit
 ```
 
-Dev uses Next.js built-in hot-reload.
+## Deployment and Dependencies
 
-### Production Server
+| Topic | Entry point |
+| --- | --- |
+| Local development, production build/start, PM2, proxy scripts, npm package | `docs/deployment/README.md` |
+| Runtime troubleshooting | `docs/operations/troubleshooting.md` |
+| Third-party packages and pi SDK docs | `docs/integrations/README.md` |
+| Published binary | `bin/pi-web.js` |
+| Build wrapper | `scripts/build-next.js` |
+| PM2 config | `ecosystem.config.cjs` |
 
-```bash
-npm run build    # produces .next/ (run on deploy target or CI)
-npm run start    # serves on :30141
-```
+## Data and Configuration
 
-**Or via PM2** (see `ecosystem.config.cjs`):
-
-```bash
-pm2 start ecosystem.config.cjs
-```
-
-PM2 auto-restarts on crash, max 1GB memory, logs to `logs/pi-web-out.log` / `logs/pi-web-error.log`.
-
-### Proxy / Network Setup
-
-The project ships two shell scripts for environments behind a proxy:
-
-- `start-pi-web-proxy.sh` — sets `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` + `NODE_OPTIONS=--use-env-proxy`
-- `update-pi-web.sh` — `git pull --rebase --autostash`, build, then restart via proxy
-
-Default proxy: `http://127.0.0.1:7897` (Clash). Override via `PROXY_URL` / `SOCKS_PROXY_URL`.
-
-### npm Published Package
-
-- Package: `@agegr/pi-web`
-- Entrypoint: `bin/pi-web.js`
-- Published files: `bin/`, `.next/`, `public/`, `next.config.ts`
-- Requires: Node.js 20+ (uses `parseArgs` from `node:util`)
-
-### Data Directory
-
-Default: `~/.pi/agent/`  
-Override via `PI_CODING_AGENT_DIR` environment variable.  
-Session files: `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`  
-Model config: `~/.pi/agent/models.json`  
-Settings: `~/.pi/agent/settings.json`
-
----
+| Item | Location |
+| --- | --- |
+| Default data dir | `~/.pi/agent/` |
+| Data dir override | `PI_CODING_AGENT_DIR` |
+| Session files | `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl` |
+| Model config | `~/.pi/agent/models.json` |
+| Settings/default model | `~/.pi/agent/settings.json` |
+| Web UI settings | `~/.pi/agent/pi-web.json` |
 
 ## Archive Rules
 
-All project knowledge belongs under `docs/`. When creating new documentation, use these guidelines:
+All durable project knowledge belongs under `docs/`. Add or update docs first, then point to them from this file when the entry is important for future agents.
 
 | Knowledge type | Archive location |
 | --- | --- |
-| Architecture, boundaries, data flow | `docs/architecture/` or add to this file's Architecture section |
-| Module / component behavior | `docs/modules/` or inline in source code |
-| Code, comment, and test standards | `docs/standards/` |
-| Deployment, environment, CI/CD | This file's Deployment section or `docs/deployment/` |
-| Third-party components / SDKs | This file's Dependencies section or `docs/integrations/` |
-| Operations, troubleshooting | `docs/operations/` |
-| Research, analysis, decisions | `docs/research/` or `docs/architecture/decisions/` |
-| Agent skills documentation | `docs/` — flat file, descriptive name |
+| Architecture, boundaries, data flow, invariants | `docs/architecture/` |
+| API, component, hook, and library module behavior | `docs/modules/` |
+| Code, comment, testing, and validation standards | `docs/standards/` |
+| Deployment, environment, CI/CD, release notes | `docs/deployment/` |
+| Third-party components, external services, SDK usage | `docs/integrations/` |
+| Operations, logs, troubleshooting, runbooks | `docs/operations/` |
+| Research, analysis, future improvements | `docs/research/` |
+| Important technical decisions | `docs/architecture/decisions/` |
+| Agent skill notes | `docs/` flat file with a descriptive name, unless a closer docs category fits |
 
-Current `docs/` contents:
-- `docs/SKILL_find_skills.md` — Instructions for discovering and installing agent skills
+Current docs index:
 
----
+- `docs/architecture/overview.md` — runtime flow, invariants, session JSONL format.
+- `docs/architecture/decisions/README.md` — archive location for durable technical decisions.
+- `docs/modules/api.md` — API route map and route implementation pointers.
+- `docs/modules/frontend.md` — component/hook/style map.
+- `docs/modules/library.md` — shared `lib/` module map and reuse rules.
+- `docs/standards/code-style.md` — code, comment, validation, and testing entry point.
+- `docs/deployment/README.md` — local, production, PM2, proxy, npm package, and data config.
+- `docs/integrations/README.md` — dependency and pi SDK integration entry point.
+- `docs/operations/troubleshooting.md` — runtime and development troubleshooting.
+- `docs/research/README.md` — archive location for investigation notes and future research.
+- `docs/SKILL_find_skills.md` — instructions for discovering/installing agent skills.
 
 ## AI Working Conventions
 
-- Start a task by following the **Reading Order** table to locate relevant sources.
-- Before modifying code, read the corresponding source file and the Project Invariants section.
-- When you discover missing documentation, create it under `docs/` following the Archive Rules, then update this file's index pointers.
-- Keep `AGENTS.md` concise and navigational — do not expand detailed explanations here.
-- When modifying API routes, update this file's API Routes table if adding/removing routes.
-- When modifying components or hooks, update this file's component/hook tables.
-- `.trellis/` and `.pi/` are local-only directories (in `.gitignore`). If present, they contain local workflow state, not project documentation.
+- Start by following the reading order for the task type.
+- Before modifying code, read the relevant module docs and source files.
+- Keep `AGENTS.md` concise and navigational; move detailed explanations to `docs/`.
+- When adding/removing API routes, update `docs/modules/api.md` and this file only if the top-level navigation changes.
+- When adding/removing major components, hooks, or shared modules, update the relevant file under `docs/modules/`.
+- When changing deployment, dependencies, or external integrations, update `docs/deployment/` or `docs/integrations/`.
+- Preserve user-authored content unless it is stale, misleading, duplicated in docs, or conflicts with this contract.

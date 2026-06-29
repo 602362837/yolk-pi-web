@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { listAllSessions } from "@/lib/session-reader";
+import { listAllSessions, scanArchivedCwds } from "@/lib/session-reader";
 
 export async function GET() {
   try {
     const sessions = await listAllSessions();
-    return NextResponse.json({ sessions });
+    const { cwds: archivedCwds, counts: archivedCounts } = scanArchivedCwds();
+    return NextResponse.json({ sessions, archivedCwds, archivedCounts });
   } catch (error) {
     return NextResponse.json(
       { error: String(error) },

@@ -1,9 +1,8 @@
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
-import { randomUUID } from "crypto";
+import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath } from "./session-reader";
-import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
-import type { AgentSessionLike, ExtensionUiContextLike, ToolInfo } from "./pi-types";
-import type { ExtensionUiRequest, ExtensionUiResponse, ExtensionWidgetItem } from "./types";
+import { canonicalizeCwd } from "./cwd";
+import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
 // ============================================================================
 // Types
@@ -16,31 +15,6 @@ export interface AgentEvent {
 
 type EventListener = (event: AgentEvent) => void;
 
-type PendingUiResponse = {
-  resolve: (response: ExtensionUiResponse) => void;
-  cancel: () => void;
-};
-
-type ExtensionUiRequestBody = Record<string, unknown> & {
-  method: ExtensionUiRequest["method"];
-  timeout?: number;
-  expiresAt?: number;
-};
-
-const CODING_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-
-function withExtensionTools(session: AgentSessionLike, toolNames: string[]): string[] {
-  if (toolNames.length === 0) return [];
-
-  const codingToolNames = new Set(CODING_TOOL_NAMES);
-  const extensionToolNames = session
-    .getAllTools()
-    .map((t) => t.name)
-    .filter((name) => !codingToolNames.has(name));
-
-  return [...new Set([...toolNames, ...extensionToolNames])];
-}
-
 // ============================================================================
 // AgentSessionWrapper
 // Wraps AgentSession with the same interface the rest of the app expects
@@ -48,18 +22,12 @@ function withExtensionTools(session: AgentSessionLike, toolNames: string[]): str
 
 export class AgentSessionWrapper {
   private listeners: EventListener[] = [];
-  private pendingUiResponses = new Map<string, PendingUiResponse>();
-  private extensionStatuses = new Map<string, string>();
-  private extensionWidgets = new Map<string, ExtensionWidgetItem>();
-  private promptRunning = false;
   private unsubscribe: (() => void) | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onDestroyCallback: (() => void) | null = null;
   private _alive = true;
 
-  constructor(public readonly inner: AgentSessionLike) {
-    this.inner.extensionRunner.setUIContext?.(this.createExtensionUiContext(), "rpc");
-  }
+  constructor(public readonly inner: AgentSessionLike, public readonly cwd: string) {}
 
   get sessionId(): string {
     return this.inner.sessionId;
@@ -76,13 +44,9 @@ export class AgentSessionWrapper {
   start(): void {
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       this.resetIdleTimer();
-      this.emit(event);
+      for (const l of this.listeners) l(event);
     });
     this.resetIdleTimer();
-  }
-
-  private emit(event: AgentEvent): void {
-    for (const l of this.listeners) l(event);
   }
 
   private resetIdleTimer(): void {
@@ -110,23 +74,7 @@ export class AgentSessionWrapper {
       case "prompt": {
         // Fire and forget — events come via subscribe
         const promptImages = command.images as Array<{ type: "image"; data: string; mimeType: string }> | undefined;
-        const streamingBehavior = command.streamingBehavior as "steer" | "followUp" | undefined;
-        this.promptRunning = true;
-        this.inner.prompt(command.message as string, {
-          ...(promptImages?.length ? { images: promptImages } : {}),
-          ...(streamingBehavior ? { streamingBehavior } : {}),
-          source: "rpc",
-        }).then(() => {
-          this.promptRunning = false;
-          if (!streamingBehavior) this.emit({ type: "prompt_done" });
-        }).catch((error) => {
-          this.promptRunning = false;
-          this.emit({
-            type: "prompt_error",
-            errorMessage: error instanceof Error ? error.message : String(error),
-          });
-          if (!streamingBehavior) this.emit({ type: "prompt_done" });
-        });
+        this.inner.prompt(command.message as string, promptImages?.length ? { images: promptImages } : undefined).catch(() => {});
         return null;
       }
 
@@ -141,7 +89,6 @@ export class AgentSessionWrapper {
           sessionId: this.inner.sessionId,
           sessionFile: this.inner.sessionFile ?? "",
           isStreaming: this.inner.isStreaming,
-          isPromptRunning: this.promptRunning,
           isCompacting: this.inner.isCompacting,
           autoCompactionEnabled: this.inner.autoCompactionEnabled,
           autoRetryEnabled: this.inner.autoRetryEnabled,
@@ -153,8 +100,6 @@ export class AgentSessionWrapper {
             : null,
           systemPrompt: this.inner.agent.state?.systemPrompt ?? "",
           thinkingLevel: this.inner.agent.state?.thinkingLevel ?? "off",
-          extensionStatuses: this.getExtensionStatuses(),
-          extensionWidgets: this.getExtensionWidgets(),
         };
       }
 
@@ -218,26 +163,23 @@ export class AgentSessionWrapper {
       }
 
       case "compact": {
+        // pi's compact() does not guard against empty messagesToSummarize — use findCutPoint
+        // to pre-check and throw a clean error instead of generating a useless empty summary.
+        const { findCutPoint, DEFAULT_COMPACTION_SETTINGS } = await import("@earendil-works/pi-coding-agent");
+        const pathEntries = this.inner.sessionManager.getBranch() as Array<{ type: string }>;
+        const settings = { ...DEFAULT_COMPACTION_SETTINGS, ...this.inner.settingsManager.getCompactionSettings() };
+        let prevCompactionIndex = -1;
+        for (let i = pathEntries.length - 1; i >= 0; i--) {
+          if (pathEntries[i].type === "compaction") { prevCompactionIndex = i; break; }
+        }
+        const boundaryStart = prevCompactionIndex + 1;
+        const cutPoint = findCutPoint(pathEntries as never, boundaryStart, pathEntries.length, settings.keepRecentTokens);
+        const historyEnd = cutPoint.isSplitTurn ? cutPoint.turnStartIndex : cutPoint.firstKeptEntryIndex;
+        if (historyEnd <= boundaryStart) {
+          throw new Error("Conversation too short to compact");
+        }
         const result = await this.inner.compact(command.customInstructions as string | undefined);
         return result;
-      }
-
-      case "set_session_name": {
-        const name = (command.name as string | undefined)?.trim();
-        if (!name) throw new Error("Session name cannot be empty");
-        this.inner.setSessionName(name);
-        return null;
-      }
-
-      case "get_session_stats": {
-        return {
-          ...this.inner.getSessionStats(),
-          sessionName: this.inner.sessionManager.getSessionName(),
-        };
-      }
-
-      case "get_last_assistant_text": {
-        return { text: this.inner.getLastAssistantText() ?? "" };
       }
 
       case "set_auto_compaction": {
@@ -267,47 +209,13 @@ export class AgentSessionWrapper {
         }));
       }
 
-      case "get_commands": {
-        const commands: SlashCommandInfo[] = [];
-        for (const registered of this.inner.extensionRunner.getRegisteredCommands()) {
-          commands.push({
-            name: registered.invocationName,
-            description: registered.description,
-            source: "extension",
-            sourceInfo: registered.sourceInfo,
-          });
-        }
-        for (const template of this.inner.promptTemplates) {
-          commands.push({
-            name: template.name,
-            description: template.description,
-            source: "prompt",
-            sourceInfo: template.sourceInfo,
-          });
-        }
-        for (const skill of this.inner.resourceLoader.getSkills().skills) {
-          commands.push({
-            name: `skill:${skill.name}`,
-            description: skill.description,
-            source: "skill",
-            sourceInfo: skill.sourceInfo,
-          });
-        }
-        return { commands };
-      }
-
       case "set_tools": {
-        this.inner.setActiveToolsByName(withExtensionTools(this.inner, command.toolNames as string[]));
+        this.inner.setActiveToolsByName(command.toolNames as string[]);
         return null;
       }
 
       case "abort_compaction": {
         this.inner.abortCompaction();
-        return null;
-      }
-
-      case "extension_ui_response": {
-        this.resolveExtensionUiResponse(command as ExtensionUiResponse);
         return null;
       }
 
@@ -326,179 +234,12 @@ export class AgentSessionWrapper {
     this._alive = false;
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.unsubscribe?.();
-    for (const pending of this.pendingUiResponses.values()) pending.cancel();
-    this.pendingUiResponses.clear();
+    try {
+      this.inner.dispose?.();
+    } catch {
+      // Dispose is best-effort; registry cleanup must still run.
+    }
     this.onDestroyCallback?.();
-  }
-
-  private resolveExtensionUiResponse(response: ExtensionUiResponse): void {
-    const pending = this.pendingUiResponses.get(response.id);
-    if (!pending) return;
-    pending.resolve(response);
-  }
-
-  private getExtensionStatuses(): Array<{ key: string; text: string }> {
-    return Array.from(this.extensionStatuses, ([key, text]) => ({ key, text }));
-  }
-
-  private getExtensionWidgets(): ExtensionWidgetItem[] {
-    return Array.from(this.extensionWidgets.values());
-  }
-
-  private requestExtensionUi<T>(
-    request: ExtensionUiRequestBody,
-    defaultValue: T,
-    parseResponse: (response: ExtensionUiResponse) => T,
-    timeout?: number,
-    signal?: AbortSignal,
-  ): Promise<T> {
-    if (signal?.aborted) return Promise.resolve(defaultValue);
-
-    const id = randomUUID();
-    const fullRequest = {
-      type: "extension_ui_request",
-      id,
-      ...request,
-      ...(timeout ? { timeout, expiresAt: Date.now() + timeout } : {}),
-    };
-
-    return new Promise((resolve) => {
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const cleanup = () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        signal?.removeEventListener("abort", onAbort);
-        this.pendingUiResponses.delete(id);
-      };
-      const settle = (value: T) => {
-        cleanup();
-        resolve(value);
-      };
-      const onAbort = () => settle(defaultValue);
-
-      if (timeout) timeoutId = setTimeout(() => settle(defaultValue), timeout);
-      signal?.addEventListener("abort", onAbort, { once: true });
-
-      this.pendingUiResponses.set(id, {
-        resolve: (response) => settle(parseResponse(response)),
-        cancel: () => settle(defaultValue),
-      });
-      this.emit(fullRequest as AgentEvent);
-    });
-  }
-
-  private createExtensionUiContext(): ExtensionUiContextLike {
-    return {
-      select: (title, options, opts) => this.requestExtensionUi(
-        { method: "select", title, options, ...(opts?.timeout ? { timeout: opts.timeout } : {}) },
-        undefined,
-        (response) => "value" in response ? response.value : undefined,
-        opts?.timeout,
-        opts?.signal,
-      ),
-      confirm: (title, message, opts) => this.requestExtensionUi(
-        { method: "confirm", title, message, ...(opts?.timeout ? { timeout: opts.timeout } : {}) },
-        false,
-        (response) => "confirmed" in response ? response.confirmed : false,
-        opts?.timeout,
-        opts?.signal,
-      ),
-      input: (title, placeholder, opts) => this.requestExtensionUi(
-        { method: "input", title, ...(placeholder !== undefined ? { placeholder } : {}), ...(opts?.timeout ? { timeout: opts.timeout } : {}) },
-        undefined,
-        (response) => "value" in response ? response.value : undefined,
-        opts?.timeout,
-        opts?.signal,
-      ),
-      editor: (title, prefill, opts) => this.requestExtensionUi(
-        { method: "editor", title, ...(prefill !== undefined ? { prefill } : {}), ...(opts?.timeout ? { timeout: opts.timeout } : {}) },
-        undefined,
-        (response) => "value" in response ? response.value : undefined,
-        opts?.timeout,
-        opts?.signal,
-      ),
-      notify: (message, type) => {
-        this.emit({
-          type: "extension_ui_request",
-          id: randomUUID(),
-          method: "notify",
-          message,
-          notifyType: type,
-        } as ExtensionUiRequest as AgentEvent);
-      },
-      onTerminalInput: () => () => {},
-      setStatus: (key, text) => {
-        if (text === undefined) this.extensionStatuses.delete(key);
-        else this.extensionStatuses.set(key, text);
-        this.emit({
-          type: "extension_ui_request",
-          id: randomUUID(),
-          method: "setStatus",
-          statusKey: key,
-          statusText: text,
-        } as ExtensionUiRequest as AgentEvent);
-      },
-      setWorkingMessage: () => {},
-      setWorkingVisible: () => {},
-      setWorkingIndicator: () => {},
-      setHiddenThinkingLabel: () => {},
-      setWidget: (key, content, options) => {
-        if (content !== undefined && !Array.isArray(content)) return;
-        if (content === undefined) {
-          this.extensionWidgets.delete(key);
-        } else {
-          this.extensionWidgets.set(key, {
-            key,
-            lines: content,
-            placement: options?.placement ?? "aboveEditor",
-          });
-        }
-        this.emit({
-          type: "extension_ui_request",
-          id: randomUUID(),
-          method: "setWidget",
-          widgetKey: key,
-          widgetLines: content,
-          widgetPlacement: options?.placement,
-        } as ExtensionUiRequest as AgentEvent);
-      },
-      setFooter: () => {},
-      setHeader: () => {},
-      setTitle: (title) => {
-        this.emit({
-          type: "extension_ui_request",
-          id: randomUUID(),
-          method: "setTitle",
-          title,
-        } as ExtensionUiRequest as AgentEvent);
-      },
-      custom: async <T = unknown>() => undefined as T,
-      pasteToEditor: (text) => {
-        this.emit({
-          type: "extension_ui_request",
-          id: randomUUID(),
-          method: "set_editor_text",
-          text,
-        } as ExtensionUiRequest as AgentEvent);
-      },
-      setEditorText: (text) => {
-        this.emit({
-          type: "extension_ui_request",
-          id: randomUUID(),
-          method: "set_editor_text",
-          text,
-        } as ExtensionUiRequest as AgentEvent);
-      },
-      getEditorText: () => "",
-      addAutocompleteProvider: () => {},
-      setEditorComponent: () => {},
-      getEditorComponent: () => undefined,
-      get theme() { return undefined; },
-      getAllThemes: () => [],
-      getTheme: () => undefined,
-      setTheme: () => ({ success: false, error: "Theme switching is not supported in pi-web extension UI yet" }),
-      getToolsExpanded: () => false,
-      setToolsExpanded: () => {},
-    };
   }
 }
 
@@ -531,6 +272,42 @@ export function getRpcSession(sessionId: string): AgentSessionWrapper | undefine
   return getRegistry().get(sessionId);
 }
 
+export function reloadRpcAuthState(): number {
+  let count = 0;
+  for (const wrapper of getRegistry().values()) {
+    if (!wrapper.isAlive()) continue;
+    try {
+      wrapper.inner.modelRegistry.authStorage?.reload?.();
+      wrapper.inner.modelRegistry.refresh?.();
+      count += 1;
+    } catch {
+      // Keep account activation best-effort for live wrappers; new requests/sessions
+      // still read the updated auth.json through fresh AuthStorage instances.
+    }
+  }
+
+  try {
+    // OpenAI Codex keeps reusable WebSockets keyed by session id. After account
+    // activation, old sessions must reconnect so the new token/account headers apply.
+    cleanupSessionResources();
+  } catch {
+    // Auth reload should remain best-effort; stale resources expire on their own.
+  }
+
+  return count;
+}
+
+export function destroyRpcSessionsForCwd(cwd: string): string[] {
+  const target = canonicalizeCwd(cwd);
+  const destroyed: string[] = [];
+  for (const [sessionId, wrapper] of getRegistry()) {
+    if (canonicalizeCwd(wrapper.cwd) !== target) continue;
+    wrapper.destroy();
+    destroyed.push(sessionId);
+  }
+  return destroyed;
+}
+
 /**
  * Get or create an AgentSession for the given session.
  * For new sessions (sessionFile === ""), pi generates its own id.
@@ -559,42 +336,30 @@ export async function startRpcSession(
       ? SessionManager.open(sessionFile, undefined)
       : SessionManager.create(cwd, undefined);
 
-    // Determine which tools to pass based on requested toolNames.
-    // Since v0.68.0, createAgentSession expects string[] tool names instead of Tool[] instances.
-    let toolsOption: string[] | undefined;
-    if (toolNames !== undefined) {
-      // toolNames === [] -> "all off" (an empty allow-list disables every tool).
-      // Otherwise DO NOT pass a builtin-only allow-list: passing CODING_TOOL_NAMES
-      // set allowedToolNames to coding builtins only, which filtered every
-      // extension/package-provided tool (e.g. subagents, web access) out of the
-      // tool registry — so they were unavailable in pi-web sessions even though the
-      // `pi` CLI keeps them. Leaving the allow-list unset lets the SDK register all
-      // tools (and activate extension tools); we narrow the ACTIVE set below.
-      toolsOption = toolNames.length === 0 ? [] : undefined;
-    }
-
+    // Do NOT pass the `tools` parameter to createAgentSession.
+    // The `tools` param acts as a global allowlist that filters out extension
+    // tools (e.g. `subagent` from pi-subagents). Instead, let all built-in and
+    // extension tools load, then control activation via setActiveToolsByName.
     const { session: inner } = await createAgentSession({
       cwd,
       agentDir,
       sessionManager,
-      ...(toolsOption !== undefined ? { tools: toolsOption } : {}),
     });
 
-    // If specific tool names were requested (non-empty), set the active tools to the
-    // requested builtin coding tools PLUS all extension/package tools, so installed
-    // extensions stay usable in pi-web just like in the `pi` CLI.
+    // If specific tool names were requested (non-empty), narrow active tools now
     if (toolNames && toolNames.length > 0) {
-      inner.setActiveToolsByName(withExtensionTools(inner, toolNames));
+      inner.setActiveToolsByName(toolNames);
     }
 
-    // When all tools are disabled, clear the system prompt entirely.
+    // When all tools are disabled, deactivate everything and clear system prompt.
     // pi's buildSystemPrompt always produces a non-empty prompt even with no tools;
     // the only way to truly clear it is to call agent.setSystemPrompt directly.
     if (toolNames?.length === 0) {
+      inner.setActiveToolsByName([]);
       inner.agent.state.systemPrompt = "";
     }
 
-    const wrapper = new AgentSessionWrapper(inner);
+    const wrapper = new AgentSessionWrapper(inner, cwd);
     wrapper.start();
 
     const realSessionId = inner.sessionId as string;

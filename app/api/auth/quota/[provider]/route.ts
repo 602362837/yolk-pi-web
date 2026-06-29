@@ -1,4 +1,4 @@
-import { getOAuthProviderSubscriptionQuota } from "@/lib/subscription-quota";
+import { getOAuthAccountSubscriptionQuota, getOAuthProviderSubscriptionQuota } from "@/lib/subscription-quota";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,10 +11,13 @@ export const runtime = "nodejs";
  * @returns provider 的订阅额度 JSON。
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ provider: string }> },
 ) {
   const { provider } = await context.params;
-  const quota = await getOAuthProviderSubscriptionQuota(provider);
+  const accountId = new URL(req.url).searchParams.get("accountId");
+  const quota = accountId?.trim()
+    ? await getOAuthAccountSubscriptionQuota(provider, accountId)
+    : await getOAuthProviderSubscriptionQuota(provider);
   return Response.json(quota);
 }

@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": "docs/modules/frontend.md", "reason": "Frontend module map for Settings/AppShell/Trellis panel changes"}
+{"file": "docs/modules/api.md", "reason": "API route documentation to update for Trellis setup/status/update routes"}
+{"file": "docs/modules/library.md", "reason": "Shared library map for config and Trellis manager helpers"}
+{"file": "docs/standards/code-style.md", "reason": "Validation and shared helper conventions"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Optional read-only workspace panel API/security contracts and Trellis UI contracts"}

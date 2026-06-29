@@ -1,0 +1,31 @@
+{
+  "assignee": "zyj",
+  "base_branch": "main",
+  "branch": null,
+  "children": [],
+  "commit": null,
+  "completedAt": "2026-06-26",
+  "createdAt": "2026-06-26",
+  "creator": "zyj",
+  "description": "",
+  "dev_type": null,
+  "id": "git-status-panel",
+  "meta": {},
+  "name": "git-status-panel",
+  "notes": "",
+  "package": null,
+  "parent": null,
+  "pr_url": null,
+  "priority": "P2",
+  "relatedFiles": [
+    "components/GitPanel.tsx",
+    "components/AppShell.tsx",
+    "app/api/git/status/route.ts",
+    "lib/types.ts"
+  ],
+  "scope": null,
+  "status": "completed",
+  "subtasks": [],
+  "title": "Git status panel in central chat top bar",
+  "worktree_path": null
+}

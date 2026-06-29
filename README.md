@@ -1,112 +1,90 @@
 # pi-web
 
-[中文文档](./README.zh-CN.md)
+`pi-web` 是面向 `pi` 编程智能体的 Web 工作台。它把本地会话、实时对话、分支切换、模型配置、文件浏览和 WorkTree 管理集中到浏览器中，适合在桌面或服务器环境中长期运行。
 
-Local web UI for the [pi coding agent](https://github.com/badlogic/pi-mono). pi-web reads your local pi session files and gives you a browser workspace for session browsing, real-time chat, model configuration, skill management, and project file preview.
+本仓库最初源自上游项目，但当前已按自身需求持续演进；使用方式也以源码构建和本地部署为主，不再把 npm 发布包作为默认安装入口。
 
-![Pi Web shows the same pi session with structured Markdown, tool calls, and project navigation beside the CLI](./docs/screenshot2.png)
+## 核心能力
 
-The same pi session in CLI and pi-web: structured tool calls, readable Markdown, session browsing, and cleaner results.
+- **会话浏览器** — 按工作目录分组展示本地 `pi` 会话，快速回到历史上下文。
+- **实时智能体对话** — 通过 SSE 流式展示智能体输出，支持运行中引导、完成后追加消息。
+- **会话分叉与分支导航** — 从任意用户消息创建新会话，或在同一会话内回退节点继续探索。
+- **模型与工具配置** — 在对话中切换模型、调整思考等级、配置工具预设和可用模型。
+- **文件与 Git 工作区辅助** — 在侧边栏浏览当前工作目录文件，并支持创建 Git worktree。
+- **长会话管理** — 支持压缩会话摘要，降低长上下文继续工作的成本。
 
-## Quick Start
+## 快速开始
 
-**Run without installing:**
-
-```bash
-npx @agegr/pi-web@latest
-```
-
-**Or install globally:**
-
-```bash
-npm install -g @agegr/pi-web
-pi-web
-```
-
-Then open [http://localhost:30141](http://localhost:30141). The CLI will try to open the browser automatically after the server is ready.
-
-**Options:**
+本项目建议从源码安装依赖并运行开发服务器：
 
 ```bash
-pi-web --port 8080              # custom port
-pi-web --hostname 127.0.0.1     # local access only
-pi-web -p 8080 -H 127.0.0.1     # combine options
-
-PORT=8080 pi-web                # environment variable is also supported
-```
-
-## Features
-
-- **Pick work back up**: browse previous pi conversations by project without digging through terminal history or session paths.
-- **Try different directions safely**: continue from an earlier message or fork a session into a separate route.
-- **Chat beside the project**: browse files on the left and preview source, docs, images, audio, and PDFs on the right while the agent works.
-- **See session state clearly**: context usage, cost, compaction state, and system prompt details are visible from the top bar.
-- **Configure less from the terminal**: manage models, login/API keys, model tests, and skill switches from the web UI.
-
-## Notes
-
-- **Data directory**: pi-web reads `~/.pi/agent/sessions` by default. Set `PI_CODING_AGENT_DIR` to point at another pi agent directory.
-- **Session files**: files are stored as `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`.
-- **Model config**: the Models panel reads and writes `models.json` in the pi agent directory. Model lists and defaults come from pi's config.
-- **File access**: file browsing and preview are scoped to the selected project directory and working directories that appear in sessions.
-- **Forks vs in-session branches**: Fork creates a new `.jsonl` file. "Edit from here" creates another branch inside the same session file.
-
-## Development
-
-```bash
+git clone <repo-url>
+cd pi-agnet-web
 npm install
 npm run dev
 ```
 
-The local dev server runs at [http://localhost:30141](http://localhost:30141).
+启动后打开 [http://localhost:30141](http://localhost:30141)。
 
-Common checks:
+## 生产运行
+
+构建并启动生产服务：
 
 ```bash
-node_modules/.bin/tsc --noEmit
-npm run lint
+npm run build
+npm run start
 ```
 
-Avoid running `next build` / `npm run build` during local development. It writes to `.next/` and can interfere with the dev server; leave builds for release work.
+默认端口是 `30141`。如需调整监听地址或端口：
 
-## Project Structure
+```bash
+npm run start -- --port 8080
+npm run start -- --hostname 127.0.0.1
+PORT=8080 npm run start
+```
+
+> 请使用 `npm run build` 进行生产构建；不要直接运行 `next build`，构建脚本包含项目需要的环境处理。
+
+## 数据与配置
+
+`pi-web` 默认读取 `~/.pi/agent/` 下的智能体数据。可通过 `PI_CODING_AGENT_DIR` 指向其他数据目录。
+
+| 路径 | 用途 |
+| --- | --- |
+| `sessions/` | 会话 JSONL 文件，按工作目录归档。 |
+| `models.json` | 模型提供商和模型列表配置。 |
+| `settings.json` | `pi` 智能体设置，包括默认模型。 |
+| `pi-web.json` | Web UI 设置，例如 New WorkTree 默认行为。 |
+
+会话文件路径格式：
+
+```text
+~/.pi/agent/sessions/<编码后的工作目录>/<时间戳>_<uuid>.jsonl
+```
+
+## 开发
+
+常用命令：
+
+```bash
+npm install
+npm run dev
+npm run lint
+node_modules/.bin/tsc --noEmit
+```
+
+项目结构概览：
 
 ```text
 app/
-  api/
-    agent/          # creates/drives AgentSession and exposes SSE events
-    auth/           # OAuth and API key management
-    cwd/validate/   # custom working directory validation
-    default-cwd/    # pi default working directory lookup
-    files/          # file listing, reading, preview, and watching
-    home/           # current user home directory
-    models/         # available models, default model, thinking levels
-    models-config/  # read/write models.json and test models
-    sessions/       # session reads, rename, delete, context, HTML export
-    skills/         # skill listing, search, install, enable/disable
-components/
-  AppShell.tsx        # main layout, URL state, top panels, file tabs
-  SessionSidebar.tsx  # project selector, session tree, Explorer
-  ChatWindow.tsx      # messages, SSE, image drag/drop, minimap
-  ChatInput.tsx       # input bar, model/tools/thinking/compact/slash controls
-  MessageView.tsx     # message, thinking, tool call/result rendering
-  ModelsConfig.tsx    # model and auth configuration panel
-  SkillsConfig.tsx    # skill management panel
-  FileExplorer.tsx    # file tree
-  FileViewer.tsx      # source, diff, image, audio, PDF, DOCX preview
-lib/
-  rpc-manager.ts      # AgentSessionWrapper lifecycle and global registry
-  session-reader.ts   # parses .jsonl session files and branch contexts
-  normalize.ts        # normalizes toolCall field names
-  file-access.ts      # file read safety boundary
-  file-paths.ts       # path encoding and relative path helpers
-  markdown.ts         # Markdown/Mermaid/KaTeX plugin configuration
-  pi-types.ts         # pi-related types
-hooks/
-  useAgentSession.ts  # session loading, command sending, SSE state machine
-  useAudio.ts         # completion sound
-  useDragDrop.ts      # image drag/drop
-  useTheme.ts         # theme switching
-bin/
-  pi-web.js           # npm CLI entrypoint
+  api/              # 会话、智能体、文件、Git、模型、配置等 API 路由
+components/         # 浏览器端 UI 组件
+hooks/              # 会话状态、主题、拖拽、音频等 React hooks
+lib/                # 会话解析、RPC 生命周期、工具调用规范化等共享逻辑
+scripts/            # 构建和运维辅助脚本
+bin/                # pi-web 命令入口，保留用于本地/发布场景
+public/             # 静态资源
+docs/               # 架构、模块、部署和运维文档
 ```
+
+更多运行与部署细节见 [`docs/deployment/README.md`](docs/deployment/README.md)。

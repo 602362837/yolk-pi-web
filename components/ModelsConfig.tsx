@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { DeepSeekBalanceResult } from "@/lib/deepseek-balance";
+import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, validateRawOAuthCredentialImport, type OAuthAccountImportMode } from "@/lib/oauth-account-converters";
 // Color icons (have their own fill colors — no background needed)
 import AnthropicIcon from "@lobehub/icons/es/Anthropic/components/Mono";
 import OpenAIIcon from "@lobehub/icons/es/OpenAI/components/Mono";
@@ -91,6 +92,32 @@ interface OAuthProvider {
   loggedIn: boolean;
 }
 
+interface OAuthAccountQuotaCache {
+  success: boolean;
+  tiers: QuotaTier[];
+  error: string | null;
+  queriedAt: number | null;
+}
+
+interface OAuthAccountSummary {
+  accountId: string;
+  label?: string;
+  extraInfo?: string;
+  quotaCache?: OAuthAccountQuotaCache;
+  displayName: string;
+  maskedAccountId: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastActivatedAt: string | null;
+}
+
+interface OAuthAccountsResponse {
+  provider: string;
+  activeAccountId: string | null;
+  accounts: OAuthAccountSummary[];
+}
+
 interface ApiKeyProvider {
   id: string;
   displayName: string;
@@ -98,6 +125,7 @@ interface ApiKeyProvider {
   source?: string;
   modelCount: number;
 }
+
 
 type OAuthLoginState =
   | { phase: "idle" }
@@ -107,7 +135,7 @@ type OAuthLoginState =
   | { phase: "prompt"; message: string; placeholder: string | null; token: string }
   | { phase: "select"; message: string; options: { id: string; label: string }[]; token: string }
   | { phase: "progress"; message: string }
-  | { phase: "success" }
+  | { phase: "success"; message?: string }
   | { phase: "error"; message: string };
 
 type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
@@ -864,11 +892,464 @@ function OAuthQuotaView({
   );
 }
 
+function accountQuotaResetText(account: OAuthAccountSummary): string {
+  const tiers = (account.quotaCache?.tiers ?? []).filter((tier) => tier.name in QUOTA_TIER_LABELS && tier.resetsAt);
+  if (tiers.length === 0) return account.quotaCache?.queriedAt ? "No reset time" : "No quota cache";
+  return tiers.map((tier) => {
+    const countdown = formatResetCountdown(tier.resetsAt);
+    return `${QUOTA_TIER_LABELS[tier.name]} ${countdown ?? "due"}`;
+  }).join(" · ");
+}
+
+function AccountQuotaMiniCharts({ account }: { account: OAuthAccountSummary }) {
+  const tiers = (account.quotaCache?.tiers ?? []).filter((tier) => tier.name in QUOTA_TIER_LABELS);
+  if (tiers.length === 0) return null;
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, verticalAlign: "middle" }}>
+      {tiers.map((tier) => {
+        const utilization = Math.min(Math.max(tier.utilization, 0), 100);
+        const color = quotaColor(utilization);
+        const label = QUOTA_TIER_LABELS[tier.name];
+        return (
+          <span key={tier.name} title={`${label} quota ${Math.round(utilization)}% used`} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+            <span style={{ width: 16, height: 16, borderRadius: "50%", background: `conic-gradient(${color} ${utilization * 3.6}deg, var(--bg-panel) 0deg)`, border: "1px solid var(--border)", display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--bg)" }} />
+            </span>
+            <span style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 600 }}>{label}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function OAuthAccountsView({
+  accounts,
+  loading,
+  error,
+  activatingAccountId,
+  savingLabelAccountId,
+  savingExtraInfoAccountId,
+  refreshingQuotaAccountId,
+  deletingAccountId,
+  onRefresh,
+  onActivate,
+  onEditLabel,
+  onEditExtraInfo,
+  onRefreshQuota,
+  onDelete,
+}: {
+  accounts: OAuthAccountSummary[];
+  loading: boolean;
+  error: string | null;
+  activatingAccountId: string | null;
+  savingLabelAccountId: string | null;
+  savingExtraInfoAccountId: string | null;
+  refreshingQuotaAccountId: string | null;
+  deletingAccountId: string | null;
+  onRefresh: () => void;
+  onActivate: (accountId: string) => void;
+  onEditLabel: (account: OAuthAccountSummary) => void;
+  onEditExtraInfo: (account: OAuthAccountSummary) => void;
+  onRefreshQuota: (account: OAuthAccountSummary) => void;
+  onDelete: (account: OAuthAccountSummary) => void;
+}) {
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Accounts</span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{loading ? "Loading…" : `${accounts.length} saved`}</span>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh accounts"
+          aria-label="Refresh accounts"
+          style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+            <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+            <path d="M3 4v8h8" />
+            <path d="M21 20v-8h-8" />
+          </svg>
+        </button>
+      </div>
+
+      {error && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{error}</div>}
+      {!loading && !error && accounts.length === 0 && (
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>No saved accounts yet.</div>
+      )}
+
+      {accounts.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {accounts.map((account) => {
+            const quotaRefreshing = refreshingQuotaAccountId === account.accountId;
+            return (
+              <div key={account.accountId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: account.active ? "#4ade80" : "var(--border)", flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
+                  <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
+                  {account.extraInfo && <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, fontSize: 10, color: account.quotaCache?.error ? "#fb923c" : "var(--text-dim)" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                      Reset: {accountQuotaResetText(account)}{account.quotaCache?.queriedAt ? ` · ${formatQuotaQueriedAt(account.quotaCache.queriedAt)}` : ""}
+                    </span>
+                    <AccountQuotaMiniCharts account={account} />
+                  </div>
+                </div>
+                <button
+                  onClick={() => onEditLabel(account)}
+                  disabled={savingLabelAccountId === account.accountId}
+                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingLabelAccountId === account.accountId ? "var(--text-dim)" : "var(--text-muted)", cursor: savingLabelAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                >
+                  {savingLabelAccountId === account.accountId ? "Saving…" : "Remark"}
+                </button>
+                <button
+                  onClick={() => onEditExtraInfo(account)}
+                  disabled={savingExtraInfoAccountId === account.accountId}
+                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingExtraInfoAccountId === account.accountId ? "var(--text-dim)" : "var(--text-muted)", cursor: savingExtraInfoAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                >
+                  {savingExtraInfoAccountId === account.accountId ? "Saving…" : "Details"}
+                </button>
+                {account.active ? (
+                  <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>active</span>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onActivate(account.accountId)}
+                      disabled={Boolean(activatingAccountId) || deletingAccountId === account.accountId}
+                      style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: activatingAccountId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId || deletingAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                    >
+                      {activatingAccountId === account.accountId ? "Activating…" : "Activate"}
+                    </button>
+                    <button
+                      onClick={() => onDelete(account)}
+                      disabled={Boolean(deletingAccountId) || Boolean(activatingAccountId)}
+                      style={{ padding: "4px 9px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: deletingAccountId === account.accountId ? "var(--text-dim)" : "#ef4444", cursor: deletingAccountId || activatingAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                    >
+                      {deletingAccountId === account.accountId ? "Deleting…" : "Delete"}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => onRefreshQuota(account)}
+                  disabled={Boolean(refreshingQuotaAccountId)}
+                  title="Refresh this account quota reset time"
+                  aria-label="Refresh this account quota reset time"
+                  style={{ width: 28, height: 28, padding: 0, background: "none", border: "1px solid var(--border)", borderRadius: 4, color: quotaRefreshing ? "var(--text-dim)" : "var(--accent)", cursor: refreshingQuotaAccountId ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+                    <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+                    <path d="M3 4v8h8" />
+                    <path d="M21 20v-8h-8" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExtraInfoDialog({
+  account,
+  saving,
+  onSave,
+  onClose,
+}: {
+  account: OAuthAccountSummary;
+  saving: boolean;
+  onSave: (account: OAuthAccountSummary, extraInfo: string) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(account.extraInfo ?? "");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setValue(account.extraInfo ?? "");
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [account]);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}
+    >
+      <div style={{ width: 520, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Account details</div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</div>
+          </div>
+          <button type="button" disabled={saving} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+        </div>
+        <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>Extra information</label>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={saving}
+            placeholder="Add notes such as subscription owner, renewal notes, usage hints…"
+            style={{ minHeight: 120, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", boxSizing: "border-box", lineHeight: 1.5 }}
+          />
+          <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>Leave empty to clear this account&apos;s extra information.</div>
+        </div>
+        <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button type="button" disabled={saving} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer", fontSize: 12 }}>Cancel</button>
+          <button type="button" disabled={saving} onClick={() => onSave(account, value)} style={{ padding: "6px 14px", background: saving ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: saving ? "var(--text-dim)" : "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Saving…" : "Save"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddAccountDialog({
+  provider,
+  view,
+  onViewChange,
+  onCodexAuth,
+  onImported,
+  onClose,
+}: {
+  provider: OAuthProvider;
+  view: "method" | "json";
+  onViewChange: (view: "method" | "json") => void;
+  onCodexAuth: () => void;
+  onImported: (accounts: OAuthAccountSummary[]) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<OAuthAccountImportMode>("raw");
+  const [jsonText, setJsonText] = useState("");
+  const [convertedJsonText, setConvertedJsonText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [validationMessage, setValidationMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const converter = mode === "raw" ? undefined : ACCOUNT_JSON_CONVERTERS[mode];
+  const finalJsonText = converter ? convertedJsonText : jsonText;
+
+  useEffect(() => {
+    if (view === "json") setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [view]);
+
+  const parseFinalCredential = useCallback((): unknown | null => {
+    try {
+      return JSON.parse(finalJsonText);
+    } catch (parseError) {
+      setValidationMessage({ type: "error", text: parseError instanceof Error ? `最终 JSON 格式无效：${parseError.message}` : "最终 JSON 格式无效" });
+      return null;
+    }
+  }, [finalJsonText]);
+
+  const validateFinalJson = useCallback((): unknown | null => {
+    setError(null);
+    const credential = parseFinalCredential();
+    if (!credential) return null;
+    const validationError = validateRawOAuthCredentialImport(credential);
+    if (validationError) {
+      setValidationMessage({ type: "error", text: validationError });
+      return null;
+    }
+    setValidationMessage({ type: "success", text: Array.isArray(credential) ? `验证通过：最终 JSON 可以保存 ${credential.length} 个账号。` : "验证通过：最终 JSON 可以保存为账号。" });
+    return credential;
+  }, [parseFinalCredential]);
+
+  const convertSourceJson = useCallback(() => {
+    if (!converter) return;
+    setError(null);
+    setValidationMessage(null);
+
+    let source: unknown;
+    try {
+      source = JSON.parse(jsonText);
+    } catch (parseError) {
+      setError(parseError instanceof Error ? `源 JSON 格式无效：${parseError.message}` : "源 JSON 格式无效");
+      return;
+    }
+
+    try {
+      const converted = converter.convert(source);
+      setConvertedJsonText(JSON.stringify(converted, null, 2));
+      setValidationMessage({ type: "success", text: "转换完成，请检查下方最终 JSON 后保存。" });
+    } catch (convertError) {
+      setError(convertError instanceof Error ? convertError.message : "转换失败");
+    }
+  }, [converter, jsonText]);
+
+  const submitRawJson = useCallback(async () => {
+    if (submitting) return;
+    const credential = validateFinalJson();
+    if (!credential) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "raw", credential }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      onImported(data.accounts ?? []);
+      onClose();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "导入账号失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [onClose, onImported, provider.id, submitting, validateFinalJson]);
+
+  const modeButton = (value: OAuthAccountImportMode, label: string, disabled = false) => {
+    const active = mode === value;
+    return (
+      <button
+        type="button"
+        disabled={disabled || submitting}
+        onClick={() => {
+          if (disabled) return;
+          setMode(value);
+          setError(null);
+          setValidationMessage(null);
+        }}
+        style={{
+          padding: "6px 9px",
+          borderRadius: 6,
+          border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+          background: active ? "rgba(59,130,246,0.12)" : "var(--bg-panel)",
+          color: disabled ? "var(--text-dim)" : active ? "var(--accent)" : "var(--text-muted)",
+          cursor: disabled ? "not-allowed" : "pointer",
+          fontSize: 12,
+          fontWeight: active ? 600 : 500,
+          opacity: disabled ? 0.55 : 1,
+        }}
+      >
+        {label}{disabled ? " · 后续支持" : ""}
+      </button>
+    );
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+    >
+      <div style={{ width: view === "json" ? 920 : 560, maxWidth: "calc(100vw - 32px)", maxHeight: "min(82vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <ProviderIcon id={provider.id} size={18} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>添加 {provider.name} 账号</div>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>选择一种账号添加方式。</div>
+            </div>
+          </div>
+          <button type="button" disabled={submitting} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: submitting ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+        </div>
+
+        {view === "method" ? (
+          <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 10 }}>
+            <button type="button" onClick={onCodexAuth} style={{ padding: 14, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>Codex 授权</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>打开现有浏览器登录授权流程，并保存授权后的账号。</div>
+            </button>
+            <button type="button" onClick={() => onViewChange("json")} style={{ padding: 14, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>输入授权 JSON</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>粘贴与账号原始保存文件一致的 OAuth credential JSON。</div>
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  请粘贴原始 credential 对象，或由 CPA/SUB2API 转换得到的 credential 数组。必填字段为 <code style={{ fontFamily: "var(--font-mono)" }}>type</code>、<code style={{ fontFamily: "var(--font-mono)" }}>access</code>、<code style={{ fontFamily: "var(--font-mono)" }}>refresh</code> 和 <code style={{ fontFamily: "var(--font-mono)" }}>expires</code>。账号会被保存，但不会自动切换为当前激活账号。
+                </div>
+                <pre style={{ margin: 0, padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11, lineHeight: 1.5, overflow: "auto", fontFamily: "var(--font-mono)" }}>{RAW_ACCOUNT_JSON_EXAMPLE}</pre>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+                  如果省略 <code style={{ fontFamily: "var(--font-mono)" }}>accountId</code>，pi-web 会尝试从 access token 中解析，失败时使用稳定 fallback。账号显示名会按邮箱、手机号、accountId 的顺序自动补全。
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {modeButton("raw", "原文 JSON")}
+                  {modeButton("cpa", "CPA 格式")}
+                  {modeButton("sub2api", "SUB2API 格式")}
+                </div>
+                {converter ? (
+                  <>
+                    <textarea
+                      ref={textareaRef}
+                      value={jsonText}
+                      onChange={(e) => { setJsonText(e.target.value); setError(null); setValidationMessage(null); }}
+                      placeholder={converter.sourcePlaceholder}
+                      spellCheck={false}
+                      style={{ minHeight: 150, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <button type="button" disabled={submitting || !jsonText.trim()} onClick={convertSourceJson} style={{ padding: "6px 12px", background: !submitting && jsonText.trim() ? "var(--accent)" : "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 6, color: !submitting && jsonText.trim() ? "#fff" : "var(--text-dim)", cursor: !submitting && jsonText.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 700 }}>转换 ↓</button>
+                      <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{converter.label} → 原文 OAuth JSON</span>
+                    </div>
+                    <textarea
+                      value={convertedJsonText}
+                      onChange={(e) => { setConvertedJsonText(e.target.value); setError(null); setValidationMessage(null); }}
+                      placeholder={RAW_ACCOUNT_JSON_EXAMPLE}
+                      spellCheck={false}
+                      style={{ minHeight: 150, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
+                    />
+                  </>
+                ) : (
+                  <textarea
+                    ref={textareaRef}
+                    value={jsonText}
+                    onChange={(e) => { setJsonText(e.target.value); setError(null); setValidationMessage(null); }}
+                    placeholder={RAW_ACCOUNT_JSON_EXAMPLE}
+                    spellCheck={false}
+                    style={{ minHeight: 260, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
+                  />
+                )}
+                {error && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{error}</div>}
+                {validationMessage && <div style={{ fontSize: 12, color: validationMessage.type === "success" ? "#34d399" : "#f87171", lineHeight: 1.5 }}>{validationMessage.text}</div>}
+              </div>
+            </div>
+
+            <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <button type="button" disabled={submitting} onClick={() => onViewChange("method")} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: submitting ? "not-allowed" : "pointer", fontSize: 12 }}>返回</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" disabled={submitting} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: submitting ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+                <button type="button" disabled={submitting || !finalJsonText.trim()} onClick={validateFinalJson} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: !submitting && finalJsonText.trim() ? "var(--text-muted)" : "var(--text-dim)", cursor: !submitting && finalJsonText.trim() ? "pointer" : "not-allowed", fontSize: 12 }}>验证</button>
+                <button type="button" disabled={submitting || !finalJsonText.trim()} onClick={submitRawJson} style={{ padding: "6px 14px", background: !submitting && finalJsonText.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 6, color: !submitting && finalJsonText.trim() ? "#fff" : "var(--text-dim)", cursor: !submitting && finalJsonText.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 700 }}>{submitting ? "保存中…" : "保存账号"}</button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
   const [quota, setQuota] = useState<SubscriptionQuota | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
+  const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
+  const [savingLabelAccountId, setSavingLabelAccountId] = useState<string | null>(null);
+  const [savingExtraInfoAccountId, setSavingExtraInfoAccountId] = useState<string | null>(null);
+  const [editingExtraInfoAccount, setEditingExtraInfoAccount] = useState<OAuthAccountSummary | null>(null);
+  const [refreshingQuotaAccountId, setRefreshingQuotaAccountId] = useState<string | null>(null);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+  const [addAccountDialogView, setAddAccountDialogView] = useState<"method" | "json" | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -884,6 +1365,16 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setInputValue("");
     setQuota(null);
     setQuotaLoading(false);
+    setAccounts([]);
+    setAccountsLoading(false);
+    setAccountsError(null);
+    setActivatingAccountId(null);
+    setSavingLabelAccountId(null);
+    setSavingExtraInfoAccountId(null);
+    setEditingExtraInfoAccount(null);
+    setRefreshingQuotaAccountId(null);
+    setDeletingAccountId(null);
+    setAddAccountDialogView(null);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
   }, [provider.id]);
@@ -892,13 +1383,36 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     return () => { eventSourceRef.current?.close(); };
   }, []);
 
-  const loadQuota = useCallback(async () => {
-    if (provider.id !== "openai-codex" || !provider.loggedIn) return;
+  const loadAccounts = useCallback(async () => {
+    if (provider.id !== "openai-codex") return;
+    setAccountsLoading(true);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`);
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+    } catch (error) {
+      setAccountsError(error instanceof Error ? error.message : "Failed to load accounts");
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, [provider.id]);
+
+  useEffect(() => {
+    if (provider.id === "openai-codex") {
+      void loadAccounts();
+    }
+  }, [provider.id, provider.loggedIn, loadAccounts]);
+
+  const loadQuota = useCallback(async (force = false) => {
+    if (provider.id !== "openai-codex" || (!provider.loggedIn && !force)) return;
     setQuotaLoading(true);
     try {
       const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}`);
       const data = await res.json() as SubscriptionQuota;
       setQuota(data);
+      void loadAccounts();
     } catch (error) {
       setQuota({
         tool: provider.id,
@@ -912,7 +1426,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setQuotaLoading(false);
     }
-  }, [provider.id, provider.loggedIn]);
+  }, [provider.id, provider.loggedIn, loadAccounts]);
 
   useEffect(() => {
     if (provider.id === "openai-codex" && provider.loggedIn) {
@@ -920,12 +1434,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, loadQuota]);
 
-  const handleLogin = useCallback(() => {
+  const handleLogin = useCallback((accountMode: "login" | "add" = "login") => {
     eventSourceRef.current?.close();
     setLoginState({ phase: "connecting" });
     setInputValue("");
 
-    const es = new EventSource(`/api/auth/login/${encodeURIComponent(provider.id)}`);
+    const loginUrl = `/api/auth/login/${encodeURIComponent(provider.id)}${accountMode === "add" ? "?accountMode=add" : ""}`;
+    const es = new EventSource(loginUrl);
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
@@ -934,6 +1449,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         token?: string; message?: string; placeholder?: string | null;
         userCode?: string; verificationUri?: string; intervalSeconds?: number | null; expiresInSeconds?: number | null;
         options?: { id: string; label: string }[];
+        account?: OAuthAccountSummary; activeAccountId?: string | null;
       };
       if (data.type === "auth") {
         setLoginState({ phase: "auth", url: data.url!, instructions: data.instructions ?? null, token: data.token! });
@@ -955,8 +1471,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         setLoginState({ phase: "progress", message: data.message! });
       } else if (data.type === "success") {
         es.close();
-        setLoginState({ phase: "success" });
+        setLoginState({ phase: "success", message: data.message ?? (accountMode === "add" ? "Account saved successfully." : "Connected successfully.") });
         onRefresh();
+        void loadAccounts();
+        if (provider.loggedIn) void loadQuota();
       } else if (data.type === "error") {
         es.close();
         setLoginState({ phase: "error", message: data.message! });
@@ -969,13 +1487,15 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       es.close();
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "Connection lost" });
     };
-  }, [provider.id, onRefresh]);
+  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota]);
 
   const handleLogout = useCallback(async () => {
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
+    setQuota(null);
     onRefresh();
-  }, [provider.id, onRefresh]);
+    void loadAccounts();
+  }, [provider.id, onRefresh, loadAccounts]);
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
@@ -1012,6 +1532,125 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       }
     } catch (e) {
       setLoginState({ phase: "error", message: e instanceof Error ? e.message : "Network error" });
+    }
+  }, [provider.id]);
+
+  const handleActivateAccount = useCallback(async (accountId: string) => {
+    setActivatingAccountId(accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setLoginState({ phase: "success", message: "Account activated." });
+      onRefresh();
+      await loadQuota(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to activate account";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setActivatingAccountId(null);
+    }
+  }, [provider.id, onRefresh, loadQuota]);
+
+  const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
+    const nextLabel = window.prompt("Account remark (leave empty to clear):", account.label ?? "");
+    if (nextLabel === null) return;
+
+    setSavingLabelAccountId(account.accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: account.accountId, label: nextLabel }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setLoginState({ phase: "success", message: nextLabel.trim() ? "Account remark saved." : "Account remark cleared." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save account remark";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setSavingLabelAccountId(null);
+    }
+  }, [provider.id]);
+
+  const handleEditAccountExtraInfo = useCallback((account: OAuthAccountSummary) => {
+    setEditingExtraInfoAccount(account);
+  }, []);
+
+  const handleSaveAccountExtraInfo = useCallback(async (account: OAuthAccountSummary, nextExtraInfo: string) => {
+    setSavingExtraInfoAccountId(account.accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: account.accountId, extraInfo: nextExtraInfo }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setEditingExtraInfoAccount(null);
+      setLoginState({ phase: "success", message: nextExtraInfo.trim() ? "Account extra info saved." : "Account extra info cleared." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save account extra info";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setSavingExtraInfoAccountId(null);
+    }
+  }, [provider.id]);
+
+  const handleRefreshAccountQuota = useCallback(async (account: OAuthAccountSummary) => {
+    setRefreshingQuotaAccountId(account.accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}?accountId=${encodeURIComponent(account.accountId)}`);
+      const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      if (account.active) setQuota(data);
+      await loadAccounts();
+      setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error ?? "Quota query failed.") });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to refresh account quota";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setRefreshingQuotaAccountId(null);
+    }
+  }, [loadAccounts, provider.id]);
+
+  const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
+    if (!window.confirm(`Delete saved credentials for ${account.displayName}?\n\nThe account must be added again to restore it.`)) return;
+
+    setDeletingAccountId(account.accountId);
+    setAccountsError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: account.accountId }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setLoginState({ phase: "success", message: "Account deleted." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete account";
+      setAccountsError(message);
+      setLoginState({ phase: "error", message });
+    } finally {
+      setDeletingAccountId(null);
     }
   }, [provider.id]);
 
@@ -1114,7 +1753,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>Connected successfully.</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{loginState.message ?? "Connected successfully."}</p>
         )}
         {loginState.phase === "error" && (
           <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
@@ -1133,11 +1772,19 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         ) : (
           <>
             <button
-              onClick={handleLogin}
+              onClick={() => handleLogin()}
               style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {provider.loggedIn ? "Re-login" : "Login"}
             </button>
+            {provider.id === "openai-codex" && provider.loggedIn && (
+              <button
+                onClick={() => setAddAccountDialogView("method")}
+                style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                Add Account
+              </button>
+            )}
             {provider.loggedIn && (
               <button
                 onClick={handleLogout}
@@ -1152,6 +1799,50 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
       {provider.id === "openai-codex" && provider.loggedIn && (
         <OAuthQuotaView quota={quota} loading={quotaLoading} onRefresh={loadQuota} />
+      )}
+
+      {provider.id === "openai-codex" && (
+        <OAuthAccountsView
+          accounts={accounts}
+          loading={accountsLoading}
+          error={accountsError}
+          activatingAccountId={activatingAccountId}
+          savingLabelAccountId={savingLabelAccountId}
+          savingExtraInfoAccountId={savingExtraInfoAccountId}
+          refreshingQuotaAccountId={refreshingQuotaAccountId}
+          deletingAccountId={deletingAccountId}
+          onRefresh={loadAccounts}
+          onActivate={handleActivateAccount}
+          onEditLabel={handleEditAccountLabel}
+          onEditExtraInfo={handleEditAccountExtraInfo}
+          onRefreshQuota={handleRefreshAccountQuota}
+          onDelete={handleDeleteAccount}
+        />
+      )}
+
+      {provider.id === "openai-codex" && editingExtraInfoAccount && (
+        <ExtraInfoDialog
+          account={editingExtraInfoAccount}
+          saving={savingExtraInfoAccountId === editingExtraInfoAccount.accountId}
+          onSave={handleSaveAccountExtraInfo}
+          onClose={() => { if (!savingExtraInfoAccountId) setEditingExtraInfoAccount(null); }}
+        />
+      )}
+
+      {provider.id === "openai-codex" && addAccountDialogView && (
+        <AddAccountDialog
+          provider={provider}
+          view={addAccountDialogView}
+          onViewChange={setAddAccountDialogView}
+          onCodexAuth={() => { setAddAccountDialogView(null); handleLogin("add"); }}
+          onImported={(nextAccounts) => {
+            setAccounts(nextAccounts);
+            setLoginState({ phase: "success", message: "账号保存成功。" });
+            onRefresh();
+            if (provider.loggedIn) void loadQuota();
+          }}
+          onClose={() => setAddAccountDialogView(null)}
+        />
       )}
     </div>
   );

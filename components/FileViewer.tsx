@@ -12,6 +12,7 @@ import { markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins } from "@/li
 interface Props {
   filePath: string;
   cwd?: string;
+  onAddChat?: (filePath: string, selection?: { startLine: number; endLine: number }) => void;
 }
 
 interface FileData {
@@ -303,7 +304,7 @@ function DiffView({ oldContent, newContent }: { oldContent: string; newContent: 
   );
 }
 
-function ImageViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
+function ImageViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: string; onAddChat?: Props["onAddChat"] }) {
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -372,6 +373,26 @@ function ImageViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
         <span style={{ marginLeft: "auto" }}>{ext || "image"}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
+        {onAddChat && (
+          <button
+            onClick={() => onAddChat(filePath)}
+            title="Add to chat (⌘1)"
+            style={{
+              padding: "2px 8px", fontSize: 11, cursor: "pointer",
+              background: "var(--bg-hover)",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)", borderRadius: 5,
+              fontWeight: 400,
+              display: "flex", alignItems: "center", gap: 4,
+              lineHeight: 1.4,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Chat
+          </button>
+        )}
         <span
           title={watching ? "Live sync active" : "Not watching"}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
@@ -437,7 +458,7 @@ function formatDuration(seconds: number): string {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
-function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
+function AudioViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: string; onAddChat?: Props["onAddChat"] }) {
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -506,6 +527,26 @@ function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
         <span style={{ marginLeft: "auto" }}>{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
+        {onAddChat && (
+          <button
+            onClick={() => onAddChat(filePath)}
+            title="Add to chat (⌘1)"
+            style={{
+              padding: "2px 8px", fontSize: 11, cursor: "pointer",
+              background: "var(--bg-hover)",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)", borderRadius: 5,
+              fontWeight: 400,
+              display: "flex", alignItems: "center", gap: 4,
+              lineHeight: 1.4,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Chat
+          </button>
+        )}
         <span
           title={watching ? "Live sync active" : "Not watching"}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
@@ -554,7 +595,7 @@ function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
   );
 }
 
-function DocumentViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
+function DocumentViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: string; onAddChat?: Props["onAddChat"] }) {
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -639,6 +680,26 @@ function DocumentViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
         </span>
         <span style={{ marginLeft: "auto" }}>{ext === "docx" ? "docx preview" : "pdf"}</span>
         {size != null && <span>{formatSize(size)}</span>}
+        {onAddChat && (
+          <button
+            onClick={() => onAddChat(filePath)}
+            title="Add to chat (⌘1)"
+            style={{
+              padding: "2px 8px", fontSize: 11, cursor: "pointer",
+              background: "var(--bg-hover)",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)", borderRadius: 5,
+              fontWeight: 400,
+              display: "flex", alignItems: "center", gap: 4,
+              lineHeight: 1.4,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Chat
+          </button>
+        )}
         <DownloadLink filePath={filePath} />
         <span
           title={watching ? "Live sync active" : "Not watching"}
@@ -676,20 +737,20 @@ function DocumentViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
   );
 }
 
-export function FileViewer({ filePath, cwd }: Props) {
+export function FileViewer({ filePath, cwd, onAddChat }: Props) {
   if (isImagePath(filePath)) {
-    return <ImageViewer filePath={filePath} cwd={cwd} />;
+    return <ImageViewer filePath={filePath} cwd={cwd} onAddChat={onAddChat} />;
   }
   if (isAudioPath(filePath)) {
-    return <AudioViewer filePath={filePath} cwd={cwd} />;
+    return <AudioViewer filePath={filePath} cwd={cwd} onAddChat={onAddChat} />;
   }
   if (isDocumentPreviewPath(filePath)) {
-    return <DocumentViewer filePath={filePath} cwd={cwd} />;
+    return <DocumentViewer filePath={filePath} cwd={cwd} onAddChat={onAddChat} />;
   }
-  return <TextFileViewer filePath={filePath} cwd={cwd} />;
+  return <TextFileViewer filePath={filePath} cwd={cwd} onAddChat={onAddChat} />;
 }
 
-function TextFileViewer({ filePath, cwd }: Props) {
+function TextFileViewer({ filePath, cwd, onAddChat }: Props) {
   const { isDark } = useTheme();
   const [data, setData] = useState<FileData | null>(null);
   const [prevContent, setPrevContent] = useState<string | null>(null);
@@ -701,6 +762,10 @@ function TextFileViewer({ filePath, cwd }: Props) {
   const [watching, setWatching] = useState(false);
   const [changeCount, setChangeCount] = useState(0);
   const esRef = useRef<EventSource | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [selectedLines, setSelectedLines] = useState<{ startLine: number; endLine: number } | null>(null);
+  const selectedLinesRef = useRef(selectedLines);
+  selectedLinesRef.current = selectedLines;
 
   const fetchContent = useCallback((filePath: string, isRefresh = false) => {
     const encoded = encodeFilePathForApi(filePath);
@@ -727,6 +792,62 @@ function TextFileViewer({ filePath, cwd }: Props) {
         return null;
       });
   }, []);
+
+  const handleMouseUp = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+      setSelectedLines(null);
+      return;
+    }
+
+    // Try to find the <code> element inside the SyntaxHighlighter
+    const codeEl = contentRef.current?.querySelector('pre > code');
+    if (!codeEl) {
+      setSelectedLines(null);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+
+    // Walk up from startContainer to find the line element (direct child of <code>)
+    let startNode: Node | null = range.startContainer;
+    while (startNode && startNode.parentElement !== codeEl) {
+      startNode = startNode.parentNode;
+    }
+
+    // Same for endContainer
+    let endNode: Node | null = range.endContainer;
+    while (endNode && endNode.parentElement !== codeEl) {
+      endNode = endNode.parentNode;
+    }
+
+    if (startNode && endNode) {
+      const children = Array.from(codeEl.children);
+      const startIdx = children.indexOf(startNode as Element);
+      const endIdx = children.indexOf(endNode as Element);
+      if (startIdx !== -1 && endIdx !== -1) {
+        setSelectedLines({ startLine: startIdx + 1, endLine: endIdx + 1 });
+        return;
+      }
+    }
+
+    setSelectedLines(null);
+  }, []);
+
+  // Keyboard shortcut: Cmd+1 / Ctrl+1 to add file to chat
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '1') {
+        if (!onAddChat) return;
+        e.preventDefault();
+        onAddChat(filePath, selectedLinesRef.current ?? undefined);
+        setSelectedLines(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [filePath, onAddChat]);
 
   // Initial load + SSE watch setup
   useEffect(() => {
@@ -821,6 +942,33 @@ function TextFileViewer({ filePath, cwd }: Props) {
         <span style={{ marginLeft: "auto" }}>{data.language}</span>
         {viewMode === "source" && <span>{lines.length} lines</span>}
         <span>{formatSize(data.size)}</span>
+
+        {/* Add Chat button */}
+        {onAddChat && (
+          <button
+            onClick={() => {
+              onAddChat(filePath, selectedLines ?? undefined);
+              setSelectedLines(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+            title="Add to chat (⌘1)"
+            style={{
+              padding: "2px 8px", fontSize: 11, cursor: "pointer",
+              background: selectedLines ? "rgba(37,99,235,0.10)" : "var(--bg-hover)",
+              color: selectedLines ? "var(--accent)" : "var(--text-muted)",
+              border: selectedLines ? "1px solid var(--accent)" : "1px solid var(--border)",
+              borderRadius: 5,
+              fontWeight: selectedLines ? 600 : 400,
+              display: "flex", alignItems: "center", gap: 4,
+              lineHeight: 1.4,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = selectedLines ? "rgba(37,99,235,0.10)" : "var(--bg-hover)"; e.currentTarget.style.color = selectedLines ? "var(--accent)" : "var(--text-muted)"; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            <span>{selectedLines ? `lines ${selectedLines.startLine}-${selectedLines.endLine}` : "Chat"}</span>
+          </button>
+        )}
 
         {/* Live watch indicator */}
         <span
@@ -943,7 +1091,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
       </div>
 
       {/* Content area */}
-      <div style={{ flex: 1, overflow: "auto", background: "var(--bg)" }}>
+      <div ref={contentRef} style={{ flex: 1, overflow: "auto", background: "var(--bg)" }} onMouseUp={handleMouseUp}>
         {viewMode === "diff" && hasDiff ? (
           <DiffView oldContent={prevContent!} newContent={data.content} language={data.language} />
         ) : isHtml && previewMode ? (

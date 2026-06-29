@@ -9,33 +9,19 @@ import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { UsageStatsModal } from "./UsageStatsModal";
+import { SubagentPanel } from "./SubagentPanel";
+import { SettingsConfig } from "./SettingsConfig";
+import { TrellisPanel } from "./TrellisPanel";
+import { TrellisSessionWidget } from "./TrellisSessionWidget";
 import { BranchNavigator } from "./BranchNavigator";
+import { GitPanel } from "./GitPanel";
+import { getRelativeFilePath } from "@/lib/file-paths";
+import { formatWorkspaceTitle } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
-import { getFileName } from "@/lib/file-paths";
-import type { SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { PiWebConfig } from "@/lib/pi-web-config";
+import type { TrellisSessionTaskLinkResult } from "@/lib/trellis-types";
 import type { ChatInputHandle } from "./ChatInput";
-import type { SessionStatsInfo } from "@/lib/pi-types";
-
-type SessionCopyField = "file" | "id";
-
-function copyText(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-    return Promise.resolve();
-  } catch {
-    return Promise.reject();
-  }
-}
 
 export function AppShell() {
   const router = useRouter();
@@ -51,9 +37,28 @@ export function AppShell() {
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [usageStatsOpen, setUsageStatsOpen] = useState(false);
+  const [settingsConfigOpen, setSettingsConfigOpen] = useState(false);
+  const [webConfig, setWebConfig] = useState<PiWebConfig | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
+
+  const loadWebConfig = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/web-config", { signal });
+      const data = await res.json() as { config?: PiWebConfig; error?: string };
+      if (res.ok && data.config && !data.error) setWebConfig(data.config);
+      else setWebConfig(null);
+    } catch (error) {
+      if ((error as { name?: string }).name !== "AbortError") setWebConfig(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadWebConfig(controller.signal);
+    return () => controller.abort();
+  }, [loadWebConfig]);
 
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
@@ -78,24 +83,9 @@ export function AppShell() {
   }, []);
 
   // Session stats (tokens + cost) — populated by ChatWindow, displayed in top bar
-  const [sessionStats, setSessionStats] = useState<SessionStatsInfo | null>(null);
-  const handleSessionStatsChange = useCallback((stats: SessionStatsInfo | null) => {
+  const [sessionStats, setSessionStats] = useState<{ tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null>(null);
+  const handleSessionStatsChange = useCallback((stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => {
     setSessionStats(stats);
-  }, []);
-  const [copiedSessionField, setCopiedSessionField] = useState<SessionCopyField | null>(null);
-  const sessionCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleCopySessionField = useCallback((field: SessionCopyField, value: string) => {
-    void copyText(value).then(() => {
-      if (sessionCopyTimerRef.current) clearTimeout(sessionCopyTimerRef.current);
-      setCopiedSessionField(field);
-      sessionCopyTimerRef.current = setTimeout(() => setCopiedSessionField(null), 1400);
-    });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (sessionCopyTimerRef.current) clearTimeout(sessionCopyTimerRef.current);
-    };
   }, []);
 
   // Context usage — populated by ChatWindow, displayed in top bar
@@ -104,16 +94,22 @@ export function AppShell() {
     setContextUsage(usage);
   }, []);
 
-  // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "session" | null>(null);
-  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
-
-  const toggleTopPanel = useCallback((panel: "branches" | "system" | "session") => {
-    setActiveTopPanel((cur) => cur === panel ? null : panel);
+  // Subagent runs — populated by ChatWindow, displayed in top bar panel
+  const [subagentRuns, setSubagentRuns] = useState<import("@/hooks/useAgentSession").SubagentRun[]>([]);
+  const handleSubagentChange = useCallback((runs: import("@/hooks/useAgentSession").SubagentRun[]) => {
+    setSubagentRuns(runs);
   }, []);
 
-  const openSessionStatsPanel = useCallback(() => {
-    setActiveTopPanel("session");
+  // Git panel state
+  const [gitDirty, setGitDirty] = useState(false);
+  const [gitRefreshKey, setGitRefreshKey] = useState(0);
+
+  // Single active panel — only one dropdown open at a time
+  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "subagents" | "git" | null>(null);
+  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const toggleTopPanel = useCallback((panel: "branches" | "system" | "subagents" | "git") => {
+    setActiveTopPanel((cur) => cur === panel ? null : panel);
   }, []);
 
   useEffect(() => {
@@ -128,30 +124,36 @@ export function AppShell() {
     return () => ro.disconnect();
   }, [activeTopPanel]);
 
-  // Right panel — file tabs only
+  // Right panel — file tabs and optional Trellis task drawer
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [rightPanelMode, setRightPanelMode] = useState<"files" | "trellis">("files");
+  const [focusedTrellisTaskKey, setFocusedTrellisTaskKey] = useState<string | null>(null);
+  const [trellisSessionTask, setTrellisSessionTask] = useState<TrellisSessionTaskLinkResult | null>(null);
+  const [trellisSessionTaskRefreshKey, setTrellisSessionTaskRefreshKey] = useState(0);
 
   const handleAtMention = useCallback((relativePath: string) => {
-    chatInputRef.current?.insertText("`" + relativePath + "`");
+    chatInputRef.current?.addFileReference(relativePath);
   }, []);
 
   const [initialSessionId] = useState<string | null>(() => searchParams.get("session"));
   const [activeCwd, setActiveCwd] = useState<string | null>(null);
+  const [activeCwdGit, setActiveCwdGit] = useState<GitInfo | undefined>(undefined);
   // True once the initial ?session= URL param has been resolved (or confirmed absent)
   const [initialSessionRestored, setInitialSessionRestored] = useState<boolean>(() => !searchParams.get("session"));
   // Suppresses sessionKey bump in handleCwdChange during the initial URL restore
   const suppressCwdBumpRef = useRef(false);
 
+  const handleAddChat = useCallback((filePath: string, selection?: { startLine: number; endLine: number }) => {
+    const relativePath = getRelativeFilePath(filePath, activeCwd ?? undefined);
+    chatInputRef.current?.addFileReference(relativePath, selection);
+  }, [activeCwd]);
+
   const handleCwdChange = useCallback((cwd: string | null) => {
     setActiveCwd(cwd);
     // Skip if cwd is null (initial mount) or during the initial URL restore.
-    if (!cwd) return;
-    if (suppressCwdBumpRef.current) {
-      suppressCwdBumpRef.current = false;
-      return;
-    }
+    if (!cwd || suppressCwdBumpRef.current) return;
     // Close any session that belongs to a different cwd — it no longer
     // matches the selected project directory.
     setSelectedSession((prev) => {
@@ -167,6 +169,8 @@ export function AppShell() {
     setBranchActiveLeafId(null);
     setSystemPrompt(null);
     setActiveTopPanel(null);
+    setGitRefreshKey((k) => k + 1);
+    setGitDirty(false);
     router.replace("/", { scroll: false });
   }, [router]);
 
@@ -180,6 +184,7 @@ export function AppShell() {
       // Suppress the redundant sessionKey bump that would come from the
       // onCwdChange effect firing after setSelectedCwd in the sidebar
       suppressCwdBumpRef.current = true;
+      setTimeout(() => { suppressCwdBumpRef.current = false; }, 0);
     }
     // Skip router.replace when restoring from URL — the param is already correct
     // and calling replace in production Next.js triggers a Suspense remount loop
@@ -210,6 +215,8 @@ export function AppShell() {
   const handleAgentEnd = useCallback(() => {
     setRefreshKey((k) => k + 1);
     setExplorerRefreshKey((k) => k + 1);
+    setGitRefreshKey((k) => k + 1);
+    setTrellisSessionTaskRefreshKey((k) => k + 1);
   }, []);
 
   const handleSessionForked = useCallback((newSessionId: string) => {
@@ -249,13 +256,14 @@ export function AppShell() {
       return [...prev, { id: tabId, label: fileName, filePath }];
     });
     setActiveFileTabId(tabId);
+    setRightPanelMode("files");
     setRightPanelOpen(true);
   }, []);
 
   const handleCloseFileTab = useCallback((tabId: string) => {
     setFileTabs((prev) => {
       const next = prev.filter((t) => t.id !== tabId);
-      if (next.length === 0) setRightPanelOpen(false);
+      if (next.length === 0 && rightPanelMode === "files") setRightPanelOpen(false);
       return next;
     });
     setActiveFileTabId((cur) => {
@@ -263,7 +271,7 @@ export function AppShell() {
       const remaining = fileTabs.filter((t) => t.id !== tabId);
       return remaining.length > 0 ? remaining[remaining.length - 1].id : null;
     });
-  }, [fileTabs]);
+  }, [fileTabs, rightPanelMode]);
 
   const handleExportSession = useCallback(() => {
     if (!selectedSession) return;
@@ -277,18 +285,99 @@ export function AppShell() {
   const showPlaceholder = initialSessionRestored && !showChat;
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
-  const activeTitleCwd = selectedSession?.cwd || newSessionCwd || activeCwd;
+  const trellisEnabled = webConfig?.trellis.enabled ?? false;
+  const trellisIncludeArchivedDefault = webConfig?.trellis.includeArchived ?? false;
+  const trellisCwd = activeCwd ?? selectedSession?.cwd ?? newSessionCwd;
+  const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
+  const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
 
-  useEffect(() => {
-    const appTitle = "Pi Agent Web";
-    if (!activeTitleCwd) {
-      document.title = appTitle;
+  const loadTrellisSessionTask = useCallback(async (signal?: AbortSignal) => {
+    if (!trellisEnabled || !selectedSession || selectedSession.archived) {
+      setTrellisSessionTask(null);
       return;
     }
 
-    const projectName = getFileName(activeTitleCwd);
-    document.title = projectName ? `${projectName} · ${appTitle}` : appTitle;
-  }, [activeTitleCwd]);
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(selectedSession.id)}/trellis-task`, { signal });
+      const data = await res.json() as TrellisSessionTaskLinkResult & { error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setTrellisSessionTask(data.task ? data : null);
+    } catch (error) {
+      if ((error as { name?: string }).name !== "AbortError") setTrellisSessionTask(null);
+    }
+  }, [selectedSession, trellisEnabled]);
+
+  useEffect(() => {
+    setFocusedTrellisTaskKey(null);
+  }, [selectedSession?.id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadTrellisSessionTask(controller.signal);
+    return () => controller.abort();
+  }, [loadTrellisSessionTask, trellisSessionTaskRefreshKey]);
+
+  const trellisSessionTaskKey = trellisSessionTask?.task?.key ?? null;
+
+  useEffect(() => {
+    if (!trellisSessionTaskKey) return;
+    const interval = window.setInterval(() => {
+      setTrellisSessionTaskRefreshKey((key) => key + 1);
+    }, 10_000);
+    return () => window.clearInterval(interval);
+  }, [trellisSessionTaskKey]);
+
+  const handleOpenTrellisSessionTask = useCallback(() => {
+    if (!trellisSessionTask?.task) return;
+    setFocusedTrellisTaskKey(trellisSessionTask.task.key);
+    setRightPanelMode("trellis");
+    setRightPanelOpen(true);
+  }, [trellisSessionTask]);
+
+  useEffect(() => {
+    if (!trellisEnabled && rightPanelMode === "trellis") {
+      setRightPanelMode("files");
+      if (fileTabs.length === 0) setRightPanelOpen(false);
+    }
+  }, [trellisEnabled, rightPanelMode, fileTabs.length]);
+
+  useEffect(() => {
+    if (!activeCwd) {
+      setActiveCwdGit(undefined);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`/api/git/info?cwd=${encodeURIComponent(activeCwd)}`, { signal: controller.signal })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { git?: GitInfo } | null) => {
+        if (!controller.signal.aborted) setActiveCwdGit(data?.git);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setActiveCwdGit(undefined);
+      });
+
+    return () => controller.abort();
+  }, [activeCwd]);
+
+  useEffect(() => {
+    const title = formatWorkspaceTitle(browserTitleCwd, browserTitleGit);
+    const applyTitle = () => {
+      if (document.title !== title) document.title = title;
+    };
+
+    applyTitle();
+    const animationFrame = requestAnimationFrame(applyTitle);
+    const timeout = window.setTimeout(applyTitle, 0);
+    const observer = new MutationObserver(applyTitle);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+      observer.disconnect();
+    };
+  }, [browserTitleCwd, browserTitleGit]);
 
   const sidebarContent = (
     <>
@@ -345,6 +434,17 @@ export function AppShell() {
               </svg>
             ),
           },
+          {
+            label: "Settings",
+            onClick: () => setSettingsConfigOpen(true),
+            disabled: false,
+            icon: (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.06V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.06-.33H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1.06V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.4.14.74.38 1 .6.31.23.68.35 1.06.33H21a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z" />
+              </svg>
+            ),
+          },
         ] as { label: string; onClick: () => void; disabled: boolean; icon: React.ReactNode }[]).map(({ label, onClick, disabled, icon }) => (
           <button
             key={label}
@@ -371,67 +471,6 @@ export function AppShell() {
 
   return (
     <>
-    <style>{`
-      @keyframes session-info-pop {
-        0% {
-          opacity: 0;
-          transform: translateY(-24px);
-          filter: blur(6px);
-          box-shadow: 0 2px 8px rgba(0,0,0,0);
-        }
-        55% {
-          opacity: 1;
-          transform: translateY(0);
-          filter: blur(0);
-          background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel));
-          box-shadow: 0 18px 44px rgba(37,99,235,0.16);
-        }
-        100% {
-          opacity: 1;
-          transform: translateY(0);
-          filter: blur(0);
-          background: var(--bg-panel);
-          box-shadow: 0 10px 28px rgba(0,0,0,0.10);
-        }
-      }
-      @keyframes session-info-light-wash {
-        0% {
-          opacity: 0;
-          transform: translateX(-110%) skewX(-16deg);
-        }
-        24% {
-          opacity: 0.42;
-        }
-        100% {
-          opacity: 0;
-          transform: translateX(115%) skewX(-16deg);
-        }
-      }
-      .session-info-popover {
-        position: relative;
-        overflow: hidden;
-        transform-origin: top right;
-        animation: session-info-pop 360ms ease-out both;
-        will-change: transform, opacity, filter, background, box-shadow;
-      }
-      .session-info-popover::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 44%;
-        pointer-events: none;
-        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 24%, transparent), transparent);
-        animation: session-info-light-wash 620ms ease-out both;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .session-info-popover,
-        .session-info-popover::after {
-          animation: none;
-        }
-      }
-    `}</style>
     <div style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
       {/* Mobile overlay backdrop */}
       <div
@@ -609,6 +648,83 @@ export function AppShell() {
                 </svg>
                 <span>System</span>
               </button>
+              <button
+                onClick={() => toggleTopPanel("subagents")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  height: "100%", padding: "0 12px",
+                  background: activeTopPanel === "subagents" ? "var(--bg-selected)" : "none",
+                  border: "none",
+                  borderTop: activeTopPanel === "subagents" ? "2px solid var(--accent)" : "2px solid transparent",
+                  borderRight: "1px solid var(--border)",
+                  cursor: "pointer",
+                  color: activeTopPanel === "subagents" ? "var(--text)" : "var(--text-muted)",
+                  fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "subagents" ? "var(--text)" : "var(--text-muted)"; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Subagents</span>
+                {(() => {
+                  const running = subagentRuns.filter((r) => r.status === "running").length;
+                  const completed = subagentRuns.filter((r) => r.status === "completed" || r.status === "failed").length;
+                  if (running > 0) {
+                    return (
+                      <span style={{
+                        position: "absolute", top: 4, right: 4,
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: "#f59e0b",
+                      }} />
+                    );
+                  }
+                  if (completed > 0) {
+                    return (
+                      <span style={{
+                        fontSize: 10, color: "#22c55e",
+                        marginLeft: 2,
+                      }}>✓</span>
+                    );
+                  }
+                  return null;
+                })()}
+              </button>
+              <button
+                onClick={() => toggleTopPanel("git")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  height: "100%", padding: "0 12px",
+                  background: activeTopPanel === "git" ? "var(--bg-selected)" : "none",
+                  border: "none",
+                  borderTop: activeTopPanel === "git" ? "2px solid var(--accent)" : "2px solid transparent",
+                  borderRight: "1px solid var(--border)",
+                  cursor: "pointer",
+                  color: activeTopPanel === "git" ? "var(--text)" : "var(--text-muted)",
+                  fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "git" ? "var(--text)" : "var(--text-muted)"; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <line x1="6" y1="3" x2="6" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 0 1-9 9" />
+                </svg>
+                <span>Git</span>
+                {gitDirty && (
+                  <span style={{
+                    position: "absolute", top: 4, right: 4,
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: "#f59e0b",
+                  }} />
+                )}
+              </button>
             </div>
           )}
           {/* Session stats — right-aligned in top bar */}
@@ -642,26 +758,18 @@ export function AppShell() {
             const tooltip = tooltipParts.join("  |  ");
 
             return (
-              <button
-                type="button"
-                onClick={() => toggleTopPanel("session")}
-                title={tooltip || "Session info"}
+              <div
+                title={tooltip}
                 style={{
                   marginLeft: "auto",
                   display: "flex", alignItems: "center", gap: 10,
                   paddingLeft: 12,
-                  paddingRight: rightPanelOpen ? 12 : 48,
+                  paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48),
                   height: "100%",
-                  background: activeTopPanel === "session" ? "var(--bg-selected)" : "none",
-                  border: "none",
-                  borderTop: activeTopPanel === "session" ? "2px solid var(--accent)" : "2px solid transparent",
                   fontSize: 11, color: "var(--text-muted)",
-                  whiteSpace: "nowrap", cursor: "pointer",
+                  whiteSpace: "nowrap", cursor: "default",
                   fontVariantNumeric: "tabular-nums",
-                  transition: "color 0.1s, background 0.1s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "session" ? "var(--text)" : "var(--text-muted)"; }}
               >
                 {t && t.input > 0 && (
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -700,7 +808,7 @@ export function AppShell() {
                     {ctxStr}
                   </span>
                 )}
-              </button>
+              </div>
             );
           })()}
           {/* Top panel dropdown — shared, only one active at a time */}
@@ -741,156 +849,20 @@ export function AppShell() {
                   )}
                 </div>
               )}
-              {activeTopPanel === "session" && (
-                <div className="session-info-popover" style={{
+              {activeTopPanel === "subagents" && (
+                <div style={{
                   background: "var(--bg-panel)",
                   borderBottom: "1px solid var(--border)",
-                  boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
-                  padding: "12px 16px",
                 }}>
-                  {sessionStats ? (() => {
-                    const sessionRows = [
-                      ...(sessionStats.sessionName ? [{ label: "Name", value: sessionStats.sessionName, copyField: null }] : []),
-                      { label: "File", value: sessionStats.sessionFile ?? "In-memory", copyField: "file" as const },
-                      { label: "ID", value: sessionStats.sessionId, copyField: "id" as const },
-                    ];
-                    const messageRows = [
-                      ["User", sessionStats.userMessages.toLocaleString()],
-                      ["Assistant", sessionStats.assistantMessages.toLocaleString()],
-                      ["Tool Calls", sessionStats.toolCalls.toLocaleString()],
-                      ["Tool Results", sessionStats.toolResults.toLocaleString()],
-                      ["Total", sessionStats.totalMessages.toLocaleString()],
-                    ];
-                    const tokenRows = [
-                      ["Input", sessionStats.tokens.input.toLocaleString()],
-                      ["Output", sessionStats.tokens.output.toLocaleString()],
-                      ...(sessionStats.tokens.cacheRead > 0 ? [["Cache Read", sessionStats.tokens.cacheRead.toLocaleString()]] : []),
-                      ...(sessionStats.tokens.cacheWrite > 0 ? [["Cache Write", sessionStats.tokens.cacheWrite.toLocaleString()]] : []),
-                      ["Total", sessionStats.tokens.total.toLocaleString()],
-                    ];
-                    const ctx = contextUsage ?? sessionStats.contextUsage;
-                    const formatCompact = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-                    const extraTokenRows = [
-                      ...(sessionStats.cost > 0 ? [["Cost", `$${sessionStats.cost.toFixed(4)}`]] : []),
-                      ...(ctx?.contextWindow ? [["Context", `${ctx.percent !== null ? `${ctx.percent.toFixed(1)}%` : "?"} / ${formatCompact(ctx.contextWindow)}`]] : []),
-                    ];
-                    const section = (
-                      title: string,
-                      sectionRows: string[][],
-                      valueAlign: "left" | "right" = "left",
-                      compact = false,
-                    ) => (
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>{title}</div>
-                          <div style={{
-                            display: "grid",
-                            gridTemplateColumns: compact ? "max-content max-content" : "auto minmax(0, 1fr)",
-                            columnGap: compact ? 14 : 12,
-                            rowGap: 4,
-                            justifyContent: compact ? "start" : undefined,
-                          }}>
-                            {sectionRows.map(([label, value]) => (
-                              <div key={`${title}:${label}`} style={{ display: "contents" }}>
-                                <div style={{ color: "var(--text-dim)", whiteSpace: "nowrap" }}>{label}</div>
-                                <div style={{
-                                  color: "var(--text-muted)",
-                                  minWidth: 0,
-                                  overflowWrap: compact ? "normal" : "anywhere",
-                                  textAlign: valueAlign,
-                                  whiteSpace: valueAlign === "right" ? "nowrap" : "normal",
-                                }}>{value}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    const copyButton = (field: SessionCopyField, value: string) => {
-                      const copied = copiedSessionField === field;
-                      return (
-                        <button
-                          type="button"
-                          title={copied ? "Copied" : `Copy ${field === "file" ? "file path" : "session ID"}`}
-                          onClick={() => handleCopySessionField(field, value)}
-                          style={{
-                            alignSelf: "start",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 22,
-                            height: 22,
-                            marginTop: -2,
-                            color: copied ? "var(--accent)" : "var(--text-dim)",
-                            background: "transparent",
-                            border: "1px solid var(--border)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            flex: "0 0 auto",
-                            transition: "color 0.12s, border-color 0.12s, background 0.12s",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = "var(--accent)";
-                            e.currentTarget.style.borderColor = "var(--accent)";
-                            e.currentTarget.style.background = "var(--bg-hover)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = copied ? "var(--accent)" : "var(--text-dim)";
-                            e.currentTarget.style.borderColor = "var(--border)";
-                            e.currentTarget.style.background = "transparent";
-                          }}
-                        >
-                          {copied ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          ) : (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    };
-                    const sessionInfoSection = (
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>Session Info</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 12, rowGap: 8, alignItems: "start" }}>
-                          {sessionRows.map((row) => (
-                            <div key={`session-info:${row.label}`} style={{ display: "contents" }}>
-                              <div style={{ color: "var(--text-dim)", whiteSpace: "nowrap" }}>{row.label}</div>
-                              <div style={{
-                                color: "var(--text-muted)",
-                                minWidth: 0,
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                                whiteSpace: "normal",
-                              }}>{row.value}</div>
-                              <div>{row.copyField ? copyButton(row.copyField, row.value) : null}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-
-                    return (
-                      <div style={{
-                        display: "grid",
-                        gridTemplateColumns: "minmax(360px, 1.7fr) minmax(140px, 0.55fr) minmax(190px, 0.75fr)",
-                        gap: 24,
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        fontFamily: "var(--font-mono)",
-                      }}>
-                        {sessionInfoSection}
-                        {section("Messages", messageRows)}
-                        {section("Tokens", [...tokenRows, ...extraTokenRows], "right", true)}
-                      </div>
-                    );
-                  })() : (
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      Send a message or run /session to load session info
-                    </div>
-                  )}
+                  <SubagentPanel runs={subagentRuns} />
+                </div>
+              )}
+              {activeTopPanel === "git" && (
+                <div style={{
+                  background: "var(--bg-panel)",
+                  borderBottom: "1px solid var(--border)",
+                }}>
+                  <GitPanel cwd={trellisCwd} refreshKey={gitRefreshKey} onDirtyChange={setGitDirty} />
                 </div>
               )}
             </div>
@@ -913,13 +885,13 @@ export function AppShell() {
               onBranchDataChange={handleBranchDataChange}
               onSystemPromptChange={handleSystemPromptChange}
               onSessionStatsChange={handleSessionStatsChange}
-              onSessionStatsPanelOpen={openSessionStatsPanel}
               onContextUsageChange={handleContextUsageChange}
+              onSubagentChange={handleSubagentChange}
             />
           ) : showPlaceholder ? (
             activeCwd ? (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 15 }}>
-                Select a session from the sidebar
+                请从侧边栏选择会话
               </div>
             ) : (
               <div style={{ position: "absolute", top: 12, left: 12, display: "flex", alignItems: "flex-start", gap: 8, userSelect: "none", pointerEvents: "none" }}>
@@ -936,10 +908,13 @@ export function AppShell() {
               </div>
             )
           ) : null}
+          {showChat && trellisSessionTask?.task && !(rightPanelOpen && rightPanelMode === "trellis" && focusedTrellisTaskKey === trellisSessionTask.task.key) && (
+            <TrellisSessionWidget task={trellisSessionTask.task} onClick={handleOpenTrellisSessionTask} />
+          )}
         </div>
       </div>
 
-      {/* Right panel: file viewer — always mounted, width animated via CSS */}
+      {/* Right panel: file viewer or Trellis — always mounted, width animated via CSS */}
       <div
         className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}`}
         style={{
@@ -949,56 +924,110 @@ export function AppShell() {
           background: "var(--bg)",
         }}
       >
-        {/* Right panel tab bar */}
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <TabBar
-              tabs={fileTabs}
-              activeTabId={activeFileTabId ?? ""}
-              onSelectTab={setActiveFileTabId}
-              onCloseTab={handleCloseFileTab}
-            />
-          </div>
-
-        </div>
-
-        {/* File content */}
-        <div style={{ flex: 1, overflow: "hidden" }}>
-          {activeFileTab?.filePath ? (
-            <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} />
-          ) : (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
-              No file open
+        {rightPanelMode === "files" ? (
+          <>
+            {/* Right panel tab bar */}
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
+              <div style={{ flex: 1, overflow: "hidden" }}>
+                <TabBar
+                  tabs={fileTabs}
+                  activeTabId={activeFileTabId ?? ""}
+                  onSelectTab={setActiveFileTabId}
+                  onCloseTab={handleCloseFileTab}
+                />
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* File content */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              {activeFileTab?.filePath ? (
+                <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} onAddChat={handleAddChat} />
+              ) : (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
+                  没有打开文件
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36, padding: "0 12px", gap: 8 }}>
+              <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>Trellis</span>
+              {trellisCwd && <span title={trellisCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{trellisCwd}</span>}
+            </div>
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <TrellisPanel cwd={trellisCwd} includeArchivedDefault={trellisIncludeArchivedDefault} focusedTaskKey={focusedTrellisTaskKey} onOpenFile={handleOpenFile} />
+            </div>
+          </>
+        )}
       </div>
     </div>
-    {/* File panel toggle — always visible at top-right */}
-    <button
-      onClick={() => setRightPanelOpen((v) => !v)}
-      title={rightPanelOpen ? "Hide file panel" : "Show file panel"}
-      style={{
-        position: "fixed", top: 0, right: 0, zIndex: 300,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        width: 36, height: 36, padding: 0,
-        background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
-        color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
-        cursor: "pointer", transition: "color 0.12s",
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen ? "var(--text)" : "var(--text-muted)"; }}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
-      </svg>
-    </button>
+    {/* Right panel mode toggles — Preview first, optional Trellis to its right. */}
+    <div style={{ position: "fixed", top: 0, right: 0, zIndex: 300, display: "flex", flexDirection: "row" }}>
+      <button
+        onClick={() => {
+          if (rightPanelOpen && rightPanelMode === "files") setRightPanelOpen(false);
+          else {
+            setRightPanelMode("files");
+            setRightPanelOpen(true);
+          }
+        }}
+        title={rightPanelOpen && rightPanelMode === "files" ? "隐藏预览面板" : "显示预览面板"}
+        aria-label={rightPanelOpen && rightPanelMode === "files" ? "隐藏预览面板" : "显示预览面板"}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, padding: 0,
+          background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+          color: rightPanelOpen && rightPanelMode === "files" ? "var(--text)" : "var(--text-muted)",
+          cursor: "pointer", transition: "color 0.12s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen && rightPanelMode === "files" ? "var(--text)" : "var(--text-muted)"; }}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      {trellisEnabled && (
+        <button
+          onClick={() => {
+            if (rightPanelOpen && rightPanelMode === "trellis") setRightPanelOpen(false);
+            else {
+              setRightPanelMode("trellis");
+              setRightPanelOpen(true);
+            }
+          }}
+          title={rightPanelOpen && rightPanelMode === "trellis" ? "隐藏 Trellis 面板" : "显示 Trellis 面板"}
+          aria-label={rightPanelOpen && rightPanelMode === "trellis" ? "隐藏 Trellis 面板" : "显示 Trellis 面板"}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 36, height: 36, padding: 0,
+            background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+            color: rightPanelOpen && rightPanelMode === "trellis" ? "var(--accent)" : "var(--text-muted)",
+            cursor: "pointer", transition: "color 0.12s",
+            fontSize: 12, fontWeight: 800,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen && rightPanelMode === "trellis" ? "var(--accent)" : "var(--text-muted)"; }}
+        >
+          T
+        </button>
+      )}
+    </div>
     {modelsConfigOpen && <ModelsConfig onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }} />}
     {skillsConfigOpen && (activeCwd ?? selectedSession?.cwd ?? newSessionCwd) && (
       <SkillsConfig cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!} onClose={() => setSkillsConfigOpen(false)} />
     )}
     {usageStatsOpen && (
       <UsageStatsModal cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} onClose={() => setUsageStatsOpen(false)} />
+    )}
+    {settingsConfigOpen && (
+      <SettingsConfig
+        cwd={trellisCwd}
+        onConfigChange={() => { void loadWebConfig(); }}
+        onClose={() => { setSettingsConfigOpen(false); void loadWebConfig(); }}
+      />
     )}
     </>
   );

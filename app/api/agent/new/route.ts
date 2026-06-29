@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { existsSync } from "fs";
-import { allowFileRoot } from "@/lib/file-access";
+import { statSync } from "fs";
 import { startRpcSession } from "@/lib/rpc-manager";
+import { canonicalizeCwd } from "@/lib/cwd";
+import { registerAllowedRoot } from "@/lib/allowed-roots";
 
-// POST /api/agent/new  body: { cwd: string; type: string; message?: string; ... }
-// Spawns a brand-new pi session. Most calls immediately send the first command;
-// type:"ensure_session" only creates the runtime so clients can query commands.
+// POST /api/agent/new  body: { cwd: string; type: string; message: string; ... }
+// Spawns a brand-new pi session and immediately sends the first command.
 // Returns { sessionId, data } where sessionId is pi's real session id.
 export async function POST(req: Request) {
   try {
@@ -15,7 +15,12 @@ export async function POST(req: Request) {
     if (!cwd || typeof cwd !== "string") {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
     }
-    if (!existsSync(cwd)) {
+    const canonicalCwd = canonicalizeCwd(cwd);
+    try {
+      if (!statSync(canonicalCwd).isDirectory()) {
+        return NextResponse.json({ error: `Path is not a directory: ${cwd}` }, { status: 400 });
+      }
+    } catch {
       return NextResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
     }
 
@@ -23,13 +28,11 @@ export async function POST(req: Request) {
     const { provider, modelId, toolNames, thinkingLevel, ...promptCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; [key: string]: unknown };
 
     const tempKey = `__new__${Date.now()}`;
-    const { session, realSessionId } = await startRpcSession(tempKey, "", cwd, toolNames);
+    const { session, realSessionId } = await startRpcSession(tempKey, "", canonicalCwd, toolNames);
 
-    // Keep the files-route allowed-roots cache (see app/api/files/[...path]/route.ts)
-    // in sync so the new cwd is immediately readable via /api/files. Without this,
-    // a file request under a brand-new cwd would 403 for up to the cache TTL.
-    allowFileRoot(cwd);
-
+    // Keep allowed workspace roots in sync so brand-new cwd file/Trellis
+    // requests do not have to wait for a session-list cache refresh.
+    registerAllowedRoot(canonicalCwd);
     // Apply pre-selected model before sending the prompt
     if (provider && modelId) {
       await session.send({ type: "set_model", provider, modelId });
@@ -38,10 +41,6 @@ export async function POST(req: Request) {
     // Apply pre-selected thinking level before sending the prompt
     if (thinkingLevel) {
       await session.send({ type: "set_thinking_level", level: thinkingLevel });
-    }
-
-    if (promptCommand.type === "ensure_session") {
-      return NextResponse.json({ success: true, sessionId: realSessionId, data: null });
     }
 
     const result = await session.send(promptCommand);

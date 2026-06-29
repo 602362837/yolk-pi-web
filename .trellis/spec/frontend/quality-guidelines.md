@@ -4,299 +4,252 @@
 
 ---
 
-## ESLint Configuration
+## Overview
 
-The project uses ESLint with Next.js core-web-vitals and TypeScript rules:
+<!--
+Document your project's quality standards here.
 
-```javascript
-// eslint.config.mjs
-import coreWebVitals from "eslint-config-next/core-web-vitals";
-import typescript from "eslint-config-next/typescript";
+Questions to answer:
+- What patterns are forbidden?
+- What linting rules do you enforce?
+- What are your testing requirements?
+- What code review standards apply?
+-->
 
-const eslintConfig = [
-  ...coreWebVitals,
-  ...typescript,
-  {
-    rules: {
-      // Relaxed rules for this project's patterns
-      "react-hooks/immutability": "off",
-      "react-hooks/refs": "off",
-      "react-hooks/set-state-in-effect": "off",
-    },
-  },
-];
-```
+(To be filled by the team)
 
-**Run lint:** `npm run lint`
-
-**Relaxed rules rationale:**
-- `react-hooks/immutability` — off because we use refs for mutable state
-- `react-hooks/refs` — off because we update refs on every render
-- `react-hooks/set-state-in-effect` — off because some effects need to update state
-
-## Required Patterns
-
-### 1. Use CSS Variables for Theming
-Always use CSS variables instead of hardcoded colors:
-
-```typescript
-// ✅ Good
-<div style={{ background: "var(--bg-panel)", color: "var(--text)" }}>
-
-// ❌ Bad
-<div style={{ background: "#f5f5f5", color: "#1a1a1a" }}>
-```
-
-### 2. Normalize Tool Calls at Boundaries
-Always call `normalizeToolCalls()` when loading or receiving assistant messages:
-
-```typescript
-// ✅ Good - in lib/session-reader.ts
-const normalized = normalizeToolCalls(message);
-
-// ✅ Good - in hooks/useAgentSession.ts
-const normalized = normalizeToolCalls(event.message);
-```
-
-### 3. Use Path Helpers for File Operations
-Always use `lib/file-paths.ts` for path encoding and display:
-
-```typescript
-// ✅ Good
-import { encodeFilePathForApi, getRelativeFilePath } from "@/lib/file-paths";
-const encoded = encodeFilePathForApi(filePath);
-
-// ❌ Bad - manual encoding
-const encoded = filePath.split("/").map(encodeURIComponent).join("/");
-```
-
-### 4. Clean Up Side Effects
-Always clean up in effect return functions:
-
-```typescript
-// ✅ Good
-useEffect(() => {
-  const es = new EventSource(`/api/agent/${sessionId}/events`);
-  es.onmessage = (e) => { /* ... */ };
-  return () => es.close();
-}, [sessionId]);
-
-// ❌ Bad - no cleanup
-useEffect(() => {
-  const es = new EventSource(`/api/agent/${sessionId}/events`);
-  es.onmessage = (e) => { /* ... */ };
-}, [sessionId]);
-```
-
-### 5. Use `useCallback` for Handlers Passed as Props
-Prevent unnecessary re-renders:
-
-```typescript
-// ✅ Good
-const handleClick = useCallback(() => {
-  onSelect(session);
-}, [onSelect, session]);
-
-return <Child onClick={handleClick} />;
-```
-
-### 6. Type Props Explicitly
-Always define `interface Props` for components:
-
-```typescript
-// ✅ Good
-interface Props {
-  session: SessionInfo;
-  onSelect: (session: SessionInfo) => void;
-}
-
-export function SessionCard({ session, onSelect }: Props) {
-  // ...
-}
-
-// ❌ Bad - inline types
-export function SessionCard({ session, onSelect }: { 
-  session: SessionInfo; 
-  onSelect: (session: SessionInfo) => void 
-}) {
-  // ...
-}
-```
+---
 
 ## Forbidden Patterns
 
-### 1. Don't Use `any` Type
-Use `unknown` and narrow with type guards:
+<!-- Patterns that should never be used and why -->
 
-```typescript
-// ❌ Bad
-function process(data: any) {
-  return data.value;
-}
+(To be filled by the team)
 
-// ✅ Good
-function process(data: unknown) {
-  if (isObject(data) && "value" in data) {
-    return data.value;
-  }
-}
-```
+---
 
-### 2. Don't Import Session Lifecycle into Components
-Keep session management in `lib/rpc-manager.ts` and `hooks/useAgentSession.ts`:
+## Required Patterns
 
-```typescript
-// ❌ Bad - in a component
-import { createAgentSession } from "@earendil-works/pi-coding-agent";
-const session = createAgentSession({ /* ... */ });
+<!-- Patterns that must always be used -->
 
-// ✅ Good - in a hook
-import { useAgentSession } from "@/hooks/useAgentSession";
-const { messages, handleSend } = useAgentSession({ session });
-```
+(To be filled by the team)
 
-### 3. Don't Hardcode Theme Colors
-Always use CSS variables:
+---
 
-```typescript
-// ❌ Bad
-<div style={{ background: isDark ? "#242424" : "#f5f5f5" }}>
+## Testing Requirements
 
-// ✅ Good
-<div style={{ background: "var(--bg-panel)" }}>
-```
+<!-- What level of testing is expected -->
 
-### 4. Don't Duplicate Path Logic
-Use `lib/file-paths.ts` helpers:
+(To be filled by the team)
 
-```typescript
-// ❌ Bad - duplicated in multiple files
-const relativePath = filePath.startsWith(cwd) 
-  ? filePath.slice(cwd.length + 1) 
-  : filePath;
-
-// ✅ Good
-import { getRelativeFilePath } from "@/lib/file-paths";
-const relativePath = getRelativeFilePath(filePath, cwd);
-```
-
-### 5. Don't Use Module-Level Maps for Session State
-Use `globalThis.__piSessions` to survive hot-reload:
-
-```typescript
-// ❌ Bad - lost on hot-reload
-const sessions = new Map<string, AgentSessionWrapper>();
-
-// ✅ Good - survives hot-reload
-globalThis.__piSessions ??= new Map<string, AgentSessionWrapper>();
-const sessions = globalThis.__piSessions;
-```
-
-See `lib/rpc-manager.ts` for the full pattern.
-
-### 6. Don't Forget to Update AGENTS.md
-When adding new components, hooks, or API routes, update the tables in `AGENTS.md`:
-
-- Components table for new `components/*.tsx` files
-- Hooks table for new `hooks/*.ts` files
-- API Routes table for new `app/api/**/route.ts` files
-
-## Testing
-
-The project currently has **no automated tests**. Quality is maintained through:
-
-1. **TypeScript type checking** — `node_modules/.bin/tsc --noEmit`
-2. **ESLint** — `npm run lint`
-3. **Manual testing** — verify in browser at `http://localhost:30141`
-4. **Code review** — follow the patterns in this spec
+---
 
 ## Code Review Checklist
 
-Before committing changes:
+<!-- What reviewers should check -->
 
-- [ ] TypeScript compiles without errors (`tsc --noEmit`)
-- [ ] ESLint passes (`npm run lint`)
-- [ ] No hardcoded colors (use CSS variables)
-- [ ] Side effects are cleaned up in effects
-- [ ] Props are typed explicitly
-- [ ] No `any` types (use `unknown` + type guards)
-- [ ] Path operations use `lib/file-paths.ts`
-- [ ] Tool calls are normalized at boundaries
-- [ ] `AGENTS.md` is updated if adding new components/hooks/routes
-- [ ] Manual testing in browser confirms functionality
+(To be filled by the team)
 
-## Build and Type Checking
+---
 
-**During development:**
-```bash
-npm run dev          # Start dev server with hot-reload
-npm run lint         # Run ESLint
-node_modules/.bin/tsc --noEmit  # Type-check without emitting
-```
+## Scenario: Optional read-only workspace-file panels
 
-**Never run `npm run build` during development** — it pollutes `.next/` and breaks `npm run dev`.
+### 1. Scope / Trigger
 
-## Performance Guidelines
+Use this contract when adding a UI panel that reads project-local files through
+Next.js API routes, especially when the panel is gated by `pi-web.json` settings.
+This is cross-layer work: settings storage → API validation → filesystem reader
+→ UI rendering.
 
-1. **Use `useCallback` for handlers passed as props** — prevents child re-renders
-2. **Use `useMemo` for expensive computations** — but only when actually expensive
-3. **Use refs for mutable state** — avoids re-renders for non-visual state
-4. **Lazy initialize state** — use `useState(() => expensiveComputation())`
-5. **Avoid inline object/array literals in JSX** — they create new references every render
+### 2. Signatures
+
+- Config API: `GET /api/web-config`, `PUT /api/web-config` with a partial patch
+  such as `{ worktree?: unknown; trellis?: unknown }`.
+- Feature API list route: `GET /api/<feature>/...?cwd=<absolute-cwd>`.
+- Feature API detail route: `GET /api/<feature>/[stableKey]?cwd=<absolute-cwd>`.
+- Shared allowed-root helper: `getAllowedRoots()`, `registerAllowedRoot(cwd)`,
+  and `isPathAllowed(target, roots)`.
+
+### 3. Contracts
+
+- The feature setting must default to disabled unless the product explicitly
+  requires opt-out behavior.
+- The UI entry point and the backing API must both respect the setting gate.
+- Browser code must not read arbitrary paths directly; components fetch typed
+  API responses only.
+- API routes must validate `cwd` against shared allowed roots before reading
+  project files.
+- Detail routes must accept stable keys returned by the list route, not raw
+  filesystem paths.
+- Filesystem readers own raw JSON/JSONL/Markdown parsing and export typed
+  projections for UI consumers.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Feature disabled | 403 JSON error from feature APIs; no UI entry point. |
+| Missing `cwd` | 400 JSON error. |
+| `cwd` outside allowed roots | 403 JSON error. |
+| Missing feature directory | 200 empty-state response, not an exception. |
+| Unknown stable key | 404 JSON error. |
+| Invalid/path-traversal key | 400 JSON error. |
+| Symlink or realpath escapes workspace | Reject with 400/security error. |
+| Malformed per-item JSON | Return per-item read error when safe; do not crash the whole list unless security is involved. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: selected workspace was validated through `/api/cwd/validate`, registered
+  with `registerAllowedRoot()`, and the panel fetches a typed list/detail API.
+- Base: no feature directory exists; the panel renders an explanatory empty
+  state.
+- Bad: component constructs `../../some/file` paths or casts raw payload fields
+  in multiple places.
+
+### 6. Tests Required
+
+At minimum, verify these assertion points manually or with focused tests:
+
+- Config patch preserves unrelated sections and validates booleans/strings.
+- Disabled setting blocks APIs and hides the UI entry point.
+- Allowed-root registration lets a newly validated workspace read feature data.
+- List route isolates malformed task/item JSON without leaking raw paths.
+- Detail route rejects invalid keys and symlink escapes.
+- Existing file-panel/drawer behavior still works after adding another mode.
+
+### 7. Wrong vs Correct
+
+#### Wrong
 
 ```typescript
-// ❌ Bad - new object every render
-<Child style={{ padding: 12, margin: 8 }} />
-
-// ✅ Good - stable reference
-const style = useMemo(() => ({ padding: 12, margin: 8 }), []);
-<Child style={style} />
+// Raw path from the browser decides what the server reads.
+fetch(`/api/feature/read?path=${encodeURIComponent(userSuppliedPath)}`);
 ```
 
-## Import Order
-
-Follow this order for imports:
+#### Correct
 
 ```typescript
-// 1. React and Next.js
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-
-// 2. Components
-import { SessionSidebar } from "./SessionSidebar";
-import { ChatWindow } from "./ChatWindow";
-
-// 3. Hooks
-import { useTheme } from "@/hooks/useTheme";
-import { useAgentSession } from "@/hooks/useAgentSession";
-
-// 4. Lib utilities
-import { encodeFilePathForApi } from "@/lib/file-paths";
-import { normalizeToolCalls } from "@/lib/normalize";
-
-// 5. Types (use import type)
-import type { SessionInfo, AgentMessage } from "@/lib/types";
+// Browser uses a cwd plus a stable key that came from the list response.
+fetch(`/api/feature/${encodeURIComponent(item.key)}?cwd=${encodeURIComponent(cwd)}`);
 ```
 
-## Documentation
+### Scenario: Session-scoped Trellis task widgets
 
-- **Component files**: No JSDoc needed; code should be self-documenting
-- **Lib functions**: Add JSDoc for public APIs with complex signatures
-- **Hooks**: Document the return object shape in the hook file
-- **API routes**: Document request/response shapes in comments
+### 1. Scope / Trigger
 
-Example:
+Use this contract when adding UI that displays a Trellis task as related to a
+specific pi chat session. This is stricter than the normal Trellis task drawer:
+the association belongs to the session projection, not to Trellis task metadata.
+
+### 2. Signatures
+
+- Session association route:
+  `GET /api/sessions/[id]/trellis-task`.
+- Success response:
+  `{ task: TrellisTaskSummary, source: "session-transcript" | "session-runtime", confidence: "high" }`.
+- No-association response:
+  `{ task: null, reason: "no-session" | "trellis-disabled" | "no-workspace" | "no-evidence" | "ambiguous" | "task-not-found" }`.
+
+### 3. Contracts
+
+- Do not write session ids, backlinks, or UI-only association fields into
+  `task.json`.
+- The browser passes only a pi session id. The server resolves the session file,
+  reads the session cwd, validates it with allowed roots, and then reads Trellis
+  data through the existing Trellis reader.
+- Automatic display is high-confidence only:
+  - explicit current-session transcript/tool evidence naming a Trellis task path
+    or lifecycle output; or
+  - exact per-session runtime pointer keys that are deterministically tied to the
+    pi session.
+- Ignore workspace-level guesses, process/global runtime fallback pointers, and
+  "first active task" heuristics. On ambiguity, hide the widget.
+- Do not expose raw `.trellis/.runtime/sessions/*.json` contents to the browser.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Trellis disabled | 403 JSON error; widget hidden. |
+| Session id not found | 404 JSON error. |
+| Session has no cwd | 200 `{ task: null, reason: "no-workspace" }`. |
+| Cwd outside allowed roots | 403 JSON error. |
+| No transcript/runtime evidence | 200 `{ task: null, reason: "no-evidence" }`. |
+| Multiple candidate tasks | 200 `{ task: null, reason: "ambiguous" }`. |
+| Evidence points to missing task | 200 `{ task: null, reason: "task-not-found" }`. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: the current session contains `Active task: .trellis/tasks/06-29-foo`;
+  the route returns `active:06-29-foo`, and clicking the widget focuses the
+  existing Trellis drawer detail.
+- Base: the session has no Trellis evidence; the widget is hidden and the normal
+  Trellis drawer still works.
+- Bad: the UI selects the first `in_progress` workspace task or mutates
+  `task.json` to add a session backlink.
+
+### 6. Tests Required
+
+At minimum, verify these assertion points manually or with focused tests:
+
+- Disabled setting blocks the association route and hides the widget.
+- Explicit session transcript task path resolves to the matching task.
+- Exact `pi_<sessionId>` / `pi_transcript_<hash(sessionFile)>` runtime pointers
+  resolve, but `pi_process_*` does not.
+- Ambiguous transcript evidence returns no task.
+- Clicking the widget opens the Trellis drawer without losing file tabs.
+
+### 7. Wrong vs Correct
+
+#### Wrong
 
 ```typescript
-// lib/agent-client.ts
-// Every /api/agent/[id] route returns one of:
-//   { success: true, data: <result> }
-//   { error: string }              (non-2xx)
+// Workspace-level guess can show the wrong task in multi-session workflows.
+const task = tasks.find((item) => item.status === "in_progress") ?? tasks[0];
+```
 
-export async function sendAgentCommand<T = unknown>(
-  sessionId: string,
-  command: Record<string, unknown>,
-): Promise<T> {
-  // ...
-}
+#### Correct
+
+```typescript
+// Session-owned projection: no high-confidence session evidence means no widget.
+const result = await fetch(`/api/sessions/${sessionId}/trellis-task`);
+if (result.task) showWidget(result.task);
+```
+
+### Trellis task-detail display contracts
+
+When rendering the Trellis task drawer, keep these projections explicit:
+
+- `task.json` is the only source for task metadata such as `base_branch`,
+  `branch`, `worktree_path`, `commit`, and `pr_url`. The web UI must not infer
+  missing historical worktree or merge details from Git logs unless that is a
+  separately designed feature.
+- `implement.jsonl` / `check.jsonl` counts are real manifest entries only;
+  seed rows shaped like `{ "_example": "..." }` count as zero. These manifests
+  are context inputs, not execution records.
+- If the UI needs to mark a quality check as executed, use an explicit
+  `task.json.meta.lastCheck` record such as
+  `{ "status": "passed", "at": "<ISO timestamp>", "summary": "..." }`.
+  Do not infer execution from `check.jsonl` entries.
+- Task child progress comes from `task.json.children`. It is a Trellis task-tree
+  count, not a subagent-dispatch count.
+- Date-only `YYYY-MM-DD` values should stay date-only in the UI. Only strings
+  that contain time information should be rendered with hour/minute/second.
+
+#### Wrong
+
+```typescript
+// Makes missing historical metadata look like an error and suggests the UI
+// knows the final merge target when it only has a task.json field.
+<MetadataLine label="基准分支" value={task.baseBranch ?? "—"} />
+<MetadataLine label="Worktree" value={task.worktreePath ?? "—"} />
+```
+
+#### Correct
+
+```typescript
+// Display recorded values, then explain which optional task.json fields were
+// not recorded instead of guessing them.
+{task.baseBranch && <MetadataLine label="记录的基准分支" value={task.baseBranch} />}
+{missingMetadata.length > 0 && <div>未记录：{missingMetadata.join("、")}</div>}
 ```

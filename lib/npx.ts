@@ -16,13 +16,13 @@ const execFileAsync = promisify(execFile);
  * directly via the current `node` binary, which works identically on every
  * platform and needs no shell.
  */
-function findNpxCli(): string | null {
+function findNpmCliScript(name: "npm-cli.js" | "npx-cli.js"): string | null {
   const nodeDir = dirname(execPath);
   const candidates = [
     // Windows MSI installer layout: node.exe and node_modules share a dir
-    join(nodeDir, "node_modules", "npm", "bin", "npx-cli.js"),
-    // Unix layout: .../bin/node + .../lib/node_modules/npm/bin/npx-cli.js
-    join(nodeDir, "..", "lib", "node_modules", "npm", "bin", "npx-cli.js"),
+    join(nodeDir, "node_modules", "npm", "bin", name),
+    // Unix layout: .../bin/node + .../lib/node_modules/npm/bin/<npm-or-npx>.js
+    join(nodeDir, "..", "lib", "node_modules", "npm", "bin", name),
   ];
   for (const p of candidates) {
     try {
@@ -32,6 +32,14 @@ function findNpxCli(): string | null {
     }
   }
   return null;
+}
+
+function findNpxCli(): string | null {
+  return findNpmCliScript("npx-cli.js");
+}
+
+function findNpmCli(): string | null {
+  return findNpmCliScript("npm-cli.js");
 }
 
 export interface RunNpxOptions {
@@ -54,6 +62,18 @@ export async function runNpx(args: string[], opts: RunNpxOptions = {}): Promise<
   const { command, commandArgs } = npxCli
     ? { command: execPath, commandArgs: [npxCli, ...args] }
     : { command: "npx", commandArgs: args };
+  return execFileAsync(command, commandArgs, {
+    timeout: opts.timeout,
+    cwd: opts.cwd,
+    env: opts.env,
+  });
+}
+
+export async function runNpm(args: string[], opts: RunNpxOptions = {}): Promise<RunNpxResult> {
+  const npmCli = findNpmCli();
+  const { command, commandArgs } = npmCli
+    ? { command: execPath, commandArgs: [npmCli, ...args] }
+    : { command: "npm", commandArgs: args };
   return execFileAsync(command, commandArgs, {
     timeout: opts.timeout,
     cwd: opts.cwd,

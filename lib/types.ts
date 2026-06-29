@@ -31,6 +31,19 @@ export interface ImageContent {
   };
 }
 
+/** A file attached to a chat message (stored server-side, referenced by path). */
+export interface AttachedFile {
+  name: string;
+  size: number;
+  path: string;
+}
+
+export interface FileReference {
+  relativePath: string;
+  startLine?: number;
+  endLine?: number;
+}
+
 export interface ThinkingContent {
   type: "thinking";
   thinking: string;
@@ -260,6 +273,22 @@ export interface SessionTreeNode {
   compressedEntryIds?: string[];
 }
 
+export interface GitInfo {
+  branch?: string;
+  repoRoot?: string;
+  mainWorktreePath?: string;
+  mainWorktreeBranch?: string;
+  isWorktree?: boolean;
+}
+
+export interface WorktreeInfo {
+  isWorktree: true;
+  branch?: string;
+  repoRoot?: string;
+  mainWorktreePath?: string;
+  mainWorktreeBranch?: string;
+}
+
 export interface SessionInfo {
   path: string;
   id: string;
@@ -270,6 +299,9 @@ export interface SessionInfo {
   messageCount: number;
   firstMessage: string;
   parentSessionId?: string; // set if this session was forked from another
+  archived?: boolean;       // true for archived sessions
+  worktree?: WorktreeInfo;
+  git?: GitInfo;
 }
 
 export interface SessionContext {
@@ -289,4 +321,63 @@ export interface RpcSessionState {
   sessionId: string;
   sessionName?: string;
   messageCount: number;
+}
+
+// Git status panel types
+export interface GitFileChange {
+  status: "M" | "A" | "D" | "R" | "C" | "U" | "?";
+  file: string;
+  oldFile?: string;
+}
+
+export interface GitCommitInfo {
+  hash: string;
+  message: string;
+  author: string;
+  date: string;
+  relativeDate: string;
+}
+
+export interface GitCommitRef {
+  name: string;
+  type: "branch" | "tag" | "head" | "remote";
+}
+
+export interface GitGraphCommit {
+  hash: string;
+  message: string;
+  author: string;
+  date: string;
+  relativeDate: string;
+  parents: string[];
+  refs: GitCommitRef[];
+}
+
+export interface GitBranchInfo {
+  name: string;
+  isCurrent: boolean;
+  upstream?: string | null;
+  ahead: number;
+  behind: number;
+  latestCommit: string;
+}
+
+export interface GitGraphData {
+  commits: GitGraphCommit[];
+  branches: GitBranchInfo[];
+}
+
+export interface GitStatusInfo {
+  branch: string | null;
+  upstream: string | null;
+  isDetached: boolean;
+  isDirty: boolean;
+  isWorktree: boolean;
+  ahead: number;
+  behind: number;
+  staged: GitFileChange[];
+  unstaged: GitFileChange[];
+  untracked: string[];
+  recentCommits: GitCommitInfo[];
+  stashCount: number;
 }

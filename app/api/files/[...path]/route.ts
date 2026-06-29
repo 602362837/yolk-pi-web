@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import {
-  getAllowedFileRoots,
-  isFilePathAllowed,
-  isWindowsAbsolutePath,
-  normalizeSlashes,
-} from "@/lib/file-access";
+import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 
 const IGNORED_NAMES = new Set([
   "node_modules", ".git", ".next", "dist", "build", "__pycache__",
@@ -90,6 +85,16 @@ function getLanguage(filePath: string): string {
   if (base === "makefile" || base === "gnumakefile") return "makefile";
   const ext = base.split(".").pop() ?? "";
   return EXT_TO_LANGUAGE[ext] ?? "text";
+}
+
+const WINDOWS_ABSOLUTE_RE = /^[a-zA-Z]:[\\/]/;
+
+function normalizeSlashes(filePath: string): string {
+  return filePath.replace(/\\/g, "/");
+}
+
+function isWindowsAbsolutePath(filePath: string): boolean {
+  return WINDOWS_ABSOLUTE_RE.test(filePath) || filePath.startsWith("\\\\") || filePath.startsWith("//");
 }
 
 function filePathFromSegments(segments: string[]): string {
@@ -284,8 +289,8 @@ export async function GET(
     const filePath = filePathFromSegments(segments);
     const type = request.nextUrl.searchParams.get("type") ?? "list";
 
-    const allowedRoots = await getAllowedFileRoots();
-    if (!isFilePathAllowed(filePath, allowedRoots)) {
+    const allowedRoots = await getAllowedRoots();
+    if (!isPathAllowed(filePath, allowedRoots)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
