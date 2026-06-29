@@ -8,7 +8,7 @@ See `package.json` for exact versions.
 | --- | --- |
 | `next`, `react`, `react-dom` | Web application framework/runtime. |
 | `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai` | In-process pi AgentSession and AI provider integration. |
-| `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `katex` | Markdown and math rendering. |
+| `react-markdown`, `remark-gfm`, `remark-math`, `rehype-raw`, `rehype-sanitize`, `rehype-katex`, `katex` | Markdown, raw HTML sanitization, and math rendering. |
 | `react-syntax-highlighter` | Code block highlighting. |
 | `mermaid` | Diagram rendering. |
 | `mammoth` | DOCX content handling. |

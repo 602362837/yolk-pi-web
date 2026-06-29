@@ -41,6 +41,22 @@ pm2 start ecosystem.config.cjs
 
 Default proxy is `http://127.0.0.1:7897`; override with `PROXY_URL` or `SOCKS_PROXY_URL` where supported.
 
+## Repository Remotes
+
+The shared upstream repository is `git@github.com:twofive1203/pi-agnet-web.git`. Configure it once with:
+
+```bash
+git remote add upstream git@github.com:twofive1203/pi-agnet-web.git
+# or, if upstream already exists:
+git remote set-url upstream git@github.com:twofive1203/pi-agnet-web.git
+```
+
+Fetch upstream `main` with:
+
+```bash
+git fetch upstream main
+```
+
 ## Source Build
 
 - Clone the repository and install dependencies with `npm install`.
