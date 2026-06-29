@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { DeepSeekBalanceResult } from "@/lib/deepseek-balance";
 import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, validateRawOAuthCredentialImport, type OAuthAccountImportMode } from "@/lib/oauth-account-converters";
+import { formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS } from "@/lib/quota-display";
 // Color icons (have their own fill colors — no background needed)
 import AnthropicIcon from "@lobehub/icons/es/Anthropic/components/Mono";
 import OpenAIIcon from "@lobehub/icons/es/OpenAI/components/Mono";
@@ -751,57 +752,6 @@ function ModelDetail({
 
 // ── OAuth detail ──────────────────────────────────────────────────────────────
 
-const QUOTA_TIER_LABELS: Record<string, string> = {
-  five_hour: "5h",
-  seven_day: "7d",
-};
-
-/**
- * 根据额度使用百分比返回展示颜色。
- *
- * @param utilization 使用百分比，范围通常为 0-100。
- * @returns CSS 颜色值。
- */
-function quotaColor(utilization: number): string {
-  if (utilization >= 90) return "#f87171";
-  if (utilization >= 70) return "#fb923c";
-  return "#4ade80";
-}
-
-/**
- * 格式化额度窗口重置倒计时。
- *
- * @param resetsAt ISO 格式的重置时间。
- * @returns 简短倒计时文本，无法计算时返回 null。
- */
-function formatResetCountdown(resetsAt: string | null): string | null {
-  if (!resetsAt) return null;
-  const diffMs = new Date(resetsAt).getTime() - Date.now();
-  if (!Number.isFinite(diffMs) || diffMs <= 0) return null;
-
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
-/**
- * 格式化额度查询的相对更新时间。
- *
- * @param timestamp 查询完成的毫秒时间戳。
- * @returns 简短相对时间文本。
- */
-function formatQuotaQueriedAt(timestamp: number | null): string {
-  if (!timestamp) return "never";
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (diffSeconds < 60) return "just now";
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
-  return `${Math.floor(diffSeconds / 86400)}d ago`;
-}
-
 /**
  * 渲染 OAuth 订阅额度查询结果。
  *
@@ -821,7 +771,7 @@ function OAuthQuotaView({
 }) {
   if (!quota && !loading) return null;
 
-  const knownTiers = (quota?.tiers ?? []).filter((tier) => tier.name in QUOTA_TIER_LABELS);
+  const knownTiers = knownQuotaTiers(quota?.tiers ?? []);
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -893,7 +843,7 @@ function OAuthQuotaView({
 }
 
 function accountQuotaResetText(account: OAuthAccountSummary): string {
-  const tiers = (account.quotaCache?.tiers ?? []).filter((tier) => tier.name in QUOTA_TIER_LABELS && tier.resetsAt);
+  const tiers = knownQuotaTiers(account.quotaCache?.tiers ?? []).filter((tier) => tier.resetsAt);
   if (tiers.length === 0) return account.quotaCache?.queriedAt ? "No reset time" : "No quota cache";
   return tiers.map((tier) => {
     const countdown = formatResetCountdown(tier.resetsAt);
@@ -902,7 +852,7 @@ function accountQuotaResetText(account: OAuthAccountSummary): string {
 }
 
 function AccountQuotaMiniCharts({ account }: { account: OAuthAccountSummary }) {
-  const tiers = (account.quotaCache?.tiers ?? []).filter((tier) => tier.name in QUOTA_TIER_LABELS);
+  const tiers = knownQuotaTiers(account.quotaCache?.tiers ?? []);
   if (tiers.length === 0) return null;
 
   return (

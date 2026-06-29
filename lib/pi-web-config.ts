@@ -63,16 +63,22 @@ export interface PiWebUsageConfig {
   includeArchived: boolean;
 }
 
+export interface PiWebChatGptConfig {
+  usagePanelEnabled: boolean;
+}
+
 export interface PiWebConfig {
   worktree: PiWebWorktreeConfig;
   trellis: PiWebTrellisConfig;
   usage: PiWebUsageConfig;
+  chatgpt: PiWebChatGptConfig;
 }
 
 export interface PiWebConfigPatch {
   worktree?: unknown;
   trellis?: unknown;
   usage?: unknown;
+  chatgpt?: unknown;
 }
 
 export interface PiWebConfigReadResult {
@@ -100,6 +106,9 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   },
   usage: {
     includeArchived: true,
+  },
+  chatgpt: {
+    usagePanelEnabled: false,
   },
   trellis: {
     enabled: false,
@@ -262,6 +271,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const worktree = isRecord(root.worktree) ? root.worktree : {};
   const trellis = isRecord(root.trellis) ? root.trellis : {};
   const usage = isRecord(root.usage) ? root.usage : {};
+  const chatgpt = isRecord(root.chatgpt) ? root.chatgpt : {};
   return {
     worktree: {
       baseRef: readString(worktree.baseRef, defaults.worktree.baseRef),
@@ -272,6 +282,9 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     },
     usage: {
       includeArchived: readBoolean(usage.includeArchived, defaults.usage.includeArchived),
+    },
+    chatgpt: {
+      usagePanelEnabled: readBoolean(chatgpt.usagePanelEnabled, defaults.chatgpt.usagePanelEnabled),
     },
     trellis: {
       enabled: readBoolean(trellis.enabled, defaults.trellis.enabled),
@@ -465,6 +478,15 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
   };
 }
 
+export function validatePiWebChatGptConfig(value: unknown): PiWebChatGptConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("chatgpt config must be an object");
+  }
+  return {
+    usagePanelEnabled: requireBoolean(value.usagePanelEnabled, "chatgpt.usagePanelEnabled"),
+  };
+}
+
 export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("trellis config must be an object");
@@ -490,13 +512,15 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasWorktree = Object.prototype.hasOwnProperty.call(patch, "worktree");
   const hasTrellis = Object.prototype.hasOwnProperty.call(patch, "trellis");
   const hasUsage = Object.prototype.hasOwnProperty.call(patch, "usage");
-  if (!hasWorktree && !hasTrellis && !hasUsage) {
+  const hasChatGpt = Object.prototype.hasOwnProperty.call(patch, "chatgpt");
+  if (!hasWorktree && !hasTrellis && !hasUsage && !hasChatGpt) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
   const normalizedWorktree = hasWorktree ? validatePiWebWorktreeConfig(patch.worktree) : undefined;
   const normalizedTrellis = hasTrellis ? validatePiWebTrellisConfig(patch.trellis) : undefined;
   const normalizedUsage = hasUsage ? validatePiWebUsageConfig(patch.usage) : undefined;
+  const normalizedChatGpt = hasChatGpt ? validatePiWebChatGptConfig(patch.chatgpt) : undefined;
   const path = getPiWebConfigPath();
   const current = readRawConfigFile(path);
   const raw = current.parseError ? {} : current.raw;
@@ -523,6 +547,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.usage = {
       ...previousUsage,
       ...normalizedUsage,
+    };
+  }
+
+  if (normalizedChatGpt) {
+    const previousChatGpt = isRecord(raw.chatgpt) ? raw.chatgpt : {};
+    nextRaw.chatgpt = {
+      ...previousChatGpt,
+      ...normalizedChatGpt,
     };
   }
 

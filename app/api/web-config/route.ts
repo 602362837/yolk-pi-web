@@ -13,7 +13,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json().catch(() => ({})) as { worktree?: unknown; trellis?: unknown; usage?: unknown };
+    const body = await req.json().catch(() => ({})) as { worktree?: unknown; trellis?: unknown; usage?: unknown; chatgpt?: unknown };
     const result = writePiWebConfigPatch(body);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {

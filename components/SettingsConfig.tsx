@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  PiWebChatGptConfig,
   PiWebConfig,
   PiWebSubagentAgentConfig,
   PiWebSubagentDifficultyTier,
@@ -66,7 +67,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "worktree" | "usage" | "trellis";
+type SettingsSection = "worktree" | "usage" | "chatgpt" | "trellis";
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
 const SUBAGENT_AGENT_NAMES = ["trellis-implement", "trellis-check", "trellis-research"];
@@ -308,6 +309,11 @@ function usageConfigsEqual(a: PiWebUsageConfig | null, b: PiWebUsageConfig | nul
   return a.includeArchived === b.includeArchived;
 }
 
+function chatGptConfigsEqual(a: PiWebChatGptConfig | null, b: PiWebChatGptConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return a.usagePanelEnabled === b.usagePanelEnabled;
+}
+
 export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string | null; onClose: () => void; onConfigChange?: () => void }) {
   const [section, setSection] = useState<SettingsSection>("worktree");
   const [loading, setLoading] = useState(true);
@@ -321,6 +327,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [savedTrellis, setSavedTrellis] = useState<PiWebTrellisConfig | null>(null);
   const [usage, setUsage] = useState<PiWebUsageConfig | null>(null);
   const [savedUsage, setSavedUsage] = useState<PiWebUsageConfig | null>(null);
+  const [chatgpt, setChatgpt] = useState<PiWebChatGptConfig | null>(null);
+  const [savedChatgpt, setSavedChatgpt] = useState<PiWebChatGptConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [trellisStatus, setTrellisStatus] = useState<TrellisSetupStatus | null>(null);
@@ -334,8 +342,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [developerNameTouched, setDeveloperNameTouched] = useState(false);
 
   const dirty = useMemo(
-    () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage),
-    [worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage],
+    () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage) || !chatGptConfigsEqual(chatgpt, savedChatgpt),
+    [worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage, chatgpt, savedChatgpt],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -353,6 +361,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       setSavedTrellis(data.config.trellis);
       setUsage(data.config.usage);
       setSavedUsage(data.config.usage);
+      setChatgpt(data.config.chatgpt);
+      setSavedChatgpt(data.config.chatgpt);
       setConfigPath(data.path);
       setExists(data.exists);
       if (data.parseError) {
@@ -440,6 +450,11 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setNotice(null);
   }, []);
 
+  const updateChatgpt = useCallback((patch: Partial<PiWebChatGptConfig>) => {
+    setChatgpt((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
   const updateDefaultSubagentPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
     setTrellis((prev) => prev ? {
       ...prev,
@@ -513,13 +528,15 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setSavedTrellis(config.trellis);
     setUsage(config.usage);
     setSavedUsage(config.usage);
+    setChatgpt(config.chatgpt);
+    setSavedChatgpt(config.chatgpt);
     setConfigPath(path);
     setExists(configExists);
     onConfigChange?.();
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!worktree || !trellis || !usage) return false;
+    if (!worktree || !trellis || !usage || !chatgpt) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -527,7 +544,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ worktree, trellis, usage }),
+        body: JSON.stringify({ worktree, trellis, usage, chatgpt }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -540,10 +557,10 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, worktree, trellis, usage]);
+  }, [applyLoadedConfig, worktree, trellis, usage, chatgpt]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。Usage/Trellis 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。Usage/ChatGPT/Trellis 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -551,6 +568,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setWorktree(defaults.worktree);
     setTrellis(defaults.trellis);
     setUsage(defaults.usage);
+    setChatgpt(defaults.chatgpt);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
 
@@ -581,6 +599,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
         setSavedTrellis(data.config.trellis);
         setUsage(data.config.usage);
         setSavedUsage(data.config.usage);
+        setChatgpt(data.config.chatgpt);
+        setSavedChatgpt(data.config.chatgpt);
         onConfigChange?.();
       }
       setNotice(action === "init" ? "Trellis 已初始化，右侧抽屉已自动启用。" : "Trellis 已更新。");
@@ -674,13 +694,14 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
           <div style={{ width: 150, borderRight: "1px solid var(--border)", padding: 10, background: "var(--bg-subtle)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             {renderSectionButton("worktree", "WorkTree", "New WorkTree 默认配置")}
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
+            {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量悬浮面板")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
           </div>
 
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : worktree && trellis && usage ? (
+            ) : worktree && trellis && usage && chatgpt ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -749,6 +770,22 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                       description="开启后 Usage 会同时扫描 sessions 和 sessions-archive；关闭后只统计当前存活的 sessions。已删除的 session 文件不会参与统计。"
                       checked={usage.includeArchived}
                       onChange={(includeArchived) => updateUsage({ includeArchived })}
+                    />
+                  </div>
+                ) : section === "chatgpt" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>ChatGPT</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制 ChatGPT/Codex 账号相关显示。保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="ChatGPT 用量悬浮面板"
+                      description="开启后顶部右侧会显示当前激活 ChatGPT/Codex 账号的半透明用量入口。不会自动刷新；展开后可手动刷新，并与 Models 中的额度缓存保持一致。"
+                      checked={chatgpt.usagePanelEnabled}
+                      onChange={(usagePanelEnabled) => updateChatgpt({ usagePanelEnabled })}
                     />
                   </div>
                 ) : (
@@ -1034,8 +1071,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !usage || !chatgpt || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !usage || !chatgpt || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !usage || !chatgpt || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>

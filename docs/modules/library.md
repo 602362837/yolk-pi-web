@@ -14,12 +14,13 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/cwd.ts` | Cwd validation and normalization helpers. |
 | `lib/git-worktree.ts` | Git worktree creation, status, archive, and removal helpers. |
 | `lib/deepseek-balance.ts` | Query DeepSeek account balance. |
+| `lib/quota-display.ts` | Shared ChatGPT/Codex quota display helpers: tier labels, utilization colors, reset countdowns, relative refresh time, and known-tier filtering. |
 | `lib/oauth-accounts.ts` | Persist, import raw/converted credential JSON, sanitize, sync, label, activate, and soft-delete saved `openai-codex` OAuth accounts without exposing tokens. |
 | `lib/oauth-account-converters.ts` | Shared OAuth account import mode registry, raw credential validation, and CPA/SUB2API-to-raw conversion used by the UI and account import API; SUB2API exports may convert to multiple raw credentials. |
 | `lib/subscription-quota.ts` | Query OpenAI Codex subscription quota. |
 | `lib/npx.ts` | Cross-platform `npx` wrapper that avoids shell quoting issues. |
 | `lib/usage-stats.ts` | Aggregate token/cost across configured active-only or active-plus-archived sessions by day, model, provider, and session. |
-| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree, Usage scan scope, and Trellis panel settings, including Trellis install/update proxy options and Trellis subagent model policy. |
+| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree, Usage scan scope, ChatGPT usage panel settings, and Trellis panel settings, including Trellis install/update proxy options and Trellis subagent model policy. |
 | `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs. |
 | `lib/trellis-manager.ts` | Trellis setup/status/update helper: prerequisite checks, CLI/version inspection, proxy-scoped child-process environment, and fixed Trellis/npm command execution. |
 | `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, optional `meta.lastCheck` quality-check state, and phase/progress derivation. |

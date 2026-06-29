@@ -9,6 +9,7 @@ import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { UsageStatsModal } from "./UsageStatsModal";
+import { ChatGptUsagePanel } from "./ChatGptUsagePanel";
 import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
 import { TrellisPanel } from "./TrellisPanel";
@@ -764,7 +765,7 @@ export function AppShell() {
                   marginLeft: "auto",
                   display: "flex", alignItems: "center", gap: 10,
                   paddingLeft: 12,
-                  paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48),
+                  paddingRight: webConfig?.chatgpt.usagePanelEnabled ? 12 : (rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48)),
                   height: "100%",
                   fontSize: 11, color: "var(--text-muted)",
                   whiteSpace: "nowrap", cursor: "default",
@@ -811,6 +812,11 @@ export function AppShell() {
               </div>
             );
           })()}
+          {webConfig?.chatgpt.usagePanelEnabled && (
+            <div style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48), height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
+              <ChatGptUsagePanel />
+            </div>
+          )}
           {/* Top panel dropdown — shared, only one active at a time */}
           {activeTopPanel && topPanelPos && (
             <div style={{
