@@ -763,27 +763,29 @@ function ModelDetail({
 function OAuthQuotaView({
   quota,
   loading,
+  account,
   onRefresh,
 }: {
   quota: SubscriptionQuota | null;
   loading: boolean;
+  account: OAuthAccountSummary | null;
   onRefresh: () => void;
 }) {
-  if (!quota && !loading) return null;
+  if (!quota && !loading && !account) return null;
 
   const knownTiers = knownQuotaTiers(quota?.tiers ?? []);
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Usage</span>
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
             {loading ? "Refreshing…" : `Updated ${formatQuotaQueriedAt(quota?.queriedAt ?? null)}`}
           </span>
         </div>
         <button
-          onClick={onRefresh}
+          onClick={() => onRefresh()}
           disabled={loading}
           title="Refresh usage"
           aria-label="Refresh usage"
@@ -797,6 +799,20 @@ function OAuthQuotaView({
           </svg>
         </button>
       </div>
+
+      {account && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, minWidth: 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: account.active ? "#4ade80" : "var(--border)", flexShrink: 0 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
+            <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
+            {account.extraInfo && <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
+          </div>
+          <span style={{ fontSize: 11, color: account.active ? "#4ade80" : "var(--text-dim)", fontWeight: 600, flexShrink: 0 }}>
+            {account.active ? "active account" : "temporary view"}
+          </span>
+        </div>
+      )}
 
       {quota && quota.credentialStatus === "expired" && !quota.success && (
         <div style={{ fontSize: 12, color: "#fb923c", lineHeight: 1.5 }}>{quota.error ?? "Token expired. Please re-login."}</div>
@@ -883,7 +899,9 @@ function OAuthAccountsView({
   savingExtraInfoAccountId,
   refreshingQuotaAccountId,
   deletingAccountId,
+  selectedAccountId,
   onRefresh,
+  onSelect,
   onActivate,
   onEditLabel,
   onEditExtraInfo,
@@ -898,7 +916,9 @@ function OAuthAccountsView({
   savingExtraInfoAccountId: string | null;
   refreshingQuotaAccountId: string | null;
   deletingAccountId: string | null;
+  selectedAccountId: string | null;
   onRefresh: () => void;
+  onSelect: (account: OAuthAccountSummary) => void;
   onActivate: (accountId: string) => void;
   onEditLabel: (account: OAuthAccountSummary) => void;
   onEditExtraInfo: (account: OAuthAccountSummary) => void;
@@ -937,8 +957,9 @@ function OAuthAccountsView({
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {accounts.map((account) => {
             const quotaRefreshing = refreshingQuotaAccountId === account.accountId;
+            const selected = selectedAccountId === account.accountId;
             return (
-              <div key={account.accountId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5 }}>
+              <div key={account.accountId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 9px", background: selected ? "var(--bg-selected)" : "var(--bg)", border: selected ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 5 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: account.active ? "#4ade80" : "var(--border)", flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
@@ -951,6 +972,13 @@ function OAuthAccountsView({
                     <AccountQuotaMiniCharts account={account} />
                   </div>
                 </div>
+                <button
+                  onClick={() => onSelect(account)}
+                  disabled={selected || Boolean(refreshingQuotaAccountId)}
+                  style={{ padding: "4px 9px", background: selected ? "var(--accent)" : "none", border: selected ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 4, color: selected ? "#fff" : "var(--accent)", cursor: selected || refreshingQuotaAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                >
+                  {selected ? "Viewing" : "View"}
+                </button>
                 <button
                   onClick={() => onEditLabel(account)}
                   disabled={savingLabelAccountId === account.accountId}
@@ -1293,6 +1321,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [selectedQuotaAccountId, setSelectedQuotaAccountId] = useState<string | null>(null);
   const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
   const [savingLabelAccountId, setSavingLabelAccountId] = useState<string | null>(null);
   const [savingExtraInfoAccountId, setSavingExtraInfoAccountId] = useState<string | null>(null);
@@ -1318,6 +1347,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setAccounts([]);
     setAccountsLoading(false);
     setAccountsError(null);
+    setSelectedQuotaAccountId(null);
     setActivatingAccountId(null);
     setSavingLabelAccountId(null);
     setSavingExtraInfoAccountId(null);
@@ -1355,11 +1385,22 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, loadAccounts]);
 
-  const loadQuota = useCallback(async (force = false) => {
+  useEffect(() => {
+    if (provider.id !== "openai-codex") return;
+    setSelectedQuotaAccountId((current) => {
+      if (accounts.length === 0) return null;
+      if (current && accounts.some((account) => account.accountId === current)) return current;
+      return accounts.find((account) => account.active)?.accountId ?? null;
+    });
+  }, [accounts, provider.id]);
+
+  const loadQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
     if (provider.id !== "openai-codex" || (!provider.loggedIn && !force)) return;
+    const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
     setQuotaLoading(true);
     try {
-      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}`);
+      const accountQuery = quotaAccountId ? `?accountId=${encodeURIComponent(quotaAccountId)}` : "";
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`);
       const data = await res.json() as SubscriptionQuota;
       setQuota(data);
       void loadAccounts();
@@ -1376,7 +1417,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setQuotaLoading(false);
     }
-  }, [provider.id, provider.loggedIn, loadAccounts]);
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts]);
 
   useEffect(() => {
     if (provider.id === "openai-codex" && provider.loggedIn) {
@@ -1443,6 +1484,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     setQuota(null);
+    setSelectedQuotaAccountId(null);
     onRefresh();
     void loadAccounts();
   }, [provider.id, onRefresh, loadAccounts]);
@@ -1485,6 +1527,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id]);
 
+  const handleSelectQuotaAccount = useCallback((account: OAuthAccountSummary) => {
+    setSelectedQuotaAccountId(account.accountId);
+    void loadQuota(true, account.accountId);
+  }, [loadQuota]);
+
   const handleActivateAccount = useCallback(async (accountId: string) => {
     setActivatingAccountId(accountId);
     setAccountsError(null);
@@ -1497,9 +1544,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
+      setSelectedQuotaAccountId(accountId);
       setLoginState({ phase: "success", message: "Account activated." });
       onRefresh();
-      await loadQuota(true);
+      await loadQuota(true, accountId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to activate account";
       setAccountsError(message);
@@ -1568,7 +1616,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}?accountId=${encodeURIComponent(account.accountId)}`);
       const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      if (account.active) setQuota(data);
+      if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setQuota(data);
       await loadAccounts();
       setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error ?? "Quota query failed.") });
     } catch (error) {
@@ -1578,7 +1626,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setRefreshingQuotaAccountId(null);
     }
-  }, [loadAccounts, provider.id]);
+  }, [loadAccounts, provider.id, selectedQuotaAccountId]);
 
   const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
     if (!window.confirm(`Delete saved credentials for ${account.displayName}?\n\nThe account must be added again to restore it.`)) return;
@@ -1603,6 +1651,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       setDeletingAccountId(null);
     }
   }, [provider.id]);
+
+  const selectedQuotaAccount = accounts.find((account) => account.accountId === selectedQuotaAccountId)
+    ?? accounts.find((account) => account.active)
+    ?? null;
 
   const isWorking = loginState.phase === "connecting" || loginState.phase === "progress" ||
     loginState.phase === "auth" || loginState.phase === "device_code" ||
@@ -1748,7 +1800,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       </div>
 
       {provider.id === "openai-codex" && provider.loggedIn && (
-        <OAuthQuotaView quota={quota} loading={quotaLoading} onRefresh={loadQuota} />
+        <OAuthQuotaView quota={quota} loading={quotaLoading} account={selectedQuotaAccount} onRefresh={loadQuota} />
       )}
 
       {provider.id === "openai-codex" && (
@@ -1761,7 +1813,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           savingExtraInfoAccountId={savingExtraInfoAccountId}
           refreshingQuotaAccountId={refreshingQuotaAccountId}
           deletingAccountId={deletingAccountId}
+          selectedAccountId={selectedQuotaAccount?.accountId ?? null}
           onRefresh={loadAccounts}
+          onSelect={handleSelectQuotaAccount}
           onActivate={handleActivateAccount}
           onEditLabel={handleEditAccountLabel}
           onEditExtraInfo={handleEditAccountExtraInfo}
