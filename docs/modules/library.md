@@ -21,7 +21,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/usage-stats.ts` | Aggregate token/cost by day, model, provider, and session. |
 | `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree and Trellis panel settings. |
 | `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs. |
-| `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, and phase/progress derivation. |
+| `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, optional `meta.lastCheck` quality-check state, and phase/progress derivation. |
 | `lib/trellis-types.ts` | Wire types for Trellis task list/detail API responses and UI consumers. |
 | `lib/workspace-title.ts` | Shared workspace title formatting from cwd and Git metadata. |
 

@@ -50,11 +50,29 @@ function statusColor(status: string): string {
   }
 }
 
-function formatDate(value?: string | null): string {
+function formatDateTime(value?: string | null): string {
   if (!value) return "—";
+
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const [, year, month, day] = dateOnly;
+    return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function shortPath(path: string): string {
@@ -388,6 +406,11 @@ function TaskHeader({ task }: { task: TrellisTaskSummary | TrellisTaskDetail }) 
   );
 }
 
+function formatManifestCounts(manifests: TrellisTaskDetail["manifests"]): string {
+  if (manifests.implementCount === 0 && manifests.checkCount === 0) return "未配置";
+  return `${manifests.implementCount} implement · ${manifests.checkCount} check`;
+}
+
 function TaskDetail({ task, artifactTab, onArtifactTabChange, cwd, onOpenFile }: { task: TrellisTaskDetail; artifactTab: ArtifactTab; onArtifactTabChange: (tab: ArtifactTab) => void; cwd: string; onOpenFile?: (filePath: string, fileName: string) => void }) {
   const docs = task.documents;
   const activeDocument = artifactTab === "prd" ? docs.prd : artifactTab === "design" ? docs.design : artifactTab === "implement" ? docs.implement : undefined;
@@ -397,9 +420,9 @@ function TaskDetail({ task, artifactTab, onArtifactTabChange, cwd, onOpenFile }:
       <ProgressTimeline task={task} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
         <MetaCard label="负责人" value={task.assignee ?? "—"} />
-        <MetaCard label="创建时间" value={formatDate(task.createdAt)} />
-        <MetaCard label="子任务" value={`${task.childProgress.completed}/${task.childProgress.total}`} />
-        <MetaCard label="上下文" value={`${task.manifests.implementCount} implement · ${task.manifests.checkCount} check`} />
+        <MetaCard label="创建时间" value={formatDateTime(task.createdAt)} title="包含时分秒的时间戳会显示到秒；历史 date-only 任务只显示日期。" />
+        <MetaCard label="Trellis 子任务" value={`${task.childProgress.completed}/${task.childProgress.total}`} title="统计 task.json.children 任务树子任务，不代表 subagent 委派次数。" />
+        <MetaCard label="上下文" value={formatManifestCounts(task.manifests)} title="统计 implement.jsonl / check.jsonl 的真实 context 条目；_example seed 行会被忽略。" />
       </div>
       <div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
@@ -452,14 +475,16 @@ function ProgressStage({ stage }: { stage: TrellisTaskProgressStage }) {
         <span>{icon}</span>
         <span>{stage.label}</span>
       </div>
-      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.35 }}>{stage.details[0]}</div>
+      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.35, display: "flex", flexDirection: "column", gap: 2 }}>
+        {stage.details.map((detail, index) => <span key={`${index}-${detail}`}>{detail}</span>)}
+      </div>
     </div>
   );
 }
 
-function MetaCard({ label, value }: { label: string; value: string }) {
+function MetaCard({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-subtle)", padding: 9, minWidth: 0 }}>
+    <div title={title} style={{ border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-subtle)", padding: 9, minWidth: 0 }}>
       <div style={{ color: "var(--text-dim)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
       <div style={{ color: "var(--text)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
     </div>
@@ -489,16 +514,32 @@ function ArtifactButton({ label, active, disabled, onClick }: { label: string; a
 
 function Overview({ task, cwd, onOpenFile }: { task: TrellisTaskDetail; cwd: string; onOpenFile?: (filePath: string, fileName: string) => void }) {
   const relatedFiles = task.relatedFiles.filter(Boolean);
+  const optionalMetadata = [
+    { label: "基准分支", value: task.baseBranch },
+    { label: "分支", value: task.branch },
+    { label: "Worktree", value: task.worktreePath ? shortPath(task.worktreePath) : null },
+    { label: "Commit", value: task.commit },
+    { label: "PR", value: task.prUrl },
+  ];
+  const missingMetadata = optionalMetadata.filter((item) => !item.value).map((item) => item.label);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)", padding: 12 }}>
         <div style={{ color: "var(--text)", fontWeight: 700, marginBottom: 8 }}>任务元数据</div>
+        <div style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45, marginBottom: 8 }}>
+          Git / Worktree 信息来自 task.json；未记录的历史字段不会自动推断。
+        </div>
         <MetadataLine label="目录" value={task.dirName} mono />
-        <MetadataLine label="基准分支" value={task.baseBranch ?? "—"} />
-        <MetadataLine label="分支" value={task.branch ?? "—"} />
-        <MetadataLine label="Worktree" value={task.worktreePath ? shortPath(task.worktreePath) : "—"} />
-        <MetadataLine label="Commit" value={task.commit ?? "—"} />
-        <MetadataLine label="PR" value={task.prUrl ?? "—"} />
+        {task.baseBranch && <MetadataLine label="记录基准" value={task.baseBranch} />}
+        {task.branch && <MetadataLine label="分支" value={task.branch} />}
+        {task.worktreePath && <MetadataLine label="Worktree" value={shortPath(task.worktreePath)} />}
+        {task.commit && <MetadataLine label="Commit" value={task.commit} />}
+        {task.prUrl && <MetadataLine label="PR" value={task.prUrl} />}
+        {missingMetadata.length > 0 && (
+          <div style={{ marginTop: 6, color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
+            未记录：{missingMetadata.join("、")}。
+          </div>
+        )}
       </div>
 
       {task.subtasks.length > 0 && (

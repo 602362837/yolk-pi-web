@@ -60,6 +60,12 @@ interface ManifestCounts {
   checkCount: number;
 }
 
+interface TaskLastCheck {
+  status: "passed" | "failed" | "unknown";
+  at?: string;
+  summary?: string;
+}
+
 interface ReaderContext {
   cwd: string;
   workspaceRoot: string;
@@ -302,6 +308,30 @@ function getArtifacts(record: TaskRecord, workspaceRoot: string, manifests: Mani
   };
 }
 
+function getLastCheck(meta: unknown): TaskLastCheck | undefined {
+  const raw = recordValue(meta).lastCheck;
+  if (!isRecord(raw)) return undefined;
+
+  const rawStatus = optionalString(raw.status)?.toLowerCase();
+  const status = rawStatus === "passed" || rawStatus === "success" || rawStatus === "done"
+    ? "passed"
+    : rawStatus === "failed" || rawStatus === "error"
+      ? "failed"
+      : "unknown";
+  return {
+    status,
+    at: optionalString(raw.at),
+    summary: optionalString(raw.summary),
+  };
+}
+
+function formatLastCheckStatus(lastCheck: TaskLastCheck): string {
+  const suffix = lastCheck.at ? `：${lastCheck.at}` : "";
+  if (lastCheck.status === "passed") return `检查通过${suffix}`;
+  if (lastCheck.status === "failed") return `检查未通过${suffix}`;
+  return `检查已记录${suffix}`;
+}
+
 function isCompletedStatus(status: string): boolean {
   const normalized = status.toLowerCase();
   return normalized === "completed" || normalized === "done" || normalized === "complete";
@@ -323,12 +353,19 @@ function createProgress(
   prUrl: string | null | undefined,
   artifacts: TrellisTaskArtifacts,
   manifests: ManifestCounts,
+  lastCheck: TaskLastCheck | undefined,
 ): TrellisTaskProgress {
   const finished = isArchived || isCompletedStatus(status) || !!completedAt || !!commit || !!prUrl;
   const planning = status.toLowerCase() === "planning";
   const inProgress = isInProgressStatus(status);
   const review = isReviewStatus(status);
   const planReady = artifacts.prd || artifacts.design || artifacts.implement || artifacts.implementContext;
+  const checkPassed = lastCheck?.status === "passed";
+  const checkFailed = lastCheck?.status === "failed";
+  const checkContextDetail = manifests.checkCount > 0 ? `已配置 ${manifests.checkCount} 条检查上下文` : "未配置检查上下文";
+  const checkDetails = lastCheck
+    ? [formatLastCheckStatus(lastCheck), ...(lastCheck.summary ? [lastCheck.summary] : []), checkContextDetail]
+    : [finished ? `任务已完成；${checkContextDetail}` : checkContextDetail];
 
   const stages: TrellisTaskProgressStage[] = [
     {
@@ -344,16 +381,14 @@ function createProgress(
     {
       id: "execute",
       label: "执行",
-      status: finished || review ? "done" : inProgress ? "active" : "pending",
-      details: [inProgress ? "任务正在执行" : finished || review ? "执行阶段已通过" : "等待任务开始"],
+      status: finished || review || checkPassed || checkFailed ? "done" : inProgress ? "active" : "pending",
+      details: [inProgress && !checkPassed && !checkFailed ? "任务正在执行" : finished || review || checkPassed || checkFailed ? "执行阶段已通过" : "等待任务开始"],
     },
     {
       id: "check",
       label: "检查",
-      status: finished ? "done" : review ? "active" : "pending",
-      details: [
-        manifests.checkCount > 0 ? `${manifests.checkCount} 条 check context` : "没有 check context",
-      ],
+      status: finished || checkPassed ? "done" : review || checkFailed ? "active" : "pending",
+      details: checkDetails,
     },
     {
       id: "finish",
@@ -417,6 +452,7 @@ function recordToSummary(record: TaskRecord, workspaceRoot: string): TrellisTask
   const completedAt = nullableString(raw.completedAt);
   const commit = nullableString(raw.commit);
   const prUrl = nullableString(raw.pr_url);
+  const lastCheck = getLastCheck(raw.meta);
 
   return {
     key: record.key,
@@ -442,7 +478,7 @@ function recordToSummary(record: TaskRecord, workspaceRoot: string): TrellisTask
     children,
     subtasks: stringArray(raw.subtasks),
     childProgress: { total: children.length, completed: 0 },
-    progress: createProgress(status, record.isArchived, completedAt, commit, prUrl, artifacts, manifests),
+    progress: createProgress(status, record.isArchived, completedAt, commit, prUrl, artifacts, manifests, lastCheck),
     hasArtifacts: artifacts,
     readError: record.readError,
   };

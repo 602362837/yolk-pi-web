@@ -132,3 +132,41 @@ fetch(`/api/feature/read?path=${encodeURIComponent(userSuppliedPath)}`);
 // Browser uses a cwd plus a stable key that came from the list response.
 fetch(`/api/feature/${encodeURIComponent(item.key)}?cwd=${encodeURIComponent(cwd)}`);
 ```
+
+### Trellis task-detail display contracts
+
+When rendering the Trellis task drawer, keep these projections explicit:
+
+- `task.json` is the only source for task metadata such as `base_branch`,
+  `branch`, `worktree_path`, `commit`, and `pr_url`. The web UI must not infer
+  missing historical worktree or merge details from Git logs unless that is a
+  separately designed feature.
+- `implement.jsonl` / `check.jsonl` counts are real manifest entries only;
+  seed rows shaped like `{ "_example": "..." }` count as zero. These manifests
+  are context inputs, not execution records.
+- If the UI needs to mark a quality check as executed, use an explicit
+  `task.json.meta.lastCheck` record such as
+  `{ "status": "passed", "at": "<ISO timestamp>", "summary": "..." }`.
+  Do not infer execution from `check.jsonl` entries.
+- Task child progress comes from `task.json.children`. It is a Trellis task-tree
+  count, not a subagent-dispatch count.
+- Date-only `YYYY-MM-DD` values should stay date-only in the UI. Only strings
+  that contain time information should be rendered with hour/minute/second.
+
+#### Wrong
+
+```typescript
+// Makes missing historical metadata look like an error and suggests the UI
+// knows the final merge target when it only has a task.json field.
+<MetadataLine label="基准分支" value={task.baseBranch ?? "—"} />
+<MetadataLine label="Worktree" value={task.worktreePath ?? "—"} />
+```
+
+#### Correct
+
+```typescript
+// Display recorded values, then explain which optional task.json fields were
+// not recorded instead of guessing them.
+{task.baseBranch && <MetadataLine label="记录的基准分支" value={task.baseBranch} />}
+{missingMetadata.length > 0 && <div>未记录：{missingMetadata.join("、")}</div>}
+```
