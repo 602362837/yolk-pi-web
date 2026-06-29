@@ -705,3 +705,36 @@ Implemented a session-scoped Trellis progress widget for pi-web: added high-conf
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: ChatGPT account metadata and quota display
+
+**Date**: 2026-06-29
+**Task**: ChatGPT account metadata and quota display
+**Branch**: `pi/20260629-113404`
+
+### Summary
+
+Added ChatGPT Plus/Pro account extra-info metadata, cached per-account quota reset display with inline usage pies, manual per-account quota refresh with saved-token refresh support, and updated API/frontend docs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2d3615f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
