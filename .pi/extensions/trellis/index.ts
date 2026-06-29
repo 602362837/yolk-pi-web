@@ -926,6 +926,17 @@ function classifyRoute(root: string, input: SubagentInput, agentName: string, cf
     return { source: "route", modality: fb.modality, tier: clampTier(fb.tier, override), routerModel: routerModel.model, fallbackReason: e instanceof Error ? e.message : String(e) };
   }
 }
+function applyInputThinkingOverride(cfg: PiRunConfig, thinking: string | undefined): PiRunConfig {
+  if (!thinking) return cfg;
+  const parsed = splitModelThinking(cfg.model, cfg.thinking);
+  return {
+    ...cfg,
+    model: parsed.model,
+    thinking,
+    routing: cfg.routing ? { ...cfg.routing, thinking } : cfg.routing,
+  };
+}
+
 function resolveRunCfg(
   root: string,
   input: SubagentInput,
@@ -936,29 +947,31 @@ function resolveRunCfg(
   agentName?: string,
 ): PiRunConfig {
   const inputModel = str(input.model);
-  if (inputModel || input.thinking) {
-    const inputSuffixThinking = normalizeThinking(inputModel?.match(suffixRe)?.[1]);
-    const baseModel = inputModel?.replace(suffixRe, "");
-    const thinking = normalizeThinking(input.thinking) ?? inputSuffixThinking ?? normalizeThinking(inheritedThinking);
-    const model = baseModel || inputModel;
-    return { model: model && thinking && thinking !== "off" ? `${model}:${thinking}` : model, thinking, routing: { source: "toolInput", model, thinking } };
+  const inputThinking = normalizeThinking(input.thinking);
+  if (inputModel) {
+    const inputSuffixThinking = normalizeThinking(inputModel.match(suffixRe)?.[1]);
+    const model = inputModel.replace(suffixRe, "");
+    const thinking = inputThinking ?? inputSuffixThinking ?? normalizeThinking(inheritedThinking);
+    return { model, thinking, routing: { source: "toolInput", model, thinking } };
   }
+
+  const finalize = (cfg: PiRunConfig) => applyInputThinkingOverride(cfg, inputThinking);
 
   if (routingConfig?.enabled) {
     const override = agentName ? routingConfig.agents[agentName] : undefined;
     if (override?.strategy !== "disabled") {
       if (override?.strategy === "fixed" && override.fixed) {
         const fixed = resolvePolicyCfg(override.fixed, inheritedThinking, parentModel ?? null, "agentFixed");
-        if (fixed) return fixed;
+        if (fixed) return finalize(fixed);
       }
       if (routingConfig.router.enabled || override?.strategy === "route") {
         const route = classifyRoute(root, input, agentName ?? "trellis-implement", routingConfig, parentModel ?? null, inheritedThinking, override);
         const policy = routingConfig.routes[route.modality ?? "text"]?.[route.tier ?? "standard"];
         const routed = policy ? resolvePolicyCfg(policy, inheritedThinking, parentModel ?? null, "route", route) : null;
-        if (routed) return routed;
+        if (routed) return finalize(routed);
       }
       const policy = resolvePolicyCfg(routingConfig.defaultPolicy, inheritedThinking, parentModel ?? null, "defaultPolicy");
-      if (policy) return policy;
+      if (policy) return finalize(policy);
     }
   }
 
@@ -967,8 +980,8 @@ function resolveRunCfg(
   const baseModel = agentModel?.replace(suffixRe, "");
   const thinking = normalizeThinking(agentCfg.thinking) ?? agentSuffixThinking ?? normalizeThinking(inheritedThinking);
   if (baseModel && thinking && thinking !== "off")
-    return { model: `${baseModel}:${thinking}`, thinking, routing: { source: "agentFrontmatter", model: baseModel, thinking } };
-  return { model: baseModel || agentModel, thinking, routing: { source: agentModel ? "agentFrontmatter" : "piDefault", model: baseModel || agentModel, thinking } };
+    return finalize({ model: `${baseModel}:${thinking}`, thinking, routing: { source: "agentFrontmatter", model: baseModel, thinking } });
+  return finalize({ model: baseModel || agentModel, thinking, routing: { source: agentModel ? "agentFrontmatter" : "piDefault", model: baseModel || agentModel, thinking } });
 }
 
 function buildPiArgs(cfg: PiRunConfig): string[] {
