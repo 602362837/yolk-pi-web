@@ -705,3 +705,38 @@ Implemented a session-scoped Trellis progress widget for pi-web: added high-conf
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: Trellis subagent model routing
+
+**Date**: 2026-06-29
+**Task**: Trellis subagent model routing
+**Branch**: `pi/20260629-111145`
+
+### Summary
+
+Designed and implemented Trellis subagent model policy, automatic routing by modality/difficulty, Chinese settings UI labels, fallback retry through agent fallbackModels, and final fallback to the main session model. Validated with TypeScript, lint, extension TS check, and Trellis task validation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f457293` | (see git log) |
+| `e01302c` | (see git log) |
+| `8582312` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
