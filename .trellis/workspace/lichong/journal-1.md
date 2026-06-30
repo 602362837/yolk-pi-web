@@ -71,3 +71,37 @@ Implemented Git panel branch preview so selecting a local branch refreshes the c
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: ChatGPT account warmup
+
+**Date**: 2026-06-30
+**Task**: ChatGPT account warmup
+**Branch**: `main`
+
+### Summary
+
+Implemented manual ChatGPT/Codex account warmup for saved accounts, then added scheduled warmup management with persisted schedule config, local scheduler, and run history.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1e55311` | (see git log) |
+| `dd522d4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
