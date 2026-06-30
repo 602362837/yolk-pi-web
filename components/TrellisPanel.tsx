@@ -80,16 +80,88 @@ function shortPath(path: string): string {
   return path.length > 44 ? `…${path.slice(-43)}` : path;
 }
 
-function buildDepth(task: TrellisTaskSummary, byDir: Map<string, TrellisTaskSummary>): number {
-  let depth = 0;
-  let parent = task.parent;
+interface TaskTreeNode {
+  task: TrellisTaskSummary;
+  children: TaskTreeNode[];
+  selfMatches: boolean;
+  descendantMatches: boolean;
+}
+
+function taskMatchesFilters(task: TrellisTaskSummary, query: string, statusFilter: string): boolean {
+  if (statusFilter !== "all" && task.status !== statusFilter) return false;
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [task.title, task.dirName, task.assignee, task.priority, task.status]
+    .filter(Boolean)
+    .some((value) => value!.toLowerCase().includes(q));
+}
+
+function buildChildrenMap(tasks: TrellisTaskSummary[]): Map<string, string[]> {
+  const byDir = new Map(tasks.map((task) => [task.dirName, task]));
+  const childrenByDir = new Map<string, string[]>();
+  const addChild = (parent: string, child: string) => {
+    if (parent === child || !byDir.has(parent) || !byDir.has(child)) return;
+    const children = childrenByDir.get(parent) ?? [];
+    if (!children.includes(child)) children.push(child);
+    childrenByDir.set(parent, children);
+  };
+
+  for (const task of tasks) {
+    for (const child of task.children) addChild(task.dirName, child);
+  }
+  for (const task of tasks) {
+    if (task.parent) addChild(task.parent, task.dirName);
+  }
+
+  return childrenByDir;
+}
+
+function hasParentCycle(task: TrellisTaskSummary, byDir: Map<string, TrellisTaskSummary>): boolean {
   const seen = new Set<string>([task.dirName]);
-  while (parent && byDir.has(parent) && !seen.has(parent) && depth < 6) {
-    depth += 1;
+  let parent = task.parent;
+  while (parent && byDir.has(parent)) {
+    if (seen.has(parent)) return true;
     seen.add(parent);
     parent = byDir.get(parent)?.parent ?? null;
   }
-  return depth;
+  return false;
+}
+
+function createTaskTree(tasks: TrellisTaskSummary[], query: string, statusFilter: string): TaskTreeNode[] {
+  const byDir = new Map(tasks.map((task) => [task.dirName, task]));
+  const childrenByDir = buildChildrenMap(tasks);
+  const filtersActive = query.trim().length > 0 || statusFilter !== "all";
+
+  const buildNode = (task: TrellisTaskSummary, ancestors: Set<string>): TaskTreeNode => {
+    const selfMatches = taskMatchesFilters(task, query, statusFilter);
+    const nextAncestors = new Set(ancestors).add(task.dirName);
+    const allChildren = (childrenByDir.get(task.dirName) ?? [])
+      .filter((dirName) => !nextAncestors.has(dirName))
+      .map((dirName) => byDir.get(dirName))
+      .filter((child): child is TrellisTaskSummary => !!child)
+      .map((child) => buildNode(child, nextAncestors));
+    const children = filtersActive
+      ? allChildren.filter((child) => child.selfMatches || child.descendantMatches)
+      : allChildren;
+    return {
+      task,
+      children,
+      selfMatches,
+      descendantMatches: children.some((child) => child.selfMatches || child.descendantMatches),
+    };
+  };
+
+  return tasks
+    .filter((task) => !task.parent || !byDir.has(task.parent) || hasParentCycle(task, byDir))
+    .map((task) => buildNode(task, new Set()))
+    .filter((node) => !filtersActive || node.selfMatches || node.descendantMatches);
+}
+
+function countRenderedTreeNodes(nodes: TaskTreeNode[], expandedKeys: Set<string>, filtersActive: boolean): number {
+  return nodes.reduce((total, node) => {
+    const expanded = node.children.length > 0 && (expandedKeys.has(node.task.key) || (filtersActive && node.descendantMatches));
+    return total + 1 + (expanded ? countRenderedTreeNodes(node.children, expandedKeys, filtersActive) : 0);
+  }, 0);
 }
 
 export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOpenFile }: TrellisPanelProps) {
@@ -108,6 +180,7 @@ export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOp
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [artifactTab, setArtifactTab] = useState<ArtifactTab>("overview");
+  const [expandedTaskKeys, setExpandedTaskKeys] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setIncludeArchived(includeArchivedDefault);
@@ -200,19 +273,19 @@ export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOp
     return ["all", ...statuses];
   }, [tasks]);
 
-  const filteredTasks = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return tasks.filter((task) => {
-      if (statusFilter !== "all" && task.status !== statusFilter) return false;
-      if (!q) return true;
-      return [task.title, task.dirName, task.assignee, task.priority, task.status]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(q));
-    });
-  }, [tasks, query, statusFilter]);
-
-  const byDir = useMemo(() => new Map(tasks.map((task) => [task.dirName, task])), [tasks]);
+  const taskTree = useMemo(() => createTaskTree(tasks, query, statusFilter), [tasks, query, statusFilter]);
+  const filtersActive = query.trim().length > 0 || statusFilter !== "all";
+  const visibleTaskCount = useMemo(() => countRenderedTreeNodes(taskTree, expandedTaskKeys, filtersActive), [expandedTaskKeys, filtersActive, taskTree]);
   const selectedSummary = selectedKey ? tasks.find((task) => task.key === selectedKey) ?? null : null;
+
+  const toggleExpandedTask = useCallback((taskKey: string) => {
+    setExpandedTaskKeys((current) => {
+      const next = new Set(current);
+      if (next.has(taskKey)) next.delete(taskKey);
+      else next.add(taskKey);
+      return next;
+    });
+  }, []);
 
   if (!cwd) {
     return <EmptyState title="未选择工作区" description="请先在侧边栏选择项目目录，再查看 Trellis 任务。" />;
@@ -286,20 +359,22 @@ export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOp
         <div className="trellis-panel-body">
           <div className="trellis-task-list-pane">
             <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", justifyContent: "space-between" }}>
-              <span>任务 ({filteredTasks.length})</span>
+              <span>任务 ({visibleTaskCount})</span>
               {loading && <span>加载中…</span>}
             </div>
             <div style={{ overflowY: "auto", minHeight: 0, flex: 1 }}>
-              {filteredTasks.map((task) => (
-                <TaskRow
-                  key={task.key}
-                  task={task}
-                  depth={buildDepth(task, byDir)}
-                  selected={task.key === selectedKey}
-                  onClick={() => setSelectedKey(task.key)}
+              {taskTree.map((node) => (
+                <TaskTreeItem
+                  key={node.task.key}
+                  node={node}
+                  selectedKey={selectedKey}
+                  expandedKeys={expandedTaskKeys}
+                  filtersActive={filtersActive}
+                  onSelect={setSelectedKey}
+                  onToggle={toggleExpandedTask}
                 />
               ))}
-              {filteredTasks.length === 0 && (
+              {taskTree.length === 0 && (
                 <div style={{ padding: 14, color: "var(--text-muted)", fontStyle: "italic" }}>没有任务匹配当前筛选条件。</div>
               )}
             </div>
@@ -336,44 +411,113 @@ function EmptyState({ title, description, tone = "muted" }: { title: string; des
   );
 }
 
-function TaskRow({ task, depth, selected, onClick }: { task: TrellisTaskSummary; depth: number; selected: boolean; onClick: () => void }) {
+function TaskTreeItem({
+  node,
+  selectedKey,
+  expandedKeys,
+  filtersActive,
+  onSelect,
+  onToggle,
+  level = 0,
+}: {
+  node: TaskTreeNode;
+  selectedKey: string | null;
+  expandedKeys: Set<string>;
+  filtersActive: boolean;
+  onSelect: (key: string) => void;
+  onToggle: (key: string) => void;
+  level?: number;
+}) {
+  const hasChildren = node.children.length > 0;
+  const expanded = hasChildren && (expandedKeys.has(node.task.key) || (filtersActive && node.descendantMatches));
+  return (
+    <div style={{ borderBottom: level === 0 ? "1px solid var(--border)" : "none" }}>
+      <TaskRow
+        task={node.task}
+        level={level}
+        selected={node.task.key === selectedKey}
+        hasChildren={hasChildren}
+        expanded={expanded}
+        onClick={() => onSelect(node.task.key)}
+        onToggle={() => onToggle(node.task.key)}
+      />
+      {expanded && (
+        <div style={{ margin: "0 8px 8px 22px", borderLeft: "1px solid var(--border)", borderRadius: 8, background: "color-mix(in srgb, var(--bg-subtle) 55%, transparent)", overflow: "hidden" }}>
+          {node.children.map((child) => (
+            <TaskTreeItem
+              key={child.task.key}
+              node={child}
+              selectedKey={selectedKey}
+              expandedKeys={expandedKeys}
+              filtersActive={filtersActive}
+              onSelect={onSelect}
+              onToggle={onToggle}
+              level={level + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskRow({ task, level, selected, hasChildren, expanded, onClick, onToggle }: { task: TrellisTaskSummary; level: number; selected: boolean; hasChildren: boolean; expanded: boolean; onClick: () => void; onToggle: () => void }) {
   const childText = task.childProgress.total > 0 ? `子任务 ${task.childProgress.completed}/${task.childProgress.total}` : null;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        width: "100%",
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        padding: "8px 10px",
-        paddingLeft: 10 + depth * 14,
-        border: "none",
-        borderBottom: "1px solid var(--border)",
-        background: selected ? "var(--bg-selected)" : "transparent",
-        color: "var(--text)",
-        cursor: "pointer",
-        textAlign: "left",
-      }}
-    >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor(task.status), marginTop: 5, flexShrink: 0 }} />
-      <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</span>
-          {task.isArchived && <Badge label="已归档" tone="muted" />}
+    <div style={{ display: "flex", alignItems: "stretch", background: selected ? "var(--bg-selected)" : "transparent" }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!hasChildren}
+        aria-label={expanded ? "折叠子任务" : "展开子任务"}
+        style={{
+          width: 26,
+          border: "none",
+          background: "transparent",
+          color: hasChildren ? "var(--text-muted)" : "transparent",
+          cursor: hasChildren ? "pointer" : "default",
+          fontSize: 11,
+          flexShrink: 0,
+        }}
+      >
+        {hasChildren ? (expanded ? "▾" : "▸") : "·"}
+      </button>
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          padding: level === 0 ? "8px 10px 8px 0" : "7px 10px 7px 0",
+          border: "none",
+          background: "transparent",
+          color: "var(--text)",
+          cursor: "pointer",
+          textAlign: "left",
+          minWidth: 0,
+        }}
+      >
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor(task.status), marginTop: 5, flexShrink: 0 }} />
+        <span style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+            <span style={{ fontSize: level === 0 ? 12 : 11, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</span>
+            {level > 0 && <Badge label="子任务" tone="muted" />}
+            {task.isArchived && <Badge label="已归档" tone="muted" />}
+          </span>
+          <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.dirName}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", color: "var(--text-muted)", fontSize: 10 }}>
+            <span>{formatStatus(task.status)}</span>
+            {task.priority && <span>· {task.priority}</span>}
+            {task.assignee && <span>· {task.assignee}</span>}
+            {childText && <span>· {childText}</span>}
+          </span>
+          {task.readError && <span style={{ color: "#f87171", fontSize: 10 }}>{task.readError}</span>}
         </span>
-        <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.dirName}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", color: "var(--text-muted)", fontSize: 10 }}>
-          <span>{formatStatus(task.status)}</span>
-          {task.priority && <span>· {task.priority}</span>}
-          {task.assignee && <span>· {task.assignee}</span>}
-          {childText && <span>· {childText}</span>}
-        </span>
-        {task.readError && <span style={{ color: "#f87171", fontSize: 10 }}>{task.readError}</span>}
-      </span>
-      <span style={{ color: "var(--text-dim)", fontSize: 10, flexShrink: 0 }}>{task.progress.percent}%</span>
-    </button>
+        <span style={{ color: "var(--text-dim)", fontSize: 10, flexShrink: 0 }}>{task.progress.percent}%</span>
+      </button>
+    </div>
   );
 }
 
@@ -431,7 +575,7 @@ function TaskDetail({ task, artifactTab, onArtifactTabChange, cwd, onOpenFile }:
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
         <MetaCard label="负责人" value={task.assignee ?? "—"} />
         <MetaCard label="创建时间" value={formatDateTime(task.createdAt)} title="包含时分秒的时间戳会显示到秒；历史 date-only 任务只显示日期。" />
-        <MetaCard label="Trellis 子任务" value={`${task.childProgress.completed}/${task.childProgress.total}`} title="统计 task.json.children 任务树子任务，不代表 subagent 委派次数。" />
+        <MetaCard label="Trellis 子任务" value={`${task.childProgress.completed}/${task.childProgress.total}`} title="统计 task.json.children 与 parent 归属推导的任务树子任务，不代表 subagent 委派次数。" />
         <MetaCard label="上下文" value={formatManifestCounts(task.manifests)} title="统计 implement.jsonl / check.jsonl 的真实 context 条目；_example seed 行会被忽略。" />
       </div>
       <div>

@@ -49,6 +49,10 @@ export interface TrellisTaskSummary {
   childProgress: {
     total: number;
     completed: number;
+    planning: number;
+    inProgress: number;
+    review: number;
+    unknown: number;
   };
   progress: TrellisTaskProgress;
   hasArtifacts: TrellisTaskArtifacts;

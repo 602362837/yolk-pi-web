@@ -43,6 +43,16 @@ function stageIcon(stage: TrellisTaskProgressStage): string {
   return "○";
 }
 
+function childStatusSegments(task: TrellisTaskSummary): Array<{ label: string; value: number; color: string }> {
+  return [
+    { label: "完成", value: task.childProgress.completed, color: "#22c55e" },
+    { label: "检查", value: task.childProgress.review, color: "#a78bfa" },
+    { label: "执行", value: task.childProgress.inProgress, color: "#60a5fa" },
+    { label: "规划", value: task.childProgress.planning, color: "#f59e0b" },
+    { label: "未知", value: task.childProgress.unknown, color: "var(--text-dim)" },
+  ].filter((item) => item.value > 0);
+}
+
 function clampPosition(position: WidgetPosition, parent: HTMLElement, widget: HTMLElement): WidgetPosition {
   const maxLeft = Math.max(DEFAULT_MARGIN, parent.clientWidth - widget.offsetWidth - DEFAULT_MARGIN);
   const maxTop = Math.max(DEFAULT_MARGIN, parent.clientHeight - widget.offsetHeight - DEFAULT_MARGIN);
@@ -91,6 +101,7 @@ export function TrellisSessionWidget({ task, onClick }: TrellisSessionWidgetProp
   const childText = task.childProgress.total > 0
     ? `子任务 ${task.childProgress.completed}/${task.childProgress.total}`
     : null;
+  const childSegments = childStatusSegments(task);
 
   useEffect(() => {
     const widget = widgetRef.current;
@@ -246,6 +257,24 @@ export function TrellisSessionWidget({ task, onClick }: TrellisSessionWidgetProp
         <div style={{ height: 3, borderRadius: 999, background: "color-mix(in srgb, var(--border) 80%, transparent)", overflow: "hidden" }}>
           <div style={{ width: `${task.progress.percent}%`, height: "100%", background: color }} />
         </div>
+
+        {task.childProgress.total > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <div title="子任务状态分布" style={{ display: "flex", height: 5, borderRadius: 999, overflow: "hidden", background: "color-mix(in srgb, var(--border) 80%, transparent)" }}>
+              {childSegments.map((segment) => (
+                <span key={segment.label} style={{ width: `${(segment.value / task.childProgress.total) * 100}%`, background: segment.color }} />
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", color: "var(--text-dim)", fontSize: 9 }}>
+              {childSegments.map((segment) => (
+                <span key={segment.label} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: segment.color }} />
+                  {segment.label} {segment.value}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 220, overflowY: "auto", paddingRight: 2 }}>
           {task.progress.stages.map((stage, index) => {

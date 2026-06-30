@@ -38,3 +38,36 @@ Implemented temporary saved-account selection for the Models ChatGPT Plus/Pro us
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Improve Trellis task hierarchy UI
+
+**Date**: 2026-06-30
+**Task**: Improve Trellis task hierarchy UI
+**Branch**: `pi/20260630-090624`
+
+### Summary
+
+Implemented hierarchical Trellis task list with expandable child groups, child-to-parent session association promotion, compact child progress in the floating widget, docs updates, validation on port 30142, and pushed branch pi/20260630-090624.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1643eb6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

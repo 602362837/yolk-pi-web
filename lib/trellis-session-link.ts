@@ -185,6 +185,25 @@ function sameTask(a: TrellisTaskSummary, b: TrellisTaskSummary): boolean {
   return a.key === b.key;
 }
 
+function promoteToAvailableParent(task: TrellisTaskSummary, tasks: TrellisTaskSummary[]): TrellisTaskSummary {
+  const byDir = new Map(tasks.map((item) => [item.dirName, item]));
+  const seen = new Set<string>([task.dirName]);
+  let current = task;
+
+  while (current.parent) {
+    const parent = byDir.get(current.parent);
+    if (!parent || seen.has(parent.dirName)) return current;
+    seen.add(parent.dirName);
+    current = parent;
+  }
+
+  return current;
+}
+
+function promoteResolved<T extends { task: TrellisTaskSummary; source: TrellisSessionTaskLinkSource }>(resolved: T, tasks: TrellisTaskSummary[]): T {
+  return { ...resolved, task: promoteToAvailableParent(resolved.task, tasks) };
+}
+
 export function resolveTrellisTaskForSession(options: ResolveOptions): TrellisSessionTaskLinkResult {
   const tasksResponse = listTrellisTasks(options.cwd, true);
   if (!tasksResponse.exists) return { task: null, reason: "no-evidence" };
@@ -204,11 +223,18 @@ export function resolveTrellisTaskForSession(options: ResolveOptions): TrellisSe
       ? resolveUniqueEvidence(pathEvidence, tasksResponse.tasks)
       : null;
 
-  if (transcriptResolved?.task && runtimeResolved?.task && !sameTask(transcriptResolved.task, runtimeResolved.task)) {
+  const promotedTranscript = transcriptResolved?.task
+    ? promoteResolved(transcriptResolved, tasksResponse.tasks)
+    : transcriptResolved;
+  const promotedRuntime = runtimeResolved?.task
+    ? promoteResolved(runtimeResolved, tasksResponse.tasks)
+    : runtimeResolved;
+
+  if (promotedTranscript?.task && promotedRuntime?.task && !sameTask(promotedTranscript.task, promotedRuntime.task)) {
     return { task: null, reason: "ambiguous" };
   }
 
-  const resolved = transcriptResolved?.task ? transcriptResolved : runtimeResolved;
+  const resolved = promotedTranscript?.task ? promotedTranscript : promotedRuntime;
   if (resolved?.task) {
     return { task: resolved.task, source: resolved.source, confidence: "high" };
   }

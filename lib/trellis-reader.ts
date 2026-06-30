@@ -432,12 +432,47 @@ function createProgress(
   };
 }
 
-function completedChildren(children: string[], summariesByDir: Map<string, TrellisTaskSummary>): number {
-  return children.filter((child) => {
+function childDirNames(summary: TrellisTaskSummary, summaries: TrellisTaskSummary[]): string[] {
+  const names = new Set<string>();
+  for (const child of summary.children) {
+    if (child && child !== summary.dirName) names.add(child);
+  }
+  for (const candidate of summaries) {
+    if (candidate.parent === summary.dirName && candidate.dirName !== summary.dirName) names.add(candidate.dirName);
+  }
+  return [...names];
+}
+
+function createChildProgress(children: string[], summariesByDir: Map<string, TrellisTaskSummary>): TrellisTaskSummary["childProgress"] {
+  const progress: TrellisTaskSummary["childProgress"] = {
+    total: children.length,
+    completed: 0,
+    planning: 0,
+    inProgress: 0,
+    review: 0,
+    unknown: 0,
+  };
+
+  for (const child of children) {
     const summary = summariesByDir.get(child);
-    if (!summary) return true;
-    return summary.isArchived || isCompletedStatus(summary.status);
-  }).length;
+    if (!summary) {
+      progress.unknown += 1;
+      continue;
+    }
+    if (summary.isArchived || isCompletedStatus(summary.status)) {
+      progress.completed += 1;
+    } else if (isReviewStatus(summary.status)) {
+      progress.review += 1;
+    } else if (isInProgressStatus(summary.status)) {
+      progress.inProgress += 1;
+    } else if (summary.status.toLowerCase() === "planning") {
+      progress.planning += 1;
+    } else {
+      progress.unknown += 1;
+    }
+  }
+
+  return progress;
 }
 
 function recordToSummary(record: TaskRecord, workspaceRoot: string): TrellisTaskSummary {
@@ -477,7 +512,7 @@ function recordToSummary(record: TaskRecord, workspaceRoot: string): TrellisTask
     parent: nullableString(raw.parent),
     children,
     subtasks: stringArray(raw.subtasks),
-    childProgress: { total: children.length, completed: 0 },
+    childProgress: { total: children.length, completed: 0, planning: 0, inProgress: 0, review: 0, unknown: 0 },
     progress: createProgress(status, record.isArchived, completedAt, commit, prUrl, artifacts, manifests, lastCheck),
     hasArtifacts: artifacts,
     readError: record.readError,
@@ -510,13 +545,14 @@ export function listTrellisTasks(cwd: string, includeArchived: boolean): Trellis
 
   const summaries = scanned.records.map((record) => recordToSummary(record, ctx.workspaceRoot));
   const byDir = new Map(summaries.map((summary) => [summary.dirName, summary]));
-  const withChildProgress = summaries.map((summary) => ({
-    ...summary,
-    childProgress: {
-      total: summary.children.length,
-      completed: completedChildren(summary.children, byDir),
-    },
-  }));
+  const withChildProgress = summaries.map((summary) => {
+    const children = childDirNames(summary, summaries);
+    return {
+      ...summary,
+      children,
+      childProgress: createChildProgress(children, byDir),
+    };
+  });
   const statusCounts: Record<string, number> = {};
   for (const task of withChildProgress) {
     statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
