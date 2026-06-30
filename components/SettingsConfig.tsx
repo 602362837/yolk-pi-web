@@ -311,7 +311,7 @@ function usageConfigsEqual(a: PiWebUsageConfig | null, b: PiWebUsageConfig | nul
 
 function chatGptConfigsEqual(a: PiWebChatGptConfig | null, b: PiWebChatGptConfig | null): boolean {
   if (!a || !b) return a === b;
-  return a.usagePanelEnabled === b.usagePanelEnabled;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string | null; onClose: () => void; onConfigChange?: () => void }) {
@@ -783,10 +783,43 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                     </div>
                     <ToggleField
                       label="ChatGPT 用量悬浮面板"
-                      description="开启后顶部右侧会显示当前激活 ChatGPT/Codex 账号的半透明用量入口。不会自动刷新；展开后可手动刷新，并与 Models 中的额度缓存保持一致。"
+                      description="开启后顶部右侧会显示当前激活 ChatGPT/Codex 账号的半透明用量入口。展开后可手动刷新，并与 Models 中的额度缓存保持一致。"
                       checked={chatgpt.usagePanelEnabled}
                       onChange={(usagePanelEnabled) => updateChatgpt({ usagePanelEnabled })}
                     />
+                    <ToggleField
+                      label="后台自动刷新所有账号"
+                      description="开启后由后端刷新器按下面的节奏刷新所有已保存 ChatGPT/Codex 账号；不会在每个浏览器标签页里各自轮询。"
+                      checked={chatgpt.autoRefreshEnabled}
+                      onChange={(autoRefreshEnabled) => updateChatgpt({ autoRefreshEnabled })}
+                    />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="总刷新间隔（秒）" description="每轮自动刷新开始前的基础等待时间。最小 300 秒。">
+                        <input type="number" min={300} step={60} value={chatgpt.refreshCycleIntervalSeconds} onChange={(e) => updateChatgpt({ refreshCycleIntervalSeconds: Number.parseInt(e.target.value || "0", 10) })} style={inputStyle} />
+                      </Field>
+                      <Field label="多账号间隔（秒）" description="一轮刷新中，刷新下一个账号前的基础等待时间。最小 5 秒。">
+                        <input type="number" min={5} step={1} value={chatgpt.refreshAccountIntervalSeconds} onChange={(e) => updateChatgpt({ refreshAccountIntervalSeconds: Number.parseInt(e.target.value || "0", 10) })} style={inputStyle} />
+                      </Field>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="总周期随机盐最小（秒）" description="每轮开始前额外随机等待的下限。">
+                        <input type="number" min={0} step={1} value={chatgpt.refreshCycleSaltMinSeconds} onChange={(e) => updateChatgpt({ refreshCycleSaltMinSeconds: Number.parseInt(e.target.value || "0", 10) })} style={inputStyle} />
+                      </Field>
+                      <Field label="总周期随机盐最大（秒）" description="每轮开始前额外随机等待的上限，需大于等于最小值。">
+                        <input type="number" min={0} step={1} value={chatgpt.refreshCycleSaltMaxSeconds} onChange={(e) => updateChatgpt({ refreshCycleSaltMaxSeconds: Number.parseInt(e.target.value || "0", 10) })} style={inputStyle} />
+                      </Field>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="账号间随机盐最小（秒）" description="刷新下一个账号前额外随机等待的下限。">
+                        <input type="number" min={0} step={1} value={chatgpt.refreshAccountSaltMinSeconds} onChange={(e) => updateChatgpt({ refreshAccountSaltMinSeconds: Number.parseInt(e.target.value || "0", 10) })} style={inputStyle} />
+                      </Field>
+                      <Field label="账号间随机盐最大（秒）" description="刷新下一个账号前额外随机等待的上限，需大于等于最小值。">
+                        <input type="number" min={0} step={1} value={chatgpt.refreshAccountSaltMaxSeconds} onChange={(e) => updateChatgpt({ refreshAccountSaltMaxSeconds: Number.parseInt(e.target.value || "0", 10) })} style={inputStyle} />
+                      </Field>
+                    </div>
+                    <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
+                      文件锁过期判断跟随配置：锁超过约 2 × 总刷新间隔未更新时，启动器会把它视为 stale 并尝试接管。
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

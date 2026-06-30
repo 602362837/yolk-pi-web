@@ -52,6 +52,10 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `auth/api-key/[provider]/` | GET | Get masked API-key status for a provider. |
 | `auth/balance/[provider]/` | GET | Query DeepSeek account balance. |
 | `auth/quota/[provider]/` | GET | Query OpenAI Codex subscription quota for the active account, or for a saved account with `?accountId=...`; queries update the saved account's cached quota reset metadata and refresh expired saved-account OAuth tokens when possible. |
+| `chatgpt/usage-refresh/status/` | GET | Ensure and inspect the backend ChatGPT usage auto-refresh scheduler, including lock diagnostics and last-run state. |
+| `chatgpt/usage-refresh/ensure/` | POST | Start or re-arm the backend ChatGPT usage auto-refresh scheduler according to `pi-web.json`. |
+| `chatgpt/usage-refresh/repair-lock/` | POST | Risk-gated stale lock repair for the ChatGPT usage auto-refresh scheduler. Requires `{ confirm: true }`. |
+| `chatgpt/usage-refresh/run/` | POST | Trigger a best-effort immediate ChatGPT usage refresh cycle through the backend scheduler. |
 
 ## Implementation Pointers
 

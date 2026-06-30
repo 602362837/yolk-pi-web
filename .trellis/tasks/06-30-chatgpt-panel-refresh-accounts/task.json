@@ -1,0 +1,30 @@
+{
+  "id": "chatgpt-panel-refresh-accounts",
+  "name": "chatgpt-panel-refresh-accounts",
+  "title": "ChatGPT panel auto refresh and account switch",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "pi-agent",
+  "assignee": "pi-agent",
+  "createdAt": "2026-06-30",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "pi/20260630-084345",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-30-chatgpt-refresh-config-settings",
+    "06-30-chatgpt-refresh-scheduler-lock",
+    "06-30-chatgpt-panel-accounts-maintenance"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
