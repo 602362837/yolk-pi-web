@@ -139,3 +139,36 @@ Implemented Codex reset-credit lookup and consume support in quota API/lib flows
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Chat auto-stick bottom toggle
+
+**Date**: 2026-06-30
+**Task**: Chat auto-stick bottom toggle
+**Branch**: `main`
+
+### Summary
+
+Implemented a persisted chat auto-stick-to-bottom toggle beside the completion sound control, added sticky scroll pause/resume behavior, suppressed the running spacer while sticky mode is enabled, updated frontend docs/specs, validated lint/type-check, committed the feature, and archived the Trellis task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3c94c10` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
