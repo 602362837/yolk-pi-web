@@ -256,6 +256,90 @@ const handleBranchDataChange = useCallback(
 />
 ```
 
+## Scenario: Browser-local terminal workspaces
+
+### 1. Scope / Trigger
+
+Use this contract when a frontend component manages ephemeral browser-local UI for
+server-backed terminal sessions, such as `components/TerminalPanel.tsx`.
+
+### 2. Signatures
+
+- Tab state owns a stable browser tab id and the server `sessionId` returned by
+  `POST /api/terminal/sessions`.
+- Layout state is a typed tree of pane leaves and split nodes; split ratios are
+  UI-only browser state.
+- Explicit destructive actions call `DELETE /api/terminal/sessions/[id]`.
+
+### 3. Contracts
+
+- Use `useReducer` for tab/pane/split transitions because add, close, move,
+  prune-empty-pane, and resize updates must stay consistent.
+- Keep terminal tabs ephemeral unless a task explicitly designs restore/reconnect
+  semantics.
+- Moving a tab between panes must move the existing `sessionId`; it must not
+  duplicate or restart the shell process.
+- React unmount cleanup may close SSE/xterm resources, but it must not delete the
+  server session when the unmount is caused by a layout move. Only explicit tab,
+  dock, or feature-close paths should delete the server session.
+- Pin the terminal workspace to the cwd captured at dock open. Do not silently
+  retarget running terminals when the selected chat/workspace changes.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Non-last tab close | Delete only that tab's session; no confirmation needed unless product asks. |
+| Last tab or whole-dock close | Confirm before deleting sessions because there is no restore. |
+| Tab move/split | Preserve `sessionId`; close only the old EventSource/xterm mount if React remounts. |
+| Workspace selection changes | Keep terminal pinned or confirm before closing; never silently retarget cwd. |
+| Pane resize/drop below usable size | Clamp resize or reject/drop-disable the split action. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: a tab is dragged from one pane into a new split pane; its `sessionId`
+  remains the same and the view reconnects to the existing SSE stream.
+- Base: closing the dock deletes all sessions and unmount cleanup only disposes
+  browser resources.
+- Bad: `useEffect` cleanup always calls `DELETE /api/terminal/sessions/[id]`, so
+  a layout remount kills a shell during drag-to-split.
+
+### 6. Tests Required
+
+At minimum, manually or automatically verify:
+
+- Moving a tab between panes does not restart the shell or lose the server
+  session.
+- Closing one non-last tab kills only that tab.
+- Closing the dock/last tab prompts and then kills all relevant sessions.
+- Workspace changes do not silently retarget a running terminal cwd.
+- Split and dock resizing trigger xterm fit/PTY resize without creating new
+  sessions.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+return () => {
+  if (sessionIdRef.current) {
+    void fetch(`/api/terminal/sessions/${sessionIdRef.current}`, { method: "DELETE" });
+  }
+  term.dispose();
+};
+```
+
+#### Correct
+
+```typescript
+return () => {
+  eventSourceRef.current?.close();
+  term.dispose();
+  // Session deletion belongs to explicit tab/dock close actions, not every
+  // React unmount caused by split-layout moves.
+};
+```
+
 ## Common Mistakes
 
 1. **Don't use `useEffect` for derived state** — compute inline or with `useMemo`
@@ -264,3 +348,4 @@ const handleBranchDataChange = useCallback(
 4. **Don't use module-level `Map` for session state** — use `globalThis.__piSessions` to survive hot-reload (see `lib/rpc-manager.ts`)
 5. **Don't put server state in global stores** — fetch on demand and cache in component state
 6. **Don't forget cleanup** — close EventSource connections, clear timers, remove listeners in effect cleanup functions
+7. **Don't delete server-backed terminal sessions on every React unmount** — layout moves can remount terminal views; delete sessions only from explicit destructive actions.

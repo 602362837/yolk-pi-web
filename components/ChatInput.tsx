@@ -2,8 +2,9 @@
 
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, useMemo } from "react";
 import type { SlashCommandEntry } from "@/app/api/commands/route";
-import type { AttachedFile, FileReference } from "@/lib/types";
+import type { AttachedFile } from "@/lib/types";
 import { encodeFilePathForApi, getFileName, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
+import { buildTrellisTaskResumePrompt, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -51,6 +52,7 @@ export interface ChatInputHandle {
   addImages: (files: File[]) => void;
   addFiles: (files: File[]) => void;
   addFileReference: (relativePath: string, lines?: { startLine: number; endLine: number }) => void;
+  addTrellisTaskContext: (context: TrellisTaskChatContext) => void;
 }
 
 const TOOL_PRESETS = ["off", "default", "full", "subagent"] as const;
@@ -247,6 +249,91 @@ function chipInsertAtCursor(container: HTMLElement, relativePath: string, lines?
   }
 }
 
+function createTrellisTaskContextBlock(context: TrellisTaskChatContext): HTMLElement {
+  const block = document.createElement("span");
+  block.contentEditable = "false";
+  block.dataset.chip = "trellis-task";
+  block.dataset.dirName = context.dirName;
+  block.dataset.title = context.title;
+  block.dataset.status = context.status;
+  block.dataset.progressLabel = context.progressLabel;
+  block.style.cssText = [
+    "display: inline-flex",
+    "flex-direction: column",
+    "gap: 3px",
+    "max-width: min(420px, 100%)",
+    "padding: 8px 10px",
+    "border-radius: 10px",
+    "border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border))",
+    "background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel))",
+    "color: var(--text)",
+    "font-size: 12px",
+    "line-height: 1.35",
+    "cursor: default",
+    "user-select: none",
+    "vertical-align: middle",
+  ].join("; ");
+
+  const label = document.createElement("span");
+  label.textContent = "Trellis 继续任务";
+  label.style.cssText = "color: var(--accent); font-size: 11px; font-weight: 700";
+
+  const title = document.createElement("span");
+  title.textContent = `${context.title} · ${context.status} · ${context.progressLabel}`;
+  title.style.cssText = "font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap";
+
+  const path = document.createElement("span");
+  path.textContent = `.trellis/tasks/${context.dirName}`;
+  path.style.cssText = "color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; overflow-wrap: anywhere";
+
+  block.append(label, title, path);
+  return block;
+}
+
+function trellisTaskContextFromElement(node: HTMLElement): TrellisTaskChatContext | null {
+  const dirName = node.dataset.dirName;
+  if (!dirName) return null;
+  return {
+    dirName,
+    title: node.dataset.title || dirName,
+    status: node.dataset.status || "unknown",
+    progressLabel: node.dataset.progressLabel || "未知阶段",
+  };
+}
+
+function trellisTaskInsertAtCursor(container: HTMLElement, context: TrellisTaskChatContext): void {
+  const block = createTrellisTaskContextBlock(context);
+  const wasFocused = document.activeElement === container;
+  container.focus();
+  const sel = window.getSelection();
+  const appendToEnd = !wasFocused || !sel || !sel.rangeCount || !container.contains(sel.getRangeAt(0).commonAncestorContainer);
+
+  if (appendToEnd) {
+    if (hasContent(container)) container.appendChild(document.createTextNode("\n"));
+    container.appendChild(block);
+    container.appendChild(document.createTextNode("\n"));
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    range.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    return;
+  }
+
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const fragment = document.createDocumentFragment();
+  if (hasContent(container)) fragment.appendChild(document.createTextNode("\n"));
+  fragment.appendChild(block);
+  const after = document.createTextNode("\n");
+  fragment.appendChild(after);
+  range.insertNode(fragment);
+  range.setStartAfter(after);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 function getTextBeforeCursor(container: Node): string {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return "";
@@ -278,6 +365,9 @@ function serializeNodes(nodes: NodeListOf<ChildNode>): string {
       } else {
         text += `\`${path}\``;
       }
+    } else if (node instanceof HTMLElement && node.dataset.chip === "trellis-task") {
+      const context = trellisTaskContextFromElement(node);
+      if (context) text += buildTrellisTaskResumePrompt(context);
     } else if (node instanceof HTMLElement) {
       text += serializeNodes(node.childNodes);
     }
@@ -532,7 +622,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     sel.addRange(range);
     syncFromDom();
     resizeInput();
-  }, [syncFromDom]);
+  }, [syncFromDom, resizeInput]);
 
   const insertSlashCommand = useCallback((command: SlashCommandEntry) => {
     const el = inputRef.current;
@@ -558,7 +648,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setSlashDismissedKey(null);
     syncFromDom();
     resizeInput();
-  }, [syncFromDom]);
+  }, [syncFromDom, resizeInput]);
 
   const insertAtMention = useCallback((suggestion: FileSuggestion) => {
     const el = inputRef.current;
@@ -617,7 +707,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setAtDismissedKey(null);
     syncFromDom();
     resizeInput();
-  }, [syncFromDom, cwd]);
+  }, [syncFromDom, cwd, resizeInput]);
 
   useImperativeHandle(ref, () => ({
     insertIfEmpty(text: string) {
@@ -647,6 +737,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       const el = inputRef.current;
       if (!el) return;
       chipInsertAtCursor(el, relativePath, lines);
+      syncFromDom();
+      resizeInput();
+    },
+    addTrellisTaskContext(context: TrellisTaskChatContext) {
+      const el = inputRef.current;
+      if (!el) return;
+      trellisTaskInsertAtCursor(el, context);
       syncFromDom();
       resizeInput();
     },
@@ -737,12 +834,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setAttachedFiles([]);
   }, []);
 
-  const clearInput = useCallback(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.textContent = "";
-  }, []);
-
   /** Build the final message: serialize the contentEditable div + append attached files/images. */
   const buildFinalMessage = useCallback((): string => {
     const parts: string[] = [];
@@ -802,7 +893,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       onFollowUp(finalMsg, attachedImages.length ? attachedImages : undefined);
     }
     clearEditor();
-  }, [syncFromDom, onSteer, onFollowUp, attachedImages, attachedFiles, buildFinalMessage, clearEditor]);
+  }, [sendActive, onSteer, onFollowUp, attachedImages, buildFinalMessage, clearEditor]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

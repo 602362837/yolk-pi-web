@@ -23,13 +23,15 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/openai-codex-warmup-scheduler.ts` | Local in-process ChatGPT warmup scheduler guarded by `globalThis`, reading `pi-web.json` each tick and running due saved schedules once per local date/time key. |
 | `lib/npx.ts` | Cross-platform `npx` wrapper that avoids shell quoting issues. |
 | `lib/usage-stats.ts` | Aggregate token/cost across configured active-only or active-plus-archived sessions by day, model, provider, and session. |
-| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree, Usage scan scope, ChatGPT usage panel, warmup schedule, and backend auto-refresh settings, and Trellis panel settings, including Trellis install/update proxy options, workflow assistant primary/fallback model policy, and Trellis subagent model policy. |
+| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree, Usage scan scope, Web Terminal settings and env assistant model policy, ChatGPT usage panel, warmup schedule, and backend auto-refresh settings, and Trellis panel settings, including Trellis install/update proxy options, workflow assistant primary/fallback model policy, and Trellis subagent model policy. |
 | `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs. |
+| `lib/terminal-manager.ts` | Web Terminal PTY manager: setting-gated session creation, cwd authorization, shell/custom path resolution, env injection, SSE subscription fan-out, input/resize handling, and process cleanup. |
 | `lib/trellis-manager.ts` | Trellis setup/status/update helper: prerequisite checks, CLI/version inspection, proxy-scoped child-process environment, and fixed Trellis/npm command execution. |
 | `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, optional `meta.lastCheck` quality-check state, and phase/progress derivation. |
 | `lib/trellis-workflow-reader.ts` | Read-only `.trellis/workflow.md` reader/parser for Settings workflow visualization; extracts phases, steps, workflow-state blocks, source line ranges, and parser warnings without executing Trellis commands or mutating files. |
 | `lib/trellis-workflow-types.ts` | Wire types for Trellis workflow visualization API responses and UI consumers. |
 | `lib/trellis-session-link.ts` | Session-scoped Trellis task association resolver for the floating widget; uses high-confidence session transcript evidence and exact per-session runtime pointers without mutating Trellis task metadata. |
+| `lib/trellis-chat-context.ts` | Pure helpers for converting Trellis task details into compact chat-composer context payloads and serializing those blocks into resume prompts recognized by session-task linking. |
 | `lib/trellis-setup-types.ts` | Wire types for Trellis setup status and setup/update command API responses. |
 | `lib/trellis-types.ts` | Wire types for Trellis task list/detail API responses and UI consumers. |
 | `lib/workspace-title.ts` | Shared workspace title formatting from cwd and Git metadata. |

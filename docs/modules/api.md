@@ -34,7 +34,13 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `git/status/` | GET | Return detailed Git status (branch, commits, staged/unstaged changes, untracked files, stash) for a cwd. |
 | `git/graph/` | GET | Return decorated commit graph data (commits, parents, refs, local branches) for the Git panel branch visualization; optional `branch` previews one validated local branch. |
 | `git/switch/` | POST | Switch the current workspace to a local branch. Validates cwd, branch existence, and working tree cleanliness before executing `git switch`. Returns `switchedTo` on success or an error message. |
-| `web-config/` | GET/PUT | Read/write `~/.pi/agent/pi-web.json` for WorkTree defaults, Usage scan scope, ChatGPT usage panel/warmup schedule settings, optional Trellis panel settings, setup proxy, and Trellis subagent model policy; also lazily ensures the local ChatGPT warmup scheduler. |
+| `web-config/` | GET/PUT | Read/write `~/.pi/agent/pi-web.json` for WorkTree defaults, Usage scan scope, Web Terminal settings, ChatGPT usage panel/warmup schedule settings, optional Trellis panel settings, setup proxy, and Trellis subagent model policy; also lazily ensures the local ChatGPT warmup scheduler. |
+| `terminal/env/assist/` | POST | Use the configured Terminal env assistant model to parse complex raw env text into normalized key-value env entries. |
+| `terminal/sessions/` | POST | Create a local Web Terminal session for an authorized workspace cwd when the Terminal setting is enabled. |
+| `terminal/sessions/[id]/` | DELETE | Close a Web Terminal session and terminate its process. |
+| `terminal/sessions/[id]/events/` | GET | Stream Web Terminal output through SSE. |
+| `terminal/sessions/[id]/input/` | POST | Write user input to a Web Terminal session. |
+| `terminal/sessions/[id]/resize/` | POST | Resize a Web Terminal PTY. |
 | `trellis/tasks/` | GET | List read-only Trellis task summaries for an authorized workspace cwd when the Trellis panel setting is enabled. |
 | `trellis/tasks/[taskKey]/` | GET | Read one Trellis task detail, artifacts, manifest counts, hierarchy, and derived phase/progress. |
 | `trellis/workflow/` | GET | Read and parse the selected workspace `.trellis/workflow.md` into a read-only workflow visualization projection with phases, steps, workflow-state blocks, source line ranges, and parser warnings. |

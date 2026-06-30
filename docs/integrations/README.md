@@ -13,6 +13,8 @@ See `package.json` for exact versions.
 | `mermaid` | Diagram rendering. |
 | `mammoth` | DOCX content handling. |
 | `@lobehub/icons` | Provider/model icon assets. |
+| `@xterm/xterm`, `@xterm/addon-fit` | Browser-side Web Terminal rendering and sizing. |
+| `@lydell/node-pty` | Server-side local PTY process for interactive Web Terminal sessions; selected because the original `node-pty` failed under the local Node 26 runtime. |
 
 ## pi SDK Documentation
 

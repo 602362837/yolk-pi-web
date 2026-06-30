@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
     "@earendil-works/pi-agent-core",
     "@earendil-works/pi-tui",
     "glob",
+    "@lydell/node-pty",
   ],
   outputFileTracingExcludes: {
     "/*": [".pi/**/*"],

@@ -106,3 +106,103 @@ Added a read-only Settings → Trellis workflow visualizer with phase/state pars
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Add Trellis task chat context block
+
+**Date**: 2026-06-30
+**Task**: Add Trellis task chat context block
+**Branch**: `pi/20260630-135730`
+
+### Summary
+
+Implemented a Trellis task join-chat action that inserts a non-editable task context block into the chat composer, serializes it into resume context on send, updates session-link-compatible context generation, and documented the new frontend/library behavior.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f9e232d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 5: Web terminal MVP
+
+**Date**: 2026-06-30
+**Task**: Web terminal MVP
+**Branch**: `pi/20260630-142622`
+
+### Summary
+
+Planned and implemented the Web Terminal MVP: settings for enablement, shell/custom path and env injection, xterm bottom dock, terminal session APIs, AI-assisted env parsing, and @lydell/node-pty PTY backend; validated type-check and lint with existing ChatInput warnings.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8dbc034` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 6: Web terminal multi-tab support
+
+**Date**: 2026-06-30
+**Task**: Web terminal multi-tab support
+**Branch**: `pi/20260630-142622`
+
+### Summary
+
+Implemented Web Terminal multi-tab support with renameable tabs, nested drag-to-split panes, pane and dock resizing, app-local fullscreen/minimize controls, destructive close confirmation, cwd pinning, and split-drop guidance for insufficient space. Updated frontend docs and terminal workspace state-management spec; lint and type-check passed with only existing ChatInput warnings.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `76b8728` | (see git log) |
+| `a86f7d1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

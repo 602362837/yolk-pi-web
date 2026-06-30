@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json().catch(() => ({})) as { worktree?: unknown; trellis?: unknown; usage?: unknown; chatgpt?: unknown };
+    const body = await req.json().catch(() => ({})) as { worktree?: unknown; trellis?: unknown; usage?: unknown; terminal?: unknown; chatgpt?: unknown };
     const result = writePiWebConfigPatch(body);
     ensureOpenAICodexWarmupScheduler();
     await ensureChatGptUsageRefreshScheduler(true);

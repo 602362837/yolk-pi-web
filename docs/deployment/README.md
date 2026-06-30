@@ -74,5 +74,5 @@ Default data directory is `~/.pi/agent/`; override with `PI_CODING_AGENT_DIR`.
 | `sessions/` | Session JSONL files. |
 | `models.json` | Model provider/model configuration. |
 | `settings.json` | pi settings, including default model. |
-| `pi-web.json` | Web UI settings, including WorkTree defaults, Usage scope, ChatGPT panel/auto-refresh settings, and Trellis settings. |
+| `pi-web.json` | Web UI settings, including WorkTree defaults, Usage scope, Web Terminal settings, ChatGPT panel/auto-refresh settings, and Trellis settings. |
 | `chatgpt-usage-refresh.lock` | Backend ChatGPT usage auto-refresh lock file; stale locks can be repaired from the ChatGPT panel fault handler. |

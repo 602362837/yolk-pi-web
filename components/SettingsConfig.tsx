@@ -10,6 +10,7 @@ import type {
   PiWebSubagentModelRef,
   PiWebSubagentModality,
   PiWebSubagentRunPolicy,
+  PiWebTerminalConfig,
   PiWebTrellisConfig,
   PiWebUsageConfig,
   PiWebWorktreeConfig,
@@ -68,7 +69,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "worktree" | "usage" | "chatgpt" | "trellis";
+type SettingsSection = "worktree" | "usage" | "terminal" | "chatgpt" | "trellis";
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
 const SUBAGENT_AGENT_NAMES = ["trellis-implement", "trellis-check", "trellis-research"];
@@ -283,6 +284,66 @@ function StatusRow({ label, value, ok, detail }: { label: string; value: string;
   );
 }
 
+function splitShellWords(line: string): string[] {
+  const words: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaping = false;
+  for (const char of line) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+    if (char === "\\" && quote !== "'") {
+      escaping = true;
+      continue;
+    }
+    if ((char === "'" || char === '"') && !quote) {
+      quote = char;
+      continue;
+    }
+    if (quote === char) {
+      quote = null;
+      continue;
+    }
+    if (/\s/.test(char) && !quote) {
+      if (current) words.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current) words.push(current);
+  return words;
+}
+
+function parseRawEnv(text: string): { env: Record<string, string>; errors: string[] } {
+  const env: Record<string, string> = {};
+  const errors: string[] = [];
+  text.split(/\r?\n/).forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return;
+    const words = splitShellWords(trimmed);
+    const candidates = words[0] === "export" ? words.slice(1) : words;
+    let parsedAny = false;
+    for (const word of candidates) {
+      const eq = word.indexOf("=");
+      if (eq <= 0) continue;
+      const key = word.slice(0, eq).trim();
+      const value = word.slice(eq + 1);
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+        errors.push(`第 ${index + 1} 行变量名无效：${key}`);
+        continue;
+      }
+      env[key] = value;
+      parsedAny = true;
+    }
+    if (!parsedAny) errors.push(`第 ${index + 1} 行没有可解析的 KEY=VALUE`);
+  });
+  return { env, errors };
+}
+
 function formatRecommendedAction(status: TrellisSetupStatus): string {
   if (status.recommendedAction === "fix-prerequisites") return "请先完成系统前置要求，然后再安装或更新 Trellis。";
   if (status.recommendedAction === "initialize") return "当前工作区还没有 Trellis，可安装并初始化 Pi Agent 支持。";
@@ -310,6 +371,11 @@ function usageConfigsEqual(a: PiWebUsageConfig | null, b: PiWebUsageConfig | nul
   return a.includeArchived === b.includeArchived;
 }
 
+function terminalConfigsEqual(a: PiWebTerminalConfig | null, b: PiWebTerminalConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function chatGptConfigsEqual(a: PiWebChatGptConfig | null, b: PiWebChatGptConfig | null): boolean {
   if (!a || !b) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);
@@ -328,6 +394,10 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [savedTrellis, setSavedTrellis] = useState<PiWebTrellisConfig | null>(null);
   const [usage, setUsage] = useState<PiWebUsageConfig | null>(null);
   const [savedUsage, setSavedUsage] = useState<PiWebUsageConfig | null>(null);
+  const [terminal, setTerminal] = useState<PiWebTerminalConfig | null>(null);
+  const [savedTerminal, setSavedTerminal] = useState<PiWebTerminalConfig | null>(null);
+  const [rawEnvImport, setRawEnvImport] = useState("");
+  const [terminalEnvAssistLoading, setTerminalEnvAssistLoading] = useState(false);
   const [chatgpt, setChatgpt] = useState<PiWebChatGptConfig | null>(null);
   const [savedChatgpt, setSavedChatgpt] = useState<PiWebChatGptConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -344,8 +414,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [developerNameTouched, setDeveloperNameTouched] = useState(false);
 
   const dirty = useMemo(
-    () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage) || !chatGptConfigsEqual(chatgpt, savedChatgpt),
-    [worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage, chatgpt, savedChatgpt],
+    () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt),
+    [worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -363,6 +433,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       setSavedTrellis(data.config.trellis);
       setUsage(data.config.usage);
       setSavedUsage(data.config.usage);
+      setTerminal(data.config.terminal);
+      setSavedTerminal(data.config.terminal);
       setChatgpt(data.config.chatgpt);
       setSavedChatgpt(data.config.chatgpt);
       setConfigPath(data.path);
@@ -430,9 +502,9 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   }, [cwd]);
 
   useEffect(() => {
-    if (section !== "trellis") return;
+    if (section !== "trellis" && section !== "terminal") return;
     const controller = new AbortController();
-    void loadTrellisStatus(controller.signal);
+    if (section === "trellis") void loadTrellisStatus(controller.signal);
     void loadModels(controller.signal);
     return () => controller.abort();
   }, [section, loadModels, loadTrellisStatus]);
@@ -454,6 +526,77 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
 
   const updateChatgpt = useCallback((patch: Partial<PiWebChatGptConfig>) => {
     setChatgpt((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateTerminal = useCallback((patch: Partial<PiWebTerminalConfig>) => {
+    setTerminal((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateTerminalEnv = useCallback((key: string, nextKey: string, value: string) => {
+    setTerminal((prev) => {
+      if (!prev) return prev;
+      const nextEnv = { ...prev.env };
+      delete nextEnv[key];
+      if (nextKey) nextEnv[nextKey] = value;
+      return { ...prev, env: nextEnv };
+    });
+    setNotice(null);
+  }, []);
+
+  const deleteTerminalEnv = useCallback((key: string) => {
+    setTerminal((prev) => {
+      if (!prev) return prev;
+      const nextEnv = { ...prev.env };
+      delete nextEnv[key];
+      return { ...prev, env: nextEnv };
+    });
+    setNotice(null);
+  }, []);
+
+  const importRawEnv = useCallback(() => {
+    const parsed = parseRawEnv(rawEnvImport);
+    if (parsed.errors.length > 0) {
+      setError(parsed.errors.join("；"));
+      return;
+    }
+    setTerminal((prev) => prev ? { ...prev, env: { ...prev.env, ...parsed.env } } : prev);
+    setRawEnvImport("");
+    setError(null);
+    setNotice("已解析 raw env 并填入环境变量表格，保存后写入配置。");
+  }, [rawEnvImport]);
+
+  const importRawEnvWithAi = useCallback(async () => {
+    if (!cwd || !rawEnvImport.trim()) return;
+    setTerminalEnvAssistLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/terminal/env/assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd, raw: rawEnvImport }),
+      });
+      const data = await res.json() as { env?: Record<string, string>; error?: string };
+      if (!res.ok || data.error || !data.env) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setTerminal((prev) => prev ? { ...prev, env: { ...prev.env, ...data.env } } : prev);
+      setRawEnvImport("");
+      setNotice("AI 已解析 raw env 并填入环境变量表格，保存后写入配置。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTerminalEnvAssistLoading(false);
+    }
+  }, [cwd, rawEnvImport]);
+
+  const updateTerminalEnvAssistantPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
+    setTerminal((prev) => prev ? { ...prev, envAssistant: { ...prev.envAssistant, ...patch } } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateTerminalEnvAssistantFallbackPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
+    setTerminal((prev) => prev ? { ...prev, envAssistantFallback: { ...prev.envAssistantFallback, ...patch } } : prev);
     setNotice(null);
   }, []);
 
@@ -546,6 +689,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setSavedTrellis(config.trellis);
     setUsage(config.usage);
     setSavedUsage(config.usage);
+    setTerminal(config.terminal);
+    setSavedTerminal(config.terminal);
     setChatgpt(config.chatgpt);
     setSavedChatgpt(config.chatgpt);
     setConfigPath(path);
@@ -554,7 +699,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!worktree || !trellis || !usage || !chatgpt) return false;
+    if (!worktree || !trellis || !usage || !terminal || !chatgpt) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -562,7 +707,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ worktree, trellis, usage, chatgpt }),
+        body: JSON.stringify({ worktree, trellis, usage, terminal, chatgpt }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -575,7 +720,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, worktree, trellis, usage, chatgpt]);
+  }, [applyLoadedConfig, worktree, trellis, usage, terminal, chatgpt]);
 
   const handleSave = useCallback(async () => {
     await saveConfig("设置已保存。Usage/ChatGPT/Trellis 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
@@ -586,6 +731,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setWorktree(defaults.worktree);
     setTrellis(defaults.trellis);
     setUsage(defaults.usage);
+    setTerminal(defaults.terminal);
     setChatgpt(defaults.chatgpt);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
@@ -617,6 +763,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
         setSavedTrellis(data.config.trellis);
         setUsage(data.config.usage);
         setSavedUsage(data.config.usage);
+        setTerminal(data.config.terminal);
+        setSavedTerminal(data.config.terminal);
         setChatgpt(data.config.chatgpt);
         setSavedChatgpt(data.config.chatgpt);
         onConfigChange?.();
@@ -713,14 +861,15 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
           <div style={{ width: 150, borderRight: "1px solid var(--border)", padding: 10, background: "var(--bg-subtle)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             {renderSectionButton("worktree", "WorkTree", "New WorkTree 默认配置")}
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
-            {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量悬浮面板与预热配置")}
+            {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
+            {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量悬浮面板")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
           </div>
 
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : worktree && trellis && usage && chatgpt ? (
+            ) : worktree && trellis && usage && terminal && chatgpt ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -790,6 +939,139 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                       checked={usage.includeArchived}
                       onChange={(includeArchived) => updateUsage({ includeArchived })}
                     />
+                  </div>
+                ) : section === "terminal" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Web 终端</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制本地 Web 终端。环境变量会明文保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="启用 Web 终端"
+                      description="开启后主界面会显示 Terminal 按钮；后端 API 也会检查这个开关，关闭时不能启动终端。"
+                      checked={terminal.enabled}
+                      onChange={(enabled) => updateTerminal({ enabled })}
+                    />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="终端类型" description="选择 custom 时会使用下面填写的绝对路径；路径错误会在打开终端时显示错误。">
+                        <select
+                          value={terminal.shell}
+                          onChange={(e) => updateTerminal({ shell: e.target.value as PiWebTerminalConfig["shell"] })}
+                          style={inputStyle}
+                        >
+                          <option value="zsh">zsh</option>
+                          <option value="bash">bash</option>
+                          <option value="sh">sh</option>
+                          <option value="custom">custom path</option>
+                        </select>
+                      </Field>
+                      <Field label="Custom shell path" description="必须是可执行文件的绝对路径，例如 /opt/homebrew/bin/fish。">
+                        <TextInput
+                          value={terminal.customShellPath}
+                          onChange={(customShellPath) => updateTerminal({ customShellPath })}
+                          placeholder="/absolute/path/to/shell"
+                          disabled={terminal.shell !== "custom"}
+                        />
+                      </Field>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>环境变量</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
+                          下面的值会覆盖或补充 pi-web 服务进程环境，并明文保存；不要填写需要加密管理的长期密钥。
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 0.45fr) minmax(160px, 1fr) 70px", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 700 }}>变量名</span>
+                        <span style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 700 }}>变量值</span>
+                        <span />
+                        {Object.entries(terminal.env).map(([key, value]) => (
+                          <div key={key} style={{ display: "contents" }}>
+                            <TextInput value={key} onChange={(nextKey) => updateTerminalEnv(key, nextKey.trim(), value)} placeholder="HTTP_PROXY" />
+                            <TextInput value={value} onChange={(nextValue) => updateTerminalEnv(key, key, nextValue)} placeholder="value" />
+                            <button
+                              type="button"
+                              onClick={() => deleteTerminalEnv(key)}
+                              style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
+                            >
+                              删除
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          let index = Object.keys(terminal.env).length + 1;
+                          let key = `TERMINAL_ENV_${index}`;
+                          while (Object.prototype.hasOwnProperty.call(terminal.env, key)) {
+                            index += 1;
+                            key = `TERMINAL_ENV_${index}`;
+                          }
+                          updateTerminal({ env: { ...terminal.env, [key]: "" } });
+                        }}
+                        style={{ alignSelf: "flex-start", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}
+                      >
+                        添加变量
+                      </button>
+                      <Field label="Raw env 导入" description="支持 KEY=VALUE / export A=B C=D / # 注释。解析结果会合并到上面的 key-value 表格，保存时只保存表格数据。">
+                        <textarea
+                          value={rawEnvImport}
+                          onChange={(e) => setRawEnvImport(e.target.value)}
+                          placeholder={'export https_proxy=http://127.0.0.1:7897 http_proxy=http://127.0.0.1:7897 all_proxy=socks5://127.0.0.1:7897\nNODE_OPTIONS="--max-old-space-size=4096"'}
+                          rows={4}
+                          spellCheck={false}
+                          style={{ ...inputStyle, resize: "vertical", fontFamily: "var(--font-mono)", lineHeight: 1.45 }}
+                        />
+                      </Field>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={importRawEnv}
+                          disabled={!rawEnvImport.trim()}
+                          style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: rawEnvImport.trim() ? "var(--bg)" : "var(--border)", color: rawEnvImport.trim() ? "var(--text)" : "var(--text-dim)", cursor: rawEnvImport.trim() ? "pointer" : "not-allowed", fontSize: 12 }}
+                        >
+                          解析到表格
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void importRawEnvWithAi()}
+                          disabled={!cwd || !rawEnvImport.trim() || terminalEnvAssistLoading}
+                          title={cwd ? "用辅助模型解析复杂 env 文本" : "请先选择工作区"}
+                          style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: cwd && rawEnvImport.trim() && !terminalEnvAssistLoading ? "var(--bg)" : "var(--border)", color: cwd && rawEnvImport.trim() && !terminalEnvAssistLoading ? "var(--text)" : "var(--text-dim)", cursor: cwd && rawEnvImport.trim() && !terminalEnvAssistLoading ? "pointer" : "not-allowed", fontSize: 12 }}
+                        >
+                          {terminalEnvAssistLoading ? "AI 解析中…" : "AI 解析"}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>Raw env AI 解析模型</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
+                          用于解析复杂 export/代理变量片段，只返回 key-value 结果并填入上方表格。
+                        </div>
+                      </div>
+                      {modelsError && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 11 }}>{modelsError}</div>}
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+                        <Field label="AI 解析模型" description="默认使用 Pi 默认模型；也可指定某个模型。">
+                          <ModelPolicySelect value={terminal.envAssistant.model} onChange={(model) => updateTerminalEnvAssistantPolicy({ model })} models={modelList} />
+                        </Field>
+                        <Field label="思考强度" description="建议 minimal/low。">
+                          <ThinkingSelect value={terminal.envAssistant.thinking} onChange={(thinking) => updateTerminalEnvAssistantPolicy({ thinking })} />
+                        </Field>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+                        <Field label="回退模型" description="主模型失败或返回不可解析内容时使用。">
+                          <ModelPolicySelect value={terminal.envAssistantFallback.model} onChange={(model) => updateTerminalEnvAssistantFallbackPolicy({ model })} models={modelList} />
+                        </Field>
+                        <Field label="回退思考强度" description="通常保持 minimal 即可。">
+                          <ThinkingSelect value={terminal.envAssistantFallback.thinking} onChange={(thinking) => updateTerminalEnvAssistantFallbackPolicy({ thinking })} />
+                        </Field>
+                      </div>
+                    </div>
                   </div>
                 ) : section === "chatgpt" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1173,8 +1455,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !usage || !chatgpt || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !usage || !chatgpt || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !usage || !chatgpt || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !usage || !terminal || !chatgpt || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !usage || !terminal || !chatgpt || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !usage || !terminal || !chatgpt || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>
