@@ -71,3 +71,38 @@ Implemented hierarchical Trellis task list with expandable child groups, child-t
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Trellis workflow visualizer
+
+**Date**: 2026-06-30
+**Task**: Trellis workflow visualizer
+**Branch**: `pi/20260630-093810`
+
+### Summary
+
+Added a read-only Settings → Trellis workflow visualizer with phase/state parsing, full-screen modal, Markdown/source detail views, workflow and node assistant reading with primary/fallback model settings, documentation updates, and fixed Trellis subagent tool declarations.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `00e29cd` | (see git log) |
+| `1e291dd` | (see git log) |
+| `f24a1e7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

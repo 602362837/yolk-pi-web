@@ -20,10 +20,12 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/subscription-quota.ts` | Query OpenAI Codex subscription quota. |
 | `lib/npx.ts` | Cross-platform `npx` wrapper that avoids shell quoting issues. |
 | `lib/usage-stats.ts` | Aggregate token/cost across configured active-only or active-plus-archived sessions by day, model, provider, and session. |
-| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree, Usage scan scope, ChatGPT usage panel settings, and Trellis panel settings, including Trellis install/update proxy options and Trellis subagent model policy. |
+| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for WorkTree, Usage scan scope, ChatGPT usage panel settings, and Trellis panel settings, including Trellis install/update proxy options, workflow assistant primary/fallback model policy, and Trellis subagent model policy. |
 | `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs. |
 | `lib/trellis-manager.ts` | Trellis setup/status/update helper: prerequisite checks, CLI/version inspection, proxy-scoped child-process environment, and fixed Trellis/npm command execution. |
 | `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, optional `meta.lastCheck` quality-check state, and phase/progress derivation. |
+| `lib/trellis-workflow-reader.ts` | Read-only `.trellis/workflow.md` reader/parser for Settings workflow visualization; extracts phases, steps, workflow-state blocks, source line ranges, and parser warnings without executing Trellis commands or mutating files. |
+| `lib/trellis-workflow-types.ts` | Wire types for Trellis workflow visualization API responses and UI consumers. |
 | `lib/trellis-session-link.ts` | Session-scoped Trellis task association resolver for the floating widget; uses high-confidence session transcript evidence and exact per-session runtime pointers without mutating Trellis task metadata. |
 | `lib/trellis-setup-types.ts` | Wire types for Trellis setup status and setup/update command API responses. |
 | `lib/trellis-types.ts` | Wire types for Trellis task list/detail API responses and UI consumers. |

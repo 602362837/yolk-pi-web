@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
 import type {
   PiWebChatGptConfig,
   PiWebConfig,
@@ -336,6 +337,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [trellisStatusError, setTrellisStatusError] = useState<string | null>(null);
   const [trellisAction, setTrellisAction] = useState<"init" | "update" | null>(null);
   const [trellisOutput, setTrellisOutput] = useState<string | null>(null);
+  const [trellisWorkflowOpen, setTrellisWorkflowOpen] = useState(false);
   const [modelList, setModelList] = useState<ModelListItem[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [developerName, setDeveloperName] = useState("");
@@ -462,6 +464,22 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
         ...prev.subagents,
         defaultPolicy: { ...prev.subagents.defaultPolicy, ...patch },
       },
+    } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateWorkflowAssistantPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
+    setTrellis((prev) => prev ? {
+      ...prev,
+      workflowAssistant: { ...prev.workflowAssistant, ...patch },
+    } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateWorkflowAssistantFallbackPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
+    setTrellis((prev) => prev ? {
+      ...prev,
+      workflowAssistantFallback: { ...prev.workflowAssistantFallback, ...patch },
     } : prev);
     setNotice(null);
   }, []);
@@ -649,6 +667,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const canUpdateTrellis = !!cwd && !!trellisStatus?.canUpdate && !trellisBusy && !trellisStatusLoading;
 
   return (
+    <>
     <div
       onClick={onClose}
       style={{
@@ -830,9 +849,20 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                           面板从当前工作区的 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)" }}>.trellis/tasks</code> 读取任务；使用前需要在项目中安装并初始化 Trellis。
                         </p>
                       </div>
-                      <a href="https://docs.trytrellis.app/" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
-                        打开 Trellis 官方文档 ↗
-                      </a>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <a href="https://docs.trytrellis.app/" target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+                          打开 Trellis 官方文档 ↗
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setTrellisWorkflowOpen(true)}
+                          disabled={!cwd}
+                          title={cwd ? "查看当前工作区的 Trellis 流程" : "请先选择工作区"}
+                          style={{ background: "none", border: "none", padding: 0, color: cwd ? "var(--accent)" : "var(--text-dim)", fontSize: 12, fontWeight: 700, cursor: cwd ? "pointer" : "not-allowed" }}
+                        >
+                          流程设计
+                        </button>
+                      </div>
                       <div style={{ color: "var(--text-dim)", fontSize: 11, overflowWrap: "anywhere" }}>
                         当前工作区：{cwd ? <code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>{cwd}</code> : "未选择"}
                       </div>
@@ -863,6 +893,45 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                       <Field label="代理地址" description="示例：https://127.0.0.1:7890。启用代理时会写入 HTTP_PROXY / HTTPS_PROXY / npm_config_proxy 等子进程环境变量。">
                         <TextInput value={trellis.proxyUrl} onChange={(proxyUrl) => updateTrellis({ proxyUrl })} placeholder="http://127.0.0.1:7890" disabled={!trellis.proxyEnabled} />
                       </Field>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>流程辅助阅读模型</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
+                          用于解释 workflow.md 节点引导内容：翻译成中文并总结关键动作。只读辅助，不会修改流程文件。
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+                        <Field label="辅助模型" description="选择“跟随主会话模型”时，后台无法获知当前聊天模型会安全回退到 Pi 默认模型。">
+                          <ModelPolicySelect
+                            value={trellis.workflowAssistant.model}
+                            onChange={(model) => updateWorkflowAssistantPolicy({ model })}
+                            models={modelList}
+                          />
+                        </Field>
+                        <Field label="思考强度" description="建议 minimal/low，辅助阅读不需要高推理预算。">
+                          <ThinkingSelect
+                            value={trellis.workflowAssistant.thinking}
+                            onChange={(thinking) => updateWorkflowAssistantPolicy({ thinking })}
+                          />
+                        </Field>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+                        <Field label="回退模型" description="主辅助模型返回空内容、超时或失败时使用。建议选择不同 provider 或更稳定的模型。">
+                          <ModelPolicySelect
+                            value={trellis.workflowAssistantFallback.model}
+                            onChange={(model) => updateWorkflowAssistantFallbackPolicy({ model })}
+                            models={modelList}
+                          />
+                        </Field>
+                        <Field label="回退思考强度" description="通常保持 minimal/low 即可。">
+                          <ThinkingSelect
+                            value={trellis.workflowAssistantFallback.thinking}
+                            onChange={(thinking) => updateWorkflowAssistantFallbackPolicy({ thinking })}
+                          />
+                        </Field>
+                      </div>
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
@@ -1113,5 +1182,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
         </div>
       </div>
     </div>
+    {trellisWorkflowOpen && <TrellisWorkflowVisualizer cwd={cwd} onClose={() => setTrellisWorkflowOpen(false)} />}
+    </>
   );
 }

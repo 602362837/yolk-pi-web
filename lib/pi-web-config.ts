@@ -56,6 +56,8 @@ export interface PiWebTrellisConfig {
   includeArchived: boolean;
   proxyEnabled: boolean;
   proxyUrl: string;
+  workflowAssistant: PiWebSubagentRunPolicy;
+  workflowAssistantFallback: PiWebSubagentRunPolicy;
   subagents: PiWebTrellisSubagentsConfig;
 }
 
@@ -129,6 +131,14 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     includeArchived: false,
     proxyEnabled: false,
     proxyUrl: "",
+    workflowAssistant: {
+      model: { mode: "followMain" },
+      thinking: "minimal",
+    },
+    workflowAssistantFallback: {
+      model: { mode: "piDefault" },
+      thinking: "minimal",
+    },
     subagents: {
       enabled: true,
       defaultPolicy: {
@@ -316,6 +326,8 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       includeArchived: readBoolean(trellis.includeArchived, defaults.trellis.includeArchived),
       proxyEnabled: readBoolean(trellis.proxyEnabled, defaults.trellis.proxyEnabled),
       proxyUrl: typeof trellis.proxyUrl === "string" ? trellis.proxyUrl.trim() : defaults.trellis.proxyUrl,
+      workflowAssistant: readSubagentPolicy(trellis.workflowAssistant, defaults.trellis.workflowAssistant),
+      workflowAssistantFallback: readSubagentPolicy(trellis.workflowAssistantFallback, defaults.trellis.workflowAssistantFallback),
       subagents: readTrellisSubagentsConfig(trellis.subagents, defaults.trellis.subagents),
     },
   };
@@ -551,6 +563,12 @@ export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
     includeArchived: requireBoolean(value.includeArchived, "trellis.includeArchived"),
     proxyEnabled,
     proxyUrl: validateProxyUrl(proxyUrl, proxyEnabled),
+    workflowAssistant: value.workflowAssistant === undefined
+      ? DEFAULT_PI_WEB_CONFIG.trellis.workflowAssistant
+      : validateSubagentPolicy(value.workflowAssistant, "trellis.workflowAssistant"),
+    workflowAssistantFallback: value.workflowAssistantFallback === undefined
+      ? DEFAULT_PI_WEB_CONFIG.trellis.workflowAssistantFallback
+      : validateSubagentPolicy(value.workflowAssistantFallback, "trellis.workflowAssistantFallback"),
     subagents: value.subagents === undefined
       ? DEFAULT_PI_WEB_CONFIG.trellis.subagents
       : validateTrellisSubagentsConfig(value.subagents),

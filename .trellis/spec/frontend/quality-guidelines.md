@@ -75,6 +75,9 @@ This is cross-layer work: settings storage → API validation → filesystem rea
 - The feature setting must default to disabled unless the product explicitly
   requires opt-out behavior.
 - The UI entry point and the backing API must both respect the setting gate.
+- Settings/setup inspection APIs may intentionally bypass the feature enable
+  gate when they are needed to inspect or configure the feature itself; document
+  that exception in the route and keep normal feature list/detail APIs gated.
 - Browser code must not read arbitrary paths directly; components fetch typed
   API responses only.
 - API routes must validate `cwd` against shared allowed roots before reading
@@ -88,7 +91,7 @@ This is cross-layer work: settings storage → API validation → filesystem rea
 
 | Condition | Required behavior |
 | --- | --- |
-| Feature disabled | 403 JSON error from feature APIs; no UI entry point. |
+| Feature disabled | 403 JSON error from normal feature APIs; setup/settings inspection APIs may still return read-only status or projections when explicitly documented. |
 | Missing `cwd` | 400 JSON error. |
 | `cwd` outside allowed roots | 403 JSON error. |
 | Missing feature directory | 200 empty-state response, not an exception. |
