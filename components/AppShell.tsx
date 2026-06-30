@@ -21,7 +21,8 @@ import { formatWorkspaceTitle } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
 import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
-import type { TrellisSessionTaskLinkResult } from "@/lib/trellis-types";
+import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
+import { trellisTaskDetailToChatContext, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import type { ChatInputHandle } from "./ChatInput";
 
 export function AppShell() {
@@ -133,6 +134,7 @@ export function AppShell() {
   const [focusedTrellisTaskKey, setFocusedTrellisTaskKey] = useState<string | null>(null);
   const [trellisSessionTask, setTrellisSessionTask] = useState<TrellisSessionTaskLinkResult | null>(null);
   const [trellisSessionTaskRefreshKey, setTrellisSessionTaskRefreshKey] = useState(0);
+  const [pendingTrellisTaskContext, setPendingTrellisTaskContext] = useState<TrellisTaskChatContext | null>(null);
 
   const handleAtMention = useCallback((relativePath: string) => {
     chatInputRef.current?.addFileReference(relativePath);
@@ -334,6 +336,44 @@ export function AppShell() {
     setRightPanelMode("trellis");
     setRightPanelOpen(true);
   }, [trellisSessionTask]);
+
+  const handleJoinTrellisTaskChat = useCallback((task: TrellisTaskDetail) => {
+    if (task.isArchived || !trellisCwd) return;
+
+    const context = trellisTaskDetailToChatContext(task);
+    setPendingTrellisTaskContext(context);
+
+    if (!selectedSession || selectedSession.cwd !== trellisCwd || selectedSession.archived) {
+      setSelectedSession(null);
+      setNewSessionCwd(trellisCwd);
+      setSessionKey((key) => key + 1);
+      setBranchTree([]);
+      setBranchActiveLeafId(null);
+      setSystemPrompt(null);
+      setActiveTopPanel(null);
+      router.replace("/", { scroll: false });
+    }
+  }, [router, selectedSession, trellisCwd]);
+
+  useEffect(() => {
+    if (!pendingTrellisTaskContext || !showChat) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const tryInsert = () => {
+      if (cancelled) return;
+      if (chatInputRef.current) {
+        chatInputRef.current.addTrellisTaskContext(pendingTrellisTaskContext);
+        setPendingTrellisTaskContext(null);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 12) window.requestAnimationFrame(tryInsert);
+    };
+
+    window.requestAnimationFrame(tryInsert);
+    return () => { cancelled = true; };
+  }, [pendingTrellisTaskContext, sessionKey, showChat]);
 
   useEffect(() => {
     if (!trellisEnabled && rightPanelMode === "trellis") {
@@ -962,7 +1002,7 @@ export function AppShell() {
               {trellisCwd && <span title={trellisCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{trellisCwd}</span>}
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <TrellisPanel cwd={trellisCwd} includeArchivedDefault={trellisIncludeArchivedDefault} focusedTaskKey={focusedTrellisTaskKey} onOpenFile={handleOpenFile} />
+              <TrellisPanel cwd={trellisCwd} includeArchivedDefault={trellisIncludeArchivedDefault} focusedTaskKey={focusedTrellisTaskKey} onOpenFile={handleOpenFile} onJoinTaskChat={handleJoinTrellisTaskChat} />
             </div>
           </>
         )}

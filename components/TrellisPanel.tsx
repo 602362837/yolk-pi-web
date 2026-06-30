@@ -9,6 +9,7 @@ interface TrellisPanelProps {
   includeArchivedDefault: boolean;
   focusedTaskKey?: string | null;
   onOpenFile?: (filePath: string, fileName: string) => void;
+  onJoinTaskChat?: (task: TrellisTaskDetail) => void;
 }
 
 type ArtifactTab = "overview" | "prd" | "design" | "implement";
@@ -164,7 +165,7 @@ function countRenderedTreeNodes(nodes: TaskTreeNode[], expandedKeys: Set<string>
   }, 0);
 }
 
-export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOpenFile }: TrellisPanelProps) {
+export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOpenFile, onJoinTaskChat }: TrellisPanelProps) {
   const [includeArchived, setIncludeArchived] = useState(includeArchivedDefault);
   const [refreshKey, setRefreshKey] = useState(0);
   const [tasks, setTasks] = useState<TrellisTaskSummary[]>([]);
@@ -391,7 +392,7 @@ export function TrellisPanel({ cwd, includeArchivedDefault, focusedTaskKey, onOp
             ) : detailError ? (
               <TaskDetailError summary={selectedSummary} error={detailError} />
             ) : detail ? (
-              <TaskDetail task={detail} artifactTab={artifactTab} onArtifactTabChange={setArtifactTab} cwd={cwd} onOpenFile={onOpenFile} />
+              <TaskDetail task={detail} artifactTab={artifactTab} onArtifactTabChange={setArtifactTab} cwd={cwd} onOpenFile={onOpenFile} onJoinTaskChat={onJoinTaskChat} />
             ) : (
               <EmptyState title="请选择任务" description="从左侧任务列表选择一个任务查看详情。" />
             )}
@@ -565,12 +566,32 @@ function formatManifestCounts(manifests: TrellisTaskDetail["manifests"]): string
   return `${manifests.implementCount} implement · ${manifests.checkCount} check`;
 }
 
-function TaskDetail({ task, artifactTab, onArtifactTabChange, cwd, onOpenFile }: { task: TrellisTaskDetail; artifactTab: ArtifactTab; onArtifactTabChange: (tab: ArtifactTab) => void; cwd: string; onOpenFile?: (filePath: string, fileName: string) => void }) {
+function TaskDetail({ task, artifactTab, onArtifactTabChange, cwd, onOpenFile, onJoinTaskChat }: { task: TrellisTaskDetail; artifactTab: ArtifactTab; onArtifactTabChange: (tab: ArtifactTab) => void; cwd: string; onOpenFile?: (filePath: string, fileName: string) => void; onJoinTaskChat?: (task: TrellisTaskDetail) => void }) {
   const docs = task.documents;
   const activeDocument = artifactTab === "prd" ? docs.prd : artifactTab === "design" ? docs.design : artifactTab === "implement" ? docs.implement : undefined;
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
       <TaskHeader task={task} />
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={() => onJoinTaskChat?.(task)}
+          disabled={!onJoinTaskChat || task.isArchived || !!task.readError}
+          title={task.isArchived ? "已归档任务暂不支持加入会话" : "将这个 Trellis 任务作为上下文块加入 Chat 输入框"}
+          style={{
+            padding: "7px 10px",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: task.isArchived ? "var(--bg-subtle)" : "var(--bg-selected)",
+            color: task.isArchived ? "var(--text-dim)" : "var(--accent)",
+            cursor: !onJoinTaskChat || task.isArchived || task.readError ? "not-allowed" : "pointer",
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          {task.isArchived ? "已归档不可加入" : "加入会话"}
+        </button>
+      </div>
       <ProgressTimeline task={task} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
         <MetaCard label="负责人" value={task.assignee ?? "—"} />

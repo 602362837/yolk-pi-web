@@ -4,10 +4,10 @@
 
 | File | Purpose |
 | --- | --- |
-| `components/AppShell.tsx` | Top-level layout, URL state, tab management, and right drawer mode switching between files and optional Trellis tasks. |
+| `components/AppShell.tsx` | Top-level layout, URL state, tab management, right drawer mode switching between files and optional Trellis tasks, and Trellis-task-to-chat context block insertion. |
 | `components/SessionSidebar.tsx` | Session tree sidebar, workspace/WorkTree picker actions grouped by main workspace, archive/unarchive actions, archived section, multi-select batch archive, and integrated file explorer. |
 | `components/ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic. Shows archived banner and disables input for archived sessions. |
-| `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload. |
+| `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload, file-reference chips, and serialized Trellis task context blocks. |
 | `components/ChatGptUsagePanel.tsx` | Optional semi-transparent top-bar ChatGPT/Codex quota panel; reads and periodically revalidates cached active-account usage, reloads accounts on expand, lists saved accounts with quick activation, supports manual quota refresh, and shows backend auto-refresh scheduler/lock maintenance state. |
 | `components/MessageView.tsx` | Render user, assistant, tool-call, and tool-result messages. |
 | `components/BranchNavigator.tsx` | In-session branch switcher. |
@@ -18,7 +18,7 @@
 | `components/SkillsConfig.tsx` | Modal for browsing/installing skills. |
 | `components/SettingsConfig.tsx` | Settings modal for WorkTree defaults, Usage scan scope, ChatGPT usage panel and backend auto-refresh settings, and optional Trellis panel settings in `pi-web.json`, including Trellis docs guidance, prerequisite/status inspection, install/init, update, proxy controls, Trellis workflow assistant primary/fallback model controls, and Trellis subagent model policy controls. |
 | `components/SubagentPanel.tsx` | Top-bar subagent activity panel, including nested subagent inspection and compact model/thinking metadata chips when subagent routing or result metadata is available. |
-| `components/TrellisPanel.tsx` | Read-only Trellis task drawer: top-level task list with expandable child task groups, filters, details, artifacts, hierarchy, manifest/context counts, recorded task metadata, optional check-run state, derived phase/progress, and optional externally focused task selection. |
+| `components/TrellisPanel.tsx` | Read-only Trellis task drawer: top-level task list with expandable child task groups, filters, details, artifacts, hierarchy, manifest/context counts, recorded task metadata, optional check-run state, derived phase/progress, optional externally focused task selection, and a join-chat action that adds active tasks as chat context blocks without mutating Trellis files. |
 | `components/TrellisWorkflowVisualizer.tsx` | Large read-only Settings → Trellis modal that visualizes `.trellis/workflow.md` phases, steps, workflow-state blocks, source line ranges, parser warnings, Markdown/raw guidance text, and model-assisted Chinese reading summaries as a foundation for future workflow editing. |
 | `components/TrellisSessionWidget.tsx` | Floating session-scoped Trellis progress widget shown only when the current chat session has a high-confidence associated task; includes compact child-task progress when present, and clicking opens the Trellis drawer focused on that task. |
 | `components/UsageStatsModal.tsx` | Token/cost usage statistics modal with active/archive scan counts and rounded M-token conversions. |

@@ -27,6 +27,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/trellis-workflow-reader.ts` | Read-only `.trellis/workflow.md` reader/parser for Settings workflow visualization; extracts phases, steps, workflow-state blocks, source line ranges, and parser warnings without executing Trellis commands or mutating files. |
 | `lib/trellis-workflow-types.ts` | Wire types for Trellis workflow visualization API responses and UI consumers. |
 | `lib/trellis-session-link.ts` | Session-scoped Trellis task association resolver for the floating widget; uses high-confidence session transcript evidence and exact per-session runtime pointers without mutating Trellis task metadata. |
+| `lib/trellis-chat-context.ts` | Pure helpers for converting Trellis task details into compact chat-composer context payloads and serializing those blocks into resume prompts recognized by session-task linking. |
 | `lib/trellis-setup-types.ts` | Wire types for Trellis setup status and setup/update command API responses. |
 | `lib/trellis-types.ts` | Wire types for Trellis task list/detail API responses and UI consumers. |
 | `lib/workspace-title.ts` | Shared workspace title formatting from cwd and Git metadata. |
