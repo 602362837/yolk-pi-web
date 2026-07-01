@@ -30,14 +30,20 @@ try {
 
 const { values: cliArgs } = parseArgs({
   options: {
-    port:     { type: "string", short: "p" },
-    hostname: { type: "string", short: "H" },
+    port:         { type: "string", short: "p" },
+    hostname:     { type: "string", short: "H" },
+    proxy:        { type: "string" },
+    "socks-proxy": { type: "string" },
+    "no-proxy":  { type: "string" },
   },
   strict: false,
 });
 
-const port     = cliArgs.port     ?? process.env.PORT     ?? "30141";
-const hostname = cliArgs.hostname ?? process.env.HOSTNAME ?? null;
+const port       = cliArgs.port     ?? process.env.PORT     ?? "30141";
+const hostname   = cliArgs.hostname ?? process.env.HOSTNAME ?? null;
+const httpProxy  = cliArgs.proxy ?? process.env.PROXY_URL ?? process.env.HTTP_PROXY ?? process.env.http_proxy ?? null;
+const socksProxy = cliArgs["socks-proxy"] ?? process.env.SOCKS_PROXY_URL ?? process.env.ALL_PROXY ?? process.env.all_proxy ?? null;
+const noProxy    = cliArgs["no-proxy"] ?? process.env.NO_PROXY ?? process.env.no_proxy ?? null;
 
 if (!fs.existsSync(nextDir)) {
   console.error("Build artifacts not found. Please report this issue.");
@@ -47,12 +53,39 @@ if (!fs.existsSync(nextDir)) {
 const nextArgs = ["start", "-p", port];
 if (hostname) nextArgs.push("-H", hostname);
 
+function appendNodeOption(current, option) {
+  const parts = (current ?? "").split(/\s+/).filter(Boolean);
+  return parts.includes(option) ? current ?? "" : [...parts, option].join(" ");
+}
+
+function createRuntimeEnv(baseEnv) {
+  const env = { ...baseEnv };
+  if (httpProxy) {
+    env.HTTP_PROXY = httpProxy;
+    env.HTTPS_PROXY = httpProxy;
+    env.http_proxy = httpProxy;
+    env.https_proxy = httpProxy;
+  }
+  if (socksProxy) {
+    env.ALL_PROXY = socksProxy;
+    env.all_proxy = socksProxy;
+  }
+  if (noProxy) {
+    env.NO_PROXY = noProxy;
+    env.no_proxy = noProxy;
+  }
+  if (httpProxy || socksProxy || noProxy) {
+    env.NODE_OPTIONS = appendNodeOption(env.NODE_OPTIONS, "--use-env-proxy");
+  }
+  return env;
+}
+
 // Always run next's JS entry with node directly — avoids .bin symlink issues
 // and path-with-spaces problems on Windows when shell: true is used.
 const child = spawn(process.execPath, [nextBin, ...nextArgs], {
   cwd: pkgDir,
   stdio: ["inherit", "pipe", "inherit"],
-  env: { ...process.env },
+  env: createRuntimeEnv(process.env),
 });
 
 let browserOpened = false;

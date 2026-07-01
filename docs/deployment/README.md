@@ -42,6 +42,8 @@ ypi --port 8080              # custom port
 ypi --hostname 127.0.0.1     # bind to localhost only
 ypi -p 8080 -H 127.0.0.1     # short options
 PORT=8080 ypi                # environment variable is also supported
+ypi --proxy http://127.0.0.1:7897                 # HTTP_PROXY/HTTPS_PROXY
+ypi --socks-proxy socks5://127.0.0.1:7897         # ALL_PROXY/SOCKS proxy
 ```
 
 `npx` accepts the same options:
@@ -49,6 +51,12 @@ PORT=8080 ypi                # environment variable is also supported
 ```bash
 npx @alan-zhao/yolk-pi-web@latest --port 8080
 ```
+
+When proxy options or proxy environment variables are present, `ypi` forwards
+`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, and appends
+`--use-env-proxy` to `NODE_OPTIONS` so Node/Next server-side fetch calls use the
+proxy. It also accepts the same environment aliases as the proxy startup scripts:
+`PROXY_URL` for HTTP/HTTPS proxy and `SOCKS_PROXY_URL` for `ALL_PROXY`.
 
 ## Data and Configuration
 

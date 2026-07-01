@@ -42,12 +42,20 @@ ypi --port 8080              # 自定义端口
 ypi --hostname 127.0.0.1     # 仅本机访问
 ypi -p 8080 -H 127.0.0.1     # 短参数组合
 PORT=8080 ypi                # 也支持 PORT 环境变量
+ypi --proxy http://127.0.0.1:7897                 # HTTP/HTTPS 代理
+ypi --socks-proxy socks5://127.0.0.1:7897         # ALL_PROXY/SOCKS 代理
 ```
 
 `npx` 同样支持这些参数：
 
 ```bash
 npx @alan-zhao/yolk-pi-web@latest --port 8080
+```
+
+如果 shell 中已有 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`，`ypi` 会继承并自动为 Node 追加 `--use-env-proxy`。也可以用 `PROXY_URL` 和 `SOCKS_PROXY_URL`：
+
+```bash
+PROXY_URL=http://127.0.0.1:7897 SOCKS_PROXY_URL=socks5://127.0.0.1:7897 ypi
 ```
 
 ## 数据与配置
