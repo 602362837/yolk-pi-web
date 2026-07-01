@@ -45,6 +45,13 @@ function streamReducer(state: StreamingState, action: StreamAction): StreamingSt
   }
 }
 
+const AUTO_SCROLL_BOTTOM_THRESHOLD = 96;
+
+function isNearScrollBottom(container: HTMLDivElement): boolean {
+  const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+  return distance <= AUTO_SCROLL_BOTTOM_THRESHOLD;
+}
+
 interface AgentEvent {
   type: string;
   [key: string]: unknown;
@@ -128,6 +135,7 @@ export interface UseAgentSessionOptions {
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSubagentChange?: OnSubagentChange;
+  autoScrollEnabled?: boolean;
   setNewSessionModel?: (model: { provider: string; modelId: string } | null) => void;
   setToolPreset?: (preset: "none" | "default" | "full" | "subagent") => void;
 }
@@ -222,6 +230,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
+    autoScrollEnabled = true,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -261,6 +270,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const pendingScrollToUserRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollEnabledRef = useRef(autoScrollEnabled);
+  const autoScrollStickyRef = useRef(true);
 
   const setNewSessionModel = opts.setNewSessionModel ?? setNewSessionModelState;
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
@@ -742,7 +753,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [setToolPresetState]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }
+    autoScrollStickyRef.current = true;
   }, []);
 
   const scrollUserMsgToTop = useCallback(() => {
@@ -790,20 +807,52 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     onBranchDataChange(data?.tree ?? [], activeLeafId, handleLeafChange);
   }, [data?.tree, activeLeafId, handleLeafChange, onBranchDataChange]);
 
+  const hasMessages = messages.length > 0;
+
   useEffect(() => {
-    if (messages.length > 0) {
-      if (pendingScrollToUserRef.current) {
-        pendingScrollToUserRef.current = false;
-        initialScrollDoneRef.current = true;
-        scrollUserMsgToTop();
-      } else if (!initialScrollDoneRef.current) {
-        initialScrollDoneRef.current = true;
-        scrollToBottom("instant");
-      } else if (!agentRunningRef.current) {
+    autoScrollEnabledRef.current = autoScrollEnabled;
+    if (!autoScrollEnabled) return;
+    autoScrollStickyRef.current = true;
+    const frame = requestAnimationFrame(() => scrollToBottom("smooth"));
+    return () => cancelAnimationFrame(frame);
+  }, [autoScrollEnabled, scrollToBottom]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      if (!autoScrollEnabledRef.current) return;
+      autoScrollStickyRef.current = isNearScrollBottom(container);
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [hasMessages]);
+
+  useEffect(() => {
+    if (!hasMessages) return;
+
+    if (pendingScrollToUserRef.current) {
+      pendingScrollToUserRef.current = false;
+      initialScrollDoneRef.current = true;
+      if (autoScrollEnabledRef.current) {
+        autoScrollStickyRef.current = true;
         scrollToBottom("smooth");
+      } else {
+        scrollUserMsgToTop();
       }
+      return;
     }
-  }, [messages.length, agentRunning, scrollToBottom, scrollUserMsgToTop]);
+
+    if (!initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      scrollToBottom("instant");
+      return;
+    }
+
+    if (autoScrollEnabledRef.current && autoScrollStickyRef.current) {
+      scrollToBottom(agentRunningRef.current ? "auto" : "smooth");
+    }
+  }, [hasMessages, messages.length, agentRunning, streamState.isStreaming, streamState.streamingMessage, autoScrollEnabled, scrollToBottom, scrollUserMsgToTop]);
 
   // Load model list
   useEffect(() => {

@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
 import { accessSync, constants, statSync } from "fs";
-import { isAbsolute } from "path";
+import { delimiter, isAbsolute } from "path";
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "child_process";
 import * as pty from "@lydell/node-pty";
 import { getAllowedRoots, isPathAllowed } from "./allowed-roots";
 import { existingCanonicalCwd } from "./cwd";
-import { readPiWebConfig, type PiWebTerminalConfig } from "./pi-web-config";
+import { readPiWebConfig, type PiWebTerminalConfig, type PiWebTerminalShell } from "./pi-web-config";
 
 const TERMINAL_IDLE_KILL_MS = 5_000;
 const TERMINAL_BUFFER_LIMIT = 500;
@@ -30,6 +30,12 @@ interface TerminalProcess {
   kill(): void;
   onData(listener: (chunk: string) => void): void;
   onExit(listener: (event: { exitCode: number; signal?: number | string }) => void): void;
+}
+
+interface ResolvedShell {
+  command: string;
+  args: string[];
+  label: string;
 }
 
 interface TerminalSession {
@@ -71,33 +77,60 @@ function assertExecutablePath(filePath: string): void {
   try {
     const stat = statSync(filePath);
     if (!stat.isFile()) throw new TerminalError("Custom shell path must point to a file");
-    accessSync(filePath, constants.X_OK);
+    if (process.platform !== "win32") accessSync(filePath, constants.X_OK);
   } catch (error) {
     if (error instanceof TerminalError) throw error;
     throw new TerminalError(`Custom shell path is not executable or does not exist: ${filePath}`);
   }
 }
 
-function resolveNamedShell(shell: "zsh" | "bash" | "sh"): string {
+function findWindowsExecutable(command: string): string | null {
+  const extensions = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
+  const candidates = command.includes(".") ? [command] : [command, ...extensions.map((extension) => `${command}${extension.toLowerCase()}`), ...extensions.map((extension) => `${command}${extension.toUpperCase()}`)];
+  for (const directory of (process.env.PATH ?? "").split(delimiter)) {
+    for (const candidate of candidates) {
+      const filePath = `${directory.replace(/[\\/]$/, "")}\\${candidate}`;
+      try {
+        const stat = statSync(filePath);
+        if (stat.isFile()) return filePath;
+      } catch {
+      }
+    }
+  }
+  return null;
+}
+
+function commandExists(command: string): boolean {
+  if (process.platform === "win32") return findWindowsExecutable(command) !== null;
+  const result = spawnSync("/bin/sh", ["-lc", `command -v ${command}`], { encoding: "utf8" });
+  return result.status === 0 && Boolean(result.stdout.trim());
+}
+
+function resolveNamedShell(shell: Exclude<PiWebTerminalShell, "custom">): ResolvedShell {
   if (process.platform === "win32") {
-    const result = spawnSync("where", [shell], { encoding: "utf8" });
-    const first = result.stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
-    if (result.status === 0 && first) return first;
-    throw new TerminalError(`Shell is not available on PATH: ${shell}`);
+    const windowsCommand = shell === "cmd" ? "cmd.exe" : shell === "powershell" ? "powershell.exe" : shell === "pwsh" ? "pwsh.exe" : shell;
+    const resolved = findWindowsExecutable(windowsCommand);
+    if (!resolved) throw new TerminalError(`Shell is not available on PATH: ${windowsCommand}`);
+    if (shell === "cmd") return { command: resolved, args: [], label: "cmd" };
+    if (shell === "powershell" || shell === "pwsh") return { command: resolved, args: ["-NoLogo"], label: shell };
+    return { command: resolved, args: ["-i"], label: shell };
   }
 
+  if (shell === "cmd" || shell === "powershell" || shell === "pwsh") {
+    throw new TerminalError(`Shell is only supported on Windows: ${shell}`);
+  }
   const result = spawnSync("/bin/sh", ["-lc", `command -v ${shell}`], { encoding: "utf8" });
   const resolved = result.stdout.trim().split(/\r?\n/)[0];
-  if (result.status === 0 && resolved) return resolved;
+  if (result.status === 0 && resolved) return { command: resolved, args: ["-i"], label: shell };
   throw new TerminalError(`Shell is not available on PATH: ${shell}`);
 }
 
-function resolveShell(config: PiWebTerminalConfig): string {
+function resolveShell(config: PiWebTerminalConfig): ResolvedShell {
   if (config.shell === "custom") {
     const customShellPath = config.customShellPath.trim();
     if (!customShellPath) throw new TerminalError("Custom shell path is required when terminal shell is custom");
     assertExecutablePath(customShellPath);
-    return customShellPath;
+    return { command: customShellPath, args: [], label: customShellPath };
   }
   return resolveNamedShell(config.shell);
 }
@@ -151,26 +184,25 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function trySpawnScript(shell: string, cwd: string, env: Record<string, string>): { process: TerminalProcess; backend: "script" } | null {
+function trySpawnScript(shell: ResolvedShell, cwd: string, env: Record<string, string>): { process: TerminalProcess; backend: "script" } | null {
   // macOS script(1) requires a controlling tty and exits immediately when
   // spawned with stdio pipes, so only use this fallback on non-Darwin systems.
-  if (process.platform === "darwin") return null;
-  const probe = spawnSync("/usr/bin/env", ["script", "--version"], { encoding: "utf8" });
-  if (probe.error) return null;
+  if (process.platform === "darwin" || process.platform === "win32" || !commandExists("script")) return null;
   const common = {
     cwd,
     env: { ...env, TERM: env.TERM ?? "xterm-256color" } as unknown as NodeJS.ProcessEnv,
     stdio: "pipe" as const,
   };
-  const child = spawn("script", ["-q", "-c", `${shellQuote(shell)} -i`, "/dev/null"], common);
+  const command = [shellQuote(shell.command), ...shell.args.map(shellQuote)].join(" ");
+  const child = spawn("script", ["-q", "-c", command, "/dev/null"], common);
   return { backend: "script", process: wrapPipeProcess(child, false) };
 }
 
-function spawnTerminalProcess(shell: string, cwd: string, env: Record<string, string>, cols: number, rows: number): { process: TerminalProcess; backend: "pty" | "script" | "pipe" } {
+function spawnTerminalProcess(shell: ResolvedShell, cwd: string, env: Record<string, string>, cols: number, rows: number): { process: TerminalProcess; backend: "pty" | "script" | "pipe" } {
   try {
     return {
       backend: "pty",
-      process: wrapPtyProcess(pty.spawn(shell, [], {
+      process: wrapPtyProcess(pty.spawn(shell.command, shell.args, {
         name: "xterm-256color",
         cols,
         rows,
@@ -181,14 +213,14 @@ function spawnTerminalProcess(shell: string, cwd: string, env: Record<string, st
   } catch {
     const scriptFallback = trySpawnScript(shell, cwd, env);
     if (scriptFallback) return scriptFallback;
-    const child = spawn(shell, ["-i"], {
+    const child = spawn(shell.command, shell.args, {
       cwd,
       env: { ...env, TERM: env.TERM ?? "xterm-256color" } as unknown as NodeJS.ProcessEnv,
       stdio: "pipe",
     });
     return {
       backend: "pipe",
-      process: wrapPipeProcess(child, true),
+      process: wrapPipeProcess(child, process.platform !== "win32"),
     };
   }
 }
@@ -219,7 +251,7 @@ export async function createTerminalSession(input: { cwd?: unknown; cols?: unkno
   const session: TerminalSession = {
     id,
     cwd,
-    shell,
+    shell: shell.label,
     process: terminalProcess.process,
     backend: terminalProcess.backend,
     subscribers: new Set(),
@@ -245,7 +277,7 @@ export async function createTerminalSession(input: { cwd?: unknown; cols?: unkno
     getTerminalSessions().delete(id);
   });
 
-  return { id, cwd, shell, backend: session.backend };
+  return { id, cwd, shell: session.shell, backend: session.backend };
 }
 
 export function subscribeTerminalOutput(id: string, listener: (chunk: string) => void): () => void {

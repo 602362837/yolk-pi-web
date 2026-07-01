@@ -1073,9 +1073,10 @@ function TextFileViewer({ filePath, cwd, initialLine, editorConfig, onAddChat, o
   const hasDiff = prevContent !== null && prevContent !== data.content;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="file-viewer-root" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Status bar */}
       <div
+        className="file-viewer-status-bar"
         style={{
           display: "flex",
           alignItems: "center",

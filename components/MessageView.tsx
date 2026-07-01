@@ -117,11 +117,12 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
 
   return (
     <div
+      className="message-view message-view-user"
       style={{ marginBottom: 16, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, maxWidth: "85%" }}>
+      <div className="message-bubble-row message-bubble-row-user" style={{ display: "flex", alignItems: "flex-end", gap: 6, maxWidth: "85%" }}>
         <div
           style={{
             flex: 1,
@@ -168,11 +169,11 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
 
       {/* Bottom row: action buttons + timestamp */}
       {(time || canFork || canNavigate || true) && (
-        <div style={{
+        <div className="message-action-row message-action-row-user" style={{
           display: "flex", alignItems: "center", justifyContent: "flex-end",
           gap: 6, marginTop: 3,
         }}>
-          <div style={{
+          <div className="message-hover-actions" style={{
             display: "flex", gap: 3,
             opacity: hovered ? 1 : 0,
             pointerEvents: hovered ? "auto" : "none",
@@ -209,7 +210,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
             </button>
           </div>
           {(canFork || canNavigate) && (
-            <div style={{
+            <div className="message-hover-actions" style={{
               display: "flex", gap: 3,
               opacity: (hovered || forking) ? 1 : 0,
               pointerEvents: (hovered || forking) ? "auto" : "none",
@@ -396,12 +397,14 @@ function AssistantMessageView({
 
   return (
     <div
+      className="message-view message-view-assistant"
       style={{ marginBottom: 16 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Model label */}
       <div
+        className="assistant-model-row"
         style={{
           fontSize: 11,
           color: "var(--text-dim)",
@@ -454,7 +457,7 @@ function AssistantMessageView({
         ))}
       </div>
 
-      <div style={{
+      <div className="message-action-row message-action-row-assistant" style={{
         display: "flex", alignItems: "center", gap: 8, marginTop: 4,
       }}>
         {message.usage && !isStreaming && (
@@ -464,6 +467,7 @@ function AssistantMessageView({
         )}
         {textContent && !isStreaming && (
           <button
+            className="message-hover-copy"
             onClick={copyContent}
             title="Copy message"
             style={{
@@ -714,7 +718,7 @@ function CustomMessageView({ message }: { message: CustomMessage }) {
   };
 
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="message-view message-view-custom" style={{ marginBottom: 16 }}>
       <div
         style={{
           border: "1px solid var(--border)",

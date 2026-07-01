@@ -583,6 +583,7 @@ export function SkillsConfig({
 
   return (
     <div
+      className="pi-modal-overlay"
       style={{
         position: "fixed",
         inset: 0,
@@ -597,6 +598,7 @@ export function SkillsConfig({
       }}
     >
       <div
+        className="pi-modal-panel pi-modal-panel-large"
         style={{
           width: 860,
           height: "78vh",
@@ -657,7 +659,7 @@ export function SkillsConfig({
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div className="pi-modal-split-body" style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* Left: skill list */}
           <div
             style={{

@@ -120,6 +120,7 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
 
   return (
     <div
+      className="pi-modal-overlay"
       role="dialog"
       aria-modal="true"
       aria-label="Usage statistics"
@@ -138,6 +139,7 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
       }}
     >
       <div
+        className="pi-modal-panel usage-modal-panel"
         style={{
           width: "min(980px, 100%)",
           maxHeight: "min(760px, calc(100dvh - 36px))",

@@ -842,6 +842,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   return (
     <>
     <div
+      className="pi-modal-overlay"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -855,6 +856,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       }}
     >
       <div
+        className="pi-modal-panel settings-modal-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(760px, calc(100vw - 40px))",
@@ -882,7 +884,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
           </button>
         </div>
 
-        <div style={{ display: "flex", minHeight: 0 }}>
+        <div className="settings-modal-body" style={{ display: "flex", minHeight: 0 }}>
           <div style={{ width: 150, borderRight: "1px solid var(--border)", padding: 10, background: "var(--bg-subtle)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             {renderSectionButton("worktree", "WorkTree", "New WorkTree 默认配置")}
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
@@ -982,7 +984,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                       onChange={(enabled) => updateTerminal({ enabled })}
                     />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <Field label="终端类型" description="选择 custom 时会使用下面填写的绝对路径；路径错误会在打开终端时显示错误。">
+                      <Field label="终端类型" description="Windows 可选择 cmd、Windows PowerShell 或 PowerShell 7；选择 custom 时会使用下面填写的绝对路径。">
                         <select
                           value={terminal.shell}
                           onChange={(e) => updateTerminal({ shell: e.target.value as PiWebTerminalConfig["shell"] })}
@@ -991,14 +993,17 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                           <option value="zsh">zsh</option>
                           <option value="bash">bash</option>
                           <option value="sh">sh</option>
+                          <option value="cmd">cmd</option>
+                          <option value="powershell">Windows PowerShell</option>
+                          <option value="pwsh">PowerShell 7</option>
                           <option value="custom">custom path</option>
                         </select>
                       </Field>
-                      <Field label="Custom shell path" description="必须是可执行文件的绝对路径，例如 /opt/homebrew/bin/fish。">
+                      <Field label="Custom shell path" description="必须是可执行文件的绝对路径，例如 /opt/homebrew/bin/fish 或 C:\\Program Files\\PowerShell\\7\\pwsh.exe。">
                         <TextInput
                           value={terminal.customShellPath}
                           onChange={(customShellPath) => updateTerminal({ customShellPath })}
-                          placeholder="/absolute/path/to/shell"
+                          placeholder="/absolute/path/to/shell or C:\\path\\to\\shell.exe"
                           disabled={terminal.shell !== "custom"}
                         />
                       </Field>

@@ -834,7 +834,7 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose }: Pr
     : { height: collapsed ? HEADER_HEIGHT : dockHeight, minHeight: collapsed ? HEADER_HEIGHT : MIN_DOCK_HEIGHT };
 
   return (
-    <div style={{ ...rootStyle, borderTop: "1px solid var(--border)", background: "var(--bg)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <div className={`terminal-panel-root${fullscreen ? " terminal-panel-fullscreen" : ""}${collapsed ? " terminal-panel-collapsed" : ""}`} style={{ ...rootStyle, borderTop: "1px solid var(--border)", background: "var(--bg)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
       {!collapsed && !fullscreen && (
         <div
           onPointerDown={handleDockResizePointerDown}

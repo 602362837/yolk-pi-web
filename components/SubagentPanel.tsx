@@ -58,7 +58,7 @@ export function SubagentPanel({ runs }: Props) {
   ));
 
   return (
-    <div style={{
+    <div className="subagent-panel-root" style={{
       maxHeight: "min(500px, 60vh)",
       overflowY: "auto",
       padding: "8px 0",
@@ -115,6 +115,7 @@ function RunItem({
   return (
     <div>
       <div
+        className="subagent-run-row"
         onClick={onToggle}
         style={{
           display: "flex",
@@ -271,6 +272,7 @@ function ChildRunItem({ run, depth }: { run: SubagentRun; depth: number }) {
   return (
     <div>
       <div
+        className="subagent-run-row subagent-child-run-row"
         onClick={() => setExpanded(!expanded)}
         style={{
           display: "flex",

@@ -196,7 +196,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
         : null;
 
   return (
-    <div style={{ maxHeight: "min(500px, 60vh)", overflowY: "auto" }}>
+    <div className="git-panel-root" style={{ maxHeight: "min(500px, 60vh)", overflowY: "auto" }}>
       {/* Refresh button */}
       <div style={{ position: "sticky", top: 0, zIndex: 1, display: "flex", justifyContent: "flex-end", padding: "4px 8px", background: "var(--bg-panel)" }}>
         <button
@@ -276,7 +276,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
           <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 6 }}>
             Preview / switch local branch
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div className="git-branch-switch-row" style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <select
               value={selectedBranch}
               onChange={(e) => {

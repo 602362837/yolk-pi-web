@@ -747,7 +747,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const sessionTree = buildSessionTree(filteredSessions);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div className="session-sidebar-root" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Header */}
       <div
         style={{
@@ -762,7 +762,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             <WorkspaceHeaderLine text={workspaceSubtitle} detail={workspaceSubtitle} />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        <div className="session-sidebar-actions" style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             <button
               onClick={handleNewSession}
               disabled={!selectedCwd}
@@ -910,7 +910,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                       onClick={() => setWorkspaceMenuOpen(false)}
                       style={{ position: "fixed", inset: 0, zIndex: 999 }}
                     />
-                    <div style={{
+                    <div className="session-sidebar-floating-menu" style={{
                       position: "absolute",
                       right: 0,
                       top: "100%",
@@ -1018,6 +1018,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
           {dropdownOpen && (
             <div
+              className="session-sidebar-cwd-menu"
               style={{
                 position: "absolute",
                 top: "calc(100% + 4px)",

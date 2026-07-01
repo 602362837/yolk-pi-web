@@ -139,3 +139,102 @@ Implemented Codex reset-credit lookup and consume support in quota API/lib flows
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Chat auto-stick bottom toggle
+
+**Date**: 2026-06-30
+**Task**: Chat auto-stick bottom toggle
+**Branch**: `main`
+
+### Summary
+
+Implemented a persisted chat auto-stick-to-bottom toggle beside the completion sound control, added sticky scroll pause/resume behavior, suppressed the running spacer while sticky mode is enabled, updated frontend docs/specs, validated lint/type-check, committed the feature, and archived the Trellis task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3c94c10` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 32: Windows web terminal support
+
+**Date**: 2026-06-30
+**Task**: Windows web terminal support
+**Branch**: `main`
+
+### Summary
+
+Added first-class Windows Web Terminal shell support for cmd, Windows PowerShell, and PowerShell 7; updated platform-aware shell resolution, settings UI options, and module docs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `418a334` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 33: Mobile responsive adaptation
+
+**Date**: 2026-07-01
+**Task**: Mobile responsive adaptation
+**Branch**: `main`
+
+### Summary
+
+Audited existing mobile support, planned Trellis task artifacts, implemented mobile responsive improvements across the app shell, chat input/messages, side/right panels, modals, file viewer, Git/Subagents panels, and terminal fallback; validated with lint and TypeScript; committed the work.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dbe9a48` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -535,7 +535,7 @@ export function AppShell() {
 
   return (
     <>
-    <div style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
+    <div className="app-shell-root" style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
       {/* Mobile overlay backdrop */}
       <div
         className="sidebar-overlay-backdrop"
@@ -569,7 +569,7 @@ export function AppShell() {
       {/* Center: chat */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
+        <div ref={topBarRef} className="app-top-bar" style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
           <button
             onClick={() => setSidebarOpen((v) => !v)}
             title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -624,7 +624,7 @@ export function AppShell() {
             )}
           </button>
           {showChat && (
-            <div style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
+            <div className="app-top-actions" style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
               <button
                 onClick={handleExportSession}
                 disabled={!selectedSession}
@@ -675,7 +675,7 @@ export function AppShell() {
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
                 </span>
-                <span>Export</span>
+                <span className="app-top-label">Export</span>
               </button>
               <BranchNavigator
                 tree={branchTree}
@@ -710,7 +710,7 @@ export function AppShell() {
                   <line x1="8" y1="13" x2="16" y2="13" />
                   <line x1="8" y1="17" x2="13" y2="17" />
                 </svg>
-                <span>System</span>
+                <span className="app-top-label">System</span>
               </button>
               <button
                 onClick={() => toggleTopPanel("subagents")}
@@ -733,7 +733,7 @@ export function AppShell() {
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
-                <span>Subagents</span>
+                <span className="app-top-label">Subagents</span>
                 {(() => {
                   const running = subagentRuns.filter((r) => r.status === "running").length;
                   const completed = subagentRuns.filter((r) => r.status === "completed" || r.status === "failed").length;
@@ -780,7 +780,7 @@ export function AppShell() {
                   <circle cx="6" cy="18" r="3" />
                   <path d="M18 9a9 9 0 0 1-9 9" />
                 </svg>
-                <span>Git</span>
+                <span className="app-top-label">Git</span>
                 {gitDirty && (
                   <span style={{
                     position: "absolute", top: 4, right: 4,
@@ -831,7 +831,7 @@ export function AppShell() {
                 <polyline points="4 17 10 11 4 5" />
                 <line x1="12" y1="19" x2="20" y2="19" />
               </svg>
-              <span>Terminal</span>
+              <span className="app-top-label">Terminal</span>
             </button>
           )}
           {/* Session stats — right-aligned in top bar */}
@@ -866,6 +866,7 @@ export function AppShell() {
 
             return (
               <div
+                className="app-top-stats"
                 title={tooltip}
                 style={{
                   marginLeft: "auto",
@@ -919,7 +920,7 @@ export function AppShell() {
             );
           })()}
           {webConfig?.chatgpt.usagePanelEnabled && (
-            <div style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48), height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
+            <div className="app-top-usage-panel" style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48), height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
               <ChatGptUsagePanel />
             </div>
           )}
@@ -1089,7 +1090,7 @@ export function AppShell() {
       </div>
     </div>
     {/* Right panel mode toggles — Preview first, optional Trellis to its right. */}
-    <div style={{ position: "fixed", top: 0, right: 0, zIndex: 300, display: "flex", flexDirection: "row" }}>
+    <div className="right-panel-toggle-strip" style={{ position: "fixed", top: 0, right: 0, zIndex: 300, display: "flex", flexDirection: "row" }}>
       <button
         onClick={() => {
           if (rightPanelOpen && rightPanelMode === "files") setRightPanelOpen(false);

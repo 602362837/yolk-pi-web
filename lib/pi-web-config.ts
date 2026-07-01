@@ -71,7 +71,7 @@ export interface PiWebChatGptWarmupConfig {
   times: string[];
 }
 
-export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "custom";
+export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "cmd" | "powershell" | "pwsh" | "custom";
 
 export interface PiWebTerminalConfig {
   enabled: boolean;
@@ -156,7 +156,7 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   },
   terminal: {
     enabled: false,
-    shell: "zsh",
+    shell: process.platform === "win32" ? "powershell" : "zsh",
     customShellPath: "",
     env: {},
     envAssistant: {
@@ -301,7 +301,7 @@ function readDailyTimes(value: unknown, fallback: string[]): string[] {
 }
 
 function readTerminalShell(value: unknown, fallback: PiWebTerminalShell): PiWebTerminalShell {
-  return value === "zsh" || value === "bash" || value === "sh" || value === "custom" ? value : fallback;
+  return value === "zsh" || value === "bash" || value === "sh" || value === "cmd" || value === "powershell" || value === "pwsh" || value === "custom" ? value : fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -683,8 +683,8 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
 }
 
 function validateTerminalShell(value: unknown): PiWebTerminalShell {
-  if (value === "zsh" || value === "bash" || value === "sh" || value === "custom") return value;
-  throw new PiWebConfigValidationError("terminal.shell must be zsh, bash, sh, or custom");
+  if (value === "zsh" || value === "bash" || value === "sh" || value === "cmd" || value === "powershell" || value === "pwsh" || value === "custom") return value;
+  throw new PiWebConfigValidationError("terminal.shell must be zsh, bash, sh, cmd, powershell, pwsh, or custom");
 }
 
 function validateTerminalEnv(value: unknown): Record<string, string> {

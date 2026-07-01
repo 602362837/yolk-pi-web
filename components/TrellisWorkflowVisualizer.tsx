@@ -401,8 +401,8 @@ export function TrellisWorkflowVisualizer({ cwd, onClose }: Props) {
   }, [cwd, data, overviewAssistLoading]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: fullscreen ? 0 : 24 }}>
-      <div style={{ width: fullscreen ? "100vw" : "min(1180px, calc(100vw - 48px))", height: fullscreen ? "100vh" : "min(820px, calc(100vh - 48px))", background: "var(--bg-panel)", border: fullscreen ? "none" : "1px solid var(--border)", borderRadius: fullscreen ? 0 : 14, boxShadow: fullscreen ? "none" : "0 20px 70px rgba(0,0,0,0.35)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div className="pi-modal-overlay" style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: fullscreen ? 0 : 24 }}>
+      <div className="pi-modal-panel trellis-workflow-modal" style={{ width: fullscreen ? "100vw" : "min(1180px, calc(100vw - 48px))", height: fullscreen ? "100vh" : "min(820px, calc(100vh - 48px))", background: "var(--bg-panel)", border: fullscreen ? "none" : "1px solid var(--border)", borderRadius: fullscreen ? 0 : 14, boxShadow: fullscreen ? "none" : "0 20px 70px rgba(0,0,0,0.35)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ color: "var(--text)", fontSize: 16, fontWeight: 900 }}>Trellis 流程设计</div>
@@ -419,7 +419,7 @@ export function TrellisWorkflowVisualizer({ cwd, onClose }: Props) {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflow: "hidden", display: "grid", gridTemplateColumns: "minmax(420px, 1.45fr) minmax(280px, 0.9fr)", gap: 0 }}>
+        <div className="mobile-stack-grid trellis-workflow-body" style={{ flex: 1, overflow: "hidden", display: "grid", gridTemplateColumns: "minmax(420px, 1.45fr) minmax(280px, 0.9fr)", gap: 0 }}>
           <div style={{ overflow: "auto", padding: 16, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 14 }}>
             {error && <div style={{ padding: 12, borderRadius: 10, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12 }}>{error}</div>}
             {loading && !data && <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在读取 workflow.md…</div>}

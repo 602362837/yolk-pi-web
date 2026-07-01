@@ -227,10 +227,11 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
 
   return (
     <div
+      className="pi-modal-overlay"
       style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={(event) => { if (event.target === event.currentTarget && !running && !scheduleSaving) onClose(); }}
     >
-      <div style={{ width: 760, maxWidth: "calc(100vw - 32px)", maxHeight: "min(88vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div className="pi-modal-panel" style={{ width: 760, maxWidth: "calc(100vw - 32px)", maxHeight: "min(88vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>ChatGPT account warmup</div>
@@ -239,7 +240,7 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
           <button type="button" disabled={running || scheduleSaving} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: running || scheduleSaving ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
         </div>
 
-        <div style={{ padding: 14, overflow: "auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 0.85fr)", gap: 14 }}>
+        <div className="mobile-stack-grid" style={{ padding: 14, overflow: "auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 0.85fr)", gap: 14 }}>
           <section style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
             <div style={{ padding: 10, borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
               Warmup sends a tiny real Codex request using a fixed low-cost model. Tokens stay server-side; this dialog only receives per-account results.

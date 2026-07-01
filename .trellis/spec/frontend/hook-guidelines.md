@@ -254,6 +254,47 @@ const handleAgentEvent = useCallback((event: AgentEvent) => {
 - Imperative handles (e.g., `chatInputRef.current?.insertText()`)
 - Tracking mutable state that doesn't trigger re-renders (e.g., timers, subscriptions)
 
+## Scenario: Chat sticky-bottom scroll preferences
+
+Use this contract when changing chat message-list scroll behavior or adding a browser preference that affects chat scrolling.
+
+### Signatures
+
+- Preference hook: `useAutoScroll()` returns `{ autoScrollEnabled: boolean; onAutoScrollToggle: () => void }`.
+- Session hook option: `useAgentSession({ autoScrollEnabled?: boolean, ... })` defaults to sticky auto-scroll enabled.
+- DOM refs owned by `useAgentSession`: `scrollContainerRef`, `messagesEndRef`, `pendingScrollToUserRef`, `initialScrollDoneRef`.
+
+### Contracts
+
+- Persist browser-only scroll preferences in `localStorage` with an SSR guard, following `hooks/useAudio.ts` lazy-initializer style.
+- Keep imperative chat scroll coordination in `hooks/useAgentSession.ts`; components pass preferences and render toggles, but do not duplicate scroll lifecycle logic.
+- Auto-scroll enabled means new/streaming output follows the bottom only while a sticky ref says the user is at or near the bottom.
+- User upward scrolling must set sticky false; returning near the bottom must set sticky true.
+- Suppress artificial bottom spacer behavior when sticky auto-scroll is enabled, because real scrollable blank space breaks the bottom-reading experience.
+
+### Tests Required
+
+- Lint and type-check pass.
+- Manual browser checks: default preference on, toggle persistence, streaming follows bottom, upward scroll pauses, returning to bottom resumes, disabled mode preserves intentional scroll as much as possible.
+
+### Wrong vs Correct
+
+#### Wrong
+
+```typescript
+// Forces the reader away from earlier output on every streaming update.
+messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+```
+
+#### Correct
+
+```typescript
+// Only follow output while sticky is active; user scrolling controls the ref.
+if (autoScrollEnabledRef.current && autoScrollStickyRef.current) {
+  scrollToBottom(agentRunningRef.current ? "auto" : "smooth");
+}
+```
+
 ## Common Mistakes
 
 1. **Don't fetch data in components** — use hooks or API routes
@@ -262,6 +303,7 @@ const handleAgentEvent = useCallback((event: AgentEvent) => {
 4. **Don't put business logic in hooks that belongs in `lib/`** — hooks orchestrate, `lib/` implements
 5. **Don't create hook directories** — the project uses a flat `hooks/` structure
 6. **Don't forget to handle SSR** — check `typeof window !== "undefined"` before accessing browser APIs
+7. **Don't force chat scroll-to-bottom on every output update** — respect sticky state so readers can scroll up during long agent output
 
 ## Effect Cleanup
 
