@@ -1,4 +1,4 @@
-# Start pi-web with proxy settings that Node/Next can actually use.
+# Start yolk pi web with proxy settings that Node/Next can actually use.
 # Usage:
 #   .\start-pi-web-proxy.ps1
 # Optional overrides:
@@ -25,7 +25,7 @@ if ($env:NODE_OPTIONS -notmatch '(^|\s)--use-env-proxy(\s|$)') {
 }
 
 Write-Host @"
-== pi-web proxy startup ==
+== yolk pi web proxy startup ==
 HTTP_PROXY=$env:HTTP_PROXY
 HTTPS_PROXY=$env:HTTPS_PROXY
 ALL_PROXY=$env:ALL_PROXY

@@ -1,6 +1,6 @@
 import type { GitInfo } from "./types";
 
-export const WORKSPACE_TITLE_FALLBACK = "Pi Agent Web";
+export const WORKSPACE_TITLE_FALLBACK = "yolk pi web";
 
 export function getPathBaseName(path: string | null | undefined): string | null {
   if (!path) return null;

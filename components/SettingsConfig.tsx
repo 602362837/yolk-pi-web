@@ -871,7 +871,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
         <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, color: "var(--text)" }}>设置</h2>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)" }}>配置 pi-web 行为。保存后动态生效，无需重启。</p>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)" }}>配置 yolk pi web 行为。保存后动态生效，无需重启。</p>
           </div>
           <button
             onClick={onClose}
@@ -1168,9 +1168,9 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                     </Field>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
                       <div>
-                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>pi-web 自定义快捷键 / 鼠标手势</div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>yolk pi web 自定义快捷键 / 鼠标手势</div>
                         <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
-                          这些是 pi-web 在 Monaco 之上额外接管的操作，可单独关闭；关闭后对应按钮仍可使用。
+                          这些是 yolk pi web 在 Monaco 之上额外接管的操作，可单独关闭；关闭后对应按钮仍可使用。
                         </div>
                       </div>
                       <ToggleField
@@ -1221,7 +1221,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                           ["Alt+↑ / Alt+↓", "移动当前行"],
                           ["Shift+Alt+↑ / ↓", "复制当前行"],
                           ["F12", "跳转定义（需要语言 provider 支持）"],
-                          ["Shift+F12", "Monaco 内置查引用（需要语言 provider 支持；pi-web 也提供轻量引用搜索）"],
+                          ["Shift+F12", "Monaco 内置查引用（需要语言 provider 支持；yolk pi web 也提供轻量引用搜索）"],
                         ].map(([key, desc]) => (
                           <div key={key} style={{ display: "contents" }}>
                             <code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, padding: "2px 6px" }}>{key}</code>
@@ -1229,7 +1229,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                           </div>
                         ))}
                       </div>
-                      <div style={{ marginTop: 8 }}>这些是 Monaco 自带编辑行为，不写入 pi-web 配置；上面的开关只控制 pi-web 额外接管的快捷键/鼠标手势。</div>
+                      <div style={{ marginTop: 8 }}>这些是 Monaco 自带编辑行为，不写入 yolk pi web 配置；上面的开关只控制 yolk pi web 额外接管的快捷键/鼠标手势。</div>
                     </div>
                   </div>
                 ) : (
@@ -1278,7 +1278,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
                       <ToggleField
                         label="安装/更新 Trellis 时使用代理"
-                        description="只会应用到安装、初始化、更新 Trellis 的子进程，不会修改 pi-web 服务本身的环境变量。建议使用 HTTP(S) 代理地址。"
+                        description="只会应用到安装、初始化、更新 Trellis 的子进程，不会修改 yolk pi web 服务本身的环境变量。建议使用 HTTP(S) 代理地址。"
                         checked={trellis.proxyEnabled}
                         onChange={(proxyEnabled) => updateTrellis({ proxyEnabled })}
                       />

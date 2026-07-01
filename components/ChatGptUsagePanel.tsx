@@ -281,7 +281,7 @@ export function ChatGptUsagePanel() {
   }, []);
 
   const repairLock = useCallback(async () => {
-    const ok = window.confirm("风险提示：修复会删除当前 ChatGPT 自动刷新锁。如果另一个健康的 pi-web 进程仍在运行，可能短时间产生重复刷新。确认只在刷新器明显卡住或锁文件 stale 时继续？");
+    const ok = window.confirm("风险提示：修复会删除当前 ChatGPT 自动刷新锁。如果另一个健康的 yolk pi web 进程仍在运行，可能短时间产生重复刷新。确认只在刷新器明显卡住或锁文件 stale 时继续？");
     if (!ok) return;
     setRepairingLock(true);
     setSchedulerError(null);

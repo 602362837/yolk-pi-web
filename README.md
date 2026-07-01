@@ -1,6 +1,6 @@
-# pi-web
+# yolk pi web
 
-`pi-web` 是面向 `pi` 编程智能体的 Web 工作台。它把本地会话、实时对话、分支切换、模型配置、文件浏览和 WorkTree 管理集中到浏览器中，适合在桌面或服务器环境中长期运行。
+`yolk pi web` 是面向 `pi` 编程智能体的 WebChat 工作台。它把本地会话、实时对话、分支切换、模型配置、文件浏览和 WorkTree 管理集中到浏览器中，适合在桌面或服务器环境中长期运行。
 
 本仓库最初源自上游项目，但当前已按自身需求持续演进；使用方式也以源码构建和本地部署为主，不再把 npm 发布包作为默认安装入口。
 
@@ -19,7 +19,7 @@
 
 ```bash
 git clone <repo-url>
-cd pi-agnet-web
+cd yolk-pi-web
 npm install
 npm run dev
 ```
@@ -41,13 +41,17 @@ npm run start
 npm run start -- --port 8080
 npm run start -- --hostname 127.0.0.1
 PORT=8080 npm run start
+
+# npm 包安装后也可使用
+npx yolk-pi-web@latest --port 8080
+ypi --port 8080
 ```
 
 > 请使用 `npm run build` 进行生产构建；不要直接运行 `next build`，构建脚本包含项目需要的环境处理。
 
 ## 数据与配置
 
-`pi-web` 默认读取 `~/.pi/agent/` 下的智能体数据。可通过 `PI_CODING_AGENT_DIR` 指向其他数据目录。
+`yolk pi web` 默认读取 `~/.pi/agent/` 下的智能体数据。可通过 `PI_CODING_AGENT_DIR` 指向其他数据目录。
 
 | 路径 | 用途 |
 | --- | --- |
@@ -82,7 +86,7 @@ components/         # 浏览器端 UI 组件
 hooks/              # 会话状态、主题、拖拽、音频等 React hooks
 lib/                # 会话解析、RPC 生命周期、工具调用规范化等共享逻辑
 scripts/            # 构建和运维辅助脚本
-bin/                # pi-web 命令入口，保留用于本地/发布场景
+bin/                # ypi 命令入口，保留用于本地/发布场景
 public/             # 静态资源
 docs/               # 架构、模块、部署和运维文档
 ```

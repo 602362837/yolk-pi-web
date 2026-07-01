@@ -1,10 +1,10 @@
 {
-  "name": "@agegr/pi-web",
+  "name": "yolk-pi-web",
   "version": "0.7.0",
-  "description": "Web UI for the pi coding agent",
+  "description": "yolk pi web WebChat workspace for the pi coding agent",
   "license": "MIT",
   "bin": {
-    "pi-web": "bin/pi-web.js"
+    "ypi": "bin/pi-web.js"
   },
   "files": [
     "bin",

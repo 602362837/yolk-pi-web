@@ -22,7 +22,7 @@ npm run start    # serves on port 30141
 
 `ecosystem.config.cjs` runs `node_modules/.bin/next start -p 30141` with:
 
-- process name `pi-web`
+- process name `yolk-pi-web` (or legacy `pi-web` for existing PM2 setups)
 - auto-restart enabled
 - max memory restart at 1 GB
 - logs under `logs/pi-web-out.log` and `logs/pi-web-error.log`
@@ -35,7 +35,7 @@ pm2 start ecosystem.config.cjs
 
 ## Proxy Startup
 
-- `scripts/start-pi-web-proxy.sh` starts pi-web with `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NODE_OPTIONS=--use-env-proxy`.
+- `scripts/start-pi-web-proxy.sh` starts yolk pi web with `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NODE_OPTIONS=--use-env-proxy`.
 - `scripts/start-pi-web-proxy.ps1` provides the same proxy startup flow for PowerShell.
 - The proxy scripts default to the production command `npm run start`; use `PI_WEB_CMD="npm run dev"` for development.
 
@@ -63,7 +63,8 @@ git fetch upstream main
 - Build locally with `npm run build`.
 - Run the production server with `npm run start`.
 - Use `npm run dev` during development.
-- CLI options are passed through `npm run start -- --port 8080` and `npm run start -- --hostname 127.0.0.1`; `PORT` is also supported.
+- Published npm package name is `yolk-pi-web` and the CLI command is `ypi`.
+- CLI options are passed through `npm run start -- --port 8080`, `npm run start -- --hostname 127.0.0.1`, or `ypi --port 8080`; `PORT` is also supported.
 
 ## Data and Configuration
 

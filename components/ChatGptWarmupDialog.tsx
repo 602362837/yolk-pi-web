@@ -291,7 +291,7 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
             <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
                 <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 800 }}>Scheduled warmup</div>
-                <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.45 }}>Uses local server time and only runs while pi-web is running.</div>
+                <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.45 }}>Uses local server time and only runs while yolk pi web is running.</div>
               </div>
 
               {configLoading ? (

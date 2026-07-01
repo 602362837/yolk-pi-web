@@ -1307,7 +1307,7 @@ function AddAccountDialog({
                 </div>
                 <pre style={{ margin: 0, padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11, lineHeight: 1.5, overflow: "auto", fontFamily: "var(--font-mono)" }}>{RAW_ACCOUNT_JSON_EXAMPLE}</pre>
                 <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-                  如果省略 <code style={{ fontFamily: "var(--font-mono)" }}>accountId</code>，pi-web 会尝试从 access token 中解析，失败时使用稳定 fallback。账号显示名会按邮箱、手机号、accountId 的顺序自动补全。
+                  如果省略 <code style={{ fontFamily: "var(--font-mono)" }}>accountId</code>，yolk pi web 会尝试从 access token 中解析，失败时使用稳定 fallback。账号显示名会按邮箱、手机号、accountId 的顺序自动补全。
                 </div>
               </div>
 

@@ -1,22 +1,22 @@
-# pi-web
+# yolk pi web
 
 [English](./README.md)
 
-[pi 编程智能体](https://github.com/badlogic/pi-mono) 的本地网页界面。它会读取本机的 pi 会话文件，在浏览器里提供会话管理、实时对话、模型配置、技能管理、项目文件预览和可选 Web 终端。
+[pi 编程智能体](https://github.com/badlogic/pi-mono) 的本地 WebChat 界面。它会读取本机的 pi 会话文件，在浏览器里提供会话管理、实时对话、模型配置、技能管理、项目文件预览和可选 Web 终端。
 
 ## 快速开始
 
 **无需安装，直接运行：**
 
 ```bash
-npx @agegr/pi-web@latest
+npx yolk-pi-web@latest
 ```
 
 **或全局安装后使用：**
 
 ```bash
-npm install -g @agegr/pi-web
-pi-web
+npm install -g yolk-pi-web
+ypi
 ```
 
 启动后打开 [http://localhost:30141](http://localhost:30141)。命令行版本会在服务就绪后尝试自动打开浏览器。
@@ -24,11 +24,11 @@ pi-web
 **可选参数：**
 
 ```bash
-pi-web --port 8080              # 自定义端口
-pi-web --hostname 127.0.0.1     # 仅本机访问
-pi-web -p 8080 -H 127.0.0.1     # 组合使用
+ypi --port 8080              # 自定义端口
+ypi --hostname 127.0.0.1     # 仅本机访问
+ypi -p 8080 -H 127.0.0.1     # 组合使用
 
-PORT=8080 pi-web                # 也支持环境变量
+PORT=8080 ypi                # 也支持环境变量
 ```
 
 ## 功能介绍
@@ -104,5 +104,5 @@ hooks/
   useDragDrop.ts      # 图片拖拽
   useTheme.ts         # 主题切换
 bin/
-  pi-web.js           # npm CLI 入口
+  pi-web.js           # npm CLI 入口（发布为 ypi 命令）
 ```
