@@ -1,10 +1,13 @@
-import { Fragment, type CSSProperties } from "react";
+"use client";
+
+import { Fragment, useCallback, useMemo, useRef, type CSSProperties, type UIEvent } from "react";
 
 interface Props {
   diff: string;
 }
 
 type SideKind = "context" | "add" | "delete" | "empty";
+type PaneSide = "old" | "new";
 
 type SectionKind = "file" | "hunk" | "meta" | "note";
 
@@ -151,6 +154,9 @@ function LineNumber({ value }: { value: number | null }) {
     <span
       style={{
         display: "block",
+        position: "sticky",
+        left: 0,
+        zIndex: 1,
         padding: "0 10px",
         color: "var(--text-dim)",
         textAlign: "right",
@@ -164,14 +170,13 @@ function LineNumber({ value }: { value: number | null }) {
   );
 }
 
-function DiffCell({ side, borderRight }: { side: DiffSide; borderRight?: boolean }) {
+function DiffCell({ side }: { side: DiffSide }) {
   return (
     <span
       style={{
         display: "block",
         padding: "0 12px",
         whiteSpace: "pre",
-        borderRight: borderRight ? "1px solid var(--border)" : undefined,
         ...sideStyle(side.kind),
       }}
     >
@@ -180,20 +185,13 @@ function DiffCell({ side, borderRight }: { side: DiffSide; borderRight?: boolean
   );
 }
 
-export function SideBySideDiffView({ diff }: Props) {
-  const rows = parseSideBySideRows(diff);
-
+function DiffPane({ rows, side }: { rows: DiffRow[]; side: PaneSide }) {
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "64px minmax(420px, max-content) 64px minmax(420px, max-content)",
-        margin: 0,
-        padding: 0,
-        fontFamily: "var(--font-mono)",
-        fontSize: 12,
-        lineHeight: 1.55,
-        minWidth: 980,
+        gridTemplateColumns: "64px minmax(420px, max-content)",
+        minWidth: "100%",
         width: "max-content",
       }}
     >
@@ -214,15 +212,80 @@ export function SideBySideDiffView({ diff }: Props) {
           );
         }
 
+        const paneSide = side === "old" ? row.oldSide : row.newSide;
         return (
           <Fragment key={index}>
-            <LineNumber value={row.oldSide.lineNumber} />
-            <DiffCell side={row.oldSide} borderRight />
-            <LineNumber value={row.newSide.lineNumber} />
-            <DiffCell side={row.newSide} />
+            <LineNumber value={paneSide.lineNumber} />
+            <DiffCell side={paneSide} />
           </Fragment>
         );
       })}
+    </div>
+  );
+}
+
+export function SideBySideDiffView({ diff }: Props) {
+  const rows = useMemo(() => parseSideBySideRows(diff), [diff]);
+  const oldPaneRef = useRef<HTMLDivElement | null>(null);
+  const newPaneRef = useRef<HTMLDivElement | null>(null);
+  const programmaticScrollPaneRef = useRef<PaneSide | null>(null);
+
+  const syncScroll = useCallback((event: UIEvent<HTMLDivElement>, sourcePane: PaneSide, targetRef: typeof oldPaneRef, targetPane: PaneSide) => {
+    if (programmaticScrollPaneRef.current === sourcePane) {
+      programmaticScrollPaneRef.current = null;
+      return;
+    }
+
+    const target = targetRef.current;
+    if (!target) return;
+
+    const source = event.currentTarget;
+    programmaticScrollPaneRef.current = targetPane;
+    target.scrollLeft = source.scrollLeft;
+    target.scrollTop = source.scrollTop;
+    window.requestAnimationFrame(() => {
+      if (programmaticScrollPaneRef.current === targetPane) {
+        programmaticScrollPaneRef.current = null;
+      }
+    });
+  }, []);
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+        height: "100%",
+        minHeight: 0,
+        margin: 0,
+        padding: 0,
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        lineHeight: 1.55,
+        background: "var(--bg)",
+      }}
+    >
+      <div
+        ref={oldPaneRef}
+        onScroll={(event) => syncScroll(event, "old", newPaneRef, "new")}
+        style={{
+          minWidth: 0,
+          overflow: "auto",
+          borderRight: "1px solid var(--border)",
+        }}
+      >
+        <DiffPane rows={rows} side="old" />
+      </div>
+      <div
+        ref={newPaneRef}
+        onScroll={(event) => syncScroll(event, "new", oldPaneRef, "old")}
+        style={{
+          minWidth: 0,
+          overflow: "auto",
+        }}
+      >
+        <DiffPane rows={rows} side="new" />
+      </div>
     </div>
   );
 }

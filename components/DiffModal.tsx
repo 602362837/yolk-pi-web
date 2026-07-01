@@ -69,6 +69,7 @@ export function DiffModal({
   }, [onClose]);
 
   const hasDiff = Boolean(diff);
+  const diffBodyOverflow = mode === "side-by-side" && hasDiff ? "hidden" : "auto";
 
   return (
     <div
@@ -128,7 +129,7 @@ export function DiffModal({
           </div>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "var(--bg)" }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: diffBodyOverflow, background: "var(--bg)" }}>
           {loading ? (
             <div style={{ padding: 18, color: "var(--text-muted)", fontSize: 13 }}>{loadingLabel}</div>
           ) : error ? (
