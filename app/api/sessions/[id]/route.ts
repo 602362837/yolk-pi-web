@@ -9,6 +9,7 @@ import {
   listAllSessions,
 } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
+import { deleteSessionChangesSidecar } from "@/lib/session-file-changes";
 
 // BranchNavigator still traverses recursively, so keep the response tree shallow.
 const MAX_PROJECTED_TREE_DEPTH = 200;
@@ -244,6 +245,7 @@ export async function DELETE(
 
     getRpcSession(id)?.destroy();
     unlinkSync(filePath);
+    deleteSessionChangesSidecar(id);
     invalidateSessionPathCache(id);
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -9,6 +9,8 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/types.ts` | Shared TypeScript types for messages, sessions, and API payloads. |
 | `lib/pi-types.ts` | `AgentSessionLike` wrapper interface expected by hooks/components. |
 | `lib/normalize.ts` | Normalize pi tool-call fields to web UI shape. |
+| `lib/session-file-changes.ts` | Non-Git session file-change tracker: observes edit/write tool events, persists sidecar summaries, and serves browser-safe changed-file projections. |
+| `lib/unified-diff.ts` | Wrapper around the `diff` package for bounded unified diff generation and addition/deletion counting. |
 | `lib/agent-client.ts` | Client-side helper for `POST /api/agent/[id]`. |
 | `lib/file-paths.ts` | Path normalization utilities for file viewer APIs. |
 | `lib/cwd.ts` | Cwd validation and normalization helpers. |

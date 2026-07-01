@@ -311,6 +311,33 @@ export interface SessionContext {
   model: { provider: string; modelId: string } | null;
 }
 
+export type SessionFileChangeStatus = "added" | "modified" | "deleted" | "metadata-only";
+export type SessionFileChangeSourceKind = "edit" | "write";
+export type SessionFileChangeReason = "binary" | "too-large" | "outside-workspace" | "unreadable" | "unchanged";
+
+export interface SessionChangedFileSummary {
+  path: string;
+  status: SessionFileChangeStatus;
+  additions: number;
+  deletions: number;
+  toolNames: SessionFileChangeSourceKind[];
+  sourceKinds: SessionFileChangeSourceKind[];
+  diffAvailable: boolean;
+  reason?: SessionFileChangeReason;
+  firstChangedAt: string;
+  lastChangedAt: string;
+}
+
+export interface SessionChangesSummaryResponse {
+  sessionId: string;
+  updatedAt?: string;
+  files: SessionChangedFileSummary[];
+}
+
+export interface SessionFileDiffResponse extends SessionChangedFileSummary {
+  diff?: string;
+}
+
 // RPC types
 export interface RpcSessionState {
   model?: { provider: string; id: string; contextWindow?: number };

@@ -66,6 +66,13 @@ The archive directory is scanned separately from `SessionManager.listAll()` (whi
 - Normalize with `normalizeToolCalls()` in `lib/normalize.ts`; it is used during file load and streaming.
 - Newer pi emits `compaction_start` / `compaction_end`; older pi emits `auto_compaction_start` / `auto_compaction_end`. Handle both.
 
+### Session file-change projection
+
+- Session changed-file UI is sidecar-based and non-Git; do not derive it from `git status` or `git diff`.
+- `lib/rpc-manager.ts` forwards live edit/write tool events to `lib/session-file-changes.ts`, which captures bounded before/after text snapshots and persists `~/.pi/agent/session-changes/<session-id>.json`.
+- Session JSONL files are not modified for this UI-only projection.
+- MVP tracks built-in `edit` and `write` tools only; arbitrary `bash` file mutations are not shown unless a future scanner/sandbox design adds explicit support.
+
 ### Models and tools
 
 - `GET /api/models` returns `defaultModel` from `~/.pi/agent/settings.json`.

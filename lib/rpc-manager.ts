@@ -1,6 +1,7 @@
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath } from "./session-reader";
+import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
@@ -44,7 +45,28 @@ export class AgentSessionWrapper {
   start(): void {
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       this.resetIdleTimer();
+      let fileChangeUpdate: AgentEvent | null = null;
+      try {
+        const result = recordSessionFileChangeEvent({
+          sessionId: this.sessionId,
+          sessionFile: this.sessionFile,
+          cwd: this.cwd,
+          event,
+        });
+        if (result.changed && event.type === "tool_execution_end") {
+          fileChangeUpdate = {
+            type: "session_file_changes_update",
+            sessionId: this.sessionId,
+            fileCount: result.fileCount,
+          };
+        }
+      } catch {
+        // File-change projection must never interrupt normal agent event delivery.
+      }
       for (const l of this.listeners) l(event);
+      if (fileChangeUpdate) {
+        for (const l of this.listeners) l(fileChangeUpdate);
+      }
     });
     this.resetIdleTimer();
   }
