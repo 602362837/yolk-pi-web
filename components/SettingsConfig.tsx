@@ -5,6 +5,7 @@ import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
 import type {
   PiWebChatGptConfig,
   PiWebConfig,
+  PiWebEditorConfig,
   PiWebSubagentAgentConfig,
   PiWebSubagentDifficultyTier,
   PiWebSubagentModelRef,
@@ -69,7 +70,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "worktree" | "usage" | "terminal" | "chatgpt" | "trellis";
+type SettingsSection = "worktree" | "usage" | "terminal" | "chatgpt" | "editor" | "trellis";
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
 const SUBAGENT_AGENT_NAMES = ["trellis-implement", "trellis-check", "trellis-research"];
@@ -381,6 +382,11 @@ function chatGptConfigsEqual(a: PiWebChatGptConfig | null, b: PiWebChatGptConfig
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function editorConfigsEqual(a: PiWebEditorConfig | null, b: PiWebEditorConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string | null; onClose: () => void; onConfigChange?: () => void }) {
   const [section, setSection] = useState<SettingsSection>("worktree");
   const [loading, setLoading] = useState(true);
@@ -400,6 +406,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [terminalEnvAssistLoading, setTerminalEnvAssistLoading] = useState(false);
   const [chatgpt, setChatgpt] = useState<PiWebChatGptConfig | null>(null);
   const [savedChatgpt, setSavedChatgpt] = useState<PiWebChatGptConfig | null>(null);
+  const [editor, setEditor] = useState<PiWebEditorConfig | null>(null);
+  const [savedEditor, setSavedEditor] = useState<PiWebEditorConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [trellisStatus, setTrellisStatus] = useState<TrellisSetupStatus | null>(null);
@@ -414,8 +422,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
   const [developerNameTouched, setDeveloperNameTouched] = useState(false);
 
   const dirty = useMemo(
-    () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt),
-    [worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt],
+    () => !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !editorConfigsEqual(editor, savedEditor),
+    [worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, editor, savedEditor],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -437,6 +445,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       setSavedTerminal(data.config.terminal);
       setChatgpt(data.config.chatgpt);
       setSavedChatgpt(data.config.chatgpt);
+      setEditor(data.config.editor);
+      setSavedEditor(data.config.editor);
       setConfigPath(data.path);
       setExists(data.exists);
       if (data.parseError) {
@@ -526,6 +536,16 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
 
   const updateChatgpt = useCallback((patch: Partial<PiWebChatGptConfig>) => {
     setChatgpt((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateEditor = useCallback((patch: Partial<PiWebEditorConfig>) => {
+    setEditor((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateEditorShortcuts = useCallback((patch: Partial<PiWebEditorConfig["shortcuts"]>) => {
+    setEditor((prev) => prev ? { ...prev, shortcuts: { ...prev.shortcuts, ...patch } } : prev);
     setNotice(null);
   }, []);
 
@@ -693,13 +713,15 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setSavedTerminal(config.terminal);
     setChatgpt(config.chatgpt);
     setSavedChatgpt(config.chatgpt);
+    setEditor(config.editor);
+    setSavedEditor(config.editor);
     setConfigPath(path);
     setExists(configExists);
     onConfigChange?.();
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!worktree || !trellis || !usage || !terminal || !chatgpt) return false;
+    if (!worktree || !trellis || !usage || !terminal || !chatgpt || !editor) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -707,7 +729,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ worktree, trellis, usage, terminal, chatgpt }),
+        body: JSON.stringify({ worktree, trellis, usage, terminal, chatgpt, editor }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -720,10 +742,10 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, worktree, trellis, usage, terminal, chatgpt]);
+  }, [applyLoadedConfig, worktree, trellis, usage, terminal, chatgpt, editor]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。Usage/ChatGPT/Trellis 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。Usage/ChatGPT/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -733,6 +755,7 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
     setUsage(defaults.usage);
     setTerminal(defaults.terminal);
     setChatgpt(defaults.chatgpt);
+    setEditor(defaults.editor);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
 
@@ -767,6 +790,8 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
         setSavedTerminal(data.config.terminal);
         setChatgpt(data.config.chatgpt);
         setSavedChatgpt(data.config.chatgpt);
+        setEditor(data.config.editor);
+        setSavedEditor(data.config.editor);
         onConfigChange?.();
       }
       setNotice(action === "init" ? "Trellis 已初始化，右侧抽屉已自动启用。" : "Trellis 已更新。");
@@ -863,13 +888,14 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
             {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
             {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量悬浮面板")}
+            {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
           </div>
 
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : worktree && trellis && usage && terminal && chatgpt ? (
+            ) : worktree && trellis && usage && terminal && chatgpt && editor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -1120,6 +1146,90 @@ export function SettingsConfig({ cwd, onClose, onConfigChange }: { cwd: string |
                     </div>
                     <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
                       文件锁过期判断跟随配置：锁超过约 2 × 总刷新间隔未更新时，启动器会把它视为 stale 并尝试接管。
+                    </div>
+                  </div>
+                ) : section === "editor" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>编辑器</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制文件面板的编辑器实现和快捷键。保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <Field label="编辑器实现" description="当前仅支持 Monaco；后续新增编辑器时会在这里切换。">
+                      <select
+                        value={editor.kind}
+                        onChange={(e) => updateEditor({ kind: e.target.value as PiWebEditorConfig["kind"] })}
+                        style={inputStyle}
+                      >
+                        <option value="monaco">Monaco Editor</option>
+                      </select>
+                    </Field>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>pi-web 自定义快捷键 / 鼠标手势</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
+                          这些是 pi-web 在 Monaco 之上额外接管的操作，可单独关闭；关闭后对应按钮仍可使用。
+                        </div>
+                      </div>
+                      <ToggleField
+                        label="保存文件 · Cmd/Ctrl+S"
+                        description="阻止浏览器默认保存网页，改为保存当前编辑器里的文件。"
+                        checked={editor.shortcuts.saveFile}
+                        onChange={(saveFile) => updateEditorShortcuts({ saveFile })}
+                      />
+                      <ToggleField
+                        label="加入聊天 · Cmd/Ctrl+1"
+                        description="把当前文件或 Monaco 中选中的行号范围加入聊天输入框。"
+                        checked={editor.shortcuts.addSelectionToChat}
+                        onChange={(addSelectionToChat) => updateEditorShortcuts({ addSelectionToChat })}
+                      />
+                      <ToggleField
+                        label="查找引用/使用处 · Shift+F12"
+                        description="根据当前光标符号在工作区常见文本/代码文件中搜索引用，适合查看变量、方法、类在哪里被使用。"
+                        checked={editor.shortcuts.findReferences}
+                        onChange={(findReferences) => updateEditorShortcuts({ findReferences })}
+                      />
+                      <ToggleField
+                        label="查找 Java 实现 · Cmd/Ctrl+F12"
+                        description="在 Java 文件中根据当前光标符号搜索 implements / extends / 方法实现 / 引用。"
+                        checked={editor.shortcuts.findJavaImplementations}
+                        onChange={(findJavaImplementations) => updateEditorShortcuts({ findJavaImplementations })}
+                      />
+                      <ToggleField
+                        label="下钻/调用跳转 · Cmd/Ctrl+鼠标点击"
+                        description="点击调用处时优先跳到定义；点击定义/接口处时搜索引用/调用处。"
+                        checked={editor.shortcuts.cmdClickDrillDown}
+                        onChange={(cmdClickDrillDown) => updateEditorShortcuts({ cmdClickDrillDown })}
+                      />
+                      <ToggleField
+                        label="层级跳转 · Shift+鼠标点击"
+                        description="点定义时查实现；点实现/调用处时向上查定义。"
+                        checked={editor.shortcuts.shiftClickHierarchy}
+                        onChange={(shiftClickHierarchy) => updateEditorShortcuts({ shiftClickHierarchy })}
+                      />
+                    </div>
+                    <div style={{ padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.6 }}>
+                      <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Monaco 内置常用快捷键</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: "6px 12px", alignItems: "baseline" }}>
+                        {[
+                          ["Cmd/Ctrl+F", "当前文件查找"],
+                          ["Cmd/Ctrl+H", "当前文件替换"],
+                          ["Cmd/Ctrl+/", "切换行注释"],
+                          ["Cmd/Ctrl+Space", "触发建议/补全"],
+                          ["Alt+↑ / Alt+↓", "移动当前行"],
+                          ["Shift+Alt+↑ / ↓", "复制当前行"],
+                          ["F12", "跳转定义（需要语言 provider 支持）"],
+                          ["Shift+F12", "Monaco 内置查引用（需要语言 provider 支持；pi-web 也提供轻量引用搜索）"],
+                        ].map(([key, desc]) => (
+                          <div key={key} style={{ display: "contents" }}>
+                            <code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, padding: "2px 6px" }}>{key}</code>
+                            <span>{desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ marginTop: 8 }}>这些是 Monaco 自带编辑行为，不写入 pi-web 配置；上面的开关只控制 pi-web 额外接管的快捷键/鼠标手势。</div>
                     </div>
                   </div>
                 ) : (

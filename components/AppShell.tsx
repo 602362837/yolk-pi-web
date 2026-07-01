@@ -158,6 +158,11 @@ export function AppShell() {
   }, [activeCwd]);
 
   const handleCwdChange = useCallback((cwd: string | null) => {
+    if (cwd !== activeCwd) {
+      setFileTabs([]);
+      setActiveFileTabId(null);
+      if (rightPanelMode === "files") setRightPanelOpen(false);
+    }
     setActiveCwd(cwd);
     // Keep an already-open terminal pinned to the cwd captured when it was opened;
     // terminal processes are ephemeral and should not be silently killed or retargeted
@@ -182,7 +187,7 @@ export function AppShell() {
     setGitRefreshKey((k) => k + 1);
     setGitDirty(false);
     router.replace("/", { scroll: false });
-  }, [router]);
+  }, [activeCwd, rightPanelMode, router]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
     setNewSessionCwd(null);
@@ -259,11 +264,12 @@ export function AppShell() {
     }
   }, [selectedSession, router]);
 
-  const handleOpenFile = useCallback((filePath: string, fileName: string) => {
+  const handleOpenFile = useCallback((filePath: string, fileName: string, line?: number) => {
     const tabId = `file:${filePath}`;
     setFileTabs((prev) => {
-      if (prev.find((t) => t.id === tabId)) return prev;
-      return [...prev, { id: tabId, label: fileName, filePath }];
+      const existing = prev.find((t) => t.id === tabId);
+      if (existing) return prev.map((tab) => tab.id === tabId ? { ...tab, line } : tab);
+      return [...prev, { id: tabId, label: fileName, filePath, line }];
     });
     setActiveFileTabId(tabId);
     setRightPanelMode("files");
@@ -1061,7 +1067,7 @@ export function AppShell() {
             {/* File content */}
             <div style={{ flex: 1, overflow: "hidden" }}>
               {activeFileTab?.filePath ? (
-                <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} onAddChat={handleAddChat} />
+                <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} initialLine={activeFileTab.line} editorConfig={webConfig?.editor} onAddChat={handleAddChat} onOpenFile={handleOpenFile} />
               ) : (
                 <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
                   没有打开文件

@@ -296,6 +296,63 @@ const model = (run as { details?: { results?: { model?: string }[] } }).details?
 const model = run.routing?.model;
 ```
 
+### Scenario: Editable workspace text-file panels
+
+#### 1. Scope / Trigger
+
+Use this contract when a browser file panel edits and saves existing workspace
+files through `app/api/files/[...path]/route.ts` or an equivalent workspace-file
+API.
+
+#### 2. Signatures
+
+- Read route: `GET /api/files/[...path]?type=read` returns
+  `{ content: string; language: string; size: number; mtimeMs?: number }` for
+  editable text files.
+- Save route: `PUT /api/files/[...path]` with
+  `{ content: string; expectedMtimeMs?: number }`.
+- Save success: `{ ok: true; size: number; mtimeMs: number; language: string }`.
+- Conflict: `409 { error: string; mtimeMs: number; size: number }`.
+
+#### 3. Contracts
+
+- Save APIs must validate the target path against shared allowed roots before
+  reading or writing.
+- MVP save flows should write existing regular text files only. Do not create,
+  rename, delete, or save preview-only/binary files unless that behavior has its
+  own design.
+- Browser dirty state must be explicit. A clean external file-change event may
+  refresh editor content, but a dirty editor must not be silently overwritten.
+- Send the read/save baseline `mtimeMs` as `expectedMtimeMs`; if the disk file
+  changed, return a 409 conflict and keep local unsaved edits visible.
+- Save failures must not clear dirty state.
+- Editor components should emit line-selection ranges through typed callbacks;
+  do not scrape DOM nodes from third-party editor internals.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Target outside allowed roots | 403 JSON error. |
+| Target missing | 404 JSON error. |
+| Target is not a regular file | 400 JSON error. |
+| Preview-only/binary target or NUL bytes | 400 JSON error. |
+| Content exceeds edit limit | 413 JSON error. |
+| `expectedMtimeMs` differs from current stat | 409 conflict; no write. |
+| Valid text file and matching baseline | Write UTF-8 content and return fresh metadata. |
+
+#### 5. Tests Required
+
+At minimum, verify these assertion points manually or with focused tests:
+
+- Editing marks the panel dirty and `Cmd/Ctrl+S` saves through the API.
+- Save errors remain visible and keep the dirty marker.
+- Clean external file changes refresh content and keep the existing diff/source
+  path usable.
+- Dirty external file changes show a conflict warning and do not replace local
+  unsaved content.
+- Binary/media/document previews remain routed to their specialized viewers.
+
 ### Scenario: Guarded Git mutation routes from status panels
 
 #### 1. Scope / Trigger

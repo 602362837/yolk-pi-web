@@ -108,7 +108,7 @@ node_modules/.bin/tsc --noEmit
 | Session files | `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl` |
 | Model config | `~/.pi/agent/models.json` |
 | Settings/default model | `~/.pi/agent/settings.json` |
-| Web UI settings (WorkTree, Usage, Web Terminal, ChatGPT panel, Trellis) | `~/.pi/agent/pi-web.json` |
+| Web UI settings (WorkTree, Usage, Web Terminal, ChatGPT panel, Editor, Trellis) | `~/.pi/agent/pi-web.json` |
 
 ## Archive Rules
 

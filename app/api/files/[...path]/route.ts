@@ -63,17 +63,20 @@ function getDocumentMime(filePath: string): string | null {
 }
 
 const EXT_TO_LANGUAGE: Record<string, string> = {
-  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-  mjs: "javascript", cjs: "javascript", py: "python", rb: "ruby",
-  go: "go", rs: "rust", java: "java", kt: "kotlin", swift: "swift",
-  c: "c", cpp: "cpp", h: "c", hpp: "cpp", cs: "csharp",
-  html: "html", htm: "html", css: "css", scss: "css", less: "css",
-  json: "json", jsonl: "json", yaml: "yaml", yml: "yaml",
+  ts: "typescript", tsx: "typescript", mts: "typescript", cts: "typescript",
+  js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
+  py: "python", pyw: "python", rb: "ruby", php: "php", go: "go", rs: "rust",
+  java: "java", kt: "kotlin", kts: "kotlin", swift: "swift", scala: "scala",
+  c: "c", h: "c", cpp: "cpp", cc: "cpp", cxx: "cpp", hpp: "cpp", hh: "cpp", hxx: "cpp",
+  cs: "csharp", fs: "fsharp", fsx: "fsharp", lua: "lua", pl: "perl", pm: "perl", r: "r",
+  html: "html", htm: "html", css: "css", scss: "scss", sass: "scss", less: "less",
+  json: "json", jsonc: "json", jsonl: "json", yaml: "yaml", yml: "yaml",
   toml: "toml", xml: "xml", md: "markdown", mdx: "markdown",
-  sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
-  sql: "sql", graphql: "graphql", gql: "graphql",
-  dockerfile: "dockerfile", tf: "hcl", hcl: "hcl",
-  env: "bash", gitignore: "bash", txt: "text",
+  sh: "shell", bash: "shell", zsh: "shell", fish: "shell", ps1: "powershell", bat: "bat", cmd: "bat",
+  sql: "sql", mysql: "mysql", pgsql: "pgsql", graphql: "graphql", gql: "graphql",
+  dockerfile: "dockerfile", tf: "hcl", tfvars: "hcl", hcl: "hcl",
+  proto: "protobuf", ini: "ini", cfg: "ini", conf: "ini", properties: "properties",
+  env: "shell", gitignore: "plaintext", txt: "plaintext", text: "plaintext",
   pdf: "pdf", docx: "word",
 };
 
@@ -81,10 +84,10 @@ function getLanguage(filePath: string): string {
   const base = path.basename(filePath).toLowerCase();
   // Special full-name matches
   if (base === "dockerfile" || base.startsWith("dockerfile.")) return "dockerfile";
-  if (base === ".env" || base.startsWith(".env.")) return "bash";
+  if (base === ".env" || base.startsWith(".env.")) return "shell";
   if (base === "makefile" || base === "gnumakefile") return "makefile";
   const ext = base.split(".").pop() ?? "";
-  return EXT_TO_LANGUAGE[ext] ?? "text";
+  return EXT_TO_LANGUAGE[ext] ?? "plaintext";
 }
 
 const WINDOWS_ABSOLUTE_RE = /^[a-zA-Z]:[\\/]/;
@@ -231,6 +234,25 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasNulByteInFile(filePath: string): boolean {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(8192);
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
+    return buffer.subarray(0, bytesRead).includes(0);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function isPreviewOnlyOrBinaryPath(filePath: string): boolean {
+  return Boolean(getImageMime(filePath) || getAudioMime(filePath) || getDocumentMime(filePath));
+}
+
 function wrapDocxPreviewHtml(bodyHtml: string, fileName: string): string {
   return `<!doctype html>
 <html>
@@ -280,6 +302,87 @@ ${bodyHtml}
 </html>`;
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  try {
+    const { path: segments } = await params;
+    const filePath = filePathFromSegments(segments);
+
+    const allowedRoots = await getAllowedRoots();
+    if (!isPathAllowed(filePath, allowedRoots)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (!stat.isFile()) {
+      return NextResponse.json({ error: "Not a file" }, { status: 400 });
+    }
+
+    const realFilePath = fs.realpathSync(filePath);
+    if (!isPathAllowed(realFilePath, allowedRoots)) {
+      return NextResponse.json({ error: "Symlink target escapes allowed roots" }, { status: 403 });
+    }
+
+    if (isPreviewOnlyOrBinaryPath(filePath)) {
+      return NextResponse.json({ error: "This file type is not editable" }, { status: 400 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    if (!isObject(payload) || typeof payload.content !== "string") {
+      return NextResponse.json({ error: "Missing string content" }, { status: 400 });
+    }
+
+    const expectedMtimeMs = typeof payload.expectedMtimeMs === "number" && Number.isFinite(payload.expectedMtimeMs)
+      ? payload.expectedMtimeMs
+      : null;
+
+    if (expectedMtimeMs !== null && Math.abs(stat.mtimeMs - expectedMtimeMs) > 1) {
+      return NextResponse.json(
+        { error: "File changed on disk. Reload or resolve the conflict before saving.", mtimeMs: stat.mtimeMs, size: stat.size },
+        { status: 409 }
+      );
+    }
+
+    if (stat.size > TEXT_PREVIEW_MAX_BYTES) {
+      return NextResponse.json({ error: "File too large to edit (>256KB)" }, { status: 413 });
+    }
+    if (Buffer.byteLength(payload.content, "utf8") > TEXT_PREVIEW_MAX_BYTES) {
+      return NextResponse.json({ error: "Content too large to save (>256KB)" }, { status: 413 });
+    }
+    if (payload.content.includes("\0")) {
+      return NextResponse.json({ error: "Binary content is not editable" }, { status: 400 });
+    }
+    if (hasNulByteInFile(filePath)) {
+      return NextResponse.json({ error: "Binary file is not editable" }, { status: 400 });
+    }
+
+    fs.writeFileSync(filePath, payload.content, "utf-8");
+    const nextStat = fs.statSync(filePath);
+    return NextResponse.json({
+      ok: true,
+      size: nextStat.size,
+      mtimeMs: nextStat.mtimeMs,
+      language: getLanguage(filePath),
+    });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -325,7 +428,7 @@ export async function GET(
       }
       const content = fs.readFileSync(filePath, "utf-8");
       const language = getLanguage(filePath);
-      return NextResponse.json({ content, language, size: stat.size });
+      return NextResponse.json({ content, language, size: stat.size, mtimeMs: stat.mtimeMs });
     }
 
     if (type === "meta") {
@@ -337,6 +440,7 @@ export async function GET(
       const documentMime = getDocumentMime(filePath);
       return NextResponse.json({
         size: stat.size,
+        mtimeMs: stat.mtimeMs,
         language: getLanguage(filePath),
         mime: imageMime || audioMime || documentMime || "text/plain",
         previewKind: documentPreviewKind(filePath),
@@ -395,7 +499,7 @@ export async function GET(
             watcher = fs.watch(filePath, () => {
               try {
                 const s = fs.statSync(filePath);
-                send("change", { mtime: s.mtime.toISOString(), size: s.size });
+                send("change", { mtime: s.mtime.toISOString(), mtimeMs: s.mtimeMs, size: s.size });
               } catch {
                 send("change", { mtime: new Date().toISOString(), size: 0 });
               }

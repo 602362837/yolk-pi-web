@@ -94,12 +94,29 @@ export interface PiWebChatGptConfig {
   refreshAccountSaltMaxSeconds: number;
 }
 
+export type PiWebEditorKind = "monaco";
+
+export interface PiWebEditorShortcutConfig {
+  saveFile: boolean;
+  addSelectionToChat: boolean;
+  findReferences: boolean;
+  findJavaImplementations: boolean;
+  cmdClickDrillDown: boolean;
+  shiftClickHierarchy: boolean;
+}
+
+export interface PiWebEditorConfig {
+  kind: PiWebEditorKind;
+  shortcuts: PiWebEditorShortcutConfig;
+}
+
 export interface PiWebConfig {
   worktree: PiWebWorktreeConfig;
   trellis: PiWebTrellisConfig;
   usage: PiWebUsageConfig;
   terminal: PiWebTerminalConfig;
   chatgpt: PiWebChatGptConfig;
+  editor: PiWebEditorConfig;
 }
 
 export interface PiWebConfigPatch {
@@ -108,6 +125,7 @@ export interface PiWebConfigPatch {
   usage?: unknown;
   terminal?: unknown;
   chatgpt?: unknown;
+  editor?: unknown;
 }
 
 export interface PiWebConfigReadResult {
@@ -164,6 +182,17 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     refreshAccountIntervalSeconds: 20,
     refreshAccountSaltMinSeconds: 0,
     refreshAccountSaltMaxSeconds: 15,
+  },
+  editor: {
+    kind: "monaco",
+    shortcuts: {
+      saveFile: true,
+      addSelectionToChat: true,
+      findReferences: true,
+      findJavaImplementations: true,
+      cmdClickDrillDown: true,
+      shiftClickHierarchy: true,
+    },
   },
   trellis: {
     enabled: false,
@@ -391,6 +420,8 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const usage = isRecord(root.usage) ? root.usage : {};
   const terminal = isRecord(root.terminal) ? root.terminal : {};
   const chatgpt = isRecord(root.chatgpt) ? root.chatgpt : {};
+  const editor = isRecord(root.editor) ? root.editor : {};
+  const editorShortcuts = isRecord(editor.shortcuts) ? editor.shortcuts : {};
   const terminalEnv: Record<string, string> = {};
   if (isRecord(terminal.env)) {
     for (const [key, value] of Object.entries(terminal.env)) {
@@ -426,6 +457,17 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       refreshAccountIntervalSeconds: readInteger(chatgpt.refreshAccountIntervalSeconds, defaults.chatgpt.refreshAccountIntervalSeconds),
       refreshAccountSaltMinSeconds: readInteger(chatgpt.refreshAccountSaltMinSeconds, defaults.chatgpt.refreshAccountSaltMinSeconds),
       refreshAccountSaltMaxSeconds: readInteger(chatgpt.refreshAccountSaltMaxSeconds, defaults.chatgpt.refreshAccountSaltMaxSeconds),
+    },
+    editor: {
+      kind: editor.kind === "monaco" ? "monaco" : defaults.editor.kind,
+      shortcuts: {
+        saveFile: readBoolean(editorShortcuts.saveFile, defaults.editor.shortcuts.saveFile),
+        addSelectionToChat: readBoolean(editorShortcuts.addSelectionToChat, defaults.editor.shortcuts.addSelectionToChat),
+        findReferences: readBoolean(editorShortcuts.findReferences, defaults.editor.shortcuts.findReferences),
+        findJavaImplementations: readBoolean(editorShortcuts.findJavaImplementations, defaults.editor.shortcuts.findJavaImplementations),
+        cmdClickDrillDown: readBoolean(editorShortcuts.cmdClickDrillDown, defaults.editor.shortcuts.cmdClickDrillDown),
+        shiftClickHierarchy: readBoolean(editorShortcuts.shiftClickHierarchy, defaults.editor.shortcuts.shiftClickHierarchy),
+      },
     },
     trellis: {
       enabled: readBoolean(trellis.enabled, defaults.trellis.enabled),
@@ -723,6 +765,29 @@ export function validatePiWebChatGptConfig(value: unknown): PiWebChatGptConfig {
   };
 }
 
+export function validatePiWebEditorConfig(value: unknown): PiWebEditorConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("editor config must be an object");
+  }
+  if (value.kind !== "monaco") {
+    throw new PiWebConfigValidationError("editor.kind must be monaco");
+  }
+  if (!isRecord(value.shortcuts)) {
+    throw new PiWebConfigValidationError("editor.shortcuts must be an object");
+  }
+  return {
+    kind: "monaco",
+    shortcuts: {
+      saveFile: requireBoolean(value.shortcuts.saveFile, "editor.shortcuts.saveFile"),
+      addSelectionToChat: requireBoolean(value.shortcuts.addSelectionToChat, "editor.shortcuts.addSelectionToChat"),
+      findReferences: requireBoolean(value.shortcuts.findReferences, "editor.shortcuts.findReferences"),
+      findJavaImplementations: requireBoolean(value.shortcuts.findJavaImplementations, "editor.shortcuts.findJavaImplementations"),
+      cmdClickDrillDown: requireBoolean(value.shortcuts.cmdClickDrillDown, "editor.shortcuts.cmdClickDrillDown"),
+      shiftClickHierarchy: requireBoolean(value.shortcuts.shiftClickHierarchy, "editor.shortcuts.shiftClickHierarchy"),
+    },
+  };
+}
+
 export function validatePiWebTrellisConfig(value: unknown): PiWebTrellisConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("trellis config must be an object");
@@ -756,7 +821,8 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasUsage = Object.prototype.hasOwnProperty.call(patch, "usage");
   const hasTerminal = Object.prototype.hasOwnProperty.call(patch, "terminal");
   const hasChatGpt = Object.prototype.hasOwnProperty.call(patch, "chatgpt");
-  if (!hasWorktree && !hasTrellis && !hasUsage && !hasTerminal && !hasChatGpt) {
+  const hasEditor = Object.prototype.hasOwnProperty.call(patch, "editor");
+  if (!hasWorktree && !hasTrellis && !hasUsage && !hasTerminal && !hasChatGpt && !hasEditor) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
@@ -776,6 +842,7 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
       ? chatGptPatch.warmup
       : currentConfig.chatgpt.warmup,
   } : chatGptPatch) : undefined;
+  const normalizedEditor = hasEditor ? validatePiWebEditorConfig(patch.editor) : undefined;
   const nextRaw: Record<string, unknown> = { ...raw };
 
   if (normalizedWorktree) {
@@ -815,6 +882,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.chatgpt = {
       ...previousChatGpt,
       ...normalizedChatGpt,
+    };
+  }
+
+  if (normalizedEditor) {
+    const previousEditor = isRecord(raw.editor) ? raw.editor : {};
+    nextRaw.editor = {
+      ...previousEditor,
+      ...normalizedEditor,
     };
   }
 
