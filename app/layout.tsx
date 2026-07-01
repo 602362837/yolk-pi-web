@@ -10,8 +10,11 @@ const notoSansMono = Noto_Sans_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pi Agent Web",
-  description: "Pi Coding Agent Web Interface",
+  title: "yolk pi web",
+  description: "WebChat workspace for the pi coding agent",
+  icons: {
+    icon: "/yolk-pi-logo.png",
+  },
 };
 
 export default function RootLayout({
