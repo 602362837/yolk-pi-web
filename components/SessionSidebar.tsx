@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { TrellisSetupStatus } from "@/lib/trellis-setup-types";
 import type { GitInfo, SessionInfo, WorktreeInfo } from "@/lib/types";
 import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
+import { Checkbox } from "./Checkbox";
 import { FileExplorer } from "./FileExplorer";
 
 interface Props {
@@ -1452,14 +1453,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               </div>
             )}
             {worktreeAction.kind === "delete" && worktreeAction.dirtySummary?.length ? (
-              <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={worktreeAction.force}
-                  onChange={(e) => setWorktreeAction((prev) => prev ? { ...prev, force: e.target.checked } : prev)}
-                />
-                Git 报告有本地修改，仍然强制删除
-              </label>
+              <Checkbox
+                checked={worktreeAction.force}
+                label="Git 报告有本地修改，仍然强制删除"
+                onChange={(e) => setWorktreeAction((prev) => prev ? { ...prev, force: e.currentTarget.checked } : prev)}
+                rootStyle={{ fontSize: 12, marginBottom: 12 }}
+              />
             ) : null}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
@@ -2062,11 +2061,11 @@ function SessionItem({
               onClick={(e) => e.stopPropagation()}
               style={{ display: "flex", alignItems: "center", flexShrink: 0 }}
             >
-              <input
-                type="checkbox"
+              <Checkbox
+                aria-label={`选择会话 ${title}`}
                 checked={!!selectedForArchive}
                 onChange={() => onToggleSelect(session.id)}
-                style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--accent)" }}
+                size={14}
               />
             </div>
           )}

@@ -6,6 +6,7 @@
 | --- | --- |
 | `components/AppShell.tsx` | Top-level layout, URL state, tab management, Web Terminal bottom-dock toggling, resizable left drawer, right drawer mode switching between files and optional Trellis tasks, and Trellis-task-to-chat context block insertion. |
 | `components/SessionSidebar.tsx` | Session tree sidebar, workspace/WorkTree picker actions grouped by main workspace, Trellis-uninitialized workspace prompt that opens the Web Terminal with `trellis init` prefilled and polls setup status until initialization is detected, archive/unarchive actions, archived section, multi-select batch archive, and integrated file explorer with a resizable session/explorer split. |
+| `components/Checkbox.tsx` | Shared theme-aware checkbox control with custom focus, hover, checked visuals, optional label text, and native input semantics. |
 | `components/ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic. Shows archived banner and disables input for archived sessions. |
 | `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload, file-reference chips, and serialized Trellis task context blocks. New empty sessions receive the default tool preset from `pi-web.json` (`yolk.defaultToolPreset`) and can still be changed per session from the compact preset dropdown. |
 | `components/ModelSelect.tsx` | Shared searchable model selector used by chat and settings model policy fields, with grouped options and fuzzy jump/subsequence search. |
