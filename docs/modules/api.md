@@ -56,6 +56,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `trellis/setup/install/` | POST | Install/ensure the Trellis CLI without running project initialization, so interactive `trellis init` prompts stay in the user's terminal. |
 | `trellis/setup/init/` | POST | Legacy endpoint that installs/ensures the Trellis CLI, runs `trellis init -u <developer> --pi` for an authorized uninitialized workspace, and auto-enables the Trellis drawer setting on success. UI flows should prefer terminal-driven initialization. |
 | `trellis/setup/update/` | POST | Upgrade/install the Trellis CLI and run `trellis update` for an authorized workspace that already has `.trellis`. |
+| `studio/agents/` | GET/POST | Read project-local YPI Studio member cards from `.ypi/agents/` for an authorized workspace, and initialize or backfill the four default members (`architect`, `ui-designer`, `implementer`, `checker`) without overwriting existing files. |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>`. |
 | `home/` | GET | Return `os.homedir()`. |
 | `usage/` | GET | Aggregate token/cost usage across active-only or active-plus-archived sessions based on `pi-web.json` Usage settings. |

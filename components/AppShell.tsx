@@ -14,6 +14,7 @@ import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
 import { TrellisPanel } from "./TrellisPanel";
 import { TrellisSessionWidget } from "./TrellisSessionWidget";
+import { YpiStudioPanel } from "./YpiStudioPanel";
 import { BranchNavigator } from "./BranchNavigator";
 import { GitPanel } from "./GitPanel";
 import { TerminalPanel } from "./TerminalPanel";
@@ -185,11 +186,11 @@ export function AppShell() {
     return () => ro.disconnect();
   }, [activeTopPanel]);
 
-  // Right panel — file tabs and optional Trellis task drawer
+  // Right panel — file tabs, Studio members, and optional Trellis task drawer
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelMode, setRightPanelMode] = useState<"files" | "trellis">("files");
+  const [rightPanelMode, setRightPanelMode] = useState<"files" | "studio" | "trellis">("files");
   const [focusedTrellisTaskKey, setFocusedTrellisTaskKey] = useState<string | null>(null);
   const [trellisSessionTask, setTrellisSessionTask] = useState<TrellisSessionTaskLinkResult | null>(null);
   const [trellisSessionTaskRefreshKey, setTrellisSessionTaskRefreshKey] = useState(0);
@@ -360,7 +361,9 @@ export function AppShell() {
   const terminalEnabled = webConfig?.terminal.enabled ?? false;
   const trellisIncludeArchivedDefault = webConfig?.trellis.includeArchived ?? false;
   const trellisCwd = activeCwd ?? selectedSession?.cwd ?? newSessionCwd;
+  const studioCwd = trellisCwd;
   const terminalCwd = activeCwd ?? selectedSession?.cwd ?? newSessionCwd;
+  const rightPanelTogglePadding = rightPanelOpen ? 12 : 48 + 36 + (trellisEnabled ? 36 : 0);
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
 
@@ -961,7 +964,7 @@ export function AppShell() {
                   marginLeft: "auto",
                   display: "flex", alignItems: "center", gap: 10,
                   paddingLeft: 12,
-                  paddingRight: webConfig?.chatgpt.usagePanelEnabled ? 12 : (rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48)),
+                  paddingRight: webConfig?.chatgpt.usagePanelEnabled ? 12 : rightPanelTogglePadding,
                   height: "100%",
                   fontSize: 11, color: "var(--text-muted)",
                   whiteSpace: "nowrap", cursor: "default",
@@ -1009,7 +1012,7 @@ export function AppShell() {
             );
           })()}
           {webConfig?.chatgpt.usagePanelEnabled && (
-            <div className="app-top-usage-panel" style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelOpen ? 12 : (trellisEnabled ? 84 : 48), height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
+            <div className="app-top-usage-panel" style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelTogglePadding, height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
               <ChatGptUsagePanel />
             </div>
           )}
@@ -1133,7 +1136,7 @@ export function AppShell() {
         </div>
       </div>
 
-      {/* Right panel: file viewer or Trellis — always mounted, width animated via CSS */}
+      {/* Right panel: file viewer, Studio, or Trellis — always mounted, width animated via CSS */}
       <div
         className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}`}
         style={{
@@ -1168,6 +1171,16 @@ export function AppShell() {
               )}
             </div>
           </>
+        ) : rightPanelMode === "studio" ? (
+          <>
+            <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36, padding: "0 12px", gap: 8 }}>
+              <span style={{ color: "var(--text)", fontSize: 13, fontWeight: 700 }}>工作室</span>
+              {studioCwd && <span title={studioCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{studioCwd}</span>}
+            </div>
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} />
+            </div>
+          </>
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36, padding: "0 12px", gap: 8 }}>
@@ -1181,7 +1194,7 @@ export function AppShell() {
         )}
       </div>
     </div>
-    {/* Right panel mode toggles — Preview first, optional Trellis to its right. */}
+    {/* Right panel mode toggles — Preview, Studio, and optional Trellis. */}
     <div className="right-panel-toggle-strip" style={{ position: "fixed", top: 0, right: 0, zIndex: 300, display: "flex", flexDirection: "row" }}>
       <button
         onClick={() => {
@@ -1207,6 +1220,29 @@ export function AppShell() {
           <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
           <circle cx="12" cy="12" r="3" />
         </svg>
+      </button>
+      <button
+        onClick={() => {
+          if (rightPanelOpen && rightPanelMode === "studio") setRightPanelOpen(false);
+          else {
+            setRightPanelMode("studio");
+            setRightPanelOpen(true);
+          }
+        }}
+        title={rightPanelOpen && rightPanelMode === "studio" ? "隐藏工作室面板" : "显示工作室面板"}
+        aria-label={rightPanelOpen && rightPanelMode === "studio" ? "隐藏工作室面板" : "显示工作室面板"}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, padding: 0,
+          background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+          color: rightPanelOpen && rightPanelMode === "studio" ? "var(--accent)" : "var(--text-muted)",
+          cursor: "pointer", transition: "color 0.12s",
+          fontSize: 12, fontWeight: 800,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = rightPanelOpen && rightPanelMode === "studio" ? "var(--accent)" : "var(--text-muted)"; }}
+      >
+        工
       </button>
       {trellisEnabled && (
         <button
