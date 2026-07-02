@@ -500,13 +500,14 @@ span.linenumber {
     border-right: none !important;
   }
   /* keep inner content at fixed width so it doesn't reflow during animation */
-  .sidebar-container > * {
+  .sidebar-container > :not(.sidebar-resize-handle) {
     width: var(--sidebar-width, 260px);
     min-width: var(--sidebar-width, 260px);
   }
   .sidebar-container > .sidebar-resize-handle {
-    width: 8px;
-    min-width: 0;
+    width: 8px !important;
+    min-width: 0 !important;
+    max-width: 8px;
   }
 }
 

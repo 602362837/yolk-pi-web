@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { DefaultResourceLoader, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { YPI_STUDIO_SLASH_COMMANDS } from "@/lib/ypi-studio-extension";
 
 export const dynamic = "force-dynamic";
 
-export type SlashCommandSource = "skill" | "prompt";
+export type SlashCommandSource = "extension" | "skill" | "prompt";
 
 export interface SlashCommandEntry {
   name: string;
@@ -33,6 +34,12 @@ export async function GET(req: Request) {
     const { prompts, diagnostics: promptDiagnostics } = loader.getPrompts();
 
     const commands: SlashCommandEntry[] = [
+      ...YPI_STUDIO_SLASH_COMMANDS.map((command) => ({
+        name: command.name,
+        source: "extension" as const,
+        description: command.description,
+        argumentHint: command.argumentHint,
+      })),
       ...skills.map((skill) => ({
         name: `skill:${skill.name}`,
         source: "skill" as const,
@@ -49,7 +56,8 @@ export async function GET(req: Request) {
         path: prompt.filePath,
       })),
     ].sort((a, b) => {
-      if (a.source !== b.source) return a.source === "skill" ? -1 : 1;
+      const sourceOrder: Record<SlashCommandSource, number> = { extension: 0, prompt: 1, skill: 2 };
+      if (a.source !== b.source) return sourceOrder[a.source] - sourceOrder[b.source];
       return a.name.localeCompare(b.name);
     });
 

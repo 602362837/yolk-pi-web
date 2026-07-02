@@ -158,15 +158,18 @@ function filterSlashCommands(commands: SlashCommandEntry[], query: string): Slas
     .map((command): SlashCommandOption | null => {
       const name = command.name.toLowerCase();
       const bareSkillName = command.source === "skill" ? name.replace(/^skill:/, "") : name;
+      const sourcePriority = command.source === "extension" ? 0 : command.source === "prompt" ? 1 : 2;
 
-      if (!normalizedQuery) return { ...command, priority: command.source === "prompt" ? 0 : 1 };
+      if (!normalizedQuery) return { ...command, priority: sourcePriority };
       if (skillPrefixQuery) {
         return name.startsWith(normalizedQuery) ? { ...command, priority: 0 } : null;
       }
-      if (command.source === "prompt" && name.startsWith(normalizedQuery)) return { ...command, priority: 0 };
-      if (command.source === "skill" && bareSkillName.startsWith(normalizedQuery)) return { ...command, priority: 1 };
-      if (command.source === "prompt" && name.includes(normalizedQuery)) return { ...command, priority: 2 };
-      if (command.source === "skill" && bareSkillName.includes(normalizedQuery)) return { ...command, priority: 3 };
+      if (command.source === "extension" && name.startsWith(normalizedQuery)) return { ...command, priority: 0 };
+      if (command.source === "prompt" && name.startsWith(normalizedQuery)) return { ...command, priority: 1 };
+      if (command.source === "skill" && bareSkillName.startsWith(normalizedQuery)) return { ...command, priority: 2 };
+      if (command.source === "extension" && name.includes(normalizedQuery)) return { ...command, priority: 3 };
+      if (command.source === "prompt" && name.includes(normalizedQuery)) return { ...command, priority: 4 };
+      if (command.source === "skill" && bareSkillName.includes(normalizedQuery)) return { ...command, priority: 5 };
       return null;
     })
     .filter((command): command is SlashCommandOption => command !== null)
@@ -1242,14 +1245,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               }}
             >
               <div style={{ padding: "7px 10px", fontSize: 11, color: "var(--text-dim)", borderBottom: "1px solid var(--border)" }}>
-                Slash commands · skills and prompt templates
+                Slash commands · extensions, skills and prompt templates
               </div>
               {slashCommandsLoading ? (
                 <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>Loading commands…</div>
               ) : slashCommandsError ? (
                 <div style={{ padding: "10px 12px", fontSize: 12, color: "#ef4444" }}>Failed to load commands: {slashCommandsError}</div>
               ) : filteredSlashCommands.length === 0 ? (
-                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>No matching skill or template commands</div>
+                <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)" }}>No matching slash commands</div>
               ) : (
                 filteredSlashCommands.map((command, index) => {
                   const selected = index === slashSelectedIndex;
@@ -1284,10 +1287,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                           {command.argumentHint && (
                             <span style={{ color: "var(--text)", fontFamily: "var(--font-mono)", marginRight: 8 }}>{command.argumentHint}</span>
                           )}
-                          {command.description || (command.source === "skill" ? "Pi skill" : "Prompt template")}
+                          {command.description || (command.source === "extension" ? "Extension command" : command.source === "skill" ? "Pi skill" : "Prompt template")}
                         </span>
                         <span style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          {command.source === "skill" ? "skill" : "template"}{command.location ? ` · ${command.location}` : ""}
+                          {command.source === "extension" ? "extension" : command.source === "skill" ? "skill" : "template"}{command.location ? ` · ${command.location}` : ""}
                         </span>
                       </span>
                     </button>

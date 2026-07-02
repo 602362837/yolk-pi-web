@@ -27,7 +27,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `skills/` | GET | List installed skills for a cwd. |
 | `skills/search/` | GET | Search skills.sh for available skills. |
 | `skills/install/` | POST | Install a skill via `npx skills add`. |
-| `commands/` | GET | List slash commands from skills for a cwd. |
+| `commands/` | GET | List slash commands from built-in YPI Studio extension commands plus skills and prompt templates for a cwd. |
 | `cwd/validate/` | POST | Validate a candidate workspace path. |
 | `git/worktrees/` | GET/POST/DELETE | Inspect, create, and remove Git worktrees from the selected cwd; removal also deletes sessions for that worktree cwd. |
 | `sessions/archive/` | POST | Archive one or more sessions (moves to `sessions-archive/`). |

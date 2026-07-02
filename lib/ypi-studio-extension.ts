@@ -51,6 +51,22 @@ interface StudioSubagentInput {
   thinking?: string;
 }
 
+export interface YpiStudioSlashCommandDefinition {
+  name: string;
+  description: string;
+  argumentHint?: string;
+}
+
+export const YPI_STUDIO_SLASH_COMMANDS: YpiStudioSlashCommandDefinition[] = [
+  { name: "studio-init", description: "Initialize or backfill YPI Studio members and workflows" },
+  { name: "studio-start", description: "Start a structured YPI Studio workflow task", argumentHint: "[goal]" },
+  { name: "studio-feature", description: "Start a YPI Studio feature development task", argumentHint: "[goal]" },
+  { name: "studio-bugfix", description: "Start a YPI Studio bugfix task", argumentHint: "[bug]" },
+  { name: "studio-ui", description: "Start a YPI Studio UI-change task", argumentHint: "[goal]" },
+  { name: "studio-continue", description: "Continue the active YPI Studio task" },
+  { name: "studio-check", description: "Ask the YPI Studio checker to review the active task or diff", argumentHint: "[focus]" },
+];
+
 const FIRST_REPLY_NOTICE = `<ypi-studio-first-reply>
 First visible reply after this extension loads: say briefly in Chinese that YPI Studio workflow context is loaded, then answer directly.
 This notice is one-shot: do not repeat it after the first assistant reply in the same session.
@@ -312,6 +328,29 @@ function runChildPi(root: string, prompt: string, input: StudioSubagentInput, si
   });
 }
 
+function sendStudioStartPrompt(
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  args: string,
+  workflowId?: "feature-dev" | "bugfix" | "ui-change",
+): void {
+  const goal = args.trim() || "请根据我接下来的说明创建工作室任务。";
+  const workflowLine = workflowId
+    ? `1. 如无 active Studio task，调用 ypi_studio_task(action=create, workflowId=${workflowId}) 创建任务。`
+    : "1. 如无 active Studio task，调用 ypi_studio_task(action=create) 创建任务；根据目标选择 feature-dev / bugfix / ui-change / review-only。";
+  pi.sendUserMessage([
+    "启动蛋黄派工作室流程。",
+    "",
+    `目标：${goal}`,
+    "",
+    "请按 YPI Studio 状态机执行：",
+    workflowLine,
+    "2. 接单和设计阶段使用 ypi_studio_subagent(member=architect) 指派架构师。",
+    "3. 涉及界面时使用 ypi_studio_subagent(member=ui-designer)。",
+    "4. 方案稳定后切到 awaiting_approval，并等待我确认后才进入 implementing。",
+    "5. 实现和检查分别通过 ypi_studio_subagent(member=implementer) 与 ypi_studio_subagent(member=checker) 指派。",
+  ].join("\n"));
+}
+
 function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string): string {
   const definition = readText(join(root, ".ypi", "agents", memberFile(member)));
   if (!definition.trim()) throw new Error(`Studio member definition not found: .ypi/agents/${memberFile(member)}`);
@@ -360,19 +399,28 @@ export function createYpiStudioExtension(workspaceRoot: string) {
   pi.registerCommand("studio-start", {
     description: "Start a structured YPI Studio workflow task",
     handler: async (args) => {
-      const goal = args.trim() || "请根据我接下来的说明创建工作室任务。";
-      pi.sendUserMessage([
-        "启动蛋黄派工作室流程。",
-        "",
-        `目标：${goal}`,
-        "",
-        "请按 YPI Studio 状态机执行：",
-        "1. 如无 active Studio task，调用 ypi_studio_task(action=create) 创建任务；根据目标选择 feature-dev / bugfix / ui-change / review-only。",
-        "2. 接单和设计阶段使用 ypi_studio_subagent(member=architect) 指派架构师。",
-        "3. 涉及界面时使用 ypi_studio_subagent(member=ui-designer)。",
-        "4. 方案稳定后切到 awaiting_approval，并等待我确认后才进入 implementing。",
-        "5. 实现和检查分别通过 ypi_studio_subagent(member=implementer) 与 ypi_studio_subagent(member=checker) 指派。",
-      ].join("\n"));
+      sendStudioStartPrompt(pi, args);
+    },
+  });
+
+  pi.registerCommand("studio-feature", {
+    description: "Start a YPI Studio feature development task",
+    handler: async (args) => {
+      sendStudioStartPrompt(pi, args, "feature-dev");
+    },
+  });
+
+  pi.registerCommand("studio-bugfix", {
+    description: "Start a YPI Studio bugfix task",
+    handler: async (args) => {
+      sendStudioStartPrompt(pi, args, "bugfix");
+    },
+  });
+
+  pi.registerCommand("studio-ui", {
+    description: "Start a YPI Studio UI-change task",
+    handler: async (args) => {
+      sendStudioStartPrompt(pi, args, "ui-change");
     },
   });
 
