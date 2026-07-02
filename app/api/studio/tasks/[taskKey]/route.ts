@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { canonicalizeCwd } from "@/lib/cwd";
 import {
+  archiveYpiStudioTask,
   bindYpiStudioTaskToContext,
   getYpiStudioTaskDetail,
+  isYpiStudioTaskArchiveBody,
   isYpiStudioTaskArtifactUpdateBody,
   isYpiStudioTaskTransitionBody,
   transitionYpiStudioTask,
@@ -23,7 +25,7 @@ async function resolveAuthorizedCwd(cwd: string): Promise<string | NextResponse>
 }
 
 function isValidTaskKey(taskKey: string): boolean {
-  return /^active:[^/\\:]+$/.test(taskKey) || /^[^/\\:]+$/.test(taskKey);
+  return /^active:[^/\\:]+$/.test(taskKey) || /^archived:\d{4}-\d{2}:[^/\\:]+$/.test(taskKey) || /^[^/\\:]+$/.test(taskKey);
 }
 
 function isBindBody(value: unknown): value is { cwd: string; contextId: string; action?: string } {
@@ -83,6 +85,10 @@ export async function PATCH(
     if (isYpiStudioTaskTransitionBody(body)) {
       const task = transitionYpiStudioTask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
+    }
+    if (isYpiStudioTaskArchiveBody(body)) {
+      const result = archiveYpiStudioTask(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json(result);
     }
 
     return NextResponse.json({ error: "Unsupported task patch body" }, { status: 400 });

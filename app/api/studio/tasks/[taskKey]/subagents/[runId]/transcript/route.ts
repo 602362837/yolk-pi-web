@@ -16,7 +16,7 @@ async function resolveAuthorizedCwd(cwd: string): Promise<string | NextResponse>
 }
 
 function isValidTaskKey(taskKey: string): boolean {
-  return /^active:[^/\\:]+$/.test(taskKey) || /^[^/\\:]+$/.test(taskKey);
+  return /^active:[^/\\:]+$/.test(taskKey) || /^archived:\d{4}-\d{2}:[^/\\:]+$/.test(taskKey) || /^[^/\\:]+$/.test(taskKey);
 }
 
 function isValidRunId(runId: string): boolean {

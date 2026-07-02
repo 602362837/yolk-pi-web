@@ -6,8 +6,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { initializeYpiStudioAgents } from "./ypi-studio-agents";
 import { readPiWebConfig, type PiWebSubagentRunPolicy, type PiWebSubagentThinking } from "./pi-web-config";
 import {
+  archiveYpiStudioTask,
   createYpiStudioTask,
   getCurrentYpiStudioTaskDetail,
+  getYpiStudioKnowledgeContextForPrompt,
   getYpiStudioTaskContextForPrompt,
   getYpiStudioTaskDetail,
   listYpiStudioTasks,
@@ -23,7 +25,7 @@ import {
   previewYpiStudioTranscriptText,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
-import type { YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import type { YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -55,7 +57,7 @@ interface PiExtensionContext {
   ui?: { notify?: (msg: string, type?: "info" | "warning" | "error") => void };
 }
 interface StudioTaskToolInput {
-  action?: "init_workflows" | "create" | "current" | "get" | "transition" | "update_artifact";
+  action?: "init_workflows" | "create" | "current" | "get" | "transition" | "update_artifact" | "archive";
   title?: string;
   workflowId?: string;
   taskId?: string;
@@ -64,6 +66,10 @@ interface StudioTaskToolInput {
   artifact?: string;
   content?: string;
   override?: boolean;
+  scope?: YpiStudioTaskScope;
+  tags?: string[];
+  knowledgeSummary?: string;
+  knowledgeMarkdown?: string;
 }
 interface StudioSubagentInput {
   member?: string;
@@ -87,6 +93,7 @@ export const YPI_STUDIO_SLASH_COMMANDS: YpiStudioSlashCommandDefinition[] = [
   { name: "studio-ui", description: "Start a YPI Studio UI-change task", argumentHint: "[goal]" },
   { name: "studio-continue", description: "Continue the active YPI Studio task" },
   { name: "studio-check", description: "Ask the YPI Studio checker to review the active task or diff", argumentHint: "[focus]" },
+  { name: "studio-archive", description: "Archive the completed active YPI Studio task and distill reusable knowledge", argumentHint: "[reason]" },
 ];
 
 const FIRST_REPLY_NOTICE = `<ypi-studio-first-reply>
@@ -189,9 +196,10 @@ function summarizeWorkflowTriggers(root: string): string {
   return "No active Studio task is bound to this chat session.";
 }
 
-function buildStudioState(root: string, key: string | null): string {
+function buildStudioState(root: string, key: string | null, query = ""): string {
   const current = key ? getCurrentYpiStudioTaskDetail(root, key) : null;
   if (!current) {
+    const knowledge = getYpiStudioKnowledgeContextForPrompt(root, query || "recent studio task knowledge", { maxEntries: 3, maxTotalChars: 2200 });
     return [
       "<ypi-studio-state>",
       "Status: no_task",
@@ -202,11 +210,13 @@ function buildStudioState(root: string, key: string | null): string {
       "3. After approval, call ypi_studio_task(action=create).",
       "4. Role work must be assigned with ypi_studio_subagent; the main session is the orchestrator.",
       "</ypi-studio-state>",
-    ].join("\n");
+      knowledge,
+    ].filter(Boolean).join("\n");
   }
 
   const workflow = readYpiStudioWorkflow(root, current.workflowId);
   const state = workflow?.states[current.status];
+  const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [current.title, current.workflowId, current.status, query].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
   return [
     "<ypi-studio-state>",
     `Task: ${current.id} (${current.status})`,
@@ -222,18 +232,21 @@ function buildStudioState(root: string, key: string | null): string {
     state?.requiresUserApproval ? "This state requires explicit user approval before moving forward." : "",
     "Never enter implementing from awaiting_approval unless the user has approved the plan.",
     "</ypi-studio-state>",
+    knowledge,
   ].filter(Boolean).join("\n");
 }
 
 function startupContext(root: string): string {
+  const knowledge = getYpiStudioKnowledgeContextForPrompt(root, "recent studio task knowledge", { maxEntries: 3, maxTotalChars: 2200 });
   return [
     "<ypi-studio-context>",
     "YPI Studio workflow context is available. Studio tasks are structured under .ypi/tasks and workflows under .ypi/workflows.",
     "The main session is the orchestrator. Use ypi_studio_task for task lifecycle and ypi_studio_subagent for role delegation.",
     "</ypi-studio-context>",
+    knowledge,
     FIRST_REPLY_NOTICE,
     `Workspace: ${root}`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 function currentTaskIdOrThrow(root: string, key: string | null, requested?: string): string {
@@ -245,7 +258,8 @@ function currentTaskIdOrThrow(root: string, key: string | null, requested?: stri
 
 function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
   const raw = isObj(value) ? value : {};
-  const action = raw.action === "init_workflows" || raw.action === "create" || raw.action === "current" || raw.action === "get" || raw.action === "transition" || raw.action === "update_artifact" ? raw.action : undefined;
+  const action = raw.action === "init_workflows" || raw.action === "create" || raw.action === "current" || raw.action === "get" || raw.action === "transition" || raw.action === "update_artifact" || raw.action === "archive" ? raw.action : undefined;
+  const scope = raw.scope === "active" || raw.scope === "archived" || raw.scope === "all" ? raw.scope : undefined;
   return {
     action,
     title: str(raw.title) ?? undefined,
@@ -256,6 +270,10 @@ function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
     artifact: str(raw.artifact) ?? undefined,
     content: typeof raw.content === "string" ? raw.content : undefined,
     override: raw.override === true,
+    scope,
+    tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
+    knowledgeSummary: typeof raw.knowledgeSummary === "string" ? raw.knowledgeSummary : undefined,
+    knowledgeMarkdown: typeof raw.knowledgeMarkdown === "string" ? raw.knowledgeMarkdown : undefined,
   };
 }
 
@@ -693,6 +711,7 @@ function buildMemberPrompt(root: string, taskId: string, member: string, delegat
   const definition = readText(join(root, ".ypi", "agents", memberFile(member)));
   if (!definition.trim()) throw new Error(`Studio member definition not found: .ypi/agents/${memberFile(member)}`);
   const taskContext = getYpiStudioTaskContextForPrompt(root, taskId);
+  const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [taskContext.slice(0, 1200), member, delegatedPrompt].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
   return [
     "# YPI Studio Member Delegation",
     "You are already running as the delegated YPI Studio member below. Do not dispatch another Studio member or subagent unless the parent explicitly asks.",
@@ -704,6 +723,8 @@ function buildMemberPrompt(root: string, taskId: string, member: string, delegat
     "",
     taskContext,
     "",
+    knowledge,
+    knowledge ? "" : "",
     "## Delegated Task",
     delegatedPrompt,
     "",
@@ -779,6 +800,23 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     },
   });
 
+  pi.registerCommand("studio-archive", {
+    description: "Archive the completed active YPI Studio task and distill reusable knowledge",
+    handler: async (args) => {
+      const reason = args.trim();
+      pi.sendUserMessage([
+        "归档当前蛋黄派工作室任务，并沉淀可复用知识。",
+        reason ? `归档原因：${reason}` : "归档原因：用户请求归档。",
+        "",
+        "请严格执行：",
+        "1. 调用 ypi_studio_task(action=current) 确认当前绑定任务，只有 status=completed 才能继续；未完成则提示先完成或取消，不要归档。",
+        "2. 基于返回的任务 artifacts/documents，用当前 session 模型整理短知识摘要：summary 控制在 1000 字以内，markdown 包含 Summary、Reusable knowledge、Source artifacts。",
+        "3. 调用 ypi_studio_task(action=archive, reason, knowledgeSummary, knowledgeMarkdown, tags) 完成持久化。",
+        "4. 回复归档任务路径和知识文件路径。",
+      ].join("\n"));
+    },
+  });
+
   pi.registerTool?.({
     name: "ypi_studio_task",
     label: "YPI Studio Task",
@@ -791,7 +829,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     parameters: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["init_workflows", "create", "current", "get", "transition", "update_artifact"] },
+        action: { type: "string", enum: ["init_workflows", "create", "current", "get", "transition", "update_artifact", "archive"] },
         title: { type: "string" },
         workflowId: { type: "string" },
         taskId: { type: "string" },
@@ -800,6 +838,10 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         artifact: { type: "string" },
         content: { type: "string" },
         override: { type: "boolean" },
+        scope: { type: "string", enum: ["active", "archived", "all"] },
+        tags: { type: "array", items: { type: "string" } },
+        knowledgeSummary: { type: "string" },
+        knowledgeMarkdown: { type: "string" },
       },
     },
     execute: async (_id: string, inputValue: unknown, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: PiExtensionContext): Promise<PiToolResult> => {
@@ -837,8 +879,22 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           const task = updateYpiStudioTaskArtifact(taskId, { cwd: root, artifact, content: input.content ?? "", contextId: key });
           return { content: [{ type: "text", text: `Updated YPI Studio artifact ${artifact} for ${task.id}.` }], details: { task } };
         }
+        if (action === "archive") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const result = archiveYpiStudioTask(taskId, {
+            cwd: root,
+            reason: str(input.reason) ?? undefined,
+            contextId: key,
+            knowledgeSummary: input.knowledgeSummary,
+            knowledgeMarkdown: input.knowledgeMarkdown,
+            tags: input.tags,
+            allowFallbackKnowledge: !input.knowledgeSummary || !input.knowledgeMarkdown,
+          });
+          const warningText = result.warnings?.length ? ` Warnings: ${result.warnings.join("; ")}` : "";
+          return { content: [{ type: "text", text: `Archived YPI Studio task ${result.task.id}. Knowledge: ${result.knowledge.knowledgePath}.${warningText}` }], details: result };
+        }
         const current = getCurrentYpiStudioTaskDetail(root, key);
-        const payload = current ? { task: current } : { task: null, tasks: listYpiStudioTasks(root).tasks.slice(0, 8) };
+        const payload = current ? { task: current } : { task: null, tasks: listYpiStudioTasks(root, { scope: input.scope ?? "active" }).tasks.slice(0, 8) };
         return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], details: payload };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -968,7 +1024,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     const key = getKey(event, ctx);
     const ev = event as { text?: string };
     if (typeof ev.text !== "string" || !ev.text.trim()) return { action: "continue" };
-    const injection = buildStudioState(root, key);
+    const injection = buildStudioState(root, key, ev.text);
     return { action: "transform", text: [ev.text, injection].join("\n\n") };
   });
 

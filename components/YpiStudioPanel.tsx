@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type {
   YpiStudioAgent,
   YpiStudioAgentWarning,
   YpiStudioAgentsInitResponse,
   YpiStudioAgentsResponse,
+  YpiStudioTaskScope,
   YpiStudioTaskSummary,
   YpiStudioTasksResponse,
   YpiStudioWorkflowFile,
@@ -31,7 +32,7 @@ function workflowFilePath(cwd: string, workflow: YpiStudioWorkflowFile): string 
 }
 
 function taskFilePath(cwd: string, task: YpiStudioTaskSummary): string {
-  return `${cwd.replace(/[\\/]+$/, "")}/.ypi/tasks/${task.id}/task.json`;
+  return `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/task.json`;
 }
 
 function shortCwd(cwd: string): string {
@@ -92,6 +93,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [initBusy, setInitBusy] = useState(false);
+  const [taskScope, setTaskScope] = useState<YpiStudioTaskScope>("active");
   const [initMessage, setInitMessage] = useState<string | null>(null);
   const [initWarning, setInitWarning] = useState<string | null>(null);
 
@@ -154,7 +156,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
 
     setTaskLoadState("loading");
     try {
-      const res = await fetch(`/api/studio/tasks?cwd=${encodeURIComponent(cwd)}`, { signal });
+      const res = await fetch(`/api/studio/tasks?cwd=${encodeURIComponent(cwd)}&scope=${taskScope}`, { signal });
       const body = await res.json() as YpiStudioTasksResponse & { error?: string };
       if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
       setTasksData(body);
@@ -164,13 +166,33 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
       setError(err instanceof Error ? err.message : String(err));
       setTaskLoadState("error");
     }
-  }, [cwd]);
+  }, [cwd, taskScope]);
 
   const reloadAll = useCallback((signal?: AbortSignal) => {
     void loadAgents(signal);
     void loadWorkflows(signal);
     void loadTasks(signal);
   }, [loadAgents, loadTasks, loadWorkflows]);
+
+  const handleArchiveTask = useCallback(async (task: YpiStudioTaskSummary) => {
+    if (!cwd || task.archived || task.status !== "completed") return;
+    const ok = window.confirm("归档会移动任务目录并生成 .ypi/knowledge 知识条目。页面归档无法调用当前聊天模型，将使用任务产物生成兜底摘要；如需模型整理，请在聊天中执行 /studio-archive。仍要归档吗？");
+    if (!ok) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/studio/tasks/${encodeURIComponent(task.key)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd, action: "archive", reason: "Archived from Studio Panel", allowFallbackKnowledge: true }),
+      });
+      const body = await res.json() as { error?: string; warnings?: string[] };
+      if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
+      if (body.warnings?.length) setInitWarning(body.warnings.join("；"));
+      await loadTasks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [cwd, loadTasks]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -282,7 +304,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
       ) : activeTab === "workflows" ? (
         <WorkflowsTab cwd={cwd} loadState={workflowLoadState} data={workflowsData} onOpenFile={onOpenFile} />
       ) : (
-        <TasksTab cwd={cwd} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} />
+        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} />
       )}
     </div>
   );
@@ -333,15 +355,38 @@ function WorkflowsTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadS
   );
 }
 
-function TasksTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadState: LoadState; data: YpiStudioTasksResponse | null; onOpenFile?: (filePath: string, fileName: string) => void }) {
-  if (loadState === "loading") return <PanelEmpty title="正在读取工作室任务" description="检查当前项目的 .ypi/tasks/ 目录。" />;
-  if (loadState === "error" && !data) return <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
-  if (!data?.exists) return <PanelEmpty title="还没有工作室任务" description="通过 /studio-start，或直接说“用工作室做这个功能”，会创建结构化任务并在这里显示进度。" />;
-  if (data.tasks.length === 0) return <PanelEmpty title="任务列表为空" description="当前 .ypi/tasks/ 没有任务目录。" />;
+function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchiveTask }: {
+  cwd: string;
+  scope: YpiStudioTaskScope;
+  setScope: (scope: YpiStudioTaskScope) => void;
+  loadState: LoadState;
+  data: YpiStudioTasksResponse | null;
+  onOpenFile?: (filePath: string, fileName: string) => void;
+  onArchiveTask: (task: YpiStudioTaskSummary) => void;
+}) {
+  const scopeControls = (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <TabButton active={scope === "active"} label="活跃" onClick={() => setScope("active")} />
+      <TabButton active={scope === "archived"} label="已归档" onClick={() => setScope("archived")} />
+      <TabButton active={scope === "all"} label="全部" onClick={() => setScope("all")} />
+    </div>
+  );
+
+  let content: ReactNode;
+  if (loadState === "loading") content = <PanelEmpty title="正在读取工作室任务" description="检查当前项目的 .ypi/tasks/ 目录。" />;
+  else if (loadState === "error" && !data) content = <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
+  else if (!data?.exists) content = <PanelEmpty title="还没有工作室任务" description="通过 /studio-start，或直接说“用工作室做这个功能”，会创建结构化任务并在这里显示进度。" />;
+  else if (data.tasks.length === 0) content = <PanelEmpty title="任务列表为空" description={scope === "archived" ? "当前没有已归档任务。" : "当前筛选范围没有任务目录。"} />;
+  else content = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {data.tasks.map((task) => <TaskCard key={task.key} cwd={cwd} task={task} onOpenFile={onOpenFile} onArchiveTask={onArchiveTask} />)}
+    </div>
+  );
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-      {data.tasks.map((task) => <TaskCard key={task.key} cwd={cwd} task={task} onOpenFile={onOpenFile} />)}
+      {scopeControls}
+      {content}
     </div>
   );
 }
@@ -432,7 +477,8 @@ function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: Yp
   );
 }
 
-function TaskCard({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskSummary; onOpenFile?: (filePath: string, fileName: string) => void }) {
+function TaskCard({ cwd, task, onOpenFile, onArchiveTask }: { cwd: string; task: YpiStudioTaskSummary; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void }) {
+  const canArchive = !task.archived && task.status === "completed";
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -446,15 +492,28 @@ function TaskCard({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskS
           </div>
           <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 5 }}>{task.pathLabel}</div>
         </div>
-        <button
-          onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")}
-          disabled={!onOpenFile}
-          style={smallButtonStyle(Boolean(onOpenFile))}
-        >
-          打开
-        </button>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {canArchive && (
+            <button
+              onClick={() => onArchiveTask(task)}
+              style={smallButtonStyle(true)}
+            >
+              归档
+            </button>
+          )}
+          <button
+            onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")}
+            disabled={!onOpenFile}
+            style={smallButtonStyle(Boolean(onOpenFile))}
+          >
+            打开
+          </button>
+        </div>
       </div>
       {task.readError && <Notice tone="error" text={task.readError} />}
+      {task.archived && (
+        <Notice tone="info" text={`归档于 ${formatDate(task.archivedAt ?? task.updatedAt)}${task.knowledgePath ? ` · 知识：${task.knowledgePath}` : ""}`} />
+      )}
       <div style={{ height: 6, borderRadius: 999, background: "var(--border)", overflow: "hidden" }}>
         <div style={{ width: `${Math.max(0, Math.min(100, task.progress.percent))}%`, height: "100%", background: "var(--accent)", borderRadius: 999 }} />
       </div>

@@ -7,6 +7,7 @@ import {
   listYpiStudioTasks,
   YpiStudioTaskSecurityError,
 } from "@/lib/ypi-studio-tasks";
+import type { YpiStudioTaskScope } from "@/lib/ypi-studio-types";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,11 @@ export async function GET(request: NextRequest) {
     const authorizedCwd = await resolveAuthorizedCwd(cwd);
     if (authorizedCwd instanceof NextResponse) return authorizedCwd;
 
-    return NextResponse.json(listYpiStudioTasks(authorizedCwd));
+    const rawScope = request.nextUrl.searchParams.get("scope") ?? "active";
+    if (rawScope !== "active" && rawScope !== "archived" && rawScope !== "all") {
+      return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+    }
+    return NextResponse.json(listYpiStudioTasks(authorizedCwd, { scope: rawScope as YpiStudioTaskScope }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = error instanceof YpiStudioTaskSecurityError ? 400 : 500;

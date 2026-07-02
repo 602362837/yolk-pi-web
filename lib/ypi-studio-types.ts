@@ -139,7 +139,9 @@ export type YpiStudioTaskStatus =
   | "archived"
   | string;
 
-export type YpiStudioTaskEventType = "created" | "transition" | "artifact" | "subagent" | "note";
+export type YpiStudioTaskScope = "active" | "archived" | "all";
+
+export type YpiStudioTaskEventType = "created" | "transition" | "artifact" | "subagent" | "note" | "archive";
 
 export interface YpiStudioTaskEvent {
   type: YpiStudioTaskEventType;
@@ -249,6 +251,11 @@ export interface YpiStudioTaskSummary {
   currentMember?: string;
   contextIds: string[];
   progress: YpiStudioTaskProgress;
+  archived?: boolean;
+  archiveMonth?: string;
+  archivedAt?: string;
+  archiveReason?: string;
+  knowledgePath?: string;
   readError?: string;
 }
 
@@ -271,9 +278,47 @@ export interface YpiStudioTasksResponse {
   cwd: string;
   exists: boolean;
   pathLabel: string;
+  scope?: YpiStudioTaskScope;
   tasks: YpiStudioTaskSummary[];
   statusCounts: Record<string, number>;
   errors: Array<{ key?: string; pathLabel?: string; message: string }>;
+}
+
+export interface YpiStudioKnowledgeEntry {
+  id: string;
+  title: string;
+  taskId: string;
+  taskKey: string;
+  workflowId: string;
+  summary: string;
+  tags: string[];
+  sourceTaskPath: string;
+  knowledgePath: string;
+  createdAt: string;
+  archivedAt: string;
+  sourceArtifacts: string[];
+}
+
+export interface YpiStudioKnowledgeIndex {
+  schemaVersion: 1;
+  updatedAt: string;
+  entries: YpiStudioKnowledgeEntry[];
+}
+
+export interface YpiStudioTaskArchiveBody {
+  cwd: string;
+  reason?: string;
+  contextId?: string;
+  knowledgeSummary?: string;
+  knowledgeMarkdown?: string;
+  tags?: string[];
+  allowFallbackKnowledge?: boolean;
+}
+
+export interface YpiStudioTaskArchiveResult {
+  task: YpiStudioTaskDetail;
+  knowledge: YpiStudioKnowledgeEntry;
+  warnings?: string[];
 }
 
 export interface YpiStudioTaskCreateBody {

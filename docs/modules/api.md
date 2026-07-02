@@ -58,8 +58,8 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `trellis/setup/update/` | POST | Upgrade/install the Trellis CLI and run `trellis update` for an authorized workspace that already has `.trellis`. |
 | `studio/agents/` | GET/POST | Read project-local YPI Studio member cards from `.ypi/agents/` for an authorized workspace, initialize/backfill the four default members (`architect`, `ui-designer`, `implementer`, `checker`), update files that exactly match the legacy defaults, and warn about custom member files that need manual cleanup without overwriting them. |
 | `studio/workflows/` | GET/POST | Read project-local structured YPI Studio workflows from `.ypi/workflows/`, and initialize/backfill default workflow JSON files without overwriting existing files. |
-| `studio/tasks/` | GET/POST | List structured YPI Studio task summaries from `.ypi/tasks/` with state/progress projections, or create a new task directory with task artifacts and runtime context binding. |
-| `studio/tasks/[taskKey]/` | GET/PATCH | Read one YPI Studio task detail, or bind a context, update an artifact, or transition the task through workflow-defined states. |
+| `studio/tasks/` | GET/POST | List structured YPI Studio task summaries from `.ypi/tasks/` with state/progress projections (`scope=active\|archived\|all`, active by default and skips `.ypi/tasks/archive`), or create a new active task directory with task artifacts and runtime context binding. |
+| `studio/tasks/[taskKey]/` | GET/PATCH | Read one YPI Studio task detail by `active:<id>` or `archived:<YYYY-MM>:<id>`, or bind a context, update an artifact, transition workflow states, or archive a completed active task with persisted `.ypi/knowledge` output. |
 | `studio/tasks/[taskKey]/subagents/[runId]/transcript/` | GET | Read a bounded, browser-safe projection of a YPI Studio member delegation transcript sidecar for a run that belongs to the requested task. |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>`. |
 | `home/` | GET | Return `os.homedir()`. |
