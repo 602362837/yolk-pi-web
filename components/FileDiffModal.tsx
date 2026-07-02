@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SessionChangedFileSummary, SessionFileDiffResponse } from "@/lib/types";
-import { UnifiedDiffView } from "./UnifiedDiffView";
+import { DiffModal } from "./DiffModal";
 
 interface Props {
   sessionId: string;
@@ -56,92 +56,45 @@ export function FileDiffModal({ sessionId, file, onClose }: Props) {
     void loadDiff();
   }, [loadDiff]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
   const display = data ?? file;
+  const diff = data?.diffAvailable && data.diff ? data.diff : undefined;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Diff for ${file.path}`}
-      style={{
+    <DiffModal
+      ariaLabel={`Diff for ${file.path}`}
+      loading={loading}
+      error={error}
+      diff={diff}
+      fallback={reasonLabel(data?.reason ?? file.reason)}
+      onClose={onClose}
+      overlayStyle={{
         position: "absolute",
         inset: 0,
         zIndex: 220,
-        display: "flex",
         alignItems: "center",
-        justifyContent: "center",
         padding: 24,
         background: "rgba(0,0,0,0.28)",
+        borderRadius: 0,
       }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+      panelStyle={{
+        width: "min(1180px, 96vw)",
+        height: "auto",
+        maxHeight: "min(760px, 90vh)",
+        boxShadow: "0 24px 60px rgba(0,0,0,0.28)",
       }}
-    >
-      <div
-        style={{
-          width: "min(1040px, 96vw)",
-          maxHeight: "min(760px, 90vh)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 14,
-          background: "var(--bg-panel)",
-          color: "var(--text)",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", borderBottom: "1px solid var(--border)" }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {file.path}
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>
-              <span>{statusLabel(display.status)}</span>
-              <span style={{ color: "#16a34a" }}>+{display.additions}</span>
-              <span style={{ color: "#dc2626" }}>-{display.deletions}</span>
-              <span>via {display.toolNames.join(", ")}</span>
-            </div>
+      header={(
+        <>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {file.path}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close diff"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text)",
-              borderRadius: 8,
-              padding: "6px 10px",
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: "var(--bg)" }}>
-          {loading ? (
-            <div style={{ padding: 18, color: "var(--text-muted)", fontSize: 13 }}>Loading diff...</div>
-          ) : error ? (
-            <div style={{ padding: 18, color: "#dc2626", fontSize: 13 }}>{error}</div>
-          ) : data?.diffAvailable && data.diff ? (
-            <UnifiedDiffView diff={data.diff} />
-          ) : (
-            <div style={{ padding: 18, color: "var(--text-muted)", fontSize: 13 }}>
-              {reasonLabel(data?.reason ?? file.reason)}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>
+            <span>{statusLabel(display.status)}</span>
+            <span style={{ color: "#16a34a" }}>+{display.additions}</span>
+            <span style={{ color: "#dc2626" }}>-{display.deletions}</span>
+            <span>via {display.toolNames.join(", ")}</span>
+          </div>
+        </>
+      )}
+    />
   );
 }

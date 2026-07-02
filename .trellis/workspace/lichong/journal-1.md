@@ -238,3 +238,102 @@ Audited existing mobile support, planned Trellis task artifacts, implemented mob
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: Git panel commit details and diff viewer
+
+**Date**: 2026-07-01
+**Task**: Git panel commit details and diff viewer
+**Branch**: `main`
+
+### Summary
+
+Implemented Git panel commit inspection: selectable commit graph rows, commit metadata and changed-file list, bounded read-only commit/file diff APIs, large modal diff viewer, shared Git wire types, and module documentation updates. Validated with lint and TypeScript checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `04f9775` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 35: Git diff side-by-side viewer
+
+**Date**: 2026-07-01
+**Task**: Git diff side-by-side viewer
+**Branch**: `main`
+
+### Summary
+
+Added shared diff modal/view components, default side-by-side diff mode, and refactored Git commit plus session file diff entry points to reuse the shared viewer.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ee76c2b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 36: Side-by-side diff linked scrolling
+
+**Date**: 2026-07-01
+**Task**: Side-by-side diff linked scrolling
+**Branch**: `main`
+
+### Summary
+
+Implemented IDE-style side-by-side diff scrolling with independent left/right pane scrollbars and synchronized scrolling, then archived the completed Trellis task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `014162d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

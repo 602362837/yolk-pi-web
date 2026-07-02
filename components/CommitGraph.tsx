@@ -268,9 +268,11 @@ interface Props {
   commits: GitGraphCommit[];
   currentBranch: string | null;
   maxDisplay?: number;
+  selectedHash?: string | null;
+  onSelectCommit?: (commit: GitGraphCommit) => void;
 }
 
-export function CommitGraph({ commits, currentBranch, maxDisplay = 50 }: Props) {
+export function CommitGraph({ commits, currentBranch, maxDisplay = 50, selectedHash, onSelectCommit }: Props) {
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -387,8 +389,10 @@ export function CommitGraph({ commits, currentBranch, maxDisplay = 50 }: Props) 
             showTooltip={showTooltip}
             hideTooltip={hideTooltip}
             isHovered={hoveredIdx === rd.idx}
+            isSelected={selectedHash === rd.commit.hash}
             onRowEnter={handleRowEnter}
             onRowLeave={handleRowLeave}
+            onSelectCommit={onSelectCommit}
           />
         ))}
         {hasMore && (
@@ -484,7 +488,7 @@ export function CommitGraph({ commits, currentBranch, maxDisplay = 50 }: Props) 
 function CommitRow({
   rd, layout, laneOrder, graphWidth, laneWidth, paddingL, rowHeight,
   currentBranch, showTooltip, hideTooltip,
-  isHovered, onRowEnter, onRowLeave,
+  isHovered, isSelected, onRowEnter, onRowLeave, onSelectCommit,
 }: {
   rd: RowData;
   layout: GraphLayout;
@@ -497,8 +501,10 @@ function CommitRow({
   showTooltip: (e: React.MouseEvent, text: string) => void;
   hideTooltip: () => void;
   isHovered: boolean;
+  isSelected: boolean;
   onRowEnter: (idx: number) => void;
   onRowLeave: () => void;
+  onSelectCommit?: (commit: GitGraphCommit) => void;
 }) {
   const { commit, idx, commitLane, dotCX, myColor, isHead, laneInSpan, hasAbove, hasBelow, forkInfo } = rd;
   const yDot = rowHeight / 2;
@@ -518,9 +524,21 @@ function CommitRow({
   const tagLabels = commit.refs.filter((r) => r.type === "tag");
 
   const tipText = formatCommitTooltip(commit);
+  const rowBackground = isSelected ? "var(--bg-selected)" : isHovered ? "var(--bg-hover)" : "transparent";
 
   return (
     <div
+      role={onSelectCommit ? "button" : undefined}
+      tabIndex={onSelectCommit ? 0 : undefined}
+      aria-pressed={onSelectCommit ? isSelected : undefined}
+      onClick={() => onSelectCommit?.(commit)}
+      onKeyDown={(event) => {
+        if (!onSelectCommit) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelectCommit(commit);
+        }
+      }}
       onMouseEnter={() => onRowEnter(idx)}
       onMouseLeave={onRowLeave}
       style={{
@@ -528,7 +546,10 @@ function CommitRow({
         alignItems: "stretch",
         minHeight: rowHeight,
         height: rowHeight,
-        background: isHovered ? "var(--bg-hover)" : "transparent",
+        background: rowBackground,
+        borderRadius: 4,
+        cursor: onSelectCommit ? "pointer" : "default",
+        outline: "none",
         transition: "background 0.08s",
       }}
     >
@@ -647,7 +668,7 @@ function CommitRow({
         display: "flex", alignItems: "center", gap: 3,
         overflow: "hidden", paddingRight: 4,
         borderRadius: 4,
-        background: isHovered ? "var(--bg-hover)" : "transparent",
+        background: rowBackground,
         transition: "background 0.08s",
       }}>
         <span style={{

@@ -351,6 +351,8 @@ export interface RpcSessionState {
 }
 
 // Git status panel types
+export type GitCommitFileStatus = "M" | "A" | "D" | "R" | "C" | "T" | "U" | "?";
+
 export interface GitFileChange {
   status: "M" | "A" | "D" | "R" | "C" | "U" | "?";
   file: string;
@@ -378,6 +380,47 @@ export interface GitGraphCommit {
   relativeDate: string;
   parents: string[];
   refs: GitCommitRef[];
+}
+
+export interface GitCommitChangedFile {
+  status: GitCommitFileStatus;
+  file: string;
+  oldFile?: string;
+  additions?: number;
+  deletions?: number;
+  binary?: boolean;
+}
+
+export interface GitCommitDetail {
+  hash: string;
+  shortHash: string;
+  parents: string[];
+  author: {
+    name: string;
+    email: string;
+    date: string;
+    relativeDate: string;
+  };
+  committer: {
+    name: string;
+    email: string;
+    date: string;
+  };
+  subject: string;
+  body: string;
+  refs: GitCommitRef[];
+  files: GitCommitChangedFile[];
+}
+
+export type GitCommitDiffReason = "binary" | "too-large" | "unavailable";
+
+export interface GitCommitFileDiffResponse {
+  hash: string;
+  file: string;
+  oldFile?: string;
+  diffAvailable: boolean;
+  diff?: string;
+  reason?: GitCommitDiffReason;
 }
 
 export interface GitBranchInfo {

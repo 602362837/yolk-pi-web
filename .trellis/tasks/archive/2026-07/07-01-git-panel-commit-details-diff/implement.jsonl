@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index and checklist for Git panel UI changes"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component props, styling, and event handler conventions"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Shared wire type and type-safety rules"}
+{"file": "docs/modules/api.md", "reason": "Existing Git API route map and documentation update target"}
