@@ -273,6 +273,8 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
         summary: optionalString(run.summary),
         model: optionalString(run.model),
         thinking: optionalString(run.thinking),
+        modelSource: optionalString(run.modelSource),
+        thinkingSource: optionalString(run.thinkingSource),
         error: optionalString(run.error),
         transcript: normalizeTranscriptRef(run.transcript),
       }))

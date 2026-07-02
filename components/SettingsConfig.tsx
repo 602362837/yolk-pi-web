@@ -11,6 +11,7 @@ import type {
   PiWebSubagentAgentConfig,
   PiWebSubagentDifficultyTier,
   PiWebSubagentModelRef,
+  PiWebStudioConfig,
   PiWebSubagentModality,
   PiWebSubagentRunPolicy,
   PiWebTerminalConfig,
@@ -74,9 +75,16 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "usage" | "terminal" | "chatgpt" | "editor" | "trellis";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "editor" | "trellis";
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
+const STUDIO_MEMBER_NAMES = ["architect", "ui-designer", "implementer", "checker"] as const;
+const STUDIO_MEMBER_LABELS: Record<(typeof STUDIO_MEMBER_NAMES)[number], string> = {
+  architect: "架构师",
+  "ui-designer": "UI 设计员",
+  implementer: "实现员",
+  checker: "检查员",
+};
 const SUBAGENT_AGENT_NAMES = ["trellis-design", "trellis-implement", "trellis-check", "trellis-research"];
 const SUBAGENT_THINKING_OPTIONS: SubagentThinkingOption[] = ["inherit", "off", "minimal", "low", "medium", "high", "xhigh"];
 const SUBAGENT_MODALITIES: PiWebSubagentModality[] = ["text", "multimodal"];
@@ -405,6 +413,11 @@ function trellisConfigsEqual(a: PiWebTrellisConfig | null, b: PiWebTrellisConfig
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function studioConfigsEqual(a: PiWebStudioConfig | null, b: PiWebStudioConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function usageConfigsEqual(a: PiWebUsageConfig | null, b: PiWebUsageConfig | null): boolean {
   if (!a || !b) return a === b;
   return a.includeArchived === b.includeArchived;
@@ -450,6 +463,8 @@ export function SettingsConfig({
   const [savedWorktree, setSavedWorktree] = useState<PiWebWorktreeConfig | null>(null);
   const [trellis, setTrellis] = useState<PiWebTrellisConfig | null>(null);
   const [savedTrellis, setSavedTrellis] = useState<PiWebTrellisConfig | null>(null);
+  const [studio, setStudio] = useState<PiWebStudioConfig | null>(null);
+  const [savedStudio, setSavedStudio] = useState<PiWebStudioConfig | null>(null);
   const [usage, setUsage] = useState<PiWebUsageConfig | null>(null);
   const [savedUsage, setSavedUsage] = useState<PiWebUsageConfig | null>(null);
   const [terminal, setTerminal] = useState<PiWebTerminalConfig | null>(null);
@@ -473,8 +488,8 @@ export function SettingsConfig({
 
 
   const dirty = useMemo(
-    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !editorConfigsEqual(editor, savedEditor),
-    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, editor, savedEditor],
+    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !editorConfigsEqual(editor, savedEditor),
+    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, editor, savedEditor],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -492,6 +507,8 @@ export function SettingsConfig({
       setSavedWorktree(data.config.worktree);
       setTrellis(data.config.trellis);
       setSavedTrellis(data.config.trellis);
+      setStudio(data.config.studio);
+      setSavedStudio(data.config.studio);
       setUsage(data.config.usage);
       setSavedUsage(data.config.usage);
       setTerminal(data.config.terminal);
@@ -561,7 +578,7 @@ export function SettingsConfig({
   }, [cwd]);
 
   useEffect(() => {
-    if (section !== "trellis" && section !== "terminal") return;
+    if (section !== "trellis" && section !== "terminal" && section !== "studio") return;
     const controller = new AbortController();
     if (section === "trellis") void loadTrellisStatus(controller.signal);
     void loadModels(controller.signal);
@@ -585,6 +602,26 @@ export function SettingsConfig({
 
   const updateUsage = useCallback((patch: Partial<PiWebUsageConfig>) => {
     setUsage((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateStudioDefaultPolicy = useCallback((patch: Partial<PiWebSubagentRunPolicy>) => {
+    setStudio((prev) => prev ? { ...prev, defaultPolicy: { ...prev.defaultPolicy, ...patch } } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateStudioMemberPolicy = useCallback((member: string, patch: Partial<PiWebSubagentRunPolicy>) => {
+    setStudio((prev) => {
+      if (!prev) return prev;
+      const current = prev.members[member] ?? prev.defaultPolicy;
+      return {
+        ...prev,
+        members: {
+          ...prev.members,
+          [member]: { ...current, ...patch },
+        },
+      };
+    });
     setNotice(null);
   }, []);
 
@@ -763,6 +800,8 @@ export function SettingsConfig({
     setSavedWorktree(config.worktree);
     setTrellis(config.trellis);
     setSavedTrellis(config.trellis);
+    setStudio(config.studio);
+    setSavedStudio(config.studio);
     setUsage(config.usage);
     setSavedUsage(config.usage);
     setTerminal(config.terminal);
@@ -777,7 +816,7 @@ export function SettingsConfig({
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!yolk || !worktree || !trellis || !usage || !terminal || !chatgpt || !editor) return false;
+    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -785,7 +824,7 @@ export function SettingsConfig({
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ yolk, worktree, trellis, usage, terminal, chatgpt, editor }),
+        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, editor }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -798,10 +837,10 @@ export function SettingsConfig({
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, yolk, worktree, trellis, usage, terminal, chatgpt, editor]);
+  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, editor]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。蛋黄𝝅/Usage/ChatGPT/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -809,6 +848,7 @@ export function SettingsConfig({
     setYolk(defaults.yolk);
     setWorktree(defaults.worktree);
     setTrellis(defaults.trellis);
+    setStudio(defaults.studio);
     setUsage(defaults.usage);
     setTerminal(defaults.terminal);
     setChatgpt(defaults.chatgpt);
@@ -940,6 +980,7 @@ export function SettingsConfig({
           <div style={{ width: 150, borderRight: "1px solid var(--border)", padding: 10, background: "var(--bg-subtle)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             {renderSectionButton("yolk", "蛋黄𝝅", "新会话默认聊天行为")}
             {renderSectionButton("worktree", "WorkTree", "New WorkTree 默认配置")}
+            {renderSectionButton("studio", "Studio", "YPI Studio 成员模型")}
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
             {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
             {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量悬浮面板")}
@@ -950,7 +991,7 @@ export function SettingsConfig({
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : yolk && worktree && trellis && usage && terminal && chatgpt && editor ? (
+            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && editor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -1022,6 +1063,53 @@ export function SettingsConfig({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                ) : section === "studio" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>YPI Studio 成员运行策略</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        配置工作室成员运行时使用的模型与思考强度。该配置保存在本机 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>，不会写入项目 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)" }}>.ypi/agents</code>。
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    {modelsError && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 11 }}>{modelsError}</div>}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>默认策略</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>当成员没有独立策略，或成员模型策略选择“本层不指定”时使用。显式工具调用入参会覆盖这里的配置。</div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+                        <Field label="默认模型" description="推荐保持跟随主会话；无法解析时会退回 Pi 默认。">
+                          <ModelPolicySelect value={studio.defaultPolicy.model} onChange={(model) => updateStudioDefaultPolicy({ model })} models={modelList} />
+                        </Field>
+                        <Field label="默认思考强度" description="inherit 表示跟随当前聊天 thinking。">
+                          <ThinkingSelect value={studio.defaultPolicy.thinking} onChange={(thinking) => updateStudioDefaultPolicy({ thinking })} />
+                        </Field>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>默认成员</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>成员职责定义仍来自 .ypi/agents；运行模型和 thinking 在这里单独配置。</div>
+                      </div>
+                      {STUDIO_MEMBER_NAMES.map((member) => {
+                        const policy = studio.members[member] ?? studio.defaultPolicy;
+                        return (
+                          <div key={member} style={{ display: "grid", gridTemplateColumns: "132px minmax(180px, 1fr) 120px", gap: 8, alignItems: "center" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <code style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis" }}>{member}</code>
+                              <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{STUDIO_MEMBER_LABELS[member]}</span>
+                            </div>
+                            <ModelPolicySelect value={policy.model} onChange={(model) => updateStudioMemberPolicy(member, { model })} models={modelList} />
+                            <ThinkingSelect value={policy.thinking} onChange={(thinking) => updateStudioMemberPolicy(member, { thinking })} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
+                      优先级：工具入参 model/thinking &gt; 成员配置 &gt; 默认策略 &gt; 主会话 &gt; Pi 默认。YPI child 进程会设置 Trellis 子进程禁用标志，避免成员流程受 Trellis 注入影响。
                     </div>
                   </div>
                 ) : section === "usage" ? (
@@ -1629,8 +1717,8 @@ export function SettingsConfig({
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !usage || !terminal || !chatgpt || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !usage || !terminal || !chatgpt || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !usage || !terminal || !chatgpt || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>

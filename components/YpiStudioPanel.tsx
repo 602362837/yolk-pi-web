@@ -305,10 +305,13 @@ function MembersTab({ loadState, data, selectedAgent, selectedKey, setSelectedKe
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateRows: "minmax(130px, 35%) 1fr" }}>
-      <div style={{ overflowY: "auto", borderBottom: "1px solid var(--border)", padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, alignContent: "start" }}>
-        {data.agents.map((agent) => (
-          <AgentCard key={agent.key} agent={agent} active={selectedKey === agent.key} onClick={() => setSelectedKey(agent.key)} />
-        ))}
+      <div style={{ overflowY: "auto", borderBottom: "1px solid var(--border)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        <Notice tone="info" text="成员职责定义保存在 .ypi/agents；运行模型和 thinking 在 Settings → Studio 配置。" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, alignContent: "start" }}>
+          {data.agents.map((agent) => (
+            <AgentCard key={agent.key} agent={agent} active={selectedKey === agent.key} onClick={() => setSelectedKey(agent.key)} />
+          ))}
+        </div>
       </div>
       <div style={{ minHeight: 0, overflowY: "auto" }}>
         {selectedAgent && <AgentDetail cwd={data.cwd} agent={selectedAgent} onOpenFile={onOpenFile} />}
@@ -524,9 +527,9 @@ function Badge({ label, tone }: { label: string; tone: "success" | "warning" | "
   );
 }
 
-function Notice({ tone, text }: { tone: "success" | "warning" | "error"; text: string }) {
-  const color = tone === "success" ? "#16a34a" : tone === "warning" ? "#f59e0b" : "#ef4444";
-  const background = tone === "success" ? "rgba(22,163,74,0.10)" : tone === "warning" ? "rgba(245,158,11,0.10)" : "rgba(239,68,68,0.10)";
+function Notice({ tone, text }: { tone: "success" | "warning" | "error" | "info"; text: string }) {
+  const color = tone === "success" ? "#16a34a" : tone === "warning" ? "#f59e0b" : tone === "error" ? "#ef4444" : "var(--accent)";
+  const background = tone === "success" ? "rgba(22,163,74,0.10)" : tone === "warning" ? "rgba(245,158,11,0.10)" : tone === "error" ? "rgba(239,68,68,0.10)" : "rgba(37,99,235,0.10)";
   return (
     <div style={{ border: `1px solid ${color}33`, color, background, borderRadius: 8, padding: "7px 9px", fontSize: 12, lineHeight: 1.45 }}>
       {text}

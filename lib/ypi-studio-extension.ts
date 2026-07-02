@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { initializeYpiStudioAgents } from "./ypi-studio-agents";
+import { readPiWebConfig, type PiWebSubagentRunPolicy, type PiWebSubagentThinking } from "./pi-web-config";
 import {
   createYpiStudioTask,
   getCurrentYpiStudioTaskDetail,
@@ -33,6 +34,18 @@ interface PiToolResult {
 }
 
 type ToolUpdateCallback = (result: PiToolResult) => void;
+type StudioPolicySource = "toolInput" | "memberConfig" | "defaultPolicy" | "followMain" | "piDefault" | "unset";
+type StudioThinkingArg = Exclude<PiWebSubagentThinking, "inherit">;
+
+interface ResolvedStudioRunPolicy {
+  modelArg?: string;
+  modelLabel: string;
+  modelSource: StudioPolicySource;
+  thinkingArg?: StudioThinkingArg;
+  thinkingLabel: string;
+  thinkingSource: StudioPolicySource;
+}
+
 interface PiExtensionContext {
   sessionManager?: {
     getSessionId?: () => string;
@@ -257,6 +270,71 @@ function normalizeSubagentInput(value: unknown): StudioSubagentInput {
   };
 }
 
+function isThinkingArg(value: string): value is StudioThinkingArg {
+  return value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh";
+}
+
+function mainModelArg(ctx?: PiExtensionContext): string | undefined {
+  const provider = str(ctx?.model?.provider);
+  const id = str(ctx?.model?.id);
+  return provider && id ? `${provider}/${id}` : undefined;
+}
+
+function readCurrentThinking(pi: Pick<ExtensionAPI, "getThinkingLevel">): StudioThinkingArg | undefined {
+  try {
+    const level = pi.getThinkingLevel();
+    return isThinkingArg(level) ? level : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveStudioModel(policy: PiWebSubagentRunPolicy, source: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy">, ctx?: PiExtensionContext): Pick<ResolvedStudioRunPolicy, "modelArg" | "modelLabel" | "modelSource"> {
+  if (policy.model.mode === "specific") {
+    const provider = str(policy.model.provider);
+    const modelId = str(policy.model.modelId);
+    if (provider && modelId) {
+      const model = `${provider}/${modelId}`;
+      return { modelArg: model, modelLabel: model, modelSource: source };
+    }
+  }
+  if (policy.model.mode === "followMain") {
+    const model = mainModelArg(ctx);
+    if (model) return { modelArg: model, modelLabel: model, modelSource: "followMain" };
+    return { modelLabel: "Pi default", modelSource: "piDefault" };
+  }
+  if (policy.model.mode === "piDefault") return { modelLabel: "Pi default", modelSource: "piDefault" };
+  return { modelLabel: "unset", modelSource: "unset" };
+}
+
+function resolveStudioThinking(policy: PiWebSubagentRunPolicy, source: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy">, pi: Pick<ExtensionAPI, "getThinkingLevel">): Pick<ResolvedStudioRunPolicy, "thinkingArg" | "thinkingLabel" | "thinkingSource"> {
+  if (policy.thinking === "inherit") {
+    const thinking = readCurrentThinking(pi);
+    if (thinking) return { thinkingArg: thinking, thinkingLabel: thinking, thinkingSource: "followMain" };
+    return { thinkingLabel: "default", thinkingSource: "piDefault" };
+  }
+  return { thinkingArg: policy.thinking, thinkingLabel: policy.thinking, thinkingSource: source };
+}
+
+function resolveStudioMemberPolicy(input: StudioSubagentInput, member: string, ctx: PiExtensionContext | undefined, pi: Pick<ExtensionAPI, "getThinkingLevel">): ResolvedStudioRunPolicy {
+  const config = readPiWebConfig().studio;
+  const memberPolicy = config.members[member];
+  const modelPolicy = memberPolicy && memberPolicy.model.mode !== "unset" ? memberPolicy : config.defaultPolicy;
+  const modelSource: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy"> = modelPolicy === memberPolicy ? "memberConfig" : "defaultPolicy";
+  const thinkingPolicy = memberPolicy ?? config.defaultPolicy;
+  const thinkingSource: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy"> = memberPolicy ? "memberConfig" : "defaultPolicy";
+  const resolvedModel = input.model
+    ? { modelArg: input.model, modelLabel: input.model, modelSource: "toolInput" as const }
+    : modelPolicy.model.mode === "unset"
+      ? resolveStudioModel({ ...modelPolicy, model: { mode: "followMain" } }, "defaultPolicy", ctx)
+      : resolveStudioModel(modelPolicy, modelSource, ctx);
+  const toolThinking = input.thinking && isThinkingArg(input.thinking) ? input.thinking : undefined;
+  const resolvedThinking = toolThinking
+    ? { thinkingArg: toolThinking, thinkingLabel: toolThinking, thinkingSource: "toolInput" as const }
+    : resolveStudioThinking(thinkingPolicy, thinkingSource, pi);
+  return { ...resolvedModel, ...resolvedThinking };
+}
+
 function memberFile(member: string): string {
   const normalized = member.trim().toLowerCase();
   if (!/^[a-z0-9_-]+$/.test(normalized)) throw new Error("Invalid Studio member id");
@@ -301,12 +379,10 @@ function resolvePiCli(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
-function buildPiArgs(input: StudioSubagentInput): string[] {
+function buildPiArgs(policy: ResolvedStudioRunPolicy): string[] {
   const args = ["--mode", "json", "-p", "--no-session"];
-  const model = str(input.model);
-  const thinking = str(input.thinking);
-  if (model) args.push("--model", thinking && thinking !== "off" && !model.includes(":") ? `${model}:${thinking}` : model);
-  else if (thinking && thinking !== "off") args.push("--thinking", thinking);
+  if (policy.modelArg) args.push("--model", policy.modelArg);
+  if (policy.thinkingArg) args.push("--thinking", policy.thinkingArg);
   return args;
 }
 
@@ -365,7 +441,7 @@ interface ChildPiResult {
 function runChildPi(
   root: string,
   prompt: string,
-  input: StudioSubagentInput,
+  policy: ResolvedStudioRunPolicy,
   meta: ChildRunMeta,
   writer: YpiStudioSubagentTranscriptWriter | null,
   signal?: AbortSignal,
@@ -373,9 +449,9 @@ function runChildPi(
 ): Promise<ChildPiResult> {
   return new Promise((resolveResult) => {
     const inv = resolvePiCli();
-    const child = spawn(inv.command, [...inv.args, ...buildPiArgs(input)], {
+    const child = spawn(inv.command, [...inv.args, ...buildPiArgs(policy)], {
       cwd: root,
-      env: { ...process.env, YPI_STUDIO_SUBAGENT_CHILD: "1" },
+      env: { ...process.env, YPI_STUDIO_SUBAGENT_CHILD: "1", TRELLIS_SUBAGENT_CHILD: "1" },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -418,13 +494,17 @@ function runChildPi(
       };
       const transcript = writer ? { ...writer.ref } : undefined;
       return {
-        content: [{ type: "text", text: `${meta.member} ${status} · ${eventCount} events · ${oneLine(lastTextPreview, 140)}` }],
+        content: [{ type: "text", text: `${meta.member} ${status} · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · ${eventCount} events · ${oneLine(lastTextPreview, 140)}` }],
         details: {
           run: {
             id: meta.runId,
             member: meta.member,
             status,
             taskId: meta.taskId,
+            model: policy.modelLabel,
+            thinking: policy.thinkingLabel,
+            modelSource: policy.modelSource,
+            thinkingSource: policy.thinkingSource,
             transcript,
             progress,
           },
@@ -485,7 +565,7 @@ function runChildPi(
         if (role === "assistant" && text) {
           finalAssistantOutput = text;
           lastTextPreview = text;
-          appendItem({ kind: "assistant", at, text, model: str(input.model) ?? undefined });
+          appendItem({ kind: "assistant", at, text, model: policy.modelLabel });
         }
       } else if (eventType === "tool_execution_start") {
         const ev = isObj(event) ? event : {};
@@ -617,6 +697,7 @@ function buildMemberPrompt(root: string, taskId: string, member: string, delegat
     "# YPI Studio Member Delegation",
     "You are already running as the delegated YPI Studio member below. Do not dispatch another Studio member or subagent unless the parent explicitly asks.",
     "Do not commit, push, or merge. Respect the active task state and report blockers instead of guessing product decisions.",
+    "YPI Studio member mode only: ignore Trellis workflow-state, Trellis SessionStart context, task.py current instructions, or Trellis task constraints unless the parent explicitly asks for Trellis.",
     "",
     "## Member Definition",
     definition,
@@ -631,7 +712,7 @@ function buildMemberPrompt(root: string, taskId: string, member: string, delegat
 }
 
 export function createYpiStudioExtension(workspaceRoot: string) {
-  return function ypiStudioExtension(pi: Pick<ExtensionAPI, "registerTool" | "registerCommand" | "sendUserMessage" | "on">): void {
+  return function ypiStudioExtension(pi: Pick<ExtensionAPI, "registerTool" | "registerCommand" | "sendUserMessage" | "on" | "getThinkingLevel">): void {
   if (process.env.YPI_STUDIO_SUBAGENT_CHILD === "1") return;
 
   const root = findRoot(workspaceRoot);
@@ -795,6 +876,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
         const startedAt = new Date().toISOString();
         const runId = `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
+        const policy = resolveStudioMemberPolicy(input, member, ctx, pi);
         const childPrompt = buildMemberPrompt(root, taskId, member, prompt);
         let writer: YpiStudioSubagentTranscriptWriter | null = null;
         const warnings: string[] = [];
@@ -811,19 +893,25 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           startedAt,
           prompt: oneLine(prompt, 240),
           summary: "Child Pi process starting.",
-          model: str(input.model) ?? undefined,
-          thinking: str(input.thinking) ?? undefined,
+          model: policy.modelLabel,
+          thinking: policy.thinkingLabel,
+          modelSource: policy.modelSource,
+          thinkingSource: policy.thinkingSource,
           transcript: writer ? { ...writer.ref } : undefined,
         };
         recordYpiStudioSubagentRun(root, taskId, runningRun);
         onUpdate?.({
-          content: [{ type: "text", text: `${member} running · child process starting` }],
+          content: [{ type: "text", text: `${member} running · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · child process starting` }],
           details: {
             run: {
               id: runId,
               member,
               status: "running",
               taskId,
+              model: policy.modelLabel,
+              thinking: policy.thinkingLabel,
+              modelSource: policy.modelSource,
+              thinkingSource: policy.thinkingSource,
               transcript: writer ? { ...writer.ref } : undefined,
               progress: {
                 startedAt,
@@ -836,7 +924,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
             },
           },
         });
-        const result = await runChildPi(root, childPrompt, input, { runId, taskId, member, startedAt }, writer, signal, onUpdate);
+        const result = await runChildPi(root, childPrompt, policy, { runId, taskId, member, startedAt }, writer, signal, onUpdate);
         const finishedAt = new Date().toISOString();
         const allWarnings = [...warnings, ...result.warnings];
         const run: YpiStudioTaskSubagentRun = {
@@ -847,8 +935,10 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           finishedAt,
           prompt: oneLine(prompt, 240),
           summary: oneLine(result.output, 1000),
-          model: str(input.model) ?? undefined,
-          thinking: str(input.thinking) ?? undefined,
+          model: policy.modelLabel,
+          thinking: policy.thinkingLabel,
+          modelSource: policy.modelSource,
+          thinkingSource: policy.thinkingSource,
           error: result.status === "failed" || result.status === "cancelled" ? oneLine(result.output, 1000) : undefined,
           transcript: result.transcript,
         };

@@ -200,6 +200,8 @@ export interface YpiStudioTaskSubagentRun {
   summary?: string;
   model?: string;
   thinking?: string;
+  modelSource?: string;
+  thinkingSource?: string;
   error?: string;
   transcript?: YpiStudioSubagentTranscriptRef;
 }

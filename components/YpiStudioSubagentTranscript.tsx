@@ -39,6 +39,8 @@ interface StudioRunProjection {
   progress?: StudioRunProgress;
   model?: string;
   thinking?: string;
+  modelSource?: string;
+  thinkingSource?: string;
   summary?: string;
   error?: string;
 }
@@ -132,6 +134,8 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
     progress: normalizeProgress(value.progress),
     model: asString(value.model),
     thinking: asString(value.thinking),
+    modelSource: asString(value.modelSource),
+    thinkingSource: asString(value.thinkingSource),
     summary: asString(value.summary),
     error: asString(value.error),
   };
@@ -140,6 +144,26 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
 function runFromDetails(details: unknown): StudioRunProjection | undefined {
   if (!isRecord(details)) return undefined;
   return normalizeRun(details.run);
+}
+
+function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): StudioRunProjection {
+  return runs.reduce<StudioRunProjection>((acc, run) => {
+    if (!run) return acc;
+    return {
+      id: run.id ?? acc.id,
+      member: run.member ?? acc.member,
+      status: run.status ?? acc.status,
+      taskId: run.taskId ?? acc.taskId,
+      transcript: run.transcript ?? acc.transcript,
+      progress: run.progress ?? acc.progress,
+      model: run.model ?? acc.model,
+      thinking: run.thinking ?? acc.thinking,
+      modelSource: run.modelSource ?? acc.modelSource,
+      thinkingSource: run.thinkingSource ?? acc.thinkingSource,
+      summary: run.summary ?? acc.summary,
+      error: run.error ?? acc.error,
+    };
+  }, {});
 }
 
 function inputString(input: Record<string, unknown>, key: string): string | undefined {
@@ -213,11 +237,13 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
     taskId: inputString(block.input, "taskId"),
     model: inputString(block.input, "model"),
     thinking: inputString(block.input, "thinking"),
+    modelSource: inputString(block.input, "model") ? "toolInput" : undefined,
+    thinkingSource: inputString(block.input, "thinking") ? "toolInput" : undefined,
   }), [block.input]);
 
   const progressRun = runFromDetails(progress?.partialResult?.details);
   const finalRun = runFromDetails(result?.details);
-  const run = { ...inputRun, ...progressRun, ...finalRun };
+  const run = mergeRunProjections(inputRun, progressRun, finalRun);
   const transcript = apiResponse?.transcript ?? run.transcript;
   const status: StudioRunStatus = run.status ?? (progress?.running ? "running" : result ? (result.isError ? "failed" : "succeeded") : "running");
   const finalText = resultText(result);
@@ -252,6 +278,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
     return () => { cancelled = true; };
   }, [effectiveCwd, expanded, runId, status, taskId, transcript]);
 
+  const modelLabel = run.model ?? "Pi default";
+  const thinkingLabel = run.thinking ?? "default";
   const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)}${elapsed ? ` · ${elapsed}` : ""} · ${previewText(lastPreview, 120)}`;
   void tick;
 
@@ -284,6 +312,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
       >
         <span style={{ color: statusColor(status), fontFamily: "var(--font-mono)", fontWeight: 650, fontSize: 11, flexShrink: 0 }}>ypi_studio_subagent</span>
         <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{headerPreview}</span>
+        <Chip title={run.modelSource ? `model source: ${run.modelSource}` : undefined}>model: {modelLabel}</Chip>
+        <Chip title={run.thinkingSource ? `thinking source: ${run.thinkingSource}` : undefined}>thinking: {thinkingLabel}</Chip>
         {run.progress?.eventCount !== undefined && <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>{run.progress.eventCount} events</span>}
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
           <polyline points="2 3.5 5 6.5 8 3.5" />
@@ -297,8 +327,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
             <Meta label="Status" value={statusLabel(status)} color={statusColor(status)} />
             <Meta label="Task" value={taskId ?? "unknown"} />
             <Meta label="Run" value={runId ?? "pending"} />
-            <Meta label="Model" value={run.model ?? "default"} />
-            <Meta label="Thinking" value={run.thinking ?? "default"} />
+            <Meta label="Model" value={modelLabel} title={run.modelSource ? `source: ${run.modelSource}` : undefined} />
+            <Meta label="Thinking" value={thinkingLabel} title={run.thinkingSource ? `source: ${run.thinkingSource}` : undefined} />
             <Meta label="Elapsed" value={elapsed ?? "—"} />
             <Meta label="Updated" value={run.progress?.updatedAt ? new Date(run.progress.updatedAt).toLocaleTimeString() : "—"} />
           </div>
@@ -339,11 +369,36 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   );
 }
 
-function Meta({ label, value, color }: { label: string; value: string; color?: string }) {
+function Chip({ children, title }: { children: ReactNode; title?: string }) {
+  return (
+    <span
+      title={title}
+      style={{
+        flexShrink: 1,
+        minWidth: 0,
+        maxWidth: 180,
+        padding: "2px 6px",
+        borderRadius: 999,
+        border: "1px solid rgba(34,197,94,0.22)",
+        background: "rgba(34,197,94,0.08)",
+        color: "var(--text-muted)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Meta({ label, value, color, title }: { label: string; value: string; color?: string; title?: string }) {
   return (
     <div style={{ minWidth: 0 }}>
       <div style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
-      <div style={{ fontSize: 12, color: color ?? "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={value}>{value}</div>
+      <div style={{ fontSize: 12, color: color ?? "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={title ?? value}>{value}</div>
     </div>
   );
 }

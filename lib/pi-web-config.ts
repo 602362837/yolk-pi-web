@@ -67,6 +67,13 @@ export interface PiWebTrellisConfig {
   subagents: PiWebTrellisSubagentsConfig;
 }
 
+export type PiWebStudioMemberId = "architect" | "ui-designer" | "implementer" | "checker" | string;
+
+export interface PiWebStudioConfig {
+  defaultPolicy: PiWebSubagentRunPolicy;
+  members: Record<PiWebStudioMemberId, PiWebSubagentRunPolicy>;
+}
+
 export interface PiWebUsageConfig {
   includeArchived: boolean;
 }
@@ -120,6 +127,7 @@ export interface PiWebConfig {
   yolk: PiWebYolkConfig;
   worktree: PiWebWorktreeConfig;
   trellis: PiWebTrellisConfig;
+  studio: PiWebStudioConfig;
   usage: PiWebUsageConfig;
   terminal: PiWebTerminalConfig;
   chatgpt: PiWebChatGptConfig;
@@ -130,6 +138,7 @@ export interface PiWebConfigPatch {
   yolk?: unknown;
   worktree?: unknown;
   trellis?: unknown;
+  studio?: unknown;
   usage?: unknown;
   terminal?: unknown;
   chatgpt?: unknown;
@@ -150,6 +159,13 @@ export class PiWebConfigValidationError extends Error {
     this.name = "PiWebConfigValidationError";
   }
 }
+
+export const PI_WEB_STUDIO_DEFAULT_MEMBERS = ["architect", "ui-designer", "implementer", "checker"] as const;
+
+const DEFAULT_STUDIO_POLICY: PiWebSubagentRunPolicy = {
+  model: { mode: "followMain" },
+  thinking: "inherit",
+};
 
 export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   yolk: {
@@ -204,6 +220,10 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
       cmdClickDrillDown: true,
       shiftClickHierarchy: true,
     },
+  },
+  studio: {
+    defaultPolicy: DEFAULT_STUDIO_POLICY,
+    members: Object.fromEntries(PI_WEB_STUDIO_DEFAULT_MEMBERS.map((member) => [member, DEFAULT_STUDIO_POLICY])) as Record<string, PiWebSubagentRunPolicy>,
   },
   trellis: {
     enabled: false,
@@ -419,6 +439,22 @@ function readTrellisSubagentsConfig(value: unknown, fallback: PiWebTrellisSubage
   };
 }
 
+function readStudioConfig(value: unknown, fallback: PiWebStudioConfig): PiWebStudioConfig {
+  const root = isRecord(value) ? value : {};
+  const defaultPolicy = readSubagentPolicy(root.defaultPolicy, fallback.defaultPolicy);
+  const members: Record<string, PiWebSubagentRunPolicy> = { ...fallback.members };
+  const rawMembers = isRecord(root.members) ? root.members : {};
+  for (const [member, rawPolicy] of Object.entries(rawMembers)) {
+    const cleanMember = member.trim();
+    if (!cleanMember) continue;
+    members[cleanMember] = readSubagentPolicy(rawPolicy, members[cleanMember] ?? defaultPolicy);
+  }
+  for (const member of PI_WEB_STUDIO_DEFAULT_MEMBERS) {
+    members[member] = readSubagentPolicy(rawMembers[member], members[member] ?? defaultPolicy);
+  }
+  return { defaultPolicy, members };
+}
+
 function readChatGptWarmupConfig(value: unknown, fallback: PiWebChatGptWarmupConfig): PiWebChatGptWarmupConfig {
   const root = isRecord(value) ? value : {};
   return {
@@ -434,6 +470,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const yolk = isRecord(root.yolk) ? root.yolk : {};
   const worktree = isRecord(root.worktree) ? root.worktree : {};
   const trellis = isRecord(root.trellis) ? root.trellis : {};
+  const studio = isRecord(root.studio) ? root.studio : {};
   const usage = isRecord(root.usage) ? root.usage : {};
   const terminal = isRecord(root.terminal) ? root.terminal : {};
   const chatgpt = isRecord(root.chatgpt) ? root.chatgpt : {};
@@ -498,6 +535,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       workflowAssistantFallback: readSubagentPolicy(trellis.workflowAssistantFallback, defaults.trellis.workflowAssistantFallback),
       subagents: readTrellisSubagentsConfig(trellis.subagents, defaults.trellis.subagents),
     },
+    studio: readStudioConfig(studio, defaults.studio),
   };
 }
 
@@ -704,6 +742,28 @@ function validateTrellisSubagentsConfig(value: unknown): PiWebTrellisSubagentsCo
   };
 }
 
+export function validatePiWebStudioConfig(value: unknown): PiWebStudioConfig {
+  if (!isRecord(value)) throw new PiWebConfigValidationError("studio config must be an object");
+  const rawMembers = isRecord(value.members) ? value.members : {};
+  const members: Record<string, PiWebSubagentRunPolicy> = {};
+  for (const member of PI_WEB_STUDIO_DEFAULT_MEMBERS) {
+    const rawPolicy = rawMembers[member] ?? DEFAULT_PI_WEB_CONFIG.studio.members[member];
+    members[member] = validateSubagentPolicy(rawPolicy, `studio.members.${member}`);
+  }
+  for (const [member, rawPolicy] of Object.entries(rawMembers)) {
+    const cleanMember = member.trim();
+    if (!cleanMember) throw new PiWebConfigValidationError("studio.members keys must be non-empty");
+    if (Object.prototype.hasOwnProperty.call(members, cleanMember)) continue;
+    members[cleanMember] = validateSubagentPolicy(rawPolicy, `studio.members.${cleanMember}`);
+  }
+  return {
+    defaultPolicy: value.defaultPolicy === undefined
+      ? DEFAULT_PI_WEB_CONFIG.studio.defaultPolicy
+      : validateSubagentPolicy(value.defaultPolicy, "studio.defaultPolicy"),
+    members,
+  };
+}
+
 export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("usage config must be an object");
@@ -850,11 +910,12 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasYolk = Object.prototype.hasOwnProperty.call(patch, "yolk");
   const hasWorktree = Object.prototype.hasOwnProperty.call(patch, "worktree");
   const hasTrellis = Object.prototype.hasOwnProperty.call(patch, "trellis");
+  const hasStudio = Object.prototype.hasOwnProperty.call(patch, "studio");
   const hasUsage = Object.prototype.hasOwnProperty.call(patch, "usage");
   const hasTerminal = Object.prototype.hasOwnProperty.call(patch, "terminal");
   const hasChatGpt = Object.prototype.hasOwnProperty.call(patch, "chatgpt");
   const hasEditor = Object.prototype.hasOwnProperty.call(patch, "editor");
-  if (!hasYolk && !hasWorktree && !hasTrellis && !hasUsage && !hasTerminal && !hasChatGpt && !hasEditor) {
+  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasEditor) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
@@ -866,6 +927,7 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const normalizedYolk = hasYolk ? validatePiWebYolkConfig(patch.yolk) : undefined;
   const normalizedWorktree = hasWorktree ? validatePiWebWorktreeConfig(patch.worktree) : undefined;
   const normalizedTrellis = hasTrellis ? validatePiWebTrellisConfig(patch.trellis) : undefined;
+  const normalizedStudio = hasStudio ? validatePiWebStudioConfig(patch.studio) : undefined;
   const normalizedUsage = hasUsage ? validatePiWebUsageConfig(patch.usage) : undefined;
   const normalizedTerminal = hasTerminal ? validatePiWebTerminalConfig(patch.terminal) : undefined;
   const normalizedChatGpt = hasChatGpt ? validatePiWebChatGptConfig(isRecord(chatGptPatch) ? {
@@ -899,6 +961,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.trellis = {
       ...previousTrellis,
       ...normalizedTrellis,
+    };
+  }
+
+  if (normalizedStudio) {
+    const previousStudio = isRecord(raw.studio) ? raw.studio : {};
+    nextRaw.studio = {
+      ...previousStudio,
+      ...normalizedStudio,
     };
   }
 
