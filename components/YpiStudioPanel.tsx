@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import type {
   YpiStudioAgent,
+  YpiStudioAgentWarning,
   YpiStudioAgentsInitResponse,
   YpiStudioAgentsResponse,
   YpiStudioTaskSummary,
@@ -40,7 +41,7 @@ function shortCwd(cwd: string): string {
 }
 
 function needsAgentInit(data: YpiStudioAgentsResponse | null): boolean {
-  return !data?.exists || (data.missingDefaultAgents.length ?? 0) > 0;
+  return !data?.exists || (data.missingDefaultAgents?.length ?? 0) > 0 || (data.outdatedDefaultAgents?.length ?? 0) > 0;
 }
 
 function needsWorkflowInit(data: YpiStudioWorkflowsResponse | null): boolean {
@@ -51,6 +52,26 @@ function initButtonLabel(agents: YpiStudioAgentsResponse | null, workflows: YpiS
   if (!agents?.exists && !workflows?.exists) return "初始化工作室";
   if (needsAgentInit(agents) || needsWorkflowInit(workflows)) return "补齐默认配置";
   return "重新检查";
+}
+
+function initSuccessMessage(createdAgents: number, createdWorkflows: number, updatedAgents: number): string {
+  if (createdAgents + createdWorkflows > 0 && updatedAgents > 0) {
+    return `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程，已更新 ${updatedAgents} 个旧版默认成员；自定义成员未覆盖。`;
+  }
+  if (createdAgents + createdWorkflows > 0) {
+    return `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程；已有自定义文件未覆盖。`;
+  }
+  if (updatedAgents > 0) {
+    return `已更新 ${updatedAgents} 个旧版默认成员；自定义成员未覆盖。`;
+  }
+  return "默认成员和流程已是最新，没有覆盖自定义内容。";
+}
+
+function initWarningMessage(warnings: YpiStudioAgentWarning[]): string | null {
+  if (warnings.length === 0) return null;
+  const fileNames = warnings.map((warning) => warning.fileName || warning.pathLabel);
+  const list = warnings.length > 3 ? `${fileNames.slice(0, 3).join("、")} 等 ${warnings.length} 个` : fileNames.join("、");
+  return `发现 ${warnings.length} 个自定义成员仍含内部引用，已跳过覆盖：${list}。可打开文件手动清理。`;
 }
 
 function statusTone(status: string): "success" | "warning" | "error" | "neutral" {
@@ -72,6 +93,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [initBusy, setInitBusy] = useState(false);
   const [initMessage, setInitMessage] = useState<string | null>(null);
+  const [initWarning, setInitWarning] = useState<string | null>(null);
 
   const loadAgents = useCallback(async (signal?: AbortSignal) => {
     if (!cwd) {
@@ -79,6 +101,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
       setSelectedKey(null);
       setLoadState("idle");
       setError(null);
+      setInitWarning(null);
       return;
     }
 
@@ -164,6 +187,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
     if (!cwd || initBusy) return;
     setInitBusy(true);
     setInitMessage(null);
+    setInitWarning(null);
     setError(null);
     try {
       const [agentsRes, workflowsRes] = await Promise.all([
@@ -195,10 +219,9 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
       setTaskLoadState("ready");
       const createdAgents = agentsBody.created.length;
       const createdWorkflows = workflowsBody.created.length;
-      setInitMessage(createdAgents + createdWorkflows > 0
-        ? `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程；已有文件未覆盖。`
-        : "默认成员和流程都已存在，没有覆盖用户内容。"
-      );
+      const updatedAgents = agentsBody.updated.length;
+      setInitMessage(initSuccessMessage(createdAgents, createdWorkflows, updatedAgents));
+      setInitWarning(initWarningMessage(agentsBody.warnings));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setLoadState("error");
@@ -224,7 +247,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
             </div>
           </div>
           <button
-            onClick={canInitialize ? handleInit : () => reloadAll()}
+            onClick={handleInit}
             disabled={initBusy || loadState === "loading" || workflowLoadState === "loading"}
             style={{
               padding: "6px 10px",
@@ -250,6 +273,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
           <TabButton active={activeTab === "tasks"} label={`任务 ${tasksData?.tasks.length ?? 0}`} onClick={() => setActiveTab("tasks")} />
         </div>
         {initMessage && <Notice tone="success" text={initMessage} />}
+        {initWarning && <Notice tone="warning" text={initWarning} />}
         {error && <Notice tone="error" text={error} />}
       </div>
 

@@ -392,7 +392,8 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     handler: async (_args, ctx) => {
       const agents = initializeYpiStudioAgents(root);
       const workflows = initializeYpiStudioWorkflows(root);
-      ctx.ui.notify?.(`YPI Studio initialized: ${agents.created.length} members, ${workflows.created.length} workflows created.`, "info");
+      const warningSuffix = agents.warnings.length > 0 ? `, ${agents.warnings.length} custom members need review` : "";
+      ctx.ui.notify?.(`YPI Studio initialized: ${agents.created.length} members created, ${agents.updated.length} members updated, ${workflows.created.length} workflows created${warningSuffix}.`, "info");
     },
   });
 

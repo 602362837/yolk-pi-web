@@ -25,7 +25,13 @@ export interface YpiStudioAgentWriteResult {
   id: string;
   fileName: string;
   pathLabel: string;
-  status: "created" | "skipped";
+  status: "created" | "updated" | "skipped";
+}
+
+export interface YpiStudioAgentWarning {
+  fileName: string;
+  pathLabel: string;
+  message: string;
 }
 
 export interface YpiStudioAgentsResponse {
@@ -34,6 +40,7 @@ export interface YpiStudioAgentsResponse {
   pathLabel: string;
   agents: YpiStudioAgent[];
   missingDefaultAgents: string[];
+  outdatedDefaultAgents: string[];
   errors: Array<{ fileName?: string; pathLabel?: string; message: string }>;
 }
 
@@ -41,7 +48,9 @@ export interface YpiStudioAgentsInitResponse {
   cwd: string;
   pathLabel: string;
   created: YpiStudioAgentWriteResult[];
+  updated: YpiStudioAgentWriteResult[];
   skipped: YpiStudioAgentWriteResult[];
+  warnings: YpiStudioAgentWarning[];
   agents: YpiStudioAgentsResponse;
 }
 

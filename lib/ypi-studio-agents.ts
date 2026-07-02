@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import {
   closeSync,
   existsSync,
@@ -16,6 +17,7 @@ import { canonicalizeCwd } from "./cwd";
 import type {
   YpiStudioAgent,
   YpiStudioAgentFrontmatter,
+  YpiStudioAgentWarning,
   YpiStudioAgentsInitResponse,
   YpiStudioAgentsResponse,
   YpiStudioAgentWriteResult,
@@ -45,13 +47,13 @@ export class YpiStudioSecurityError extends Error {
   }
 }
 
-function agentTemplate(frontmatter: { id: string; name: string; description: string }, body: string): string {
+function agentTemplate(frontmatter: { id: string; name: string; description: string }, body: string, version = 2): string {
   return [
     "---",
     `id: ${frontmatter.id}`,
     `name: ${frontmatter.name}`,
     `description: ${frontmatter.description}`,
-    "version: 1",
+    `version: ${version}`,
     "---",
     "",
     body.trim(),
@@ -75,7 +77,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 ## 定位
 
-你是蛋黄派工作室的架构师，参考 Trellis Design Agent 的规划能力，但不绑定 Trellis 的任务状态机、脚本或目录结构。你的工作是在实现前把需求、设计、执行和检查边界讲清楚，让后续成员可以低歧义接手。
+你是蛋黄派工作室的架构师，负责在实现前把目标、范围、约束转化为 PRD、UI、Design、Implement、Checks 等可执行规划。你的工作是把需求、设计、执行和检查边界讲清楚，让后续成员可以低歧义接手。
 
 ## 启动规则
 
@@ -159,7 +161,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 ## 定位
 
-你是蛋黄派工作室的 UI 设计员，承接架构师拆出的 UI / 原型任务。你参考 Trellis Design Agent 的“先读上下文再输出设计”方式，但专注界面、交互和体验，不处理 Trellis 状态、脚本或任务目录。
+你是蛋黄派工作室的 UI 设计员，承接架构师拆出的 UI / 原型任务。你采用工作室任务的上下文优先方式：先读取需求、现有界面和组件模式，再输出原型、交互、状态和验收点。
 
 ## 启动规则
 
@@ -239,7 +241,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 ## 定位
 
-你是蛋黄派工作室的实现员，参考 Trellis Implement Agent 的执行方式：先加载上下文和规范，再按计划实现，最后验证并汇报。你不依赖 Trellis 的 active task、jsonl manifest 或状态脚本；这些概念在这里只转化为“先读相关材料”。
+你是蛋黄派工作室的实现员。你先加载任务材料和项目规范，再按计划实现，最后验证并汇报。被派发时只依赖工作室任务上下文、用户提供材料和项目文件；如果上下文不足，先报告阻塞。
 
 ## 启动规则
 
@@ -306,7 +308,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 ## 定位
 
-你是蛋黄派工作室的检查员，参考 Trellis Check Agent 的质量门禁能力：读取上下文、检查 diff、验证质量、必要时修复小问题并报告结论。你不依赖 Trellis 的 active task、check.jsonl 或状态脚本；这些概念在这里只转化为“按项目材料和改动证据检查”。
+你是蛋黄派工作室的检查员，负责按需求、设计、实现报告和改动证据进行质量门禁，运行验证，必要时修复范围内低风险小问题并报告结论。被派发时只依赖工作室任务上下文和项目材料；如果上下文不足，先报告缺失。
 
 ## 启动规则
 
@@ -366,6 +368,36 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 const DEFAULT_AGENT_BY_FILE = new Map(DEFAULT_YPI_STUDIO_AGENTS.map((agent) => [agent.fileName, agent]));
 const DEFAULT_AGENT_ORDER = new Map(DEFAULT_YPI_STUDIO_AGENTS.map((agent, index) => [agent.fileName, index]));
+const OLD_DEFAULT_AGENT_HASHES = new Map<string, string>([
+  ["architect.md", "197c251f41768e628e4751bb1327b937869c0f64847e46f8bf05945188a293f9"],
+  ["ui-designer.md", "d728c01f248087c6e5196cd0cbef84a2464027cf30e0ff5f69aabed627990a56"],
+  ["implementer.md", "c30369447547a9ef80273a17abab0fd398f287c668e3cdb990729c443338b8b7"],
+  ["checker.md", "cac89b291d61f596c0c4ace30c8bd604915c31d1ef5a47ea223fbfc4a0f3f1e3"],
+]);
+const INTERNAL_REFERENCE_MARKERS = [
+  "trel" + "lis",
+  "task" + ".py",
+  "active" + " task",
+  "jsonl" + " manifest",
+  "check" + ".jsonl",
+];
+
+function sha256Text(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function containsInternalReference(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return INTERNAL_REFERENCE_MARKERS.some((marker) => normalized.includes(marker));
+}
+
+function internalReferenceWarning(fileName: string, pathLabel: string): YpiStudioAgentWarning {
+  return {
+    fileName,
+    pathLabel,
+    message: "该自定义成员仍含内部引用，已跳过覆盖。",
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -520,6 +552,18 @@ function sortAgents(a: YpiStudioAgent, b: YpiStudioAgent): number {
   return a.fileName.localeCompare(b.fileName);
 }
 
+function isOldDefaultAgent(ctx: ReaderContext, fileName: string): boolean {
+  const expectedHash = OLD_DEFAULT_AGENT_HASHES.get(fileName);
+  if (!expectedHash) return false;
+  const filePath = path.join(ctx.agentsRoot, fileName);
+  try {
+    if (!safeStatFile(filePath, ctx.workspaceRoot)) return false;
+    return sha256Text(readFileSync(filePath, "utf8")) === expectedHash;
+  } catch {
+    return false;
+  }
+}
+
 export function listYpiStudioAgents(cwd: string): YpiStudioAgentsResponse {
   const ctx = createContext(cwd);
   const baseResponse = {
@@ -533,6 +577,7 @@ export function listYpiStudioAgents(cwd: string): YpiStudioAgentsResponse {
       exists: false,
       agents: [],
       missingDefaultAgents: DEFAULT_YPI_STUDIO_AGENTS.map((agent) => agent.fileName),
+      outdatedDefaultAgents: [],
       errors: [],
     };
   }
@@ -552,12 +597,16 @@ export function listYpiStudioAgents(cwd: string): YpiStudioAgentsResponse {
   const missingDefaultAgents = DEFAULT_YPI_STUDIO_AGENTS
     .filter((agent) => !present.has(agent.fileName))
     .map((agent) => agent.fileName);
+  const outdatedDefaultAgents = DEFAULT_YPI_STUDIO_AGENTS
+    .filter((agent) => present.has(agent.fileName) && isOldDefaultAgent(ctx, agent.fileName))
+    .map((agent) => agent.fileName);
 
   return {
     ...baseResponse,
     exists: true,
     agents: agents.sort(sortAgents),
     missingDefaultAgents,
+    outdatedDefaultAgents,
     errors,
   };
 }
@@ -577,16 +626,46 @@ function ensureWritableAgentsRoot(ctx: ReaderContext): void {
   }
 }
 
-function writeDefaultAgent(ctx: ReaderContext, agent: DefaultStudioAgent): YpiStudioAgentWriteResult {
+interface AgentWriteOutcome {
+  result: YpiStudioAgentWriteResult;
+  warning?: YpiStudioAgentWarning;
+}
+
+function writeDefaultAgent(ctx: ReaderContext, agent: DefaultStudioAgent): AgentWriteOutcome {
   const filePath = path.join(ctx.agentsRoot, agent.fileName);
   const pathLabel = relativeLabel(ctx.workspaceRoot, filePath);
   if (existsSync(filePath)) {
     if (!safeStatFile(filePath, ctx.workspaceRoot)) throw new Error(`Existing agent path is not a file: ${pathLabel}`);
-    return { id: agent.id, fileName: agent.fileName, pathLabel, status: "skipped" };
+    const existingContent = readFileSync(filePath, "utf8");
+    if (OLD_DEFAULT_AGENT_HASHES.get(agent.fileName) === sha256Text(existingContent)) {
+      writeFileSync(filePath, agent.content, { encoding: "utf8" });
+      safeStatFile(filePath, ctx.workspaceRoot);
+      return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "updated" } };
+    }
+    const warning = containsInternalReference(existingContent) ? internalReferenceWarning(agent.fileName, pathLabel) : undefined;
+    return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "skipped" }, warning };
   }
   writeFileSync(filePath, agent.content, { encoding: "utf8", flag: "wx" });
   safeStatFile(filePath, ctx.workspaceRoot);
-  return { id: agent.id, fileName: agent.fileName, pathLabel, status: "created" };
+  return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "created" } };
+}
+
+function collectCustomReferenceWarnings(ctx: ReaderContext, knownWarnings: Set<string>): YpiStudioAgentWarning[] {
+  const warnings: YpiStudioAgentWarning[] = [];
+  for (const entry of readdirSync(ctx.agentsRoot, { withFileTypes: true })) {
+    if ((!entry.isFile() && !entry.isSymbolicLink()) || !entry.name.toLowerCase().endsWith(".md")) continue;
+    if (DEFAULT_AGENT_BY_FILE.has(entry.name) || knownWarnings.has(entry.name)) continue;
+    const filePath = path.join(ctx.agentsRoot, entry.name);
+    const pathLabel = relativeLabel(ctx.workspaceRoot, filePath);
+    try {
+      if (!safeStatFile(filePath, ctx.workspaceRoot)) continue;
+      const content = readFileSync(filePath, "utf8");
+      if (containsInternalReference(content)) warnings.push(internalReferenceWarning(entry.name, pathLabel));
+    } catch {
+      // Read errors are reported by listYpiStudioAgents; warning detection should not block initialization.
+    }
+  }
+  return warnings;
 }
 
 export function initializeYpiStudioAgents(cwd: string): YpiStudioAgentsInitResponse {
@@ -594,19 +673,26 @@ export function initializeYpiStudioAgents(cwd: string): YpiStudioAgentsInitRespo
   ensureWritableAgentsRoot(ctx);
 
   const created: YpiStudioAgentWriteResult[] = [];
+  const updated: YpiStudioAgentWriteResult[] = [];
   const skipped: YpiStudioAgentWriteResult[] = [];
+  const warnings: YpiStudioAgentWarning[] = [];
   for (const agent of DEFAULT_YPI_STUDIO_AGENTS) {
-    const result = writeDefaultAgent(ctx, agent);
+    const { result, warning } = writeDefaultAgent(ctx, agent);
     if (result.status === "created") created.push(result);
+    else if (result.status === "updated") updated.push(result);
     else skipped.push(result);
+    if (warning) warnings.push(warning);
   }
+  warnings.push(...collectCustomReferenceWarnings(ctx, new Set(warnings.map((warning) => warning.fileName))));
 
   const agents = listYpiStudioAgents(ctx.cwd);
   return {
     cwd: ctx.cwd,
     pathLabel: AGENTS_DIR,
     created,
+    updated,
     skipped,
+    warnings,
     agents,
   };
 }
