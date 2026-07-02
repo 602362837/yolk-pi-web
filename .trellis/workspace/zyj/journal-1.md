@@ -940,3 +940,36 @@ Fetched upstream/main, summarized and merged upstream Git diff viewer features, 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: Release 0.7.4
+
+**Date**: 2026-07-02
+**Task**: Release 0.7.4
+**Branch**: `main`
+
+### Summary
+
+Prepared and published @alan-zhao/yolk-pi-web 0.7.4, added the yolk-release-publish project Pi skill, pushed origin main and tag v0.7.4, and verified npm latest.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c26283e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

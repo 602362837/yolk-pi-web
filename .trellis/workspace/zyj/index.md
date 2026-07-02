@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 29
 - **Last Active**: 2026-07-02
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~942 | Active |
+| `journal-1.md` | ~975 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-07-02 | Release 0.7.4 | `c26283e` | `main` |
 | 28 | 2026-07-02 | Merge upstream main | `e722983` | `main` |
 | 27 | 2026-07-02 | Add Trellis design subagent | `5f9ad66` | `main` |
 <!-- @@@/auto:session-history -->
