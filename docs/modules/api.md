@@ -36,9 +36,12 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `sessions/archived/` | GET | List archived sessions for a cwd. |
 | `git/worktrees/archive/` | POST | Squash, push, merge, and remove a Git worktree after user risk confirmation; archive also deletes sessions for that worktree cwd. |
 | `git/info/` | GET | Return best-effort Git branch/worktree metadata for a cwd. |
-| `git/status/` | GET | Return detailed Git status (branch, commits, staged/unstaged changes, untracked files, stash) for a cwd. |
+| `git/status/` | GET | Return detailed Git status (branch, commits, staged/unstaged changes, untracked files parsed from NUL-delimited porcelain output, stash) for a cwd. |
 | `git/graph/` | GET | Return decorated commit graph data (commits, parents, refs, local branches) for the Git panel branch visualization; optional `branch` previews one validated local branch. |
-| `git/commit/` | GET | Return read-only metadata and first-parent/root changed-file stats for a selected commit in the Git panel. |
+| `git/stage/` | POST | Stage tracked changes or track untracked files for authorized repo-relative pathspecs using literal `git add -- <files>`. |
+| `git/unstage/` | POST | Remove authorized repo-relative pathspecs from the index using literal `git restore --staged -- <files>` with reset fallback. |
+| `git/commit/` | GET/POST | GET returns read-only metadata and first-parent/root changed-file stats for a selected commit in the Git panel. POST commits already-staged changes with a non-empty message, rejects detached HEAD and empty index, and returns the new hash. |
+| `git/push/` | POST | Push the current branch to its upstream or, with explicit `setUpstream: true`, publish it to `origin/<currentBranch>`; rejects detached HEAD and behind branches. |
 | `git/diff/` | GET | Return a bounded read-only unified diff, or binary/too-large/unavailable fallback metadata, for one changed file in a selected commit. |
 | `git/switch/` | POST | Switch the current workspace to a local branch. Validates cwd, branch existence, and working tree cleanliness before executing `git switch`. Returns `switchedTo` on success or an error message. |
 | `web-config/` | GET/PUT | Read/write `~/.pi/agent/pi-web.json` for Yolk Pi chat defaults such as `yolk.defaultToolPreset`, WorkTree defaults, YPI Studio default/member model and thinking policies, Usage scan scope, Web Terminal settings, ChatGPT usage panel/warmup schedule settings, Editor implementation/shortcut settings, optional Trellis panel settings, setup proxy, and Trellis subagent model policy; also lazily ensures the local ChatGPT warmup scheduler. |

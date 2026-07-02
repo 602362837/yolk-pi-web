@@ -14,7 +14,7 @@ async function git(args: string[], cwd: string): Promise<string> {
   return stdout;
 }
 
-function parsePorcelainV1(output: string): {
+function parsePorcelainV1Z(output: string): {
   staged: GitFileChange[];
   unstaged: GitFileChange[];
   untracked: string[];
@@ -22,46 +22,34 @@ function parsePorcelainV1(output: string): {
   const staged: GitFileChange[] = [];
   const unstaged: GitFileChange[] = [];
   const untracked: string[] = [];
+  const tokens = output.split("\0").filter((token) => token.length > 0);
 
-  for (const line of output.split(/\r?\n/)) {
-    if (!line.trim()) continue;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token.length < 4) continue;
 
-    // Untracked files
-    if (line.startsWith("?? ")) {
-      untracked.push(line.slice(3));
+    const x = token[0];
+    const y = token[1];
+    const file = token.slice(3);
+
+    if (x === "?" && y === "?") {
+      untracked.push(file);
       continue;
     }
 
-    // Renamed or copied files with origin path
-    const renameMatch = line.match(/^([ MADRCU?!][ MADRCU?!])\s(.+?)\s*->\s*(.+)$/);
-    if (renameMatch) {
-      const [, xy, oldFile, file] = renameMatch;
-      const xStatus = xy[0] !== " " ? xy[0] : undefined;
-      const yStatus = xy[1] !== " " ? xy[1] : undefined;
-      const statusChar = (yStatus ?? xStatus ?? "?") as GitFileChange["status"];
-
-      if (xStatus) {
-        staged.push({ status: statusChar, file, oldFile });
-      }
-      if (yStatus) {
-        unstaged.push({ status: statusChar, file, oldFile });
-      }
-      continue;
+    let oldFile: string | undefined;
+    if (x === "R" || x === "C" || y === "R" || y === "C") {
+      oldFile = tokens[++i];
     }
 
-    // Standard two-character status
-    const match = line.match(/^([ MADRCU?!])([ MADRCU?!])\s(.+)$/);
-    if (!match) continue;
-
-    const [, x, y, file] = match;
     const xStatus = x !== " " ? x : undefined;
     const yStatus = y !== " " ? y : undefined;
 
     if (xStatus) {
-      staged.push({ status: xStatus as GitFileChange["status"], file });
+      staged.push({ status: xStatus as GitFileChange["status"], file, oldFile });
     }
     if (yStatus) {
-      unstaged.push({ status: yStatus as GitFileChange["status"], file });
+      unstaged.push({ status: yStatus as GitFileChange["status"], file, oldFile });
     }
   }
 
@@ -123,7 +111,7 @@ export async function GET(req: NextRequest) {
       upstreamOutput,
       aheadBehindOutput,
     ] = await Promise.all([
-      git(["status", "--porcelain"], cwd).catch(() => ""),
+      git(["status", "--porcelain=v1", "-z"], cwd).catch(() => ""),
       git(["log", "--format=%H\t%an\t%ar\t%ai\t%s", "-10"], cwd).catch(() => ""),
       git(["stash", "list"], cwd).catch(() => ""),
       git(["rev-parse", "--abbrev-ref", "HEAD"], cwd).catch(() => "HEAD"),
@@ -136,7 +124,7 @@ export async function GET(req: NextRequest) {
       throw new Error("Git command failed");
     });
 
-    const { staged, unstaged, untracked } = parsePorcelainV1(statusOutput.trim());
+    const { staged, unstaged, untracked } = parsePorcelainV1Z(statusOutput);
     const isDirty = staged.length > 0 || unstaged.length > 0 || untracked.length > 0;
 
     const isDetached = branchOutput.trim() === "HEAD";

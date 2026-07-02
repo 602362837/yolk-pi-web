@@ -14,6 +14,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/agent-client.ts` | Client-side helper for `POST /api/agent/[id]`. |
 | `lib/file-paths.ts` | Path normalization utilities for file viewer APIs. |
 | `lib/cwd.ts` | Cwd validation and normalization helpers. |
+| `lib/git-actions.ts` | Shared Git mutation safety layer for stage/unstage/commit/push routes: authorized cwd/repo-root resolution, literal pathspec validation, `execFile` Git execution, timeout/buffer defaults, and user-facing Git error mapping. |
 | `lib/git-worktree.ts` | Git worktree creation, status, archive, and removal helpers. |
 | `lib/deepseek-balance.ts` | Query DeepSeek account balance. |
 | `lib/quota-display.ts` | Shared ChatGPT/Codex quota display helpers: tier labels, utilization colors, quota/reset-credit countdowns, earliest reset-credit expiration, relative refresh time, and known-tier filtering. |

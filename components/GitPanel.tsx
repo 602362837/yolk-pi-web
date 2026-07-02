@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { GitStatusInfo, GitFileChange, GitGraphData, GitGraphCommit, GitCommitDetail, GitCommitChangedFile } from "@/lib/types";
+import type { GitStatusInfo, GitFileChange, GitGraphData, GitGraphCommit, GitCommitDetail, GitCommitChangedFile, GitFileActionTarget, GitCommitCreateResponse } from "@/lib/types";
 import { CommitGraph } from "./CommitGraph";
 import { SelectDropdown } from "./SelectDropdown";
 import { GitCommitDiffModal } from "./GitCommitDiffModal";
@@ -34,7 +34,64 @@ const gitStatusLabels: Record<string, string> = {
   "?": "untracked",
 };
 
-function FileChangeRow({ change }: { change: GitFileChange }) {
+function fileActionKey(target: GitFileActionTarget): string {
+  return `${target.oldFile ?? ""}\0${target.file}`;
+}
+
+function SmallActionButton({
+  label,
+  title,
+  disabled,
+  pending,
+  onClick,
+}: {
+  label: string;
+  title?: string;
+  disabled?: boolean;
+  pending?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || pending}
+      title={title ?? label}
+      aria-label={title ?? label}
+      style={{
+        flexShrink: 0,
+        minWidth: 52,
+        height: 22,
+        padding: "0 7px",
+        border: "1px solid var(--border)",
+        borderRadius: 4,
+        background: disabled || pending ? "var(--bg-hover)" : "var(--bg-panel)",
+        color: disabled || pending ? "var(--text-dim)" : "var(--text)",
+        cursor: disabled || pending ? "not-allowed" : "pointer",
+        fontSize: 10,
+        fontWeight: 600,
+      }}
+    >
+      {pending ? "..." : label}
+    </button>
+  );
+}
+
+function FileChangeRow({
+  change,
+  actionLabel,
+  actionTitle,
+  onAction,
+  disabled,
+  pending,
+}: {
+  change: GitFileChange;
+  actionLabel?: string;
+  actionTitle?: string;
+  onAction?: () => void;
+  disabled?: boolean;
+  pending?: boolean;
+}) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 0" }}>
       <span style={{
@@ -45,12 +102,37 @@ function FileChangeRow({ change }: { change: GitFileChange }) {
         background: gitStatusColors[change.status] ?? "#9ca3af",
         flexShrink: 0,
       }} />
-      <span style={{ fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
         {change.oldFile ? `${change.oldFile} → ${change.file}` : change.file}
       </span>
       <span style={{ fontSize: 9, color: "var(--text-dim)", marginLeft: "auto", flexShrink: 0 }}>
         {gitStatusLabels[change.status] ?? change.status}
       </span>
+      {actionLabel && onAction && (
+        <SmallActionButton label={actionLabel} title={actionTitle} disabled={disabled} pending={pending} onClick={onAction} />
+      )}
+    </div>
+  );
+}
+
+function UntrackedFileRow({
+  file,
+  onTrack,
+  disabled,
+  pending,
+}: {
+  file: string;
+  onTrack: () => void;
+  disabled?: boolean;
+  pending?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 0" }}>
+      <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", flexShrink: 0 }} />
+      <span style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+        {file}
+      </span>
+      <SmallActionButton label="Track" title={`Track ${file}`} disabled={disabled} pending={pending} onClick={onTrack} />
     </div>
   );
 }
@@ -111,6 +193,8 @@ function formatRefLabel(ref: GitCommitDetail["refs"][number]): string {
   if (ref.type === "head") return `HEAD:${ref.name}`;
   return ref.name;
 }
+
+type PendingAction = { type: "stage" | "unstage" | "commit" | "push"; key?: string } | null;
 
 function CommitDetailPanel({
   detail,
@@ -195,6 +279,10 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [gitActionError, setGitActionError] = useState<string | null>(null);
+  const [gitActionSuccess, setGitActionSuccess] = useState<string | null>(null);
+  const [commitMessage, setCommitMessage] = useState("");
   const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
   const [commitDetail, setCommitDetail] = useState<GitCommitDetail | null>(null);
   const [commitDetailLoading, setCommitDetailLoading] = useState(false);
@@ -253,6 +341,10 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
     setCommitDetail(null);
     setCommitDetailError(null);
     setDiffFile(null);
+    setPendingAction(null);
+    setGitActionError(null);
+    setGitActionSuccess(null);
+    setCommitMessage("");
   }, [cwd]);
 
   useEffect(() => {
@@ -329,7 +421,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
   }, []);
 
   const handleSwitchBranch = useCallback(async () => {
-    if (!cwd || !selectedBranch || status?.isDirty || switching) return;
+    if (!cwd || !selectedBranch || status?.isDirty || switching || pendingAction) return;
 
     setSwitching(true);
     setSwitchError(null);
@@ -349,7 +441,81 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
     } finally {
       setSwitching(false);
     }
-  }, [cwd, fetchAll, selectedBranch, status?.isDirty, switching]);
+  }, [cwd, fetchAll, pendingAction, selectedBranch, status?.isDirty, switching]);
+
+  const postGitAction = useCallback(async <T,>(endpoint: string, body: unknown): Promise<T> => {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({})) as T & { error?: string };
+    if (!res.ok || data.error) {
+      throw new Error(data.error ?? `Git action failed with HTTP ${res.status}`);
+    }
+    return data;
+  }, []);
+
+  const runFileMutation = useCallback(async (
+    type: "stage" | "unstage",
+    files: GitFileActionTarget[],
+    successMessage: string,
+    key?: string,
+  ) => {
+    if (!cwd || pendingAction) return;
+    setPendingAction({ type, key });
+    setGitActionError(null);
+    setGitActionSuccess(null);
+    try {
+      await postGitAction(type === "stage" ? "/api/git/stage" : "/api/git/unstage", { cwd, files });
+      setGitActionSuccess(successMessage);
+      await fetchAll();
+    } catch (error) {
+      setGitActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPendingAction(null);
+    }
+  }, [cwd, fetchAll, pendingAction, postGitAction]);
+
+  const handleCommit = useCallback(async () => {
+    if (!cwd || !status || pendingAction || status.isDetached || status.staged.length === 0 || !commitMessage.trim()) return;
+    setPendingAction({ type: "commit" });
+    setGitActionError(null);
+    setGitActionSuccess(null);
+    try {
+      const result = await postGitAction<GitCommitCreateResponse>("/api/git/commit", { cwd, message: commitMessage });
+      setCommitMessage("");
+      setGitActionSuccess(`Committed ${result.shortHash}`);
+      setSelectedCommitHash(result.hash);
+      await fetchAll();
+    } catch (error) {
+      setGitActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPendingAction(null);
+    }
+  }, [commitMessage, cwd, fetchAll, pendingAction, postGitAction, status]);
+
+  const handlePush = useCallback(async () => {
+    if (!cwd || !status || pendingAction || status.isDetached || status.behind > 0) return;
+    const publish = !status.upstream;
+    if (publish) {
+      const confirmed = window.confirm(`Publish branch "${status.branch}" to origin/${status.branch}?`);
+      if (!confirmed) return;
+    }
+
+    setPendingAction({ type: "push" });
+    setGitActionError(null);
+    setGitActionSuccess(null);
+    try {
+      await postGitAction("/api/git/push", { cwd, setUpstream: publish });
+      setGitActionSuccess(publish ? "Branch published" : "Push complete");
+      await fetchAll();
+    } catch (error) {
+      setGitActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPendingAction(null);
+    }
+  }, [cwd, fetchAll, pendingAction, postGitAction, status]);
 
   const sectionTitleStyle: React.CSSProperties = {
     fontSize: 10,
@@ -389,7 +555,8 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
   const branchOptions = graphData?.branches ?? [];
   const previewBranch = selectedBranch || status.branch;
   const selectedIsCurrent = selectedBranch === status.branch || branchOptions.some((branch) => branch.name === selectedBranch && branch.isCurrent);
-  const canSwitchBranch = Boolean(selectedBranch) && branchOptions.length > 0 && !loading && !switching && !status.isDirty && !selectedIsCurrent;
+  const mutationPending = Boolean(pendingAction);
+  const canSwitchBranch = Boolean(selectedBranch) && branchOptions.length > 0 && !loading && !switching && !mutationPending && !status.isDirty && !selectedIsCurrent;
   const switchDisabledReason = status.isDirty
     ? "Commit, stash, or discard local changes before switching branches."
     : branchOptions.length === 0
@@ -397,6 +564,17 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
       : selectedIsCurrent
         ? "Select a different local branch to switch."
         : null;
+  const pushLabel = status.upstream ? "Push" : "Publish branch";
+  const pushDisabledReason = status.isDetached
+    ? "Detached HEAD cannot be pushed. Switch to a local branch first."
+    : status.behind > 0
+      ? "Branch is behind upstream. Pull or rebase before pushing."
+      : status.upstream && status.ahead === 0
+        ? "Nothing to push."
+        : !status.branch
+          ? "No local branch is checked out."
+          : null;
+  const canPush = !loading && !mutationPending && !pushDisabledReason;
 
   return (
     <div className="git-panel-root" style={{ maxHeight: "min(720px, 75vh)", overflowY: "auto" }}>
@@ -404,7 +582,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
       <div style={{ position: "sticky", top: 0, zIndex: 1, display: "flex", justifyContent: "flex-end", padding: "4px 8px", background: "var(--bg-panel)" }}>
         <button
           onClick={() => void fetchAll()}
-          disabled={loading}
+          disabled={loading || mutationPending}
           title="Refresh git status and selected branch graph"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -412,7 +590,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
             background: "none", border: "none",
             borderRadius: 4, color: "var(--text-muted)", cursor: "pointer",
             fontSize: 11,
-            opacity: loading ? 0.5 : 1,
+            opacity: loading || mutationPending ? 0.5 : 1,
             transition: "background 0.12s, color 0.12s",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
@@ -425,6 +603,22 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
           </svg>
         </button>
       </div>
+
+      {(gitActionError || gitActionSuccess) && (
+        <div style={{ padding: "0 16px 8px 16px" }}>
+          <div style={{
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: `1px solid ${gitActionError ? "rgba(239,68,68,0.35)" : "rgba(34,197,94,0.35)"}`,
+            background: gitActionError ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)",
+            color: gitActionError ? "#ef4444" : "#22c55e",
+            fontSize: 11,
+            whiteSpace: "pre-wrap",
+          }}>
+            {gitActionError ?? gitActionSuccess}
+          </div>
+        </div>
+      )}
 
       {/* Branch Status */}
       <div style={{ padding: "0 16px 8px 16px" }}>
@@ -473,6 +667,28 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
               )}
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={() => void handlePush()}
+            disabled={!canPush}
+            title={pushDisabledReason ?? (status.upstream ? `Push ${status.branch}` : `Publish ${status.branch} to origin/${status.branch}`)}
+            style={{
+              marginLeft: "auto",
+              height: 24,
+              padding: "0 9px",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              background: canPush ? "var(--accent)" : "var(--bg-panel)",
+              color: canPush ? "white" : "var(--text-dim)",
+              cursor: canPush ? "pointer" : "not-allowed",
+              fontSize: 10,
+              fontWeight: 700,
+              opacity: pendingAction?.type === "push" ? 0.7 : 1,
+            }}
+          >
+            {pendingAction?.type === "push" ? "Pushing..." : pushLabel}
+          </button>
         </div>
 
         <div style={{ marginTop: 8, padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 6 }}>
@@ -490,7 +706,7 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
                   setSelectedBranch(branch);
                   setSwitchError(null);
                 }}
-                disabled={loading || switching || branchOptions.length === 0}
+                disabled={loading || switching || mutationPending || branchOptions.length === 0}
                 ariaLabel="Select local Git branch"
                 size="field"
                 minWidth={220}
@@ -607,26 +823,109 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
 
       {/* Staged Changes */}
       <div style={{ padding: "0 16px 8px 16px" }}>
-        <div style={sectionTitleStyle}>Staged Changes <span style={{ fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>({status.staged.length})</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Staged Changes <span style={{ fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>({status.staged.length})</span></div>
+          <SmallActionButton
+            label="Unstage all"
+            title="Unstage all staged changes"
+            disabled={mutationPending || status.staged.length === 0}
+            pending={pendingAction?.type === "unstage" && pendingAction.key === "all-staged"}
+            onClick={() => void runFileMutation("unstage", status.staged, "Unstaged all staged changes", "all-staged")}
+          />
+        </div>
         {status.staged.length > 0 ? (
           <div>
-            {status.staged.map((change, i) => (
-              <FileChangeRow key={`staged-${i}`} change={change} />
-            ))}
+            {status.staged.map((change, i) => {
+              const key = fileActionKey(change);
+              return (
+                <FileChangeRow
+                  key={`staged-${i}`}
+                  change={change}
+                  actionLabel="Unstage"
+                  actionTitle={`Unstage ${change.file}`}
+                  disabled={mutationPending}
+                  pending={pendingAction?.type === "unstage" && pendingAction.key === key}
+                  onAction={() => void runFileMutation("unstage", [change], `Unstaged ${change.file}`, key)}
+                />
+              );
+            })}
           </div>
         ) : (
           <div style={emptyTextStyle}>No staged changes</div>
         )}
+        <div style={{ marginTop: 8, padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-subtle)" }}>
+          <textarea
+            value={commitMessage}
+            onChange={(event) => setCommitMessage(event.target.value)}
+            placeholder="Commit message"
+            disabled={mutationPending}
+            aria-label="Commit message"
+            style={{
+              width: "100%",
+              minHeight: 58,
+              resize: "vertical",
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              padding: "6px 8px",
+              background: "var(--bg-panel)",
+              color: "var(--text)",
+              fontSize: 11,
+              outline: "none",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Only staged changes will be committed.</span>
+            <button
+              type="button"
+              onClick={() => void handleCommit()}
+              disabled={mutationPending || status.isDetached || status.staged.length === 0 || !commitMessage.trim()}
+              title={status.isDetached ? "Detached HEAD cannot be committed. Switch to a local branch first." : status.staged.length === 0 ? "Stage changes before committing" : "Commit staged changes"}
+              style={{
+                height: 26,
+                padding: "0 10px",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                background: !mutationPending && !status.isDetached && status.staged.length > 0 && commitMessage.trim() ? "var(--accent)" : "var(--bg-hover)",
+                color: !mutationPending && !status.isDetached && status.staged.length > 0 && commitMessage.trim() ? "white" : "var(--text-dim)",
+                cursor: !mutationPending && !status.isDetached && status.staged.length > 0 && commitMessage.trim() ? "pointer" : "not-allowed",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {pendingAction?.type === "commit" ? "Committing..." : "Commit staged changes"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Unstaged Changes */}
       <div style={{ padding: "0 16px 8px 16px" }}>
-        <div style={sectionTitleStyle}>Unstaged Changes <span style={{ fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>({status.unstaged.length})</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Unstaged Changes <span style={{ fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>({status.unstaged.length})</span></div>
+          <SmallActionButton
+            label="Stage all"
+            title="Stage all tracked unstaged changes"
+            disabled={mutationPending || status.unstaged.length === 0}
+            pending={pendingAction?.type === "stage" && pendingAction.key === "all-unstaged"}
+            onClick={() => void runFileMutation("stage", status.unstaged, "Staged all unstaged changes", "all-unstaged")}
+          />
+        </div>
         {status.unstaged.length > 0 ? (
           <div>
-            {status.unstaged.map((change, i) => (
-              <FileChangeRow key={`unstaged-${i}`} change={change} />
-            ))}
+            {status.unstaged.map((change, i) => {
+              const key = fileActionKey(change);
+              return (
+                <FileChangeRow
+                  key={`unstaged-${i}`}
+                  change={change}
+                  actionLabel="Stage"
+                  actionTitle={`Stage ${change.file}`}
+                  disabled={mutationPending}
+                  pending={pendingAction?.type === "stage" && pendingAction.key === key}
+                  onAction={() => void runFileMutation("stage", [change], `Staged ${change.file}`, key)}
+                />
+              );
+            })}
           </div>
         ) : (
           <div style={emptyTextStyle}>No unstaged changes</div>
@@ -635,19 +934,26 @@ export function GitPanel({ cwd, refreshKey, onDirtyChange }: Props) {
 
       {/* Untracked Files */}
       <div style={{ padding: "0 16px 8px 16px" }}>
-        <div style={sectionTitleStyle}>Untracked Files <span style={{ fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>({status.untracked.length})</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Untracked Files <span style={{ fontWeight: 400, color: "var(--text-dim)", textTransform: "none" }}>({status.untracked.length})</span></div>
+          <SmallActionButton
+            label="Track all"
+            title="Track all untracked files"
+            disabled={mutationPending || status.untracked.length === 0}
+            pending={pendingAction?.type === "stage" && pendingAction.key === "all-untracked"}
+            onClick={() => void runFileMutation("stage", status.untracked.map((file) => ({ file })), "Tracked all untracked files", "all-untracked")}
+          />
+        </div>
         {status.untracked.length > 0 ? (
           <div>
             {status.untracked.map((file, i) => (
-              <div key={`untracked-${i}`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 0" }}>
-                <span style={{
-                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                  background: "#9ca3af", flexShrink: 0,
-                }} />
-                <span style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {file}
-                </span>
-              </div>
+              <UntrackedFileRow
+                key={`untracked-${i}`}
+                file={file}
+                disabled={mutationPending}
+                pending={pendingAction?.type === "stage" && pendingAction.key === fileActionKey({ file })}
+                onTrack={() => void runFileMutation("stage", [{ file }], `Tracked ${file}`, fileActionKey({ file }))}
+              />
             ))}
           </div>
         ) : (

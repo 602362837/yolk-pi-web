@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import type { GitCommitChangedFile, GitCommitDetail, GitCommitFileStatus, GitCommitRef } from "@/lib/types";
+import { GIT_LONG_ACTION_TIMEOUT_MS, GitActionUserError, getGitErrorMessage as getGitActionErrorMessage, jsonGitActionError, resolveAuthorizedGitRepo, runGit } from "@/lib/git-actions";
+import type { GitCommitChangedFile, GitCommitCreateResponse, GitCommitDetail, GitCommitFileStatus, GitCommitRef } from "@/lib/types";
 
 const execFileAsync = promisify(execFile);
 
 export const dynamic = "force-dynamic";
 
 const GIT_BUFFER = 4 * 1024 * 1024;
-
-interface GitExecError extends Error {
-  stdout?: string | Buffer;
-  stderr?: string | Buffer;
-}
 
 class GitCommitUserError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -22,11 +18,7 @@ class GitCommitUserError extends Error {
 }
 
 function getGitErrorMessage(error: unknown): string {
-  const err = error as Partial<GitExecError>;
-  const stderr = typeof err.stderr === "string" ? err.stderr : err.stderr?.toString();
-  const stdout = typeof err.stdout === "string" ? err.stdout : err.stdout?.toString();
-  const message = error instanceof Error ? error.message : String(error);
-  return (stderr || stdout || message || "Git command failed").trim();
+  return getGitActionErrorMessage(error);
 }
 
 async function git(args: string[], cwd: string, maxBuffer = GIT_BUFFER): Promise<string> {
@@ -238,5 +230,40 @@ export async function GET(req: NextRequest) {
     const status = error instanceof GitCommitUserError ? error.status : 500;
     const message = error instanceof GitCommitUserError ? error.message : getGitErrorMessage(error);
     return NextResponse.json({ error: message }, { status });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({})) as { cwd?: unknown; message?: unknown };
+    const cwd = typeof body.cwd === "string" ? body.cwd : "";
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+    if (!message) throw new GitActionUserError("Commit message is required", 400);
+    if (message.length > 64 * 1024) throw new GitActionUserError("Commit message is too large", 400);
+
+    const repo = await resolveAuthorizedGitRepo(cwd);
+    const branch = (await runGit(["rev-parse", "--abbrev-ref", "HEAD"], repo.repoRoot)).trim();
+    if (!branch || branch === "HEAD") {
+      throw new GitActionUserError("Detached HEAD cannot be committed from the Git panel. Switch to a local branch first.", 409);
+    }
+
+    try {
+      await runGit(["diff", "--cached", "--quiet", "--exit-code"], repo.repoRoot);
+      throw new GitActionUserError("No staged changes to commit", 409);
+    } catch (error) {
+      if (error instanceof GitActionUserError) throw error;
+      const code = typeof error === "object" && error !== null && "code" in error ? (error as { code?: unknown }).code : undefined;
+      if (code !== 1) throw error;
+    }
+
+    await runGit(["commit", "-m", message], repo.repoRoot, { timeout: GIT_LONG_ACTION_TIMEOUT_MS });
+    const hash = (await runGit(["rev-parse", "HEAD"], repo.repoRoot)).trim();
+    const shortHash = (await runGit(["rev-parse", "--short", "HEAD"], repo.repoRoot)).trim();
+
+    const response: GitCommitCreateResponse = { success: true, hash, shortHash, branch };
+    return NextResponse.json(response);
+  } catch (error) {
+    const details = jsonGitActionError(error);
+    return NextResponse.json({ error: details.error }, { status: details.status });
   }
 }

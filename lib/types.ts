@@ -355,9 +355,32 @@ export interface RpcSessionState {
 export type GitCommitFileStatus = "M" | "A" | "D" | "R" | "C" | "T" | "U" | "?";
 
 export interface GitFileChange {
-  status: "M" | "A" | "D" | "R" | "C" | "U" | "?";
+  status: GitCommitFileStatus;
   file: string;
   oldFile?: string;
+}
+
+export interface GitFileActionTarget {
+  file: string;
+  oldFile?: string;
+}
+
+export interface GitFileMutationResponse {
+  success: true;
+  count: number;
+}
+
+export interface GitCommitCreateResponse {
+  success: true;
+  hash: string;
+  shortHash: string;
+  branch: string;
+}
+
+export interface GitPushResponse {
+  success: true;
+  branch: string;
+  upstream: string | null;
 }
 
 export interface GitCommitInfo {
