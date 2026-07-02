@@ -154,6 +154,8 @@ git fetch upstream main
 
 ## npm Package Release
 
+Project-level release guidance is also available as the Pi skill `.pi/skills/yolk-release-publish/SKILL.md`; use it when bumping versions, tagging, pushing, or publishing `@alan-zhao/yolk-pi-web` / `ypi`.
+
 Before publishing, authenticate and validate the release bundle:
 
 ```bash
