@@ -1,0 +1,32 @@
+{
+  "id": "ypi-studio-workflow-tasks",
+  "name": "ypi-studio-workflow-tasks",
+  "title": "YPI Studio workflow tasks",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "pi",
+  "assignee": "pi",
+  "createdAt": "2026-07-02",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "pi/20260702-100525",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "lastCheck": {
+      "status": "passed",
+      "at": "2026-07-02T03:37:12Z",
+      "summary": "npm run lint and node_modules/.bin/tsc --noEmit passed after Studio panel/commands/init updates"
+    }
+  }
+}

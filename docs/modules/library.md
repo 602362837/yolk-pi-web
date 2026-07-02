@@ -4,7 +4,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 
 | File | Purpose |
 | --- | --- |
-| `lib/rpc-manager.ts` | `AgentSessionWrapper`, global registry, `startRpcSession()`, cwd-scoped session cleanup, lifecycle handling. |
+| `lib/rpc-manager.ts` | `AgentSessionWrapper`, global registry, `startRpcSession()`, cwd-scoped session cleanup, lifecycle handling, and built-in YPI Studio extension factory injection for web-created AgentSessions. |
 | `lib/session-reader.ts` | Parse `.jsonl` session files, resolve session paths, prune/delete sessions for removed WorkTree cwd paths, read model/default config. Archive helpers: `getSessionsArchiveDir()`, `archiveSessionFile()`, `unarchiveSessionFile()`, `scanArchivedCwds()`, `listArchivedSessionsForCwd()`, `resolveArchivedSessionPath()`. |
 | `lib/types.ts` | Shared TypeScript types for messages, sessions, Git status/graph/commit/diff wire payloads, and API payloads. |
 | `lib/pi-types.ts` | `AgentSessionLike` wrapper interface expected by hooks/components. |
@@ -35,7 +35,10 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/trellis-session-link.ts` | Session-scoped Trellis task association resolver for the floating widget; uses high-confidence session transcript evidence and exact per-session runtime pointers without mutating Trellis task metadata. |
 | `lib/trellis-chat-context.ts` | Pure helpers for converting Trellis task details into compact chat-composer context payloads and serializing those blocks into resume prompts recognized by session-task linking. |
 | `lib/ypi-studio-agents.ts` | Project-local YPI Studio member reader/initializer for `.ypi/agents/`, including default member card templates, safe workspace path checks, frontmatter parsing, non-overwriting backfill, and typed list/init projections. |
-| `lib/ypi-studio-types.ts` | Wire types for YPI Studio member cards, list responses, and initialization results. |
+| `lib/ypi-studio-workflows.ts` | Project-local YPI Studio structured workflow reader/initializer for `.ypi/workflows/`, including default workflow state machines, trigger metadata, transitions, progress states, and non-overwriting backfill. |
+| `lib/ypi-studio-tasks.ts` | Project-local YPI Studio task persistence and projections for `.ypi/tasks/`, including task creation, runtime session binding, workflow transition validation, artifact updates, event JSONL, subagent run summaries, and task list/detail readers. |
+| `lib/ypi-studio-extension.ts` | Built-in Pi extension factory loaded by `lib/rpc-manager.ts`; injects YPI Studio workflow state, registers `/studio-init`, `/studio-start`, `/studio-continue`, `/studio-check`, exports `ypi_studio_task` and `ypi_studio_subagent`, and adds `YPI_STUDIO_CONTEXT_ID` to bash commands for runtime task binding. |
+| `lib/ypi-studio-types.ts` | Wire types for YPI Studio member cards, workflows, tasks, state-machine progress, events, subagent run summaries, and API responses. |
 | `lib/trellis-setup-types.ts` | Wire types for Trellis setup status and setup/update command API responses. |
 | `lib/trellis-types.ts` | Wire types for Trellis task list/detail API responses and UI consumers. |
 | `lib/workspace-title.ts` | Shared workspace title formatting from cwd and Git metadata. |

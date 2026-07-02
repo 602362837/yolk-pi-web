@@ -3,6 +3,7 @@ import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath } from "./session-reader";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
+import { createYpiStudioExtension } from "./ypi-studio-extension";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
 // ============================================================================
@@ -351,12 +352,18 @@ export async function startRpcSession(
   if (inflight) return inflight;
 
   const starting = (async () => {
-    const { SessionManager, getAgentDir } = await import("@earendil-works/pi-coding-agent");
+    const { SessionManager, getAgentDir, DefaultResourceLoader } = await import("@earendil-works/pi-coding-agent");
     const agentDir = getAgentDir();
 
     const sessionManager = sessionFile
       ? SessionManager.open(sessionFile, undefined)
       : SessionManager.create(cwd, undefined);
+    const resourceLoader = new DefaultResourceLoader({
+      cwd,
+      agentDir,
+      extensionFactories: [createYpiStudioExtension(cwd)],
+    });
+    await resourceLoader.reload();
 
     // Do NOT pass the `tools` parameter to createAgentSession.
     // The `tools` param acts as a global allowlist that filters out extension
@@ -366,6 +373,7 @@ export async function startRpcSession(
       cwd,
       agentDir,
       sessionManager,
+      resourceLoader,
     });
 
     // If specific tool names were requested (non-empty), narrow active tools now

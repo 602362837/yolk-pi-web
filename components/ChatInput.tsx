@@ -1076,7 +1076,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     TOOL_PRESETS.map((lvl) => ({
       value: TOOL_PRESET_MAP[lvl],
       label: lvl,
-      description: lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "4 项内置工具" : lvl === "subagent" ? "全部工具 + subagent 委派" : "全部内置工具",
+      description: lvl === "off" ? "无工具，纯聊天" : lvl === "default" ? "基础工具 + 工作室任务" : lvl === "subagent" ? "全部工具 + subagent/工作室委派" : "全部内置工具 + 工作室任务",
     }))
   ), []);
 

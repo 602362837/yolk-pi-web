@@ -10,9 +10,9 @@ export interface ToolEntry {
 
 export type ToolPreset = "none" | "default" | "full" | "subagent";
 export const PRESET_NONE: string[] = [];
-export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write"];
-export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls"];
-export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent"];
+export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write", "ypi_studio_task"];
+export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "ypi_studio_task"];
+export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent", "ypi_studio_task", "ypi_studio_subagent"];
 const BUILTIN_TOOL_NAMES = new Set(PRESET_SUBAGENT);
 
 export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {
@@ -39,9 +39,9 @@ interface Props {
 
 const PRESETS: { id: ToolPreset; label: string; desc: string; tools: string[] }[] = [
   { id: "none",    label: "Off",  desc: "No tools",                                tools: PRESET_NONE },
-  { id: "default", label: "Low",  desc: "read · bash · edit · write",              tools: PRESET_DEFAULT },
-  { id: "full",    label: "High", desc: "read · bash · edit · write · grep · find · ls", tools: PRESET_FULL },
-  { id: "subagent", label: "Agent", desc: "High + subagent delegation", tools: PRESET_SUBAGENT },
+  { id: "default", label: "Low",  desc: "read · bash · edit · write · Studio task", tools: PRESET_DEFAULT },
+  { id: "full",    label: "High", desc: "read · bash · edit · write · grep · find · ls · Studio task", tools: PRESET_FULL },
+  { id: "subagent", label: "Agent", desc: "High + subagent and Studio delegation", tools: PRESET_SUBAGENT },
 ];
 
 export function ToolPanel({ tools, onPreset, onClose }: Props) {

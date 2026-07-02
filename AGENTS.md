@@ -58,7 +58,7 @@ npm run dev     # http://localhost:30141
 | Chat/session UI state | `hooks/useAgentSession.ts`, `components/ChatWindow.tsx`, `components/ChatInput.tsx` | `docs/modules/frontend.md` |
 | Tool-call normalization | `lib/normalize.ts` | `docs/architecture/overview.md`, `docs/modules/library.md` |
 | Workspace files and Git context | `app/api/files/**`, `app/api/git/**`, `lib/file-paths.ts`, `lib/git-worktree.ts`, `lib/workspace-title.ts` | `docs/modules/api.md`, `docs/modules/library.md` |
-| YPI Studio members | `components/YpiStudioPanel.tsx`, `app/api/studio/agents/route.ts`, `lib/ypi-studio-agents.ts` | `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md` |
+| YPI Studio members/workflows/tasks | `components/YpiStudioPanel.tsx`, `app/api/studio/**`, `lib/ypi-studio-*`, `lib/rpc-manager.ts` | `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Models, skills, auth, usage | `app/api/models*`, `app/api/skills/**`, `app/api/auth/**`, `app/api/usage/route.ts` | `docs/modules/api.md`, `docs/integrations/README.md` |
 
 ## Project Invariants

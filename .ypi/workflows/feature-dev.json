@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "id": "feature-dev",
+  "name": "功能开发",
+  "description": "从需求接单、设计、实现、检查到收尾的标准工作室流程。",
+  "triggers": {
+    "slash": [
+      "studio-start",
+      "studio-feature"
+    ],
+    "natural": [
+      "用工作室做",
+      "走工作室流程",
+      "让蛋黄派工作室处理",
+      "先让架构师设计"
+    ]
+  },
+  "initialStatus": "intake",
+  "terminalStatuses": [
+    "completed",
+    "cancelled",
+    "archived"
+  ],
+  "states": {
+    "intake": {
+      "id": "intake",
+      "label": "接单",
+      "owner": "architect",
+      "progress": 10,
+      "instruction": "理解目标、范围、约束和已有材料；需求不清楚时先问问题。",
+      "requiredArtifacts": [
+        "brief.md"
+      ],
+      "optionalArtifacts": [],
+      "requiresSubagent": true
+    },
+    "planning": {
+      "id": "planning",
+      "label": "设计",
+      "owner": "architect",
+      "progress": 35,
+      "instruction": "产出 PRD、Design、Implement 和 Checks；涉及界面时派发 UI 设计员。",
+      "requiredArtifacts": [
+        "prd.md",
+        "design.md",
+        "implement.md",
+        "checks.md"
+      ],
+      "optionalArtifacts": [
+        "ui.md"
+      ],
+      "requiresSubagent": true
+    },
+    "awaiting_approval": {
+      "id": "awaiting_approval",
+      "label": "等待确认",
+      "owner": "main",
+      "progress": 45,
+      "instruction": "等待用户确认方案。未确认前禁止进入实现阶段。",
+      "requiredArtifacts": [
+        "prd.md",
+        "design.md",
+        "implement.md",
+        "checks.md"
+      ],
+      "optionalArtifacts": [
+        "ui.md"
+      ],
+      "requiresUserApproval": true
+    },
+    "implementing": {
+      "id": "implementing",
+      "label": "制作",
+      "owner": "implementer",
+      "progress": 70,
+      "instruction": "主 session 必须通过 ypi_studio_subagent 指派实现员完成实现。",
+      "requiredArtifacts": [
+        "handoff.md"
+      ],
+      "optionalArtifacts": [],
+      "requiresSubagent": true
+    },
+    "checking": {
+      "id": "checking",
+      "label": "检查",
+      "owner": "checker",
+      "progress": 90,
+      "instruction": "主 session 必须通过 ypi_studio_subagent 指派检查员审查 diff、运行验证并修复低风险小问题。",
+      "requiredArtifacts": [
+        "review.md"
+      ],
+      "optionalArtifacts": [],
+      "requiresSubagent": true
+    },
+    "changes_requested": {
+      "id": "changes_requested",
+      "label": "请求修改",
+      "owner": "main",
+      "progress": 78,
+      "instruction": "检查未通过。主 session 需要决定退回实现员修复，还是退回架构师重新设计。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "ready": {
+      "id": "ready",
+      "label": "待收尾",
+      "owner": "main",
+      "progress": 95,
+      "instruction": "检查通过，等待主 session 汇总、提交计划或收尾。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "completed": {
+      "id": "completed",
+      "label": "完成",
+      "owner": "main",
+      "progress": 100,
+      "instruction": "任务已完成。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "blocked": {
+      "id": "blocked",
+      "label": "阻塞",
+      "owner": "main",
+      "progress": 50,
+      "instruction": "等待用户、外部条件或设计决策。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "cancelled": {
+      "id": "cancelled",
+      "label": "取消",
+      "owner": "main",
+      "progress": 100,
+      "instruction": "任务已取消。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "archived": {
+      "id": "archived",
+      "label": "归档",
+      "owner": "main",
+      "progress": 100,
+      "instruction": "任务已归档。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    }
+  },
+  "transitions": [
+    {
+      "from": "intake",
+      "to": "planning"
+    },
+    {
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    {
+      "from": "awaiting_approval",
+      "to": "implementing",
+      "requiresUserApproval": true
+    },
+    {
+      "from": "implementing",
+      "to": "checking"
+    },
+    {
+      "from": "checking",
+      "to": "ready"
+    },
+    {
+      "from": "checking",
+      "to": "changes_requested"
+    },
+    {
+      "from": "changes_requested",
+      "to": "implementing"
+    },
+    {
+      "from": "changes_requested",
+      "to": "planning"
+    },
+    {
+      "from": "ready",
+      "to": "completed"
+    },
+    {
+      "from": "intake",
+      "to": "blocked",
+      "overrideAllowed": true
+    },
+    {
+      "from": "planning",
+      "to": "blocked",
+      "overrideAllowed": true
+    },
+    {
+      "from": "implementing",
+      "to": "blocked",
+      "overrideAllowed": true
+    },
+    {
+      "from": "checking",
+      "to": "blocked",
+      "overrideAllowed": true
+    },
+    {
+      "from": "blocked",
+      "to": "intake",
+      "overrideAllowed": true
+    },
+    {
+      "from": "blocked",
+      "to": "planning",
+      "overrideAllowed": true
+    },
+    {
+      "from": "blocked",
+      "to": "implementing",
+      "overrideAllowed": true
+    },
+    {
+      "from": "intake",
+      "to": "cancelled",
+      "overrideAllowed": true
+    },
+    {
+      "from": "planning",
+      "to": "cancelled",
+      "overrideAllowed": true
+    },
+    {
+      "from": "awaiting_approval",
+      "to": "cancelled",
+      "overrideAllowed": true
+    },
+    {
+      "from": "completed",
+      "to": "archived"
+    }
+  ]
+}

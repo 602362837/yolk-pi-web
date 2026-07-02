@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "id": "review-only",
+  "name": "只检查",
+  "description": "不执行实现，只由检查员审查当前改动并给出结论。",
+  "triggers": {
+    "slash": [
+      "studio-check"
+    ],
+    "natural": [
+      "让检查员 review",
+      "工作室检查一下",
+      "只走检查流程"
+    ]
+  },
+  "initialStatus": "checking",
+  "terminalStatuses": [
+    "completed",
+    "cancelled",
+    "archived"
+  ],
+  "states": {
+    "checking": {
+      "id": "checking",
+      "label": "检查",
+      "owner": "checker",
+      "progress": 90,
+      "instruction": "主 session 必须通过 ypi_studio_subagent 指派检查员审查 diff、运行验证并修复低风险小问题。",
+      "requiredArtifacts": [
+        "review.md"
+      ],
+      "optionalArtifacts": [],
+      "requiresSubagent": true
+    },
+    "changes_requested": {
+      "id": "changes_requested",
+      "label": "请求修改",
+      "owner": "main",
+      "progress": 78,
+      "instruction": "检查未通过。主 session 需要决定退回实现员修复，还是退回架构师重新设计。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "ready": {
+      "id": "ready",
+      "label": "待收尾",
+      "owner": "main",
+      "progress": 95,
+      "instruction": "检查通过，等待主 session 汇总、提交计划或收尾。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "completed": {
+      "id": "completed",
+      "label": "完成",
+      "owner": "main",
+      "progress": 100,
+      "instruction": "任务已完成。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "blocked": {
+      "id": "blocked",
+      "label": "阻塞",
+      "owner": "main",
+      "progress": 50,
+      "instruction": "等待用户、外部条件或设计决策。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "cancelled": {
+      "id": "cancelled",
+      "label": "取消",
+      "owner": "main",
+      "progress": 100,
+      "instruction": "任务已取消。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "archived": {
+      "id": "archived",
+      "label": "归档",
+      "owner": "main",
+      "progress": 100,
+      "instruction": "任务已归档。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    }
+  },
+  "transitions": [
+    {
+      "from": "checking",
+      "to": "ready"
+    },
+    {
+      "from": "checking",
+      "to": "changes_requested"
+    },
+    {
+      "from": "changes_requested",
+      "to": "checking"
+    },
+    {
+      "from": "ready",
+      "to": "completed"
+    },
+    {
+      "from": "checking",
+      "to": "blocked",
+      "overrideAllowed": true
+    },
+    {
+      "from": "blocked",
+      "to": "checking",
+      "overrideAllowed": true
+    },
+    {
+      "from": "checking",
+      "to": "cancelled",
+      "overrideAllowed": true
+    },
+    {
+      "from": "completed",
+      "to": "archived"
+    }
+  ]
+}

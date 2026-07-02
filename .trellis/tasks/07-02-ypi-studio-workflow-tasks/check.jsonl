@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend/API/lib project spec entrypoint for final check."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Verify new modules/routes are placed in existing project structure."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify workflow/task JSON parsing uses type-safe boundary checks."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify route gating, allowed-root checks, and error behavior."}

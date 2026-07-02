@@ -57,6 +57,9 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `trellis/setup/init/` | POST | Legacy endpoint that installs/ensures the Trellis CLI, runs `trellis init -u <developer> --pi` for an authorized uninitialized workspace, and auto-enables the Trellis drawer setting on success. UI flows should prefer terminal-driven initialization. |
 | `trellis/setup/update/` | POST | Upgrade/install the Trellis CLI and run `trellis update` for an authorized workspace that already has `.trellis`. |
 | `studio/agents/` | GET/POST | Read project-local YPI Studio member cards from `.ypi/agents/` for an authorized workspace, and initialize or backfill the four default members (`architect`, `ui-designer`, `implementer`, `checker`) without overwriting existing files. |
+| `studio/workflows/` | GET/POST | Read project-local structured YPI Studio workflows from `.ypi/workflows/`, and initialize/backfill default workflow JSON files without overwriting existing files. |
+| `studio/tasks/` | GET/POST | List structured YPI Studio task summaries from `.ypi/tasks/` with state/progress projections, or create a new task directory with task artifacts and runtime context binding. |
+| `studio/tasks/[taskKey]/` | GET/PATCH | Read one YPI Studio task detail, or bind a context, update an artifact, or transition the task through workflow-defined states. |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>`. |
 | `home/` | GET | Return `os.homedir()`. |
 | `usage/` | GET | Aggregate token/cost usage across active-only or active-plus-archived sessions based on `pi-web.json` Usage settings. |

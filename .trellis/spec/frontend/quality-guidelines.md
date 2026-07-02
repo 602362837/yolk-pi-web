@@ -52,6 +52,103 @@ Questions to answer:
 
 ---
 
+## Scenario: YPI Studio workflow/task state machines
+
+### 1. Scope / Trigger
+
+Use this contract when adding or changing YPI Studio workflows, tasks, runtime
+session binding, role-subagent dispatch, or the Studio APIs that project those
+files to the browser. This is cross-layer work: `.ypi/` storage → `lib/` reader
+and writer → Next.js API routes → Pi extension workflow interception.
+
+### 2. Signatures
+
+- Workflow storage: `.ypi/workflows/<workflow-id>.json` with
+  `schemaVersion`, `id`, `states`, `transitions`, `initialStatus`,
+  `terminalStatuses`, and `triggers`.
+- Task storage: `.ypi/tasks/<task-id>/task.json` plus `events.jsonl` and
+  markdown artifact files.
+- Runtime pointer: `.ypi/.runtime/sessions/<context-id>.json` with
+  `{ currentTask, updatedAt }`.
+- List APIs: `GET /api/studio/workflows?cwd=<cwd>` and
+  `GET /api/studio/tasks?cwd=<cwd>`.
+- Detail/mutation API: `GET/PATCH /api/studio/tasks/[taskKey]?cwd=<cwd>`.
+- Extension tools: `ypi_studio_task` for lifecycle/artifacts and
+  `ypi_studio_subagent` for member delegation.
+
+### 3. Contracts
+
+- Workflow and task readers must validate workspace paths with allowed roots and
+  must not let stable keys become raw filesystem paths.
+- Default workflow initialization/backfill is additive only; never overwrite
+  user-authored `.ypi/workflows/*.json` files.
+- Task transitions must follow workflow-defined transitions unless an explicit
+  override/reason path is used.
+- `awaiting_approval -> implementing` requires user approval; the main session
+  must not silently treat planning approval as implementation approval.
+- Role work belongs to `ypi_studio_subagent`; the main session remains the
+  orchestrator and should not pretend to be architect/implementer/checker for
+  member-owned phases.
+- Extension child processes must set a guard env such as
+  `YPI_STUDIO_SUBAGENT_CHILD=1` to avoid recursively registering the Studio
+  extension inside children.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Missing `.ypi/workflows` | Workflow list returns an empty state; explicit init creates defaults. |
+| Existing workflow file | Backfill skips it and does not overwrite content. |
+| Malformed workflow/task JSON | List route returns a per-item read error when safe. |
+| Invalid task key or artifact name | Reject with 400/security error; do not read arbitrary paths. |
+| Unknown transition | Reject unless override is explicit and recorded. |
+| Missing active runtime pointer | Extension injects `no_task` guidance instead of guessing a task. |
+| Missing member definition | `ypi_studio_subagent` returns a clear error; do not fallback to main-session execution. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: `/studio-start` creates a task, binds the current context id, dispatches
+  the architect through `ypi_studio_subagent`, then waits in
+  `awaiting_approval` before implementation.
+- Base: a workspace has no Studio tasks; the task list API returns an empty list
+  and the extension injects `no_task` guidance.
+- Bad: the UI sends `../../task.json` as a task id, or the agent directly edits
+  code while the task is still in `awaiting_approval`.
+
+### 6. Tests Required
+
+At minimum, verify these assertion points manually or with focused tests:
+
+- Default workflows initialize/backfill without overwriting existing files.
+- Task creation writes valid `task.json`, `events.jsonl`, and artifact files.
+- Runtime context id resolves the current task.
+- Invalid transitions and invalid task keys are rejected.
+- `ypi_studio_subagent` receives member definition plus task/workflow context and
+  records a run summary.
+- `npm run lint` and `node_modules/.bin/tsc --noEmit` pass after route/lib changes.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+// Browser or agent chooses an arbitrary path and bypasses the state machine.
+fetch(`/api/studio/tasks/read?path=${encodeURIComponent("../../task.json")}`);
+await editCodeWhileTaskStatusIs("awaiting_approval");
+```
+
+#### Correct
+
+```typescript
+// Browser uses the stable key returned by the list API, and implementation waits
+// for an approved state transition.
+await fetch(`/api/studio/tasks/${encodeURIComponent(task.key)}?cwd=${encodeURIComponent(cwd)}`);
+await ypi_studio_task({ action: "transition", taskId: task.id, to: "implementing", reason: "user approved plan" });
+await ypi_studio_subagent({ member: "implementer", taskId: task.id, prompt: "Implement the approved plan." });
+```
+
+---
+
 ## Scenario: Optional read-only workspace-file panels
 
 ### 1. Scope / Trigger

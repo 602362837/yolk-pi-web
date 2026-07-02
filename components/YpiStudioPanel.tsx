@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { YpiStudioAgent, YpiStudioAgentsInitResponse, YpiStudioAgentsResponse } from "@/lib/ypi-studio-types";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import type {
+  YpiStudioAgent,
+  YpiStudioAgentsInitResponse,
+  YpiStudioAgentsResponse,
+  YpiStudioTaskSummary,
+  YpiStudioTasksResponse,
+  YpiStudioWorkflowFile,
+  YpiStudioWorkflowsInitResponse,
+  YpiStudioWorkflowsResponse,
+} from "@/lib/ypi-studio-types";
 import { MarkdownBody } from "./MarkdownBody";
 
 interface Props {
@@ -10,9 +19,18 @@ interface Props {
 }
 
 type LoadState = "idle" | "loading" | "ready" | "error";
+type StudioTab = "members" | "workflows" | "tasks";
 
 function agentFilePath(cwd: string, agent: YpiStudioAgent): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${agent.pathLabel.replace(/^\/+/, "")}`;
+}
+
+function workflowFilePath(cwd: string, workflow: YpiStudioWorkflowFile): string {
+  return `${cwd.replace(/[\\/]+$/, "")}/${workflow.pathLabel.replace(/^\/+/, "")}`;
+}
+
+function taskFilePath(cwd: string, task: YpiStudioTaskSummary): string {
+  return `${cwd.replace(/[\\/]+$/, "")}/.ypi/tasks/${task.id}/task.json`;
 }
 
 function shortCwd(cwd: string): string {
@@ -21,15 +39,35 @@ function shortCwd(cwd: string): string {
   return `…/${parts.slice(-2).join("/")}`;
 }
 
-function initButtonLabel(data: YpiStudioAgentsResponse | null): string {
-  if (!data?.exists) return "初始化工作室成员";
-  if (data.missingDefaultAgents.length > 0) return "补齐默认成员";
+function needsAgentInit(data: YpiStudioAgentsResponse | null): boolean {
+  return !data?.exists || (data.missingDefaultAgents.length ?? 0) > 0;
+}
+
+function needsWorkflowInit(data: YpiStudioWorkflowsResponse | null): boolean {
+  return !data?.exists || (data.missingDefaultWorkflows.length ?? 0) > 0;
+}
+
+function initButtonLabel(agents: YpiStudioAgentsResponse | null, workflows: YpiStudioWorkflowsResponse | null): string {
+  if (!agents?.exists && !workflows?.exists) return "初始化工作室";
+  if (needsAgentInit(agents) || needsWorkflowInit(workflows)) return "补齐默认配置";
   return "重新检查";
 }
 
+function statusTone(status: string): "success" | "warning" | "error" | "neutral" {
+  if (status === "completed" || status === "ready" || status === "archived") return "success";
+  if (status === "blocked" || status === "changes_requested") return "warning";
+  if (status === "cancelled") return "error";
+  return "neutral";
+}
+
 export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
+  const [activeTab, setActiveTab] = useState<StudioTab>("members");
   const [loadState, setLoadState] = useState<LoadState>("idle");
+  const [workflowLoadState, setWorkflowLoadState] = useState<LoadState>("idle");
+  const [taskLoadState, setTaskLoadState] = useState<LoadState>("idle");
   const [data, setData] = useState<YpiStudioAgentsResponse | null>(null);
+  const [workflowsData, setWorkflowsData] = useState<YpiStudioWorkflowsResponse | null>(null);
+  const [tasksData, setTasksData] = useState<YpiStudioTasksResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [initBusy, setInitBusy] = useState(false);
@@ -63,11 +101,59 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
     }
   }, [cwd]);
 
+  const loadWorkflows = useCallback(async (signal?: AbortSignal) => {
+    if (!cwd) {
+      setWorkflowsData(null);
+      setWorkflowLoadState("idle");
+      return;
+    }
+
+    setWorkflowLoadState("loading");
+    try {
+      const res = await fetch(`/api/studio/workflows?cwd=${encodeURIComponent(cwd)}`, { signal });
+      const body = await res.json() as YpiStudioWorkflowsResponse & { error?: string };
+      if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
+      setWorkflowsData(body);
+      setWorkflowLoadState("ready");
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") return;
+      setError(err instanceof Error ? err.message : String(err));
+      setWorkflowLoadState("error");
+    }
+  }, [cwd]);
+
+  const loadTasks = useCallback(async (signal?: AbortSignal) => {
+    if (!cwd) {
+      setTasksData(null);
+      setTaskLoadState("idle");
+      return;
+    }
+
+    setTaskLoadState("loading");
+    try {
+      const res = await fetch(`/api/studio/tasks?cwd=${encodeURIComponent(cwd)}`, { signal });
+      const body = await res.json() as YpiStudioTasksResponse & { error?: string };
+      if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
+      setTasksData(body);
+      setTaskLoadState("ready");
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") return;
+      setError(err instanceof Error ? err.message : String(err));
+      setTaskLoadState("error");
+    }
+  }, [cwd]);
+
+  const reloadAll = useCallback((signal?: AbortSignal) => {
+    void loadAgents(signal);
+    void loadWorkflows(signal);
+    void loadTasks(signal);
+  }, [loadAgents, loadTasks, loadWorkflows]);
+
   useEffect(() => {
     const controller = new AbortController();
-    void loadAgents(controller.signal);
+    reloadAll(controller.signal);
     return () => controller.abort();
-  }, [loadAgents]);
+  }, [reloadAll]);
 
   const selectedAgent = useMemo(() => {
     if (!data?.agents.length) return null;
@@ -80,24 +166,38 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
     setInitMessage(null);
     setError(null);
     try {
-      const res = await fetch("/api/studio/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cwd }),
-      });
-      const body = await res.json() as YpiStudioAgentsInitResponse & { error?: string };
-      if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
-      setData(body.agents);
+      const [agentsRes, workflowsRes] = await Promise.all([
+        fetch("/api/studio/agents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cwd }),
+        }),
+        fetch("/api/studio/workflows", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cwd }),
+        }),
+      ]);
+      const agentsBody = await agentsRes.json() as YpiStudioAgentsInitResponse & { error?: string };
+      const workflowsBody = await workflowsRes.json() as YpiStudioWorkflowsInitResponse & { error?: string };
+      if (!agentsRes.ok || agentsBody.error) throw new Error(agentsBody.error ?? `HTTP ${agentsRes.status}`);
+      if (!workflowsRes.ok || workflowsBody.error) throw new Error(workflowsBody.error ?? `HTTP ${workflowsRes.status}`);
+
+      setData(agentsBody.agents);
+      setWorkflowsData(workflowsBody.workflows);
       setSelectedKey((current) => {
-        if (current && body.agents.agents.some((agent) => agent.key === current)) return current;
-        return body.agents.agents[0]?.key ?? null;
+        if (current && agentsBody.agents.agents.some((agent) => agent.key === current)) return current;
+        return agentsBody.agents.agents[0]?.key ?? null;
       });
       setLoadState("ready");
-      const createdCount = body.created.length;
-      const skippedCount = body.skipped.length;
-      setInitMessage(createdCount > 0
-        ? `已创建 ${createdCount} 个成员，跳过 ${skippedCount} 个已存在文件。`
-        : "默认成员文件已存在，没有覆盖用户内容。"
+      setWorkflowLoadState("ready");
+      await loadTasks();
+      setTaskLoadState("ready");
+      const createdAgents = agentsBody.created.length;
+      const createdWorkflows = workflowsBody.created.length;
+      setInitMessage(createdAgents + createdWorkflows > 0
+        ? `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程；已有文件未覆盖。`
+        : "默认成员和流程都已存在，没有覆盖用户内容。"
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -105,75 +205,138 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
     } finally {
       setInitBusy(false);
     }
-  }, [cwd, initBusy]);
+  }, [cwd, initBusy, loadTasks]);
 
   if (!cwd) {
-    return <PanelEmpty title="请选择项目空间" description="选择一个会话或工作目录后，可在该项目根目录初始化 .ypi/agents/ 工作室成员。" />;
+    return <PanelEmpty title="请选择项目空间" description="选择一个会话或工作目录后，可在该项目根目录初始化 .ypi/agents/、.ypi/workflows/ 和工作室任务。" />;
   }
 
-  const canInitialize = !data?.exists || (data?.missingDefaultAgents.length ?? 0) > 0;
+  const canInitialize = needsAgentInit(data) || needsWorkflowInit(workflowsData);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--text)" }}>
       <div style={{ padding: 14, borderBottom: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>工作室成员</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)" }}>工作室</div>
             <div title={cwd} style={{ marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {shortCwd(cwd)} · .ypi/agents/
+              {shortCwd(cwd)} · .ypi/
             </div>
           </div>
           <button
-            onClick={canInitialize ? handleInit : () => { void loadAgents(); }}
-            disabled={initBusy || loadState === "loading"}
+            onClick={canInitialize ? handleInit : () => reloadAll()}
+            disabled={initBusy || loadState === "loading" || workflowLoadState === "loading"}
             style={{
               padding: "6px 10px",
               borderRadius: 8,
               border: "1px solid var(--border)",
               background: canInitialize ? "var(--accent)" : "var(--bg)",
               color: canInitialize ? "white" : "var(--text-muted)",
-              cursor: initBusy || loadState === "loading" ? "wait" : "pointer",
+              cursor: initBusy || loadState === "loading" || workflowLoadState === "loading" ? "wait" : "pointer",
               fontSize: 12,
               fontWeight: 700,
               whiteSpace: "nowrap",
             }}
           >
-            {initBusy ? "处理中…" : initButtonLabel(data)}
+            {initBusy ? "处理中…" : initButtonLabel(data, workflowsData)}
           </button>
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-          这里只管理项目级成员描述，不引入任务状态机或 Trellis 流程。初始化只补齐缺失文件，不覆盖已有自定义内容。
+          工作室包含成员、结构化流程和任务状态机。初始化只补齐缺失默认文件，不覆盖已有自定义内容。
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <TabButton active={activeTab === "members"} label={`成员 ${data?.agents.length ?? 0}`} onClick={() => setActiveTab("members")} />
+          <TabButton active={activeTab === "workflows"} label={`流程 ${workflowsData?.workflows.length ?? 0}`} onClick={() => setActiveTab("workflows")} />
+          <TabButton active={activeTab === "tasks"} label={`任务 ${tasksData?.tasks.length ?? 0}`} onClick={() => setActiveTab("tasks")} />
         </div>
         {initMessage && <Notice tone="success" text={initMessage} />}
         {error && <Notice tone="error" text={error} />}
       </div>
 
-      {loadState === "loading" ? (
-        <PanelEmpty title="正在读取工作室成员" description="检查当前项目的 .ypi/agents/ 目录。" />
-      ) : loadState === "error" && !data ? (
-        <PanelEmpty title="读取失败" description="请检查上方错误信息，或确认当前工作目录已被授权访问。" />
-      ) : !data?.exists ? (
-        <PanelEmpty
-          title="尚未初始化"
-          description="点击“初始化工作室成员”会在项目根目录创建 architect、ui-designer、implementer、checker 四个默认成员文件。"
-        />
-      ) : data.agents.length === 0 ? (
-        <PanelEmpty title="没有成员文件" description=".ypi/agents/ 已存在，但没有可读取的 Markdown 成员文件。可点击补齐默认成员。" />
+      {activeTab === "members" ? (
+        <MembersTab loadState={loadState} data={data} selectedAgent={selectedAgent} selectedKey={selectedKey} setSelectedKey={setSelectedKey} onOpenFile={onOpenFile} />
+      ) : activeTab === "workflows" ? (
+        <WorkflowsTab cwd={cwd} loadState={workflowLoadState} data={workflowsData} onOpenFile={onOpenFile} />
       ) : (
-        <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateRows: "minmax(130px, 35%) 1fr" }}>
-          <div style={{ overflowY: "auto", borderBottom: "1px solid var(--border)", padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, alignContent: "start" }}>
-            {data.agents.map((agent) => (
-              <AgentCard key={agent.key} agent={agent} active={selectedAgent?.key === agent.key} onClick={() => setSelectedKey(agent.key)} />
-            ))}
-          </div>
-          <div style={{ minHeight: 0, overflowY: "auto" }}>
-            {selectedAgent && (
-              <AgentDetail cwd={data.cwd} agent={selectedAgent} onOpenFile={onOpenFile} />
-            )}
-          </div>
-        </div>
+        <TasksTab cwd={cwd} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} />
       )}
     </div>
+  );
+}
+
+function MembersTab({ loadState, data, selectedAgent, selectedKey, setSelectedKey, onOpenFile }: {
+  loadState: LoadState;
+  data: YpiStudioAgentsResponse | null;
+  selectedAgent: YpiStudioAgent | null;
+  selectedKey: string | null;
+  setSelectedKey: (key: string) => void;
+  onOpenFile?: (filePath: string, fileName: string) => void;
+}) {
+  if (loadState === "loading") return <PanelEmpty title="正在读取工作室成员" description="检查当前项目的 .ypi/agents/ 目录。" />;
+  if (loadState === "error" && !data) return <PanelEmpty title="读取失败" description="请检查上方错误信息，或确认当前工作目录已被授权访问。" />;
+  if (!data?.exists) {
+    return <PanelEmpty title="尚未初始化成员" description="点击“初始化工作室”会在项目根目录创建 architect、ui-designer、implementer、checker 四个默认成员文件。" />;
+  }
+  if (data.agents.length === 0) return <PanelEmpty title="没有成员文件" description=".ypi/agents/ 已存在，但没有可读取的 Markdown 成员文件。可点击补齐默认配置。" />;
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateRows: "minmax(130px, 35%) 1fr" }}>
+      <div style={{ overflowY: "auto", borderBottom: "1px solid var(--border)", padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, alignContent: "start" }}>
+        {data.agents.map((agent) => (
+          <AgentCard key={agent.key} agent={agent} active={selectedKey === agent.key} onClick={() => setSelectedKey(agent.key)} />
+        ))}
+      </div>
+      <div style={{ minHeight: 0, overflowY: "auto" }}>
+        {selectedAgent && <AgentDetail cwd={data.cwd} agent={selectedAgent} onOpenFile={onOpenFile} />}
+      </div>
+    </div>
+  );
+}
+
+function WorkflowsTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadState: LoadState; data: YpiStudioWorkflowsResponse | null; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  if (loadState === "loading") return <PanelEmpty title="正在读取工作室流程" description="检查当前项目的 .ypi/workflows/ 目录。" />;
+  if (loadState === "error" && !data) return <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
+  if (!data?.exists) return <PanelEmpty title="尚未初始化流程" description="点击“初始化工作室”会创建默认工作流 JSON：功能开发、Bug 修复、UI 改动、只检查。" />;
+  if (data.workflows.length === 0) return <PanelEmpty title="没有流程文件" description=".ypi/workflows/ 已存在，但没有可读取的 JSON 流程文件。" />;
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      {data.workflows.map((workflow) => <WorkflowCard key={workflow.key} cwd={cwd} workflow={workflow} onOpenFile={onOpenFile} />)}
+    </div>
+  );
+}
+
+function TasksTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadState: LoadState; data: YpiStudioTasksResponse | null; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  if (loadState === "loading") return <PanelEmpty title="正在读取工作室任务" description="检查当前项目的 .ypi/tasks/ 目录。" />;
+  if (loadState === "error" && !data) return <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
+  if (!data?.exists) return <PanelEmpty title="还没有工作室任务" description="通过 /studio-start，或直接说“用工作室做这个功能”，会创建结构化任务并在这里显示进度。" />;
+  if (data.tasks.length === 0) return <PanelEmpty title="任务列表为空" description="当前 .ypi/tasks/ 没有任务目录。" />;
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      {data.tasks.map((task) => <TaskCard key={task.key} cwd={cwd} task={task} onOpenFile={onOpenFile} />)}
+    </div>
+  );
+}
+
+function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "5px 9px",
+        borderRadius: 999,
+        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+        background: active ? "var(--bg-selected)" : "var(--bg)",
+        color: active ? "var(--accent)" : "var(--text-muted)",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -209,6 +372,79 @@ function AgentCard({ agent, active, onClick }: { agent: YpiStudioAgent; active: 
   );
 }
 
+function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: YpiStudioWorkflowFile; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  const states = Object.values(workflow.states).sort((a, b) => a.progress - b.progress);
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 800 }}>{workflow.name}</div>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4, lineHeight: 1.45 }}>{workflow.description}</div>
+          <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 5 }}>{workflow.pathLabel}</div>
+        </div>
+        <button
+          onClick={() => onOpenFile?.(workflowFilePath(cwd, workflow), workflow.fileName)}
+          disabled={!onOpenFile}
+          style={smallButtonStyle(Boolean(onOpenFile))}
+        >
+          打开
+        </button>
+      </div>
+      {workflow.readError && <Notice tone="error" text={workflow.readError} />}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {states.map((state) => (
+          <span key={state.id} title={state.instruction} style={{ border: "1px solid var(--border)", borderRadius: 999, padding: "3px 7px", color: "var(--text-muted)", fontSize: 11 }}>
+            {state.label} · {state.owner} · {state.progress}%
+          </span>
+        ))}
+      </div>
+      <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
+        触发词：{workflow.triggers.natural?.slice(0, 4).join(" / ") || "—"}
+      </div>
+    </div>
+  );
+}
+
+function TaskCard({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskSummary; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 800 }}>{task.title}</span>
+            <Badge label={task.status} tone={statusTone(task.status)} />
+          </div>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 5 }}>
+            {task.workflowName ?? task.workflowId} · 当前：{task.progress.label} · 负责人：{task.currentMember ?? task.progress.owner}
+          </div>
+          <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 5 }}>{task.pathLabel}</div>
+        </div>
+        <button
+          onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")}
+          disabled={!onOpenFile}
+          style={smallButtonStyle(Boolean(onOpenFile))}
+        >
+          打开
+        </button>
+      </div>
+      {task.readError && <Notice tone="error" text={task.readError} />}
+      <div style={{ height: 6, borderRadius: 999, background: "var(--border)", overflow: "hidden" }}>
+        <div style={{ width: `${Math.max(0, Math.min(100, task.progress.percent))}%`, height: "100%", background: "var(--accent)", borderRadius: 999 }} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, color: "var(--text-muted)", fontSize: 11 }}>
+        <div>进度：{task.progress.percent}%</div>
+        <div>缺失：{task.progress.missingArtifacts.length || 0}</div>
+        <div>更新：{formatDate(task.updatedAt)}</div>
+      </div>
+      {task.progress.missingArtifacts.length > 0 && (
+        <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
+          待产物：{task.progress.missingArtifacts.join("、")}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AgentDetail({ cwd, agent, onOpenFile }: { cwd: string; agent: YpiStudioAgent; onOpenFile?: (filePath: string, fileName: string) => void }) {
   const filePath = agentFilePath(cwd, agent);
   return (
@@ -218,21 +454,7 @@ function AgentDetail({ cwd, agent, onOpenFile }: { cwd: string; agent: YpiStudio
           <h3 style={{ margin: 0, color: "var(--text)", fontSize: 18, lineHeight: 1.25 }}>{agent.name}</h3>
           <div style={{ marginTop: 5, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{agent.pathLabel}</div>
         </div>
-        <button
-          onClick={() => onOpenFile?.(filePath, agent.fileName)}
-          disabled={!onOpenFile}
-          style={{
-            padding: "6px 10px",
-            borderRadius: 8,
-            border: "1px solid var(--border)",
-            background: "var(--bg-panel)",
-            color: onOpenFile ? "var(--text-muted)" : "var(--text-dim)",
-            cursor: onOpenFile ? "pointer" : "default",
-            fontSize: 12,
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-          }}
-        >
+        <button onClick={() => onOpenFile?.(filePath, agent.fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>
           打开文件
         </button>
       </div>
@@ -245,6 +467,36 @@ function AgentDetail({ cwd, agent, onOpenFile }: { cwd: string; agent: YpiStudio
         </div>
       )}
     </div>
+  );
+}
+
+function smallButtonStyle(enabled: boolean): CSSProperties {
+  return {
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--bg-panel)",
+    color: enabled ? "var(--text-muted)" : "var(--text-dim)",
+    cursor: enabled ? "pointer" : "default",
+    fontSize: 12,
+    fontWeight: 700,
+    whiteSpace: "nowrap",
+  };
+}
+
+function formatDate(value: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString();
+}
+
+function Badge({ label, tone }: { label: string; tone: "success" | "warning" | "error" | "neutral" }) {
+  const color = tone === "success" ? "#16a34a" : tone === "warning" ? "#f59e0b" : tone === "error" ? "#ef4444" : "var(--text-dim)";
+  return (
+    <span style={{ border: `1px solid ${color}55`, color, borderRadius: 999, padding: "2px 6px", fontSize: 10, fontWeight: 800 }}>
+      {label}
+    </span>
   );
 }
 
