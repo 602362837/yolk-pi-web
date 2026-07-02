@@ -173,7 +173,19 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
 
   const studioProgressSignature = Object.values(toolProgressById)
     .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent")
-    .map((progress) => `${progress.toolCallId}|${progress.updatedAt}|${progress.running}`)
+    .map((progress) => {
+      const details = (isRecord(progress.result?.details) ? progress.result.details : isRecord(progress.partialResult?.details) ? progress.partialResult.details : {}) as Record<string, unknown>;
+      const run = isRecord(details.run) ? details.run : null;
+      const task = isRecord(details.task) ? details.task : null;
+      return [
+        progress.toolCallId,
+        progress.updatedAt,
+        progress.running,
+        optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId) ?? "",
+        optionalString(task?.key) ?? optionalString(run?.taskKey) ?? "",
+        optionalString(task?.status) ?? optionalString(run?.status) ?? "",
+      ].join("|");
+    })
     .join(";");
   useEffect(() => {
     if (!onStudioToolProgressChange) return;

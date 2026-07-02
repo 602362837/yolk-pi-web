@@ -238,6 +238,25 @@ export interface YpiStudioTaskProgress {
   missingArtifacts: string[];
 }
 
+export interface YpiStudioApprovalGate {
+  enteredAt: string;
+  contextId?: string;
+  from: string;
+  to: "awaiting_approval";
+}
+
+export interface YpiStudioApprovalGrant {
+  approvedAt: string;
+  contextId: string;
+  inputHash: string;
+  source: "user-input";
+}
+
+export interface YpiStudioTaskMeta extends Record<string, unknown> {
+  approvalGate?: YpiStudioApprovalGate;
+  approvalGrant?: YpiStudioApprovalGrant;
+}
+
 export interface YpiStudioTaskRecord {
   schemaVersion: 1;
   id: string;
@@ -252,7 +271,7 @@ export interface YpiStudioTaskRecord {
   currentMember?: string;
   artifacts: Record<string, string>;
   subagents: YpiStudioTaskSubagentRun[];
-  meta: Record<string, unknown>;
+  meta: YpiStudioTaskMeta;
 }
 
 export interface YpiStudioTaskSummary {
@@ -289,7 +308,7 @@ export interface YpiStudioTaskDetail extends YpiStudioTaskSummary {
   artifacts: Record<string, string>;
   documents: Record<string, YpiStudioTaskDocument>;
   subagents: YpiStudioTaskSubagentRun[];
-  meta: Record<string, unknown>;
+  meta: YpiStudioTaskMeta;
   events: YpiStudioTaskEvent[];
 }
 

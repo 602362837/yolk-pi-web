@@ -201,6 +201,8 @@ export function AppShell() {
   const [studioSessionTaskRefreshKey, setStudioSessionTaskRefreshKey] = useState(0);
   const [studioLiveOverlays, setStudioLiveOverlays] = useState<YpiStudioLiveRunOverlay[]>([]);
   const [chatAgentRunning, setChatAgentRunning] = useState(false);
+  const studioToolTaskSignatureRef = useRef("");
+  const studioToolRefreshTimerRef = useRef<number | null>(null);
   const [pendingTrellisTaskContext, setPendingTrellisTaskContext] = useState<TrellisTaskChatContext | null>(null);
 
   const handleAtMention = useCallback((relativePath: string) => {
@@ -441,6 +443,7 @@ export function AppShell() {
     setStudioSessionTask(null);
     setStudioLiveOverlays([]);
     setChatAgentRunning(false);
+    studioToolTaskSignatureRef.current = "";
   }, [selectedSession?.id]);
 
   useEffect(() => {
@@ -455,13 +458,30 @@ export function AppShell() {
   useEffect(() => {
     if (!selectedSession || selectedSession.archived) return;
     if (!studioSessionTaskKey && !chatAgentRunning) return;
-    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), studioHasRunning || chatAgentRunning ? 3000 : 10000);
+    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), studioHasRunning || chatAgentRunning ? 5000 : 15000);
     return () => window.clearInterval(interval);
   }, [chatAgentRunning, selectedSession, studioHasRunning, studioSessionTaskKey]);
+
+  useEffect(() => () => {
+    if (studioToolRefreshTimerRef.current !== null) window.clearTimeout(studioToolRefreshTimerRef.current);
+  }, []);
 
   const handleStudioToolProgressChange = useCallback((snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => {
     setChatAgentRunning(snapshot.agentRunning);
     setStudioLiveOverlays(snapshot.overlays);
+    const taskSignature = snapshot.overlays
+      .filter((overlay) => !overlay.running && (overlay.taskKey || overlay.taskId))
+      .map((overlay) => `${overlay.toolCallId}:${overlay.taskKey ?? overlay.taskId}:${overlay.status ?? ""}`)
+      .sort()
+      .join("|");
+    if (taskSignature && taskSignature !== studioToolTaskSignatureRef.current) {
+      studioToolTaskSignatureRef.current = taskSignature;
+      if (studioToolRefreshTimerRef.current !== null) window.clearTimeout(studioToolRefreshTimerRef.current);
+      studioToolRefreshTimerRef.current = window.setTimeout(() => {
+        studioToolRefreshTimerRef.current = null;
+        setStudioSessionTaskRefreshKey((key) => key + 1);
+      }, 500);
+    }
   }, []);
 
   const handleOpenStudioSessionTask = useCallback(() => {
@@ -1243,7 +1263,7 @@ export function AppShell() {
               {studioCwd && <span title={studioCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{studioCwd}</span>}
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={studioSessionTaskRefreshKey} />
+              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={rightPanelOpen && rightPanelMode === "studio" ? studioSessionTaskRefreshKey : 0} />
             </div>
           </>
         ) : (
