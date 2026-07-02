@@ -175,9 +175,10 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 1. 设计页面结构、信息层级和主要用户路径。
 2. 设计关键交互：入口、操作、反馈、确认、撤销、错误恢复。
 3. 覆盖完整状态：默认、空、加载、成功、失败、禁用、权限不足、长内容、窄屏等。
-4. 输出低保真原型，可使用 Markdown、表格、Mermaid、ASCII 或 HTML 草图表达。
+4. 必须输出 HTML 格式原型图；Markdown 只能用于说明，不可替代 HTML 原型。
 5. 标注可复用组件、样式变量、文案建议和与现有体验的一致性要求。
-6. 为实现员提供足够明确的 UI 验收点，为检查员提供 UI 检查清单。
+6. 在交付实现前，将 HTML 原型上报主会话 / 用户审阅并等待确认。
+7. 为实现员提供足够明确的 UI 验收点，为检查员提供 UI 检查清单。
 
 ## 输出格式建议
 
@@ -187,11 +188,16 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 - 用户路径
 - 信息架构
 
-### Prototype
+### HTML Prototype
 
-- 页面布局
-- 区块说明
-- 关键按钮和操作
+- 提供自包含 HTML 原型（推荐使用 fenced \`html\` 代码块，或给出明确的 \`.html\` 文件路径）
+- 覆盖主要页面布局、关键组件、主路径和关键状态
+- Markdown 说明、表格或图示只能作为补充，不能替代 HTML 原型
+
+### Review Request
+
+- 明确请求主会话 / 用户审阅 HTML 原型
+- 获得确认前不得进入实现阶段
 
 ### Interaction States
 
@@ -213,7 +219,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 ## 写入边界
 
-- 可以产出 UI 方案和原型说明。
+- 可以产出 UI 方案和 HTML 原型说明。
 - 不直接实现生产代码，除非用户明确要求你临时兼任。
 - 不修改需求范围、技术方案或质量门禁。
 - 不执行 git commit / push / merge。
@@ -221,6 +227,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 ## 工作原则
 
 - UI 方案必须能被实现员直接执行。
+- HTML 原型是 UI 设计交付门禁，确认前不进入实现。
 - 每个交互都要有状态反馈。
 - 优先贴合项目现有设计，不引入不必要的新视觉体系。
 - 不确定时返回问题给架构师或用户。`,
@@ -368,11 +375,17 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 const DEFAULT_AGENT_BY_FILE = new Map(DEFAULT_YPI_STUDIO_AGENTS.map((agent) => [agent.fileName, agent]));
 const DEFAULT_AGENT_ORDER = new Map(DEFAULT_YPI_STUDIO_AGENTS.map((agent, index) => [agent.fileName, index]));
-const OLD_DEFAULT_AGENT_HASHES = new Map<string, string>([
-  ["architect.md", "197c251f41768e628e4751bb1327b937869c0f64847e46f8bf05945188a293f9"],
-  ["ui-designer.md", "d728c01f248087c6e5196cd0cbef84a2464027cf30e0ff5f69aabed627990a56"],
-  ["implementer.md", "c30369447547a9ef80273a17abab0fd398f287c668e3cdb990729c443338b8b7"],
-  ["checker.md", "cac89b291d61f596c0c4ace30c8bd604915c31d1ef5a47ea223fbfc4a0f3f1e3"],
+const OLD_DEFAULT_AGENT_HASHES = new Map<string, readonly string[]>([
+  ["architect.md", ["197c251f41768e628e4751bb1327b937869c0f64847e46f8bf05945188a293f9"]],
+  [
+    "ui-designer.md",
+    [
+      "d728c01f248087c6e5196cd0cbef84a2464027cf30e0ff5f69aabed627990a56",
+      "e8957ea09b0b276701a70fcd243a759f9d51c8c1957dc00836bbad454637880d",
+    ],
+  ],
+  ["implementer.md", ["c30369447547a9ef80273a17abab0fd398f287c668e3cdb990729c443338b8b7"]],
+  ["checker.md", ["cac89b291d61f596c0c4ace30c8bd604915c31d1ef5a47ea223fbfc4a0f3f1e3"]],
 ]);
 const INTERNAL_REFERENCE_MARKERS = [
   "trel" + "lis",
@@ -553,12 +566,12 @@ function sortAgents(a: YpiStudioAgent, b: YpiStudioAgent): number {
 }
 
 function isOldDefaultAgent(ctx: ReaderContext, fileName: string): boolean {
-  const expectedHash = OLD_DEFAULT_AGENT_HASHES.get(fileName);
-  if (!expectedHash) return false;
+  const expectedHashes = OLD_DEFAULT_AGENT_HASHES.get(fileName);
+  if (!expectedHashes) return false;
   const filePath = path.join(ctx.agentsRoot, fileName);
   try {
     if (!safeStatFile(filePath, ctx.workspaceRoot)) return false;
-    return sha256Text(readFileSync(filePath, "utf8")) === expectedHash;
+    return expectedHashes.includes(sha256Text(readFileSync(filePath, "utf8")));
   } catch {
     return false;
   }
@@ -637,7 +650,7 @@ function writeDefaultAgent(ctx: ReaderContext, agent: DefaultStudioAgent): Agent
   if (existsSync(filePath)) {
     if (!safeStatFile(filePath, ctx.workspaceRoot)) throw new Error(`Existing agent path is not a file: ${pathLabel}`);
     const existingContent = readFileSync(filePath, "utf8");
-    if (OLD_DEFAULT_AGENT_HASHES.get(agent.fileName) === sha256Text(existingContent)) {
+    if (OLD_DEFAULT_AGENT_HASHES.get(agent.fileName)?.includes(sha256Text(existingContent))) {
       writeFileSync(filePath, agent.content, { encoding: "utf8" });
       safeStatFile(filePath, ctx.workspaceRoot);
       return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "updated" } };

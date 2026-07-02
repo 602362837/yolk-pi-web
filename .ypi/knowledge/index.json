@@ -31,6 +31,56 @@
         "prd.md",
         "brief.md"
       ]
+    },
+    {
+      "id": "20260702-175940-规范-ui-设计员默认模板产出-html-原型图",
+      "title": "规范 UI 设计员默认模板产出 HTML 原型图",
+      "taskId": "20260702-175057-规范-ui-设计员默认模板产出-html-原型图",
+      "taskKey": "archived:2026-07:20260702-175057-规范-ui-设计员默认模板产出-html-原型图",
+      "workflowId": "feature-dev",
+      "summary": "规范 YPI Studio UI 设计员默认模板时，应从 `lib/ypi-studio-agents.ts` 的 `DEFAULT_YPI_STUDIO_AGENTS` 更新默认成员内容，并同步仍匹配默认模板的 `.ypi/agents/ui-designer.md`。UI 设计员模板应明确：必须输出 HTML 格式原型图，Markdown/表格/图示只能补充不能替代；交付实现前必须通过 Review Request 上报主会话/用户审阅，获得确认前不得进入实现。默认成员迁移需保持只覆盖精确匹配已知默认 hash 的文件；当默认模板更新时，把上一版默认 hash 加入多 hash 白名单，避免覆盖用户自定义模板且保留旧默认迁移能力。验证重点包括 lint、tsc、旧替代文案搜索、HTML/Review gate 文案搜索和 hash 白名单检查。",
+      "tags": [
+        "ypi-studio",
+        "ui-designer",
+        "template",
+        "html-prototype",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-175057-规范-ui-设计员默认模板产出-html-原型图",
+      "knowledgePath": ".ypi/knowledge/20260702-175940-规范-ui-设计员默认模板产出-html-原型图.md",
+      "createdAt": "2026-07-02T09:59:40.944Z",
+      "archivedAt": "2026-07-02T09:59:40.944Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
+    {
+      "id": "20260702-174625-增强-ypi-studio-任务详情页与-tab-信息展示",
+      "title": "增强 YPI Studio 任务详情页与 Tab 信息展示",
+      "taskId": "20260702-171656-增强-ypi-studio-任务详情页与-tab-信息展示",
+      "taskKey": "archived:2026-07:20260702-171656-增强-ypi-studio-任务详情页与-tab-信息展示",
+      "workflowId": "feature-dev",
+      "summary": "Review and validation summary: - Architect subagent produced design for task detail tabs and field coverage. - Checker subagent reviewed the implementation and identified one blocker: Artifacts tab only used current progress required/optional artifacts, which would hide artifacts on completed/archived states. - Fixed blocker by building the artifact list from the union of required artifacts, optional artifacts, `task.artifacts`, and `task.documents`. - Fixed keyboard event bubbling edge case for task-card action buttons. Commands run: ```bash npm run lint && node_modules/.bin/tsc --noEmit ``` Result: passed. Known follow-up: - Full transcript viewer is intentionally out of scope for this first detail view; current UI displays transcript metadata only.",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-171656-增强-ypi-studio-任务详情页与-tab-信息展示",
+      "knowledgePath": ".ypi/knowledge/20260702-174625-增强-ypi-studio-任务详情页与-tab-信息展示.md",
+      "createdAt": "2026-07-02T09:46:25.277Z",
+      "archivedAt": "2026-07-02T09:46:25.277Z",
+      "sourceArtifacts": [
+        "checks.md",
+        "implement.md"
+      ]
     }
   ]
 }
