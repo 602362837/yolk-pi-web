@@ -1,7 +1,190 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-02T10:48:42.394Z",
+  "updatedAt": "2026-07-02T10:57:00.090Z",
   "entries": [
+    {
+      "id": "20260702-185700-为关联-session-增加-ypi-studio-任务进度悬浮小卡片",
+      "title": "为关联 Session 增加 YPI Studio 任务进度悬浮小卡片",
+      "taskId": "20260702-150431-为关联-session-增加-ypi-studio-任务进度悬浮小卡片",
+      "taskKey": "archived:2026-07:20260702-150431-为关联-session-增加-ypi-studio-任务进度悬浮小卡片",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：为关联 Session 增加 YPI Studio 任务进度悬浮小卡片。归档前关闭了 task.json 中一个遗留的 stale running architect 记录；该任务已完成且设计/实现/检查产物齐全。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-150431-为关联-session-增加-ypi-studio-任务进度悬浮小卡片",
+      "knowledgePath": ".ypi/knowledge/20260702-185700-为关联-session-增加-ypi-studio-任务进度悬浮小卡片.md",
+      "createdAt": "2026-07-02T10:57:00.090Z",
+      "archivedAt": "2026-07-02T10:57:00.090Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "ui.md"
+      ]
+    },
+    {
+      "id": "20260702-185631-修正工作室成员初始化描述中的-trellis-直指问题",
+      "title": "修正工作室成员初始化描述中的 Trellis 直指问题",
+      "taskId": "20260702-124539-修正工作室成员初始化描述中的-trellis-直指问题",
+      "taskKey": "archived:2026-07:20260702-124539-修正工作室成员初始化描述中的-trellis-直指问题",
+      "workflowId": "bugfix",
+      "summary": "已完成并归档：修正工作室成员初始化描述中的 Trellis 直指问题。",
+      "tags": [
+        "studio",
+        "bugfix"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-124539-修正工作室成员初始化描述中的-trellis-直指问题",
+      "knowledgePath": ".ypi/knowledge/20260702-185631-修正工作室成员初始化描述中的-trellis-直指问题.md",
+      "createdAt": "2026-07-02T10:56:31.875Z",
+      "archivedAt": "2026-07-02T10:56:31.875Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
+    {
+      "id": "20260702-185628-让-ypi-subagent-调度展开区显示完整对话信息",
+      "title": "让 YPI subagent 调度展开区显示完整对话信息",
+      "taskId": "20260702-131127-让-ypi-subagent-调度展开区显示完整对话信息",
+      "taskKey": "archived:2026-07:20260702-131127-让-ypi-subagent-调度展开区显示完整对话信息",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：让 YPI subagent 调度展开区显示完整对话信息。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-131127-让-ypi-subagent-调度展开区显示完整对话信息",
+      "knowledgePath": ".ypi/knowledge/20260702-185628-让-ypi-subagent-调度展开区显示完整对话信息.md",
+      "createdAt": "2026-07-02T10:56:28.679Z",
+      "archivedAt": "2026-07-02T10:56:28.679Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
+    {
+      "id": "20260702-185625-ypi-studio-成员模型与思考等级独立配置研究",
+      "title": "YPI Studio 成员模型与思考等级独立配置研究",
+      "taskId": "20260702-140309-ypi-studio-成员模型与思考等级独立配置研究",
+      "taskKey": "archived:2026-07:20260702-140309-ypi-studio-成员模型与思考等级独立配置研究",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：YPI Studio 成员模型与思考等级独立配置研究。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-140309-ypi-studio-成员模型与思考等级独立配置研究",
+      "knowledgePath": ".ypi/knowledge/20260702-185625-ypi-studio-成员模型与思考等级独立配置研究.md",
+      "createdAt": "2026-07-02T10:56:25.487Z",
+      "archivedAt": "2026-07-02T10:56:25.487Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
+    {
+      "id": "20260702-185622-ypi-studio-任务归档与知识沉淀能力",
+      "title": "YPI Studio 任务归档与知识沉淀能力",
+      "taskId": "20260702-143557-ypi-studio-任务归档与知识沉淀能力",
+      "taskKey": "archived:2026-07:20260702-143557-ypi-studio-任务归档与知识沉淀能力",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：YPI Studio 任务归档与知识沉淀能力。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-143557-ypi-studio-任务归档与知识沉淀能力",
+      "knowledgePath": ".ypi/knowledge/20260702-185622-ypi-studio-任务归档与知识沉淀能力.md",
+      "createdAt": "2026-07-02T10:56:22.355Z",
+      "archivedAt": "2026-07-02T10:56:22.355Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
+    {
+      "id": "20260702-185617-处理-subagent-等待用户回答导致主-session-卡死的问题",
+      "title": "处理 subagent 等待用户回答导致主 session 卡死的问题",
+      "taskId": "20260702-153000-处理-subagent-等待用户回答导致主-session-卡死的问题",
+      "taskKey": "archived:2026-07:20260702-153000-处理-subagent-等待用户回答导致主-session-卡死的问题",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：处理 subagent 等待用户回答导致主 session 卡死的问题。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-153000-处理-subagent-等待用户回答导致主-session-卡死的问题",
+      "knowledgePath": ".ypi/knowledge/20260702-185617-处理-subagent-等待用户回答导致主-session-卡死的问题.md",
+      "createdAt": "2026-07-02T10:56:17.901Z",
+      "archivedAt": "2026-07-02T10:56:17.901Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "brief.md"
+      ]
+    },
+    {
+      "id": "20260702-185609-为-ypi-studio-工作室流程增加流程详情展示",
+      "title": "为 YPI Studio 工作室流程增加流程详情展示",
+      "taskId": "20260702-180251-为-ypi-studio-工作室流程增加流程详情展示",
+      "taskKey": "archived:2026-07:20260702-180251-为-ypi-studio-工作室流程增加流程详情展示",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：为 YPI Studio 工作室流程增加流程详情展示。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-180251-为-ypi-studio-工作室流程增加流程详情展示",
+      "knowledgePath": ".ypi/knowledge/20260702-185609-为-ypi-studio-工作室流程增加流程详情展示.md",
+      "createdAt": "2026-07-02T10:56:09.183Z",
+      "archivedAt": "2026-07-02T10:56:09.183Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260702-184842-修复-ypi-studio-设计确认-面板刷新与任务浮窗同步问题",
       "title": "修复 YPI Studio 设计确认、面板刷新与任务浮窗同步问题",

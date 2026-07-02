@@ -17,3 +17,4 @@
 {"type":"transition","at":"2026-07-02T10:16:32.702Z","taskId":"20260702-180251-为-ypi-studio-工作室流程增加流程详情展示","from":"checking","to":"ready","message":"检查员 review 完成，lint 与 tsc 均通过。","data":{"override":false}}
 {"type":"artifact","at":"2026-07-02T10:16:39.149Z","taskId":"20260702-180251-为-ypi-studio-工作室流程增加流程详情展示","artifact":"summary","message":"Updated summary"}
 {"type":"transition","at":"2026-07-02T10:16:41.837Z","taskId":"20260702-180251-为-ypi-studio-工作室流程增加流程详情展示","from":"ready","to":"completed","message":"实现与检查完成，summary 已沉淀。","data":{"override":false}}
+{"type":"archive","at":"2026-07-02T10:56:09.183Z","taskId":"20260702-180251-为-ypi-studio-工作室流程增加流程详情展示","data":{"archiveMonth":"2026-07","sourceTaskPath":".ypi/tasks/archive/2026-07/20260702-180251-为-ypi-studio-工作室流程增加流程详情展示","knowledgeEntryId":"20260702-185609-为-ypi-studio-工作室流程增加流程详情展示","knowledgePath":".ypi/knowledge/20260702-185609-为-ypi-studio-工作室流程增加流程详情展示.md","runtimePointersRemoved":0,"warnings":[]}}

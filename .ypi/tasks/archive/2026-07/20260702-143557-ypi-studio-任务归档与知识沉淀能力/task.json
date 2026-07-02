@@ -3,10 +3,10 @@
   "id": "20260702-143557-ypi-studio-任务归档与知识沉淀能力",
   "title": "YPI Studio 任务归档与知识沉淀能力",
   "workflowId": "feature-dev",
-  "status": "completed",
+  "status": "archived",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
   "createdAt": "2026-07-02T06:35:57.431Z",
-  "updatedAt": "2026-07-02T07:00:25.199Z",
+  "updatedAt": "2026-07-02T10:56:22.355Z",
   "completedAt": "2026-07-02T07:00:25.199Z",
   "contextIds": [
     "pi_process_92c93ca766cf9090ee01a99e"
@@ -118,5 +118,9 @@
       }
     }
   ],
-  "meta": {}
+  "meta": {
+    "archivedAt": "2026-07-02T10:56:22.355Z",
+    "knowledgeEntryId": "20260702-185622-ypi-studio-任务归档与知识沉淀能力",
+    "knowledgePath": ".ypi/knowledge/20260702-185622-ypi-studio-任务归档与知识沉淀能力.md"
+  }
 }

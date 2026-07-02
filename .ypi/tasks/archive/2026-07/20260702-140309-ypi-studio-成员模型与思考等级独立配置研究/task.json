@@ -3,10 +3,10 @@
   "id": "20260702-140309-ypi-studio-成员模型与思考等级独立配置研究",
   "title": "YPI Studio 成员模型与思考等级独立配置研究",
   "workflowId": "feature-dev",
-  "status": "completed",
+  "status": "archived",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
   "createdAt": "2026-07-02T06:03:09.299Z",
-  "updatedAt": "2026-07-02T06:27:28.447Z",
+  "updatedAt": "2026-07-02T10:56:25.487Z",
   "completedAt": "2026-07-02T06:27:28.447Z",
   "contextIds": [
     "pi_process_dca4f4d6ebeb07889cc60997"
@@ -106,5 +106,9 @@
       }
     }
   ],
-  "meta": {}
+  "meta": {
+    "archivedAt": "2026-07-02T10:56:25.487Z",
+    "knowledgeEntryId": "20260702-185625-ypi-studio-成员模型与思考等级独立配置研究",
+    "knowledgePath": ".ypi/knowledge/20260702-185625-ypi-studio-成员模型与思考等级独立配置研究.md"
+  }
 }

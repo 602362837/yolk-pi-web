@@ -3,10 +3,10 @@
   "id": "20260702-180251-为-ypi-studio-工作室流程增加流程详情展示",
   "title": "为 YPI Studio 工作室流程增加流程详情展示",
   "workflowId": "feature-dev",
-  "status": "completed",
+  "status": "archived",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260702-180116",
   "createdAt": "2026-07-02T10:02:51.821Z",
-  "updatedAt": "2026-07-02T10:16:41.837Z",
+  "updatedAt": "2026-07-02T10:56:09.183Z",
   "completedAt": "2026-07-02T10:16:41.837Z",
   "contextIds": [
     "pi_process_8d26326e3dd4a8eeba89c821"
@@ -118,5 +118,9 @@
       }
     }
   ],
-  "meta": {}
+  "meta": {
+    "archivedAt": "2026-07-02T10:56:09.183Z",
+    "knowledgeEntryId": "20260702-185609-为-ypi-studio-工作室流程增加流程详情展示",
+    "knowledgePath": ".ypi/knowledge/20260702-185609-为-ypi-studio-工作室流程增加流程详情展示.md"
+  }
 }

@@ -3,10 +3,10 @@
   "id": "20260702-153000-处理-subagent-等待用户回答导致主-session-卡死的问题",
   "title": "处理 subagent 等待用户回答导致主 session 卡死的问题",
   "workflowId": "feature-dev",
-  "status": "completed",
+  "status": "archived",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
   "createdAt": "2026-07-02T07:30:00.461Z",
-  "updatedAt": "2026-07-02T07:45:23.464Z",
+  "updatedAt": "2026-07-02T10:56:17.901Z",
   "completedAt": "2026-07-02T07:45:23.464Z",
   "contextIds": [
     "pi_process_4ebbbefb8deb1f46f866e681"
@@ -118,5 +118,9 @@
       }
     }
   ],
-  "meta": {}
+  "meta": {
+    "archivedAt": "2026-07-02T10:56:17.901Z",
+    "knowledgeEntryId": "20260702-185617-处理-subagent-等待用户回答导致主-session-卡死的问题",
+    "knowledgePath": ".ypi/knowledge/20260702-185617-处理-subagent-等待用户回答导致主-session-卡死的问题.md"
+  }
 }
