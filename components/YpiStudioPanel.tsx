@@ -15,6 +15,7 @@ import type {
   YpiStudioWorkflowsResponse,
 } from "@/lib/ypi-studio-types";
 import { MarkdownBody } from "./MarkdownBody";
+import { TaskWorkflowFlowSection, WorkflowDetailPanel } from "./YpiStudioWorkflowDetail";
 
 interface Props {
   cwd: string | null;
@@ -26,6 +27,7 @@ interface Props {
 }
 
 type LoadState = "idle" | "loading" | "ready" | "error";
+type LoadOptions = { background?: boolean };
 type StudioTab = "members" | "workflows" | "tasks";
 type TaskDetailTab = "overview" | "artifacts" | "subagents" | "events" | "metadata";
 
@@ -96,14 +98,20 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
   const [data, setData] = useState<YpiStudioAgentsResponse | null>(null);
   const [workflowsData, setWorkflowsData] = useState<YpiStudioWorkflowsResponse | null>(null);
   const [tasksData, setTasksData] = useState<YpiStudioTasksResponse | null>(null);
+  const tasksDataRef = useRef<YpiStudioTasksResponse | null>(null);
+  const [tasksRefreshing, setTasksRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [initBusy, setInitBusy] = useState(false);
   const [taskScope, setTaskScope] = useState<YpiStudioTaskScope>(initialScope ?? "active");
   const [initMessage, setInitMessage] = useState<string | null>(null);
   const [initWarning, setInitWarning] = useState<string | null>(null);
+  const initialLoadCwdRef = useRef<string | null>(null);
+  const taskScopeLoadRef = useRef<{ cwd: string; scope: YpiStudioTaskScope } | null>(null);
 
-  const loadAgents = useCallback(async (signal?: AbortSignal) => {
+  useEffect(() => { tasksDataRef.current = tasksData; }, [tasksData]);
+
+  const loadAgents = useCallback(async (signal?: AbortSignal, options: LoadOptions = {}) => {
     if (!cwd) {
       setData(null);
       setSelectedKey(null);
@@ -113,7 +121,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
       return;
     }
 
-    setLoadState("loading");
+    if (!options.background) setLoadState("loading");
     setError(null);
     try {
       const res = await fetch(`/api/studio/agents?cwd=${encodeURIComponent(cwd)}`, { signal });
@@ -132,14 +140,14 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     }
   }, [cwd]);
 
-  const loadWorkflows = useCallback(async (signal?: AbortSignal) => {
+  const loadWorkflows = useCallback(async (signal?: AbortSignal, options: LoadOptions = {}) => {
     if (!cwd) {
       setWorkflowsData(null);
       setWorkflowLoadState("idle");
       return;
     }
 
-    setWorkflowLoadState("loading");
+    if (!options.background) setWorkflowLoadState("loading");
     try {
       const res = await fetch(`/api/studio/workflows?cwd=${encodeURIComponent(cwd)}`, { signal });
       const body = await res.json() as YpiStudioWorkflowsResponse & { error?: string };
@@ -153,14 +161,17 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     }
   }, [cwd]);
 
-  const loadTasks = useCallback(async (signal?: AbortSignal) => {
+  const loadTasks = useCallback(async (signal?: AbortSignal, options: LoadOptions = {}) => {
     if (!cwd) {
       setTasksData(null);
       setTaskLoadState("idle");
+      setTasksRefreshing(false);
       return;
     }
 
-    setTaskLoadState("loading");
+    const canRefreshInBackground = options.background && !!tasksDataRef.current;
+    if (canRefreshInBackground) setTasksRefreshing(true);
+    else setTaskLoadState("loading");
     try {
       const res = await fetch(`/api/studio/tasks?cwd=${encodeURIComponent(cwd)}&scope=${taskScope}`, { signal });
       const body = await res.json() as YpiStudioTasksResponse & { error?: string };
@@ -170,15 +181,27 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return;
       setError(err instanceof Error ? err.message : String(err));
-      setTaskLoadState("error");
+      if (!canRefreshInBackground) setTaskLoadState("error");
+    } finally {
+      if (canRefreshInBackground) setTasksRefreshing(false);
     }
   }, [cwd, taskScope]);
 
-  const reloadAll = useCallback((signal?: AbortSignal) => {
-    void loadAgents(signal);
-    void loadWorkflows(signal);
-    void loadTasks(signal);
-  }, [loadAgents, loadTasks, loadWorkflows]);
+  const loadInitialData = useCallback((signal?: AbortSignal) => {
+    if (activeTab === "tasks") {
+      void loadTasks(signal);
+      void loadAgents(signal, { background: true });
+      void loadWorkflows(signal, { background: true });
+    } else if (activeTab === "workflows") {
+      void loadWorkflows(signal);
+      void loadAgents(signal, { background: true });
+      void loadTasks(signal, { background: true });
+    } else {
+      void loadAgents(signal);
+      void loadWorkflows(signal, { background: true });
+      void loadTasks(signal, { background: true });
+    }
+  }, [activeTab, loadAgents, loadTasks, loadWorkflows]);
 
   const handleArchiveTask = useCallback(async (task: YpiStudioTaskSummary) => {
     if (!cwd || task.archived || task.status !== "completed") return;
@@ -201,10 +224,25 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
   }, [cwd, loadTasks]);
 
   useEffect(() => {
+    if (!cwd) {
+      initialLoadCwdRef.current = null;
+      return;
+    }
+    if (initialLoadCwdRef.current === cwd) return;
+    initialLoadCwdRef.current = cwd;
+    taskScopeLoadRef.current = { cwd, scope: taskScope };
     const controller = new AbortController();
-    reloadAll(controller.signal);
+    loadInitialData(controller.signal);
     return () => controller.abort();
-  }, [reloadAll]);
+  }, [cwd, loadInitialData, taskScope]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (activeTab === "members" && loadState === "idle") void loadAgents(controller.signal);
+    if (activeTab === "workflows" && workflowLoadState === "idle") void loadWorkflows(controller.signal);
+    if (activeTab === "tasks" && taskLoadState === "idle") void loadTasks(controller.signal);
+    return () => controller.abort();
+  }, [activeTab, loadAgents, loadState, loadTasks, taskLoadState, loadWorkflows, workflowLoadState]);
 
   useEffect(() => {
     if (!focusedTaskKey) return;
@@ -213,8 +251,17 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
   }, [focusedTaskKey]);
 
   useEffect(() => {
+    if (!cwd || initialLoadCwdRef.current !== cwd) return;
+    if (taskScopeLoadRef.current?.cwd === cwd && taskScopeLoadRef.current.scope === taskScope) return;
+    taskScopeLoadRef.current = { cwd, scope: taskScope };
+    const controller = new AbortController();
+    void loadTasks(controller.signal);
+    return () => controller.abort();
+  }, [cwd, loadTasks, taskScope]);
+
+  useEffect(() => {
     if (refreshKey === 0) return;
-    void loadTasks();
+    void loadTasks(undefined, { background: true });
   }, [loadTasks, refreshKey]);
 
   const selectedAgent = useMemo(() => {
@@ -321,7 +368,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
       ) : activeTab === "workflows" ? (
         <WorkflowsTab cwd={cwd} loadState={workflowLoadState} data={workflowsData} onOpenFile={onOpenFile} />
       ) : (
-        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} />
+        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} refreshing={tasksRefreshing} data={tasksData} workflowsData={workflowsData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} />
       )}
     </div>
   );
@@ -360,24 +407,34 @@ function MembersTab({ loadState, data, selectedAgent, selectedKey, setSelectedKe
 }
 
 function WorkflowsTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadState: LoadState; data: YpiStudioWorkflowsResponse | null; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  const [detailWorkflowKey, setDetailWorkflowKey] = useState<string | null>(null);
+  const detailWorkflow = detailWorkflowKey ? data?.workflows.find((workflow) => workflow.key === detailWorkflowKey || workflow.id === detailWorkflowKey) ?? null : null;
+
+  useEffect(() => {
+    setDetailWorkflowKey((current) => current && data?.workflows.some((workflow) => workflow.key === current || workflow.id === current) ? current : null);
+  }, [data?.workflows]);
+
   if (loadState === "loading") return <PanelEmpty title="正在读取工作室流程" description="检查当前项目的 .ypi/workflows/ 目录。" />;
   if (loadState === "error" && !data) return <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
   if (!data?.exists) return <PanelEmpty title="尚未初始化流程" description="点击“初始化工作室”会创建默认工作流 JSON：功能开发、Bug 修复、UI 改动、只检查。" />;
   if (data.workflows.length === 0) return <PanelEmpty title="没有流程文件" description=".ypi/workflows/ 已存在，但没有可读取的 JSON 流程文件。" />;
+  if (detailWorkflow) return <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12 }}><WorkflowDetailPanel cwd={cwd} workflow={detailWorkflow} onBack={() => setDetailWorkflowKey(null)} onOpenFile={onOpenFile} /></div>;
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-      {data.workflows.map((workflow) => <WorkflowCard key={workflow.key} cwd={cwd} workflow={workflow} onOpenFile={onOpenFile} />)}
+      {data.workflows.map((workflow) => <WorkflowCard key={workflow.key} cwd={cwd} workflow={workflow} onSelect={() => setDetailWorkflowKey(workflow.key)} onOpenFile={onOpenFile} />)}
     </div>
   );
 }
 
-function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchiveTask, focusedTaskKey }: {
+function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflowsData, onOpenFile, onArchiveTask, focusedTaskKey }: {
   cwd: string;
   scope: YpiStudioTaskScope;
   setScope: (scope: YpiStudioTaskScope) => void;
   loadState: LoadState;
+  refreshing: boolean;
   data: YpiStudioTasksResponse | null;
+  workflowsData: YpiStudioWorkflowsResponse | null;
   onOpenFile?: (filePath: string, fileName: string) => void;
   onArchiveTask: (task: YpiStudioTaskSummary) => void;
   focusedTaskKey?: string | null;
@@ -442,7 +499,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
   );
 
   let content: ReactNode;
-  if (loadState === "loading") content = <PanelEmpty title="正在读取工作室任务" description="检查当前项目的 .ypi/tasks/ 目录。" />;
+  if (loadState === "loading" && !data) content = <PanelEmpty title="正在读取工作室任务" description="检查当前项目的 .ypi/tasks/ 目录。" />;
   else if (loadState === "error" && !data) content = <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
   else if (!data?.exists) content = <PanelEmpty title="还没有工作室任务" description="通过 /studio-start，或直接说“用工作室做这个功能”，会创建结构化任务并在这里显示进度。" />;
   else if (data.tasks.length === 0) content = <PanelEmpty title="任务列表为空" description={scope === "archived" ? "当前没有已归档任务。" : "当前筛选范围没有任务目录。"} />;
@@ -456,6 +513,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
       setActiveTab={setDetailTab}
       onBack={() => setDetailTaskKey(null)}
       onOpenFile={onOpenFile}
+      workflow={taskDetail ? workflowsData?.workflows.find((workflow) => workflow.id === taskDetail.workflowId || workflow.key === taskDetail.workflowId) ?? null : null}
     />
   );
   else content = (
@@ -479,6 +537,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       {!detailTaskKey && scopeControls}
+      {(refreshing || (loadState === "loading" && data)) && <Notice tone="info" text="后台刷新任务中，当前内容会保留。" />}
       {content}
     </div>
   );
@@ -537,10 +596,10 @@ function AgentCard({ agent, active, onClick }: { agent: YpiStudioAgent; active: 
   );
 }
 
-function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: YpiStudioWorkflowFile; onOpenFile?: (filePath: string, fileName: string) => void }) {
+function WorkflowCard({ cwd, workflow, onSelect, onOpenFile }: { cwd: string; workflow: YpiStudioWorkflowFile; onSelect: () => void; onOpenFile?: (filePath: string, fileName: string) => void }) {
   const states = Object.values(workflow.states).sort((a, b) => a.progress - b.progress);
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div onClick={onSelect} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(); }} style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10, cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 800 }}>{workflow.name}</div>
@@ -548,7 +607,8 @@ function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: Yp
           <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 5 }}>{workflow.pathLabel}</div>
         </div>
         <button
-          onClick={() => onOpenFile?.(workflowFilePath(cwd, workflow), workflow.fileName)}
+          onClick={(event) => { event.stopPropagation(); onOpenFile?.(workflowFilePath(cwd, workflow), workflow.fileName); }}
+          onKeyDown={(event) => event.stopPropagation()}
           disabled={!onOpenFile}
           style={smallButtonStyle(Boolean(onOpenFile))}
         >
@@ -627,9 +687,10 @@ function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOp
   );
 }
 
-function TaskDetailPanel({ cwd, task, loadState, error, activeTab, setActiveTab, onBack, onOpenFile }: {
+function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, setActiveTab, onBack, onOpenFile }: {
   cwd: string;
   task: YpiStudioTaskDetail | null;
+  workflow: YpiStudioWorkflowFile | null;
   loadState: LoadState;
   error: string | null;
   activeTab: TaskDetailTab;
@@ -660,7 +721,7 @@ function TaskDetailPanel({ cwd, task, loadState, error, activeTab, setActiveTab,
         <TabButton active={activeTab === "events"} label={`事件 ${task.events.length}`} onClick={() => setActiveTab("events")} />
         <TabButton active={activeTab === "metadata"} label="元数据" onClick={() => setActiveTab("metadata")} />
       </div>
-      {activeTab === "overview" ? <TaskOverviewTab task={task} />
+      {activeTab === "overview" ? <TaskOverviewTab task={task} workflow={workflow} />
         : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
         : activeTab === "subagents" ? <TaskSubagentsTab task={task} />
         : activeTab === "events" ? <TaskEventsTab task={task} />
@@ -680,7 +741,7 @@ function TaskDetailShell({ onBack, children }: { onBack: () => void; children: R
   );
 }
 
-function TaskOverviewTab({ task }: { task: YpiStudioTaskDetail }) {
+function TaskOverviewTab({ task, workflow }: { task: YpiStudioTaskDetail; workflow: YpiStudioWorkflowFile | null }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ height: 8, borderRadius: 999, background: "var(--border)", overflow: "hidden" }}><div style={{ width: `${Math.max(0, Math.min(100, task.progress.percent))}%`, height: "100%", background: "var(--accent)" }} /></div>
@@ -692,6 +753,7 @@ function TaskOverviewTab({ task }: { task: YpiStudioTaskDetail }) {
         <DetailRow label="更新" value={formatDateTime(task.updatedAt)} />
         <DetailRow label="完成" value={task.completedAt ? formatDateTime(task.completedAt) : "—"} />
       </div>
+      <TaskWorkflowFlowSection task={task} workflow={workflow} />
       <SectionCard title="路径与上下文">
         <DetailRow label="目录" value={task.pathLabel} mono />
         <DetailRow label="CWD" value={task.cwd} mono />

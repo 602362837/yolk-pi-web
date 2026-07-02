@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import {
   appendFileSync,
   closeSync,
@@ -27,6 +28,8 @@ import type {
   YpiStudioTaskArchiveBody,
   YpiStudioTaskArchiveResult,
   YpiStudioTaskArtifactUpdateBody,
+  YpiStudioApprovalGate,
+  YpiStudioApprovalGrant,
   YpiStudioTaskCreateBody,
   YpiStudioTaskDetail,
   YpiStudioTaskDocument,
@@ -235,6 +238,71 @@ function ensureTaskRoots(ctx: TaskContext): void {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function hashText(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 24);
+}
+
+function isApprovalGate(value: unknown): value is YpiStudioApprovalGate {
+  return isRecord(value)
+    && optionalString(value.enteredAt) !== undefined
+    && optionalString(value.from) !== undefined
+    && value.to === "awaiting_approval"
+    && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
+function isApprovalGrant(value: unknown): value is YpiStudioApprovalGrant {
+  return isRecord(value)
+    && optionalString(value.approvedAt) !== undefined
+    && optionalString(value.contextId) !== undefined
+    && optionalString(value.inputHash) !== undefined
+    && value.source === "user-input";
+}
+
+function isAfterIso(candidate: string, baseline: string): boolean {
+  const candidateMs = Date.parse(candidate);
+  const baselineMs = Date.parse(baseline);
+  return Number.isFinite(candidateMs) && Number.isFinite(baselineMs) && candidateMs > baselineMs;
+}
+
+const APPROVAL_TEXT_RE = /确认|批准|同意|可以实现|开始实现|按方案做|继续制作|approve|approved|go ahead|start implementation|proceed/i;
+const APPROVAL_REJECTION_RE = /不批准|不同意|先别|不要|不能|暂缓|修改|改一下|调整|change|changes|revise|revision|not approve|not approved|don't approve|do not approve|don't go ahead|do not go ahead|don't proceed|do not proceed|don't start implementation|do not start implementation|hold on|wait|not yet|not now/i;
+
+export function isExplicitYpiStudioApprovalText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  if (APPROVAL_REJECTION_RE.test(normalized)) return false;
+  return APPROVAL_TEXT_RE.test(normalized);
+}
+
+function isApprovalImplementationEdge(from: string, to: string): boolean {
+  return from === "awaiting_approval" && to === "implementing";
+}
+
+export function assertYpiStudioImplementationApproved(task: YpiStudioTaskRecord, contextId: string | undefined): void {
+  const grant = isApprovalGrant(task.meta.approvalGrant) ? task.meta.approvalGrant : null;
+  const gate = isApprovalGate(task.meta.approvalGate) ? task.meta.approvalGate : null;
+  if (!contextId) {
+    throw new Error("Transition awaiting_approval -> implementing requires explicit user approval in this chat session. Please ask the user to reply 确认/批准 before implementing.");
+  }
+  if (!grant) {
+    throw new Error("Transition awaiting_approval -> implementing is blocked until a later user message explicitly approves the plan (for example: 确认，开始实现). override cannot bypass this approval gate.");
+  }
+  if (grant.contextId !== contextId) {
+    throw new Error("Transition awaiting_approval -> implementing approval belongs to a different Studio session context. Ask the user to approve in this chat session.");
+  }
+  if (gate && !isAfterIso(grant.approvedAt, gate.enteredAt)) {
+    throw new Error("Transition awaiting_approval -> implementing requires approval after the task entered awaiting_approval.");
+  }
+}
+
+function approvalGate(enteredAt: string, from: string, contextId?: string): YpiStudioApprovalGate {
+  return { enteredAt, contextId, from, to: "awaiting_approval" };
+}
+
+function approvalGrant(approvedAt: string, contextId: string, inputText: string): YpiStudioApprovalGrant {
+  return { approvedAt, contextId, inputHash: hashText(inputText), source: "user-input" };
 }
 
 function slugify(value: string): string {
@@ -968,6 +1036,28 @@ export function bindYpiStudioTaskToContext(cwd: string, taskIdOrKey: string, con
   return detail;
 }
 
+export function recordYpiStudioUserApproval(cwd: string, contextId: string, inputText: string): YpiStudioTaskDetail | null {
+  if (!contextId || !isExplicitYpiStudioApprovalText(inputText)) return null;
+  const ctx = createContext(cwd);
+  const taskId = getYpiStudioTaskIdForContext(ctx.cwd, contextId);
+  if (!taskId) return null;
+  const record = loadTaskRecord(ctx, taskId);
+  if (!record?.raw || record.archived || record.raw.status !== "awaiting_approval") return null;
+  const approvedAt = nowIso();
+  const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, "unknown", contextId);
+  record.raw.meta = {
+    ...record.raw.meta,
+    approvalGate: existingGate,
+    approvalGrant: approvalGrant(approvedAt, contextId, inputText),
+  };
+  if (!record.raw.contextIds.includes(contextId)) record.raw.contextIds.push(contextId);
+  record.raw.updatedAt = approvedAt;
+  writeTaskJson(record.dirPath, record.raw);
+  appendTaskEvent(record.dirPath, { type: "note", at: approvedAt, taskId: record.raw.id, message: "User approved Studio plan", data: { contextId, approvalGate: existingGate } });
+  writeRuntimePointer(ctx, contextId, record.raw.id);
+  return getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+}
+
 export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTaskTransitionBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
   const record = loadTaskRecord(ctx, taskIdOrKey);
@@ -977,7 +1067,9 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   const from = record.raw.status;
   const transition = findYpiStudioTransition(workflow, from, body.to);
   if (!transition && !body.override) throw new Error(`Invalid Studio transition: ${from} -> ${body.to}`);
-  if (transition?.requiresUserApproval && !body.reason && !body.override) {
+  if (isApprovalImplementationEdge(from, body.to)) {
+    assertYpiStudioImplementationApproved(record.raw, body.contextId);
+  } else if (transition?.requiresUserApproval && !body.reason && !body.override) {
     throw new Error(`Transition ${from} -> ${body.to} requires user approval reason`);
   }
   if (!workflow.states[body.to]) throw new Error(`Unknown workflow state: ${body.to}`);
@@ -987,8 +1079,15 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   record.raw.currentMember = workflow.states[body.to]?.owner;
   if (workflow.terminalStatuses.includes(body.to)) record.raw.completedAt = updatedAt;
   if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+  if (body.to === "awaiting_approval") {
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGate: approvalGate(updatedAt, from, body.contextId),
+      approvalGrant: undefined,
+    };
+  }
   writeTaskJson(record.dirPath, record.raw);
-  appendTaskEvent(record.dirPath, { type: "transition", at: updatedAt, taskId: record.raw.id, from, to: body.to, message: body.reason, data: { override: body.override === true } });
+  appendTaskEvent(record.dirPath, { type: "transition", at: updatedAt, taskId: record.raw.id, from, to: body.to, message: body.reason, data: { override: body.override === true, approvalGate: body.to === "awaiting_approval" } });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after transition");

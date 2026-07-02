@@ -14,6 +14,7 @@ import {
   getYpiStudioTaskDetail,
   listYpiStudioTasks,
   recordYpiStudioSubagentRun,
+  recordYpiStudioUserApproval,
   transitionYpiStudioTask,
   updateYpiStudioTaskArtifact,
 } from "./ypi-studio-tasks";
@@ -167,13 +168,19 @@ function lookupStr(data: unknown, keys: string[]): string | null {
   return null;
 }
 
+function sanitizeContextId(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180) || hash(value);
+}
+
 function contextKey(input?: unknown, ctx?: PiExtensionContext): string | null {
-  const envKey = str(process.env.YPI_STUDIO_CONTEXT_ID);
-  if (envKey) return envKey.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180) || hash(envKey);
-  const sessionId = callStr(ctx?.sessionManager?.getSessionId) ?? str(process.env.PI_SESSION_ID) ?? lookupStr(input, ["session_id", "sessionId", "sessionID"]);
-  if (sessionId) return `pi_${sessionId.replace(/[^A-Za-z0-9._-]+/g, "_") || hash(sessionId)}`;
+  const sessionId = callStr(ctx?.sessionManager?.getSessionId) ?? lookupStr(input, ["session_id", "sessionId", "sessionID"]);
+  if (sessionId) return `pi_${sanitizeContextId(sessionId)}`;
   const transcriptPath = callStr(ctx?.sessionManager?.getSessionFile) ?? lookupStr(input, ["transcript_path", "transcriptPath", "transcript"]);
   if (transcriptPath) return `pi_transcript_${hash(transcriptPath)}`;
+  const envKey = str(process.env.YPI_STUDIO_CONTEXT_ID);
+  if (envKey) return sanitizeContextId(envKey);
+  const envSessionId = str(process.env.PI_SESSION_ID);
+  if (envSessionId) return `pi_${sanitizeContextId(envSessionId)}`;
   return null;
 }
 
@@ -196,6 +203,22 @@ function summarizeWorkflowTriggers(root: string): string {
   return "No active Studio task is bound to this chat session.";
 }
 
+function hasRecordedApprovalGrant(task: { meta?: unknown }, key: string | null): boolean {
+  if (!key || !isObj(task.meta)) return false;
+  const grant = isObj(task.meta.approvalGrant) ? task.meta.approvalGrant : null;
+  if (!grant) return false;
+  const contextId = str(grant.contextId);
+  const source = str(grant.source);
+  const approvedAt = str(grant.approvedAt);
+  if (contextId !== key || source !== "user-input" || !approvedAt) return false;
+  const gate = isObj(task.meta.approvalGate) ? task.meta.approvalGate : null;
+  const enteredAt = str(gate?.enteredAt);
+  if (!enteredAt) return true;
+  const approvedMs = Date.parse(approvedAt);
+  const enteredMs = Date.parse(enteredAt);
+  return Number.isFinite(approvedMs) && Number.isFinite(enteredMs) ? approvedMs > enteredMs : true;
+}
+
 function buildStudioState(root: string, key: string | null, query = ""): string {
   const current = key ? getCurrentYpiStudioTaskDetail(root, key) : null;
   if (!current) {
@@ -216,6 +239,7 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
 
   const workflow = readYpiStudioWorkflow(root, current.workflowId);
   const state = workflow?.states[current.status];
+  const approvalGranted = current.status === "awaiting_approval" && hasRecordedApprovalGrant(current, key);
   const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [current.title, current.workflowId, current.status, query].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
   return [
     "<ypi-studio-state>",
@@ -229,8 +253,11 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     `Missing artifacts: ${current.progress.missingArtifacts.join(", ") || "none"}`,
     state?.instruction ? `State instruction: ${state.instruction}` : "",
     state?.requiresSubagent ? "The next owner must be dispatched through ypi_studio_subagent." : "The main session may handle orchestration for this state.",
-    state?.requiresUserApproval ? "This state requires explicit user approval before moving forward." : "",
-    "Never enter implementing from awaiting_approval unless the user has approved the plan.",
+    current.status === "planning" ? "When planning/design artifacts are complete, transition only to awaiting_approval and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
+    current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
+    current.status === "awaiting_approval" && !approvalGranted ? "Current task is awaiting approval: summarize the plan/artifacts and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
+    state?.requiresUserApproval && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
+    "Never enter implementing from awaiting_approval unless a server-recorded user approval grant exists.",
     "</ypi-studio-state>",
     knowledge,
   ].filter(Boolean).join("\n");
@@ -242,6 +269,7 @@ function startupContext(root: string): string {
     "<ypi-studio-context>",
     "YPI Studio workflow context is available. Studio tasks are structured under .ypi/tasks and workflows under .ypi/workflows.",
     "The main session is the orchestrator. Use ypi_studio_task for task lifecycle and ypi_studio_subagent for role delegation.",
+    "Design/planning must stop at awaiting_approval for user confirmation; implementation may start only after a later explicit user approval.",
     "</ypi-studio-context>",
     knowledge,
     FIRST_REPLY_NOTICE,
@@ -732,8 +760,8 @@ function sendStudioStartPrompt(
     workflowLine,
     "2. 接单和设计阶段使用 ypi_studio_subagent(member=architect) 指派架构师。",
     "3. 涉及界面时使用 ypi_studio_subagent(member=ui-designer)。",
-    "4. 方案稳定后切到 awaiting_approval，并等待我确认后才进入 implementing。",
-    "5. 实现和检查分别通过 ypi_studio_subagent(member=implementer) 与 ypi_studio_subagent(member=checker) 指派。",
+    "4. 方案稳定后只切到 awaiting_approval；本轮必须停止，向我展示 PRD/Design/Implement/Checks 摘要并请求确认或修改意见。",
+    "5. 未收到后续用户明确确认前，不得进入 implementing，不得调用 implementer；确认后实现和检查分别通过 ypi_studio_subagent(member=implementer) 与 ypi_studio_subagent(member=checker) 指派。"
   ].join("\n"));
 }
 
@@ -854,7 +882,8 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     promptSnippet: "Use ypi_studio_task to initialize workflows, create/bind/read Studio tasks, transition states, and update artifacts.",
     promptGuidelines: [
       "Use ypi_studio_task before doing non-trivial YPI Studio work; do not invent task state outside .ypi/tasks/task.json.",
-      "Do not transition from awaiting_approval to implementing unless the user approved the plan.",
+      "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
+      "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
     ],
     parameters: {
       type: "object",
@@ -1054,6 +1083,11 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     const key = getKey(event, ctx);
     const ev = event as { text?: string };
     if (typeof ev.text !== "string" || !ev.text.trim()) return { action: "continue" };
+    try {
+      recordYpiStudioUserApproval(root, key, ev.text);
+    } catch {
+      // Approval recording is best-effort; the injected state still tells the model to wait.
+    }
     const injection = buildStudioState(root, key, ev.text);
     return { action: "transform", text: [ev.text, injection].join("\n\n") };
   });

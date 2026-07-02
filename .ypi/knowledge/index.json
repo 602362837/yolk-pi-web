@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-02T10:48:42.394Z",
+  "entries": [
+    {
+      "id": "20260702-184842-修复-ypi-studio-设计确认-面板刷新与任务浮窗同步问题",
+      "title": "修复 YPI Studio 设计确认、面板刷新与任务浮窗同步问题",
+      "taskId": "20260702-182153-修复-ypi-studio-设计确认-面板刷新与任务浮窗同步问题",
+      "taskKey": "archived:2026-07:20260702-182153-修复-ypi-studio-设计确认-面板刷新与任务浮窗同步问题",
+      "workflowId": "feature-dev",
+      "summary": "本次修复确立了 YPI Studio 设计确认的硬门禁：任务进入 awaiting_approval 时写入 approvalGate 并清除旧 grant；只有后续同一稳定 session context 中用户明确批准（如“确认/批准/开始实现/approve/go ahead”）后写入 approvalGrant，awaiting_approval -> implementing 才允许，override 不能绕过。prompt/extension 也明确要求设计完成后停在 awaiting_approval 并向用户确认。前端同步方面，Studio 面板改为当前 tab 优先与懒/后台加载，后台刷新保留已有任务内容并仅显示轻量刷新状态，AppShell 仅在 Studio 面板打开时推进面板 refreshKey。任务浮窗实时性通过稳定 context key（优先 pi_<sessionId>）和 Studio task 工具结果 task id/key 的去抖重查实现。验证包含 lint、tsc、checker review 与用户手工验证。",
+      "tags": [
+        "ypi-studio",
+        "workflow",
+        "approval-gate",
+        "frontend-refresh",
+        "session-widget",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260702-182153-修复-ypi-studio-设计确认-面板刷新与任务浮窗同步问题",
+      "knowledgePath": ".ypi/knowledge/20260702-184842-修复-ypi-studio-设计确认-面板刷新与任务浮窗同步问题.md",
+      "createdAt": "2026-07-02T10:48:42.394Z",
+      "archivedAt": "2026-07-02T10:48:42.394Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    }
+  ]
+}
