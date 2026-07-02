@@ -113,7 +113,7 @@ function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef 
   const taskId = optionalString(value.taskId);
   const member = optionalString(value.member);
   const pathLabel = optionalString(value.pathLabel);
-  const status = value.status === "running" || value.status === "succeeded" || value.status === "failed" || value.status === "cancelled" ? value.status : undefined;
+  const status = value.status === "running" || value.status === "succeeded" || value.status === "failed" || value.status === "cancelled" || value.status === "waiting_for_user" ? value.status : undefined;
   const startedAt = optionalString(value.startedAt);
   const updatedAt = optionalString(value.updatedAt);
   if (!runId || !taskId || !member || !pathLabel || !status || !startedAt || !updatedAt) return undefined;
@@ -312,7 +312,7 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
     ? value.subagents.filter(isRecord).map((run): YpiStudioTaskSubagentRun => ({
         id: optionalString(run.id) ?? `run-${Date.now()}`,
         member: optionalString(run.member) ?? "unknown",
-        status: run.status === "running" || run.status === "succeeded" || run.status === "failed" || run.status === "cancelled" ? run.status : "failed",
+        status: run.status === "running" || run.status === "succeeded" || run.status === "failed" || run.status === "cancelled" || run.status === "waiting_for_user" ? run.status : "failed",
         startedAt: optionalString(run.startedAt) ?? nowIso(),
         finishedAt: optionalString(run.finishedAt),
         prompt: optionalString(run.prompt),

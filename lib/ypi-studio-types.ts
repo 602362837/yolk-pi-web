@@ -155,7 +155,7 @@ export interface YpiStudioTaskEvent {
   data?: Record<string, unknown>;
 }
 
-export type YpiStudioSubagentTranscriptStatus = "running" | "succeeded" | "failed" | "cancelled";
+export type YpiStudioSubagentTranscriptStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
 
 export interface YpiStudioSubagentTranscriptRef {
   schemaVersion: 1;

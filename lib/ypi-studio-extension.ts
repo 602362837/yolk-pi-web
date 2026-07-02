@@ -433,6 +433,27 @@ function eventAssistantDeltaText(event: unknown): string {
   return "";
 }
 
+function isBlockingExtensionUiRequest(event: unknown): boolean {
+  if (!isObj(event) || event.type !== "extension_ui_request") return false;
+  return event.method === "select" || event.method === "confirm" || event.method === "input" || event.method === "editor";
+}
+
+function extensionUiRequestText(event: unknown): string {
+  if (!isObj(event)) return "Child requested user input.";
+  const method = str(event.method) ?? "input";
+  const title = str(event.title);
+  const message = str(event.message);
+  const placeholder = str(event.placeholder);
+  const options = Array.isArray(event.options) ? event.options.filter((item): item is string => typeof item === "string").join(", ") : undefined;
+  return [
+    `Child Studio member is waiting for user ${method} input.`,
+    title ? `Title: ${title}` : undefined,
+    message ? `Message: ${message}` : undefined,
+    placeholder ? `Placeholder: ${placeholder}` : undefined,
+    options ? `Options: ${options}` : undefined,
+  ].filter(Boolean).join("\n");
+}
+
 interface ChildRunMeta {
   runId: string;
   taskId: string;
@@ -603,6 +624,15 @@ function runChildPi(
         const isError = ev.isError === true;
         lastTextPreview = `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
         appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError });
+      } else if (eventType === "extension_ui_request" && isBlockingExtensionUiRequest(event)) {
+        const text = extensionUiRequestText(event);
+        status = "waiting_for_user";
+        finalAssistantOutput = text;
+        lastTextPreview = text;
+        warnings.push("Child Studio member requested interactive user input; surfaced to parent session instead of waiting indefinitely.");
+        appendItem({ kind: "assistant", at, text, model: policy.modelLabel });
+        emitProgress(true);
+        child.kill();
       } else if (eventType === "extension_error") {
         const message = isObj(event) && typeof event.error === "string" ? event.error : safeJson(event);
         lastTextPreview = message;
@@ -637,7 +667,7 @@ function runChildPi(
       if (errorMessage) {
         status = "failed";
         appendItem({ kind: "error", at: new Date().toISOString(), text: errorMessage });
-      } else if (status !== "cancelled") {
+      } else if (status !== "cancelled" && status !== "waiting_for_user") {
         status = code === 0 ? "succeeded" : "failed";
       }
       const output = finalAssistantOutput.trim() || extractAssistantText(out, err).trim() || (status === "cancelled" ? "cancelled" : "(no output)");

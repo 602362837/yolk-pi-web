@@ -19,7 +19,7 @@ interface Props {
   cwd?: string;
 }
 
-type StudioRunStatus = "running" | "succeeded" | "failed" | "cancelled" | "unavailable";
+type StudioRunStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" | "unavailable";
 
 interface StudioRunProgress {
   startedAt?: string;
@@ -67,12 +67,12 @@ function resultText(result?: ToolResultMessage): string {
 }
 
 function normalizeStatus(value: unknown): StudioRunStatus | undefined {
-  if (value === "running" || value === "succeeded" || value === "failed" || value === "cancelled") return value;
+  if (value === "running" || value === "succeeded" || value === "failed" || value === "cancelled" || value === "waiting_for_user") return value;
   return undefined;
 }
 
 function normalizeTranscriptStatus(value: unknown): YpiStudioSubagentTranscriptRef["status"] | undefined {
-  if (value === "running" || value === "succeeded" || value === "failed" || value === "cancelled") return value;
+  if (value === "running" || value === "succeeded" || value === "failed" || value === "cancelled" || value === "waiting_for_user") return value;
   return undefined;
 }
 
@@ -185,15 +185,29 @@ function statusLabel(status: StudioRunStatus): string {
   if (status === "succeeded") return "Succeeded";
   if (status === "failed") return "Failed";
   if (status === "cancelled") return "Cancelled";
+  if (status === "waiting_for_user") return "Waiting for user";
   if (status === "unavailable") return "Transcript unavailable";
   return "Running";
 }
 
 function statusColor(status: StudioRunStatus): string {
   if (status === "succeeded") return "#16a34a";
+  if (status === "waiting_for_user") return "#f59e0b";
   if (status === "failed" || status === "cancelled") return "#f87171";
   if (status === "unavailable") return "var(--text-dim)";
   return "var(--accent)";
+}
+
+function statusBorderColor(status: StudioRunStatus): string {
+  if (status === "failed" || status === "cancelled") return "rgba(248,113,113,0.45)";
+  if (status === "waiting_for_user") return "rgba(245,158,11,0.45)";
+  return "rgba(34,197,94,0.25)";
+}
+
+function statusBackground(status: StudioRunStatus): string {
+  if (status === "failed" || status === "cancelled") return "rgba(248,113,113,0.05)";
+  if (status === "waiting_for_user") return "rgba(245,158,11,0.06)";
+  return "rgba(34,197,94,0.04)";
 }
 
 function itemText(item: YpiStudioSubagentTranscriptItem): string {
@@ -289,8 +303,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
         borderRadius: 7,
         overflow: "hidden",
         fontSize: 12,
-        border: `1px solid ${status === "failed" || status === "cancelled" ? "rgba(248,113,113,0.45)" : "rgba(34,197,94,0.25)"}`,
-        background: status === "failed" || status === "cancelled" ? "rgba(248,113,113,0.05)" : "rgba(34,197,94,0.04)",
+        border: `1px solid ${statusBorderColor(status)}`,
+        background: statusBackground(status),
       }}
     >
       <button
