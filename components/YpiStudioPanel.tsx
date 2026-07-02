@@ -6,6 +6,7 @@ import type {
   YpiStudioAgentWarning,
   YpiStudioAgentsInitResponse,
   YpiStudioAgentsResponse,
+  YpiStudioTaskDetail,
   YpiStudioTaskScope,
   YpiStudioTaskSummary,
   YpiStudioTasksResponse,
@@ -26,6 +27,7 @@ interface Props {
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type StudioTab = "members" | "workflows" | "tasks";
+type TaskDetailTab = "overview" | "artifacts" | "subagents" | "events" | "metadata";
 
 function agentFilePath(cwd: string, agent: YpiStudioAgent): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${agent.pathLabel.replace(/^\/+/, "")}`;
@@ -381,10 +383,56 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
   focusedTaskKey?: string | null;
 }) {
   const focusedRef = useRef<HTMLDivElement | null>(null);
+  const [detailTaskKey, setDetailTaskKey] = useState<string | null>(focusedTaskKey ?? null);
+  const [taskDetail, setTaskDetail] = useState<YpiStudioTaskDetail | null>(null);
+  const [detailLoadState, setDetailLoadState] = useState<LoadState>("idle");
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<TaskDetailTab>("overview");
+
   useEffect(() => {
     if (!focusedTaskKey || !focusedRef.current) return;
     focusedRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [focusedTaskKey, data?.tasks]);
+
+  useEffect(() => {
+    if (!data?.tasks.length) {
+      setDetailTaskKey(null);
+      return;
+    }
+    if (focusedTaskKey && data.tasks.some((task) => task.key === focusedTaskKey)) {
+      setDetailTaskKey(focusedTaskKey);
+      return;
+    }
+    setDetailTaskKey((current) => current && data.tasks.some((task) => task.key === current) ? current : null);
+  }, [data?.tasks, focusedTaskKey]);
+
+  useEffect(() => {
+    if (!detailTaskKey) {
+      setTaskDetail(null);
+      setDetailLoadState("idle");
+      setDetailError(null);
+      return;
+    }
+    const controller = new AbortController();
+    setDetailLoadState("loading");
+    setDetailError(null);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/studio/tasks/${encodeURIComponent(detailTaskKey)}?cwd=${encodeURIComponent(cwd)}`, { signal: controller.signal });
+        const body = await res.json() as { task?: YpiStudioTaskDetail; error?: string };
+        if (!res.ok || body.error || !body.task) throw new Error(body.error ?? `HTTP ${res.status}`);
+        setTaskDetail(body.task);
+        setDetailLoadState("ready");
+      } catch (err) {
+        if ((err as { name?: string }).name === "AbortError") return;
+        setTaskDetail(null);
+        setDetailError(err instanceof Error ? err.message : String(err));
+        setDetailLoadState("error");
+      }
+    })();
+    return () => controller.abort();
+  }, [cwd, detailTaskKey]);
+
   const scopeControls = (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       <TabButton active={scope === "active"} label="活跃" onClick={() => setScope("active")} />
@@ -398,11 +446,31 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
   else if (loadState === "error" && !data) content = <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
   else if (!data?.exists) content = <PanelEmpty title="还没有工作室任务" description="通过 /studio-start，或直接说“用工作室做这个功能”，会创建结构化任务并在这里显示进度。" />;
   else if (data.tasks.length === 0) content = <PanelEmpty title="任务列表为空" description={scope === "archived" ? "当前没有已归档任务。" : "当前筛选范围没有任务目录。"} />;
+  else if (detailTaskKey) content = (
+    <TaskDetailPanel
+      cwd={cwd}
+      task={taskDetail}
+      loadState={detailLoadState}
+      error={detailError}
+      activeTab={detailTab}
+      setActiveTab={setDetailTab}
+      onBack={() => setDetailTaskKey(null)}
+      onOpenFile={onOpenFile}
+    />
+  );
   else content = (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {data.tasks.map((task) => (
         <div key={task.key} ref={task.key === focusedTaskKey ? focusedRef : undefined}>
-          <TaskCard focused={task.key === focusedTaskKey} cwd={cwd} task={task} onOpenFile={onOpenFile} onArchiveTask={onArchiveTask} />
+          <TaskCard
+            focused={task.key === focusedTaskKey}
+            selected={false}
+            cwd={cwd}
+            task={task}
+            onSelect={() => setDetailTaskKey(task.key)}
+            onOpenFile={onOpenFile}
+            onArchiveTask={onArchiveTask}
+          />
         </div>
       ))}
     </div>
@@ -410,7 +478,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-      {scopeControls}
+      {!detailTaskKey && scopeControls}
       {content}
     </div>
   );
@@ -502,10 +570,11 @@ function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: Yp
   );
 }
 
-function TaskCard({ cwd, task, focused = false, onOpenFile, onArchiveTask }: { cwd: string; task: YpiStudioTaskSummary; focused?: boolean; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void }) {
+function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOpenFile, onArchiveTask }: { cwd: string; task: YpiStudioTaskSummary; focused?: boolean; selected?: boolean; onSelect?: () => void; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void }) {
   const canArchive = !task.archived && task.status === "completed";
+  const highlighted = focused || selected;
   return (
-    <div style={{ border: `1px solid ${focused ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: focused ? "var(--bg-selected)" : "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: focused ? "0 0 0 1px rgba(37,99,235,0.18) inset" : "none" }}>
+    <div onClick={onSelect} role={onSelect ? "button" : undefined} tabIndex={onSelect ? 0 : undefined} onKeyDown={(event) => { if (onSelect && (event.key === "Enter" || event.key === " ")) onSelect(); }} style={{ border: `1px solid ${highlighted ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: highlighted ? "var(--bg-selected)" : "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: highlighted ? "0 0 0 1px rgba(37,99,235,0.18) inset" : "none", cursor: onSelect ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -520,14 +589,16 @@ function TaskCard({ cwd, task, focused = false, onOpenFile, onArchiveTask }: { c
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           {canArchive && (
             <button
-              onClick={() => onArchiveTask(task)}
+              onClick={(event) => { event.stopPropagation(); onArchiveTask(task); }}
+              onKeyDown={(event) => event.stopPropagation()}
               style={smallButtonStyle(true)}
             >
               归档
             </button>
           )}
           <button
-            onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")}
+            onClick={(event) => { event.stopPropagation(); onOpenFile?.(taskFilePath(cwd, task), "task.json"); }}
+            onKeyDown={(event) => event.stopPropagation()}
             disabled={!onOpenFile}
             style={smallButtonStyle(Boolean(onOpenFile))}
           >
@@ -554,6 +625,191 @@ function TaskCard({ cwd, task, focused = false, onOpenFile, onArchiveTask }: { c
       )}
     </div>
   );
+}
+
+function TaskDetailPanel({ cwd, task, loadState, error, activeTab, setActiveTab, onBack, onOpenFile }: {
+  cwd: string;
+  task: YpiStudioTaskDetail | null;
+  loadState: LoadState;
+  error: string | null;
+  activeTab: TaskDetailTab;
+  setActiveTab: (tab: TaskDetailTab) => void;
+  onBack: () => void;
+  onOpenFile?: (filePath: string, fileName: string) => void;
+}) {
+  if (loadState === "loading") return <TaskDetailShell onBack={onBack}><PanelEmpty title="正在读取任务详情" description="加载任务产物、成员运行、事件和元数据。" /></TaskDetailShell>;
+  if (loadState === "error") return <TaskDetailShell onBack={onBack}><PanelEmpty title="详情读取失败" description={error ?? "请稍后重试。"} /></TaskDetailShell>;
+  if (!task) return <TaskDetailShell onBack={onBack}><PanelEmpty title="选择一个任务" description="点击任务卡片查看完整详情。" /></TaskDetailShell>;
+
+  return (
+    <TaskDetailShell onBack={onBack}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <h3 style={{ margin: 0, color: "var(--text)", fontSize: 16, lineHeight: 1.3 }}>{task.title}</h3>
+            <Badge label={task.status} tone={statusTone(task.status)} />
+          </div>
+          <div style={{ marginTop: 4, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{task.key}</div>
+        </div>
+        <button onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开 task.json</button>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <TabButton active={activeTab === "overview"} label="概览" onClick={() => setActiveTab("overview")} />
+        <TabButton active={activeTab === "artifacts"} label={`产物 ${Object.keys(task.artifacts).length}`} onClick={() => setActiveTab("artifacts")} />
+        <TabButton active={activeTab === "subagents"} label={`成员运行 ${task.subagents.length}`} onClick={() => setActiveTab("subagents")} />
+        <TabButton active={activeTab === "events"} label={`事件 ${task.events.length}`} onClick={() => setActiveTab("events")} />
+        <TabButton active={activeTab === "metadata"} label="元数据" onClick={() => setActiveTab("metadata")} />
+      </div>
+      {activeTab === "overview" ? <TaskOverviewTab task={task} />
+        : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
+        : activeTab === "subagents" ? <TaskSubagentsTab task={task} />
+        : activeTab === "events" ? <TaskEventsTab task={task} />
+        : <TaskMetadataTab task={task} />}
+    </TaskDetailShell>
+  );
+}
+
+function TaskDetailShell({ onBack, children }: { onBack: () => void; children: ReactNode }) {
+  return (
+    <div style={{ minHeight: 0, flex: 1, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={onBack} style={smallButtonStyle(true)}>← 返回任务列表</button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TaskOverviewTab({ task }: { task: YpiStudioTaskDetail }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ height: 8, borderRadius: 999, background: "var(--border)", overflow: "hidden" }}><div style={{ width: `${Math.max(0, Math.min(100, task.progress.percent))}%`, height: "100%", background: "var(--accent)" }} /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+        <DetailRow label="进度" value={`${task.progress.label} · ${task.progress.percent}%`} />
+        <DetailRow label="流程" value={task.workflowName ? `${task.workflowName} (${task.workflowId})` : task.workflowId} />
+        <DetailRow label="负责人" value={task.currentMember ?? task.progress.owner} />
+        <DetailRow label="创建" value={formatDateTime(task.createdAt)} />
+        <DetailRow label="更新" value={formatDateTime(task.updatedAt)} />
+        <DetailRow label="完成" value={task.completedAt ? formatDateTime(task.completedAt) : "—"} />
+      </div>
+      <SectionCard title="路径与上下文">
+        <DetailRow label="目录" value={task.pathLabel} mono />
+        <DetailRow label="CWD" value={task.cwd} mono />
+        <DetailRow label="上下文" value={task.contextIds.length ? task.contextIds.join("、") : "—"} mono />
+      </SectionCard>
+      {task.archived && <SectionCard title="归档信息">
+        <DetailRow label="归档月份" value={task.archiveMonth ?? "—"} />
+        <DetailRow label="归档时间" value={formatDateTime(task.archivedAt ?? "")} />
+        <DetailRow label="原因" value={task.archiveReason ?? "—"} />
+        <DetailRow label="知识路径" value={task.knowledgePath ?? "—"} mono />
+      </SectionCard>}
+      {task.readError && <Notice tone="error" text={task.readError} />}
+    </div>
+  );
+}
+
+function TaskArtifactsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  const artifacts = useMemo(() => Array.from(new Set([
+    ...task.progress.requiredArtifacts,
+    ...task.progress.optionalArtifacts,
+    ...Object.keys(task.artifacts),
+    ...Object.keys(task.documents),
+  ])), [task.artifacts, task.documents, task.progress.optionalArtifacts, task.progress.requiredArtifacts]);
+  const [activeArtifact, setActiveArtifact] = useState<string | null>(artifacts[0] ?? null);
+
+  useEffect(() => {
+    setActiveArtifact((current) => current && artifacts.includes(current) ? current : artifacts[0] ?? null);
+  }, [artifacts]);
+
+  if (artifacts.length === 0) return <PanelEmpty title="没有定义产物" description="当前任务还没有产物映射或文档内容。" />;
+
+  const artifact = activeArtifact && artifacts.includes(activeArtifact) ? activeArtifact : artifacts[0];
+  const document = task.documents[artifact];
+  const required = task.progress.requiredArtifacts.includes(artifact);
+  const completed = task.progress.completedArtifacts.includes(artifact) || Boolean(document && !document.content.includes("_TBD by YPI Studio workflow._"));
+  const fileName = document?.fileName ?? task.artifacts[artifact] ?? `${artifact}.md`;
+  const filePath = `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/${fileName}`;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {artifacts.map((item) => {
+          const itemDocument = task.documents[item];
+          const itemCompleted = task.progress.completedArtifacts.includes(item) || Boolean(itemDocument && !itemDocument.content.includes("_TBD by YPI Studio workflow._"));
+          return <TabButton key={item} active={item === artifact} label={`${item}${itemCompleted ? " ✓" : ""}`} onClick={() => setActiveArtifact(item)} />;
+        })}
+      </div>
+      <SectionCard title={`${artifact}${required ? " · 必需" : " · 可选"}`} action={<button onClick={() => onOpenFile?.(filePath, fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开</button>}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          <Badge label={completed ? "已完成" : "缺失"} tone={completed ? "success" : "warning"} />
+          {document?.truncated && <Badge label="已截断" tone="warning" />}
+        </div>
+        <DetailRow label="文件" value={fileName} mono />
+        {document ? <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg)" }}><MarkdownBody>{document.content || "（空文件）"}</MarkdownBody></div> : <Notice tone="warning" text="产物文件不存在或尚未写入。" />}
+      </SectionCard>
+    </div>
+  );
+}
+
+function TaskSubagentsTab({ task }: { task: YpiStudioTaskDetail }) {
+  if (task.subagents.length === 0) return <PanelEmpty title="没有成员运行记录" description="该任务尚未调度工作室成员。" />;
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{task.subagents.map((run) => (
+    <SectionCard key={run.id} title={`${run.member} · ${run.status}`}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+        <DetailRow label="Run ID" value={run.id} mono />
+        <DetailRow label="模型" value={run.model ? `${run.model}${run.modelSource ? ` (${run.modelSource})` : ""}` : "—"} />
+        <DetailRow label="Thinking" value={run.thinking ? `${run.thinking}${run.thinkingSource ? ` (${run.thinkingSource})` : ""}` : "—"} />
+        <DetailRow label="开始" value={formatDateTime(run.startedAt)} />
+        <DetailRow label="结束" value={formatDateTime(run.finishedAt ?? "")} />
+        <DetailRow label="Transcript" value={run.transcript ? `${run.transcript.itemCount} items / ${run.transcript.messageCount} messages / ${run.transcript.toolCallCount} tools${run.transcript.truncated ? " · truncated" : ""}` : "—"} />
+      </div>
+      {run.prompt && <DetailRow label="Prompt" value={run.prompt} />}
+      {run.summary && <DetailRow label="Summary" value={run.summary} />}
+      {run.error && <Notice tone="error" text={run.error} />}
+      {run.transcript?.pathLabel && <DetailRow label="Transcript path" value={run.transcript.pathLabel} mono />}
+    </SectionCard>
+  ))}</div>;
+}
+
+function TaskEventsTab({ task }: { task: YpiStudioTaskDetail }) {
+  if (task.events.length === 0) return <PanelEmpty title="没有事件" description="任务事件 JSONL 暂无记录。" />;
+  return <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{[...task.events].reverse().map((event, index) => (
+    <SectionCard key={`${event.at}-${index}`} title={`${event.type} · ${formatDateTime(event.at)}`}>
+      {event.message && <div style={{ color: "var(--text)", fontSize: 12, lineHeight: 1.5 }}>{event.message}</div>}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+        {event.from && event.to && <Badge label={`${event.from} → ${event.to}`} tone="neutral" />}
+        {event.member && <Badge label={event.member} tone="neutral" />}
+        {event.artifact && <Badge label={event.artifact} tone="neutral" />}
+      </div>
+      {event.data && <JsonBlock value={event.data} />}
+    </SectionCard>
+  ))}</div>;
+}
+
+function TaskMetadataTab({ task }: { task: YpiStudioTaskDetail }) {
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <SectionCard title="Meta"><JsonBlock value={task.meta} /></SectionCard>
+    <SectionCard title="Artifacts mapping"><JsonBlock value={task.artifacts} /></SectionCard>
+    <SectionCard title="完整摘要 JSON"><JsonBlock value={{ id: task.id, key: task.key, status: task.status, archived: task.archived, archiveMonth: task.archiveMonth, archiveReason: task.archiveReason, knowledgePath: task.knowledgePath, readError: task.readError }} /></SectionCard>
+  </div>;
+}
+
+function SectionCard({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
+  return <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg)", padding: 12 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
+      <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>{title}</div>
+      {action}
+    </div>
+    {children}
+  </div>;
+}
+
+function DetailRow({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
+  return <div style={{ minWidth: 0, color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}><span style={{ color: "var(--text-dim)" }}>{label}：</span><span style={{ fontFamily: mono ? "var(--font-mono)" : undefined, overflowWrap: "anywhere" }}>{value || "—"}</span></div>;
+}
+
+function JsonBlock({ value }: { value: unknown }) {
+  return <pre style={{ margin: "8px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5, fontFamily: "var(--font-mono)" }}>{JSON.stringify(value, null, 2)}</pre>;
 }
 
 function AgentDetail({ cwd, agent, onOpenFile }: { cwd: string; agent: YpiStudioAgent; onOpenFile?: (filePath: string, fileName: string) => void }) {
@@ -600,6 +856,13 @@ function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString();
+}
+
+function formatDateTime(value: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
 }
 
 function Badge({ label, tone }: { label: string; tone: "success" | "warning" | "error" | "neutral" }) {
