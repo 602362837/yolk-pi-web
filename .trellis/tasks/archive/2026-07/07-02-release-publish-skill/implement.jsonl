@@ -1,3 +1,0 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
-{"file": ".trellis/spec/frontend/index.md", "reason": "Project coding/documentation conventions for release skill changes"}
-{"file": ".trellis/tasks/07-02-release-publish-skill/research/release-evidence.md", "reason": "Release facts, npm auth/version status, and Pi skill structure guidance"}

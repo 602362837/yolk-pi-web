@@ -1,7 +1,0 @@
-{"file":".trellis/spec/index.md","reason":"Project Trellis spec overview and core boundaries for implementation."}
-{"file":".trellis/spec/frontend/index.md","reason":"Frontend spec entry for component/API-adjacent work."}
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Route/lib/component boundary guidance for quota API and UI changes."}
-{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Component prop, callback, styling, and accessibility conventions for Models and usage panel UI."}
-{"file":".trellis/spec/frontend/type-safety.md","reason":"External payload normalization and shared type safety guidance for ChatGPT responses."}
-{"file":".trellis/spec/frontend/state-management.md","reason":"State and loading/error handling guidance for client-side quota reset actions."}
-{"file":".trellis/tasks/06-30-codex-reset-credits/research/code-survey.md","reason":"Task-specific survey of existing quota flow and integration points."}

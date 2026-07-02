@@ -1,7 +1,0 @@
-{"file":".trellis/spec/index.md","reason":"Project Trellis spec overview and verification expectations."}
-{"file":".trellis/spec/frontend/index.md","reason":"Frontend spec entry for affected app surfaces."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Quality contracts and validation expectations for cross-layer UI/API work."}
-{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review component changes for styling, callbacks, and accessibility."}
-{"file":".trellis/spec/frontend/type-safety.md","reason":"Review external payload parsing and no-any type safety requirements."}
-{"file":".trellis/spec/frontend/state-management.md","reason":"Review loading/error state behavior for reset actions."}
-{"file":".trellis/tasks/06-30-codex-reset-credits/research/code-survey.md","reason":"Check implementation against researched quota integration points."}

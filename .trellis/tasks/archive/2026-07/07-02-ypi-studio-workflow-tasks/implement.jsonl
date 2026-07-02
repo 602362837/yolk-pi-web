@@ -1,4 +1,0 @@
-{"file":".trellis/spec/frontend/index.md","reason":"Frontend/API/lib project spec entrypoint for YPI Studio workflow work."}
-{"file":".trellis/spec/frontend/directory-structure.md","reason":"Guides where to place new API routes, shared lib modules, and components."}
-{"file":".trellis/spec/frontend/type-safety.md","reason":"Type guard and shared contract patterns for workflow/task JSON readers."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Optional workspace-file panel and route safety contracts relevant to .ypi readers."}

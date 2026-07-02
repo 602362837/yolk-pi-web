@@ -3,7 +3,7 @@ import typescript from "eslint-config-next/typescript";
 
 const eslintConfig = [
   {
-    ignores: [".pi/**", ".trellis/**"],
+    ignores: [".pi/**"],
   },
   ...coreWebVitals,
   ...typescript,

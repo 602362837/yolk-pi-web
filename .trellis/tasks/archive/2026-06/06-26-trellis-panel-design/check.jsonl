@@ -1,7 +1,0 @@
-{"file":".trellis/spec/frontend/index.md","reason":"Check frontend work against loaded specs."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify config/API/library/UI contracts are consistent."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Verify shared helpers are reused and constants are not duplicated."}
-{"file":"docs/modules/frontend.md","reason":"Verify frontend module docs are updated for new component/layout behavior."}
-{"file":"docs/modules/api.md","reason":"Verify new API routes and config behavior are documented."}
-{"file":"docs/modules/library.md","reason":"Verify shared library docs are updated."}
-{"file":"docs/standards/code-style.md","reason":"Run required lint and type-check validation."}

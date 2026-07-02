@@ -1,3 +1,0 @@
-{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Frontend component structure, props, styling, event handler, and accessibility conventions for terminal workspace components."}
-{"file":".trellis/spec/frontend/state-management.md","reason":"Complex terminal tab/pane layout state should follow reducer and cleanup guidance."}
-{"file":".trellis/spec/frontend/type-safety.md","reason":"Typed layout tree, tab state, callback, and external API response handling conventions."}

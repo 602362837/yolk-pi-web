@@ -29,7 +29,7 @@ npm run dev     # http://localhost:30141
 | Change UI behavior | `docs/modules/frontend.md` | Relevant file in `components/` or `hooks/` |
 | Change shared logic | `docs/modules/library.md` | Relevant file in `lib/` and all callers |
 | Change session lifecycle, branching, JSONL, or SSE | `docs/architecture/overview.md` | `lib/rpc-manager.ts`, `lib/session-reader.ts`, `hooks/useAgentSession.ts` |
-| Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code and `.trellis/spec/` if Trellis is active |
+| Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code |
 | Deploy, publish, or debug runtime | `docs/deployment/README.md` | `docs/operations/troubleshooting.md`, `ecosystem.config.cjs`, proxy scripts |
 | Change dependencies or pi SDK integration | `docs/integrations/README.md` | `package.json`, installed pi docs under `node_modules/@earendil-works/pi-coding-agent/` |
 
@@ -46,7 +46,7 @@ npm run dev     # http://localhost:30141
 | `scripts/` | Build and operational helpers. | `docs/deployment/README.md` |
 | `public/` | Static assets. | Inspect files directly. |
 | `docs/` | Project knowledge base and archive target. | This file's archive rules. |
-| `.trellis/`, `.pi/` | Local workflow/runtime state; gitignored and not project docs. | Read only when the active workflow/skill requires it. |
+| `.pi/` | Local Pi agent configuration, skills, prompts, and runtime helpers. | Read only when the active workflow/skill requires it. |
 
 ## Module Entry Points
 
@@ -82,7 +82,6 @@ Keep this section short and operational; detailed rationale belongs in `docs/arc
 | TypeScript config | `tsconfig.json` |
 | ESLint config | `eslint.config.mjs` |
 | Package scripts and dependencies | `package.json` |
-| Trellis coding specs, when active | `.trellis/spec/frontend/index.md`, `.trellis/spec/guides/index.md` |
 
 Minimum validation for code changes:
 
@@ -111,7 +110,7 @@ node_modules/.bin/tsc --noEmit
 | Session files | `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl` |
 | Model config | `~/.pi/agent/models.json` |
 | Settings/default model | `~/.pi/agent/settings.json` |
-| Web UI settings (Yolk Pi chat defaults, WorkTree, Usage, Web Terminal, ChatGPT panel, Editor, Trellis) | `~/.pi/agent/pi-web.json` |
+| Web UI settings (Yolk Pi chat defaults, WorkTree, Usage, Web Terminal, ChatGPT panel, Editor) | `~/.pi/agent/pi-web.json` |
 
 ## Archive Rules
 

@@ -30,7 +30,3 @@ Do not run `next build` directly during development. Use `npm run build` only fo
 ## Tests
 
 There is no dedicated automated test suite in the current repository. For changes that affect data flow, use lint + type-check and manually verify the affected browser/API flow. If a test framework is introduced later, document it here and update `AGENTS.md`.
-
-## Trellis Specs
-
-Local Trellis guidance exists under `.trellis/spec/` and is not project documentation. If a coding task uses Trellis, load the relevant spec indexes before editing; user-facing project knowledge still belongs in `docs/`.

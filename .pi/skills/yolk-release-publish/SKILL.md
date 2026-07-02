@@ -13,7 +13,7 @@ Use this skill for project releases of `@alan-zhao/yolk-pi-web` (`ypi`). Follow 
 - Never push to `upstream`; release pushes go to `origin` only unless the user explicitly changes the plan.
 - Do not publish before validation passes.
 - Do not run `next build` directly; use `npm run build`.
-- Keep release/work commits separate from Trellis archive and journal commits. Archive/journal commits happen after the release commit.
+- Keep release/work commits focused on durable release files only.
 - Stop if the target npm version already exists in the registry.
 
 ## Standard Release Flow
@@ -38,7 +38,7 @@ Use this skill for project releases of `@alan-zhao/yolk-pi-web` (`ypi`). Follow 
    npm run build
    npm pack --dry-run
    ```
-5. Commit only durable release files, not Trellis task files. Include release documentation when it changed:
+5. Commit only durable release files. Include release documentation when it changed:
    ```bash
    git add package.json package-lock.json docs/deployment/README.md .pi/skills/yolk-release-publish/SKILL.md
    git commit -m "chore: release <version>"
@@ -54,11 +54,9 @@ Use this skill for project releases of `@alan-zhao/yolk-pi-web` (`ypi`). Follow 
    npm publish --access public
    npm view @alan-zhao/yolk-pi-web version --prefer-online
    ```
-8. After the release is verified, finish Trellis work so archive and journal commits land after the release commit.
-
 ## Version Bump Notes
 
-- Prefer a manual version edit when Trellis task files are dirty; `npm version` expects a clean worktree and can accidentally mix release and workflow bookkeeping.
+- Prefer a manual version edit when the working tree is dirty; `npm version` expects a clean worktree and can accidentally mix unrelated bookkeeping.
 - Keep `package.json` and `package-lock.json` in sync.
 - Use tag format `v<version>` such as `v0.7.4`.
 
