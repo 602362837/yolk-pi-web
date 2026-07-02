@@ -13,7 +13,8 @@
 | `components/SelectDropdown.tsx` | Shared non-search dropdown used by compact chat controls and settings fields such as thinking-level selectors. |
 | `components/ChatGptUsagePanel.tsx` | Optional semi-transparent top-bar ChatGPT/Codex quota panel; reads and periodically revalidates cached active-account usage and reset-credit availability, reloads accounts on expand, lists saved accounts with quick activation, supports manual quota refresh and confirmed reset-credit consumption for the active account, and shows backend auto-refresh scheduler/lock maintenance state. |
 | `components/ChatGptWarmupDialog.tsx` | ChatGPT/Codex warmup management dialog opened from the saved-account management area; supports manual multi-select warmup, scheduled warmup account/time settings, and recent manual/scheduled run history. |
-| `components/MessageView.tsx` | Render user, assistant, tool-call, and tool-result messages. |
+| `components/MessageView.tsx` | Render user, assistant, tool-call, and tool-result messages; routes `ypi_studio_subagent` tool calls to the Studio transcript view while generic tools keep the compact JSON/result renderer. |
+| `components/YpiStudioSubagentTranscript.tsx` | Chat-like transcript renderer for YPI Studio member delegation tool calls, combining live `tool_execution_update` progress, persisted transcript API data, delegated input, final output, and missing-transcript fallbacks. |
 | `components/BranchNavigator.tsx` | In-session branch switcher. |
 | `components/ChatMinimap.tsx` | Scroll minimap beside message list. |
 | `components/ToolPanel.tsx` | Tool presets and preset inference helpers, including YPI Studio task/delegation tools in the appropriate presets so implicit workflow routing can create tasks and dispatch members. |
@@ -47,7 +48,7 @@
 
 | File | Purpose |
 | --- | --- |
-| `hooks/useAgentSession.ts` | Central chat/session hook: data loading, SSE, streaming state, commands, tools, models, thinking levels, and subagent run/routing metadata. |
+| `hooks/useAgentSession.ts` | Central chat/session hook: data loading, SSE, streaming state, commands, tools, models, thinking levels, subagent run/routing metadata, and per-tool live progress keyed by `toolCallId` for accumulated `tool_execution_update` partial results. |
 | `hooks/useTheme.ts` | Dark/light theme toggle with view-transition animation. |
 | `hooks/useDragDrop.ts` | Drag-and-drop image attachment handler. |
 | `hooks/useAudio.ts` | Sound toggle and completion chime playback. |

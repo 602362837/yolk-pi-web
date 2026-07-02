@@ -28,6 +28,7 @@ import type {
   YpiStudioTaskProgress,
   YpiStudioTaskRecord,
   YpiStudioTaskSubagentRun,
+  YpiStudioSubagentTranscriptRef,
   YpiStudioTaskSummary,
   YpiStudioTasksResponse,
   YpiStudioTaskTransitionBody,
@@ -88,6 +89,37 @@ function optionalString(value: unknown): string | undefined {
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.schemaVersion !== 1 || value.format !== "ypi-studio-subagent-transcript") return undefined;
+  const runId = optionalString(value.runId);
+  const taskId = optionalString(value.taskId);
+  const member = optionalString(value.member);
+  const pathLabel = optionalString(value.pathLabel);
+  const status = value.status === "running" || value.status === "succeeded" || value.status === "failed" || value.status === "cancelled" ? value.status : undefined;
+  const startedAt = optionalString(value.startedAt);
+  const updatedAt = optionalString(value.updatedAt);
+  if (!runId || !taskId || !member || !pathLabel || !status || !startedAt || !updatedAt) return undefined;
+  return {
+    schemaVersion: 1,
+    format: "ypi-studio-subagent-transcript",
+    runId,
+    taskId,
+    member,
+    pathLabel,
+    status,
+    startedAt,
+    finishedAt: optionalString(value.finishedAt),
+    updatedAt,
+    itemCount: typeof value.itemCount === "number" ? value.itemCount : 0,
+    messageCount: typeof value.messageCount === "number" ? value.messageCount : 0,
+    toolCallCount: typeof value.toolCallCount === "number" ? value.toolCallCount : 0,
+    stderrBytes: typeof value.stderrBytes === "number" ? value.stderrBytes : 0,
+    bytes: typeof value.bytes === "number" ? value.bytes : 0,
+    truncated: value.truncated === true,
+  };
 }
 
 function relativeLabel(root: string, target: string): string {
@@ -242,6 +274,7 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
         model: optionalString(run.model),
         thinking: optionalString(run.thinking),
         error: optionalString(run.error),
+        transcript: normalizeTranscriptRef(run.transcript),
       }))
     : [];
   return {
@@ -648,7 +681,7 @@ export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run
     taskId: record.raw.id,
     member: run.member,
     message: run.summary ?? run.error ?? `${run.member} ${run.status}`,
-    data: { runId: run.id, status: run.status },
+    data: { runId: run.id, status: run.status, transcript: run.transcript },
   });
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after subagent update");

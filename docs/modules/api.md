@@ -60,6 +60,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `studio/workflows/` | GET/POST | Read project-local structured YPI Studio workflows from `.ypi/workflows/`, and initialize/backfill default workflow JSON files without overwriting existing files. |
 | `studio/tasks/` | GET/POST | List structured YPI Studio task summaries from `.ypi/tasks/` with state/progress projections, or create a new task directory with task artifacts and runtime context binding. |
 | `studio/tasks/[taskKey]/` | GET/PATCH | Read one YPI Studio task detail, or bind a context, update an artifact, or transition the task through workflow-defined states. |
+| `studio/tasks/[taskKey]/subagents/[runId]/transcript/` | GET | Read a bounded, browser-safe projection of a YPI Studio member delegation transcript sidecar for a run that belongs to the requested task. |
 | `default-cwd/` | POST | Create and return `~/pi-cwd-<YYYYMMDD>`. |
 | `home/` | GET | Return `os.homedir()`. |
 | `usage/` | GET | Aggregate token/cost usage across active-only or active-plus-archived sessions based on `pi-web.json` Usage settings. |

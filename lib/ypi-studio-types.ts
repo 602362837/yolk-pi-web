@@ -153,10 +153,47 @@ export interface YpiStudioTaskEvent {
   data?: Record<string, unknown>;
 }
 
+export type YpiStudioSubagentTranscriptStatus = "running" | "succeeded" | "failed" | "cancelled";
+
+export interface YpiStudioSubagentTranscriptRef {
+  schemaVersion: 1;
+  format: "ypi-studio-subagent-transcript";
+  runId: string;
+  taskId: string;
+  member: string;
+  pathLabel: string;
+  status: YpiStudioSubagentTranscriptStatus;
+  startedAt: string;
+  finishedAt?: string;
+  updatedAt: string;
+  itemCount: number;
+  messageCount: number;
+  toolCallCount: number;
+  stderrBytes: number;
+  bytes: number;
+  truncated: boolean;
+}
+
+export type YpiStudioSubagentTranscriptItem =
+  | { kind: "status"; at: string; text: string; truncated?: boolean }
+  | { kind: "prompt"; at: string; text: string; truncated?: boolean }
+  | { kind: "assistant"; at: string; text: string; model?: string; truncated?: boolean }
+  | { kind: "tool_call"; at: string; toolCallId: string; toolName: string; inputPreview: string; truncated?: boolean }
+  | { kind: "tool_result"; at: string; toolCallId: string; toolName?: string; text: string; isError?: boolean; truncated?: boolean }
+  | { kind: "stderr"; at: string; text: string; truncated?: boolean }
+  | { kind: "error"; at: string; text: string };
+
+export interface YpiStudioSubagentTranscriptResponse {
+  transcript: YpiStudioSubagentTranscriptRef;
+  items: YpiStudioSubagentTranscriptItem[];
+  nextCursor?: number;
+  warnings?: string[];
+}
+
 export interface YpiStudioTaskSubagentRun {
   id: string;
   member: string;
-  status: "running" | "succeeded" | "failed" | "cancelled";
+  status: YpiStudioSubagentTranscriptStatus;
   startedAt: string;
   finishedAt?: string;
   prompt?: string;
@@ -164,6 +201,7 @@ export interface YpiStudioTaskSubagentRun {
   model?: string;
   thinking?: string;
   error?: string;
+  transcript?: YpiStudioSubagentTranscriptRef;
 }
 
 export interface YpiStudioTaskProgress {

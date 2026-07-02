@@ -123,6 +123,24 @@ export type AgentPhase =
   | { kind: "running_tools"; tools: { id: string; name: string }[] }
   | null;
 
+export interface ToolExecutionProgress {
+  toolCallId: string;
+  toolName: string;
+  args?: Record<string, unknown>;
+  partialResult?: {
+    content?: unknown[];
+    details?: unknown;
+    isError?: boolean;
+  };
+  result?: {
+    content?: unknown[];
+    details?: unknown;
+    isError?: boolean;
+  };
+  updatedAt: number;
+  running: boolean;
+}
+
 export type OnSubagentChange = (runs: SubagentRun[]) => void;
 
 export interface UseAgentSessionOptions {
@@ -263,6 +281,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [compactError, setCompactError] = useState<string | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
   const [subagentRuns, setSubagentRuns] = useState<SubagentRun[]>([]);
+  const [toolProgressById, setToolProgressById] = useState<Record<string, ToolExecutionProgress>>({});
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
@@ -415,6 +434,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setAgentRunning(true);
         setAgentPhase({ kind: "waiting_model" });
         setSubagentRuns([]);
+        setToolProgressById({});
         dispatch({ type: "start" });
         break;
       case "agent_end":
@@ -458,9 +478,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "tool_execution_start": {
         const id = event.toolCallId as string;
         const name = event.toolName as string;
+        const args = event.args && typeof event.args === "object" && !Array.isArray(event.args) ? event.args as Record<string, unknown> : undefined;
+        setToolProgressById((prev) => ({
+          ...prev,
+          [id]: { toolCallId: id, toolName: name, args, updatedAt: Date.now(), running: true },
+        }));
         const isSubagent = name === "subagent" || name === "trellis_subagent";
         if (isSubagent) {
-          const args = event.args as Record<string, unknown> | undefined;
           // Skip management actions (list, get, doctor, etc.) — only track execution calls
           if (args && !("action" in args)) {
             const runs = extractSubagentRuns(id, args, name);
@@ -478,7 +502,21 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       case "tool_execution_update": {
         const updateId = event.toolCallId as string;
+        const updateName = event.toolName as string;
+        const updateArgs = event.args && typeof event.args === "object" && !Array.isArray(event.args) ? event.args as Record<string, unknown> : undefined;
         const partial = event.partialResult as { content?: { text?: string }[]; details?: { routing?: SubagentRun["routing"]; runs?: { routing?: SubagentRun["routing"] }[] } } | undefined;
+        setToolProgressById((prev) => ({
+          ...prev,
+          [updateId]: {
+            toolCallId: updateId,
+            toolName: updateName || prev[updateId]?.toolName || "tool",
+            args: updateArgs ?? prev[updateId]?.args,
+            partialResult: event.partialResult as ToolExecutionProgress["partialResult"],
+            result: prev[updateId]?.result,
+            updatedAt: Date.now(),
+            running: true,
+          },
+        }));
         const text = partial?.content?.map((c) => c.text ?? "").join("") ?? "";
         const routing = partial?.details?.routing ?? partial?.details?.runs?.find((run) => run.routing)?.routing;
         if (text || routing) {
@@ -494,7 +532,20 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       case "tool_execution_end": {
         const endId = event.toolCallId as string;
+        const endName = event.toolName as string;
         const isError = !!event.isError;
+        setToolProgressById((prev) => ({
+          ...prev,
+          [endId]: {
+            toolCallId: endId,
+            toolName: endName || prev[endId]?.toolName || "tool",
+            args: prev[endId]?.args,
+            partialResult: prev[endId]?.partialResult,
+            result: event.result as ToolExecutionProgress["result"],
+            updatedAt: Date.now(),
+            running: false,
+          },
+        }));
         const resultText =
           (event.result as { content?: { text?: string }[] } | undefined)
             ?.content?.map((c) => c.text ?? "")
@@ -897,7 +948,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
-    agentPhase, subagentRuns,
+    agentPhase, subagentRuns, toolProgressById,
     isNew,
     // Refs
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,

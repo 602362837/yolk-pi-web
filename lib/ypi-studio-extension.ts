@@ -15,7 +15,14 @@ import {
   updateYpiStudioTaskArtifact,
 } from "./ypi-studio-tasks";
 import { initializeYpiStudioWorkflows, readYpiStudioWorkflow } from "./ypi-studio-workflows";
-import type { YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import {
+  appendYpiStudioSubagentTranscriptItem,
+  createYpiStudioSubagentTranscript,
+  finalizeYpiStudioSubagentTranscript,
+  previewYpiStudioTranscriptText,
+  type YpiStudioSubagentTranscriptWriter,
+} from "./ypi-studio-transcripts";
+import type { YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -24,6 +31,8 @@ interface PiToolResult {
   details: unknown;
   isError?: boolean;
 }
+
+type ToolUpdateCallback = (result: PiToolResult) => void;
 interface PiExtensionContext {
   sessionManager?: {
     getSessionId?: () => string;
@@ -89,6 +98,14 @@ function readText(filePath: string): string {
     return readFileSync(filePath, "utf8");
   } catch {
     return "";
+  }
+}
+
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
   }
 }
 
@@ -293,7 +310,67 @@ function buildPiArgs(input: StudioSubagentInput): string[] {
   return args;
 }
 
-function runChildPi(root: string, prompt: string, input: StudioSubagentInput, signal?: AbortSignal): Promise<{ output: string; failed: boolean }> {
+function contentText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((block) => {
+    if (!isObj(block)) return "";
+    if (block.type === "text" && typeof block.text === "string") return block.text;
+    if (block.type === "thinking" && typeof block.thinking === "string") return "";
+    return "";
+  }).join("");
+}
+
+function resultText(result: unknown): string {
+  if (!isObj(result)) return "";
+  return contentText(result.content);
+}
+
+function eventMessageText(event: unknown): string {
+  if (!isObj(event) || !isObj(event.message)) return "";
+  return contentText(event.message.content);
+}
+
+function eventAssistantDeltaText(event: unknown): string {
+  if (!isObj(event) || !isObj(event.assistantMessageEvent)) return "";
+  const delta = event.assistantMessageEvent;
+  if (typeof delta.delta === "string") return delta.delta;
+  if (typeof delta.content === "string") return delta.content;
+  return "";
+}
+
+interface ChildRunMeta {
+  runId: string;
+  taskId: string;
+  member: string;
+  startedAt: string;
+}
+
+interface ChildRunProgress {
+  startedAt: string;
+  updatedAt: string;
+  eventCount: number;
+  lastTextPreview: string;
+  itemsPreview: YpiStudioSubagentTranscriptItem[];
+  warnings?: string[];
+}
+
+interface ChildPiResult {
+  output: string;
+  status: YpiStudioTaskSubagentRun["status"];
+  transcript?: YpiStudioSubagentTranscriptRef;
+  warnings: string[];
+}
+
+function runChildPi(
+  root: string,
+  prompt: string,
+  input: StudioSubagentInput,
+  meta: ChildRunMeta,
+  writer: YpiStudioSubagentTranscriptWriter | null,
+  signal?: AbortSignal,
+  onUpdate?: ToolUpdateCallback,
+): Promise<ChildPiResult> {
   return new Promise((resolveResult) => {
     const inv = resolvePiCli();
     const child = spawn(inv.command, [...inv.args, ...buildPiArgs(input)], {
@@ -304,26 +381,207 @@ function runChildPi(root: string, prompt: string, input: StudioSubagentInput, si
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
+    const recentItems: YpiStudioSubagentTranscriptItem[] = [];
+    const warnings: string[] = [];
+    let stdoutBuffer = "";
+    let stderrBytes = 0;
+    let eventCount = 0;
+    let lastTextPreview = "Child Pi process started. Waiting for first JSON event…";
+    let finalAssistantOutput = "";
+    let status: YpiStudioTaskSubagentRun["status"] = "running";
     let settled = false;
-    const finish = (output: string, failed: boolean) => {
+    let lastUpdateAt = 0;
+    let updateTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const appendItem = (item: YpiStudioSubagentTranscriptItem): void => {
+      let stored = item;
+      if (writer) {
+        try {
+          stored = appendYpiStudioSubagentTranscriptItem(writer, item);
+        } catch (error) {
+          warnings.push(`Transcript write failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      recentItems.push(stored);
+      if (recentItems.length > 24) recentItems.shift();
+    };
+
+    const progressPayload = (): PiToolResult => {
+      const updatedAt = new Date().toISOString();
+      const progress: ChildRunProgress = {
+        startedAt: meta.startedAt,
+        updatedAt,
+        eventCount,
+        lastTextPreview,
+        itemsPreview: recentItems.slice(-12),
+        warnings: warnings.length ? warnings.slice(-5) : undefined,
+      };
+      const transcript = writer ? { ...writer.ref } : undefined;
+      return {
+        content: [{ type: "text", text: `${meta.member} ${status} · ${eventCount} events · ${oneLine(lastTextPreview, 140)}` }],
+        details: {
+          run: {
+            id: meta.runId,
+            member: meta.member,
+            status,
+            taskId: meta.taskId,
+            transcript,
+            progress,
+          },
+        },
+      };
+    };
+
+    const emitProgress = (force = false): void => {
+      if (!onUpdate) return;
+      const now = Date.now();
+      const send = () => {
+        lastUpdateAt = Date.now();
+        updateTimer = null;
+        try {
+          onUpdate(progressPayload());
+        } catch (error) {
+          warnings.push(`Progress update failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      };
+      if (force || now - lastUpdateAt >= 450) {
+        if (updateTimer) {
+          clearTimeout(updateTimer);
+          updateTimer = null;
+        }
+        send();
+      } else if (!updateTimer) {
+        updateTimer = setTimeout(send, 450 - (now - lastUpdateAt));
+      }
+    };
+
+    const parseLine = (line: string): void => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const at = new Date().toISOString();
+      let event: unknown;
+      try {
+        event = JSON.parse(trimmed) as unknown;
+      } catch {
+        lastTextPreview = trimmed;
+        appendItem({ kind: "status", at, text: `Non-JSON stdout: ${trimmed}` });
+        emitProgress();
+        return;
+      }
+      eventCount += 1;
+      const eventType = isObj(event) && typeof event.type === "string" ? event.type : "json";
+      if (eventType === "agent_start") {
+        lastTextPreview = "Agent started.";
+        appendItem({ kind: "status", at, text: "Child Pi agent started." });
+      } else if (eventType === "agent_end") {
+        lastTextPreview = "Agent finished.";
+        appendItem({ kind: "status", at, text: "Child Pi agent finished." });
+      } else if (eventType === "message_update") {
+        const delta = eventAssistantDeltaText(event);
+        if (delta) lastTextPreview = delta;
+      } else if (eventType === "message_end") {
+        const text = eventMessageText(event).trim();
+        const role = isObj(event) && isObj(event.message) && typeof event.message.role === "string" ? event.message.role : undefined;
+        if (role === "assistant" && text) {
+          finalAssistantOutput = text;
+          lastTextPreview = text;
+          appendItem({ kind: "assistant", at, text, model: str(input.model) ?? undefined });
+        }
+      } else if (eventType === "tool_execution_start") {
+        const ev = isObj(event) ? event : {};
+        const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
+        const toolName = str(ev.toolName) ?? "tool";
+        const preview = previewYpiStudioTranscriptText(ev.args).text;
+        lastTextPreview = `Running tool ${toolName}`;
+        appendItem({ kind: "tool_call", at, toolCallId, toolName, inputPreview: preview });
+      } else if (eventType === "tool_execution_update") {
+        const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
+        if (text) lastTextPreview = text;
+      } else if (eventType === "tool_execution_end" || eventType === "tool_result_end") {
+        const ev = isObj(event) ? event : {};
+        const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
+        const toolName = str(ev.toolName) ?? undefined;
+        const text = resultText(ev.result).trim() || resultText(ev.message).trim() || "(no output)";
+        const isError = ev.isError === true;
+        lastTextPreview = `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
+        appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError });
+      } else if (eventType === "extension_error") {
+        const message = isObj(event) && typeof event.error === "string" ? event.error : safeJson(event);
+        lastTextPreview = message;
+        appendItem({ kind: "error", at, text: message });
+      } else if (eventType !== "response") {
+        lastTextPreview = `Received ${eventType}.`;
+      }
+      emitProgress();
+    };
+
+    const flushStdoutLines = (chunk: Buffer): void => {
+      stdout.push(chunk);
+      stdoutBuffer += chunk.toString("utf8");
+      while (true) {
+        const idx = stdoutBuffer.indexOf("\n");
+        if (idx < 0) break;
+        const line = stdoutBuffer.slice(0, idx).replace(/\r$/, "");
+        stdoutBuffer = stdoutBuffer.slice(idx + 1);
+        parseLine(line);
+      }
+    };
+
+    const finish = (code: number | null, errorMessage?: string) => {
       if (settled) return;
       settled = true;
+      if (updateTimer) clearTimeout(updateTimer);
       signal?.removeEventListener("abort", abort);
-      resolveResult({ output, failed });
-    };
-    const abort = () => {
-      child.kill();
-      finish("cancelled", true);
-    };
-    signal?.addEventListener("abort", abort, { once: true });
-    child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
-    child.on("error", (error) => finish(error instanceof Error ? error.message : String(error), true));
-    child.on("close", (code) => {
+      if (stdoutBuffer.trim()) parseLine(stdoutBuffer);
+      stdoutBuffer = "";
       const out = Buffer.concat(stdout).toString("utf8");
       const err = Buffer.concat(stderr).toString("utf8");
-      finish(extractAssistantText(out, err), code !== 0);
+      if (errorMessage) {
+        status = "failed";
+        appendItem({ kind: "error", at: new Date().toISOString(), text: errorMessage });
+      } else if (status !== "cancelled") {
+        status = code === 0 ? "succeeded" : "failed";
+      }
+      const output = finalAssistantOutput.trim() || extractAssistantText(out, err).trim() || (status === "cancelled" ? "cancelled" : "(no output)");
+      if (output && !finalAssistantOutput.trim()) {
+        appendItem({ kind: status === "failed" ? "error" : "assistant", at: new Date().toISOString(), text: output });
+      }
+      let transcript: YpiStudioSubagentTranscriptRef | undefined;
+      if (writer) {
+        try {
+          transcript = finalizeYpiStudioSubagentTranscript(writer, status);
+        } catch (error) {
+          warnings.push(`Transcript finalize failed: ${error instanceof Error ? error.message : String(error)}`);
+          transcript = { ...writer.ref, status };
+        }
+      }
+      lastTextPreview = output;
+      emitProgress(true);
+      resolveResult({ output, status, transcript, warnings });
+    };
+
+    const abort = () => {
+      status = "cancelled";
+      lastTextPreview = "Cancelled by parent session.";
+      appendItem({ kind: "status", at: new Date().toISOString(), text: "Child Pi run cancelled by parent session." });
+      emitProgress(true);
+      child.kill();
+    };
+
+    signal?.addEventListener("abort", abort, { once: true });
+    appendItem({ kind: "status", at: meta.startedAt, text: "Child Pi process starting." });
+    emitProgress(true);
+    child.stdout?.on("data", flushStdoutLines);
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr.push(chunk);
+      stderrBytes += chunk.length;
+      const text = chunk.toString("utf8");
+      lastTextPreview = text.trim() || `${stderrBytes} stderr bytes`;
+      appendItem({ kind: "stderr", at: new Date().toISOString(), text });
+      emitProgress();
     });
+    child.on("error", (error) => finish(1, error instanceof Error ? error.message : String(error)));
+    child.on("close", (code) => finish(code));
     child.stdin?.end(prompt);
   });
 }
@@ -527,7 +785,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
       },
       required: ["member", "prompt"],
     },
-    execute: async (_id: string, inputValue: unknown, signal?: AbortSignal, _onUpdate?: unknown, ctx?: PiExtensionContext): Promise<PiToolResult> => {
+    execute: async (_id: string, inputValue: unknown, signal?: AbortSignal, onUpdate?: ToolUpdateCallback, ctx?: PiExtensionContext): Promise<PiToolResult> => {
       const input = normalizeSubagentInput(inputValue);
       const key = getKey(input, ctx);
       const member = str(input.member);
@@ -538,22 +796,64 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         const startedAt = new Date().toISOString();
         const runId = `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
         const childPrompt = buildMemberPrompt(root, taskId, member, prompt);
-        const result = await runChildPi(root, childPrompt, input, signal);
+        let writer: YpiStudioSubagentTranscriptWriter | null = null;
+        const warnings: string[] = [];
+        try {
+          writer = createYpiStudioSubagentTranscript(root, taskId, { runId, member, startedAt });
+          appendYpiStudioSubagentTranscriptItem(writer, { kind: "prompt", at: startedAt, text: prompt });
+        } catch (error) {
+          warnings.push(`Transcript capture unavailable: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        const runningRun: YpiStudioTaskSubagentRun = {
+          id: runId,
+          member,
+          status: "running",
+          startedAt,
+          prompt: oneLine(prompt, 240),
+          summary: "Child Pi process starting.",
+          model: str(input.model) ?? undefined,
+          thinking: str(input.thinking) ?? undefined,
+          transcript: writer ? { ...writer.ref } : undefined,
+        };
+        recordYpiStudioSubagentRun(root, taskId, runningRun);
+        onUpdate?.({
+          content: [{ type: "text", text: `${member} running · child process starting` }],
+          details: {
+            run: {
+              id: runId,
+              member,
+              status: "running",
+              taskId,
+              transcript: writer ? { ...writer.ref } : undefined,
+              progress: {
+                startedAt,
+                updatedAt: startedAt,
+                eventCount: 0,
+                lastTextPreview: "Child Pi process starting.",
+                itemsPreview: writer ? [{ kind: "prompt", at: startedAt, text: prompt }] : [],
+                warnings: warnings.length ? warnings : undefined,
+              },
+            },
+          },
+        });
+        const result = await runChildPi(root, childPrompt, input, { runId, taskId, member, startedAt }, writer, signal, onUpdate);
         const finishedAt = new Date().toISOString();
+        const allWarnings = [...warnings, ...result.warnings];
         const run: YpiStudioTaskSubagentRun = {
           id: runId,
           member,
-          status: result.failed ? "failed" : "succeeded",
+          status: result.status,
           startedAt,
           finishedAt,
           prompt: oneLine(prompt, 240),
           summary: oneLine(result.output, 1000),
           model: str(input.model) ?? undefined,
           thinking: str(input.thinking) ?? undefined,
-          error: result.failed ? oneLine(result.output, 1000) : undefined,
+          error: result.status === "failed" || result.status === "cancelled" ? oneLine(result.output, 1000) : undefined,
+          transcript: result.transcript,
         };
         const task = recordYpiStudioSubagentRun(root, taskId, run);
-        return { content: [{ type: "text", text: result.output }], details: { task, run }, isError: result.failed };
+        return { content: [{ type: "text", text: result.output }], details: { task, run, warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { content: [{ type: "text", text: message }], details: { error: message }, isError: true };

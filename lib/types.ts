@@ -92,6 +92,7 @@ export interface ToolResultMessage {
   toolCallId: string;
   toolName?: string;
   content: (TextContent | ImageContent)[];
+  details?: unknown;
   isError?: boolean;
   timestamp?: number;
 }

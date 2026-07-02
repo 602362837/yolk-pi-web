@@ -103,7 +103,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, displayModel: displayModelValue, sessionStats,
-    agentPhase,
+    agentPhase, toolProgressById,
     isNew,
     messagesEndRef, scrollContainerRef,
     lastUserMsgRef,
@@ -383,6 +383,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
                     onEditContent={(content) => chatInputRef?.current?.insertIfEmpty(content)}
                     showTimestamp={showTimestamp}
                     prevTimestamp={idx > 0 ? (messages[idx - 1] as import("@/lib/types").AgentMessage & { timestamp?: number }).timestamp : undefined}
+                    toolProgressById={toolProgressById}
+                    cwd={session?.cwd ?? newSessionCwd ?? undefined}
                   />
                 );
                 if (!isVisible) return view;
@@ -398,7 +400,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
             })()}
 
             {streamState.isStreaming && streamState.streamingMessage && (
-              <MessageView message={streamState.streamingMessage as AgentMessage} isStreaming modelNames={modelNames} />
+              <MessageView message={streamState.streamingMessage as AgentMessage} isStreaming modelNames={modelNames} toolProgressById={toolProgressById} cwd={session?.cwd ?? newSessionCwd ?? undefined} />
             )}
 
             {agentRunning && !streamState.streamingMessage && (
