@@ -874,3 +874,36 @@ Added an optional ChatGPT/Codex usage panel with Settings toggle, cached active-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: Add Trellis design subagent
+
+**Date**: 2026-07-02
+**Task**: Add Trellis design subagent
+**Branch**: `main`
+
+### Summary
+
+Added the Trellis design subagent flow, including agent definition, workflow/prompt routing, and per-agent model settings support.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5f9ad66` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
