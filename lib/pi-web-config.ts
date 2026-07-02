@@ -245,6 +245,7 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
         },
       },
       agents: {
+        "trellis-design": { strategy: "default", minimumTier: "complex" },
         "trellis-implement": { strategy: "default", minimumTier: "complex" },
         "trellis-check": { strategy: "default", minimumTier: "standard" },
         "trellis-research": { strategy: "default" },

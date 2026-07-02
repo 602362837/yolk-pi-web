@@ -77,7 +77,7 @@ const TEMPLATE_VARIABLES = [
 type SettingsSection = "yolk" | "worktree" | "usage" | "terminal" | "chatgpt" | "editor" | "trellis";
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
-const SUBAGENT_AGENT_NAMES = ["trellis-implement", "trellis-check", "trellis-research"];
+const SUBAGENT_AGENT_NAMES = ["trellis-design", "trellis-implement", "trellis-check", "trellis-research"];
 const SUBAGENT_THINKING_OPTIONS: SubagentThinkingOption[] = ["inherit", "off", "minimal", "low", "medium", "high", "xhigh"];
 const SUBAGENT_MODALITIES: PiWebSubagentModality[] = ["text", "multimodal"];
 const SUBAGENT_TIERS: PiWebSubagentDifficultyTier[] = ["simple", "standard", "complex", "critical"];

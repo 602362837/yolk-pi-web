@@ -25,7 +25,8 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 `get_context.py` shows the active task's `status` field. Route by `status` + artifact presence. This command replaces the user needing to remember the Trellis flow; it does not itself approve implementation.
 
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
-- `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** to add `design.md` + `implement.md`.
+- `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex should dispatch `trellis-design` to produce `design.md` + `implement.md`, then return to **1.4** review.
+- `status=planning` + complex task missing `design.md` or `implement.md` → dispatch `trellis-design`.
 - `status=planning` + complex artifacts complete + sub-agent jsonl not curated (only the seed `_example` row) → **1.3**
 - `status=planning` + required artifacts complete + required jsonl curated or inline mode → **1.4** (ask for start review; only run `task.py start` after user confirms)
 - `status=in_progress` + implementation not started → **2.1**
@@ -48,6 +49,17 @@ python3 ./.trellis/scripts/get_context.py --mode phase --step <X.X> --platform p
 ```
 
 Follow the loaded instructions. After each `[required]` step completes, move to the next.
+
+When dispatching the design sub-agent, start the prompt with the active task path:
+
+```text
+Active task: <task path>
+
+You are already the trellis-design sub-agent.
+Read prd.md, research/ if present, relevant specs, and nearby code structure.
+Write or update design.md and implement.md.
+Do not implement code, do not run task.py start, and do not commit.
+```
 
 ---
 
