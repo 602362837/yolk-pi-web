@@ -14,6 +14,7 @@ import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
 import { TrellisPanel } from "./TrellisPanel";
 import { TrellisSessionWidget } from "./TrellisSessionWidget";
+import { YpiStudioSessionWidget } from "./YpiStudioSessionWidget";
 import { YpiStudioPanel } from "./YpiStudioPanel";
 import { BranchNavigator } from "./BranchNavigator";
 import { GitPanel } from "./GitPanel";
@@ -24,6 +25,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
+import type { YpiStudioLiveRunOverlay, YpiStudioSessionTaskLinkResult } from "@/lib/ypi-studio-types";
 import { trellisTaskDetailToChatContext, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import type { ChatInputHandle } from "./ChatInput";
 
@@ -194,6 +196,11 @@ export function AppShell() {
   const [focusedTrellisTaskKey, setFocusedTrellisTaskKey] = useState<string | null>(null);
   const [trellisSessionTask, setTrellisSessionTask] = useState<TrellisSessionTaskLinkResult | null>(null);
   const [trellisSessionTaskRefreshKey, setTrellisSessionTaskRefreshKey] = useState(0);
+  const [focusedStudioTaskKey, setFocusedStudioTaskKey] = useState<string | null>(null);
+  const [studioSessionTask, setStudioSessionTask] = useState<YpiStudioSessionTaskLinkResult | null>(null);
+  const [studioSessionTaskRefreshKey, setStudioSessionTaskRefreshKey] = useState(0);
+  const [studioLiveOverlays, setStudioLiveOverlays] = useState<YpiStudioLiveRunOverlay[]>([]);
+  const [chatAgentRunning, setChatAgentRunning] = useState(false);
   const [pendingTrellisTaskContext, setPendingTrellisTaskContext] = useState<TrellisTaskChatContext | null>(null);
 
   const handleAtMention = useCallback((relativePath: string) => {
@@ -288,6 +295,7 @@ export function AppShell() {
     setExplorerRefreshKey((k) => k + 1);
     setGitRefreshKey((k) => k + 1);
     setTrellisSessionTaskRefreshKey((k) => k + 1);
+    setStudioSessionTaskRefreshKey((k) => k + 1);
   }, []);
 
   const handleSessionForked = useCallback((newSessionId: string) => {
@@ -409,6 +417,59 @@ export function AppShell() {
     setRightPanelMode("trellis");
     setRightPanelOpen(true);
   }, [trellisSessionTask]);
+
+  const loadStudioSessionTask = useCallback(async (signal?: AbortSignal) => {
+    if (!selectedSession || selectedSession.archived) {
+      setStudioSessionTask(null);
+      return;
+    }
+    try {
+      const params = new URLSearchParams();
+      if (branchActiveLeafId) params.set("leafId", branchActiveLeafId);
+      const suffix = params.toString() ? `?${params.toString()}` : "";
+      const res = await fetch(`/api/sessions/${encodeURIComponent(selectedSession.id)}/studio-task${suffix}`, { signal });
+      const data = await res.json() as YpiStudioSessionTaskLinkResult & { error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setStudioSessionTask(data.task ? data : null);
+    } catch (error) {
+      if ((error as { name?: string }).name !== "AbortError") setStudioSessionTask(null);
+    }
+  }, [branchActiveLeafId, selectedSession]);
+
+  useEffect(() => {
+    setFocusedStudioTaskKey(null);
+    setStudioSessionTask(null);
+    setStudioLiveOverlays([]);
+    setChatAgentRunning(false);
+  }, [selectedSession?.id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadStudioSessionTask(controller.signal);
+    return () => controller.abort();
+  }, [loadStudioSessionTask, studioSessionTaskRefreshKey]);
+
+  const studioSessionTaskKey = studioSessionTask?.task?.key ?? null;
+  const studioHasRunning = studioSessionTask?.task?.subagents.some((run) => run.status === "running") || studioLiveOverlays.some((overlay) => overlay.running);
+
+  useEffect(() => {
+    if (!selectedSession || selectedSession.archived) return;
+    if (!studioSessionTaskKey && !chatAgentRunning) return;
+    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), studioHasRunning || chatAgentRunning ? 3000 : 10000);
+    return () => window.clearInterval(interval);
+  }, [chatAgentRunning, selectedSession, studioHasRunning, studioSessionTaskKey]);
+
+  const handleStudioToolProgressChange = useCallback((snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => {
+    setChatAgentRunning(snapshot.agentRunning);
+    setStudioLiveOverlays(snapshot.overlays);
+  }, []);
+
+  const handleOpenStudioSessionTask = useCallback(() => {
+    if (!studioSessionTask?.task) return;
+    setFocusedStudioTaskKey(studioSessionTask.task.key);
+    setRightPanelMode("studio");
+    setRightPanelOpen(true);
+  }, [studioSessionTask]);
 
   const handleOpenTerminalCommand = useCallback((cwd: string, command: string) => {
     setTerminalDockCwd(cwd);
@@ -1093,6 +1154,7 @@ export function AppShell() {
               onSessionStatsChange={handleSessionStatsChange}
               onContextUsageChange={handleContextUsageChange}
               onSubagentChange={handleSubagentChange}
+              onStudioToolProgressChange={handleStudioToolProgressChange}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
             />
           ) : showPlaceholder ? (
@@ -1117,6 +1179,9 @@ export function AppShell() {
           ) : null}
           {showChat && trellisSessionTask?.task && !(rightPanelOpen && rightPanelMode === "trellis" && focusedTrellisTaskKey === trellisSessionTask.task.key) && (
             <TrellisSessionWidget task={trellisSessionTask.task} onClick={handleOpenTrellisSessionTask} />
+          )}
+          {showChat && studioSessionTask?.task && !(rightPanelOpen && rightPanelMode === "studio" && focusedStudioTaskKey === studioSessionTask.task.key) && (
+            <YpiStudioSessionWidget task={studioSessionTask.task} liveOverlays={studioLiveOverlays} onClick={handleOpenStudioSessionTask} />
           )}
           </div>
           {terminalOpen && terminalEnabled && terminalDockCwd && (
@@ -1178,7 +1243,7 @@ export function AppShell() {
               {studioCwd && <span title={studioCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{studioCwd}</span>}
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} />
+              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={studioSessionTaskRefreshKey} />
             </div>
           </>
         ) : (

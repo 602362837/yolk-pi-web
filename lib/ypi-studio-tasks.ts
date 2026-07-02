@@ -898,9 +898,15 @@ export function getYpiStudioTaskDetail(cwd: string, taskIdOrKey: string): YpiStu
   return record ? recordToDetail(ctx, record) : null;
 }
 
+export function getYpiStudioTaskIdForContext(cwd: string, contextId: string): string | null {
+  const ctx = createContext(cwd);
+  if (contextId.startsWith("pi_process_")) return null;
+  return readRuntimePointer(ctx, contextId);
+}
+
 export function getCurrentYpiStudioTaskDetail(cwd: string, contextId: string): YpiStudioTaskDetail | null {
   const ctx = createContext(cwd);
-  const taskId = readRuntimePointer(ctx, contextId);
+  const taskId = getYpiStudioTaskIdForContext(ctx.cwd, contextId);
   return taskId ? getYpiStudioTaskDetail(ctx.cwd, taskId) : null;
 }
 

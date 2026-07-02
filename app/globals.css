@@ -939,6 +939,43 @@ span.linenumber {
   }
 }
 
+@keyframes ypi-studio-widget-flow-dash {
+  to { background-position: 24px 0; }
+}
+
+@keyframes ypi-studio-widget-svg-flow {
+  to { stroke-dashoffset: -28; }
+}
+
+@keyframes ypi-studio-widget-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0); }
+}
+
+.ypi-studio-widget-line-active {
+  background: linear-gradient(90deg, var(--accent), #22c55e, var(--accent)) !important;
+  background-size: 24px 2px !important;
+  animation: ypi-studio-widget-flow-dash 1.2s linear infinite;
+}
+
+.ypi-studio-widget-flow-path {
+  stroke-dasharray: 10 7;
+  animation: ypi-studio-widget-svg-flow 1.4s linear infinite;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+.ypi-studio-widget-pulse {
+  animation: ypi-studio-widget-pulse 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ypi-studio-widget-line-active,
+  .ypi-studio-widget-flow-path,
+  .ypi-studio-widget-pulse {
+    animation: none !important;
+  }
+}
+
 /* ContentEditable input placeholder */
 .ce-input:empty:before {
   content: attr(data-placeholder);

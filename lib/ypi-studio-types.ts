@@ -284,6 +284,96 @@ export interface YpiStudioTasksResponse {
   errors: Array<{ key?: string; pathLabel?: string; message: string }>;
 }
 
+export type YpiStudioSessionTaskLinkSource = "session-runtime" | "task-context" | "session-transcript";
+
+export type YpiStudioSessionTaskLinkReason = "no-workspace" | "no-evidence" | "task-not-found" | "ambiguous";
+
+export type YpiStudioWidgetStepStatus = "done" | "active" | "pending";
+
+export interface YpiStudioTaskWidgetStep {
+  id: string;
+  label: string;
+  owner: string;
+  progress: number;
+  requiresSubagent?: boolean;
+  requiresUserApproval?: boolean;
+  requiredArtifacts: string[];
+  optionalArtifacts: string[];
+  status: YpiStudioWidgetStepStatus;
+}
+
+export interface YpiStudioTaskWidgetSubagentRun {
+  id: string;
+  member: string;
+  status: "running" | "succeeded" | "failed" | "cancelled";
+  startedAt: string;
+  finishedAt?: string;
+  summary?: string;
+  error?: string;
+  model?: string;
+  thinking?: string;
+  modelSource?: string;
+  thinkingSource?: string;
+  transcriptMeta?: YpiStudioSubagentTranscriptRef;
+  lastItemsPreview: YpiStudioSubagentTranscriptItem[];
+  warnings?: string[];
+}
+
+export interface YpiStudioTaskWidgetEvent {
+  type: YpiStudioTaskEventType;
+  at: string;
+  message?: string;
+  from?: string;
+  to?: string;
+  member?: string;
+  artifact?: string;
+}
+
+export interface YpiStudioTaskWidgetProjection {
+  key: string;
+  id: string;
+  title: string;
+  workflowId: string;
+  workflowName?: string;
+  status: string;
+  statusLabel: string;
+  progress: number;
+  currentMember?: string;
+  updatedAt: string;
+  archived?: boolean;
+  archiveMonth?: string;
+  archivedAt?: string;
+  pathLabel: string;
+  artifacts: {
+    required: string[];
+    optional: string[];
+    completed: string[];
+    missing: string[];
+  };
+  steps: YpiStudioTaskWidgetStep[];
+  subagents: YpiStudioTaskWidgetSubagentRun[];
+  events?: YpiStudioTaskWidgetEvent[];
+}
+
+export type YpiStudioSessionTaskLinkResult =
+  | { task: YpiStudioTaskWidgetProjection; source: YpiStudioSessionTaskLinkSource; confidence: "high"; warnings?: string[] }
+  | { task: null; reason: YpiStudioSessionTaskLinkReason; warnings?: string[] };
+
+export interface YpiStudioLiveRunOverlay {
+  toolCallId: string;
+  toolName: "ypi_studio_task" | "ypi_studio_subagent";
+  taskId?: string;
+  taskKey?: string;
+  member?: string;
+  status?: "running" | "succeeded" | "failed" | "cancelled";
+  model?: string;
+  thinking?: string;
+  lastTextPreview?: string;
+  itemsPreview?: YpiStudioSubagentTranscriptItem[];
+  updatedAt: number;
+  running: boolean;
+}
+
 export interface YpiStudioKnowledgeEntry {
   id: string;
   title: string;

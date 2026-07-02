@@ -10,6 +10,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `sessions/[id]/changes/` | GET | List files changed by tracked agent file tools in this session from non-Git sidecar data. |
 | `sessions/[id]/changes/file/` | GET | Return the stored unified diff or metadata-only reason for one tracked session-changed file. |
 | `sessions/[id]/trellis-task/` | GET | Resolve the high-confidence Trellis task associated with one pi session, using session-local transcript evidence or exact per-session Trellis runtime pointers only. |
+| `sessions/[id]/studio-task/` | GET | Resolve the high-confidence YPI Studio task associated with one pi session and return a lightweight widget projection (no artifact bodies or full transcripts). |
 | `sessions/[id]/export/` | GET | Export session as Markdown. |
 | `sessions/new/` | 410 | Deprecated route kept for compatibility. |
 | `agent/new/` | POST | Create a new session and send the first message. |

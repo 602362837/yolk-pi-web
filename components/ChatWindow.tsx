@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PiWebToolPreset } from "@/lib/pi-web-config";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { YpiStudioLiveRunOverlay } from "@/lib/ypi-studio-types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
@@ -26,7 +27,21 @@ interface Props {
   onSubagentChange?: (runs: import("@/hooks/useAgentSession").SubagentRun[]) => void;
   onSessionStatsChange?: (stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
+  onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;
   defaultToolPreset?: PiWebToolPreset;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function textFromContent(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((item) => isRecord(item) && item.type === "text" ? optionalString(item.text) : undefined).filter(Boolean).join(" ").slice(0, 300) || undefined;
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -96,7 +111,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, defaultToolPreset }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, defaultToolPreset }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -155,6 +170,38 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     onContextUsageChange?.(contextUsageRef.current);
   }, [ctxKey, onContextUsageChange]);
   useEffect(() => () => { onContextUsageChange?.(null); }, [onContextUsageChange]);
+
+  const studioProgressSignature = Object.values(toolProgressById)
+    .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent")
+    .map((progress) => `${progress.toolCallId}|${progress.updatedAt}|${progress.running}`)
+    .join(";");
+  useEffect(() => {
+    if (!onStudioToolProgressChange) return;
+    const overlays: YpiStudioLiveRunOverlay[] = Object.values(toolProgressById)
+      .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent")
+      .map((progress) => {
+        const details = (isRecord(progress.result?.details) ? progress.result.details : isRecord(progress.partialResult?.details) ? progress.partialResult.details : {}) as Record<string, unknown>;
+        const run = isRecord(details.run) ? details.run : null;
+        const task = isRecord(details.task) ? details.task : null;
+        const status = optionalString(run?.status) ?? (progress.running ? "running" : progress.result?.isError ? "failed" : undefined);
+        const safeStatus = status === "succeeded" || status === "failed" || status === "cancelled" || status === "running" ? status : undefined;
+        return {
+          toolCallId: progress.toolCallId,
+          toolName: progress.toolName as "ypi_studio_task" | "ypi_studio_subagent",
+          taskId: optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId),
+          taskKey: optionalString(task?.key) ?? optionalString(run?.taskKey),
+          member: optionalString(run?.member) ?? optionalString(progress.args?.member),
+          status: safeStatus,
+          model: optionalString(run?.model),
+          thinking: optionalString(run?.thinking),
+          lastTextPreview: textFromContent(progress.partialResult?.content) ?? textFromContent(progress.result?.content) ?? optionalString(run?.summary),
+          updatedAt: progress.updatedAt,
+          running: progress.running,
+        };
+      });
+    onStudioToolProgressChange({ agentRunning, overlays });
+  }, [agentRunning, onStudioToolProgressChange, studioProgressSignature, toolProgressById]);
+  useEffect(() => () => { onStudioToolProgressChange?.({ agentRunning: false, overlays: [] }); }, [onStudioToolProgressChange]);
 
   const onDrop = useCallback((files: File[]) => {
     const imageFiles = files.filter((f) => f.type.startsWith("image/"));

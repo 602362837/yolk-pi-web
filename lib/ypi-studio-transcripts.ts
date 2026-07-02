@@ -213,6 +213,32 @@ function resolveTranscriptFile(root: string, run: YpiStudioTaskSubagentRun): str
   return target;
 }
 
+export function readYpiStudioSubagentTranscriptPreview(
+  root: string,
+  taskId: string,
+  run: YpiStudioTaskSubagentRun,
+  options: { limit?: number; maxItemBytes?: number } = {},
+): YpiStudioSubagentTranscriptResponse {
+  const limit = Math.min(Math.max(1, options.limit ?? 5), 20);
+  const response = readYpiStudioSubagentTranscript(root, taskId, run, { limit: MAX_API_LIMIT });
+  const maxItemBytes = Math.min(Math.max(64, options.maxItemBytes ?? 300), 2048);
+  return {
+    ...response,
+    items: response.items.slice(-limit).map((item) => normalizeItem(item)).map((item) => {
+      if (item.kind === "tool_call") {
+        const preview = truncateText(item.inputPreview, maxItemBytes);
+        return { ...item, inputPreview: preview.text, truncated: item.truncated || preview.truncated };
+      }
+      if ("text" in item) {
+        const preview = truncateText(item.text, maxItemBytes);
+        return { ...item, text: preview.text, truncated: ("truncated" in item ? item.truncated : false) || preview.truncated } as YpiStudioSubagentTranscriptItem;
+      }
+      return item;
+    }),
+    nextCursor: undefined,
+  };
+}
+
 export function readYpiStudioSubagentTranscript(
   root: string,
   _taskId: string,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type {
   YpiStudioAgent,
   YpiStudioAgentWarning,
@@ -18,6 +18,10 @@ import { MarkdownBody } from "./MarkdownBody";
 interface Props {
   cwd: string | null;
   onOpenFile?: (filePath: string, fileName: string) => void;
+  focusedTaskKey?: string | null;
+  initialTab?: StudioTab;
+  initialScope?: YpiStudioTaskScope;
+  refreshKey?: number;
 }
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -82,8 +86,8 @@ function statusTone(status: string): "success" | "warning" | "error" | "neutral"
   return "neutral";
 }
 
-export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
-  const [activeTab, setActiveTab] = useState<StudioTab>("members");
+export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initialTab, initialScope, refreshKey = 0 }: Props) {
+  const [activeTab, setActiveTab] = useState<StudioTab>(initialTab ?? "members");
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [workflowLoadState, setWorkflowLoadState] = useState<LoadState>("idle");
   const [taskLoadState, setTaskLoadState] = useState<LoadState>("idle");
@@ -93,7 +97,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [initBusy, setInitBusy] = useState(false);
-  const [taskScope, setTaskScope] = useState<YpiStudioTaskScope>("active");
+  const [taskScope, setTaskScope] = useState<YpiStudioTaskScope>(initialScope ?? "active");
   const [initMessage, setInitMessage] = useState<string | null>(null);
   const [initWarning, setInitWarning] = useState<string | null>(null);
 
@@ -200,6 +204,17 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
     return () => controller.abort();
   }, [reloadAll]);
 
+  useEffect(() => {
+    if (!focusedTaskKey) return;
+    setActiveTab("tasks");
+    setTaskScope(focusedTaskKey.startsWith("archived:") ? "archived" : "active");
+  }, [focusedTaskKey]);
+
+  useEffect(() => {
+    if (refreshKey === 0) return;
+    void loadTasks();
+  }, [loadTasks, refreshKey]);
+
   const selectedAgent = useMemo(() => {
     if (!data?.agents.length) return null;
     return data.agents.find((agent) => agent.key === selectedKey) ?? data.agents[0] ?? null;
@@ -304,7 +319,7 @@ export function YpiStudioPanel({ cwd, onOpenFile }: Props) {
       ) : activeTab === "workflows" ? (
         <WorkflowsTab cwd={cwd} loadState={workflowLoadState} data={workflowsData} onOpenFile={onOpenFile} />
       ) : (
-        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} />
+        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} />
       )}
     </div>
   );
@@ -355,7 +370,7 @@ function WorkflowsTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadS
   );
 }
 
-function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchiveTask }: {
+function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchiveTask, focusedTaskKey }: {
   cwd: string;
   scope: YpiStudioTaskScope;
   setScope: (scope: YpiStudioTaskScope) => void;
@@ -363,7 +378,13 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
   data: YpiStudioTasksResponse | null;
   onOpenFile?: (filePath: string, fileName: string) => void;
   onArchiveTask: (task: YpiStudioTaskSummary) => void;
+  focusedTaskKey?: string | null;
 }) {
+  const focusedRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!focusedTaskKey || !focusedRef.current) return;
+    focusedRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusedTaskKey, data?.tasks]);
   const scopeControls = (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       <TabButton active={scope === "active"} label="活跃" onClick={() => setScope("active")} />
@@ -379,7 +400,11 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
   else if (data.tasks.length === 0) content = <PanelEmpty title="任务列表为空" description={scope === "archived" ? "当前没有已归档任务。" : "当前筛选范围没有任务目录。"} />;
   else content = (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {data.tasks.map((task) => <TaskCard key={task.key} cwd={cwd} task={task} onOpenFile={onOpenFile} onArchiveTask={onArchiveTask} />)}
+      {data.tasks.map((task) => (
+        <div key={task.key} ref={task.key === focusedTaskKey ? focusedRef : undefined}>
+          <TaskCard focused={task.key === focusedTaskKey} cwd={cwd} task={task} onOpenFile={onOpenFile} onArchiveTask={onArchiveTask} />
+        </div>
+      ))}
     </div>
   );
 
@@ -477,10 +502,10 @@ function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: Yp
   );
 }
 
-function TaskCard({ cwd, task, onOpenFile, onArchiveTask }: { cwd: string; task: YpiStudioTaskSummary; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void }) {
+function TaskCard({ cwd, task, focused = false, onOpenFile, onArchiveTask }: { cwd: string; task: YpiStudioTaskSummary; focused?: boolean; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void }) {
   const canArchive = !task.archived && task.status === "completed";
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ border: `1px solid ${focused ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: focused ? "var(--bg-selected)" : "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: focused ? "0 0 0 1px rgba(37,99,235,0.18) inset" : "none" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
