@@ -49,8 +49,9 @@ ecosystem.config.cjs
 start-pi-web-proxy.sh
 update-pi-web.sh
 
-# runtime logs (never commit)
+# runtime logs and ephemeral Studio session bindings (never commit)
 logs/
+.ypi/.runtime/
 
 # work handoff / task notes (not project code)
 handoff/
