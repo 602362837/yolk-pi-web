@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { SessionEntry, AgentMessage, ToolResultMessage, AssistantMessage, ToolCallContent } from "./types";
 import { getYpiStudioTaskDetail, getYpiStudioTaskIdForContext, listYpiStudioTasks } from "./ypi-studio-tasks";
 import { readYpiStudioSubagentTranscriptPreview } from "./ypi-studio-transcripts";
+import { orderYpiStudioWorkflowStates } from "./ypi-studio-workflow-flow";
 import { readYpiStudioWorkflow } from "./ypi-studio-workflows";
 import type {
   YpiStudioSessionTaskLinkResult,
@@ -9,7 +10,6 @@ import type {
   YpiStudioTaskDetail,
   YpiStudioTaskSummary,
   YpiStudioTaskWidgetProjection,
-  YpiStudioWorkflow,
   YpiStudioWorkflowState,
   YpiStudioTaskWidgetSubagentRun,
   YpiStudioSubagentTranscriptItem,
@@ -272,41 +272,6 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
   });
 }
 
-function orderedWorkflowStates(workflow: YpiStudioWorkflow | null, currentStatus: string): YpiStudioWorkflowState[] {
-  if (!workflow) return [];
-  const output: YpiStudioWorkflowState[] = [];
-  const seen = new Set<string>();
-  let current = workflow.initialStatus;
-  const targetTerminal = workflow.states.completed ? "completed" : workflow.terminalStatuses.find((status) => workflow.states[status]);
-
-  while (current && workflow.states[current] && !seen.has(current)) {
-    output.push(workflow.states[current]);
-    seen.add(current);
-    if (current === targetTerminal) break;
-    const next = workflow.transitions.find((transition) => (
-      transition.from === current
-      && !transition.overrideAllowed
-      && transition.to !== current
-      && (!workflow.terminalStatuses.includes(transition.to) || transition.to === targetTerminal)
-    ));
-    if (!next) break;
-    current = next.to;
-  }
-
-  // Exceptional states such as blocked/cancelled/changes_requested should not sit in the happy-path line.
-  // Show them only when current, as a branch alternative before the happy terminal. Archive is special:
-  // it is a post-completion state, so it remains after completed.
-  if (!seen.has(currentStatus) && workflow.states[currentStatus]) {
-    const isPostCompletion = currentStatus === "archived" && targetTerminal === "completed";
-    if (!isPostCompletion && targetTerminal) {
-      const terminalIndex = output.findIndex((state) => state.id === targetTerminal);
-      if (terminalIndex >= 0) output.splice(terminalIndex, 1);
-    }
-    output.push(workflow.states[currentStatus]);
-  }
-  return output;
-}
-
 function stepStatus(stateIndex: number, currentIndex: number, state: YpiStudioWorkflowState, detail: YpiStudioTaskDetail): "done" | "active" | "pending" {
   if (currentIndex >= 0) return stateIndex < currentIndex ? "done" : stateIndex === currentIndex ? "active" : "pending";
   return state.id === detail.status ? "active" : state.progress < detail.progress.percent ? "done" : "pending";
@@ -316,7 +281,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
   const detail = getYpiStudioTaskDetail(cwd, summary.key);
   if (!detail) return null;
   const workflow = readYpiStudioWorkflow(cwd, detail.workflowId);
-  const states = orderedWorkflowStates(workflow, detail.status);
+  const states = orderYpiStudioWorkflowStates(workflow, detail.status);
   const currentIndex = states.findIndex((state) => state.id === detail.status);
   const steps = states.length > 0 ? states.map((state, index) => ({
     id: state.id,

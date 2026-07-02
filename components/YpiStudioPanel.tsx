@@ -15,6 +15,7 @@ import type {
   YpiStudioWorkflowsResponse,
 } from "@/lib/ypi-studio-types";
 import { MarkdownBody } from "./MarkdownBody";
+import { TaskWorkflowFlowSection, WorkflowDetailPanel } from "./YpiStudioWorkflowDetail";
 
 interface Props {
   cwd: string | null;
@@ -321,7 +322,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
       ) : activeTab === "workflows" ? (
         <WorkflowsTab cwd={cwd} loadState={workflowLoadState} data={workflowsData} onOpenFile={onOpenFile} />
       ) : (
-        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} data={tasksData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} />
+        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} data={tasksData} workflowsData={workflowsData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} />
       )}
     </div>
   );
@@ -360,24 +361,33 @@ function MembersTab({ loadState, data, selectedAgent, selectedKey, setSelectedKe
 }
 
 function WorkflowsTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadState: LoadState; data: YpiStudioWorkflowsResponse | null; onOpenFile?: (filePath: string, fileName: string) => void }) {
+  const [detailWorkflowKey, setDetailWorkflowKey] = useState<string | null>(null);
+  const detailWorkflow = detailWorkflowKey ? data?.workflows.find((workflow) => workflow.key === detailWorkflowKey || workflow.id === detailWorkflowKey) ?? null : null;
+
+  useEffect(() => {
+    setDetailWorkflowKey((current) => current && data?.workflows.some((workflow) => workflow.key === current || workflow.id === current) ? current : null);
+  }, [data?.workflows]);
+
   if (loadState === "loading") return <PanelEmpty title="正在读取工作室流程" description="检查当前项目的 .ypi/workflows/ 目录。" />;
   if (loadState === "error" && !data) return <PanelEmpty title="读取失败" description="请检查上方错误信息。" />;
   if (!data?.exists) return <PanelEmpty title="尚未初始化流程" description="点击“初始化工作室”会创建默认工作流 JSON：功能开发、Bug 修复、UI 改动、只检查。" />;
   if (data.workflows.length === 0) return <PanelEmpty title="没有流程文件" description=".ypi/workflows/ 已存在，但没有可读取的 JSON 流程文件。" />;
+  if (detailWorkflow) return <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12 }}><WorkflowDetailPanel cwd={cwd} workflow={detailWorkflow} onBack={() => setDetailWorkflowKey(null)} onOpenFile={onOpenFile} /></div>;
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-      {data.workflows.map((workflow) => <WorkflowCard key={workflow.key} cwd={cwd} workflow={workflow} onOpenFile={onOpenFile} />)}
+      {data.workflows.map((workflow) => <WorkflowCard key={workflow.key} cwd={cwd} workflow={workflow} onSelect={() => setDetailWorkflowKey(workflow.key)} onOpenFile={onOpenFile} />)}
     </div>
   );
 }
 
-function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchiveTask, focusedTaskKey }: {
+function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpenFile, onArchiveTask, focusedTaskKey }: {
   cwd: string;
   scope: YpiStudioTaskScope;
   setScope: (scope: YpiStudioTaskScope) => void;
   loadState: LoadState;
   data: YpiStudioTasksResponse | null;
+  workflowsData: YpiStudioWorkflowsResponse | null;
   onOpenFile?: (filePath: string, fileName: string) => void;
   onArchiveTask: (task: YpiStudioTaskSummary) => void;
   focusedTaskKey?: string | null;
@@ -456,6 +466,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, onOpenFile, onArchive
       setActiveTab={setDetailTab}
       onBack={() => setDetailTaskKey(null)}
       onOpenFile={onOpenFile}
+      workflow={taskDetail ? workflowsData?.workflows.find((workflow) => workflow.id === taskDetail.workflowId || workflow.key === taskDetail.workflowId) ?? null : null}
     />
   );
   else content = (
@@ -537,10 +548,10 @@ function AgentCard({ agent, active, onClick }: { agent: YpiStudioAgent; active: 
   );
 }
 
-function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: YpiStudioWorkflowFile; onOpenFile?: (filePath: string, fileName: string) => void }) {
+function WorkflowCard({ cwd, workflow, onSelect, onOpenFile }: { cwd: string; workflow: YpiStudioWorkflowFile; onSelect: () => void; onOpenFile?: (filePath: string, fileName: string) => void }) {
   const states = Object.values(workflow.states).sort((a, b) => a.progress - b.progress);
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div onClick={onSelect} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(); }} style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10, cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 800 }}>{workflow.name}</div>
@@ -548,7 +559,8 @@ function WorkflowCard({ cwd, workflow, onOpenFile }: { cwd: string; workflow: Yp
           <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 5 }}>{workflow.pathLabel}</div>
         </div>
         <button
-          onClick={() => onOpenFile?.(workflowFilePath(cwd, workflow), workflow.fileName)}
+          onClick={(event) => { event.stopPropagation(); onOpenFile?.(workflowFilePath(cwd, workflow), workflow.fileName); }}
+          onKeyDown={(event) => event.stopPropagation()}
           disabled={!onOpenFile}
           style={smallButtonStyle(Boolean(onOpenFile))}
         >
@@ -627,9 +639,10 @@ function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOp
   );
 }
 
-function TaskDetailPanel({ cwd, task, loadState, error, activeTab, setActiveTab, onBack, onOpenFile }: {
+function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, setActiveTab, onBack, onOpenFile }: {
   cwd: string;
   task: YpiStudioTaskDetail | null;
+  workflow: YpiStudioWorkflowFile | null;
   loadState: LoadState;
   error: string | null;
   activeTab: TaskDetailTab;
@@ -660,7 +673,7 @@ function TaskDetailPanel({ cwd, task, loadState, error, activeTab, setActiveTab,
         <TabButton active={activeTab === "events"} label={`事件 ${task.events.length}`} onClick={() => setActiveTab("events")} />
         <TabButton active={activeTab === "metadata"} label="元数据" onClick={() => setActiveTab("metadata")} />
       </div>
-      {activeTab === "overview" ? <TaskOverviewTab task={task} />
+      {activeTab === "overview" ? <TaskOverviewTab task={task} workflow={workflow} />
         : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
         : activeTab === "subagents" ? <TaskSubagentsTab task={task} />
         : activeTab === "events" ? <TaskEventsTab task={task} />
@@ -680,7 +693,7 @@ function TaskDetailShell({ onBack, children }: { onBack: () => void; children: R
   );
 }
 
-function TaskOverviewTab({ task }: { task: YpiStudioTaskDetail }) {
+function TaskOverviewTab({ task, workflow }: { task: YpiStudioTaskDetail; workflow: YpiStudioWorkflowFile | null }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ height: 8, borderRadius: 999, background: "var(--border)", overflow: "hidden" }}><div style={{ width: `${Math.max(0, Math.min(100, task.progress.percent))}%`, height: "100%", background: "var(--accent)" }} /></div>
@@ -692,6 +705,7 @@ function TaskOverviewTab({ task }: { task: YpiStudioTaskDetail }) {
         <DetailRow label="更新" value={formatDateTime(task.updatedAt)} />
         <DetailRow label="完成" value={task.completedAt ? formatDateTime(task.completedAt) : "—"} />
       </div>
+      <TaskWorkflowFlowSection task={task} workflow={workflow} />
       <SectionCard title="路径与上下文">
         <DetailRow label="目录" value={task.pathLabel} mono />
         <DetailRow label="CWD" value={task.cwd} mono />

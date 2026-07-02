@@ -19,6 +19,7 @@ import type {
   YpiStudioWorkflowsInitResponse,
   YpiStudioWorkflowsResponse,
 } from "./ypi-studio-types";
+export { buildYpiStudioWorkflowFlow, getYpiStudioWorkflowBranchTransitions, orderYpiStudioWorkflowStates } from "./ypi-studio-workflow-flow";
 
 const WORKFLOWS_DIR = path.join(".ypi", "workflows");
 

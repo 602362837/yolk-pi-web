@@ -101,6 +101,25 @@ export interface YpiStudioWorkflowFile extends YpiStudioWorkflow {
   readError?: string;
 }
 
+export interface YpiStudioWorkflowFlowStep {
+  state: YpiStudioWorkflowState;
+  index: number;
+  isCurrent: boolean;
+}
+
+export interface YpiStudioWorkflowFlowTransition {
+  transition: YpiStudioWorkflowTransition;
+  fromState?: YpiStudioWorkflowState;
+  toState?: YpiStudioWorkflowState;
+}
+
+export interface YpiStudioWorkflowFlow {
+  steps: YpiStudioWorkflowFlowStep[];
+  mainTransitions: YpiStudioWorkflowFlowTransition[];
+  branchTransitions: YpiStudioWorkflowFlowTransition[];
+  warnings: string[];
+}
+
 export interface YpiStudioWorkflowWriteResult {
   id: string;
   fileName: string;
