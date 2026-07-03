@@ -355,6 +355,7 @@ const MAX_CHILD_STDERR_BYTES = 1 * 1024 * 1024;
 const MAX_CHILD_STDOUT_LINE_BYTES = 1 * 1024 * 1024;
 const MAX_CHILD_FINAL_OUTPUT_BYTES = 256 * 1024;
 const MAX_CHILD_LIVE_PREVIEW_BYTES = 4 * 1024;
+const CHILD_RECENT_PROGRESS_LIMIT = 5;
 const MAX_CHILD_TAIL_BYTES = 64 * 1024;
 const CHILD_NO_FIRST_EVENT_WARN_MS = 60_000;
 const CHILD_IDLE_TIMEOUT_MS = 10 * 60_000;
@@ -468,6 +469,7 @@ interface ChildPiResult {
   transcript?: YpiStudioSubagentTranscriptRef;
   warnings: string[];
   progress: YpiStudioSubagentRunProgress;
+  terminationReason?: string;
 }
 
 function runChildPi(
@@ -508,6 +510,8 @@ function runChildPi(
     let lastMessageTextTail = "";
     let lastTextPreview = "Child Pi process started. Waiting for first JSON event…";
     let finalAssistantOutput = "";
+    let previewTruncated = false;
+    let finalOutputTruncated = false;
     let status: YpiStudioTaskSubagentRun["status"] = "running";
     let terminationReason: string | undefined;
     let settled = false;
@@ -564,16 +568,18 @@ function runChildPi(
         }
       }
       recentItems.push(stored);
-      if (recentItems.length > 24) recentItems.shift();
+      while (recentItems.length > CHILD_RECENT_PROGRESS_LIMIT) recentItems.shift();
     };
 
-    const safeRecentItems = (): YpiStudioSubagentTranscriptItem[] => recentItems.slice(-12).map((item) => {
+    const safeRecentItems = (): YpiStudioSubagentTranscriptItem[] => recentItems.slice(-CHILD_RECENT_PROGRESS_LIMIT).map((item) => {
       if (item.kind === "tool_call") {
         const preview = truncateBytes(item.inputPreview, MAX_CHILD_LIVE_PREVIEW_BYTES);
+        if (preview.truncated) previewTruncated = true;
         return { ...item, inputPreview: preview.text, truncated: item.truncated || preview.truncated };
       }
       if ("text" in item) {
         const preview = truncateBytes(item.text, MAX_CHILD_LIVE_PREVIEW_BYTES);
+        if (preview.truncated) previewTruncated = true;
         return { ...item, text: preview.text, truncated: ("truncated" in item ? item.truncated : false) || preview.truncated } as YpiStudioSubagentTranscriptItem;
       }
       return item;
@@ -598,6 +604,14 @@ function runChildPi(
         firstTokenAt,
         lastTokenAt,
         currentTool,
+        display: {
+          recentLimit: CHILD_RECENT_PROGRESS_LIMIT,
+          previewTruncated,
+          finalOutputTruncated,
+          transcriptItemTruncated: writer?.ref.truncation?.itemTruncated === true,
+          transcriptCaptureLimited: writer?.ref.truncation?.captureLimited === true,
+        },
+        terminationReason: terminationReason ?? undefined,
       };
     };
 
@@ -619,6 +633,7 @@ function runChildPi(
             policy: policy.diagnostics,
             transcript,
             progress,
+            terminationReason: terminationReason ?? undefined,
           },
         },
       };
@@ -694,7 +709,10 @@ function runChildPi(
 
     const rememberAssistantOutput = (text: string): string => {
       const truncated = truncateBytes(text, MAX_CHILD_FINAL_OUTPUT_BYTES);
-      if (truncated.truncated) addWarning(`Assistant output exceeded ${MAX_CHILD_FINAL_OUTPUT_BYTES} bytes and was truncated.`);
+      if (truncated.truncated) {
+        finalOutputTruncated = true;
+        addWarning(`Display note: final assistant output was clipped to ${MAX_CHILD_FINAL_OUTPUT_BYTES} bytes for the parent result; the member run status is unchanged.`);
+      }
       finalAssistantOutput = truncated.text;
       return truncated.text;
     };
@@ -869,7 +887,7 @@ function runChildPi(
         tokenSource = "estimated_chars";
       }
       emitProgress(true);
-      resolveResult({ output, status, transcript, warnings, progress: progressSnapshot() });
+      resolveResult({ output, status, transcript, warnings, progress: progressSnapshot(), terminationReason: terminationReason ?? undefined });
     };
 
     const abort = () => terminateChild("abort_signal", "cancelled");
@@ -1245,6 +1263,14 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         } catch (error) {
           warnings.push(`Transcript capture unavailable: ${error instanceof Error ? error.message : String(error)}`);
         }
+        const promptPreview = previewYpiStudioTranscriptText(prompt, MAX_CHILD_LIVE_PREVIEW_BYTES);
+        const initialItemsPreview: YpiStudioSubagentTranscriptItem[] = writer ? [{ kind: "prompt", at: startedAt, text: promptPreview.text, truncated: promptPreview.truncated }] : [];
+        const initialDisplay = {
+          recentLimit: CHILD_RECENT_PROGRESS_LIMIT,
+          previewTruncated: promptPreview.truncated || undefined,
+          transcriptItemTruncated: writer?.ref.truncation?.itemTruncated === true || undefined,
+          transcriptCaptureLimited: writer?.ref.truncation?.captureLimited === true || undefined,
+        } satisfies YpiStudioSubagentRunProgress["display"];
         const runningRun: YpiStudioTaskSubagentRun = {
           id: runId,
           member,
@@ -1265,8 +1291,9 @@ export function createYpiStudioExtension(workspaceRoot: string) {
             updatedAt: startedAt,
             eventCount: 0,
             lastTextPreview: "Child Pi process starting.",
-            itemsPreview: writer ? [{ kind: "prompt", at: startedAt, text: prompt }] : [],
+            itemsPreview: initialItemsPreview,
             warnings: [...policy.warnings, ...warnings],
+            display: initialDisplay,
           },
           transcript: writer ? { ...writer.ref } : undefined,
         };
@@ -1293,8 +1320,9 @@ export function createYpiStudioExtension(workspaceRoot: string) {
                 updatedAt: startedAt,
                 eventCount: 0,
                 lastTextPreview: "Child Pi process starting.",
-                itemsPreview: writer ? [{ kind: "prompt", at: startedAt, text: prompt }] : [],
+                itemsPreview: initialItemsPreview,
                 warnings: [...policy.warnings, ...warnings],
+                display: initialDisplay,
               } satisfies YpiStudioSubagentRunProgress,
             },
           },
@@ -1317,6 +1345,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           thinkingSource: policy.thinkingSource,
           policy: policy.diagnostics,
           progress: result.progress,
+          terminationReason: result.terminationReason,
           error: result.status === "failed" || result.status === "cancelled" ? oneLine(result.output, 1000) : undefined,
           transcript: result.transcript,
         };

@@ -77,9 +77,18 @@ function statsLabel(run: Pick<YpiStudioTaskWidgetSubagentRun, "tokens" | "tps">)
   return [tokens, tps].filter(Boolean).join(" · ") || undefined;
 }
 
+function isDisplayOnlyNote(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return normalized.startsWith("display note:") || normalized.includes("api projection limits") || normalized.includes("member run status is unchanged");
+}
+
 function previewForRun(run: YpiStudioTaskWidgetSubagentRun): string {
   const recovery = run.status === "failed" || run.status === "cancelled" ? "可重试或从当前阶段继续" : undefined;
-  return [run.warnings?.slice(-1)[0], run.lastItemsPreview.map(itemText).filter(Boolean).slice(-2).join(" · ") || run.summary || run.error || recovery || "等待成员输出…"].filter(Boolean).join(" · ");
+  const latestWarning = run.warnings?.slice(-1)[0];
+  const displayNote = latestWarning && isDisplayOnlyNote(latestWarning) ? latestWarning.replace(/^Display note:\s*/i, "显示说明：") : undefined;
+  const runtimeWarning = latestWarning && !displayNote ? latestWarning : undefined;
+  const activity = run.lastItemsPreview.map(itemText).filter(Boolean).slice(-2).join(" · ") || run.summary || run.error || recovery || "等待成员输出…";
+  return [runtimeWarning, activity, displayNote].filter(Boolean).join(" · ");
 }
 
 function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveRunOverlay[] = []): YpiStudioTaskWidgetSubagentRun[] {

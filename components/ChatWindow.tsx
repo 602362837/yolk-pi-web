@@ -206,6 +206,16 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         optionalNumber(runProgress?.tokens) ?? "",
         optionalNumber(runProgress?.tps) ?? "",
         optionalString(isRecord(runProgress?.currentTool) ? runProgress.currentTool.toolName : undefined) ?? "",
+        Array.isArray(runProgress?.itemsPreview) ? runProgress.itemsPreview.length : "",
+        Array.isArray(runProgress?.itemsPreview) ? JSON.stringify(runProgress.itemsPreview.slice(-2).map((item) => isRecord(item) ? [optionalString(item.kind), optionalString(item.at), optionalString(item.text) ?? optionalString(item.inputPreview), item.truncated === true] : null)) : "",
+        isRecord(runProgress?.display) ? [
+          runProgress.display.recentLimit,
+          runProgress.display.previewTruncated === true,
+          runProgress.display.finalOutputTruncated === true,
+          runProgress.display.transcriptItemTruncated === true,
+          runProgress.display.transcriptCaptureLimited === true,
+          runProgress.display.apiProjectionLimited === true,
+        ].join(",") : "",
       ].join("|");
     })
     .join(";");

@@ -126,7 +126,20 @@ function normalizePolicyDiagnostics(value: unknown): YpiStudioSubagentPolicyDiag
 }
 
 function normalizeRunProgress(value: unknown): YpiStudioSubagentRunProgress | undefined {
-  return isRecord(value) && value.schemaVersion === 1 ? value as unknown as YpiStudioSubagentRunProgress : undefined;
+  if (!isRecord(value) || value.schemaVersion !== 1) return undefined;
+  const progress = value as unknown as YpiStudioSubagentRunProgress;
+  if (isRecord(value.display)) {
+    progress.display = {
+      recentLimit: numberOr(value.display.recentLimit, progress.itemsPreview?.length ?? 0),
+      previewTruncated: value.display.previewTruncated === true,
+      finalOutputTruncated: value.display.finalOutputTruncated === true,
+      transcriptItemTruncated: value.display.transcriptItemTruncated === true,
+      transcriptCaptureLimited: value.display.transcriptCaptureLimited === true,
+      apiProjectionLimited: value.display.apiProjectionLimited === true,
+    };
+  }
+  progress.terminationReason = optionalString(value.terminationReason);
+  return progress;
 }
 
 
@@ -348,6 +361,12 @@ function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef 
     stderrBytes: typeof value.stderrBytes === "number" ? value.stderrBytes : 0,
     bytes: typeof value.bytes === "number" ? value.bytes : 0,
     truncated: value.truncated === true,
+    truncation: isRecord(value.truncation) ? {
+      itemTruncated: value.truncation.itemTruncated === true,
+      captureLimited: value.truncation.captureLimited === true,
+      bytesLimit: typeof value.truncation.bytesLimit === "number" ? value.truncation.bytesLimit : undefined,
+      itemBytesLimit: typeof value.truncation.itemBytesLimit === "number" ? value.truncation.itemBytesLimit : undefined,
+    } : undefined,
   };
 }
 
@@ -603,6 +622,7 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
         thinkingSource: optionalString(run.thinkingSource),
         policy: normalizePolicyDiagnostics(run.policy),
         progress: normalizeRunProgress(run.progress),
+        terminationReason: optionalString(run.terminationReason),
         error: optionalString(run.error),
         transcript: normalizeTranscriptRef(run.transcript),
       }))

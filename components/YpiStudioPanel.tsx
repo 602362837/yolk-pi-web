@@ -24,6 +24,8 @@ interface Props {
   initialTab?: StudioTab;
   initialScope?: YpiStudioTaskScope;
   refreshKey?: number;
+  currentSessionContextId?: string | null;
+  onTaskBound?: (task: YpiStudioTaskDetail) => void;
 }
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -90,7 +92,7 @@ function statusTone(status: string): "success" | "warning" | "error" | "neutral"
   return "neutral";
 }
 
-export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initialTab, initialScope, refreshKey = 0 }: Props) {
+export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initialTab, initialScope, refreshKey = 0, currentSessionContextId = null, onTaskBound }: Props) {
   const [activeTab, setActiveTab] = useState<StudioTab>(initialTab ?? "members");
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [workflowLoadState, setWorkflowLoadState] = useState<LoadState>("idle");
@@ -368,7 +370,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
       ) : activeTab === "workflows" ? (
         <WorkflowsTab cwd={cwd} loadState={workflowLoadState} data={workflowsData} onOpenFile={onOpenFile} />
       ) : (
-        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} refreshing={tasksRefreshing} data={tasksData} workflowsData={workflowsData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} />
+        <TasksTab cwd={cwd} scope={taskScope} setScope={setTaskScope} loadState={taskLoadState} refreshing={tasksRefreshing} data={tasksData} workflowsData={workflowsData} onOpenFile={onOpenFile} onArchiveTask={handleArchiveTask} focusedTaskKey={focusedTaskKey} currentSessionContextId={currentSessionContextId} onTaskBound={onTaskBound} reloadTasks={loadTasks} />
       )}
     </div>
   );
@@ -427,7 +429,7 @@ function WorkflowsTab({ cwd, loadState, data, onOpenFile }: { cwd: string; loadS
   );
 }
 
-function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflowsData, onOpenFile, onArchiveTask, focusedTaskKey }: {
+function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflowsData, onOpenFile, onArchiveTask, focusedTaskKey, currentSessionContextId, onTaskBound, reloadTasks }: {
   cwd: string;
   scope: YpiStudioTaskScope;
   setScope: (scope: YpiStudioTaskScope) => void;
@@ -438,6 +440,9 @@ function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflows
   onOpenFile?: (filePath: string, fileName: string) => void;
   onArchiveTask: (task: YpiStudioTaskSummary) => void;
   focusedTaskKey?: string | null;
+  currentSessionContextId?: string | null;
+  onTaskBound?: (task: YpiStudioTaskDetail) => void;
+  reloadTasks: (signal?: AbortSignal, options?: LoadOptions) => Promise<void>;
 }) {
   const focusedRef = useRef<HTMLDivElement | null>(null);
   const [detailTaskKey, setDetailTaskKey] = useState<string | null>(focusedTaskKey ?? null);
@@ -445,6 +450,8 @@ function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflows
   const [detailLoadState, setDetailLoadState] = useState<LoadState>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<TaskDetailTab>("overview");
+  const [bindBusyKey, setBindBusyKey] = useState<string | null>(null);
+  const [bindMessage, setBindMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!focusedTaskKey || !focusedRef.current) return;
@@ -490,6 +497,31 @@ function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflows
     return () => controller.abort();
   }, [cwd, detailTaskKey]);
 
+  const handleBindTask = useCallback(async (task: YpiStudioTaskSummary | YpiStudioTaskDetail) => {
+    if (!currentSessionContextId || task.archived || bindBusyKey) return;
+    setBindBusyKey(task.key);
+    setBindMessage(null);
+    setDetailError(null);
+    try {
+      const res = await fetch(`/api/studio/tasks/${encodeURIComponent(task.key)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd, action: "bind", contextId: currentSessionContextId }),
+      });
+      const body = await res.json() as { task?: YpiStudioTaskDetail; error?: string };
+      if (!res.ok || body.error || !body.task) throw new Error(body.error ?? `HTTP ${res.status}`);
+      setBindMessage("已绑定到当前聊天。后续确认/继续会在当前聊天上下文中生效。");
+      if (detailTaskKey === task.key) setTaskDetail(body.task);
+      onTaskBound?.(body.task);
+      await reloadTasks(undefined, { background: true });
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : String(err));
+      setBindMessage(null);
+    } finally {
+      setBindBusyKey(null);
+    }
+  }, [bindBusyKey, currentSessionContextId, cwd, detailTaskKey, onTaskBound, reloadTasks]);
+
   const scopeControls = (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       <TabButton active={scope === "active"} label="活跃" onClick={() => setScope("active")} />
@@ -514,6 +546,10 @@ function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflows
       onBack={() => setDetailTaskKey(null)}
       onOpenFile={onOpenFile}
       workflow={taskDetail ? workflowsData?.workflows.find((workflow) => workflow.id === taskDetail.workflowId || workflow.key === taskDetail.workflowId) ?? null : null}
+      currentSessionContextId={currentSessionContextId}
+      bindBusy={bindBusyKey === detailTaskKey}
+      bindMessage={bindMessage}
+      onBindTask={handleBindTask}
     />
   );
   else content = (
@@ -528,6 +564,9 @@ function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflows
             onSelect={() => setDetailTaskKey(task.key)}
             onOpenFile={onOpenFile}
             onArchiveTask={onArchiveTask}
+            currentSessionContextId={currentSessionContextId}
+            bindBusy={bindBusyKey === task.key}
+            onBindTask={handleBindTask}
           />
         </div>
       ))}
@@ -538,6 +577,7 @@ function TasksTab({ cwd, scope, setScope, loadState, refreshing, data, workflows
     <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       {!detailTaskKey && scopeControls}
       {(refreshing || (loadState === "loading" && data)) && <Notice tone="info" text="后台刷新任务中，当前内容会保留。" />}
+      {!detailTaskKey && bindMessage && <Notice tone="success" text={bindMessage} />}
       {content}
     </div>
   );
@@ -630,9 +670,11 @@ function WorkflowCard({ cwd, workflow, onSelect, onOpenFile }: { cwd: string; wo
   );
 }
 
-function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOpenFile, onArchiveTask }: { cwd: string; task: YpiStudioTaskSummary; focused?: boolean; selected?: boolean; onSelect?: () => void; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void }) {
+function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOpenFile, onArchiveTask, currentSessionContextId, bindBusy = false, onBindTask }: { cwd: string; task: YpiStudioTaskSummary; focused?: boolean; selected?: boolean; onSelect?: () => void; onOpenFile?: (filePath: string, fileName: string) => void; onArchiveTask: (task: YpiStudioTaskSummary) => void; currentSessionContextId?: string | null; bindBusy?: boolean; onBindTask?: (task: YpiStudioTaskSummary) => void }) {
   const canArchive = !task.archived && task.status === "completed";
-  const highlighted = focused || selected;
+  const canBind = !task.archived && !!currentSessionContextId;
+  const alreadyBound = !!currentSessionContextId && task.contextIds.includes(currentSessionContextId);
+  const highlighted = focused || selected || alreadyBound;
   return (
     <div onClick={onSelect} role={onSelect ? "button" : undefined} tabIndex={onSelect ? 0 : undefined} onKeyDown={(event) => { if (onSelect && (event.key === "Enter" || event.key === " ")) onSelect(); }} style={{ border: `1px solid ${highlighted ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: highlighted ? "var(--bg-selected)" : "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10, boxShadow: highlighted ? "0 0 0 1px rgba(37,99,235,0.18) inset" : "none", cursor: onSelect ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -647,6 +689,17 @@ function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOp
           <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 5 }}>{task.pathLabel}</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {canBind && (
+            <button
+              onClick={(event) => { event.stopPropagation(); onBindTask?.(task); }}
+              onKeyDown={(event) => event.stopPropagation()}
+              disabled={bindBusy || alreadyBound}
+              title={alreadyBound ? "该任务已绑定到当前聊天" : "把这个任务绑定到当前聊天，便于继续审批和实现"}
+              style={smallButtonStyle(!bindBusy && !alreadyBound)}
+            >
+              {bindBusy ? "绑定中…" : alreadyBound ? "已绑定" : "绑定/继续"}
+            </button>
+          )}
           {canArchive && (
             <button
               onClick={(event) => { event.stopPropagation(); onArchiveTask(task); }}
@@ -695,7 +748,7 @@ function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOp
   );
 }
 
-function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, setActiveTab, onBack, onOpenFile }: {
+function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, setActiveTab, onBack, onOpenFile, currentSessionContextId, bindBusy = false, bindMessage, onBindTask }: {
   cwd: string;
   task: YpiStudioTaskDetail | null;
   workflow: YpiStudioWorkflowFile | null;
@@ -705,10 +758,16 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
   setActiveTab: (tab: TaskDetailTab) => void;
   onBack: () => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
+  currentSessionContextId?: string | null;
+  bindBusy?: boolean;
+  bindMessage?: string | null;
+  onBindTask?: (task: YpiStudioTaskDetail) => void;
 }) {
   if (loadState === "loading") return <TaskDetailShell onBack={onBack}><PanelEmpty title="正在读取任务详情" description="加载任务产物、成员运行、事件和元数据。" /></TaskDetailShell>;
   if (loadState === "error") return <TaskDetailShell onBack={onBack}><PanelEmpty title="详情读取失败" description={error ?? "请稍后重试。"} /></TaskDetailShell>;
   if (!task) return <TaskDetailShell onBack={onBack}><PanelEmpty title="选择一个任务" description="点击任务卡片查看完整详情。" /></TaskDetailShell>;
+  const canBind = !task.archived && !!currentSessionContextId;
+  const alreadyBound = !!currentSessionContextId && task.contextIds.includes(currentSessionContextId);
 
   return (
     <TaskDetailShell onBack={onBack}>
@@ -720,8 +779,22 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
           </div>
           <div style={{ marginTop: 4, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{task.key}</div>
         </div>
-        <button onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开 task.json</button>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {canBind && (
+            <button
+              onClick={() => onBindTask?.(task)}
+              disabled={bindBusy || alreadyBound}
+              title={alreadyBound ? "该任务已绑定到当前聊天" : "把这个任务绑定到当前聊天，便于继续审批和实现"}
+              style={smallButtonStyle(!bindBusy && !alreadyBound)}
+            >
+              {bindBusy ? "绑定中…" : alreadyBound ? "已绑定当前聊天" : "绑定/继续到当前聊天"}
+            </button>
+          )}
+          <button onClick={() => onOpenFile?.(taskFilePath(cwd, task), "task.json")} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开 task.json</button>
+        </div>
       </div>
+      {bindMessage && <Notice tone="success" text={bindMessage} />}
+      {canBind && !alreadyBound && <Notice tone="info" text="绑定只会关联当前聊天上下文，方便后续继续/审批；不会跳过 awaiting_approval 门禁，也不会自动进入实现。" />}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <TabButton active={activeTab === "overview"} label="概览" onClick={() => setActiveTab("overview")} />
         <TabButton active={activeTab === "implementation"} label={`实现 ${task.implementation?.done ?? 0}/${task.implementation?.total ?? 0}`} onClick={() => setActiveTab("implementation")} />

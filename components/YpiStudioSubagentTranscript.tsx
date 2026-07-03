@@ -24,6 +24,15 @@ interface Props {
 
 type StudioRunStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" | "unavailable";
 
+interface StudioRunDisplayLimits {
+  recentLimit?: number;
+  previewTruncated?: boolean;
+  finalOutputTruncated?: boolean;
+  transcriptItemTruncated?: boolean;
+  transcriptCaptureLimited?: boolean;
+  apiProjectionLimited?: boolean;
+}
+
 interface StudioRunProgress {
   schemaVersion?: 1;
   phase?: YpiStudioSubagentRunPhase;
@@ -40,6 +49,8 @@ interface StudioRunProgress {
   firstTokenAt?: string;
   lastTokenAt?: string;
   currentTool?: YpiStudioSubagentCurrentTool;
+  display?: StudioRunDisplayLimits;
+  terminationReason?: string;
 }
 
 interface StudioRunProjection {
@@ -56,6 +67,7 @@ interface StudioRunProjection {
   policy?: YpiStudioSubagentPolicyDiagnostics;
   summary?: string;
   error?: string;
+  terminationReason?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -116,6 +128,12 @@ function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef 
     stderrBytes: typeof value.stderrBytes === "number" ? value.stderrBytes : 0,
     bytes: typeof value.bytes === "number" ? value.bytes : 0,
     truncated: value.truncated === true,
+    truncation: isRecord(value.truncation) ? {
+      itemTruncated: value.truncation.itemTruncated === true,
+      captureLimited: value.truncation.captureLimited === true,
+      bytesLimit: typeof value.truncation.bytesLimit === "number" ? value.truncation.bytesLimit : undefined,
+      itemBytesLimit: typeof value.truncation.itemBytesLimit === "number" ? value.truncation.itemBytesLimit : undefined,
+    } : undefined,
   };
 }
 
@@ -134,6 +152,18 @@ function normalizeCurrentTool(value: unknown): YpiStudioSubagentCurrentTool | un
   const toolName = asString(value.toolName);
   if (!toolCallId || !toolName) return undefined;
   return { toolCallId, toolName, startedAt: asString(value.startedAt) };
+}
+
+function normalizeDisplayLimits(value: unknown): StudioRunDisplayLimits | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    recentLimit: typeof value.recentLimit === "number" ? value.recentLimit : undefined,
+    previewTruncated: value.previewTruncated === true,
+    finalOutputTruncated: value.finalOutputTruncated === true,
+    transcriptItemTruncated: value.transcriptItemTruncated === true,
+    transcriptCaptureLimited: value.transcriptCaptureLimited === true,
+    apiProjectionLimited: value.apiProjectionLimited === true,
+  };
 }
 
 function normalizePolicy(value: unknown): YpiStudioSubagentPolicyDiagnostics | undefined {
@@ -158,6 +188,8 @@ function normalizeProgress(value: unknown): StudioRunProgress | undefined {
     firstTokenAt: asString(value.firstTokenAt),
     lastTokenAt: asString(value.lastTokenAt),
     currentTool: normalizeCurrentTool(value.currentTool),
+    display: normalizeDisplayLimits(value.display),
+    terminationReason: asString(value.terminationReason),
   };
 }
 
@@ -177,6 +209,7 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
     policy: normalizePolicy(value.policy),
     summary: asString(value.summary),
     error: asString(value.error),
+    terminationReason: asString(value.terminationReason),
   };
 }
 
@@ -202,6 +235,7 @@ function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): Stud
       policy: run.policy ?? acc.policy,
       summary: run.summary ?? acc.summary,
       error: run.error ?? acc.error,
+      terminationReason: run.terminationReason ?? acc.terminationReason,
     };
   }, {});
 }
@@ -294,16 +328,14 @@ function itemAccent(item: YpiStudioSubagentTranscriptItem): string {
   return "var(--text-muted)";
 }
 
-function compactItems(items: YpiStudioSubagentTranscriptItem[], debug: boolean): YpiStudioSubagentTranscriptItem[] {
+function compactItems(items: YpiStudioSubagentTranscriptItem[], debug: boolean, limit = 5): YpiStudioSubagentTranscriptItem[] {
   if (debug) return items;
-  const visible = items.filter((item) => {
-    if (item.kind === "prompt" || item.kind === "status" || item.kind === "stderr") return false;
-    if (item.kind === "tool_result" && item.isError) return true;
-    return item.kind === "assistant" || item.kind === "tool_call" || item.kind === "tool_result" || item.kind === "error";
-  });
-  const assistant = visible.filter((item) => item.kind === "assistant").slice(-3);
-  const nonAssistant = visible.filter((item) => item.kind !== "assistant");
-  return [...nonAssistant, ...assistant].slice(-12);
+  const visible = items.filter((item) => item.kind !== "prompt" && item.kind !== "stderr");
+  return visible.slice(-Math.max(1, limit));
+}
+
+function isDisplayNote(text: string): boolean {
+  return /^Display note:/i.test(text) || /projection limits|bounded preview|clipped|truncated/i.test(text);
 }
 
 function previewText(text: string, max = 180): string {
@@ -370,11 +402,20 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
 
   const modelLabel = run.model ?? "Pi default";
   const thinkingLabel = run.thinking ?? "default";
-  const displayItems = compactItems(items, debugExpanded);
+  const recentLimit = run.progress?.display?.recentLimit ?? 5;
+  const displayItems = compactItems(items, debugExpanded, recentLimit);
   const phase = run.progress?.phase ?? (status === "running" ? "waiting_model" : status === "waiting_for_user" ? "waiting_for_user" : result ? "finished" : undefined);
   const stats = statsText(run.progress);
-  const warningTitle = warnings.slice(0, 3).join("\n");
-  const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)} · ${phaseLabel(phase, run.progress?.currentTool)}${elapsed ? ` · ${elapsed}` : ""}${stats ? ` · ${stats}` : ""} · ${previewText(lastPreview, 120)}`;
+  const tpsLabel = typeof run.progress?.tps === "number" ? `${run.progress.tps.toFixed(1)} t/s` : undefined;
+  const displayNotes = [
+    transcript?.truncated ? "Showing a bounded recent/debug preview. Transcript clipping does not by itself mean the member run failed." : undefined,
+    run.progress?.display?.finalOutputTruncated ? "Final output was clipped for the parent result; the member run status is unchanged." : undefined,
+    run.progress?.display?.previewTruncated ? "Recent activity text is clipped for display safety." : undefined,
+    ...warnings.filter(isDisplayNote),
+  ].filter((note): note is string => !!note);
+  const warningNotes = warnings.filter((warning) => !isDisplayNote(warning));
+  const warningTitle = warningNotes.slice(0, 3).join("\n");
+  const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)} · ${phaseLabel(phase, run.progress?.currentTool)}${elapsed ? ` · ${elapsed}` : ""} · ${previewText(lastPreview, 120)}`;
   void tick;
 
   return (
@@ -406,9 +447,11 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
       >
         <span style={{ color: statusColor(status), fontFamily: "var(--font-mono)", fontWeight: 650, fontSize: 11, flexShrink: 0 }}>ypi_studio_subagent</span>
         <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{headerPreview}</span>
+        {tpsLabel && <Chip title={run.progress?.tokenSource === "estimated_chars" ? "estimated from output characters" : "usage tokens"}>{tpsLabel}</Chip>}
         <Chip title={run.modelSource ? `model source: ${run.modelSource}` : undefined}>model: {modelLabel}</Chip>
         <Chip title={run.thinkingSource ? `thinking source: ${run.thinkingSource}` : undefined}>thinking: {thinkingLabel}</Chip>
-        {warnings.length > 0 && <span title={warningTitle} style={{ color: "#eab308", fontSize: 12, flexShrink: 0 }}>⚠ {warnings.length}</span>}
+        {displayNotes.length > 0 && <span title={displayNotes.slice(0, 3).join("\n")} style={{ color: "var(--text-dim)", fontSize: 12, flexShrink: 0 }}>ⓘ {displayNotes.length}</span>}
+        {warningNotes.length > 0 && <span title={warningTitle} style={{ color: "#eab308", fontSize: 12, flexShrink: 0 }}>⚠ {warningNotes.length}</span>}
         {run.progress?.eventCount !== undefined && <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>{run.progress.eventCount} events</span>}
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
           <polyline points="2 3.5 5 6.5 8 3.5" />
@@ -431,10 +474,10 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
           </div>
 
           <SectionHeader title="Delegated prompt" right={<button onClick={() => setInputExpanded((value) => !value)} style={plainButtonStyle}>{inputExpanded ? "Hide prompt" : "Show prompt"}</button>} />
-          <div style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12 }}>{inputExpanded ? (asString(block.input.prompt) ?? "(no prompt)") : previewText(asString(block.input.prompt) ?? "(no prompt)", 220)}</div>
+          {inputExpanded && <div style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12 }}>{asString(block.input.prompt) ?? "(no prompt)"}</div>}
 
-          <SectionHeader title="Child transcript" right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>{transcript?.pathLabel ? <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{transcript.pathLabel}</span> : null}<button onClick={() => setDebugExpanded((value) => !value)} style={plainButtonStyle}>{debugExpanded ? "Hide debug" : "Show debug"}</button>{debugExpanded && <button onClick={() => setRawExpanded((value) => !value)} style={plainButtonStyle}>{rawExpanded ? "Hide raw" : "Show raw"}</button>}</div>} />
-          <div style={{ maxHeight: "min(560px, 65vh)", overflow: "auto", background: "var(--bg)", padding: "8px 10px" }}>
+          <SectionHeader title={`Recent activity · last ${recentLimit}`} right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>{debugExpanded && transcript?.pathLabel ? <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{transcript.pathLabel}</span> : null}<button onClick={() => setDebugExpanded((value) => !value)} style={plainButtonStyle}>{debugExpanded ? "Hide debug" : "Show debug"}</button>{debugExpanded && <button onClick={() => setRawExpanded((value) => !value)} style={plainButtonStyle}>{rawExpanded ? "Hide raw" : "Show raw"}</button>}</div>} />
+          <div style={{ maxHeight: "min(360px, 45vh)", overflow: "auto", background: "var(--bg)", padding: "8px 10px" }}>
             {status === "running" && items.length === 0 && (
               <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>Child Pi process started. Waiting for first JSON event…</div>
             )}
@@ -442,9 +485,9 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
               <Warning text="This Studio member run was created before transcript capture, or transcript capture failed; showing final output only." />
             )}
             {apiError && <Warning text={`Transcript unavailable: ${apiError}. Showing cached preview/final output instead.`} />}
-            {(status === "failed" || status === "cancelled") && <Warning text="This member run stopped before completion. You can ask the main session to retry the same member, continue from the current Studio phase, or mark the task blocked/cancelled if the failure is persistent." />}
-            {transcript?.truncated && <Warning text="Transcript capture was truncated by safety limits; raw/debug output is a bounded preview." />}
-            {warnings.map((warning, index) => <Warning key={`${index}-${warning}`} text={warning} />)}
+            {(status === "failed" || status === "cancelled") && <Warning text={`This member run stopped before completion${run.terminationReason ? ` (${run.terminationReason})` : ""}. You can ask the main session to retry the same member, continue from the current Studio phase, or mark the task blocked/cancelled if the failure is persistent.`} />}
+            {displayNotes.map((note, index) => <Info key={`info-${index}-${note}`} text={note} />)}
+            {warningNotes.map((warning, index) => <Warning key={`${index}-${warning}`} text={warning} />)}
             {displayItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {displayItems.map((item, index) => <TranscriptItem key={`${item.at}-${item.kind}-${index}`} item={item} compact={!debugExpanded} />)}
@@ -522,8 +565,21 @@ function Warning({ text }: { text: string }) {
   return <div style={{ marginBottom: 8, padding: "6px 8px", border: "1px solid rgba(234,179,8,0.28)", borderRadius: 6, background: "rgba(234,179,8,0.08)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{text}</div>;
 }
 
+function Info({ text }: { text: string }) {
+  return <div style={{ marginBottom: 8, padding: "6px 8px", border: "1px solid rgba(148,163,184,0.24)", borderRadius: 6, background: "rgba(148,163,184,0.07)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{text}</div>;
+}
+
+function displayItemText(item: YpiStudioSubagentTranscriptItem, compact: boolean): string {
+  if (!compact) return itemText(item);
+  if (item.kind === "tool_call") return `Running tool: ${item.toolName}`;
+  if (item.kind === "tool_result") return `Tool ${item.isError ? "failed" : "completed"}${item.toolName ? `: ${item.toolName}` : ""}`;
+  if (item.kind === "status") return previewText(item.text, 220);
+  if (item.kind === "error") return item.text;
+  return previewText(itemText(item), 420);
+}
+
 function TranscriptItem({ item, compact = false }: { item: YpiStudioSubagentTranscriptItem; compact?: boolean }) {
-  const text = compact && !(item.kind === "error" || (item.kind === "tool_result" && item.isError)) ? previewText(itemText(item), 420) : itemText(item);
+  const text = displayItemText(item, compact);
   const isMarkdown = item.kind === "assistant" || item.kind === "prompt";
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", background: "var(--bg-panel)" }}>

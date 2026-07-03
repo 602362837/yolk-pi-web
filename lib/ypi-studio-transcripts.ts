@@ -160,6 +160,10 @@ export function createYpiStudioSubagentTranscript(
     stderrBytes: 0,
     bytes: 0,
     truncated: false,
+    truncation: {
+      bytesLimit: MAX_TRANSCRIPT_BYTES,
+      itemBytesLimit: MAX_ITEM_TEXT_BYTES,
+    },
   };
   writeFileSync(filePath, "", { encoding: "utf8", flag: "w" });
   const writer = { root, taskId, runId: options.runId, member: options.member, filePath, metaPath, ref };
@@ -173,17 +177,19 @@ export function appendYpiStudioSubagentTranscriptItem(
 ): YpiStudioSubagentTranscriptItem {
   if (writer.ref.bytes >= MAX_TRANSCRIPT_BYTES) {
     writer.ref.truncated = true;
+    writer.ref.truncation = { ...writer.ref.truncation, captureLimited: true, bytesLimit: MAX_TRANSCRIPT_BYTES, itemBytesLimit: MAX_ITEM_TEXT_BYTES };
     writer.ref.updatedAt = item.at || nowIso();
     writeMeta(writer);
-    return { kind: "status", at: item.at || nowIso(), text: "Transcript capture stopped after reaching the 5 MiB safety limit.", truncated: true };
+    return { kind: "status", at: item.at || nowIso(), text: "Display note: transcript capture stopped after reaching the 5 MiB safety limit; the member run status is unchanged.", truncated: true };
   }
   const normalized = normalizeItem(item);
   const line = `${JSON.stringify(normalized)}\n`;
   const lineBytes = byteLength(line);
   if (writer.ref.bytes + lineBytes > MAX_TRANSCRIPT_BYTES) {
     writer.ref.truncated = true;
+    writer.ref.truncation = { ...writer.ref.truncation, captureLimited: true, bytesLimit: MAX_TRANSCRIPT_BYTES, itemBytesLimit: MAX_ITEM_TEXT_BYTES };
     writer.ref.updatedAt = item.at || nowIso();
-    const warning: YpiStudioSubagentTranscriptItem = { kind: "status", at: item.at || nowIso(), text: "Transcript capture truncated at the 5 MiB safety limit.", truncated: true };
+    const warning: YpiStudioSubagentTranscriptItem = { kind: "status", at: item.at || nowIso(), text: "Display note: transcript capture reached the 5 MiB safety limit; the member run status is unchanged.", truncated: true };
     const warningLine = `${JSON.stringify(warning)}\n`;
     appendFileSync(writer.filePath, warningLine, "utf8");
     writer.ref.itemCount += 1;
@@ -198,7 +204,10 @@ export function appendYpiStudioSubagentTranscriptItem(
   if (normalized.kind === "assistant") writer.ref.messageCount += 1;
   if (normalized.kind === "tool_call") writer.ref.toolCallCount += 1;
   if (normalized.kind === "stderr") writer.ref.stderrBytes += byteLength(normalized.text);
-  if ("truncated" in normalized && normalized.truncated) writer.ref.truncated = true;
+  if ("truncated" in normalized && normalized.truncated) {
+    writer.ref.truncated = true;
+    writer.ref.truncation = { ...writer.ref.truncation, itemTruncated: true, bytesLimit: MAX_TRANSCRIPT_BYTES, itemBytesLimit: MAX_ITEM_TEXT_BYTES };
+  }
   writeMeta(writer);
   return normalized;
 }
@@ -282,7 +291,7 @@ export function readYpiStudioSubagentTranscript(
     if (!line) continue;
     if (items.length >= limit || totalBytes >= maxBytes) {
       nextCursor = i;
-      warnings.push("Transcript response was truncated by API projection limits.");
+      warnings.push("Display note: transcript response was limited by API projection limits; use cursor/limit or full debug loading for more rows.");
       break;
     }
     try {

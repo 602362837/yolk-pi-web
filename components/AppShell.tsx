@@ -45,6 +45,12 @@ function getInitialSidebarWidth(): number {
   return clampNumber(stored, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
 }
 
+function studioContextIdForSession(sessionId: string | null | undefined): string | null {
+  if (!sessionId) return null;
+  const safe = sessionId.replace(/[^A-Za-z0-9._-]+/g, "_");
+  return `pi_${safe || sessionId}`;
+}
+
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1264,7 +1270,7 @@ export function AppShell() {
               {studioCwd && <span title={studioCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{studioCwd}</span>}
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={rightPanelOpen && rightPanelMode === "studio" ? studioSessionTaskRefreshKey : 0} />
+              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={rightPanelOpen && rightPanelMode === "studio" ? studioSessionTaskRefreshKey : 0} currentSessionContextId={studioContextIdForSession(selectedSession?.id)} onTaskBound={() => setStudioSessionTaskRefreshKey((key) => key + 1)} />
             </div>
           </>
         ) : (

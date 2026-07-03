@@ -225,6 +225,15 @@ export interface YpiStudioSubagentCurrentTool {
   startedAt?: string;
 }
 
+export interface YpiStudioSubagentRunDisplayLimits {
+  recentLimit: number;
+  previewTruncated?: boolean;
+  finalOutputTruncated?: boolean;
+  transcriptItemTruncated?: boolean;
+  transcriptCaptureLimited?: boolean;
+  apiProjectionLimited?: boolean;
+}
+
 export interface YpiStudioSubagentRunProgress {
   schemaVersion: 1;
   phase: YpiStudioSubagentRunPhase;
@@ -241,6 +250,15 @@ export interface YpiStudioSubagentRunProgress {
   firstTokenAt?: string;
   lastTokenAt?: string;
   currentTool?: YpiStudioSubagentCurrentTool;
+  display?: YpiStudioSubagentRunDisplayLimits;
+  terminationReason?: string;
+}
+
+export interface YpiStudioSubagentTranscriptTruncation {
+  itemTruncated?: boolean;
+  captureLimited?: boolean;
+  bytesLimit?: number;
+  itemBytesLimit?: number;
 }
 
 export interface YpiStudioSubagentTranscriptRef {
@@ -260,6 +278,7 @@ export interface YpiStudioSubagentTranscriptRef {
   stderrBytes: number;
   bytes: number;
   truncated: boolean;
+  truncation?: YpiStudioSubagentTranscriptTruncation;
 }
 
 export type YpiStudioSubagentTranscriptItem =
@@ -395,6 +414,7 @@ export interface YpiStudioTaskSubagentRun {
   thinkingSource?: string;
   policy?: YpiStudioSubagentPolicyDiagnostics;
   progress?: YpiStudioSubagentRunProgress;
+  terminationReason?: string;
   error?: string;
   transcript?: YpiStudioSubagentTranscriptRef;
 }
