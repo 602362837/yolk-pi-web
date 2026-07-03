@@ -4,6 +4,7 @@ import { cacheSessionPath } from "./session-reader";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
+import { abortYpiStudioChildRunsForSession } from "./ypi-studio-subagent-runtime";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
 // ============================================================================
@@ -16,6 +17,8 @@ export interface AgentEvent {
 }
 
 type EventListener = (event: AgentEvent) => void;
+
+const ABORT_WAIT_TIMEOUT_MS = 3_000;
 
 // ============================================================================
 // AgentSessionWrapper
@@ -101,9 +104,15 @@ export class AgentSessionWrapper {
         return null;
       }
 
-      case "abort":
-        await this.inner.abort();
-        return null;
+      case "abort": {
+        const abortedChildren = abortYpiStudioChildRunsForSession(this.sessionId, "parent_abort");
+        const abortResult = await Promise.race([
+          this.inner.abort().then(() => ({ timedOut: false as const }), (error: unknown) => ({ timedOut: false as const, error })),
+          new Promise<{ timedOut: true }>((resolve) => setTimeout(() => resolve({ timedOut: true }), ABORT_WAIT_TIMEOUT_MS)),
+        ]);
+        if ("error" in abortResult) throw abortResult.error;
+        return { abortedChildren, abortTimedOut: abortResult.timedOut };
+      }
 
       case "get_state": {
         const model = this.inner.model;
@@ -256,6 +265,7 @@ export class AgentSessionWrapper {
     if (!this._alive) return;
     this._alive = false;
     if (this.idleTimer) clearTimeout(this.idleTimer);
+    abortYpiStudioChildRunsForSession(this.sessionId, "session_destroy");
     this.unsubscribe?.();
     try {
       this.inner.dispose?.();

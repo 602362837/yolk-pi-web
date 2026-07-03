@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-03T01:37:16.497Z",
+  "updatedAt": "2026-07-03T03:03:00.969Z",
   "entries": [
+    {
+      "id": "20260703-110300-修复-ypi-studio-子代理卡死-停止无效与超大输出崩溃问题",
+      "title": "修复 YPI Studio 子代理卡死、停止无效与超大输出崩溃问题",
+      "taskId": "20260703-104215-修复-ypi-studio-子代理卡死-停止无效与超大输出崩溃问题",
+      "taskKey": "archived:2026-07:20260703-104215-修复-ypi-studio-子代理卡死-停止无效与超大输出崩溃问题",
+      "workflowId": "feature-dev",
+      "summary": "YPI Studio 子代理卡死/停止无效/ERR_STRING_TOO_LONG 修复：根因是 ypi_studio_subagent 子进程 stdout/stderr 无界累积和结束时超大字符串转换。修复通过 bounded JSONL 流式解析、输出/单行/final/progress/transcript/API 上限、子进程 runtime registry、主 session abort/destroy 级联取消、abort 3 秒超时返回、idle/max-runtime/output-limit 终止、UI 截断/失败/取消提示解决。验证 lint、tsc、test:studio-policy 与 checker review 通过。",
+      "tags": [
+        "bugfix",
+        "ypi-studio",
+        "subagent",
+        "stability",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260703-104215-修复-ypi-studio-子代理卡死-停止无效与超大输出崩溃问题",
+      "knowledgePath": ".ypi/knowledge/20260703-110300-修复-ypi-studio-子代理卡死-停止无效与超大输出崩溃问题.md",
+      "createdAt": "2026-07-03T03:03:00.969Z",
+      "archivedAt": "2026-07-03T03:03:00.969Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260703-093716-优化-ypi-studio-subagent-模型策略与-chat-实时展示",
       "title": "优化 YPI Studio subagent 模型策略与 Chat 实时展示",

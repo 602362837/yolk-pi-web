@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { initializeYpiStudioAgents } from "./ypi-studio-agents";
 import { readPiWebConfigForApi } from "./pi-web-config";
@@ -27,6 +28,7 @@ import {
   previewYpiStudioTranscriptText,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
+import { registerYpiStudioChildRun, unregisterYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import type { YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
@@ -320,26 +322,34 @@ function memberFile(member: string): string {
   return `${normalized}.md`;
 }
 
-function extractAssistantText(stdout: string, stderr: string): string {
-  let finalText = "";
-  for (const line of stdout.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const event = JSON.parse(trimmed) as unknown;
-      const message = isObj(event) && isObj(event.message) ? event.message : null;
-      if (message?.role === "assistant") {
-        const content = message.content;
-        if (typeof content === "string") finalText = content;
-        else if (Array.isArray(content)) {
-          finalText = content.map((block) => isObj(block) && block.type === "text" && typeof block.text === "string" ? block.text : "").join("");
-        }
-      }
-    } catch {
-      // Non-JSON output is handled by the fallback below.
-    }
-  }
-  return finalText.trim() || stdout.trim() || stderr.trim();
+const MAX_CHILD_STDOUT_BYTES = 16 * 1024 * 1024;
+const MAX_CHILD_STDERR_BYTES = 1 * 1024 * 1024;
+const MAX_CHILD_STDOUT_LINE_BYTES = 1 * 1024 * 1024;
+const MAX_CHILD_FINAL_OUTPUT_BYTES = 256 * 1024;
+const MAX_CHILD_LIVE_PREVIEW_BYTES = 4 * 1024;
+const MAX_CHILD_TAIL_BYTES = 64 * 1024;
+const CHILD_NO_FIRST_EVENT_WARN_MS = 60_000;
+const CHILD_IDLE_TIMEOUT_MS = 10 * 60_000;
+const CHILD_MAX_RUNTIME_MS = 60 * 60_000;
+const CHILD_KILL_GRACE_MS = 2_000;
+
+function byteLength(value: string): number {
+  return Buffer.byteLength(value, "utf8");
+}
+
+function truncateBytes(value: string, maxBytes: number): { text: string; truncated: boolean } {
+  if (byteLength(value) <= maxBytes) return { text: value, truncated: false };
+  let end = Math.min(value.length, maxBytes);
+  while (end > 0 && byteLength(value.slice(0, end)) > maxBytes) end -= 1;
+  return { text: `${value.slice(0, Math.max(0, end - 1))}…`, truncated: true };
+}
+
+function boundedAppendTail(current: string, addition: string, maxBytes: number): string {
+  const combined = `${current}${addition}`;
+  if (byteLength(combined) <= maxBytes) return combined;
+  let start = Math.max(0, combined.length - maxBytes);
+  while (start < combined.length && byteLength(combined.slice(start)) > maxBytes) start += 1;
+  return combined.slice(start);
 }
 
 function resolvePiCli(): { command: string; args: string[] } {
@@ -420,6 +430,7 @@ interface ChildRunMeta {
   taskId: string;
   member: string;
   startedAt: string;
+  parentSessionId?: string;
 }
 
 
@@ -447,13 +458,17 @@ function runChildPi(
       env: { ...process.env, YPI_STUDIO_SUBAGENT_CHILD: "1", TRELLIS_SUBAGENT_CHILD: "1" },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
     });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
+    const decoder = new StringDecoder("utf8");
     const recentItems: YpiStudioSubagentTranscriptItem[] = [];
     const warnings: string[] = [];
+    const timers = new Set<ReturnType<typeof setTimeout>>();
     let stdoutBuffer = "";
+    let stdoutBytes = 0;
     let stderrBytes = 0;
+    let stdoutTail = "";
+    let stderrTail = "";
     let eventCount = 0;
     let phase: YpiStudioSubagentRunPhase = "starting";
     let outputChars = 0;
@@ -462,13 +477,54 @@ function runChildPi(
     let firstTokenAt: string | undefined;
     let lastTokenAt: string | undefined;
     let currentTool: YpiStudioSubagentCurrentTool | undefined;
-    let lastMessageText = "";
+    let lastMessageTextTail = "";
     let lastTextPreview = "Child Pi process started. Waiting for first JSON event…";
     let finalAssistantOutput = "";
     let status: YpiStudioTaskSubagentRun["status"] = "running";
+    let terminationReason: string | undefined;
     let settled = false;
+    let terminating = false;
     let lastUpdateAt = 0;
+    let lastActivityAt = Date.now();
     let updateTimer: ReturnType<typeof setTimeout> | null = null;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const markActivity = (): void => {
+      lastActivityAt = Date.now();
+    };
+
+    const addWarning = (warning: string): void => {
+      if (!warnings.includes(warning)) warnings.push(warning);
+    };
+
+    const boundedText = (value: string, maxBytes = MAX_CHILD_LIVE_PREVIEW_BYTES): string => truncateBytes(value, maxBytes).text;
+
+    const schedule = (fn: () => void, ms: number): ReturnType<typeof setTimeout> => {
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        fn();
+      }, ms);
+      timers.add(timer);
+      return timer;
+    };
+
+    const killChild = (signalName: NodeJS.Signals = "SIGTERM"): void => {
+      if (!child.pid) return;
+      try {
+        if (process.platform !== "win32") process.kill(-child.pid, signalName);
+        else child.kill(signalName);
+      } catch {
+        try { child.kill(signalName); } catch {}
+      }
+    };
+
+    const forceKillWindows = (): void => {
+      if (process.platform !== "win32" || !child.pid) return;
+      try {
+        const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+        killer.on("error", () => {});
+      } catch {}
+    };
 
     const appendItem = (item: YpiStudioSubagentTranscriptItem): void => {
       let stored = item;
@@ -476,12 +532,24 @@ function runChildPi(
         try {
           stored = appendYpiStudioSubagentTranscriptItem(writer, item);
         } catch (error) {
-          warnings.push(`Transcript write failed: ${error instanceof Error ? error.message : String(error)}`);
+          addWarning(`Transcript write failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
       recentItems.push(stored);
       if (recentItems.length > 24) recentItems.shift();
     };
+
+    const safeRecentItems = (): YpiStudioSubagentTranscriptItem[] => recentItems.slice(-12).map((item) => {
+      if (item.kind === "tool_call") {
+        const preview = truncateBytes(item.inputPreview, MAX_CHILD_LIVE_PREVIEW_BYTES);
+        return { ...item, inputPreview: preview.text, truncated: item.truncated || preview.truncated };
+      }
+      if ("text" in item) {
+        const preview = truncateBytes(item.text, MAX_CHILD_LIVE_PREVIEW_BYTES);
+        return { ...item, text: preview.text, truncated: ("truncated" in item ? item.truncated : false) || preview.truncated } as YpiStudioSubagentTranscriptItem;
+      }
+      return item;
+    });
 
     const progressSnapshot = (): YpiStudioSubagentRunProgress => {
       const updatedAt = new Date().toISOString();
@@ -492,9 +560,9 @@ function runChildPi(
         startedAt: meta.startedAt,
         updatedAt,
         eventCount,
-        lastTextPreview,
-        itemsPreview: recentItems.slice(-12),
-        warnings: warnings.length ? warnings.slice(-5) : undefined,
+        lastTextPreview: boundedText(lastTextPreview),
+        itemsPreview: safeRecentItems(),
+        warnings: warnings.length ? warnings.slice(-8) : undefined,
         outputChars,
         tokens,
         tokenSource,
@@ -509,7 +577,7 @@ function runChildPi(
       const progress = progressSnapshot();
       const transcript = writer ? { ...writer.ref } : undefined;
       return {
-        content: [{ type: "text", text: `${meta.member} ${status} · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · ${eventCount} events · ${oneLine(lastTextPreview, 140)}` }],
+        content: [{ type: "text", text: `${meta.member} ${status} · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · ${eventCount} events · ${oneLine(progress.lastTextPreview, 140)}` }],
         details: {
           run: {
             id: meta.runId,
@@ -537,7 +605,7 @@ function runChildPi(
         try {
           onUpdate(progressPayload());
         } catch (error) {
-          warnings.push(`Progress update failed: ${error instanceof Error ? error.message : String(error)}`);
+          addWarning(`Progress update failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       };
       if (force || now - lastUpdateAt >= 450) {
@@ -548,6 +616,35 @@ function runChildPi(
         send();
       } else if (!updateTimer) {
         updateTimer = setTimeout(send, 450 - (now - lastUpdateAt));
+      }
+    };
+
+    const terminateChild = (reason: string, nextStatus: YpiStudioTaskSubagentRun["status"] = "failed"): void => {
+      if (settled) return;
+      terminationReason ??= reason;
+      if (status === "running") status = nextStatus;
+      phase = status === "waiting_for_user" ? "waiting_for_user" : "finished";
+      currentTool = undefined;
+      const text = reason === "parent_abort" || reason === "session_destroy" || reason === "abort_signal"
+        ? "Child Pi run cancelled by parent session."
+        : `Child Pi run terminated: ${reason}.`;
+      lastTextPreview = text;
+      addWarning(text);
+      appendItem({ kind: nextStatus === "failed" ? "error" : "status", at: new Date().toISOString(), text });
+      emitProgress(true);
+      if (!terminating) {
+        terminating = true;
+        killChild("SIGTERM");
+        schedule(() => {
+          if (settled) return;
+          if (process.platform === "win32") forceKillWindows();
+          killChild("SIGKILL");
+        }, CHILD_KILL_GRACE_MS);
+        schedule(() => {
+          if (settled) return;
+          addWarning("Child Pi process did not emit close after termination; resolving parent run with the recorded cancellation/failure state.");
+          finish(null);
+        }, CHILD_KILL_GRACE_MS + 5_000);
       }
     };
 
@@ -567,16 +664,25 @@ function runChildPi(
       return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
     };
 
+    const rememberAssistantOutput = (text: string): string => {
+      const truncated = truncateBytes(text, MAX_CHILD_FINAL_OUTPUT_BYTES);
+      if (truncated.truncated) addWarning(`Assistant output exceeded ${MAX_CHILD_FINAL_OUTPUT_BYTES} bytes and was truncated.`);
+      finalAssistantOutput = truncated.text;
+      return truncated.text;
+    };
+
     const parseLine = (line: string): void => {
       const trimmed = line.trim();
       if (!trimmed) return;
+      markActivity();
       const at = new Date().toISOString();
       let event: unknown;
       try {
         event = JSON.parse(trimmed) as unknown;
       } catch {
-        lastTextPreview = trimmed;
-        appendItem({ kind: "status", at, text: `Non-JSON stdout: ${trimmed}` });
+        const preview = boundedText(trimmed);
+        lastTextPreview = preview;
+        appendItem({ kind: "status", at, text: `Non-JSON stdout: ${preview}`, truncated: preview.length < trimmed.length });
         emitProgress();
         return;
       }
@@ -595,18 +701,18 @@ function runChildPi(
         const delta = eventAssistantDeltaText(event);
         const text = delta || eventMessageText(event);
         if (text) {
-          const addition = delta || (text.startsWith(lastMessageText) ? text.slice(lastMessageText.length) : text);
-          lastMessageText = text;
+          const addition = delta || (text.startsWith(lastMessageTextTail) ? text.slice(lastMessageTextTail.length) : text);
+          lastMessageTextTail = boundedAppendTail("", text, MAX_CHILD_TAIL_BYTES);
           noteOutput(addition, at);
-          lastTextPreview = addition || text;
+          lastTextPreview = boundedText(addition || text);
         }
       } else if (eventType === "message_end") {
         const text = eventMessageText(event).trim();
         const role = isObj(event) && isObj(event.message) && typeof event.message.role === "string" ? event.message.role : undefined;
         if (role === "assistant" && text) {
           phase = "waiting_model";
-          finalAssistantOutput = text;
-          lastTextPreview = text;
+          const output = rememberAssistantOutput(text);
+          lastTextPreview = output;
           outputChars = Math.max(outputChars, text.length);
           const usageTokens = usageOutputTokens(event);
           if (usageTokens !== undefined) {
@@ -616,8 +722,8 @@ function runChildPi(
             tokens = Math.max(tokens ?? 0, Math.ceil(outputChars / 4));
             tokenSource = tokenSource ?? "estimated_chars";
           }
-          lastMessageText = text;
-          appendItem({ kind: "assistant", at, text, model: policy.modelLabel });
+          lastMessageTextTail = boundedAppendTail("", text, MAX_CHILD_TAIL_BYTES);
+          appendItem({ kind: "assistant", at, text: output, model: policy.modelLabel, truncated: output.length < text.length });
         }
       } else if (eventType === "tool_execution_start") {
         const ev = isObj(event) ? event : {};
@@ -631,31 +737,32 @@ function runChildPi(
       } else if (eventType === "tool_execution_update") {
         phase = "running_tool";
         const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
-        if (text) lastTextPreview = text;
+        if (text) lastTextPreview = boundedText(text);
       } else if (eventType === "tool_execution_end" || eventType === "tool_result_end") {
         const ev = isObj(event) ? event : {};
         const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
         const toolName = str(ev.toolName) ?? undefined;
-        const text = resultText(ev.result).trim() || resultText(ev.message).trim() || "(no output)";
+        const rawText = resultText(ev.result).trim() || resultText(ev.message).trim() || "(no output)";
+        const text = boundedText(rawText, MAX_CHILD_FINAL_OUTPUT_BYTES);
         const isError = ev.isError === true;
         phase = "waiting_model";
         currentTool = undefined;
         lastTextPreview = `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
-        appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError });
+        appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError, truncated: text.length < rawText.length });
       } else if (eventType === "extension_ui_request" && isBlockingExtensionUiRequest(event)) {
         const text = extensionUiRequestText(event);
         status = "waiting_for_user";
         phase = "waiting_for_user";
-        finalAssistantOutput = text;
+        rememberAssistantOutput(text);
         lastTextPreview = text;
-        warnings.push("Child Studio member requested interactive user input; surfaced to parent session instead of waiting indefinitely.");
+        addWarning("Child Studio member requested interactive user input; surfaced to parent session instead of waiting indefinitely.");
         appendItem({ kind: "assistant", at, text, model: policy.modelLabel });
         emitProgress(true);
-        child.kill();
+        terminateChild("waiting_for_user", "waiting_for_user");
       } else if (eventType === "extension_error") {
         const message = isObj(event) && typeof event.error === "string" ? event.error : safeJson(event);
-        lastTextPreview = message;
-        appendItem({ kind: "error", at, text: message });
+        lastTextPreview = boundedText(message);
+        appendItem({ kind: "error", at, text: boundedText(message, MAX_CHILD_FINAL_OUTPUT_BYTES) });
       } else if (eventType !== "response") {
         lastTextPreview = `Received ${eventType}.`;
       }
@@ -663,8 +770,21 @@ function runChildPi(
     };
 
     const flushStdoutLines = (chunk: Buffer): void => {
-      stdout.push(chunk);
-      stdoutBuffer += chunk.toString("utf8");
+      if (settled) return;
+      markActivity();
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > MAX_CHILD_STDOUT_BYTES) {
+        terminateChild("stdout_output_limit", "failed");
+        return;
+      }
+      const text = decoder.write(chunk);
+      stdoutTail = boundedAppendTail(stdoutTail, text, MAX_CHILD_TAIL_BYTES);
+      stdoutBuffer += text;
+      if (byteLength(stdoutBuffer) > MAX_CHILD_STDOUT_LINE_BYTES) {
+        stdoutBuffer = "";
+        terminateChild("stdout_line_limit", "failed");
+        return;
+      }
       while (true) {
         const idx = stdoutBuffer.indexOf("\n");
         if (idx < 0) break;
@@ -677,22 +797,31 @@ function runChildPi(
     const finish = (code: number | null, errorMessage?: string) => {
       if (settled) return;
       settled = true;
+      unregisterYpiStudioChildRun(meta.runId);
       if (updateTimer) clearTimeout(updateTimer);
+      if (idleTimer) clearTimeout(idleTimer);
+      for (const timer of timers) clearTimeout(timer);
+      timers.clear();
       signal?.removeEventListener("abort", abort);
-      if (stdoutBuffer.trim()) parseLine(stdoutBuffer);
+      const tail = decoder.end();
+      if (tail) stdoutBuffer += tail;
+      if (stdoutBuffer.trim() && byteLength(stdoutBuffer) <= MAX_CHILD_STDOUT_LINE_BYTES) parseLine(stdoutBuffer);
       stdoutBuffer = "";
-      const out = Buffer.concat(stdout).toString("utf8");
-      const err = Buffer.concat(stderr).toString("utf8");
       if (errorMessage) {
         status = "failed";
         phase = "finished";
-        appendItem({ kind: "error", at: new Date().toISOString(), text: errorMessage });
-      } else if (status !== "cancelled" && status !== "waiting_for_user") {
+        appendItem({ kind: "error", at: new Date().toISOString(), text: boundedText(errorMessage, MAX_CHILD_FINAL_OUTPUT_BYTES) });
+      } else if (status !== "cancelled" && status !== "waiting_for_user" && status !== "failed") {
         status = code === 0 ? "succeeded" : "failed";
       }
       phase = status === "waiting_for_user" ? "waiting_for_user" : "finished";
       currentTool = undefined;
-      const output = finalAssistantOutput.trim() || extractAssistantText(out, err).trim() || (status === "cancelled" ? "cancelled" : "(no output)");
+      const fallbackOutput = stdoutTail.trim() || stderrTail.trim();
+      const output = (finalAssistantOutput.trim() || boundedText(fallbackOutput, MAX_CHILD_FINAL_OUTPUT_BYTES).trim() || (status === "cancelled" ? "cancelled" : "(no output)"));
+      if (terminationReason) {
+        const reason = terminationReason;
+        if (!warnings.some((warning) => warning.includes(reason))) addWarning(`Termination reason: ${reason}`);
+      }
       if (output && !finalAssistantOutput.trim()) {
         appendItem({ kind: status === "failed" ? "error" : "assistant", at: new Date().toISOString(), text: output });
       }
@@ -701,7 +830,7 @@ function runChildPi(
         try {
           transcript = finalizeYpiStudioSubagentTranscript(writer, status);
         } catch (error) {
-          warnings.push(`Transcript finalize failed: ${error instanceof Error ? error.message : String(error)}`);
+          addWarning(`Transcript finalize failed: ${error instanceof Error ? error.message : String(error)}`);
           transcript = { ...writer.ref, status };
         }
       }
@@ -715,29 +844,58 @@ function runChildPi(
       resolveResult({ output, status, transcript, warnings, progress: progressSnapshot() });
     };
 
-    const abort = () => {
-      status = "cancelled";
-      phase = "finished";
-      lastTextPreview = "Cancelled by parent session.";
-      appendItem({ kind: "status", at: new Date().toISOString(), text: "Child Pi run cancelled by parent session." });
-      emitProgress(true);
-      child.kill();
-    };
+    const abort = () => terminateChild("abort_signal", "cancelled");
+
+    registerYpiStudioChildRun({
+      runId: meta.runId,
+      taskId: meta.taskId,
+      member: meta.member,
+      cwd: root,
+      parentSessionId: meta.parentSessionId,
+      pid: child.pid,
+      startedAt: meta.startedAt,
+      abort: (reason) => terminateChild(reason, "cancelled"),
+    });
 
     signal?.addEventListener("abort", abort, { once: true });
     appendItem({ kind: "status", at: meta.startedAt, text: "Child Pi process starting." });
     emitProgress(true);
     child.stdout?.on("data", flushStdoutLines);
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr.push(chunk);
+      if (settled) return;
+      markActivity();
       stderrBytes += chunk.length;
+      if (stderrBytes > MAX_CHILD_STDERR_BYTES) {
+        stderrTail = boundedAppendTail(stderrTail, chunk.toString("utf8"), MAX_CHILD_TAIL_BYTES);
+        terminateChild("stderr_output_limit", "failed");
+        return;
+      }
       const text = chunk.toString("utf8");
-      lastTextPreview = text.trim() || `${stderrBytes} stderr bytes`;
-      appendItem({ kind: "stderr", at: new Date().toISOString(), text });
+      stderrTail = boundedAppendTail(stderrTail, text, MAX_CHILD_TAIL_BYTES);
+      lastTextPreview = boundedText(text.trim() || `${stderrBytes} stderr bytes`);
+      appendItem({ kind: "stderr", at: new Date().toISOString(), text: boundedText(text, MAX_CHILD_FINAL_OUTPUT_BYTES), truncated: byteLength(text) > MAX_CHILD_FINAL_OUTPUT_BYTES });
       emitProgress();
     });
     child.on("error", (error) => finish(1, error instanceof Error ? error.message : String(error)));
     child.on("close", (code) => finish(code));
+
+    schedule(() => {
+      if (settled || eventCount > 0) return;
+      addWarning("Child Pi produced no JSON events for 60 seconds.");
+      lastTextPreview = "Child Pi has not produced JSON events yet.";
+      appendItem({ kind: "status", at: new Date().toISOString(), text: lastTextPreview });
+      emitProgress(true);
+    }, CHILD_NO_FIRST_EVENT_WARN_MS);
+    schedule(() => terminateChild("max_runtime", "failed"), CHILD_MAX_RUNTIME_MS);
+    const resetIdleTimer = (): void => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (Date.now() - lastActivityAt >= CHILD_IDLE_TIMEOUT_MS) terminateChild("idle_timeout", "failed");
+        else resetIdleTimer();
+      }, CHILD_IDLE_TIMEOUT_MS);
+    };
+    resetIdleTimer();
+
     child.stdin?.end(prompt);
   });
 }
@@ -1056,7 +1214,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
             },
           },
         });
-        const result = await runChildPi(root, childPrompt, policy, { runId, taskId, member, startedAt }, writer, signal, onUpdate);
+        const result = await runChildPi(root, childPrompt, policy, { runId, taskId, member, startedAt, parentSessionId: callStr(ctx?.sessionManager?.getSessionId) ?? undefined }, writer, signal, onUpdate);
         const finishedAt = new Date().toISOString();
         const allWarnings = [...policy.warnings, ...warnings, ...result.warnings];
         const run: YpiStudioTaskSubagentRun = {

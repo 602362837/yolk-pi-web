@@ -78,7 +78,8 @@ function statsLabel(run: Pick<YpiStudioTaskWidgetSubagentRun, "tokens" | "tps">)
 }
 
 function previewForRun(run: YpiStudioTaskWidgetSubagentRun): string {
-  return run.lastItemsPreview.map(itemText).filter(Boolean).slice(-2).join(" · ") || run.summary || run.error || "等待成员输出…";
+  const recovery = run.status === "failed" || run.status === "cancelled" ? "可重试或从当前阶段继续" : undefined;
+  return [run.warnings?.slice(-1)[0], run.lastItemsPreview.map(itemText).filter(Boolean).slice(-2).join(" · ") || run.summary || run.error || recovery || "等待成员输出…"].filter(Boolean).join(" · ");
 }
 
 function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveRunOverlay[] = []): YpiStudioTaskWidgetSubagentRun[] {

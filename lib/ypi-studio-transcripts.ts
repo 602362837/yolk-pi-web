@@ -20,6 +20,8 @@ import type {
 const TRANSCRIPTS_DIR = path.join(".ypi", ".runtime", "studio-subagents");
 const MAX_ITEM_TEXT_BYTES = 16 * 1024;
 const MAX_API_BYTES = 256 * 1024;
+const MAX_API_FULL_BYTES = 2 * 1024 * 1024;
+const MAX_TRANSCRIPT_BYTES = 5 * 1024 * 1024;
 const DEFAULT_API_LIMIT = 200;
 const MAX_API_LIMIT = 1000;
 
@@ -169,11 +171,29 @@ export function appendYpiStudioSubagentTranscriptItem(
   writer: YpiStudioSubagentTranscriptWriter,
   item: YpiStudioSubagentTranscriptItem,
 ): YpiStudioSubagentTranscriptItem {
+  if (writer.ref.bytes >= MAX_TRANSCRIPT_BYTES) {
+    writer.ref.truncated = true;
+    writer.ref.updatedAt = item.at || nowIso();
+    writeMeta(writer);
+    return { kind: "status", at: item.at || nowIso(), text: "Transcript capture stopped after reaching the 5 MiB safety limit.", truncated: true };
+  }
   const normalized = normalizeItem(item);
   const line = `${JSON.stringify(normalized)}\n`;
+  const lineBytes = byteLength(line);
+  if (writer.ref.bytes + lineBytes > MAX_TRANSCRIPT_BYTES) {
+    writer.ref.truncated = true;
+    writer.ref.updatedAt = item.at || nowIso();
+    const warning: YpiStudioSubagentTranscriptItem = { kind: "status", at: item.at || nowIso(), text: "Transcript capture truncated at the 5 MiB safety limit.", truncated: true };
+    const warningLine = `${JSON.stringify(warning)}\n`;
+    appendFileSync(writer.filePath, warningLine, "utf8");
+    writer.ref.itemCount += 1;
+    writer.ref.bytes += byteLength(warningLine);
+    writeMeta(writer);
+    return warning;
+  }
   appendFileSync(writer.filePath, line, "utf8");
   writer.ref.itemCount += 1;
-  writer.ref.bytes += byteLength(line);
+  writer.ref.bytes += lineBytes;
   writer.ref.updatedAt = item.at || nowIso();
   if (normalized.kind === "assistant") writer.ref.messageCount += 1;
   if (normalized.kind === "tool_call") writer.ref.toolCallCount += 1;
@@ -250,7 +270,7 @@ export function readYpiStudioSubagentTranscript(
   const filePath = resolveTranscriptFile(root, run);
   const cursor = Math.max(0, options.cursor ?? 0);
   const limit = options.full ? MAX_API_LIMIT : Math.min(Math.max(1, options.limit ?? DEFAULT_API_LIMIT), MAX_API_LIMIT);
-  const maxBytes = options.full ? Number.POSITIVE_INFINITY : MAX_API_BYTES;
+  const maxBytes = options.full ? MAX_API_FULL_BYTES : MAX_API_BYTES;
   const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
   const items: YpiStudioSubagentTranscriptItem[] = [];
   const warnings: string[] = [];

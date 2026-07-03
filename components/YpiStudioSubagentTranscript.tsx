@@ -442,6 +442,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
               <Warning text="This Studio member run was created before transcript capture, or transcript capture failed; showing final output only." />
             )}
             {apiError && <Warning text={`Transcript unavailable: ${apiError}. Showing cached preview/final output instead.`} />}
+            {(status === "failed" || status === "cancelled") && <Warning text="This member run stopped before completion. You can ask the main session to retry the same member, continue from the current Studio phase, or mark the task blocked/cancelled if the failure is persistent." />}
+            {transcript?.truncated && <Warning text="Transcript capture was truncated by safety limits; raw/debug output is a bounded preview." />}
             {warnings.map((warning, index) => <Warning key={`${index}-${warning}`} text={warning} />)}
             {displayItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

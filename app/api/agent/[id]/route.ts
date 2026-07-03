@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveSessionPath } from "@/lib/session-reader";
 import { startRpcSession, getRpcSession } from "@/lib/rpc-manager";
+import { abortYpiStudioChildRunsForSession } from "@/lib/ypi-studio-subagent-runtime";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 
 // POST /api/agent/[id] - Send a command to an existing session
@@ -18,6 +19,11 @@ export async function POST(
     if (existing?.isAlive()) {
       const result = await existing.send(body);
       return NextResponse.json({ success: true, data: result });
+    }
+
+    if (body.type === "abort") {
+      const abortedChildren = abortYpiStudioChildRunsForSession(id, "parent_abort");
+      return NextResponse.json({ success: true, data: { running: false, abortedChildren } });
     }
 
     const filePath = await resolveSessionPath(id);
