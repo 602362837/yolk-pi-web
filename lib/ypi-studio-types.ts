@@ -176,6 +176,8 @@ export interface YpiStudioTaskEvent {
 
 export type YpiStudioSubagentTranscriptStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
 
+export type YpiStudioSubagentRunStatus = "queued" | YpiStudioSubagentTranscriptStatus;
+
 export type YpiStudioPolicySource = "toolInput" | "memberConfig" | "defaultPolicy" | "followMain" | "piDefault" | "unset";
 
 export type YpiStudioPolicyWarningCode =
@@ -299,12 +301,32 @@ export interface YpiStudioSubagentTranscriptResponse {
 
 
 export type YpiStudioImplementationSubtaskStatus =
-  | "pending"
+  | "pending" // Legacy alias. UI and scheduler projections should present it as waiting.
+  | "waiting"
   | "ready"
+  | "queued"
   | "running"
   | "blocked"
+  | "failed"
   | "done"
   | "skipped";
+
+export type YpiStudioImplementationSchedulerMode = "dag";
+export type YpiStudioImplementationSchedulerStrategy = "ready_fifo" | "priority";
+export type YpiStudioImplementationFailurePolicy = "block_dependents" | "manual" | "allow_dependents_when_skipped";
+
+export interface YpiStudioImplementationScheduler {
+  mode: YpiStudioImplementationSchedulerMode;
+  strategy?: YpiStudioImplementationSchedulerStrategy;
+  failFast?: boolean;
+  defaultFailurePolicy?: Exclude<YpiStudioImplementationFailurePolicy, "allow_dependents_when_skipped">;
+}
+
+export interface YpiStudioImplementationDependencyStatus {
+  id: string;
+  title?: string;
+  status: YpiStudioImplementationSubtaskStatus;
+}
 
 export type YpiStudioImplementationLocalReviewStatus =
   | "not_requested"
@@ -314,13 +336,32 @@ export type YpiStudioImplementationLocalReviewStatus =
   | "failed"
   | "skipped";
 
+export type YpiStudioImplementationSubtaskRelation = "serial" | "parallel" | "barrier";
+
+export interface YpiStudioImplementationExecutionGroup {
+  id: string;
+  title: string;
+  relation: YpiStudioImplementationSubtaskRelation;
+  dependencies?: string[];
+  subtaskIds: string[];
+}
+
+export interface YpiStudioImplementationExecution {
+  mode: "mixed" | "serial" | "parallel";
+  maxParallel?: number;
+  groups?: YpiStudioImplementationExecutionGroup[];
+}
+
 export interface YpiStudioImplementationSubtaskPlan {
   id: string;
   title: string;
   phase?: string;
   description?: string;
   order: number;
+  /** DAG scheduling source of truth. `dependencies` is kept as a legacy alias. */
   dependsOn: string[];
+  dependencies?: string[];
+  relation: YpiStudioImplementationSubtaskRelation;
   files?: string[];
   instructions?: string[];
   acceptance?: string[];
@@ -328,6 +369,10 @@ export interface YpiStudioImplementationSubtaskPlan {
   risks?: string[];
   parallelGroup?: string;
   parallelizable?: boolean;
+  member?: "implementer" | "checker" | string;
+  priority?: number;
+  failurePolicy?: YpiStudioImplementationFailurePolicy;
+  retry?: { maxAttempts?: number };
   localReview?: {
     required?: boolean;
     reviewer?: "checker" | string;
@@ -335,12 +380,15 @@ export interface YpiStudioImplementationSubtaskPlan {
 }
 
 export interface YpiStudioImplementationPlan {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   updatedAt: string;
   sourceArtifact?: "implement.md" | string;
   summary?: string;
   strategy?: string;
   maxConcurrency?: number;
+  scheduler?: YpiStudioImplementationScheduler;
+  /** UI/readability projection only; scheduler readiness is derived from subtasks[].dependsOn. */
+  execution?: YpiStudioImplementationExecution;
   subtasks: YpiStudioImplementationSubtaskPlan[];
 }
 
@@ -353,8 +401,16 @@ export interface YpiStudioImplementationSubtaskProgress {
   attempts: number;
   runIds: string[];
   lastRunId?: string;
+  currentRunId?: string;
+  queuedAt?: string;
+  claimedAt?: string;
+  claimedByContextId?: string;
+  member?: string;
+  waitingOn?: YpiStudioImplementationDependencyStatus[];
+  blockedBy?: string[];
   blockedReason?: string;
   skippedReason?: string;
+  terminationReason?: string;
   summary?: string;
   validation?: string[];
   localReview?: {
@@ -375,10 +431,15 @@ export interface YpiStudioImplementationHistoryEntry {
 }
 
 export interface YpiStudioImplementationProgress {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   updatedAt: string;
+  /** Legacy primary active subtask; v2 readers should prefer activeSubtaskIds. */
   activeSubtaskId?: string;
+  activeSubtaskIds?: string[];
+  queuedSubtaskIds?: string[];
+  /** Legacy first ready subtask; v2 readers should prefer nextSubtaskIds. */
   nextSubtaskId?: string;
+  nextSubtaskIds?: string[];
   counts: Record<YpiStudioImplementationSubtaskStatus, number>;
   subtasks: Record<string, YpiStudioImplementationSubtaskProgress>;
   history?: YpiStudioImplementationHistoryEntry[];
@@ -389,12 +450,18 @@ export interface YpiStudioImplementationSummary {
   done: number;
   skipped: number;
   blocked: number;
+  failed: number;
   running: number;
+  queued: number;
   ready: number;
+  waiting: number;
+  /** Legacy count retained for existing UI; pending should be displayed as waiting. */
   pending: number;
   activeSubtaskId?: string;
+  activeSubtaskIds?: string[];
   activeTitle?: string;
   nextSubtaskId?: string;
+  nextSubtaskIds?: string[];
   nextTitle?: string;
   blockedTitles: string[];
 }
@@ -403,7 +470,7 @@ export interface YpiStudioTaskSubagentRun {
   id: string;
   subtaskId?: string;
   member: string;
-  status: YpiStudioSubagentTranscriptStatus;
+  status: YpiStudioSubagentRunStatus;
   startedAt: string;
   finishedAt?: string;
   prompt?: string;
@@ -439,6 +506,7 @@ export interface YpiStudioApprovalGate {
 
 export interface YpiStudioApprovalGrant {
   approvedAt: string;
+  /** Must match the bound Studio context key (normally pi_<sessionId>) used by input hooks and task binding. */
   contextId: string;
   inputHash: string;
   source: "user-input";
@@ -499,6 +567,61 @@ export interface YpiStudioTaskDocument {
   truncated: boolean;
 }
 
+export interface YpiStudioImplementationRunProjection {
+  id: string;
+  member: string;
+  subtaskId?: string;
+  status: YpiStudioSubagentRunStatus;
+  registryStatus?: YpiStudioSubagentRunStatus | "runtime_lost";
+  registryActive: boolean;
+  startedAt: string;
+  finishedAt?: string;
+  summary?: string;
+  error?: string;
+  terminationReason?: string;
+  phase?: YpiStudioSubagentRunPhase;
+  tokens?: number;
+  tps?: number;
+  currentTool?: YpiStudioSubagentCurrentTool;
+  transcriptMeta?: YpiStudioSubagentTranscriptRef;
+}
+
+export interface YpiStudioImplementationSubtaskProjection extends YpiStudioImplementationSubtaskPlan {
+  status: YpiStudioImplementationSubtaskStatus;
+  displayStatus: "waiting" | Exclude<YpiStudioImplementationSubtaskStatus, "pending">;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  attempts: number;
+  runIds: string[];
+  lastRunId?: string;
+  currentRunId?: string;
+  queuedAt?: string;
+  claimedAt?: string;
+  claimedByContextId?: string;
+  member?: string;
+  waitingOn?: YpiStudioImplementationDependencyStatus[];
+  blockedBy?: string[];
+  blockedReason?: string;
+  skippedReason?: string;
+  terminationReason?: string;
+  summary?: string;
+  validation?: string[];
+  runs: YpiStudioImplementationRunProjection[];
+}
+
+export interface YpiStudioImplementationProjection {
+  schemaVersion: 1 | 2;
+  maxConcurrency: number;
+  statusCounts: Record<YpiStudioImplementationSubtaskStatus, number>;
+  activeSubtaskIds: string[];
+  queuedSubtaskIds: string[];
+  nextSubtaskIds: string[];
+  subtasksWithStatus: YpiStudioImplementationSubtaskProjection[];
+  runsBySubtask: Record<string, YpiStudioImplementationRunProjection[]>;
+  nonTerminalSubtasks: YpiStudioImplementationSubtaskProjection[];
+}
+
 export interface YpiStudioTaskDetail extends YpiStudioTaskSummary {
   artifacts: Record<string, string>;
   documents: Record<string, YpiStudioTaskDocument>;
@@ -507,6 +630,7 @@ export interface YpiStudioTaskDetail extends YpiStudioTaskSummary {
   events: YpiStudioTaskEvent[];
   implementationPlan?: YpiStudioImplementationPlan;
   implementationProgress?: YpiStudioImplementationProgress;
+  implementationProjection?: YpiStudioImplementationProjection;
 }
 
 export interface YpiStudioTasksResponse {
@@ -541,7 +665,7 @@ export interface YpiStudioTaskWidgetSubagentRun {
   id: string;
   member: string;
   subtaskId?: string;
-  status: "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
+  status: YpiStudioSubagentRunStatus;
   startedAt: string;
   finishedAt?: string;
   summary?: string;
@@ -595,6 +719,7 @@ export interface YpiStudioTaskWidgetProjection {
   subagents: YpiStudioTaskWidgetSubagentRun[];
   events?: YpiStudioTaskWidgetEvent[];
   implementation?: YpiStudioImplementationSummary;
+  implementationProjection?: Pick<YpiStudioImplementationProjection, "maxConcurrency" | "statusCounts" | "activeSubtaskIds" | "queuedSubtaskIds" | "nextSubtaskIds" | "nonTerminalSubtasks">;
 }
 
 export type YpiStudioSessionTaskLinkResult =
@@ -606,9 +731,10 @@ export interface YpiStudioLiveRunOverlay {
   toolName: "ypi_studio_task" | "ypi_studio_subagent";
   taskId?: string;
   taskKey?: string;
+  runId?: string;
   member?: string;
   subtaskId?: string;
-  status?: "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
+  status?: YpiStudioSubagentRunStatus;
   model?: string;
   thinking?: string;
   phase?: YpiStudioSubagentRunPhase;
@@ -677,7 +803,11 @@ export interface YpiStudioTaskImplementationSubtaskClaimBody {
   cwd: string;
   action: "claim_implementation_subtask";
   subtaskId?: string;
+  subtaskIds?: string[];
+  limit?: number;
   runId?: string;
+  runIds?: string[];
+  status?: "queued" | "running";
   message?: string;
   contextId?: string;
 }
@@ -690,14 +820,56 @@ export interface YpiStudioTaskImplementationSubtaskUpdateBody {
   runId?: string;
   message?: string;
   validation?: string[];
+  blockedBy?: string[];
   blockedReason?: string;
   skippedReason?: string;
+  terminationReason?: string;
   localReview?: {
     status?: YpiStudioImplementationLocalReviewStatus;
     runId?: string;
     summary?: string;
   };
   contextId?: string;
+}
+
+export type YpiStudioSubagentToolAction = "start" | "poll" | "collect" | "cancel";
+export type YpiStudioSubagentToolMode = "sync" | "async";
+
+export interface YpiStudioSubagentToolInput {
+  /** Omitted action/mode preserves the existing synchronous delegation behavior. */
+  action?: YpiStudioSubagentToolAction;
+  mode?: YpiStudioSubagentToolMode;
+  member?: string;
+  prompt?: string;
+  taskId?: string;
+  model?: string;
+  thinking?: string;
+  subtaskId?: string;
+  runId?: string;
+  runIds?: string[];
+  cancelReason?: string;
+}
+
+export interface YpiStudioSubagentToolRunProjection {
+  runId: string;
+  taskId?: string;
+  subtaskId?: string;
+  member?: string;
+  status: YpiStudioSubagentRunStatus;
+  progress?: YpiStudioSubagentRunProgress;
+  transcript?: YpiStudioSubagentTranscriptRef;
+  summary?: string;
+  error?: string;
+  terminationReason?: string;
+}
+
+export interface YpiStudioSubagentToolResult {
+  action: YpiStudioSubagentToolAction;
+  mode: YpiStudioSubagentToolMode;
+  run?: YpiStudioSubagentToolRunProjection;
+  runs?: YpiStudioSubagentToolRunProjection[];
+  message?: string;
+  warnings?: string[];
 }
 
 export interface YpiStudioTaskTransitionBody {

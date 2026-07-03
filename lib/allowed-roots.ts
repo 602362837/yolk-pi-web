@@ -8,6 +8,7 @@ const WINDOWS_ABSOLUTE_RE = /^[a-zA-Z]:[\\/]/;
 
 declare global {
   var __piAllowedRootsCache: { roots: Set<string>; expiresAt: number } | undefined;
+  var __piAllowedRootsCachePromise: Promise<Set<string>> | undefined;
   var __piRegisteredAllowedRoots: Set<string> | undefined;
 }
 
@@ -32,18 +33,13 @@ export function registerAllowedRoot(cwd: string): void {
   globalThis.__piAllowedRootsCache = undefined;
 }
 
-export async function getAllowedRoots(): Promise<Set<string>> {
-  const now = Date.now();
-  const cached = globalThis.__piAllowedRootsCache;
-  if (cached && cached.expiresAt > now) return cached.roots;
-
-  const { listAllSessions } = await import("@/lib/session-reader");
-  const sessions = await listAllSessions();
+async function buildAllowedRoots(): Promise<Set<string>> {
+  const { listSessionCwdsForAllowedRoots } = await import("@/lib/session-reader");
+  const sessionCwds = await listSessionCwdsForAllowedRoots();
   const roots = new Set<string>();
 
-  for (const session of sessions) {
-    if (!session.cwd) continue;
-    for (const root of createRootVariants(session.cwd)) roots.add(root);
+  for (const cwd of sessionCwds) {
+    for (const root of createRootVariants(cwd)) roots.add(root);
   }
 
   const home = homedir();
@@ -67,8 +63,25 @@ export async function getAllowedRoots(): Promise<Set<string>> {
     }
   }
 
-  globalThis.__piAllowedRootsCache = { roots, expiresAt: now + ALLOWED_ROOTS_TTL_MS };
   return roots;
+}
+
+export async function getAllowedRoots(): Promise<Set<string>> {
+  const now = Date.now();
+  const cached = globalThis.__piAllowedRootsCache;
+  if (cached && cached.expiresAt > now) return cached.roots;
+  if (globalThis.__piAllowedRootsCachePromise) return globalThis.__piAllowedRootsCachePromise;
+
+  const promise = buildAllowedRoots()
+    .then((roots) => {
+      globalThis.__piAllowedRootsCache = { roots, expiresAt: Date.now() + ALLOWED_ROOTS_TTL_MS };
+      return roots;
+    })
+    .finally(() => {
+      globalThis.__piAllowedRootsCachePromise = undefined;
+    });
+  globalThis.__piAllowedRootsCachePromise = promise;
+  return promise;
 }
 
 export function isPathAllowed(target: string, allowedRoots: Set<string>): boolean {

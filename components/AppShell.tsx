@@ -25,7 +25,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
-import type { YpiStudioLiveRunOverlay, YpiStudioSessionTaskLinkResult } from "@/lib/ypi-studio-types";
+import type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTaskLinkResult } from "@/lib/ypi-studio-types";
 import { trellisTaskDetailToChatContext, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import type { ChatInputHandle } from "./ChatInput";
 
@@ -66,6 +66,7 @@ export function AppShell() {
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [usageStatsOpen, setUsageStatsOpen] = useState(false);
   const [settingsConfigOpen, setSettingsConfigOpen] = useState(false);
+  const [settingsStudioFocusMember, setSettingsStudioFocusMember] = useState<{ id: string; name?: string } | null>(null);
   const [webConfig, setWebConfig] = useState<PiWebConfig | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -459,14 +460,19 @@ export function AppShell() {
   }, [loadStudioSessionTask, studioSessionTaskRefreshKey]);
 
   const studioSessionTaskKey = studioSessionTask?.task?.key ?? null;
-  const studioHasRunning = studioSessionTask?.task?.subagents.some((run) => run.status === "running") || studioLiveOverlays.some((overlay) => overlay.running);
+  const studioActiveRunCount =
+    (studioSessionTask?.task?.subagents.filter((run) => run.status === "running" || run.status === "queued" || run.status === "waiting_for_user").length ?? 0)
+    + studioLiveOverlays.filter((overlay) => overlay.running || overlay.status === "running" || overlay.status === "queued" || overlay.status === "waiting_for_user").length
+    + (studioSessionTask?.task?.implementationProjection?.statusCounts.running ?? 0)
+    + (studioSessionTask?.task?.implementationProjection?.statusCounts.queued ?? 0);
+  const studioHasActiveRuns = studioActiveRunCount > 0;
 
   useEffect(() => {
     if (!selectedSession || selectedSession.archived) return;
     if (!studioSessionTaskKey && !chatAgentRunning) return;
-    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), studioHasRunning || chatAgentRunning ? 5000 : 15000);
+    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), studioHasActiveRuns || chatAgentRunning ? 4000 : 20000);
     return () => window.clearInterval(interval);
-  }, [chatAgentRunning, selectedSession, studioHasRunning, studioSessionTaskKey]);
+  }, [chatAgentRunning, selectedSession, studioHasActiveRuns, studioSessionTaskKey]);
 
   useEffect(() => () => {
     if (studioToolRefreshTimerRef.current !== null) window.clearTimeout(studioToolRefreshTimerRef.current);
@@ -496,6 +502,11 @@ export function AppShell() {
     setRightPanelMode("studio");
     setRightPanelOpen(true);
   }, [studioSessionTask]);
+
+  const handleOpenStudioMemberSettings = useCallback((agent: YpiStudioAgent) => {
+    setSettingsStudioFocusMember({ id: agent.id, name: agent.name });
+    setSettingsConfigOpen(true);
+  }, []);
 
   const handleOpenTerminalCommand = useCallback((cwd: string, command: string) => {
     setTerminalDockCwd(cwd);
@@ -665,7 +676,7 @@ export function AppShell() {
           },
           {
             label: "Settings",
-            onClick: () => setSettingsConfigOpen(true),
+            onClick: () => { setSettingsStudioFocusMember(null); setSettingsConfigOpen(true); },
             disabled: false,
             icon: (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1270,7 +1281,7 @@ export function AppShell() {
               {studioCwd && <span title={studioCwd} style={{ color: "var(--text-dim)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{studioCwd}</span>}
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={rightPanelOpen && rightPanelMode === "studio" ? studioSessionTaskRefreshKey : 0} currentSessionContextId={studioContextIdForSession(selectedSession?.id)} onTaskBound={() => setStudioSessionTaskRefreshKey((key) => key + 1)} />
+              <YpiStudioPanel cwd={studioCwd} onOpenFile={handleOpenFile} focusedTaskKey={focusedStudioTaskKey} initialTab="tasks" initialScope={focusedStudioTaskKey?.startsWith("archived:") ? "archived" : "active"} refreshKey={rightPanelOpen && rightPanelMode === "studio" ? studioSessionTaskRefreshKey : 0} currentSessionContextId={studioContextIdForSession(selectedSession?.id)} onTaskBound={() => setStudioSessionTaskRefreshKey((key) => key + 1)} studioConfig={webConfig?.studio ?? null} onOpenStudioMemberSettings={handleOpenStudioMemberSettings} />
             </div>
           </>
         ) : (
@@ -1372,8 +1383,11 @@ export function AppShell() {
     {settingsConfigOpen && (
       <SettingsConfig
         cwd={trellisCwd}
+        initialSection={settingsStudioFocusMember ? "studio" : undefined}
+        studioFocusMember={settingsStudioFocusMember ?? undefined}
+        studioFocusField={settingsStudioFocusMember ? "model" : undefined}
         onConfigChange={() => { void loadWebConfig(); }}
-        onClose={() => { setSettingsConfigOpen(false); void loadWebConfig(); }}
+        onClose={() => { setSettingsConfigOpen(false); setSettingsStudioFocusMember(null); void loadWebConfig(); }}
         terminalEnabled={terminalEnabled}
         onOpenTerminalCommand={handleOpenTerminalCommand}
       />

@@ -22,7 +22,7 @@ interface Props {
   cwd?: string;
 }
 
-type StudioRunStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" | "unavailable";
+type StudioRunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" | "unavailable";
 
 interface StudioRunDisplayLimits {
   recentLimit?: number;
@@ -58,6 +58,10 @@ interface StudioRunProjection {
   member?: string;
   status?: StudioRunStatus;
   taskId?: string;
+  taskKey?: string;
+  subtaskId?: string;
+  action?: string;
+  mode?: string;
   transcript?: YpiStudioSubagentTranscriptRef;
   progress?: StudioRunProgress;
   model?: string;
@@ -92,7 +96,7 @@ function resultText(result?: ToolResultMessage): string {
 }
 
 function normalizeStatus(value: unknown): StudioRunStatus | undefined {
-  if (value === "running" || value === "succeeded" || value === "failed" || value === "cancelled" || value === "waiting_for_user") return value;
+  if (value === "queued" || value === "running" || value === "succeeded" || value === "failed" || value === "cancelled" || value === "waiting_for_user") return value;
   return undefined;
 }
 
@@ -200,6 +204,8 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
     member: asString(value.member),
     status: normalizeStatus(value.status),
     taskId: asString(value.taskId),
+    taskKey: asString(value.taskKey),
+    subtaskId: asString(value.subtaskId),
     transcript: normalizeTranscriptRef(value.transcript),
     progress: normalizeProgress(value.progress),
     model: asString(value.model),
@@ -226,6 +232,10 @@ function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): Stud
       member: run.member ?? acc.member,
       status: run.status ?? acc.status,
       taskId: run.taskId ?? acc.taskId,
+      taskKey: run.taskKey ?? acc.taskKey,
+      subtaskId: run.subtaskId ?? acc.subtaskId,
+      action: run.action ?? acc.action,
+      mode: run.mode ?? acc.mode,
       transcript: run.transcript ?? acc.transcript,
       progress: run.progress ?? acc.progress,
       model: run.model ?? acc.model,
@@ -260,6 +270,7 @@ function statusLabel(status: StudioRunStatus): string {
   if (status === "failed") return "Failed";
   if (status === "cancelled") return "Cancelled";
   if (status === "waiting_for_user") return "Waiting for user";
+  if (status === "queued") return "Queued";
   if (status === "unavailable") return "Transcript unavailable";
   return "Running";
 }
@@ -289,6 +300,7 @@ function statusColor(status: StudioRunStatus): string {
   if (status === "succeeded") return "#16a34a";
   if (status === "waiting_for_user") return "#f59e0b";
   if (status === "failed" || status === "cancelled") return "#f87171";
+  if (status === "queued") return "#38bdf8";
   if (status === "unavailable") return "var(--text-dim)";
   return "var(--accent)";
 }
@@ -296,6 +308,7 @@ function statusColor(status: StudioRunStatus): string {
 function statusBorderColor(status: StudioRunStatus): string {
   if (status === "failed" || status === "cancelled") return "rgba(248,113,113,0.45)";
   if (status === "waiting_for_user") return "rgba(245,158,11,0.45)";
+  if (status === "queued") return "rgba(56,189,248,0.35)";
   return "rgba(34,197,94,0.25)";
 }
 
@@ -358,6 +371,11 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
     taskId: inputString(block.input, "taskId"),
     model: inputString(block.input, "model"),
     thinking: inputString(block.input, "thinking"),
+    id: inputString(block.input, "runId"),
+    taskKey: inputString(block.input, "taskKey"),
+    subtaskId: inputString(block.input, "subtaskId"),
+    action: inputString(block.input, "action"),
+    mode: inputString(block.input, "mode"),
     modelSource: inputString(block.input, "model") ? "toolInput" : undefined,
     thinkingSource: inputString(block.input, "thinking") ? "toolInput" : undefined,
   }), [block.input]);
@@ -366,7 +384,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   const finalRun = runFromDetails(result?.details);
   const run = mergeRunProjections(inputRun, progressRun, finalRun);
   const transcript = apiResponse?.transcript ?? run.transcript;
-  const status: StudioRunStatus = run.status ?? (progress?.running ? "running" : result ? (result.isError ? "failed" : "succeeded") : "running");
+  const isAsyncStart = run.mode === "async" && (!run.action || run.action === "start");
+  const status: StudioRunStatus = run.status ?? (progress?.running ? "running" : result ? (result.isError ? "failed" : isAsyncStart ? "running" : "succeeded") : isAsyncStart ? "queued" : "running");
   const finalText = resultText(result);
   const progressItems = run.progress?.itemsPreview ?? [];
   const items = apiResponse?.items ?? progressItems;
@@ -374,21 +393,22 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   const elapsed = formatElapsed(run.progress?.startedAt ?? transcript?.startedAt, transcript?.finishedAt, duration);
   const lastPreview = run.progress?.lastTextPreview ?? run.summary ?? run.error ?? previewText(finalText || "Waiting for Studio member output…");
   const taskId = transcript?.taskId ?? run.taskId ?? inputRun.taskId;
+  const taskKey = run.taskKey ?? taskId;
   const runId = transcript?.runId ?? run.id;
   const effectiveCwd = cwd ?? (isRecord(result?.details) && isRecord(result.details.task) ? asString(result.details.task.cwd) : undefined);
 
   useEffect(() => {
-    if (status !== "running") return;
+    if (status !== "running" && status !== "queued") return;
     const timer = setInterval(() => setTick((value) => value + 1), 1000);
     return () => clearInterval(timer);
   }, [status]);
 
   useEffect(() => {
     const needsFullTranscript = debugExpanded || rawExpanded;
-    if (!needsFullTranscript || !transcript || !taskId || !runId || !effectiveCwd || status === "running") return;
+    if (!needsFullTranscript || !transcript || !taskKey || !runId || !effectiveCwd || status === "running" || status === "queued") return;
     let cancelled = false;
     setApiError(null);
-    const url = `/api/studio/tasks/${encodeURIComponent(taskId)}/subagents/${encodeURIComponent(runId)}/transcript?cwd=${encodeURIComponent(effectiveCwd)}&limit=300`;
+    const url = `/api/studio/tasks/${encodeURIComponent(taskKey)}/subagents/${encodeURIComponent(runId)}/transcript?cwd=${encodeURIComponent(effectiveCwd)}&limit=300`;
     fetch(url)
       .then(async (response) => {
         const body = await response.json().catch(() => ({})) as unknown;
@@ -398,13 +418,13 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
       .then((body) => { if (!cancelled) setApiResponse(body); })
       .catch((error) => { if (!cancelled) setApiError(error instanceof Error ? error.message : String(error)); });
     return () => { cancelled = true; };
-  }, [debugExpanded, effectiveCwd, rawExpanded, runId, status, taskId, transcript]);
+  }, [debugExpanded, effectiveCwd, rawExpanded, runId, status, taskKey, transcript]);
 
   const modelLabel = run.model ?? "Pi default";
   const thinkingLabel = run.thinking ?? "default";
   const recentLimit = run.progress?.display?.recentLimit ?? 5;
   const displayItems = compactItems(items, debugExpanded, recentLimit);
-  const phase = run.progress?.phase ?? (status === "running" ? "waiting_model" : status === "waiting_for_user" ? "waiting_for_user" : result ? "finished" : undefined);
+  const phase = run.progress?.phase ?? (status === "running" ? "waiting_model" : status === "queued" ? "starting" : status === "waiting_for_user" ? "waiting_for_user" : result ? "finished" : undefined);
   const stats = statsText(run.progress);
   const tpsLabel = typeof run.progress?.tps === "number" ? `${run.progress.tps.toFixed(1)} t/s` : undefined;
   const displayNotes = [

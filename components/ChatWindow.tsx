@@ -201,6 +201,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         progress.running,
         optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId) ?? "",
         optionalString(task?.key) ?? optionalString(run?.taskKey) ?? "",
+        optionalString(run?.id) ?? optionalString(progress.args?.runId) ?? "",
         optionalString(task?.status) ?? optionalString(run?.status) ?? "",
         optionalString(runProgress?.phase) ?? "",
         optionalNumber(runProgress?.tokens) ?? "",
@@ -232,12 +233,13 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           ? { toolCallId: runProgress.currentTool.toolCallId, toolName: runProgress.currentTool.toolName, startedAt: optionalString(runProgress.currentTool.startedAt) }
           : undefined;
         const status = optionalString(run?.status) ?? (progress.running ? "running" : progress.result?.isError ? "failed" : undefined);
-        const safeStatus = status === "succeeded" || status === "failed" || status === "cancelled" || status === "running" || status === "waiting_for_user" ? status : undefined;
+        const safeStatus = status === "queued" || status === "succeeded" || status === "failed" || status === "cancelled" || status === "running" || status === "waiting_for_user" ? status : undefined;
         return {
           toolCallId: progress.toolCallId,
           toolName: progress.toolName as "ypi_studio_task" | "ypi_studio_subagent",
           taskId: optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId),
           taskKey: optionalString(task?.key) ?? optionalString(run?.taskKey),
+          runId: optionalString(run?.id) ?? optionalString(progress.args?.runId),
           member: optionalString(run?.member) ?? optionalString(progress.args?.member),
           status: safeStatus,
           model: optionalString(run?.model),

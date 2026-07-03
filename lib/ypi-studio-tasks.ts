@@ -27,12 +27,18 @@ import type {
   YpiStudioKnowledgeIndex,
   YpiStudioTaskArchiveBody,
   YpiStudioTaskArchiveResult,
+  YpiStudioImplementationDependencyStatus,
+  YpiStudioImplementationExecution,
+  YpiStudioImplementationExecutionGroup,
   YpiStudioImplementationPlan,
   YpiStudioImplementationProgress,
   YpiStudioImplementationSubtaskPlan,
   YpiStudioImplementationSubtaskProgress,
+  YpiStudioImplementationSubtaskRelation,
   YpiStudioImplementationSubtaskStatus,
   YpiStudioImplementationLocalReviewStatus,
+  YpiStudioImplementationProjection,
+  YpiStudioImplementationRunProjection,
   YpiStudioImplementationSummary,
   YpiStudioTaskImplementationPlanUpdateBody,
   YpiStudioTaskImplementationSubtaskClaimBody,
@@ -56,6 +62,7 @@ import type {
   YpiStudioTaskTransitionBody,
   YpiStudioWorkflowFile,
 } from "./ypi-studio-types";
+import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 
 const TASKS_DIR = path.join(".ypi", "tasks");
 const TASKS_ARCHIVE_DIR = path.join(TASKS_DIR, "archive");
@@ -66,6 +73,7 @@ const TASK_JSON = "task.json";
 const EVENTS_JSONL = "events.jsonl";
 const DOC_MAX_BYTES = 256 * 1024;
 const EVENTS_MAX_BYTES = 512 * 1024;
+const taskMutationLocks = new Set<string>();
 
 const DEFAULT_ARTIFACTS: Record<string, string> = {
   brief: "brief.md",
@@ -99,6 +107,17 @@ interface TaskRecordOnDisk {
   modifiedMs: number;
   archived: boolean;
   archiveMonth?: string;
+}
+
+function withTaskMutationLock<T>(ctx: TaskContext, taskIdOrKey: string, action: () => T): T {
+  const lockKey = `${ctx.workspaceRoot}:${parseTaskKey(taskIdOrKey).id}`;
+  if (taskMutationLocks.has(lockKey)) throw new Error("YPI Studio task is already being updated. Please retry shortly.");
+  taskMutationLocks.add(lockKey);
+  try {
+    return action();
+  } finally {
+    taskMutationLocks.delete(lockKey);
+  }
 }
 
 export class YpiStudioTaskSecurityError extends Error {
@@ -143,7 +162,7 @@ function normalizeRunProgress(value: unknown): YpiStudioSubagentRunProgress | un
 }
 
 
-const IMPLEMENTATION_STATUSES: YpiStudioImplementationSubtaskStatus[] = ["pending", "ready", "running", "blocked", "done", "skipped"];
+const IMPLEMENTATION_STATUSES: YpiStudioImplementationSubtaskStatus[] = ["pending", "waiting", "ready", "queued", "running", "blocked", "failed", "done", "skipped"];
 
 function isImplementationStatus(value: unknown): value is YpiStudioImplementationSubtaskStatus {
   return typeof value === "string" && IMPLEMENTATION_STATUSES.includes(value as YpiStudioImplementationSubtaskStatus);
@@ -158,6 +177,10 @@ function normalizeStringList(value: unknown, max = 80): string[] | undefined {
   return arr.length ? arr : undefined;
 }
 
+function isImplementationRelation(value: unknown): value is YpiStudioImplementationSubtaskRelation {
+  return value === "serial" || value === "parallel" || value === "barrier";
+}
+
 function normalizeSubtaskPlan(value: unknown, index: number): YpiStudioImplementationSubtaskPlan | null {
   if (!isRecord(value)) return null;
   const id = optionalString(value.id)?.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -167,42 +190,144 @@ function normalizeSubtaskPlan(value: unknown, index: number): YpiStudioImplement
     required: value.localReview.required === true,
     reviewer: optionalString(value.localReview.reviewer),
   } : undefined;
+  const dependsOn = Array.from(new Set([...stringArray(value.dependsOn), ...stringArray(value.dependencies)]));
+  const relation = isImplementationRelation(value.relation) ? value.relation : value.parallelizable === true ? "parallel" : "serial";
   return {
     id,
     title,
     phase: optionalString(value.phase),
     description: optionalString(value.description),
     order: numberOr(value.order, (index + 1) * 10),
-    dependsOn: stringArray(value.dependsOn).filter((item) => item !== id),
+    dependsOn,
+    dependencies: dependsOn,
+    relation,
     files: normalizeStringList(value.files),
     instructions: normalizeStringList(value.instructions),
     acceptance: normalizeStringList(value.acceptance),
     validation: normalizeStringList(value.validation),
     risks: normalizeStringList(value.risks),
     parallelGroup: optionalString(value.parallelGroup),
-    parallelizable: value.parallelizable === true,
+    parallelizable: value.parallelizable === true || relation === "parallel",
+    member: optionalString(value.member),
+    priority: typeof value.priority === "number" && Number.isFinite(value.priority) ? value.priority : undefined,
+    failurePolicy: value.failurePolicy === "block_dependents" || value.failurePolicy === "manual" || value.failurePolicy === "allow_dependents_when_skipped" ? value.failurePolicy : undefined,
+    retry: isRecord(value.retry) ? { maxAttempts: typeof value.retry.maxAttempts === "number" && Number.isFinite(value.retry.maxAttempts) ? Math.max(0, Math.floor(value.retry.maxAttempts)) : undefined } : undefined,
     localReview,
   };
 }
 
-function normalizeImplementationPlan(value: unknown): YpiStudioImplementationPlan | undefined {
+function normalizeExecution(value: unknown, subtasks: YpiStudioImplementationSubtaskPlan[], maxConcurrency: number): YpiStudioImplementationExecution | undefined {
+  const ids = new Set(subtasks.map((subtask) => subtask.id));
+  const raw = isRecord(value) ? value : undefined;
+  const mode = raw?.mode === "serial" || raw?.mode === "parallel" || raw?.mode === "mixed"
+    ? raw.mode
+    : maxConcurrency > 1 || subtasks.some((subtask) => subtask.relation === "parallel") ? "mixed" : "serial";
+  const groups: YpiStudioImplementationExecutionGroup[] = Array.isArray(raw?.groups)
+    ? raw.groups.filter(isRecord).reduce<YpiStudioImplementationExecutionGroup[]>((acc, group) => {
+      const subtaskIds = stringArray(group.subtaskIds).filter((id) => ids.has(id));
+      if (!subtaskIds.length) return acc;
+      const dependencies = stringArray(group.dependencies).filter((id) => ids.has(id) || subtaskIds.includes(id));
+      acc.push({
+        id: optionalString(group.id) ?? subtaskIds.join("-"),
+        title: optionalString(group.title) ?? optionalString(group.id) ?? subtaskIds.join(", "),
+        relation: isImplementationRelation(group.relation) ? group.relation : subtaskIds.length > 1 ? "parallel" : "serial",
+        dependencies,
+        subtaskIds,
+      });
+      return acc;
+    }, [])
+    : [];
+  if (!groups.length) {
+    const grouped = new Map<string, YpiStudioImplementationExecutionGroup>();
+    for (const subtask of subtasks) {
+      const groupId = subtask.parallelGroup ?? subtask.id;
+      const existing = grouped.get(groupId);
+      if (existing) {
+        existing.subtaskIds.push(subtask.id);
+        existing.dependencies = Array.from(new Set([...(existing.dependencies ?? []), ...subtask.dependsOn]));
+        if (subtask.relation === "parallel") existing.relation = "parallel";
+        continue;
+      }
+      grouped.set(groupId, {
+        id: groupId,
+        title: subtask.parallelGroup ?? subtask.phase ?? subtask.title,
+        relation: subtask.relation,
+        dependencies: subtask.dependsOn,
+        subtaskIds: [subtask.id],
+      });
+    }
+    groups.push(...grouped.values());
+  }
+  return { mode, maxParallel: Math.max(1, Math.min(8, Math.floor(numberOr(raw?.maxParallel, maxConcurrency)))), groups };
+}
+
+function assertValidImplementationDAG(subtasks: YpiStudioImplementationSubtaskPlan[]): void {
+  const ids = new Set<string>();
+  for (const subtask of subtasks) {
+    if (ids.has(subtask.id)) throw new Error(`Duplicate implementation subtask id: ${subtask.id}`);
+    ids.add(subtask.id);
+  }
+  for (const subtask of subtasks) {
+    for (const dep of subtask.dependsOn) {
+      if (dep === subtask.id) throw new Error(`Implementation subtask ${subtask.id} cannot depend on itself`);
+      if (!ids.has(dep)) throw new Error(`Implementation subtask ${subtask.id} depends on missing subtask ${dep}`);
+    }
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const byId = new Map(subtasks.map((subtask) => [subtask.id, subtask]));
+  const visit = (id: string, stack: string[]): void => {
+    if (visited.has(id)) return;
+    if (visiting.has(id)) {
+      const start = stack.indexOf(id);
+      const cycle = [...stack.slice(Math.max(0, start)), id].join(" -> ");
+      throw new Error(`Implementation subtask dependency cycle detected: ${cycle}`);
+    }
+    visiting.add(id);
+    const subtask = byId.get(id);
+    for (const dep of subtask?.dependsOn ?? []) visit(dep, [...stack, dep]);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const subtask of subtasks) visit(subtask.id, [subtask.id]);
+}
+
+export function normalizeImplementationPlan(value: unknown): YpiStudioImplementationPlan | undefined {
   if (!isRecord(value) || !Array.isArray(value.subtasks)) return undefined;
+  const normalizedSubtasks = value.subtasks.map(normalizeSubtaskPlan).filter((item): item is YpiStudioImplementationSubtaskPlan => !!item);
+  if (normalizedSubtasks.length === 0) return undefined;
+  const schemaVersion = value.schemaVersion === 2 ? 2 : 1;
+  if (schemaVersion === 2) assertValidImplementationDAG(normalizedSubtasks);
   const seen = new Set<string>();
-  const subtasks = value.subtasks.map(normalizeSubtaskPlan).filter((item): item is YpiStudioImplementationSubtaskPlan => !!item && !seen.has(item.id) && !!seen.add(item.id));
-  if (subtasks.length === 0) return undefined;
+  const subtasks = normalizedSubtasks.filter((item) => !seen.has(item.id) && !!seen.add(item.id));
+  const ids = new Set(subtasks.map((subtask) => subtask.id));
+  const sortedSubtasks = subtasks
+    .map((subtask) => {
+      const dependsOn = schemaVersion === 2 ? subtask.dependsOn : subtask.dependsOn.filter((dep) => ids.has(dep) && dep !== subtask.id);
+      return { ...subtask, dependsOn, dependencies: dependsOn };
+    })
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const maxConcurrency = Math.max(1, Math.min(8, Math.floor(numberOr(value.maxConcurrency, numberOr(isRecord(value.execution) ? value.execution.maxParallel : undefined, 1)))));
   return {
-    schemaVersion: 1,
+    schemaVersion,
     updatedAt: optionalString(value.updatedAt) ?? nowIso(),
     sourceArtifact: optionalString(value.sourceArtifact),
     summary: optionalString(value.summary),
     strategy: optionalString(value.strategy),
-    maxConcurrency: Math.max(1, Math.min(8, Math.floor(numberOr(value.maxConcurrency, 1)))),
-    subtasks: subtasks.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)),
+    maxConcurrency,
+    scheduler: isRecord(value.scheduler) && value.scheduler.mode === "dag" ? {
+      mode: "dag",
+      strategy: value.scheduler.strategy === "priority" ? "priority" : value.scheduler.strategy === "ready_fifo" ? "ready_fifo" : undefined,
+      failFast: value.scheduler.failFast === true,
+      defaultFailurePolicy: value.scheduler.defaultFailurePolicy === "manual" ? "manual" : value.scheduler.defaultFailurePolicy === "block_dependents" ? "block_dependents" : undefined,
+    } : undefined,
+    execution: normalizeExecution(value.execution, sortedSubtasks, maxConcurrency),
+    subtasks: sortedSubtasks,
   };
 }
 
 function emptyImplementationCounts(): Record<YpiStudioImplementationSubtaskStatus, number> {
-  return { pending: 0, ready: 0, running: 0, blocked: 0, done: 0, skipped: 0 };
+  return { pending: 0, waiting: 0, ready: 0, queued: 0, running: 0, blocked: 0, failed: 0, done: 0, skipped: 0 };
 }
 
 export function implementationCounts(progress: YpiStudioImplementationProgress | undefined): Record<YpiStudioImplementationSubtaskStatus, number> {
@@ -212,17 +337,49 @@ export function implementationCounts(progress: YpiStudioImplementationProgress |
   return counts;
 }
 
-function dependencySatisfied(progress: YpiStudioImplementationProgress, id: string): boolean {
+function dependencySatisfiedForPlan(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress, id: string): boolean {
   const item = progress.subtasks[id];
-  return item?.status === "done" || item?.status === "skipped";
+  if (item?.status === "done") return true;
+  if (item?.status !== "skipped") return false;
+  if (plan.schemaVersion !== 2) return true;
+  const dependencyPlan = plan.subtasks.find((subtask) => subtask.id === id);
+  return dependencyPlan?.failurePolicy === "allow_dependents_when_skipped";
+}
+
+function dependencyBlocks(progress: YpiStudioImplementationProgress, id: string): boolean {
+  const status = progress.subtasks[id]?.status;
+  return status === "failed" || status === "blocked";
+}
+
+function waitingDependencies(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress, subtask: YpiStudioImplementationSubtaskPlan): YpiStudioImplementationDependencyStatus[] {
+  const byId = new Map(plan.subtasks.map((item) => [item.id, item]));
+  return subtask.dependsOn
+    .filter((dep) => !dependencySatisfiedForPlan(plan, progress, dep))
+    .map((dep) => ({ id: dep, title: byId.get(dep)?.title, status: progress.subtasks[dep]?.status ?? "pending" }));
+}
+
+function concurrencySlotsAvailable(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): number {
+  const maxConcurrency = Math.max(1, plan.maxConcurrency ?? plan.execution?.maxParallel ?? 1);
+  const occupied = Object.values(progress.subtasks).filter((item) => item.status === "queued" || item.status === "running").length;
+  return Math.max(0, maxConcurrency - occupied);
+}
+
+export function selectReadyYpiStudioImplementationSubtasks(plan: YpiStudioImplementationPlan | undefined, progress: YpiStudioImplementationProgress | undefined, limit?: number): YpiStudioImplementationSubtaskPlan[] {
+  if (!plan || !progress) return [];
+  const slots = concurrencySlotsAvailable(plan, progress);
+  const cappedLimit = Math.max(0, Math.floor(limit ?? slots));
+  if (slots <= 0 || cappedLimit <= 0) return [];
+  return plan.subtasks
+    .filter((subtask) => progress.subtasks[subtask.id]?.status === "ready" && subtask.dependsOn.every((dep) => dependencySatisfiedForPlan(plan, progress, dep)))
+    .sort((a, b) => {
+      if (plan.scheduler?.strategy === "priority") return (b.priority ?? 0) - (a.priority ?? 0) || a.order - b.order || a.id.localeCompare(b.id);
+      return a.order - b.order || a.id.localeCompare(b.id);
+    })
+    .slice(0, Math.min(slots, cappedLimit));
 }
 
 export function selectNextYpiStudioImplementationSubtask(plan: YpiStudioImplementationPlan | undefined, progress: YpiStudioImplementationProgress | undefined): YpiStudioImplementationSubtaskPlan | null {
-  if (!plan || !progress) return null;
-  const active = progress.activeSubtaskId ? progress.subtasks[progress.activeSubtaskId] : undefined;
-  const maxConcurrency = Math.max(1, plan.maxConcurrency ?? 1);
-  if (maxConcurrency <= 1 && active?.status === "running") return null;
-  return plan.subtasks.find((subtask) => progress.subtasks[subtask.id]?.status === "ready" && subtask.dependsOn.every((dep) => dependencySatisfied(progress, dep))) ?? null;
+  return selectReadyYpiStudioImplementationSubtasks(plan, progress, 1)[0] ?? null;
 }
 
 function summarizeImplementation(plan: YpiStudioImplementationPlan | undefined, progress: YpiStudioImplementationProgress | undefined): YpiStudioImplementationSummary | undefined {
@@ -232,7 +389,108 @@ function summarizeImplementation(plan: YpiStudioImplementationPlan | undefined, 
   const active = progress.activeSubtaskId ? byId.get(progress.activeSubtaskId) : undefined;
   const next = progress.nextSubtaskId ? byId.get(progress.nextSubtaskId) : selectNextYpiStudioImplementationSubtask(plan, progress) ?? undefined;
   const blockedTitles = plan.subtasks.filter((subtask) => progress.subtasks[subtask.id]?.status === "blocked").map((subtask) => subtask.title).slice(0, 5);
-  return { total: plan.subtasks.length, done: counts.done, skipped: counts.skipped, blocked: counts.blocked, running: counts.running, ready: counts.ready, pending: counts.pending, activeSubtaskId: progress.activeSubtaskId, activeTitle: active?.title, nextSubtaskId: next?.id, nextTitle: next?.title, blockedTitles };
+  return {
+    total: plan.subtasks.length,
+    done: counts.done,
+    skipped: counts.skipped,
+    blocked: counts.blocked,
+    failed: counts.failed,
+    running: counts.running,
+    queued: counts.queued,
+    ready: counts.ready,
+    waiting: counts.waiting,
+    pending: counts.pending,
+    activeSubtaskId: progress.activeSubtaskId,
+    activeSubtaskIds: progress.activeSubtaskIds,
+    activeTitle: active?.title,
+    nextSubtaskId: next?.id,
+    nextSubtaskIds: progress.nextSubtaskIds,
+    nextTitle: next?.title,
+    blockedTitles,
+  };
+}
+
+function projectImplementationRun(run: YpiStudioTaskSubagentRun): YpiStudioImplementationRunProjection {
+  const handle = getYpiStudioChildRun(run.id);
+  return {
+    id: run.id,
+    member: run.member,
+    subtaskId: run.subtaskId,
+    status: handle?.status === "runtime_lost" ? run.status : handle?.status ?? run.status,
+    registryStatus: handle?.status,
+    registryActive: !!handle,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    summary: run.summary,
+    error: run.error,
+    terminationReason: run.terminationReason,
+    phase: (handle?.progress ?? run.progress)?.phase,
+    tokens: (handle?.progress ?? run.progress)?.tokens,
+    tps: (handle?.progress ?? run.progress)?.tps,
+    currentTool: (handle?.progress ?? run.progress)?.currentTool,
+    transcriptMeta: run.transcript,
+  };
+}
+
+function isTerminalImplementationStatus(status: YpiStudioImplementationSubtaskStatus): boolean {
+  return status === "done" || status === "skipped";
+}
+
+function buildImplementationProjection(
+  plan: YpiStudioImplementationPlan | undefined,
+  progress: YpiStudioImplementationProgress | undefined,
+  runs: YpiStudioTaskSubagentRun[],
+): YpiStudioImplementationProjection | undefined {
+  if (!plan || !progress) return undefined;
+  const projectedRuns = runs.map(projectImplementationRun);
+  const runsBySubtask: Record<string, YpiStudioImplementationRunProjection[]> = {};
+  for (const run of projectedRuns) {
+    if (!run.subtaskId) continue;
+    (runsBySubtask[run.subtaskId] ??= []).push(run);
+  }
+  for (const list of Object.values(runsBySubtask)) {
+    list.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  }
+  const statusCounts = implementationCounts(progress);
+  const subtasksWithStatus = plan.subtasks.map((subtask) => {
+    const item = progress.subtasks[subtask.id] ?? normalizeSubtaskProgress(undefined, subtask.id, progress.updatedAt);
+    const taskRuns = runsBySubtask[subtask.id] ?? [];
+    return {
+      ...subtask,
+      status: item.status,
+      displayStatus: item.status === "pending" ? "waiting" as const : item.status,
+      updatedAt: item.updatedAt,
+      startedAt: item.startedAt,
+      finishedAt: item.finishedAt,
+      attempts: item.attempts,
+      runIds: item.runIds,
+      lastRunId: item.lastRunId,
+      currentRunId: item.currentRunId,
+      queuedAt: item.queuedAt,
+      claimedAt: item.claimedAt,
+      claimedByContextId: item.claimedByContextId,
+      member: item.member,
+      waitingOn: item.waitingOn,
+      blockedBy: item.blockedBy,
+      blockedReason: item.blockedReason,
+      skippedReason: item.skippedReason,
+      terminationReason: item.terminationReason,
+      summary: item.summary,
+      validation: item.validation,
+      runs: taskRuns,
+    };
+  });
+  return {
+    schemaVersion: plan.schemaVersion,
+    maxConcurrency: Math.max(1, plan.maxConcurrency ?? plan.execution?.maxParallel ?? 1),
+    statusCounts,
+    activeSubtaskIds: progress.activeSubtaskIds ?? (progress.activeSubtaskId ? [progress.activeSubtaskId] : []),
+    queuedSubtaskIds: progress.queuedSubtaskIds ?? [],
+    nextSubtaskIds: progress.nextSubtaskIds ?? (progress.nextSubtaskId ? [progress.nextSubtaskId] : []),
+    subtasksWithStatus,
+    runsBySubtask,
+    nonTerminalSubtasks: subtasksWithStatus.filter((subtask) => !isTerminalImplementationStatus(subtask.status) || subtask.status === "failed" || subtask.status === "blocked"),
+  };
 }
 
 
@@ -257,8 +515,16 @@ function normalizeSubtaskProgress(value: unknown, id: string, now: string): YpiS
     attempts: Math.max(0, Math.floor(numberOr(raw.attempts, 0))),
     runIds: stringArray(raw.runIds),
     lastRunId: optionalString(raw.lastRunId),
+    currentRunId: optionalString(raw.currentRunId),
+    queuedAt: optionalString(raw.queuedAt),
+    claimedAt: optionalString(raw.claimedAt),
+    claimedByContextId: optionalString(raw.claimedByContextId),
+    member: optionalString(raw.member),
+    waitingOn: Array.isArray(raw.waitingOn) ? raw.waitingOn.filter(isRecord).map((item) => ({ id: optionalString(item.id) ?? "", title: optionalString(item.title), status: isImplementationStatus(item.status) ? item.status : "pending" })).filter((item) => item.id) : undefined,
+    blockedBy: normalizeStringList(raw.blockedBy),
     blockedReason: optionalString(raw.blockedReason),
     skippedReason: optionalString(raw.skippedReason),
+    terminationReason: optionalString(raw.terminationReason),
     summary: optionalString(raw.summary),
     validation: normalizeStringList(raw.validation),
     localReview,
@@ -276,26 +542,29 @@ function rebuildImplementationProgress(plan: YpiStudioImplementationPlan, existi
     subtasks[subtask.id] = { ...current, updatedAt: current.updatedAt || now };
   }
   const progress: YpiStudioImplementationProgress = {
-    schemaVersion: 1,
+    schemaVersion: plan.schemaVersion === 2 || existing?.schemaVersion === 2 ? 2 : 1,
     updatedAt: now,
     activeSubtaskId: existing?.activeSubtaskId && subtasks[existing.activeSubtaskId] ? existing.activeSubtaskId : undefined,
+    activeSubtaskIds: existing?.activeSubtaskIds?.filter((id) => subtasks[id]),
+    queuedSubtaskIds: existing?.queuedSubtaskIds?.filter((id) => subtasks[id]),
     counts: emptyImplementationCounts(),
     subtasks,
     history: existing?.history?.filter((item) => planIds.has(item.subtaskId)).slice(-200),
   };
-  progress.nextSubtaskId = selectNextYpiStudioImplementationSubtask(plan, progress)?.id;
-  progress.counts = implementationCounts(progress);
-  return progress;
+  return refreshDerivedImplementationDAG(plan, progress);
 }
 
 function normalizeImplementationProgress(value: unknown, plan: YpiStudioImplementationPlan | undefined): YpiStudioImplementationProgress | undefined {
   if (!plan) return undefined;
   if (!isRecord(value) || !isRecord(value.subtasks)) return rebuildImplementationProgress(plan);
   const existing: YpiStudioImplementationProgress = {
-    schemaVersion: 1,
+    schemaVersion: value.schemaVersion === 2 ? 2 : 1,
     updatedAt: optionalString(value.updatedAt) ?? nowIso(),
     activeSubtaskId: optionalString(value.activeSubtaskId),
+    activeSubtaskIds: stringArray(value.activeSubtaskIds),
+    queuedSubtaskIds: stringArray(value.queuedSubtaskIds),
     nextSubtaskId: optionalString(value.nextSubtaskId),
+    nextSubtaskIds: stringArray(value.nextSubtaskIds),
     counts: emptyImplementationCounts(),
     subtasks: Object.fromEntries(Object.keys(value.subtasks).map((id) => [id, normalizeSubtaskProgress((value.subtasks as Record<string, unknown>)[id], id, nowIso())])),
     history: Array.isArray(value.history) ? value.history.filter(isRecord).map((item) => ({ at: optionalString(item.at) ?? nowIso(), subtaskId: optionalString(item.subtaskId) ?? "", from: isImplementationStatus(item.from) ? item.from : undefined, to: isImplementationStatus(item.to) ? item.to : "pending", runId: optionalString(item.runId), message: optionalString(item.message) })).filter((item) => item.subtaskId).slice(-200) : undefined,
@@ -309,28 +578,68 @@ function assertImplementationMutable(record: TaskRecordOnDisk | null): asserts r
 }
 
 function assertTaskStatusForImplementationMutation(task: YpiStudioTaskRecord, status: YpiStudioImplementationSubtaskStatus): void {
-  if (status === "running" || status === "done" || status === "blocked" || status === "skipped") {
-    if (task.status !== "implementing") throw new Error("Implementation subtask running/done/blocked/skipped updates require the main task to be in implementing after user approval.");
+  if (status === "queued" || status === "running" || status === "done" || status === "failed" || status === "blocked" || status === "skipped") {
+    if (task.status !== "implementing") throw new Error("Implementation subtask queued/running/done/failed/blocked/skipped updates require the main task to be in implementing after user approval.");
     return;
   }
-  if ((status === "ready" || status === "pending") && task.status !== "implementing" && task.status !== "changes_requested") {
-    throw new Error("Implementation subtask ready/pending updates are only allowed while the main task is implementing or changes_requested.");
+  if ((status === "ready" || status === "waiting" || status === "pending") && task.status !== "implementing" && task.status !== "changes_requested") {
+    throw new Error("Implementation subtask ready/waiting/pending updates are only allowed while the main task is implementing or changes_requested.");
   }
 }
 
-function refreshDerivedImplementation(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): void {
+export function propagateBlockedDependents(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): void {
+  const now = nowIso();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const subtask of plan.subtasks) {
+      const item = progress.subtasks[subtask.id];
+      if (!item || item.status === "done" || item.status === "skipped" || item.status === "failed") continue;
+      const blockedBy = subtask.dependsOn.filter((dep) => dependencyBlocks(progress, dep));
+      if (!blockedBy.length) continue;
+      const previous = item.status;
+      item.status = "blocked";
+      item.blockedBy = Array.from(new Set([...(item.blockedBy ?? []), ...blockedBy]));
+      item.waitingOn = waitingDependencies(plan, progress, subtask);
+      item.blockedReason ??= `Blocked by failed/blocked dependency: ${blockedBy.join(", ")}`;
+      item.updatedAt = now;
+      if (previous !== "blocked") changed = true;
+    }
+  }
+}
+
+export function refreshDerivedImplementationDAG(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): YpiStudioImplementationProgress {
+  propagateBlockedDependents(plan, progress);
+  const now = nowIso();
   for (const subtask of plan.subtasks) {
     const p = progress.subtasks[subtask.id];
-    if (p?.status === "pending" && subtask.dependsOn.every((dep) => dependencySatisfied(progress, dep))) {
-      p.status = "ready";
-      p.updatedAt = nowIso();
+    if (!p || p.status === "done" || p.status === "skipped" || p.status === "failed" || p.status === "blocked" || p.status === "queued" || p.status === "running") continue;
+    const waitingOn = waitingDependencies(plan, progress, subtask);
+    p.waitingOn = waitingOn.length ? waitingOn : undefined;
+    if (waitingOn.length === 0) {
+      if (p.status === "pending" || p.status === "waiting") {
+        p.status = "ready";
+        p.updatedAt = now;
+      }
+    } else if (p.status === "ready") {
+      p.status = plan.schemaVersion === 2 ? "waiting" : "pending";
+      p.updatedAt = now;
     }
   }
   const active = progress.activeSubtaskId ? progress.subtasks[progress.activeSubtaskId] : undefined;
   if (active && active.status !== "running") progress.activeSubtaskId = undefined;
-  progress.nextSubtaskId = selectNextYpiStudioImplementationSubtask(plan, progress)?.id;
+  const readySubtasks = selectReadyYpiStudioImplementationSubtasks(plan, progress);
+  progress.nextSubtaskId = readySubtasks[0]?.id;
+  progress.nextSubtaskIds = readySubtasks.length ? readySubtasks.map((subtask) => subtask.id) : undefined;
+  progress.activeSubtaskIds = Object.values(progress.subtasks).filter((item) => item.status === "running").map((item) => item.id);
+  progress.queuedSubtaskIds = Object.values(progress.subtasks).filter((item) => item.status === "queued").map((item) => item.id);
   progress.counts = implementationCounts(progress);
-  progress.updatedAt = nowIso();
+  progress.updatedAt = now;
+  return progress;
+}
+
+function refreshDerivedImplementation(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): void {
+  refreshDerivedImplementationDAG(plan, progress);
 }
 
 function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef | undefined {
@@ -514,13 +823,16 @@ export function assertYpiStudioImplementationApproved(task: YpiStudioTaskRecord,
   const grant = isApprovalGrant(task.meta.approvalGrant) ? task.meta.approvalGrant : null;
   const gate = isApprovalGate(task.meta.approvalGate) ? task.meta.approvalGate : null;
   if (!contextId) {
-    throw new Error("Transition awaiting_approval -> implementing requires explicit user approval in this chat session. Please ask the user to reply 确认/批准 before implementing.");
+    throw new Error("Transition awaiting_approval -> implementing requires this chat to be bound to the Studio task context before approval can be recorded. Bind/resume the task, then ask the user to reply 确认/批准.");
+  }
+  if (!task.contextIds.includes(contextId)) {
+    throw new Error("Transition awaiting_approval -> implementing requires approval from a bound Studio context. This chat is not bound to the task; bind/resume it, then ask the user to approve.");
   }
   if (!grant) {
-    throw new Error("Transition awaiting_approval -> implementing is blocked until a later user message explicitly approves the plan (for example: 确认，开始实现). override cannot bypass this approval gate.");
+    throw new Error("Transition awaiting_approval -> implementing is blocked because no approvalGrant is recorded for this task. Ask the user for a later explicit confirmation such as 确认，开始实现; override cannot bypass this approval gate.");
   }
   if (grant.contextId !== contextId) {
-    throw new Error("Transition awaiting_approval -> implementing approval belongs to a different Studio session context. Ask the user to approve in this chat session.");
+    throw new Error("Transition awaiting_approval -> implementing approvalGrant belongs to a different Studio session context. Ask the user to approve in this chat session.");
   }
   if (gate && !isAfterIso(grant.approvedAt, gate.enteredAt)) {
     throw new Error("Transition awaiting_approval -> implementing requires approval after the task entered awaiting_approval.");
@@ -611,7 +923,7 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
         id: optionalString(run.id) ?? `run-${Date.now()}`,
         subtaskId: optionalString(run.subtaskId),
         member: optionalString(run.member) ?? "unknown",
-        status: run.status === "running" || run.status === "succeeded" || run.status === "failed" || run.status === "cancelled" || run.status === "waiting_for_user" ? run.status : "failed",
+        status: run.status === "queued" || run.status === "running" || run.status === "succeeded" || run.status === "failed" || run.status === "cancelled" || run.status === "waiting_for_user" ? run.status : "failed",
         startedAt: optionalString(run.startedAt) ?? nowIso(),
         finishedAt: optionalString(run.finishedAt),
         prompt: optionalString(run.prompt),
@@ -886,6 +1198,7 @@ function recordToDetail(ctx: TaskContext, record: TaskRecordOnDisk): YpiStudioTa
     events: readEvents(record.dirPath),
     implementationPlan: record.raw.implementationPlan,
     implementationProgress: record.raw.implementationProgress,
+    implementationProjection: buildImplementationProjection(record.raw.implementationPlan, record.raw.implementationProgress, record.raw.subagents),
   };
 }
 
@@ -1277,12 +1590,22 @@ export function bindYpiStudioTaskToContext(cwd: string, taskIdOrKey: string, con
   return detail;
 }
 
+function findAwaitingApprovalTaskForContext(ctx: TaskContext, contextId: string): TaskRecordOnDisk | null {
+  const pointerTaskId = readRuntimePointer(ctx, contextId);
+  if (pointerTaskId) {
+    const pointed = loadTaskRecord(ctx, pointerTaskId);
+    if (pointed?.raw && !pointed.archived && pointed.raw.status === "awaiting_approval") return pointed;
+  }
+  const candidates = scanTaskRecords(ctx).records
+    .filter((record) => record.raw && !record.archived && record.raw.status === "awaiting_approval" && record.raw.contextIds.includes(contextId))
+    .sort((a, b) => (b.raw?.updatedAt ?? "").localeCompare(a.raw?.updatedAt ?? ""));
+  return candidates[0] ?? null;
+}
+
 export function recordYpiStudioUserApproval(cwd: string, contextId: string, inputText: string): YpiStudioTaskDetail | null {
   if (!contextId || !isExplicitYpiStudioApprovalText(inputText)) return null;
   const ctx = createContext(cwd);
-  const taskId = getYpiStudioTaskIdForContext(ctx.cwd, contextId);
-  if (!taskId) return null;
-  const record = loadTaskRecord(ctx, taskId);
+  const record = findAwaitingApprovalTaskForContext(ctx, contextId);
   if (!record?.raw || record.archived || record.raw.status !== "awaiting_approval") return null;
   const approvedAt = nowIso();
   const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, "unknown", contextId);
@@ -1356,22 +1679,53 @@ export function updateYpiStudioTaskArtifact(taskIdOrKey: string, body: YpiStudio
 
 export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run: YpiStudioTaskSubagentRun): YpiStudioTaskDetail {
   const ctx = createContext(cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
   const record = loadTaskRecord(ctx, taskIdOrKey);
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Archived tasks cannot record subagent runs");
   const updatedAt = nowIso();
   record.raw.subagents = [...record.raw.subagents.filter((existing) => existing.id !== run.id), run];
   if (run.subtaskId && record.raw.implementationPlan && record.raw.implementationProgress?.subtasks[run.subtaskId]) {
+    assertTaskStatusForImplementationMutation(record.raw, run.status === "succeeded" ? "done" : run.status === "cancelled" ? "failed" : run.status === "waiting_for_user" ? "blocked" : run.status);
     const progress = record.raw.implementationProgress;
     const subtask = progress.subtasks[run.subtaskId];
+    const previousStatus = subtask.status;
+    const hadRunId = subtask.runIds.includes(run.id);
     subtask.runIds = Array.from(new Set([...subtask.runIds, run.id]));
     subtask.lastRunId = run.id;
     subtask.updatedAt = updatedAt;
-    if (run.status === "running") {
+    if (run.status === "queued") {
+      subtask.status = "queued";
+      subtask.queuedAt ??= updatedAt;
+      subtask.finishedAt = undefined;
+      subtask.currentRunId = run.id;
+    } else if (run.status === "running") {
       subtask.status = "running";
       subtask.startedAt ??= updatedAt;
-      subtask.attempts = Math.max(1, subtask.attempts + (subtask.runIds.length === 1 ? 1 : 0));
+      subtask.finishedAt = undefined;
+      subtask.currentRunId = run.id;
+      if (previousStatus === "queued" || (previousStatus !== "running" && !hadRunId)) subtask.attempts = Math.max(1, subtask.attempts + 1);
       progress.activeSubtaskId = run.subtaskId;
+    } else if (run.status === "succeeded") {
+      subtask.status = "done";
+      subtask.finishedAt = run.finishedAt ?? updatedAt;
+      subtask.currentRunId = undefined;
+      subtask.summary = run.summary ?? subtask.summary;
+      subtask.terminationReason = run.terminationReason ?? subtask.terminationReason;
+    } else if (run.status === "failed" || run.status === "cancelled") {
+      subtask.status = "failed";
+      subtask.finishedAt = run.finishedAt ?? updatedAt;
+      subtask.currentRunId = undefined;
+      subtask.summary = run.summary ?? run.error ?? subtask.summary;
+      subtask.blockedReason = run.error ?? run.summary ?? subtask.blockedReason;
+      subtask.terminationReason = run.terminationReason ?? run.status;
+    } else if (run.status === "waiting_for_user") {
+      subtask.status = "blocked";
+      subtask.finishedAt = undefined;
+      subtask.currentRunId = undefined;
+      subtask.summary = run.summary ?? subtask.summary;
+      subtask.blockedReason = run.summary ?? run.error ?? "Child Studio member is waiting for user input.";
+      subtask.terminationReason = run.terminationReason ?? "waiting_for_user";
     }
     refreshDerivedImplementation(record.raw.implementationPlan, progress);
   }
@@ -1389,6 +1743,28 @@ export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after subagent update");
   return detail;
+  });
+}
+
+export function reconcileYpiStudioRuntimeLostSubagentRun(cwd: string, taskIdOrKey: string, runIdOrRun: string | YpiStudioTaskSubagentRun): YpiStudioTaskSubagentRun {
+  const task = getYpiStudioTaskDetail(cwd, taskIdOrKey);
+  if (!task) throw new Error("Task not found");
+  const run = typeof runIdOrRun === "string" ? task.subagents.find((item) => item.id === runIdOrRun) : runIdOrRun;
+  if (!run) throw new Error(`Studio subagent run not found: ${String(runIdOrRun)}`);
+  if (getYpiStudioChildRun(run.id) || (run.status !== "running" && run.status !== "queued")) return run;
+  const finishedAt = nowIso();
+  const failedRun: YpiStudioTaskSubagentRun = {
+    ...run,
+    status: "failed",
+    finishedAt,
+    summary: run.summary ?? "Studio subagent runtime handle was lost before completion.",
+    error: "Studio subagent runtime handle was lost before completion. Retry or handle manually.",
+    terminationReason: "runtime_lost",
+    progress: run.progress ? { ...run.progress, phase: "finished", updatedAt: finishedAt, terminationReason: "runtime_lost" } : run.progress,
+    transcript: run.transcript ? { ...run.transcript, status: "failed", finishedAt, updatedAt: finishedAt } : run.transcript,
+  };
+  recordYpiStudioSubagentRun(cwd, task.id, failedRun);
+  return failedRun;
 }
 
 export function getYpiStudioTaskContextForPrompt(cwd: string, taskIdOrKey: string): string {
@@ -1416,6 +1792,7 @@ export function getYpiStudioTaskContextForPrompt(cwd: string, taskIdOrKey: strin
 
 export function updateYpiStudioImplementationPlan(taskIdOrKey: string, body: YpiStudioTaskImplementationPlanUpdateBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
   const record = loadTaskRecord(ctx, taskIdOrKey);
   assertImplementationMutable(record);
   if (!record.raw) throw new Error("Task not found");
@@ -1437,16 +1814,19 @@ export function updateYpiStudioImplementationPlan(taskIdOrKey: string, body: Ypi
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after implementation plan update");
   return detail;
+  });
 }
 
-export function getNextYpiStudioImplementationSubtask(cwd: string, taskIdOrKey: string): { task: YpiStudioTaskDetail; subtask: YpiStudioImplementationSubtaskPlan | null; summary?: YpiStudioImplementationSummary } {
+export function getNextYpiStudioImplementationSubtask(cwd: string, taskIdOrKey: string, options: { limit?: number } = {}): { task: YpiStudioTaskDetail; subtask: YpiStudioImplementationSubtaskPlan | null; subtasks: YpiStudioImplementationSubtaskPlan[]; summary?: YpiStudioImplementationSummary } {
   const task = getYpiStudioTaskDetail(cwd, taskIdOrKey);
   if (!task) throw new Error("Task not found");
-  return { task, subtask: selectNextYpiStudioImplementationSubtask(task.implementationPlan, task.implementationProgress), summary: task.implementation };
+  const subtasks = selectReadyYpiStudioImplementationSubtasks(task.implementationPlan, task.implementationProgress, options.limit);
+  return { task, subtask: subtasks[0] ?? null, subtasks, summary: task.implementation };
 }
 
 export function claimYpiStudioImplementationSubtask(taskIdOrKey: string, body: YpiStudioTaskImplementationSubtaskClaimBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
   const record = loadTaskRecord(ctx, taskIdOrKey);
   assertImplementationMutable(record);
   if (!record.raw) throw new Error("Task not found");
@@ -1455,38 +1835,63 @@ export function claimYpiStudioImplementationSubtask(taskIdOrKey: string, body: Y
   const progress = record.raw.implementationProgress;
   if (!plan || !progress) throw new Error("Task has no implementation plan to claim from.");
   refreshDerivedImplementation(plan, progress);
-  const explicit = body.subtaskId ? plan.subtasks.find((subtask) => subtask.id === body.subtaskId) ?? null : null;
-  const candidate = explicit ?? selectNextYpiStudioImplementationSubtask(plan, progress);
-  if (!candidate) throw new Error("No ready implementation subtask is available. Check dependencies, blocked subtasks, or running active subtask.");
-  const item = progress.subtasks[candidate.id];
-  if (!item || item.status !== "ready") throw new Error(`Subtask ${candidate.id} is not ready`);
-  if (!candidate.dependsOn.every((dep) => dependencySatisfied(progress, dep))) throw new Error(`Subtask ${candidate.id} has unfinished dependencies`);
-  const updatedAt = nowIso();
-  const from = item.status;
-  item.status = "running";
-  item.startedAt = updatedAt;
-  item.finishedAt = undefined;
-  item.updatedAt = updatedAt;
-  item.attempts += 1;
-  if (body.runId) {
-    item.runIds = Array.from(new Set([...item.runIds, body.runId]));
-    item.lastRunId = body.runId;
+  const requestedIds = body.subtaskIds?.length ? body.subtaskIds : body.subtaskId ? [body.subtaskId] : undefined;
+  const requestedRunIds = body.runIds ?? (body.runId ? [body.runId] : undefined);
+  const targetStatus: YpiStudioImplementationSubtaskStatus = body.status === "queued" ? "queued" : "running";
+  const limit = Math.max(1, Math.floor(body.limit ?? requestedIds?.length ?? 1));
+  const candidates = requestedIds
+    ? requestedIds.map((id) => plan.subtasks.find((subtask) => subtask.id === id) ?? null)
+    : selectReadyYpiStudioImplementationSubtasks(plan, progress, limit);
+  if (candidates.some((candidate) => !candidate)) throw new Error("One or more requested implementation subtasks do not exist.");
+  const selected = candidates.filter((candidate): candidate is YpiStudioImplementationSubtaskPlan => !!candidate).slice(0, limit);
+  if (!selected.length) throw new Error("No ready implementation subtask is available. Check dependencies, blocked subtasks, or running active subtask.");
+  if (selected.length > concurrencySlotsAvailable(plan, progress)) throw new Error("Requested implementation subtasks exceed available concurrency slots.");
+  for (const candidate of selected) {
+    const item = progress.subtasks[candidate.id];
+    if (!item || item.status !== "ready") throw new Error(`Subtask ${candidate.id} is not ready or no concurrency slot is available`);
+    if (!candidate.dependsOn.every((dep) => dependencySatisfiedForPlan(plan, progress, dep))) throw new Error(`Subtask ${candidate.id} has unfinished dependencies`);
   }
-  progress.activeSubtaskId = candidate.id;
-  progress.history = [...(progress.history ?? []), { at: updatedAt, subtaskId: candidate.id, from, to: "running" as const, runId: body.runId, message: body.message }].slice(-200);
+  const updatedAt = nowIso();
+  const claimedIds: string[] = [];
+  selected.forEach((candidate, index) => {
+    const item = progress.subtasks[candidate.id];
+    const from = item.status;
+    const runId = requestedRunIds?.[index] ?? (selected.length === 1 ? body.runId : undefined);
+    item.status = targetStatus;
+    item.finishedAt = undefined;
+    item.updatedAt = updatedAt;
+    item.claimedAt = updatedAt;
+    item.claimedByContextId = body.contextId;
+    if (targetStatus === "running") {
+      item.startedAt = updatedAt;
+      item.attempts += 1;
+      progress.activeSubtaskId = candidate.id;
+    } else {
+      item.queuedAt = updatedAt;
+    }
+    if (runId) {
+      item.runIds = Array.from(new Set([...item.runIds, runId]));
+      item.lastRunId = runId;
+      item.currentRunId = runId;
+    }
+    progress.history = [...(progress.history ?? []), { at: updatedAt, subtaskId: candidate.id, from, to: targetStatus, runId, message: body.message }].slice(-200);
+    claimedIds.push(candidate.id);
+  });
   refreshDerivedImplementation(plan, progress);
   record.raw.updatedAt = updatedAt;
   if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
   writeTaskJson(record.dirPath, record.raw);
-  appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Claimed implementation subtask ${candidate.id}`, data: { subtaskId: candidate.id, status: "running", runId: body.runId } });
+  appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Claimed implementation subtasks ${claimedIds.join(", ")}`, data: { subtaskIds: claimedIds, status: targetStatus, runIds: requestedRunIds } });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after claim");
   return detail;
+  });
 }
 
 export function updateYpiStudioImplementationSubtask(taskIdOrKey: string, body: YpiStudioTaskImplementationSubtaskUpdateBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
   const record = loadTaskRecord(ctx, taskIdOrKey);
   assertImplementationMutable(record);
   if (!record.raw) throw new Error("Task not found");
@@ -1500,26 +1905,39 @@ export function updateYpiStudioImplementationSubtask(taskIdOrKey: string, body: 
   const updatedAt = nowIso();
   item.status = body.status;
   item.updatedAt = updatedAt;
+  if (body.status === "queued") {
+    item.queuedAt = updatedAt;
+    item.finishedAt = undefined;
+  }
   if (body.status === "running") {
     item.startedAt = updatedAt;
     item.finishedAt = undefined;
     item.attempts += 1;
     progress.activeSubtaskId = body.subtaskId;
   }
-  if (body.status === "done" || body.status === "skipped" || body.status === "blocked") item.finishedAt = body.status === "blocked" ? undefined : updatedAt;
+  if (body.status === "done" || body.status === "skipped" || body.status === "blocked" || body.status === "failed") item.finishedAt = body.status === "blocked" ? undefined : updatedAt;
   if (body.status === "ready") {
     item.finishedAt = undefined;
+    item.blockedBy = undefined;
     item.blockedReason = undefined;
     item.skippedReason = undefined;
+    item.terminationReason = undefined;
+    item.currentRunId = undefined;
+    item.queuedAt = undefined;
+    item.claimedAt = undefined;
+    item.claimedByContextId = undefined;
   }
   if (body.runId) {
     item.runIds = Array.from(new Set([...item.runIds, body.runId]));
     item.lastRunId = body.runId;
+    item.currentRunId = body.runId;
   }
   item.summary = body.message ?? item.summary;
   item.validation = body.validation ?? item.validation;
+  item.blockedBy = body.blockedBy ?? item.blockedBy;
   item.blockedReason = body.blockedReason ?? (body.status === "blocked" ? body.message ?? item.blockedReason : item.blockedReason);
   item.skippedReason = body.skippedReason ?? (body.status === "skipped" ? body.message ?? item.skippedReason : item.skippedReason);
+  item.terminationReason = body.terminationReason ?? item.terminationReason;
   if (body.localReview) {
     const previous = item.localReview ?? {};
     item.localReview = {
@@ -1539,6 +1957,7 @@ export function updateYpiStudioImplementationSubtask(taskIdOrKey: string, body: 
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after subtask update");
   return detail;
+  });
 }
 
 export function isYpiStudioTaskCreateBody(value: unknown): value is YpiStudioTaskCreateBody {
@@ -1560,7 +1979,11 @@ export function isYpiStudioTaskImplementationPlanUpdateBody(value: unknown): val
 export function isYpiStudioTaskImplementationSubtaskClaimBody(value: unknown): value is YpiStudioTaskImplementationSubtaskClaimBody {
   return isRecord(value) && value.action === "claim_implementation_subtask" && typeof value.cwd === "string"
     && (value.subtaskId === undefined || typeof value.subtaskId === "string")
+    && (value.subtaskIds === undefined || (Array.isArray(value.subtaskIds) && value.subtaskIds.every((item) => typeof item === "string")))
+    && (value.limit === undefined || (typeof value.limit === "number" && Number.isFinite(value.limit)))
     && (value.runId === undefined || typeof value.runId === "string")
+    && (value.runIds === undefined || (Array.isArray(value.runIds) && value.runIds.every((item) => typeof item === "string")))
+    && (value.status === undefined || value.status === "queued" || value.status === "running")
     && (value.message === undefined || typeof value.message === "string")
     && (value.contextId === undefined || typeof value.contextId === "string");
 }
@@ -1571,8 +1994,11 @@ export function isYpiStudioTaskImplementationSubtaskUpdateBody(value: unknown): 
     && (value.runId === undefined || typeof value.runId === "string")
     && (value.message === undefined || typeof value.message === "string")
     && (value.validation === undefined || (Array.isArray(value.validation) && value.validation.every((item) => typeof item === "string")))
+    && (value.blockedBy === undefined || (Array.isArray(value.blockedBy) && value.blockedBy.every((item) => typeof item === "string")))
     && (value.blockedReason === undefined || typeof value.blockedReason === "string")
-    && (value.skippedReason === undefined || typeof value.skippedReason === "string");
+    && (value.skippedReason === undefined || typeof value.skippedReason === "string")
+    && (value.terminationReason === undefined || typeof value.terminationReason === "string")
+    && (value.contextId === undefined || typeof value.contextId === "string");
 }
 
 export function isYpiStudioTaskArchiveBody(value: unknown): value is YpiStudioTaskArchiveBody & { action: "archive" } {

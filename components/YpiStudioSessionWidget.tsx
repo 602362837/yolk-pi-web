@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import type { YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection, YpiStudioTaskWidgetSubagentRun, YpiStudioSubagentTranscriptItem } from "@/lib/ypi-studio-types";
+import type { YpiStudioImplementationSubtaskProjection, YpiStudioImplementationSubtaskStatus, YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection, YpiStudioTaskWidgetSubagentRun, YpiStudioSubagentTranscriptItem } from "@/lib/ypi-studio-types";
 
 interface Props {
   task: YpiStudioTaskWidgetProjection;
@@ -47,12 +47,60 @@ function useMobile(): boolean {
 }
 
 function statusColor(status: string): string {
-  if (status === "succeeded" || status === "done") return "#22c55e";
-  if (status === "waiting_for_user") return "#f59e0b";
+  if (status === "succeeded" || status === "done" || status === "skipped") return "#22c55e";
+  if (status === "waiting_for_user" || status === "blocked") return "#f59e0b";
   if (status === "failed") return "#ef4444";
+  if (status === "queued" || status === "ready") return "#38bdf8";
   if (status === "cancelled") return "var(--text-dim)";
   if (status === "running" || status === "active") return "var(--accent)";
   return "var(--text-dim)";
+}
+
+function subtaskStatusLabel(status: YpiStudioImplementationSubtaskStatus): string {
+  if (status === "pending" || status === "waiting") return "等待";
+  if (status === "ready") return "就绪";
+  if (status === "queued") return "队列";
+  if (status === "running") return "运行";
+  if (status === "done") return "完成";
+  if (status === "failed") return "失败";
+  if (status === "blocked") return "阻塞";
+  return "跳过";
+}
+
+function subtaskReason(subtask: YpiStudioImplementationSubtaskProjection): string {
+  const waiting = subtask.waitingOn?.map((dependency) => `${dependency.title ?? dependency.id}:${dependency.status}`).join("、");
+  if (waiting) return `等待 ${waiting}`;
+  if (subtask.blockedReason) return subtask.blockedReason;
+  if (subtask.blockedBy?.length) return `受阻于 ${subtask.blockedBy.join("、")}`;
+  if (subtask.terminationReason) return subtask.terminationReason;
+  const runError = subtask.runs.find((run) => run.error)?.error;
+  if (runError) return runError;
+  if (subtask.currentRunId ?? subtask.lastRunId) return `run ${subtask.currentRunId ?? subtask.lastRunId}`;
+  if (subtask.member) return `成员 ${subtask.member}`;
+  return subtask.summary ?? "";
+}
+
+function implementationCount(task: YpiStudioTaskWidgetProjection, status: YpiStudioImplementationSubtaskStatus): number {
+  return task.implementationProjection?.statusCounts[status] ?? 0;
+}
+
+function implementationCountSummary(task: YpiStudioTaskWidgetProjection): string | undefined {
+  const total = task.implementation?.total;
+  if (!total && !task.implementationProjection) return undefined;
+  const done = implementationCount(task, "done") || task.implementation?.done || 0;
+  const skipped = implementationCount(task, "skipped") || task.implementation?.skipped || 0;
+  const running = implementationCount(task, "running");
+  const queued = implementationCount(task, "queued");
+  const waiting = implementationCount(task, "waiting") + implementationCount(task, "pending");
+  const ready = implementationCount(task, "ready");
+  const failed = implementationCount(task, "failed");
+  const blocked = implementationCount(task, "blocked") || task.implementation?.blocked || 0;
+  const pieces = [`运行 ${running}`, `队列 ${queued}`, `等待 ${waiting}`, `就绪 ${ready}`, `失败 ${failed}`, `阻塞 ${blocked}`, `完成 ${done + skipped}/${total ?? done + skipped}`];
+  return pieces.filter((piece) => !/ (0)(\D|$)/.test(piece) || piece.startsWith("完成")).join(" · ");
+}
+
+function visibleSubtasks(task: YpiStudioTaskWidgetProjection): YpiStudioImplementationSubtaskProjection[] {
+  return task.implementationProjection?.nonTerminalSubtasks ?? [];
 }
 
 function itemText(item: YpiStudioSubagentTranscriptItem): string {
@@ -91,10 +139,14 @@ function previewForRun(run: YpiStudioTaskWidgetSubagentRun): string {
   return [runtimeWarning, activity, displayNote].filter(Boolean).join(" · ");
 }
 
+function isActiveOverlay(overlay: YpiStudioLiveRunOverlay): boolean {
+  return overlay.running || overlay.status === "queued" || overlay.status === "running" || overlay.status === "waiting_for_user";
+}
+
 function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveRunOverlay[] = []): YpiStudioTaskWidgetSubagentRun[] {
-  const relevant = overlays.filter((overlay) => overlay.running && (overlay.taskKey === task.key || overlay.taskId === task.id));
+  const relevant = overlays.filter((overlay) => isActiveOverlay(overlay) && (overlay.taskKey === task.key || overlay.taskId === task.id));
   const liveRuns = relevant.map((overlay): YpiStudioTaskWidgetSubagentRun => ({
-    id: overlay.toolCallId,
+    id: overlay.runId ?? overlay.toolCallId,
     member: overlay.member ?? "studio",
     subtaskId: overlay.subtaskId,
     status: overlay.status ?? "running",
@@ -163,6 +215,8 @@ function buildStepFlow(task: YpiStudioTaskWidgetProjection) {
 function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: YpiStudioTaskWidgetSubagentRun[] }) {
   const completedCount = task.artifacts.completed.filter((artifact) => task.artifacts.required.includes(artifact)).length;
   const implementation = task.implementation;
+  const implementationSummary = implementationCountSummary(task);
+  const subtasks = visibleSubtasks(task);
   const stepFlow = buildStepFlow(task);
   return (
     <>
@@ -177,6 +231,7 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
           <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", color: "var(--text-dim)", fontSize: 10 }}>
             <span>{task.statusLabel}</span><span>·</span><span>负责人 {task.currentMember ?? "—"}</span><span>·</span><span>产物 {completedCount}/{task.artifacts.required.length}</span>{implementation && <><span>·</span><span>子任务 {implementation.done + implementation.skipped}/{implementation.total}</span></>}
           </div>
+          {implementationSummary && <div style={{ marginTop: 5, color: implementationCount(task, "failed") > 0 || implementationCount(task, "blocked") > 0 ? "#f59e0b" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{implementationSummary}</div>}
         </div>
       </div>
       <div style={{ padding: "0 12px 10px", display: "flex", flexDirection: "column", gap: 9 }}>
@@ -195,7 +250,20 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
             </div>
           ))}
         </div>
-        {implementation && (implementation.activeTitle || implementation.nextTitle || implementation.blocked > 0) && <div style={{ color: implementation.blocked > 0 ? "#f59e0b" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{implementation.activeTitle ? `当前子任务：${implementation.activeTitle}` : implementation.nextTitle ? `下一个子任务：${implementation.nextTitle}` : `阻塞子任务：${implementation.blocked}`}</div>}
+        {implementation && !task.implementationProjection && (implementation.activeTitle || implementation.nextTitle || implementation.blocked > 0) && <div style={{ color: implementation.blocked > 0 ? "#f59e0b" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{implementation.activeTitle ? `当前子任务：${implementation.activeTitle}` : implementation.nextTitle ? `下一个子任务：${implementation.nextTitle}` : `阻塞子任务：${implementation.blocked}`}</div>}
+        {subtasks.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 120, overflowY: "auto", paddingRight: 2 }}>
+            {subtasks.map((subtask) => {
+              const reason = subtaskReason(subtask);
+              return (
+                <div key={subtask.id} title={reason || subtask.title} style={{ display: "grid", gridTemplateColumns: "54px 1fr", alignItems: "center", gap: 7, borderBottom: "1px solid color-mix(in srgb, var(--border) 45%, transparent)", padding: "3px 0" }}>
+                  <span style={{ color: statusColor(subtask.status), fontSize: 9, fontWeight: 900 }}>{subtaskStatusLabel(subtask.status)}</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><span style={{ color: "var(--text)", fontWeight: 800 }}>{subtask.id}</span> · {subtask.title}{reason ? ` · ${reason}` : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {task.artifacts.missing.length > 0 && <div style={{ color: "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>缺失：{task.artifacts.missing.join("、")}</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 150, overflowY: "auto", paddingRight: 2 }}>
           {runs.length === 0 ? <div style={{ color: "var(--text-dim)", fontSize: 11 }}>暂无 Studio 成员执行记录</div> : runs.map((run) => (
@@ -288,7 +356,7 @@ export function YpiStudioSessionWidget({ task, liveOverlays = [], onClick }: Pro
   if (isMobile) {
     return (
       <>
-        <button type="button" onClick={() => setMobileOpen(true)} style={{ position: "absolute", left: "50%", bottom: 12, transform: "translateX(-50%)", zIndex: 250, border: "1px solid var(--border)", background: "color-mix(in srgb, var(--bg-panel) 92%, transparent)", color: "var(--text)", borderRadius: 999, padding: "7px 12px", fontSize: 12, fontWeight: 800, boxShadow: "0 10px 30px rgba(0,0,0,0.18)", backdropFilter: "blur(10px)" }}>工 Studio {task.progress}% · {runs[0]?.member ?? task.currentMember ?? task.statusLabel}</button>
+        <button type="button" onClick={() => setMobileOpen(true)} style={{ position: "absolute", left: "50%", bottom: 12, transform: "translateX(-50%)", zIndex: 250, border: "1px solid var(--border)", background: "color-mix(in srgb, var(--bg-panel) 92%, transparent)", color: "var(--text)", borderRadius: 999, padding: "7px 12px", fontSize: 12, fontWeight: 800, boxShadow: "0 10px 30px rgba(0,0,0,0.18)", backdropFilter: "blur(10px)" }}>工 Studio {task.progress}% · {implementationCountSummary(task) ?? runs[0]?.member ?? task.currentMember ?? task.statusLabel}</button>
         {mobileOpen && <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "flex-end" }} onClick={() => setMobileOpen(false)}><div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxHeight: "78vh", overflowY: "auto", borderTopLeftRadius: 16, borderTopRightRadius: 16, border: "1px solid var(--border)", background: "var(--bg)", boxShadow: "0 -16px 40px rgba(0,0,0,0.22)" }}><Content task={task} runs={runs} /><div style={{ padding: 12, display: "flex", gap: 8 }}><button onClick={onClick} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent)", color: "white", fontWeight: 800 }}>打开工作室</button><button onClick={() => setMobileOpen(false)} style={{ padding: 10, borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg-panel)", color: "var(--text-muted)", fontWeight: 800 }}>关闭</button></div></div></div>}
       </>
     );

@@ -12,6 +12,7 @@ import type {
   YpiStudioTaskWidgetProjection,
   YpiStudioWorkflowState,
   YpiStudioTaskWidgetSubagentRun,
+  YpiStudioSubagentRunStatus,
   YpiStudioSubagentTranscriptItem,
 } from "./ypi-studio-types";
 
@@ -233,14 +234,17 @@ function clip(value: string | undefined, max = 500): string | undefined {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
 }
 
-function normalizeRunStatus(status: string): "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" {
-  return status === "succeeded" || status === "failed" || status === "cancelled" || status === "waiting_for_user" ? status : "running";
+function normalizeRunStatus(status: string): YpiStudioSubagentRunStatus {
+  return status === "queued" || status === "succeeded" || status === "failed" || status === "cancelled" || status === "waiting_for_user" ? status : "running";
 }
 
 function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTaskWidgetSubagentRun[] {
-  const runs = [...detail.subagents]
-    .sort((a, b) => (a.status === "running" ? -1 : b.status === "running" ? 1 : b.startedAt.localeCompare(a.startedAt)))
-    .slice(0, 5);
+  const activeRuns = detail.subagents.filter((run) => run.status === "running" || run.status === "queued");
+  const recentRuns = detail.subagents
+    .filter((run) => run.status !== "running" && run.status !== "queued")
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+    .slice(0, Math.max(0, 5 - activeRuns.length));
+  const runs = [...activeRuns.sort((a, b) => b.startedAt.localeCompare(a.startedAt)), ...recentRuns];
   return runs.map((run) => {
     let lastItemsPreview: YpiStudioSubagentTranscriptItem[] = [];
     const warnings: string[] = [];
@@ -276,6 +280,30 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
       warnings: warnings.length ? warnings : undefined,
     };
   });
+}
+
+function buildWidgetImplementationProjection(detail: YpiStudioTaskDetail): YpiStudioTaskWidgetProjection["implementationProjection"] {
+  const projection = detail.implementationProjection;
+  if (!projection) return undefined;
+  return {
+    maxConcurrency: projection.maxConcurrency,
+    statusCounts: projection.statusCounts,
+    activeSubtaskIds: projection.activeSubtaskIds,
+    queuedSubtaskIds: projection.queuedSubtaskIds,
+    nextSubtaskIds: projection.nextSubtaskIds,
+    nonTerminalSubtasks: projection.nonTerminalSubtasks.map((subtask) => ({
+      ...subtask,
+      description: clip(subtask.description, 240),
+      files: subtask.files?.slice(0, 8),
+      instructions: undefined,
+      acceptance: undefined,
+      validation: undefined,
+      risks: undefined,
+      summary: clip(subtask.summary, 300),
+      blockedReason: clip(subtask.blockedReason, 300),
+      runs: subtask.runs.slice(0, 3).map((run) => ({ ...run, summary: clip(run.summary, 240), error: clip(run.error, 240) })),
+    })),
+  };
 }
 
 function stepStatus(stateIndex: number, currentIndex: number, state: YpiStudioWorkflowState, detail: YpiStudioTaskDetail): "done" | "active" | "pending" {
@@ -333,6 +361,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
     subagents: buildSubagents(cwd, detail),
     events: detail.events.slice(-5).reverse().map((event) => ({ type: event.type, at: event.at, message: event.message, from: event.from, to: event.to, member: event.member, artifact: event.artifact })),
     implementation: detail.implementation,
+    implementationProjection: buildWidgetImplementationProjection(detail),
   };
 }
 

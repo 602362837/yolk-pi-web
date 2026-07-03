@@ -84,6 +84,15 @@ export async function deleteSessionsForCwd(cwd: string, aliases: string[] = []):
   return deleted;
 }
 
+export async function listSessionCwdsForAllowedRoots(): Promise<string[]> {
+  let piSessions: PiSessionInfo[] = await SessionManager.listAll();
+  const prunedSessionIds = pruneDeletedWorktreeSessions(piSessions);
+  if (prunedSessionIds.size > 0) {
+    piSessions = piSessions.filter((session) => !prunedSessionIds.has(session.id));
+  }
+  return [...new Set(piSessions.map((session) => session.cwd).filter((cwd): cwd is string => Boolean(cwd)))];
+}
+
 export async function listAllSessions(): Promise<SessionInfo[]> {
   let piSessions: PiSessionInfo[] = await SessionManager.listAll();
   const prunedSessionIds = pruneDeletedWorktreeSessions(piSessions);

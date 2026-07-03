@@ -1,7 +1,37 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-03T05:04:57.749Z",
+  "updatedAt": "2026-07-03T09:11:51.200Z",
   "entries": [
+    {
+      "id": "20260703-171151-在-ypi-studio-成员-tab-显示并快速修改成员模型配置",
+      "title": "在 YPI Studio 成员 tab 显示并快速修改成员模型配置",
+      "taskId": "20260703-165152-在-ypi-studio-成员-tab-显示并快速修改成员模型配置",
+      "taskKey": "archived:2026-07:20260703-165152-在-ypi-studio-成员-tab-显示并快速修改成员模型配置",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：在 YPI Studio 成员 tab 显示并快速修改成员模型配置。可复用结论：成员运行模型配置来自 `~/.pi/agent/pi-web.json` 的 `studio.defaultPolicy` 与 `studio.members[memberId]`，不应写入 `.ypi/agents`；Members tab 可复用 `/api/web-config` 中的 studio 配置展示模型、thinking 与来源，点击“修改模型”由 AppShell 打开 SettingsConfig 并传入 `initialSection=\"studio\"`、`studioFocusMember` 来滚动/高亮目标行；默认成员直接定位现有行，自定义成员只在从 Members tab 跳转时临时展示配置行并写入 `studio.members[id]`。UI 注意避免嵌套 button，成员卡改非 button 容器并保留 Enter/Space 键盘选择；当成员或默认策略 model 为 `unset` 时，展示应明确说明回退链（默认策略/跟随主会话/Pi 默认），不要误导为真实模型。实现不新增 API、不改变 `ypi-studio-policy` 的运行时解析优先级。验证通过 lint 与 tsc，浏览器滚动/高亮仍建议手工确认。",
+      "tags": [
+        "feature-dev",
+        "ypi-studio",
+        "settings",
+        "members",
+        "model-config",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260703-165152-在-ypi-studio-成员-tab-显示并快速修改成员模型配置",
+      "knowledgePath": ".ypi/knowledge/20260703-171151-在-ypi-studio-成员-tab-显示并快速修改成员模型配置.md",
+      "createdAt": "2026-07-03T09:11:51.200Z",
+      "archivedAt": "2026-07-03T09:11:51.200Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260703-130457-优化-ypi-studio-subagent-chat-渲染与截断异常判断",
       "title": "优化 YPI Studio subagent Chat 渲染与截断异常判断",

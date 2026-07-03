@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModelSelect, type ModelSelectOption } from "./ModelSelect";
 import { SelectDropdown, type SelectDropdownOption } from "./SelectDropdown";
 import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
@@ -77,6 +77,7 @@ const TEMPLATE_VARIABLES = [
 ];
 
 type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "editor" | "trellis";
+type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
 const STUDIO_MEMBER_NAMES = ["architect", "ui-designer", "implementer", "checker"] as const;
@@ -455,14 +456,20 @@ export function SettingsConfig({
   onConfigChange,
   terminalEnabled = false,
   onOpenTerminalCommand,
+  initialSection,
+  studioFocusMember,
+  studioFocusField,
 }: {
   cwd: string | null;
   onClose: () => void;
   onConfigChange?: () => void;
   terminalEnabled?: boolean;
   onOpenTerminalCommand?: (cwd: string, command: string) => void;
+  initialSection?: SettingsSection;
+  studioFocusMember?: StudioFocusMember;
+  studioFocusField?: "model" | "thinking";
 }) {
-  const [section, setSection] = useState<SettingsSection>("yolk");
+  const [section, setSection] = useState<SettingsSection>(initialSection ?? "yolk");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [configPath, setConfigPath] = useState("");
@@ -496,6 +503,8 @@ export function SettingsConfig({
   const [trellisWorkflowOpen, setTrellisWorkflowOpen] = useState(false);
   const [modelList, setModelList] = useState<ModelListItem[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
+  const studioMemberRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightedStudioMember, setHighlightedStudioMember] = useState<string | null>(studioFocusMember?.id ?? null);
 
 
   const dirty = useMemo(
@@ -583,6 +592,25 @@ export function SettingsConfig({
     void loadConfig(controller.signal);
     return () => controller.abort();
   }, [loadConfig]);
+
+  useEffect(() => {
+    if (!initialSection) return;
+    setSection(initialSection);
+  }, [initialSection]);
+
+  useEffect(() => {
+    if (!studioFocusMember?.id) return;
+    setHighlightedStudioMember(studioFocusMember.id);
+  }, [studioFocusMember?.id]);
+
+  useEffect(() => {
+    if (loading || section !== "studio" || !studioFocusMember?.id) return;
+    const target = studioMemberRowRefs.current[studioFocusMember.id];
+    if (!target) return;
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
+    const timer = window.setTimeout(() => setHighlightedStudioMember(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [loading, section, studioFocusMember?.id]);
 
   useEffect(() => {
     setTrellisOutput(null);
@@ -941,6 +969,8 @@ export function SettingsConfig({
       : trellisStatus?.blockingReasons[0] ?? null;
   const canInstallTrellisCli = !trellisStatus?.cli.installed && !trellisBusy && !trellisStatusLoading;
   const canUpdateTrellis = !!cwd && !!trellisStatus?.canUpdate && terminalEnabled && !!onOpenTerminalCommand && !trellisBusy && !trellisStatusLoading;
+  const focusedCustomStudioMember = studioFocusMember && !STUDIO_MEMBER_NAMES.includes(studioFocusMember.id as (typeof STUDIO_MEMBER_NAMES)[number]) ? studioFocusMember : null;
+  const studioFocusDescription = studioFocusMember ? `已从成员页定位到 ${studioFocusMember.name ?? studioFocusMember.id} 的${studioFocusField === "thinking" ? " thinking" : "模型"}配置。` : null;
 
   return (
     <>
@@ -1093,6 +1123,7 @@ export function SettingsConfig({
                         {exists ? "" : "（保存时会自动创建）"}
                       </p>
                     </div>
+                    {studioFocusDescription && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 11 }}>{studioFocusDescription}</div>}
                     {modelsError && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 11 }}>{modelsError}</div>}
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
                       <div>
@@ -1115,8 +1146,13 @@ export function SettingsConfig({
                       </div>
                       {STUDIO_MEMBER_NAMES.map((member) => {
                         const policy = studio.members[member] ?? studio.defaultPolicy;
+                        const highlighted = highlightedStudioMember === member;
                         return (
-                          <div key={member} style={{ display: "grid", gridTemplateColumns: "132px minmax(180px, 1fr) 120px", gap: 8, alignItems: "center" }}>
+                          <div
+                            key={member}
+                            ref={(node) => { studioMemberRowRefs.current[member] = node; }}
+                            style={{ display: "grid", gridTemplateColumns: "132px minmax(180px, 1fr) 120px", gap: 8, alignItems: "center", padding: 6, margin: -6, borderRadius: 8, background: highlighted ? "rgba(37,99,235,0.14)" : "transparent", boxShadow: highlighted ? "0 0 0 1px rgba(37,99,235,0.35) inset" : "none", transition: "background 0.18s, box-shadow 0.18s" }}
+                          >
                             <div style={{ minWidth: 0 }}>
                               <code style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis" }}>{member}</code>
                               <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{STUDIO_MEMBER_LABELS[member]}</span>
@@ -1127,6 +1163,30 @@ export function SettingsConfig({
                         );
                       })}
                     </div>
+                    {focusedCustomStudioMember && (() => {
+                      const member = focusedCustomStudioMember.id;
+                      const policy = studio.members[member] ?? studio.defaultPolicy;
+                      const highlighted = highlightedStudioMember === member;
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                          <div>
+                            <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>当前项目成员</div>
+                            <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>从 Members tab 跳转的自定义成员。保存后写入 <code style={{ fontFamily: "var(--font-mono)" }}>studio.members[{member}]</code>；常规 Settings 入口不会主动列出项目成员。</div>
+                          </div>
+                          <div
+                            ref={(node) => { studioMemberRowRefs.current[member] = node; }}
+                            style={{ display: "grid", gridTemplateColumns: "132px minmax(180px, 1fr) 120px", gap: 8, alignItems: "center", padding: 6, margin: -6, borderRadius: 8, background: highlighted ? "rgba(37,99,235,0.14)" : "transparent", boxShadow: highlighted ? "0 0 0 1px rgba(37,99,235,0.35) inset" : "none", transition: "background 0.18s, box-shadow 0.18s" }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <code style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis" }}>{member}</code>
+                              <span style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis" }}>{focusedCustomStudioMember.name ?? "自定义成员"}</span>
+                            </div>
+                            <ModelPolicySelect value={policy.model} onChange={(model) => updateStudioMemberPolicy(member, { model })} models={modelList} />
+                            <ThinkingSelect value={policy.thinking} onChange={(thinking) => updateStudioMemberPolicy(member, { thinking })} />
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
                       固定解析链：工具入参 model/thinking &gt; 成员配置 &gt; 默认策略 &gt; 主会话 &gt; Pi 默认。成员 id 会先规范化为小写；unset 不作为最终策略，成员 unset 会落到默认策略，默认 unset 会按 followMain → Pi default 回退。所有 fallback 与 warning 会显示在 Chat transcript/final details。YPI child 进程会设置 Trellis 子进程禁用标志，避免成员流程受 Trellis 注入影响。
                     </div>

@@ -19,6 +19,7 @@ import {
   listYpiStudioTasks,
   recordYpiStudioSubagentRun,
   recordYpiStudioUserApproval,
+  reconcileYpiStudioRuntimeLostSubagentRun,
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
   updateYpiStudioImplementationSubtask,
@@ -30,10 +31,11 @@ import {
   createYpiStudioSubagentTranscript,
   finalizeYpiStudioSubagentTranscript,
   previewYpiStudioTranscriptText,
+  readYpiStudioSubagentTranscriptPreview,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
-import { registerYpiStudioChildRun, unregisterYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
-import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
+import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -69,20 +71,32 @@ interface StudioTaskToolInput {
   knowledgeMarkdown?: string;
   implementationPlan?: Record<string, unknown>;
   subtaskId?: string;
+  subtaskIds?: string[];
+  limit?: number;
+  includeWaitingReasons?: boolean;
   status?: YpiStudioImplementationSubtaskStatus;
   runId?: string;
+  runIds?: string[];
   validation?: string[];
+  blockedBy?: string[];
   blockedReason?: string;
   skippedReason?: string;
+  terminationReason?: string;
   localReview?: { status?: YpiStudioImplementationLocalReviewStatus; runId?: string; summary?: string };
 }
 interface StudioSubagentInput {
+  /** Omitted action/mode preserves the existing synchronous delegation behavior. */
+  action?: YpiStudioSubagentToolAction;
+  mode?: YpiStudioSubagentToolMode;
   member?: string;
   prompt?: string;
   taskId?: string;
   model?: string;
   thinking?: string;
   subtaskId?: string;
+  runId?: string;
+  runIds?: string[];
+  cancelReason?: string;
 }
 
 export interface YpiStudioSlashCommandDefinition {
@@ -315,11 +329,17 @@ function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
     knowledgeMarkdown: typeof raw.knowledgeMarkdown === "string" ? raw.knowledgeMarkdown : undefined,
     implementationPlan: isObj(raw.implementationPlan) ? raw.implementationPlan : undefined,
     subtaskId: str(raw.subtaskId) ?? undefined,
-    status: raw.status === "pending" || raw.status === "ready" || raw.status === "running" || raw.status === "blocked" || raw.status === "done" || raw.status === "skipped" ? raw.status : undefined,
+    subtaskIds: Array.isArray(raw.subtaskIds) ? raw.subtaskIds.filter((item): item is string => typeof item === "string") : undefined,
+    limit: typeof raw.limit === "number" && Number.isFinite(raw.limit) ? Math.max(1, Math.floor(raw.limit)) : undefined,
+    includeWaitingReasons: raw.includeWaitingReasons === true,
+    status: raw.status === "pending" || raw.status === "waiting" || raw.status === "ready" || raw.status === "queued" || raw.status === "running" || raw.status === "blocked" || raw.status === "failed" || raw.status === "done" || raw.status === "skipped" ? raw.status : undefined,
     runId: str(raw.runId) ?? undefined,
+    runIds: Array.isArray(raw.runIds) ? raw.runIds.filter((item): item is string => typeof item === "string") : undefined,
     validation: Array.isArray(raw.validation) ? raw.validation.filter((item): item is string => typeof item === "string") : undefined,
+    blockedBy: Array.isArray(raw.blockedBy) ? raw.blockedBy.filter((item): item is string => typeof item === "string") : undefined,
     blockedReason: str(raw.blockedReason) ?? undefined,
     skippedReason: str(raw.skippedReason) ?? undefined,
+    terminationReason: str(raw.terminationReason) ?? undefined,
     localReview: isObj(raw.localReview) ? { status: isLocalReviewStatus(raw.localReview.status) ? raw.localReview.status : undefined, runId: str(raw.localReview.runId) ?? undefined, summary: str(raw.localReview.summary) ?? undefined } : undefined,
   };
 }
@@ -327,12 +347,17 @@ function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
 function normalizeSubagentInput(value: unknown): StudioSubagentInput {
   const raw = isObj(value) ? value : {};
   return {
+    action: raw.action === "start" || raw.action === "poll" || raw.action === "collect" || raw.action === "cancel" ? raw.action : undefined,
+    mode: raw.mode === "sync" || raw.mode === "async" ? raw.mode : undefined,
     member: str(raw.member) ?? undefined,
     prompt: str(raw.prompt) ?? undefined,
     taskId: str(raw.taskId) ?? undefined,
     model: str(raw.model) ?? undefined,
     thinking: str(raw.thinking) ?? undefined,
     subtaskId: str(raw.subtaskId) ?? undefined,
+    runId: str(raw.runId) ?? undefined,
+    runIds: Array.isArray(raw.runIds) ? raw.runIds.filter((item): item is string => typeof item === "string") : undefined,
+    cancelReason: str(raw.cancelReason) ?? undefined,
   };
 }
 
@@ -350,7 +375,6 @@ function memberFile(member: string): string {
   return `${normalized}.md`;
 }
 
-const MAX_CHILD_STDOUT_BYTES = 16 * 1024 * 1024;
 const MAX_CHILD_STDERR_BYTES = 1 * 1024 * 1024;
 const MAX_CHILD_STDOUT_LINE_BYTES = 1 * 1024 * 1024;
 const MAX_CHILD_FINAL_OUTPUT_BYTES = 256 * 1024;
@@ -428,6 +452,7 @@ function eventMessageText(event: unknown): string {
 function eventAssistantDeltaText(event: unknown): string {
   if (!isObj(event) || !isObj(event.assistantMessageEvent)) return "";
   const delta = event.assistantMessageEvent;
+  if (delta.type !== "text_delta") return "";
   if (typeof delta.delta === "string") return delta.delta;
   if (typeof delta.content === "string") return delta.content;
   return "";
@@ -460,6 +485,7 @@ interface ChildRunMeta {
   member: string;
   startedAt: string;
   parentSessionId?: string;
+  subtaskId?: string;
 }
 
 
@@ -472,6 +498,11 @@ interface ChildPiResult {
   terminationReason?: string;
 }
 
+interface ChildPiPersistenceCallbacks {
+  onProgress?: (run: YpiStudioTaskSubagentRun) => void;
+  onFinal?: (run: YpiStudioTaskSubagentRun, result: ChildPiResult) => void;
+}
+
 function runChildPi(
   root: string,
   prompt: string,
@@ -480,8 +511,9 @@ function runChildPi(
   writer: YpiStudioSubagentTranscriptWriter | null,
   signal?: AbortSignal,
   onUpdate?: ToolUpdateCallback,
+  persistence?: ChildPiPersistenceCallbacks,
 ): Promise<ChildPiResult> {
-  return new Promise((resolveResult) => {
+  const childPromise = new Promise<ChildPiResult>((resolveResult) => {
     const inv = resolvePiCli();
     const child = spawn(inv.command, [...inv.args, ...buildPiArgs(policy)], {
       cwd: root,
@@ -495,10 +527,7 @@ function runChildPi(
     const warnings: string[] = [];
     const timers = new Set<ReturnType<typeof setTimeout>>();
     let stdoutBuffer = "";
-    let stdoutBytes = 0;
     let stderrBytes = 0;
-    let stdoutTail = "";
-    let stderrTail = "";
     let eventCount = 0;
     let phase: YpiStudioSubagentRunPhase = "starting";
     let outputChars = 0;
@@ -615,8 +644,28 @@ function runChildPi(
       };
     };
 
+    const runSnapshot = (runStatus: YpiStudioTaskSubagentRun["status"], summary?: string): YpiStudioTaskSubagentRun => ({
+      id: meta.runId,
+      member: meta.member,
+      subtaskId: meta.subtaskId,
+      status: runStatus,
+      startedAt: meta.startedAt,
+      prompt: undefined,
+      summary: summary ?? oneLine(lastTextPreview, 1000),
+      model: policy.modelLabel,
+      thinking: policy.thinkingLabel,
+      modelSource: policy.modelSource,
+      thinkingSource: policy.thinkingSource,
+      policy: policy.diagnostics,
+      progress: progressSnapshot(),
+      terminationReason: terminationReason ?? undefined,
+      error: runStatus === "failed" || runStatus === "cancelled" ? oneLine(summary ?? lastTextPreview, 1000) : undefined,
+      transcript: writer ? { ...writer.ref, status: runStatus === "queued" ? "running" : runStatus } : undefined,
+    });
+
     const progressPayload = (): PiToolResult => {
       const progress = progressSnapshot();
+      updateYpiStudioChildRun(meta.runId, { status, progress });
       const transcript = writer ? { ...writer.ref } : undefined;
       return {
         content: [{ type: "text", text: `${meta.member} ${status} · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · ${eventCount} events · ${oneLine(progress.lastTextPreview, 140)}` }],
@@ -640,13 +689,15 @@ function runChildPi(
     };
 
     const emitProgress = (force = false): void => {
-      if (!onUpdate) return;
+      if (!onUpdate && !persistence?.onProgress) return;
       const now = Date.now();
       const send = () => {
         lastUpdateAt = Date.now();
         updateTimer = null;
         try {
-          onUpdate(progressPayload());
+          const payload = progressPayload();
+          onUpdate?.(payload);
+          persistence?.onProgress?.(runSnapshot(status));
         } catch (error) {
           addWarning(`Progress update failed: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -726,9 +777,8 @@ function runChildPi(
       try {
         event = JSON.parse(trimmed) as unknown;
       } catch {
-        const preview = boundedText(trimmed);
-        lastTextPreview = preview;
-        appendItem({ kind: "status", at, text: `Non-JSON stdout: ${preview}`, truncated: preview.length < trimmed.length });
+        lastTextPreview = "Ignored non-JSON stdout from child process.";
+        appendItem({ kind: "status", at, text: lastTextPreview, truncated: true });
         emitProgress();
         return;
       }
@@ -818,13 +868,7 @@ function runChildPi(
     const flushStdoutLines = (chunk: Buffer): void => {
       if (settled) return;
       markActivity();
-      stdoutBytes += chunk.length;
-      if (stdoutBytes > MAX_CHILD_STDOUT_BYTES) {
-        terminateChild("stdout_output_limit", "failed");
-        return;
-      }
       const text = decoder.write(chunk);
-      stdoutTail = boundedAppendTail(stdoutTail, text, MAX_CHILD_TAIL_BYTES);
       stdoutBuffer += text;
       if (byteLength(stdoutBuffer) > MAX_CHILD_STDOUT_LINE_BYTES) {
         stdoutBuffer = "";
@@ -843,7 +887,7 @@ function runChildPi(
     const finish = (code: number | null, errorMessage?: string) => {
       if (settled) return;
       settled = true;
-      unregisterYpiStudioChildRun(meta.runId);
+      updateYpiStudioChildRun(meta.runId, { status, progress: progressSnapshot() });
       if (updateTimer) clearTimeout(updateTimer);
       if (idleTimer) clearTimeout(idleTimer);
       for (const timer of timers) clearTimeout(timer);
@@ -862,8 +906,8 @@ function runChildPi(
       }
       phase = status === "waiting_for_user" ? "waiting_for_user" : "finished";
       currentTool = undefined;
-      const fallbackOutput = stdoutTail.trim() || stderrTail.trim();
-      const output = (finalAssistantOutput.trim() || boundedText(fallbackOutput, MAX_CHILD_FINAL_OUTPUT_BYTES).trim() || (status === "cancelled" ? "cancelled" : "(no output)"));
+      const output = finalAssistantOutput.trim()
+        || (status === "cancelled" ? "cancelled" : "Child Pi run finished without a captured final assistant message.");
       if (terminationReason) {
         const reason = terminationReason;
         if (!warnings.some((warning) => warning.includes(reason))) addWarning(`Termination reason: ${reason}`);
@@ -887,7 +931,20 @@ function runChildPi(
         tokenSource = "estimated_chars";
       }
       emitProgress(true);
-      resolveResult({ output, status, transcript, warnings, progress: progressSnapshot(), terminationReason: terminationReason ?? undefined });
+      const childResult = { output, status, transcript, warnings, progress: progressSnapshot(), terminationReason: terminationReason ?? undefined } satisfies ChildPiResult;
+      const finalRun = runSnapshot(status, output);
+      finalRun.finishedAt = new Date().toISOString();
+      finalRun.progress = childResult.progress;
+      finalRun.terminationReason = childResult.terminationReason;
+      finalRun.transcript = transcript;
+      updateYpiStudioChildRun(meta.runId, { status, progress: childResult.progress, result: childResult });
+      try {
+        persistence?.onFinal?.(finalRun, childResult);
+      } catch (error) {
+        addWarning(`Final run persistence failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      unregisterYpiStudioChildRun(meta.runId);
+      resolveResult(childResult);
     };
 
     const abort = () => terminateChild("abort_signal", "cancelled");
@@ -895,12 +952,24 @@ function runChildPi(
     registerYpiStudioChildRun({
       runId: meta.runId,
       taskId: meta.taskId,
+      subtaskId: meta.subtaskId,
       member: meta.member,
       cwd: root,
       parentSessionId: meta.parentSessionId,
       pid: child.pid,
       startedAt: meta.startedAt,
+      status: "running",
       abort: (reason) => terminateChild(reason, "cancelled"),
+      onAbortPersist: (reason) => {
+        const cancelledRun = runSnapshot("cancelled", `Child Pi run cancelled: ${reason}`);
+        cancelledRun.finishedAt = new Date().toISOString();
+        cancelledRun.terminationReason = reason;
+        try {
+          persistence?.onFinal?.(cancelledRun, { output: cancelledRun.summary ?? "cancelled", status: "cancelled", transcript: cancelledRun.transcript, warnings, progress: cancelledRun.progress!, terminationReason: reason });
+        } catch {
+          // Best-effort persistence; terminateChild/finish will perform the normal finalizer if the parent tool remains alive.
+        }
+      },
     });
 
     signal?.addEventListener("abort", abort, { once: true });
@@ -912,14 +981,11 @@ function runChildPi(
       markActivity();
       stderrBytes += chunk.length;
       if (stderrBytes > MAX_CHILD_STDERR_BYTES) {
-        stderrTail = boundedAppendTail(stderrTail, chunk.toString("utf8"), MAX_CHILD_TAIL_BYTES);
         terminateChild("stderr_output_limit", "failed");
         return;
       }
-      const text = chunk.toString("utf8");
-      stderrTail = boundedAppendTail(stderrTail, text, MAX_CHILD_TAIL_BYTES);
-      lastTextPreview = boundedText(text.trim() || `${stderrBytes} stderr bytes`);
-      appendItem({ kind: "stderr", at: new Date().toISOString(), text: boundedText(text, MAX_CHILD_FINAL_OUTPUT_BYTES), truncated: byteLength(text) > MAX_CHILD_FINAL_OUTPUT_BYTES });
+      lastTextPreview = `Child Pi wrote ${stderrBytes} stderr bytes.`;
+      appendItem({ kind: "stderr", at: new Date().toISOString(), text: lastTextPreview, truncated: true });
       emitProgress();
     });
     child.on("error", (error) => finish(1, error instanceof Error ? error.message : String(error)));
@@ -944,6 +1010,8 @@ function runChildPi(
 
     child.stdin?.end(prompt);
   });
+  updateYpiStudioChildRun(meta.runId, { promise: childPromise });
+  return childPromise;
 }
 
 function sendStudioStartPrompt(
@@ -967,6 +1035,51 @@ function sendStudioStartPrompt(
     "4. 方案稳定后只切到 awaiting_approval；本轮必须停止，向我展示 PRD/Design/Implement/Checks 摘要并请求确认或修改意见。",
     "5. 未收到后续用户明确确认前，不得进入 implementing，不得调用 implementer；确认后先领取一个 ready implementation subtask，再通过 ypi_studio_subagent(member=implementer, subtaskId=...) 逐项指派。"
   ].join("\n"));
+}
+
+interface StudioSubagentRunProjection {
+  runId: string;
+  taskId: string;
+  subtaskId?: string;
+  member: string;
+  status: YpiStudioTaskSubagentRun["status"];
+  registryStatus?: string;
+  registryActive: boolean;
+  progress?: YpiStudioSubagentRunProgress;
+  transcript?: YpiStudioSubagentTranscriptRef;
+  transcriptPreview?: unknown;
+  summary?: string;
+  error?: string;
+  terminationReason?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
+function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSubagentRun): StudioSubagentRunProjection {
+  const handle = getYpiStudioChildRun(run.id);
+  let transcriptPreview: unknown;
+  try {
+    transcriptPreview = run.transcript ? readYpiStudioSubagentTranscriptPreview(root, taskId, run, { limit: 5, maxItemBytes: 500 }) : undefined;
+  } catch (error) {
+    transcriptPreview = { error: error instanceof Error ? error.message : String(error) };
+  }
+  return {
+    runId: run.id,
+    taskId,
+    subtaskId: run.subtaskId,
+    member: run.member,
+    status: handle?.status === "runtime_lost" ? run.status : handle?.status ?? run.status,
+    registryStatus: handle?.status,
+    registryActive: !!handle,
+    progress: handle?.progress ?? run.progress,
+    transcript: run.transcript,
+    transcriptPreview,
+    summary: run.summary,
+    error: run.error,
+    terminationReason: run.terminationReason,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+  };
 }
 
 function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string, subtaskId?: string): string {
@@ -1103,7 +1216,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
       "Use ypi_studio_task before doing non-trivial YPI Studio work; do not invent task state outside .ypi/tasks/task.json.",
       "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
-      "For tasks with implementationPlan, save the plan before awaiting_approval, and during implementing claim exactly one ready subtask before dispatching implementer with subtaskId.",
+      "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit to inspect ready batches, then claim ready subtask(s) without exceeding maxConcurrency before dispatching members with subtaskId.",
     ],
     parameters: {
       type: "object",
@@ -1123,11 +1236,17 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         knowledgeMarkdown: { type: "string" },
         implementationPlan: { type: "object" },
         subtaskId: { type: "string" },
-        status: { type: "string", enum: ["pending", "ready", "running", "blocked", "done", "skipped"] },
+        subtaskIds: { type: "array", items: { type: "string" } },
+        limit: { type: "number" },
+        includeWaitingReasons: { type: "boolean" },
+        status: { type: "string", enum: ["pending", "waiting", "ready", "queued", "running", "blocked", "failed", "done", "skipped"] },
         runId: { type: "string" },
+        runIds: { type: "array", items: { type: "string" } },
         validation: { type: "array", items: { type: "string" } },
+        blockedBy: { type: "array", items: { type: "string" } },
         blockedReason: { type: "string" },
         skippedReason: { type: "string" },
+        terminationReason: { type: "string" },
         localReview: { type: "object" },
       },
     },
@@ -1174,19 +1293,25 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         }
         if (action === "implementation_next") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
-          const result = getNextYpiStudioImplementationSubtask(root, taskId);
-          return { content: [{ type: "text", text: result.subtask ? `Next implementation subtask: ${result.subtask.id} · ${result.subtask.title}` : "No ready implementation subtask is available." }], details: result };
+          const result = getNextYpiStudioImplementationSubtask(root, taskId, { limit: input.limit });
+          const waiting = input.includeWaitingReasons ? Object.values(result.task.implementationProgress?.subtasks ?? {}).filter((item) => item.status === "waiting" || item.status === "pending" || item.status === "blocked") : undefined;
+          const text = result.subtasks.length > 1
+            ? `Ready implementation subtasks: ${result.subtasks.map((subtask) => `${subtask.id} · ${subtask.title}`).join("; ")}`
+            : result.subtask ? `Next implementation subtask: ${result.subtask.id} · ${result.subtask.title}` : "No ready implementation subtask is available.";
+          return { content: [{ type: "text", text }], details: { ...result, waiting } };
         }
         if (action === "claim_implementation_subtask") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
-          const task = claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId: input.subtaskId, runId: input.runId, message: input.reason, contextId: key });
-          return { content: [{ type: "text", text: `Claimed implementation subtask ${task.implementationProgress?.activeSubtaskId ?? input.subtaskId ?? "unknown"} for ${task.id}.` }], details: { task, subtaskId: task.implementationProgress?.activeSubtaskId } };
+          const targetStatus = input.status === "queued" || input.status === "running" ? input.status : undefined;
+          const task = claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId: input.subtaskId, subtaskIds: input.subtaskIds, limit: input.limit, runId: input.runId, runIds: input.runIds, status: targetStatus, message: input.reason, contextId: key });
+          const claimedIds = [...(task.implementationProgress?.activeSubtaskIds ?? []), ...(task.implementationProgress?.queuedSubtaskIds ?? [])];
+          return { content: [{ type: "text", text: `Claimed implementation subtask(s) ${claimedIds.join(", ") || input.subtaskIds?.join(", ") || input.subtaskId || "unknown"} for ${task.id}.` }], details: { task, subtaskIds: claimedIds, subtaskId: task.implementationProgress?.activeSubtaskId } };
         }
         if (action === "update_implementation_subtask") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const subtaskId = str(input.subtaskId);
           if (!subtaskId || !input.status) throw new Error("subtaskId and status are required for update_implementation_subtask");
-          const task = updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedReason: input.blockedReason, skippedReason: input.skippedReason, localReview: input.localReview, contextId: key });
+          const task = updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedBy: input.blockedBy, blockedReason: input.blockedReason, skippedReason: input.skippedReason, terminationReason: input.terminationReason, localReview: input.localReview, contextId: key });
           return { content: [{ type: "text", text: `Implementation subtask ${subtaskId} -> ${input.status}.` }], details: { task, subtaskId } };
         }
         if (action === "archive") {
@@ -1222,38 +1347,108 @@ export function createYpiStudioExtension(workspaceRoot: string) {
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
       "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
       "When dispatching implementer for a task with implementationPlan, pass subtaskId for exactly one claimed subtask; without subtaskId the implementer must not perform full implementation.",
+      "Omitting action/mode preserves the current synchronous behavior. Future async orchestration uses action=start with mode=async, then poll/collect/cancel by runId.",
     ],
     parameters: {
       type: "object",
       properties: {
+        action: { type: "string", enum: ["start", "poll", "collect", "cancel"], description: "Omitted for legacy synchronous start." },
+        mode: { type: "string", enum: ["sync", "async"], description: "Omitted or sync keeps the existing blocking child run behavior." },
         member: { type: "string", description: "architect, ui-designer, implementer, checker, or a custom .ypi/agents member id" },
         prompt: { type: "string" },
         taskId: { type: "string" },
         subtaskId: { type: "string" },
+        runId: { type: "string" },
+        runIds: { type: "array", items: { type: "string" } },
+        cancelReason: { type: "string" },
         model: { type: "string" },
         thinking: { type: "string", enum: ["off", "minimal", "low", "medium", "high", "xhigh"] },
       },
-      required: ["member", "prompt"],
     },
     execute: async (_id: string, inputValue: unknown, signal?: AbortSignal, onUpdate?: ToolUpdateCallback, ctx?: PiExtensionContext): Promise<PiToolResult> => {
       const input = normalizeSubagentInput(inputValue);
       const key = getKey(input, ctx);
-      const requestedMember = str(input.member);
-      const prompt = str(input.prompt);
-      if (!requestedMember || !prompt) return { content: [{ type: "text", text: "member and prompt are required" }], details: { error: "member and prompt are required" }, isError: true };
+      const action = input.action ?? "start";
+      const mode = input.mode ?? "sync";
       try {
         const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+        const taskDetail = getYpiStudioTaskDetail(root, taskId);
+        if (!taskDetail) throw new Error("Task not found");
+
+        if (action === "poll" || action === "collect") {
+          const requestedRunIds = input.runIds?.length ? input.runIds : input.runId ? [input.runId] : [];
+          if (!requestedRunIds.length) throw new Error("runId or runIds is required for poll/collect");
+          const runs = requestedRunIds.map((id) => {
+            const persisted = taskDetail.subagents.find((run) => run.id === id);
+            if (!persisted) throw new Error(`Studio subagent run not found: ${id}`);
+            return reconcileYpiStudioRuntimeLostSubagentRun(root, taskId, persisted);
+          });
+          const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;
+          const projected = runs.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run));
+          const unfinished = projected.filter((run) => run.status === "queued" || run.status === "running").length;
+          return {
+            content: [{ type: "text", text: action === "collect" && unfinished === 0 ? `Collected ${projected.length} Studio subagent run(s).` : `${projected.length} Studio subagent run(s): ${projected.map((run) => `${run.runId}=${run.status}`).join(", ")}` }],
+            details: { action, mode, task: refreshed, runs: projected, run: projected[0] },
+          };
+        }
+
+        if (action === "cancel") {
+          const requestedRunIds = input.runIds?.length ? input.runIds : input.runId ? [input.runId] : [];
+          if (!requestedRunIds.length) throw new Error("runId or runIds is required for cancel");
+          const reason = input.cancelReason ?? "cancel_requested";
+          const cancelledRuns = requestedRunIds.map((id) => {
+            const persisted = taskDetail.subagents.find((run) => run.id === id);
+            if (!persisted) throw new Error(`Studio subagent run not found: ${id}`);
+            const aborted = abortYpiStudioChildRun(id, reason);
+            if (aborted) return persisted;
+            const finishedAt = new Date().toISOString();
+            const cancelled: YpiStudioTaskSubagentRun = {
+              ...persisted,
+              status: "cancelled",
+              finishedAt,
+              summary: persisted.summary ?? `Studio subagent run cancelled: ${reason}`,
+              error: `Studio subagent run cancelled: ${reason}`,
+              terminationReason: reason,
+              progress: persisted.progress ? { ...persisted.progress, phase: "finished", updatedAt: finishedAt, terminationReason: reason } : persisted.progress,
+              transcript: persisted.transcript ? { ...persisted.transcript, status: "cancelled", finishedAt, updatedAt: finishedAt } : persisted.transcript,
+            };
+            recordYpiStudioSubagentRun(root, taskId, cancelled);
+            return cancelled;
+          });
+          const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;
+          const projected = cancelledRuns.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run));
+          return { content: [{ type: "text", text: `Cancelled Studio subagent run(s): ${requestedRunIds.join(", ")}.` }], details: { action, mode, task: refreshed, runs: projected, run: projected[0] } };
+        }
+
+        const requestedMember = str(input.member);
+        const prompt = str(input.prompt);
+        if (!requestedMember || !prompt) throw new Error("member and prompt are required for start");
         const configResult = readPiWebConfigForApi();
         const policy = resolveYpiStudioMemberPolicy({ input, configResult, main: { model: ctx?.model, thinking: currentThinking(pi) } });
         const member = policy.member;
         const startedAt = new Date().toISOString();
-        const runId = `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
+        const runId = str(input.runId) ?? `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
         const subtaskId = str(input.subtaskId) ?? undefined;
-        const taskDetail = getYpiStudioTaskDetail(root, taskId);
-        if (!taskDetail) throw new Error("Task not found");
         if (subtaskId && taskDetail.implementationPlan && !taskDetail.implementationPlan.subtasks.some((item) => item.id === subtaskId)) {
           throw new Error(`Unknown implementation subtask: ${subtaskId}`);
         }
+        if (member === "implementer" && taskDetail.implementationPlan && !subtaskId) {
+          throw new Error("This task has an implementationPlan; ypi_studio_subagent(member=implementer) requires subtaskId and must not run the full task.");
+        }
+        if (subtaskId && taskDetail.implementationPlan) {
+          const current = taskDetail.implementationProgress?.subtasks[subtaskId];
+          if (!current) throw new Error(`Unknown implementation subtask: ${subtaskId}`);
+          if (taskDetail.status !== "implementing") {
+            throw new Error("Implementation subagent start requires the main task to be in implementing after user approval.");
+          }
+          if (mode === "async" && current.status === "ready") {
+            claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId, runId, status: "running", message: `Async Studio subagent ${member} started`, contextId: key });
+          } else if (current.status !== "queued" && current.status !== "running") {
+            const hint = mode === "async" ? "ready/queued/running" : "queued/running (claim it first with ypi_studio_task)";
+            throw new Error(`Implementation subtask ${subtaskId} must be ${hint} before ${mode} start; current status is ${current.status}.`);
+          }
+        }
+
         const childPrompt = buildMemberPrompt(root, taskId, member, prompt, subtaskId);
         let writer: YpiStudioSubagentTranscriptWriter | null = null;
         const warnings: string[] = [];
@@ -1278,7 +1473,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           status: "running",
           startedAt,
           prompt: oneLine(prompt, 240),
-          summary: "Child Pi process starting.",
+          summary: mode === "async" ? "Async child Pi process starting." : "Child Pi process starting.",
           model: policy.modelLabel,
           thinking: policy.thinkingLabel,
           modelSource: policy.modelSource,
@@ -1297,37 +1492,29 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           },
           transcript: writer ? { ...writer.ref } : undefined,
         };
-        recordYpiStudioSubagentRun(root, taskId, runningRun);
+        const taskAfterInitialRun = recordYpiStudioSubagentRun(root, taskId, runningRun);
         onUpdate?.({
           content: [{ type: "text", text: `${member} running · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · child process starting` }],
-          details: {
-            run: {
-              id: runId,
-              member,
-              subtaskId,
-              status: "running",
-              taskId,
-              model: policy.modelLabel,
-              thinking: policy.thinkingLabel,
-              modelSource: policy.modelSource,
-              thinkingSource: policy.thinkingSource,
-              policy: policy.diagnostics,
-              transcript: writer ? { ...writer.ref } : undefined,
-              progress: {
-                schemaVersion: 1,
-                phase: "starting",
-                startedAt,
-                updatedAt: startedAt,
-                eventCount: 0,
-                lastTextPreview: "Child Pi process starting.",
-                itemsPreview: initialItemsPreview,
-                warnings: [...policy.warnings, ...warnings],
-                display: initialDisplay,
-              } satisfies YpiStudioSubagentRunProgress,
-            },
-          },
+          details: { run: projectSubagentRun(root, taskId, runningRun) },
         });
-        const result = await runChildPi(root, childPrompt, policy, { runId, taskId, member, startedAt, parentSessionId: callStr(ctx?.sessionManager?.getSessionId) ?? undefined }, writer, signal, onUpdate);
+        const childPromise = runChildPi(
+          root,
+          childPrompt,
+          policy,
+          { runId, taskId, member, startedAt, parentSessionId: callStr(ctx?.sessionManager?.getSessionId) ?? undefined, subtaskId },
+          writer,
+          signal,
+          onUpdate,
+          { onFinal: (run) => { recordYpiStudioSubagentRun(root, taskId, run); } },
+        );
+        if (mode === "async") {
+          childPromise.catch(() => {});
+          return {
+            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. Use action=poll or action=collect with runId to refresh.` }],
+            details: { action: "start", mode: "async", task: taskAfterInitialRun, run: projectSubagentRun(root, taskId, runningRun), warnings: [...policy.warnings, ...warnings].length ? [...policy.warnings, ...warnings] : undefined },
+          };
+        }
+        const result = await childPromise;
         const finishedAt = new Date().toISOString();
         const allWarnings = [...policy.warnings, ...warnings, ...result.warnings];
         const run: YpiStudioTaskSubagentRun = {
@@ -1350,7 +1537,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           transcript: result.transcript,
         };
         const task = recordYpiStudioSubagentRun(root, taskId, run);
-        return { content: [{ type: "text", text: result.output }], details: { task, run, warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
+        return { content: [{ type: "text", text: result.output }], details: { action: "start", mode: "sync", task, run, warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { content: [{ type: "text", text: message }], details: { error: message }, isError: true };
