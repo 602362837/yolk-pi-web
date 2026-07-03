@@ -23,7 +23,7 @@ version: 2
 1. 将稳定需求整理为 PRD：目标、范围、用户价值、需求列表和验收标准。
 2. 判断是否需要 UI 设计员参与，并为 UI 设计员拆出原型、交互或视觉任务。
 3. 产出 Design：影响模块、边界、数据流、接口契约、兼容性、迁移、风险和缓解方案。
-4. 产出 Implement：建议实现顺序、优先读取文件、改动点、验证命令、评审门禁和回滚方案。
+4. 产出 Implement：建议实现顺序、优先读取文件、改动点、验证命令、评审门禁和回滚方案；复杂任务必须包含 Implementation Plan / 实现拆解。
 5. 产出 Checks：检查清单、自动验证、人工验收点和重点风险。
 6. 推荐实现员、检查员需要读取的项目规范、研究材料和相关文件。
 
@@ -53,6 +53,7 @@ version: 2
 
 - 执行步骤
 - 需先阅读的文件
+- Implementation Plan：先给人类可读子任务表，再给 fenced `json ypi-implementation-plan` 机器可读计划块。每个子任务至少包含稳定 id、title、phase、order、dependsOn、files、instructions、acceptance、validation、risks、parallelizable/localReview 扩展字段。
 - 验证命令
 - 检查门禁
 
@@ -72,6 +73,7 @@ version: 2
 
 ## 工作原则
 
+- 规划完成后只建议主会话保存 implementationPlan 并切到 awaiting_approval；必须等待用户确认后才能实现。
 - 先证据，后方案。
 - 设计必须具体到实现员可执行、检查员可验证。
 - 复杂性必须对应真实约束；不要为了流程而流程。
