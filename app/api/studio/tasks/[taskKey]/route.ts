@@ -4,11 +4,17 @@ import { canonicalizeCwd } from "@/lib/cwd";
 import {
   archiveYpiStudioTask,
   bindYpiStudioTaskToContext,
+  claimYpiStudioImplementationSubtask,
   getYpiStudioTaskDetail,
   isYpiStudioTaskArchiveBody,
+  isYpiStudioTaskImplementationPlanUpdateBody,
+  isYpiStudioTaskImplementationSubtaskClaimBody,
+  isYpiStudioTaskImplementationSubtaskUpdateBody,
   isYpiStudioTaskArtifactUpdateBody,
   isYpiStudioTaskTransitionBody,
   transitionYpiStudioTask,
+  updateYpiStudioImplementationPlan,
+  updateYpiStudioImplementationSubtask,
   updateYpiStudioTaskArtifact,
   YpiStudioTaskSecurityError,
 } from "@/lib/ypi-studio-tasks";
@@ -84,6 +90,18 @@ export async function PATCH(
     }
     if (isYpiStudioTaskTransitionBody(body)) {
       const task = transitionYpiStudioTask(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioTaskImplementationPlanUpdateBody(body)) {
+      const task = updateYpiStudioImplementationPlan(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioTaskImplementationSubtaskClaimBody(body)) {
+      const task = claimYpiStudioImplementationSubtask(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioTaskImplementationSubtaskUpdateBody(body)) {
+      const task = updateYpiStudioImplementationSubtask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
     }
     if (isYpiStudioTaskArchiveBody(body)) {
