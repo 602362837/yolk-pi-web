@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PiWebToolPreset } from "@/lib/pi-web-config";
+import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { YpiStudioLiveRunOverlay } from "@/lib/ypi-studio-types";
 import { MessageView } from "./MessageView";
@@ -29,6 +29,7 @@ interface Props {
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;
   defaultToolPreset?: PiWebToolPreset;
+  defaultThinkingLevel?: PiWebThinkingLevel;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,7 +112,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, defaultToolPreset }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, defaultToolPreset, defaultThinkingLevel }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -128,7 +129,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   } = useAgentSession({
     session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
-    autoScrollEnabled, defaultToolPreset,
+    autoScrollEnabled, defaultToolPreset, defaultThinkingLevel,
   });
 
   const { soundEnabled, onSoundToggle, playDoneSound } = useAudio();

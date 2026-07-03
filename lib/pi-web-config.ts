@@ -3,9 +3,11 @@ import { dirname, join } from "path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 export type PiWebToolPreset = "none" | "default" | "full" | "subagent";
+export type PiWebThinkingLevel = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 export interface PiWebYolkConfig {
   defaultToolPreset: PiWebToolPreset;
+  defaultThinkingLevel: PiWebThinkingLevel;
 }
 
 export interface PiWebWorktreeConfig {
@@ -170,6 +172,7 @@ const DEFAULT_STUDIO_POLICY: PiWebSubagentRunPolicy = {
 export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   yolk: {
     defaultToolPreset: "default",
+    defaultThinkingLevel: "auto",
   },
   worktree: {
     baseRef: "HEAD",
@@ -292,6 +295,10 @@ function readInteger(value: unknown, fallback: number): number {
 
 function readToolPreset(value: unknown, fallback: PiWebToolPreset): PiWebToolPreset {
   return value === "none" || value === "default" || value === "full" || value === "subagent" ? value : fallback;
+}
+
+function readThinkingLevel(value: unknown, fallback: PiWebThinkingLevel): PiWebThinkingLevel {
+  return value === "auto" || value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh" ? value : fallback;
 }
 
 function readSessionDisplay(value: unknown, fallback: "separate" | "tag"): "separate" | "tag" {
@@ -485,6 +492,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   return {
     yolk: {
       defaultToolPreset: readToolPreset(yolk.defaultToolPreset, defaults.yolk.defaultToolPreset),
+      defaultThinkingLevel: readThinkingLevel(yolk.defaultThinkingLevel, defaults.yolk.defaultThinkingLevel),
     },
     worktree: {
       baseRef: readString(worktree.baseRef, defaults.worktree.baseRef),
@@ -583,7 +591,11 @@ export function validatePiWebYolkConfig(value: unknown): PiWebYolkConfig {
   if (defaultToolPreset !== "none" && defaultToolPreset !== "default" && defaultToolPreset !== "full" && defaultToolPreset !== "subagent") {
     throw new PiWebConfigValidationError("yolk.defaultToolPreset must be none, default, full, or subagent");
   }
-  return { defaultToolPreset };
+  const defaultThinkingLevel = value.defaultThinkingLevel;
+  if (defaultThinkingLevel !== "auto" && defaultThinkingLevel !== "off" && defaultThinkingLevel !== "minimal" && defaultThinkingLevel !== "low" && defaultThinkingLevel !== "medium" && defaultThinkingLevel !== "high" && defaultThinkingLevel !== "xhigh") {
+    throw new PiWebConfigValidationError("yolk.defaultThinkingLevel must be auto, off, minimal, low, medium, high, or xhigh");
+  }
+  return { defaultToolPreset, defaultThinkingLevel };
 }
 
 export function validatePiWebWorktreeConfig(value: unknown): PiWebWorktreeConfig {

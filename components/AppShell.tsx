@@ -1176,6 +1176,7 @@ export function AppShell() {
               onSubagentChange={handleSubagentChange}
               onStudioToolProgressChange={handleStudioToolProgressChange}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
+              defaultThinkingLevel={webConfig?.yolk.defaultThinkingLevel}
             />
           ) : showPlaceholder ? (
             activeCwd ? (

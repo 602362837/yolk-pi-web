@@ -15,6 +15,7 @@ import type {
   PiWebSubagentModality,
   PiWebSubagentRunPolicy,
   PiWebTerminalConfig,
+  PiWebThinkingLevel,
   PiWebToolPreset,
   PiWebTrellisConfig,
   PiWebUsageConfig,
@@ -104,6 +105,15 @@ const TOOL_PRESET_OPTIONS: SelectDropdownOption[] = [
   { value: "default", label: "default", description: "4 项内置工具" },
   { value: "full", label: "full", description: "全部内置工具" },
   { value: "subagent", label: "subagent", description: "全部工具 + subagent 委派" },
+];
+const MAIN_THINKING_OPTIONS: SelectDropdownOption[] = [
+  { value: "auto", label: "auto", description: "沿用 pi 默认设置" },
+  { value: "off", label: "off", description: "关闭推理" },
+  { value: "minimal", label: "minimal", description: "最少推理" },
+  { value: "low", label: "low", description: "低强度推理" },
+  { value: "medium", label: "medium", description: "中等推理" },
+  { value: "high", label: "high", description: "高强度推理" },
+  { value: "xhigh", label: "xhigh", description: "最高强度推理" },
 ];
 
 function formatModelValue(model: PiWebSubagentModelRef): string {
@@ -396,7 +406,8 @@ function formatRecommendedAction(status: TrellisSetupStatus): string {
 
 function yolkConfigsEqual(a: PiWebYolkConfig | null, b: PiWebYolkConfig | null): boolean {
   if (!a || !b) return a === b;
-  return a.defaultToolPreset === b.defaultToolPreset;
+  return a.defaultToolPreset === b.defaultToolPreset
+    && a.defaultThinkingLevel === b.defaultThinkingLevel;
 }
 
 function worktreeConfigsEqual(a: PiWebWorktreeConfig | null, b: PiWebWorktreeConfig | null): boolean {
@@ -1011,6 +1022,14 @@ export function SettingsConfig({
                         options={TOOL_PRESET_OPTIONS}
                         onChange={(defaultToolPreset) => updateYolk({ defaultToolPreset: defaultToolPreset as PiWebToolPreset })}
                         ariaLabel="选择默认工具预设"
+                      />
+                    </Field>
+                    <Field label="默认思考等级" description="新建会话时默认选中的思考强度。仍可在输入框右下角随时手动切换；已有会话会保留当前思考设置。">
+                      <SelectDropdown
+                        value={yolk.defaultThinkingLevel}
+                        options={MAIN_THINKING_OPTIONS}
+                        onChange={(defaultThinkingLevel) => updateYolk({ defaultThinkingLevel: defaultThinkingLevel as PiWebThinkingLevel })}
+                        ariaLabel="选择默认思考等级"
                       />
                     </Field>
                   </div>

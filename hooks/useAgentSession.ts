@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useReducer } from "react";
-import type { PiWebToolPreset } from "@/lib/pi-web-config";
+import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
@@ -158,9 +158,10 @@ export interface UseAgentSessionOptions {
   setNewSessionModel?: (model: { provider: string; modelId: string } | null) => void;
   setToolPreset?: (preset: PiWebToolPreset) => void;
   defaultToolPreset?: PiWebToolPreset;
+  defaultThinkingLevel?: PiWebThinkingLevel;
 }
 
-export type ThinkingLevelOption = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevelOption = PiWebThinkingLevel;
 
 export interface ChatInputHandle {
   insertText: (text: string) => void;
@@ -252,6 +253,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
     autoScrollEnabled = true,
     defaultToolPreset = "default",
+    defaultThinkingLevel = "auto",
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -270,7 +272,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [modelThinkingLevelMaps, setModelThinkingLevelMaps] = useState<Record<string, Record<string, string | null>>>({});
   const [newSessionModel, setNewSessionModelState] = useState<{ provider: string; modelId: string } | null>(null);
   const [toolPreset, setToolPreset] = useState<PiWebToolPreset>(isNew ? defaultToolPreset : "default");
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>("auto");
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>(isNew ? defaultThinkingLevel : "auto");
   const [retryInfo, setRetryInfo] = useState<{ attempt: number; maxAttempts: number; errorMessage?: string } | null>(null);
   const [contextUsage, setContextUsage] = useState<{ percent: number | null; contextWindow: number; tokens: number | null } | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
@@ -295,6 +297,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const autoScrollEnabledRef = useRef(autoScrollEnabled);
   const autoScrollStickyRef = useRef(true);
   const toolPresetTouchedRef = useRef(false);
+  const thinkingLevelTouchedRef = useRef(false);
 
   const setNewSessionModel = opts.setNewSessionModel ?? setNewSessionModelState;
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
@@ -306,6 +309,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!isNew || toolPresetTouchedRef.current || messages.length > 0 || agentRunning) return;
     setToolPresetState(defaultToolPreset);
   }, [agentRunning, defaultToolPreset, isNew, messages.length, setToolPresetState]);
+
+  useEffect(() => {
+    if (!isNew || thinkingLevelTouchedRef.current || messages.length > 0 || agentRunning) return;
+    setThinkingLevel(defaultThinkingLevel);
+  }, [agentRunning, defaultThinkingLevel, isNew, messages.length]);
 
   const sessionStats = (() => {
     const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -788,6 +796,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, []);
 
   const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
+    thinkingLevelTouchedRef.current = true;
     setThinkingLevel(level);
     if (level === "auto") return; // "auto" leaves pi's current setting untouched
     const sid = sessionIdRef.current;
