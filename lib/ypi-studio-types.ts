@@ -278,8 +278,111 @@ export interface YpiStudioSubagentTranscriptResponse {
   warnings?: string[];
 }
 
+
+export type YpiStudioImplementationSubtaskStatus =
+  | "pending"
+  | "ready"
+  | "running"
+  | "blocked"
+  | "done"
+  | "skipped";
+
+export type YpiStudioImplementationLocalReviewStatus =
+  | "not_requested"
+  | "requested"
+  | "running"
+  | "passed"
+  | "failed"
+  | "skipped";
+
+export interface YpiStudioImplementationSubtaskPlan {
+  id: string;
+  title: string;
+  phase?: string;
+  description?: string;
+  order: number;
+  dependsOn: string[];
+  files?: string[];
+  instructions?: string[];
+  acceptance?: string[];
+  validation?: string[];
+  risks?: string[];
+  parallelGroup?: string;
+  parallelizable?: boolean;
+  localReview?: {
+    required?: boolean;
+    reviewer?: "checker" | string;
+  };
+}
+
+export interface YpiStudioImplementationPlan {
+  schemaVersion: 1;
+  updatedAt: string;
+  sourceArtifact?: "implement.md" | string;
+  summary?: string;
+  strategy?: string;
+  maxConcurrency?: number;
+  subtasks: YpiStudioImplementationSubtaskPlan[];
+}
+
+export interface YpiStudioImplementationSubtaskProgress {
+  id: string;
+  status: YpiStudioImplementationSubtaskStatus;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  attempts: number;
+  runIds: string[];
+  lastRunId?: string;
+  blockedReason?: string;
+  skippedReason?: string;
+  summary?: string;
+  validation?: string[];
+  localReview?: {
+    status?: YpiStudioImplementationLocalReviewStatus;
+    runIds?: string[];
+    summary?: string;
+    updatedAt?: string;
+  };
+}
+
+export interface YpiStudioImplementationHistoryEntry {
+  at: string;
+  subtaskId: string;
+  from?: YpiStudioImplementationSubtaskStatus;
+  to: YpiStudioImplementationSubtaskStatus;
+  runId?: string;
+  message?: string;
+}
+
+export interface YpiStudioImplementationProgress {
+  schemaVersion: 1;
+  updatedAt: string;
+  activeSubtaskId?: string;
+  nextSubtaskId?: string;
+  counts: Record<YpiStudioImplementationSubtaskStatus, number>;
+  subtasks: Record<string, YpiStudioImplementationSubtaskProgress>;
+  history?: YpiStudioImplementationHistoryEntry[];
+}
+
+export interface YpiStudioImplementationSummary {
+  total: number;
+  done: number;
+  skipped: number;
+  blocked: number;
+  running: number;
+  ready: number;
+  pending: number;
+  activeSubtaskId?: string;
+  activeTitle?: string;
+  nextSubtaskId?: string;
+  nextTitle?: string;
+  blockedTitles: string[];
+}
+
 export interface YpiStudioTaskSubagentRun {
   id: string;
+  subtaskId?: string;
   member: string;
   status: YpiStudioSubagentTranscriptStatus;
   startedAt: string;
@@ -341,6 +444,8 @@ export interface YpiStudioTaskRecord {
   artifacts: Record<string, string>;
   subagents: YpiStudioTaskSubagentRun[];
   meta: YpiStudioTaskMeta;
+  implementationPlan?: YpiStudioImplementationPlan;
+  implementationProgress?: YpiStudioImplementationProgress;
 }
 
 export interface YpiStudioTaskSummary {
@@ -364,6 +469,7 @@ export interface YpiStudioTaskSummary {
   archiveReason?: string;
   knowledgePath?: string;
   readError?: string;
+  implementation?: YpiStudioImplementationSummary;
 }
 
 export interface YpiStudioTaskDocument {
@@ -379,6 +485,8 @@ export interface YpiStudioTaskDetail extends YpiStudioTaskSummary {
   subagents: YpiStudioTaskSubagentRun[];
   meta: YpiStudioTaskMeta;
   events: YpiStudioTaskEvent[];
+  implementationPlan?: YpiStudioImplementationPlan;
+  implementationProgress?: YpiStudioImplementationProgress;
 }
 
 export interface YpiStudioTasksResponse {
@@ -412,6 +520,7 @@ export interface YpiStudioTaskWidgetStep {
 export interface YpiStudioTaskWidgetSubagentRun {
   id: string;
   member: string;
+  subtaskId?: string;
   status: "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
   startedAt: string;
   finishedAt?: string;
@@ -465,6 +574,7 @@ export interface YpiStudioTaskWidgetProjection {
   steps: YpiStudioTaskWidgetStep[];
   subagents: YpiStudioTaskWidgetSubagentRun[];
   events?: YpiStudioTaskWidgetEvent[];
+  implementation?: YpiStudioImplementationSummary;
 }
 
 export type YpiStudioSessionTaskLinkResult =
@@ -477,6 +587,7 @@ export interface YpiStudioLiveRunOverlay {
   taskId?: string;
   taskKey?: string;
   member?: string;
+  subtaskId?: string;
   status?: "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
   model?: string;
   thinking?: string;
@@ -532,6 +643,40 @@ export interface YpiStudioTaskCreateBody {
   cwd: string;
   title: string;
   workflowId?: string;
+  contextId?: string;
+}
+
+export interface YpiStudioTaskImplementationPlanUpdateBody {
+  cwd: string;
+  action: "update_implementation_plan";
+  implementationPlan: YpiStudioImplementationPlan | Record<string, unknown>;
+  contextId?: string;
+}
+
+export interface YpiStudioTaskImplementationSubtaskClaimBody {
+  cwd: string;
+  action: "claim_implementation_subtask";
+  subtaskId?: string;
+  runId?: string;
+  message?: string;
+  contextId?: string;
+}
+
+export interface YpiStudioTaskImplementationSubtaskUpdateBody {
+  cwd: string;
+  action: "update_implementation_subtask";
+  subtaskId: string;
+  status: YpiStudioImplementationSubtaskStatus;
+  runId?: string;
+  message?: string;
+  validation?: string[];
+  blockedReason?: string;
+  skippedReason?: string;
+  localReview?: {
+    status?: YpiStudioImplementationLocalReviewStatus;
+    runId?: string;
+    summary?: string;
+  };
   contextId?: string;
 }
 

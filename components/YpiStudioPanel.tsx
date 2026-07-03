@@ -29,7 +29,7 @@ interface Props {
 type LoadState = "idle" | "loading" | "ready" | "error";
 type LoadOptions = { background?: boolean };
 type StudioTab = "members" | "workflows" | "tasks";
-type TaskDetailTab = "overview" | "artifacts" | "subagents" | "events" | "metadata";
+type TaskDetailTab = "overview" | "implementation" | "artifacts" | "subagents" | "events" | "metadata";
 
 function agentFilePath(cwd: string, agent: YpiStudioAgent): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${agent.pathLabel.replace(/^\/+/, "")}`;
@@ -84,9 +84,9 @@ function initWarningMessage(warnings: YpiStudioAgentWarning[]): string | null {
 }
 
 function statusTone(status: string): "success" | "warning" | "error" | "neutral" {
-  if (status === "completed" || status === "ready" || status === "archived") return "success";
+  if (status === "completed" || status === "ready" || status === "archived" || status === "done" || status === "skipped") return "success";
   if (status === "blocked" || status === "changes_requested") return "warning";
-  if (status === "cancelled") return "error";
+  if (status === "cancelled" || status === "failed") return "error";
   return "neutral";
 }
 
@@ -678,6 +678,14 @@ function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOp
         <div>缺失：{task.progress.missingArtifacts.length || 0}</div>
         <div>更新：{formatDate(task.updatedAt)}</div>
       </div>
+      {task.implementation && task.implementation.total > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", color: "var(--text-dim)", fontSize: 11 }}>
+          <span>子任务：{task.implementation.done + task.implementation.skipped}/{task.implementation.total}</span>
+          {task.implementation.activeTitle && <span>当前：{task.implementation.activeTitle}</span>}
+          {!task.implementation.activeTitle && task.implementation.nextTitle && <span>下一个：{task.implementation.nextTitle}</span>}
+          {task.implementation.blocked > 0 && <span style={{ color: "#f59e0b" }}>阻塞：{task.implementation.blocked}</span>}
+        </div>
+      )}
       {task.progress.missingArtifacts.length > 0 && (
         <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
           待产物：{task.progress.missingArtifacts.join("、")}
@@ -716,12 +724,14 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <TabButton active={activeTab === "overview"} label="概览" onClick={() => setActiveTab("overview")} />
+        <TabButton active={activeTab === "implementation"} label={`实现 ${task.implementation?.done ?? 0}/${task.implementation?.total ?? 0}`} onClick={() => setActiveTab("implementation")} />
         <TabButton active={activeTab === "artifacts"} label={`产物 ${Object.keys(task.artifacts).length}`} onClick={() => setActiveTab("artifacts")} />
         <TabButton active={activeTab === "subagents"} label={`成员运行 ${task.subagents.length}`} onClick={() => setActiveTab("subagents")} />
         <TabButton active={activeTab === "events"} label={`事件 ${task.events.length}`} onClick={() => setActiveTab("events")} />
         <TabButton active={activeTab === "metadata"} label="元数据" onClick={() => setActiveTab("metadata")} />
       </div>
       {activeTab === "overview" ? <TaskOverviewTab task={task} workflow={workflow} />
+        : activeTab === "implementation" ? <TaskImplementationTab task={task} />
         : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
         : activeTab === "subagents" ? <TaskSubagentsTab task={task} />
         : activeTab === "events" ? <TaskEventsTab task={task} />
@@ -759,6 +769,12 @@ function TaskOverviewTab({ task, workflow }: { task: YpiStudioTaskDetail; workfl
         <DetailRow label="CWD" value={task.cwd} mono />
         <DetailRow label="上下文" value={task.contextIds.length ? task.contextIds.join("、") : "—"} mono />
       </SectionCard>
+      {task.implementation && <SectionCard title="实现拆解摘要">
+        <DetailRow label="完成" value={`${task.implementation.done + task.implementation.skipped}/${task.implementation.total}`} />
+        <DetailRow label="当前" value={task.implementation.activeTitle ?? task.implementation.activeSubtaskId ?? "—"} />
+        <DetailRow label="下一个" value={task.implementation.nextTitle ?? task.implementation.nextSubtaskId ?? "—"} />
+        <DetailRow label="阻塞" value={task.implementation.blockedTitles.length ? task.implementation.blockedTitles.join("、") : String(task.implementation.blocked)} />
+      </SectionCard>}
       {task.archived && <SectionCard title="归档信息">
         <DetailRow label="归档月份" value={task.archiveMonth ?? "—"} />
         <DetailRow label="归档时间" value={formatDateTime(task.archivedAt ?? "")} />
@@ -768,6 +784,66 @@ function TaskOverviewTab({ task, workflow }: { task: YpiStudioTaskDetail; workfl
       {task.readError && <Notice tone="error" text={task.readError} />}
     </div>
   );
+}
+
+
+function TaskImplementationTab({ task }: { task: YpiStudioTaskDetail }) {
+  const plan = task.implementationPlan;
+  const progress = task.implementationProgress;
+  if (!plan || !progress) return <PanelEmpty title="尚未保存实现拆解" description="旧任务或尚在规划中的任务可能没有 implementationPlan。请在架构师规划完成后保存结构化 Implementation Plan。" />;
+  const grouped = plan.subtasks.reduce<Record<string, typeof plan.subtasks>>((acc, subtask) => {
+    const key = subtask.phase || "未分阶段";
+    acc[key] = [...(acc[key] ?? []), subtask];
+    return acc;
+  }, {});
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <SectionCard title="实现拆解总览">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
+        <DetailRow label="策略" value={plan.strategy ?? plan.summary ?? "—"} />
+        <DetailRow label="完成" value={`${task.implementation?.done ?? 0}/${task.implementation?.total ?? plan.subtasks.length}`} />
+        <DetailRow label="当前" value={task.implementation?.activeTitle ?? progress.activeSubtaskId ?? "—"} />
+        <DetailRow label="下一个" value={task.implementation?.nextTitle ?? progress.nextSubtaskId ?? "—"} />
+        <DetailRow label="并发上限" value={String(plan.maxConcurrency ?? 1)} />
+        <DetailRow label="更新时间" value={formatDateTime(progress.updatedAt || plan.updatedAt)} />
+      </div>
+      {task.archived && <Notice tone="info" text="该任务已归档，只读展示实现拆解。" />}
+    </SectionCard>
+    {Object.entries(grouped).map(([phase, subtasks]) => <SectionCard key={phase} title={phase}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {subtasks.map((subtask) => {
+          const item = progress.subtasks[subtask.id];
+          return <div key={subtask.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 7 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <Badge label={item?.status ?? "pending"} tone={statusTone(item?.status ?? "pending")} />
+              <span style={{ color: "var(--text)", fontWeight: 800, fontSize: 13 }}>{subtask.title}</span>
+              <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{subtask.id} · #{subtask.order}</span>
+            </div>
+            {subtask.description && <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{subtask.description}</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 6 }}>
+              <DetailRow label="依赖" value={subtask.dependsOn.length ? subtask.dependsOn.join("、") : "无"} mono />
+              <DetailRow label="文件" value={subtask.files?.join("、") ?? "—"} />
+              <DetailRow label="尝试" value={String(item?.attempts ?? 0)} />
+              <DetailRow label="Run" value={item?.lastRunId ?? item?.runIds.join("、") ?? "—"} mono />
+              <DetailRow label="局部检查" value={item?.localReview?.status ?? (subtask.localReview?.required ? "required" : "—")} />
+            </div>
+            {subtask.instructions?.length ? <Bullets title="执行说明" items={subtask.instructions} /> : null}
+            {subtask.acceptance?.length ? <Bullets title="验收" items={subtask.acceptance} /> : null}
+            {subtask.validation?.length ? <Bullets title="验证" items={subtask.validation} /> : null}
+            {item?.blockedReason && <Notice tone="warning" text={`阻塞：${item.blockedReason}`} />}
+            {item?.skippedReason && <Notice tone="info" text={`跳过：${item.skippedReason}`} />}
+            {item?.summary && <DetailRow label="摘要" value={item.summary} />}
+          </div>;
+        })}
+      </div>
+    </SectionCard>)}
+  </div>;
+}
+
+function Bullets({ title, items }: { title: string; items: string[] }) {
+  return <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+    <div style={{ color: "var(--text-dim)", fontWeight: 800 }}>{title}</div>
+    <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>{items.slice(0, 6).map((item, index) => <li key={index}>{item}</li>)}</ul>
+  </div>;
 }
 
 function TaskArtifactsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void }) {
@@ -819,6 +895,7 @@ function TaskSubagentsTab({ task }: { task: YpiStudioTaskDetail }) {
     <SectionCard key={run.id} title={`${run.member} · ${run.status}`}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
         <DetailRow label="Run ID" value={run.id} mono />
+        <DetailRow label="Subtask" value={run.subtaskId ?? "—"} mono />
         <DetailRow label="模型" value={run.model ? `${run.model}${run.modelSource ? ` (${run.modelSource})` : ""}` : "—"} />
         <DetailRow label="Thinking" value={run.thinking ? `${run.thinking}${run.thinkingSource ? ` (${run.thinkingSource})` : ""}` : "—"} />
         <DetailRow label="开始" value={formatDateTime(run.startedAt)} />
@@ -852,6 +929,7 @@ function TaskMetadataTab({ task }: { task: YpiStudioTaskDetail }) {
   return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
     <SectionCard title="Meta"><JsonBlock value={task.meta} /></SectionCard>
     <SectionCard title="Artifacts mapping"><JsonBlock value={task.artifacts} /></SectionCard>
+    <SectionCard title="Implementation"><JsonBlock value={{ implementationPlan: task.implementationPlan, implementationProgress: task.implementationProgress, implementation: task.implementation }} /></SectionCard>
     <SectionCard title="完整摘要 JSON"><JsonBlock value={{ id: task.id, key: task.key, status: task.status, archived: task.archived, archiveMonth: task.archiveMonth, archiveReason: task.archiveReason, knowledgePath: task.knowledgePath, readError: task.readError }} /></SectionCard>
   </div>;
 }

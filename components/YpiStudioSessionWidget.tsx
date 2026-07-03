@@ -86,6 +86,7 @@ function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveR
   const liveRuns = relevant.map((overlay): YpiStudioTaskWidgetSubagentRun => ({
     id: overlay.toolCallId,
     member: overlay.member ?? "studio",
+    subtaskId: overlay.subtaskId,
     status: overlay.status ?? "running",
     startedAt: new Date(overlay.updatedAt).toISOString(),
     summary: overlay.lastTextPreview,
@@ -151,6 +152,7 @@ function buildStepFlow(task: YpiStudioTaskWidgetProjection) {
 
 function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: YpiStudioTaskWidgetSubagentRun[] }) {
   const completedCount = task.artifacts.completed.filter((artifact) => task.artifacts.required.includes(artifact)).length;
+  const implementation = task.implementation;
   const stepFlow = buildStepFlow(task);
   return (
     <>
@@ -163,7 +165,7 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
           </div>
           <div style={{ marginTop: 4, color: "var(--text)", fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</div>
           <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", color: "var(--text-dim)", fontSize: 10 }}>
-            <span>{task.statusLabel}</span><span>·</span><span>负责人 {task.currentMember ?? "—"}</span><span>·</span><span>产物 {completedCount}/{task.artifacts.required.length}</span>
+            <span>{task.statusLabel}</span><span>·</span><span>负责人 {task.currentMember ?? "—"}</span><span>·</span><span>产物 {completedCount}/{task.artifacts.required.length}</span>{implementation && <><span>·</span><span>子任务 {implementation.done + implementation.skipped}/{implementation.total}</span></>}
           </div>
         </div>
       </div>
@@ -183,6 +185,7 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
             </div>
           ))}
         </div>
+        {implementation && (implementation.activeTitle || implementation.nextTitle || implementation.blocked > 0) && <div style={{ color: implementation.blocked > 0 ? "#f59e0b" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{implementation.activeTitle ? `当前子任务：${implementation.activeTitle}` : implementation.nextTitle ? `下一个子任务：${implementation.nextTitle}` : `阻塞子任务：${implementation.blocked}`}</div>}
         {task.artifacts.missing.length > 0 && <div style={{ color: "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>缺失：{task.artifacts.missing.join("、")}</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 150, overflowY: "auto", paddingRight: 2 }}>
           {runs.length === 0 ? <div style={{ color: "var(--text-dim)", fontSize: 11 }}>暂无 Studio 成员执行记录</div> : runs.map((run) => (

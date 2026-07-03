@@ -256,6 +256,7 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
     return {
       id: run.id,
       member: run.member,
+      subtaskId: run.subtaskId,
       status: normalizeRunStatus(run.status),
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
@@ -331,6 +332,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
     steps,
     subagents: buildSubagents(cwd, detail),
     events: detail.events.slice(-5).reverse().map((event) => ({ type: event.type, at: event.at, message: event.message, from: event.from, to: event.to, member: event.member, artifact: event.artifact })),
+    implementation: detail.implementation,
   };
 }
 

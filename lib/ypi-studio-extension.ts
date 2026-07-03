@@ -8,8 +8,10 @@ import { readPiWebConfigForApi } from "./pi-web-config";
 import { resolveYpiStudioMemberPolicy, type ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import {
   archiveYpiStudioTask,
+  claimYpiStudioImplementationSubtask,
   createYpiStudioTask,
   getCurrentYpiStudioTaskDetail,
+  getNextYpiStudioImplementationSubtask,
   getYpiStudioKnowledgeContextForPrompt,
   getYpiStudioTaskContextForPrompt,
   getYpiStudioTaskDetail,
@@ -17,6 +19,8 @@ import {
   recordYpiStudioSubagentRun,
   recordYpiStudioUserApproval,
   transitionYpiStudioTask,
+  updateYpiStudioImplementationPlan,
+  updateYpiStudioImplementationSubtask,
   updateYpiStudioTaskArtifact,
 } from "./ypi-studio-tasks";
 import { initializeYpiStudioWorkflows, readYpiStudioWorkflow } from "./ypi-studio-workflows";
@@ -27,7 +31,7 @@ import {
   previewYpiStudioTranscriptText,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
-import type { YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -48,7 +52,7 @@ interface PiExtensionContext {
   ui?: { notify?: (msg: string, type?: "info" | "warning" | "error") => void };
 }
 interface StudioTaskToolInput {
-  action?: "init_workflows" | "create" | "current" | "get" | "transition" | "update_artifact" | "archive";
+  action?: "init_workflows" | "create" | "current" | "get" | "transition" | "update_artifact" | "archive" | "update_implementation_plan" | "implementation_next" | "claim_implementation_subtask" | "update_implementation_subtask";
   title?: string;
   workflowId?: string;
   taskId?: string;
@@ -61,6 +65,14 @@ interface StudioTaskToolInput {
   tags?: string[];
   knowledgeSummary?: string;
   knowledgeMarkdown?: string;
+  implementationPlan?: Record<string, unknown>;
+  subtaskId?: string;
+  status?: YpiStudioImplementationSubtaskStatus;
+  runId?: string;
+  validation?: string[];
+  blockedReason?: string;
+  skippedReason?: string;
+  localReview?: { status?: YpiStudioImplementationLocalReviewStatus; runId?: string; summary?: string };
 }
 interface StudioSubagentInput {
   member?: string;
@@ -68,6 +80,7 @@ interface StudioSubagentInput {
   taskId?: string;
   model?: string;
   thinking?: string;
+  subtaskId?: string;
 }
 
 export interface YpiStudioSlashCommandDefinition {
@@ -243,7 +256,9 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     `Missing artifacts: ${current.progress.missingArtifacts.join(", ") || "none"}`,
     state?.instruction ? `State instruction: ${state.instruction}` : "",
     state?.requiresSubagent ? "The next owner must be dispatched through ypi_studio_subagent." : "The main session may handle orchestration for this state.",
-    current.status === "planning" ? "When planning/design artifacts are complete, transition only to awaiting_approval and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
+    current.implementationPlan ? `Implementation subtasks: ${current.implementation?.done ?? 0}/${current.implementation?.total ?? current.implementationPlan.subtasks.length} done; active=${current.implementation?.activeTitle ?? current.implementation?.activeSubtaskId ?? "none"}; next=${current.implementation?.nextTitle ?? current.implementation?.nextSubtaskId ?? "none"}; blocked=${current.implementation?.blocked ?? 0}.` : "Implementation plan: not saved yet.",
+    current.status === "planning" ? "When planning/design artifacts are complete, save implementationPlan with ypi_studio_task(action=update_implementation_plan), transition only to awaiting_approval, and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
+    current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: first call ypi_studio_task(action=claim_implementation_subtask) to claim exactly one ready subtask, then call ypi_studio_subagent(member=implementer, subtaskId=<claimed id>). Do not delegate the whole implementation at once." : "",
     current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
     current.status === "awaiting_approval" && !approvalGranted ? "Current task is awaiting approval: summarize the plan/artifacts and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
     state?.requiresUserApproval && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
@@ -274,9 +289,13 @@ function currentTaskIdOrThrow(root: string, key: string | null, requested?: stri
   return current.id;
 }
 
+function isLocalReviewStatus(value: unknown): value is YpiStudioImplementationLocalReviewStatus {
+  return value === "not_requested" || value === "requested" || value === "running" || value === "passed" || value === "failed" || value === "skipped";
+}
+
 function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
   const raw = isObj(value) ? value : {};
-  const action = raw.action === "init_workflows" || raw.action === "create" || raw.action === "current" || raw.action === "get" || raw.action === "transition" || raw.action === "update_artifact" || raw.action === "archive" ? raw.action : undefined;
+  const action = raw.action === "init_workflows" || raw.action === "create" || raw.action === "current" || raw.action === "get" || raw.action === "transition" || raw.action === "update_artifact" || raw.action === "archive" || raw.action === "update_implementation_plan" || raw.action === "implementation_next" || raw.action === "claim_implementation_subtask" || raw.action === "update_implementation_subtask" ? raw.action : undefined;
   const scope = raw.scope === "active" || raw.scope === "archived" || raw.scope === "all" ? raw.scope : undefined;
   return {
     action,
@@ -292,6 +311,14 @@ function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
     tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
     knowledgeSummary: typeof raw.knowledgeSummary === "string" ? raw.knowledgeSummary : undefined,
     knowledgeMarkdown: typeof raw.knowledgeMarkdown === "string" ? raw.knowledgeMarkdown : undefined,
+    implementationPlan: isObj(raw.implementationPlan) ? raw.implementationPlan : undefined,
+    subtaskId: str(raw.subtaskId) ?? undefined,
+    status: raw.status === "pending" || raw.status === "ready" || raw.status === "running" || raw.status === "blocked" || raw.status === "done" || raw.status === "skipped" ? raw.status : undefined,
+    runId: str(raw.runId) ?? undefined,
+    validation: Array.isArray(raw.validation) ? raw.validation.filter((item): item is string => typeof item === "string") : undefined,
+    blockedReason: str(raw.blockedReason) ?? undefined,
+    skippedReason: str(raw.skippedReason) ?? undefined,
+    localReview: isObj(raw.localReview) ? { status: isLocalReviewStatus(raw.localReview.status) ? raw.localReview.status : undefined, runId: str(raw.localReview.runId) ?? undefined, summary: str(raw.localReview.summary) ?? undefined } : undefined,
   };
 }
 
@@ -303,6 +330,7 @@ function normalizeSubagentInput(value: unknown): StudioSubagentInput {
     taskId: str(raw.taskId) ?? undefined,
     model: str(raw.model) ?? undefined,
     thinking: str(raw.thinking) ?? undefined,
+    subtaskId: str(raw.subtaskId) ?? undefined,
   };
 }
 
@@ -761,15 +789,28 @@ function sendStudioStartPrompt(
     "2. 接单和设计阶段使用 ypi_studio_subagent(member=architect) 指派架构师。",
     "3. 涉及界面时使用 ypi_studio_subagent(member=ui-designer)。",
     "4. 方案稳定后只切到 awaiting_approval；本轮必须停止，向我展示 PRD/Design/Implement/Checks 摘要并请求确认或修改意见。",
-    "5. 未收到后续用户明确确认前，不得进入 implementing，不得调用 implementer；确认后实现和检查分别通过 ypi_studio_subagent(member=implementer) 与 ypi_studio_subagent(member=checker) 指派。"
+    "5. 未收到后续用户明确确认前，不得进入 implementing，不得调用 implementer；确认后先领取一个 ready implementation subtask，再通过 ypi_studio_subagent(member=implementer, subtaskId=...) 逐项指派。"
   ].join("\n"));
 }
 
-function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string): string {
+function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string, subtaskId?: string): string {
   const definition = readText(join(root, ".ypi", "agents", memberFile(member)));
   if (!definition.trim()) throw new Error(`Studio member definition not found: .ypi/agents/${memberFile(member)}`);
   const taskContext = getYpiStudioTaskContextForPrompt(root, taskId);
   const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [taskContext.slice(0, 1200), member, delegatedPrompt].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
+  const detail = getYpiStudioTaskDetail(root, taskId);
+  const selectedPlan = subtaskId && detail?.implementationPlan ? detail.implementationPlan.subtasks.find((item) => item.id === subtaskId) : null;
+  const selectedProgress = subtaskId ? detail?.implementationProgress?.subtasks[subtaskId] : undefined;
+  const implementationBlock = detail?.implementationPlan ? [
+    "## Implementation Plan Boundary",
+    `Plan summary: ${detail.implementationPlan.summary ?? "(no summary)"}`,
+    `Progress: ${detail.implementation?.done ?? 0}/${detail.implementation?.total ?? detail.implementationPlan.subtasks.length} done; active=${detail.implementation?.activeSubtaskId ?? "none"}; next=${detail.implementation?.nextSubtaskId ?? "none"}; blocked=${detail.implementation?.blocked ?? 0}`,
+    subtaskId ? `Assigned subtaskId: ${subtaskId}` : "Assigned subtaskId: none",
+    selectedPlan ? `Selected subtask JSON:\n${safeJson({ plan: selectedPlan, progress: selectedProgress })}` : "No selected subtask was found in the plan.",
+    member === "implementer" && subtaskId ? "Implementer rule: execute only the selected subtask boundary. Do not implement unrelated subtasks." : "",
+    member === "implementer" && !subtaskId ? "Implementer rule: because this task has an implementation plan but no subtaskId was assigned, do not implement the full task. Report blocked and ask the parent session to claim/select one subtask." : "",
+    member === "checker" && subtaskId ? "Checker rule: perform a local review for the selected subtask first, then report verdict and evidence." : "",
+  ].filter(Boolean).join("\n") : "## Implementation Plan Boundary\nNo implementation plan is saved for this task.";
   return [
     "# YPI Studio Member Delegation",
     "You are already running as the delegated YPI Studio member below. Do not dispatch another Studio member or subagent unless the parent explicitly asks.",
@@ -780,6 +821,8 @@ function buildMemberPrompt(root: string, taskId: string, member: string, delegat
     definition,
     "",
     taskContext,
+    "",
+    implementationBlock,
     "",
     knowledge,
     knowledge ? "" : "",
@@ -884,11 +927,12 @@ export function createYpiStudioExtension(workspaceRoot: string) {
       "Use ypi_studio_task before doing non-trivial YPI Studio work; do not invent task state outside .ypi/tasks/task.json.",
       "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
+      "For tasks with implementationPlan, save the plan before awaiting_approval, and during implementing claim exactly one ready subtask before dispatching implementer with subtaskId.",
     ],
     parameters: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["init_workflows", "create", "current", "get", "transition", "update_artifact", "archive"] },
+        action: { type: "string", enum: ["init_workflows", "create", "current", "get", "transition", "update_artifact", "archive", "update_implementation_plan", "implementation_next", "claim_implementation_subtask", "update_implementation_subtask"] },
         title: { type: "string" },
         workflowId: { type: "string" },
         taskId: { type: "string" },
@@ -901,6 +945,14 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         tags: { type: "array", items: { type: "string" } },
         knowledgeSummary: { type: "string" },
         knowledgeMarkdown: { type: "string" },
+        implementationPlan: { type: "object" },
+        subtaskId: { type: "string" },
+        status: { type: "string", enum: ["pending", "ready", "running", "blocked", "done", "skipped"] },
+        runId: { type: "string" },
+        validation: { type: "array", items: { type: "string" } },
+        blockedReason: { type: "string" },
+        skippedReason: { type: "string" },
+        localReview: { type: "object" },
       },
     },
     execute: async (_id: string, inputValue: unknown, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: PiExtensionContext): Promise<PiToolResult> => {
@@ -938,6 +990,29 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           const task = updateYpiStudioTaskArtifact(taskId, { cwd: root, artifact, content: input.content ?? "", contextId: key });
           return { content: [{ type: "text", text: `Updated YPI Studio artifact ${artifact} for ${task.id}.` }], details: { task } };
         }
+        if (action === "update_implementation_plan") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          if (!input.implementationPlan) throw new Error("implementationPlan is required for update_implementation_plan");
+          const task = updateYpiStudioImplementationPlan(taskId, { cwd: root, action: "update_implementation_plan", implementationPlan: input.implementationPlan, contextId: key });
+          return { content: [{ type: "text", text: `Updated implementation plan for ${task.id}: ${task.implementation?.total ?? 0} subtasks.` }], details: { task } };
+        }
+        if (action === "implementation_next") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const result = getNextYpiStudioImplementationSubtask(root, taskId);
+          return { content: [{ type: "text", text: result.subtask ? `Next implementation subtask: ${result.subtask.id} · ${result.subtask.title}` : "No ready implementation subtask is available." }], details: result };
+        }
+        if (action === "claim_implementation_subtask") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const task = claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId: input.subtaskId, runId: input.runId, message: input.reason, contextId: key });
+          return { content: [{ type: "text", text: `Claimed implementation subtask ${task.implementationProgress?.activeSubtaskId ?? input.subtaskId ?? "unknown"} for ${task.id}.` }], details: { task, subtaskId: task.implementationProgress?.activeSubtaskId } };
+        }
+        if (action === "update_implementation_subtask") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const subtaskId = str(input.subtaskId);
+          if (!subtaskId || !input.status) throw new Error("subtaskId and status are required for update_implementation_subtask");
+          const task = updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedReason: input.blockedReason, skippedReason: input.skippedReason, localReview: input.localReview, contextId: key });
+          return { content: [{ type: "text", text: `Implementation subtask ${subtaskId} -> ${input.status}.` }], details: { task, subtaskId } };
+        }
         if (action === "archive") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const result = archiveYpiStudioTask(taskId, {
@@ -970,6 +1045,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     promptGuidelines: [
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
       "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
+      "When dispatching implementer for a task with implementationPlan, pass subtaskId for exactly one claimed subtask; without subtaskId the implementer must not perform full implementation.",
     ],
     parameters: {
       type: "object",
@@ -977,6 +1053,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         member: { type: "string", description: "architect, ui-designer, implementer, checker, or a custom .ypi/agents member id" },
         prompt: { type: "string" },
         taskId: { type: "string" },
+        subtaskId: { type: "string" },
         model: { type: "string" },
         thinking: { type: "string", enum: ["off", "minimal", "low", "medium", "high", "xhigh"] },
       },
@@ -995,7 +1072,13 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         const member = policy.member;
         const startedAt = new Date().toISOString();
         const runId = `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
-        const childPrompt = buildMemberPrompt(root, taskId, member, prompt);
+        const subtaskId = str(input.subtaskId) ?? undefined;
+        const taskDetail = getYpiStudioTaskDetail(root, taskId);
+        if (!taskDetail) throw new Error("Task not found");
+        if (subtaskId && taskDetail.implementationPlan && !taskDetail.implementationPlan.subtasks.some((item) => item.id === subtaskId)) {
+          throw new Error(`Unknown implementation subtask: ${subtaskId}`);
+        }
+        const childPrompt = buildMemberPrompt(root, taskId, member, prompt, subtaskId);
         let writer: YpiStudioSubagentTranscriptWriter | null = null;
         const warnings: string[] = [];
         try {
@@ -1007,6 +1090,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         const runningRun: YpiStudioTaskSubagentRun = {
           id: runId,
           member,
+          subtaskId,
           status: "running",
           startedAt,
           prompt: oneLine(prompt, 240),
@@ -1035,6 +1119,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
             run: {
               id: runId,
               member,
+              subtaskId,
               status: "running",
               taskId,
               model: policy.modelLabel,
@@ -1062,6 +1147,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         const run: YpiStudioTaskSubagentRun = {
           id: runId,
           member,
+          subtaskId,
           status: result.status,
           startedAt,
           finishedAt,
