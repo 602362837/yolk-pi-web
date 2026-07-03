@@ -1,7 +1,31 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-02T10:57:00.090Z",
+  "updatedAt": "2026-07-03T01:37:16.497Z",
   "entries": [
+    {
+      "id": "20260703-093716-优化-ypi-studio-subagent-模型策略与-chat-实时展示",
+      "title": "优化 YPI Studio subagent 模型策略与 Chat 实时展示",
+      "taskId": "20260703-085853-优化-ypi-studio-subagent-模型策略与-chat-实时展示",
+      "taskKey": "archived:2026-07:20260703-085853-优化-ypi-studio-subagent-模型策略与-chat-实时展示",
+      "workflowId": "feature-dev",
+      "summary": "完成 YPI Studio subagent 模型策略与 Chat 实时展示优化：新增纯策略解析模块 lib/ypi-studio-policy.ts，固化 toolInput > memberConfig > defaultPolicy > followMain > piDefault 优先级，输出 diagnostics/fallback warnings；ypi_studio_subagent progress 增加 phase/tokens/tps/currentTool；Chat transcript 改为摘要优先并支持 debug/raw 二级展开；Session widget/live overlay 展示 waiting_model/streaming/running_tool/waiting_for_user 和 t/s；新增 npm run test:studio-policy。验证：test:studio-policy、lint、tsc 通过，checker review pass。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260703-085853-优化-ypi-studio-subagent-模型策略与-chat-实时展示",
+      "knowledgePath": ".ypi/knowledge/20260703-093716-优化-ypi-studio-subagent-模型策略与-chat-实时展示.md",
+      "createdAt": "2026-07-03T01:37:16.497Z",
+      "archivedAt": "2026-07-03T01:37:16.497Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md"
+      ]
+    },
     {
       "id": "20260702-185700-为关联-session-增加-ypi-studio-任务进度悬浮小卡片",
       "title": "为关联 Session 增加 YPI Studio 任务进度悬浮小卡片",

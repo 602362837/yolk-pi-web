@@ -37,6 +37,8 @@ import type {
   YpiStudioTaskProgress,
   YpiStudioTaskRecord,
   YpiStudioTaskSubagentRun,
+  YpiStudioSubagentPolicyDiagnostics,
+  YpiStudioSubagentRunProgress,
   YpiStudioSubagentTranscriptRef,
   YpiStudioTaskSummary,
   YpiStudioTasksResponse,
@@ -107,6 +109,14 @@ function optionalString(value: unknown): string | undefined {
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+function normalizePolicyDiagnostics(value: unknown): YpiStudioSubagentPolicyDiagnostics | undefined {
+  return isRecord(value) && value.schemaVersion === 1 ? value as unknown as YpiStudioSubagentPolicyDiagnostics : undefined;
+}
+
+function normalizeRunProgress(value: unknown): YpiStudioSubagentRunProgress | undefined {
+  return isRecord(value) && value.schemaVersion === 1 ? value as unknown as YpiStudioSubagentRunProgress : undefined;
 }
 
 function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef | undefined {
@@ -389,6 +399,8 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
         thinking: optionalString(run.thinking),
         modelSource: optionalString(run.modelSource),
         thinkingSource: optionalString(run.thinkingSource),
+        policy: normalizePolicyDiagnostics(run.policy),
+        progress: normalizeRunProgress(run.progress),
         error: optionalString(run.error),
         transcript: normalizeTranscriptRef(run.transcript),
       }))

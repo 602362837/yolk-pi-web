@@ -37,6 +37,7 @@
     "build": "node scripts/build-next.js",
     "start": "next start -p 30141",
     "lint": "eslint .",
+    "test:studio-policy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-policy.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
     "release:patch": "npm version patch && npm publish --access public",
     "release": "npm run release:patch"

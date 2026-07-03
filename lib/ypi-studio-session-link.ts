@@ -233,8 +233,8 @@ function clip(value: string | undefined, max = 500): string | undefined {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
 }
 
-function normalizeRunStatus(status: string): "running" | "succeeded" | "failed" | "cancelled" {
-  return status === "succeeded" || status === "failed" || status === "cancelled" ? status : "running";
+function normalizeRunStatus(status: string): "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" {
+  return status === "succeeded" || status === "failed" || status === "cancelled" || status === "waiting_for_user" ? status : "running";
 }
 
 function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTaskWidgetSubagentRun[] {
@@ -265,6 +265,11 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
       thinking: run.thinking,
       modelSource: run.modelSource,
       thinkingSource: run.thinkingSource,
+      phase: run.progress?.phase,
+      tokens: run.progress?.tokens,
+      tps: run.progress?.tps,
+      currentTool: run.progress?.currentTool,
+      policy: run.policy,
       transcriptMeta: run.transcript,
       lastItemsPreview,
       warnings: warnings.length ? warnings : undefined,
