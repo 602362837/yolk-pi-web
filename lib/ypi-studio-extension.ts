@@ -4,7 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { initializeYpiStudioAgents } from "./ypi-studio-agents";
-import { readPiWebConfig, type PiWebSubagentRunPolicy, type PiWebSubagentThinking } from "./pi-web-config";
+import { readPiWebConfigForApi } from "./pi-web-config";
+import { resolveYpiStudioMemberPolicy, type ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import {
   archiveYpiStudioTask,
   createYpiStudioTask,
@@ -26,7 +27,7 @@ import {
   previewYpiStudioTranscriptText,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
-import type { YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import type { YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -37,17 +38,6 @@ interface PiToolResult {
 }
 
 type ToolUpdateCallback = (result: PiToolResult) => void;
-type StudioPolicySource = "toolInput" | "memberConfig" | "defaultPolicy" | "followMain" | "piDefault" | "unset";
-type StudioThinkingArg = Exclude<PiWebSubagentThinking, "inherit">;
-
-interface ResolvedStudioRunPolicy {
-  modelArg?: string;
-  modelLabel: string;
-  modelSource: StudioPolicySource;
-  thinkingArg?: StudioThinkingArg;
-  thinkingLabel: string;
-  thinkingSource: StudioPolicySource;
-}
 
 interface PiExtensionContext {
   sessionManager?: {
@@ -316,69 +306,12 @@ function normalizeSubagentInput(value: unknown): StudioSubagentInput {
   };
 }
 
-function isThinkingArg(value: string): value is StudioThinkingArg {
-  return value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh";
-}
-
-function mainModelArg(ctx?: PiExtensionContext): string | undefined {
-  const provider = str(ctx?.model?.provider);
-  const id = str(ctx?.model?.id);
-  return provider && id ? `${provider}/${id}` : undefined;
-}
-
-function readCurrentThinking(pi: Pick<ExtensionAPI, "getThinkingLevel">): StudioThinkingArg | undefined {
+function currentThinking(pi: Pick<ExtensionAPI, "getThinkingLevel">): string | undefined {
   try {
-    const level = pi.getThinkingLevel();
-    return isThinkingArg(level) ? level : undefined;
+    return pi.getThinkingLevel();
   } catch {
     return undefined;
   }
-}
-
-function resolveStudioModel(policy: PiWebSubagentRunPolicy, source: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy">, ctx?: PiExtensionContext): Pick<ResolvedStudioRunPolicy, "modelArg" | "modelLabel" | "modelSource"> {
-  if (policy.model.mode === "specific") {
-    const provider = str(policy.model.provider);
-    const modelId = str(policy.model.modelId);
-    if (provider && modelId) {
-      const model = `${provider}/${modelId}`;
-      return { modelArg: model, modelLabel: model, modelSource: source };
-    }
-  }
-  if (policy.model.mode === "followMain") {
-    const model = mainModelArg(ctx);
-    if (model) return { modelArg: model, modelLabel: model, modelSource: "followMain" };
-    return { modelLabel: "Pi default", modelSource: "piDefault" };
-  }
-  if (policy.model.mode === "piDefault") return { modelLabel: "Pi default", modelSource: "piDefault" };
-  return { modelLabel: "unset", modelSource: "unset" };
-}
-
-function resolveStudioThinking(policy: PiWebSubagentRunPolicy, source: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy">, pi: Pick<ExtensionAPI, "getThinkingLevel">): Pick<ResolvedStudioRunPolicy, "thinkingArg" | "thinkingLabel" | "thinkingSource"> {
-  if (policy.thinking === "inherit") {
-    const thinking = readCurrentThinking(pi);
-    if (thinking) return { thinkingArg: thinking, thinkingLabel: thinking, thinkingSource: "followMain" };
-    return { thinkingLabel: "default", thinkingSource: "piDefault" };
-  }
-  return { thinkingArg: policy.thinking, thinkingLabel: policy.thinking, thinkingSource: source };
-}
-
-function resolveStudioMemberPolicy(input: StudioSubagentInput, member: string, ctx: PiExtensionContext | undefined, pi: Pick<ExtensionAPI, "getThinkingLevel">): ResolvedStudioRunPolicy {
-  const config = readPiWebConfig().studio;
-  const memberPolicy = config.members[member];
-  const modelPolicy = memberPolicy && memberPolicy.model.mode !== "unset" ? memberPolicy : config.defaultPolicy;
-  const modelSource: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy"> = modelPolicy === memberPolicy ? "memberConfig" : "defaultPolicy";
-  const thinkingPolicy = memberPolicy ?? config.defaultPolicy;
-  const thinkingSource: Extract<StudioPolicySource, "memberConfig" | "defaultPolicy"> = memberPolicy ? "memberConfig" : "defaultPolicy";
-  const resolvedModel = input.model
-    ? { modelArg: input.model, modelLabel: input.model, modelSource: "toolInput" as const }
-    : modelPolicy.model.mode === "unset"
-      ? resolveStudioModel({ ...modelPolicy, model: { mode: "followMain" } }, "defaultPolicy", ctx)
-      : resolveStudioModel(modelPolicy, modelSource, ctx);
-  const toolThinking = input.thinking && isThinkingArg(input.thinking) ? input.thinking : undefined;
-  const resolvedThinking = toolThinking
-    ? { thinkingArg: toolThinking, thinkingLabel: toolThinking, thinkingSource: "toolInput" as const }
-    : resolveStudioThinking(thinkingPolicy, thinkingSource, pi);
-  return { ...resolvedModel, ...resolvedThinking };
 }
 
 function memberFile(member: string): string {
@@ -425,7 +358,7 @@ function resolvePiCli(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
-function buildPiArgs(policy: ResolvedStudioRunPolicy): string[] {
+function buildPiArgs(policy: ResolvedYpiStudioMemberPolicy): string[] {
   const args = ["--mode", "json", "-p", "--no-session"];
   if (policy.modelArg) args.push("--model", policy.modelArg);
   if (policy.thinkingArg) args.push("--thinking", policy.thinkingArg);
@@ -489,26 +422,19 @@ interface ChildRunMeta {
   startedAt: string;
 }
 
-interface ChildRunProgress {
-  startedAt: string;
-  updatedAt: string;
-  eventCount: number;
-  lastTextPreview: string;
-  itemsPreview: YpiStudioSubagentTranscriptItem[];
-  warnings?: string[];
-}
 
 interface ChildPiResult {
   output: string;
   status: YpiStudioTaskSubagentRun["status"];
   transcript?: YpiStudioSubagentTranscriptRef;
   warnings: string[];
+  progress: YpiStudioSubagentRunProgress;
 }
 
 function runChildPi(
   root: string,
   prompt: string,
-  policy: ResolvedStudioRunPolicy,
+  policy: ResolvedYpiStudioMemberPolicy,
   meta: ChildRunMeta,
   writer: YpiStudioSubagentTranscriptWriter | null,
   signal?: AbortSignal,
@@ -529,6 +455,14 @@ function runChildPi(
     let stdoutBuffer = "";
     let stderrBytes = 0;
     let eventCount = 0;
+    let phase: YpiStudioSubagentRunPhase = "starting";
+    let outputChars = 0;
+    let tokens: number | undefined;
+    let tokenSource: YpiStudioSubagentRunProgress["tokenSource"] | undefined;
+    let firstTokenAt: string | undefined;
+    let lastTokenAt: string | undefined;
+    let currentTool: YpiStudioSubagentCurrentTool | undefined;
+    let lastMessageText = "";
     let lastTextPreview = "Child Pi process started. Waiting for first JSON event…";
     let finalAssistantOutput = "";
     let status: YpiStudioTaskSubagentRun["status"] = "running";
@@ -549,16 +483,30 @@ function runChildPi(
       if (recentItems.length > 24) recentItems.shift();
     };
 
-    const progressPayload = (): PiToolResult => {
+    const progressSnapshot = (): YpiStudioSubagentRunProgress => {
       const updatedAt = new Date().toISOString();
-      const progress: ChildRunProgress = {
+      const elapsedSeconds = firstTokenAt && lastTokenAt ? Math.max(0.001, (Date.parse(lastTokenAt) - Date.parse(firstTokenAt)) / 1000) : undefined;
+      return {
+        schemaVersion: 1,
+        phase,
         startedAt: meta.startedAt,
         updatedAt,
         eventCount,
         lastTextPreview,
         itemsPreview: recentItems.slice(-12),
         warnings: warnings.length ? warnings.slice(-5) : undefined,
+        outputChars,
+        tokens,
+        tokenSource,
+        tps: tokens !== undefined && elapsedSeconds ? Number((tokens / elapsedSeconds).toFixed(2)) : undefined,
+        firstTokenAt,
+        lastTokenAt,
+        currentTool,
       };
+    };
+
+    const progressPayload = (): PiToolResult => {
+      const progress = progressSnapshot();
       const transcript = writer ? { ...writer.ref } : undefined;
       return {
         content: [{ type: "text", text: `${meta.member} ${status} · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · ${eventCount} events · ${oneLine(lastTextPreview, 140)}` }],
@@ -572,6 +520,7 @@ function runChildPi(
             thinking: policy.thinkingLabel,
             modelSource: policy.modelSource,
             thinkingSource: policy.thinkingSource,
+            policy: policy.diagnostics,
             transcript,
             progress,
           },
@@ -602,6 +551,22 @@ function runChildPi(
       }
     };
 
+    const noteOutput = (text: string, at: string): void => {
+      if (!text) return;
+      outputChars += text.length;
+      tokens = Math.max(tokens ?? 0, Math.ceil(outputChars / 4));
+      tokenSource = tokenSource === "usage" ? "usage" : "estimated_chars";
+      firstTokenAt ??= at;
+      lastTokenAt = at;
+    };
+
+    const usageOutputTokens = (event: unknown): number | undefined => {
+      if (!isObj(event)) return undefined;
+      const usage = isObj(event.usage) ? event.usage : isObj(event.message) && isObj(event.message.usage) ? event.message.usage : undefined;
+      const value = usage ? usage.outputTokens ?? usage.output_tokens ?? usage.output ?? usage.completion_tokens : undefined;
+      return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+    };
+
     const parseLine = (line: string): void => {
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -618,20 +583,40 @@ function runChildPi(
       eventCount += 1;
       const eventType = isObj(event) && typeof event.type === "string" ? event.type : "json";
       if (eventType === "agent_start") {
+        phase = "waiting_model";
         lastTextPreview = "Agent started.";
         appendItem({ kind: "status", at, text: "Child Pi agent started." });
       } else if (eventType === "agent_end") {
+        phase = "finished";
         lastTextPreview = "Agent finished.";
         appendItem({ kind: "status", at, text: "Child Pi agent finished." });
       } else if (eventType === "message_update") {
+        phase = "streaming";
         const delta = eventAssistantDeltaText(event);
-        if (delta) lastTextPreview = delta;
+        const text = delta || eventMessageText(event);
+        if (text) {
+          const addition = delta || (text.startsWith(lastMessageText) ? text.slice(lastMessageText.length) : text);
+          lastMessageText = text;
+          noteOutput(addition, at);
+          lastTextPreview = addition || text;
+        }
       } else if (eventType === "message_end") {
         const text = eventMessageText(event).trim();
         const role = isObj(event) && isObj(event.message) && typeof event.message.role === "string" ? event.message.role : undefined;
         if (role === "assistant" && text) {
+          phase = "waiting_model";
           finalAssistantOutput = text;
           lastTextPreview = text;
+          outputChars = Math.max(outputChars, text.length);
+          const usageTokens = usageOutputTokens(event);
+          if (usageTokens !== undefined) {
+            tokens = usageTokens;
+            tokenSource = "usage";
+          } else {
+            tokens = Math.max(tokens ?? 0, Math.ceil(outputChars / 4));
+            tokenSource = tokenSource ?? "estimated_chars";
+          }
+          lastMessageText = text;
           appendItem({ kind: "assistant", at, text, model: policy.modelLabel });
         }
       } else if (eventType === "tool_execution_start") {
@@ -639,9 +624,12 @@ function runChildPi(
         const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
         const toolName = str(ev.toolName) ?? "tool";
         const preview = previewYpiStudioTranscriptText(ev.args).text;
+        phase = "running_tool";
+        currentTool = { toolCallId, toolName, startedAt: at };
         lastTextPreview = `Running tool ${toolName}`;
         appendItem({ kind: "tool_call", at, toolCallId, toolName, inputPreview: preview });
       } else if (eventType === "tool_execution_update") {
+        phase = "running_tool";
         const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
         if (text) lastTextPreview = text;
       } else if (eventType === "tool_execution_end" || eventType === "tool_result_end") {
@@ -650,11 +638,14 @@ function runChildPi(
         const toolName = str(ev.toolName) ?? undefined;
         const text = resultText(ev.result).trim() || resultText(ev.message).trim() || "(no output)";
         const isError = ev.isError === true;
+        phase = "waiting_model";
+        currentTool = undefined;
         lastTextPreview = `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
         appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError });
       } else if (eventType === "extension_ui_request" && isBlockingExtensionUiRequest(event)) {
         const text = extensionUiRequestText(event);
         status = "waiting_for_user";
+        phase = "waiting_for_user";
         finalAssistantOutput = text;
         lastTextPreview = text;
         warnings.push("Child Studio member requested interactive user input; surfaced to parent session instead of waiting indefinitely.");
@@ -694,10 +685,13 @@ function runChildPi(
       const err = Buffer.concat(stderr).toString("utf8");
       if (errorMessage) {
         status = "failed";
+        phase = "finished";
         appendItem({ kind: "error", at: new Date().toISOString(), text: errorMessage });
       } else if (status !== "cancelled" && status !== "waiting_for_user") {
         status = code === 0 ? "succeeded" : "failed";
       }
+      phase = status === "waiting_for_user" ? "waiting_for_user" : "finished";
+      currentTool = undefined;
       const output = finalAssistantOutput.trim() || extractAssistantText(out, err).trim() || (status === "cancelled" ? "cancelled" : "(no output)");
       if (output && !finalAssistantOutput.trim()) {
         appendItem({ kind: status === "failed" ? "error" : "assistant", at: new Date().toISOString(), text: output });
@@ -712,12 +706,18 @@ function runChildPi(
         }
       }
       lastTextPreview = output;
+      if (output && outputChars === 0) {
+        outputChars = output.length;
+        tokens = Math.ceil(outputChars / 4);
+        tokenSource = "estimated_chars";
+      }
       emitProgress(true);
-      resolveResult({ output, status, transcript, warnings });
+      resolveResult({ output, status, transcript, warnings, progress: progressSnapshot() });
     };
 
     const abort = () => {
       status = "cancelled";
+      phase = "finished";
       lastTextPreview = "Cancelled by parent session.";
       appendItem({ kind: "status", at: new Date().toISOString(), text: "Child Pi run cancelled by parent session." });
       emitProgress(true);
@@ -969,6 +969,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     promptSnippet: "Use ypi_studio_subagent to assign Studio role work to architect, ui-designer, implementer, or checker.",
     promptGuidelines: [
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
+      "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
     ],
     parameters: {
       type: "object",
@@ -984,14 +985,16 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     execute: async (_id: string, inputValue: unknown, signal?: AbortSignal, onUpdate?: ToolUpdateCallback, ctx?: PiExtensionContext): Promise<PiToolResult> => {
       const input = normalizeSubagentInput(inputValue);
       const key = getKey(input, ctx);
-      const member = str(input.member);
+      const requestedMember = str(input.member);
       const prompt = str(input.prompt);
-      if (!member || !prompt) return { content: [{ type: "text", text: "member and prompt are required" }], details: { error: "member and prompt are required" }, isError: true };
+      if (!requestedMember || !prompt) return { content: [{ type: "text", text: "member and prompt are required" }], details: { error: "member and prompt are required" }, isError: true };
       try {
         const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+        const configResult = readPiWebConfigForApi();
+        const policy = resolveYpiStudioMemberPolicy({ input, configResult, main: { model: ctx?.model, thinking: currentThinking(pi) } });
+        const member = policy.member;
         const startedAt = new Date().toISOString();
         const runId = `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
-        const policy = resolveStudioMemberPolicy(input, member, ctx, pi);
         const childPrompt = buildMemberPrompt(root, taskId, member, prompt);
         let writer: YpiStudioSubagentTranscriptWriter | null = null;
         const warnings: string[] = [];
@@ -1012,6 +1015,17 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           thinking: policy.thinkingLabel,
           modelSource: policy.modelSource,
           thinkingSource: policy.thinkingSource,
+          policy: policy.diagnostics,
+          progress: {
+            schemaVersion: 1,
+            phase: "starting",
+            startedAt,
+            updatedAt: startedAt,
+            eventCount: 0,
+            lastTextPreview: "Child Pi process starting.",
+            itemsPreview: writer ? [{ kind: "prompt", at: startedAt, text: prompt }] : [],
+            warnings: [...policy.warnings, ...warnings],
+          },
           transcript: writer ? { ...writer.ref } : undefined,
         };
         recordYpiStudioSubagentRun(root, taskId, runningRun);
@@ -1027,21 +1041,24 @@ export function createYpiStudioExtension(workspaceRoot: string) {
               thinking: policy.thinkingLabel,
               modelSource: policy.modelSource,
               thinkingSource: policy.thinkingSource,
+              policy: policy.diagnostics,
               transcript: writer ? { ...writer.ref } : undefined,
               progress: {
+                schemaVersion: 1,
+                phase: "starting",
                 startedAt,
                 updatedAt: startedAt,
                 eventCount: 0,
                 lastTextPreview: "Child Pi process starting.",
                 itemsPreview: writer ? [{ kind: "prompt", at: startedAt, text: prompt }] : [],
-                warnings: warnings.length ? warnings : undefined,
-              },
+                warnings: [...policy.warnings, ...warnings],
+              } satisfies YpiStudioSubagentRunProgress,
             },
           },
         });
         const result = await runChildPi(root, childPrompt, policy, { runId, taskId, member, startedAt }, writer, signal, onUpdate);
         const finishedAt = new Date().toISOString();
-        const allWarnings = [...warnings, ...result.warnings];
+        const allWarnings = [...policy.warnings, ...warnings, ...result.warnings];
         const run: YpiStudioTaskSubagentRun = {
           id: runId,
           member,
@@ -1054,6 +1071,8 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           thinking: policy.thinkingLabel,
           modelSource: policy.modelSource,
           thinkingSource: policy.thinkingSource,
+          policy: policy.diagnostics,
+          progress: result.progress,
           error: result.status === "failed" || result.status === "cancelled" ? oneLine(result.output, 1000) : undefined,
           transcript: result.transcript,
         };

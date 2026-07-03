@@ -29,4 +29,12 @@ Do not run `next build` directly during development. Use `npm run build` only fo
 
 ## Tests
 
-There is no dedicated automated test suite in the current repository. For changes that affect data flow, use lint + type-check and manually verify the affected browser/API flow. If a test framework is introduced later, document it here and update `AGENTS.md`.
+There is no dedicated heavy automated test suite in the current repository. For changes that affect data flow, use lint + type-check and manually verify the affected browser/API flow.
+
+Current lightweight scripts:
+
+```bash
+npm run test:studio-policy
+```
+
+This script exercises the pure YPI Studio member model/thinking policy resolver without introducing a test framework. If a broader test framework is introduced later, document it here and update `AGENTS.md`.

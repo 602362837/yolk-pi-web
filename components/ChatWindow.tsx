@@ -40,6 +40,22 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function studioPhase(value: unknown): YpiStudioLiveRunOverlay["phase"] | undefined {
+  return value === "starting" || value === "waiting_model" || value === "streaming" || value === "running_tool" || value === "waiting_for_user" || value === "finished" ? value : undefined;
+}
+
+function studioPolicyWarnings(value: unknown): string[] | undefined {
+  if (!isRecord(value) || !Array.isArray(value.warnings)) return undefined;
+  const warnings = value.warnings
+    .map((item) => isRecord(item) && typeof item.message === "string" ? item.message : undefined)
+    .filter((item): item is string => !!item);
+  return warnings.length ? warnings : undefined;
+}
+
 function textFromContent(value: unknown): string | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.map((item) => isRecord(item) && item.type === "text" ? optionalString(item.text) : undefined).filter(Boolean).join(" ").slice(0, 300) || undefined;
@@ -178,6 +194,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       const details = (isRecord(progress.result?.details) ? progress.result.details : isRecord(progress.partialResult?.details) ? progress.partialResult.details : {}) as Record<string, unknown>;
       const run = isRecord(details.run) ? details.run : null;
       const task = isRecord(details.task) ? details.task : null;
+      const runProgress = isRecord(run?.progress) ? run.progress : null;
       return [
         progress.toolCallId,
         progress.updatedAt,
@@ -185,6 +202,10 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId) ?? "",
         optionalString(task?.key) ?? optionalString(run?.taskKey) ?? "",
         optionalString(task?.status) ?? optionalString(run?.status) ?? "",
+        optionalString(runProgress?.phase) ?? "",
+        optionalNumber(runProgress?.tokens) ?? "",
+        optionalNumber(runProgress?.tps) ?? "",
+        optionalString(isRecord(runProgress?.currentTool) ? runProgress.currentTool.toolName : undefined) ?? "",
       ].join("|");
     })
     .join(";");
@@ -196,8 +217,12 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         const details = (isRecord(progress.result?.details) ? progress.result.details : isRecord(progress.partialResult?.details) ? progress.partialResult.details : {}) as Record<string, unknown>;
         const run = isRecord(details.run) ? details.run : null;
         const task = isRecord(details.task) ? details.task : null;
+        const runProgress = isRecord(run?.progress) ? run.progress : null;
+        const currentTool = isRecord(runProgress?.currentTool) && typeof runProgress.currentTool.toolCallId === "string" && typeof runProgress.currentTool.toolName === "string"
+          ? { toolCallId: runProgress.currentTool.toolCallId, toolName: runProgress.currentTool.toolName, startedAt: optionalString(runProgress.currentTool.startedAt) }
+          : undefined;
         const status = optionalString(run?.status) ?? (progress.running ? "running" : progress.result?.isError ? "failed" : undefined);
-        const safeStatus = status === "succeeded" || status === "failed" || status === "cancelled" || status === "running" ? status : undefined;
+        const safeStatus = status === "succeeded" || status === "failed" || status === "cancelled" || status === "running" || status === "waiting_for_user" ? status : undefined;
         return {
           toolCallId: progress.toolCallId,
           toolName: progress.toolName as "ypi_studio_task" | "ypi_studio_subagent",
@@ -207,7 +232,13 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           status: safeStatus,
           model: optionalString(run?.model),
           thinking: optionalString(run?.thinking),
-          lastTextPreview: textFromContent(progress.partialResult?.content) ?? textFromContent(progress.result?.content) ?? optionalString(run?.summary),
+          phase: studioPhase(runProgress?.phase),
+          tokens: optionalNumber(runProgress?.tokens),
+          tps: optionalNumber(runProgress?.tps),
+          currentTool,
+          policyWarnings: studioPolicyWarnings(run?.policy),
+          lastTextPreview: optionalString(runProgress?.lastTextPreview) ?? textFromContent(progress.partialResult?.content) ?? textFromContent(progress.result?.content) ?? optionalString(run?.summary),
+          itemsPreview: Array.isArray(runProgress?.itemsPreview) ? runProgress.itemsPreview as YpiStudioLiveRunOverlay["itemsPreview"] : undefined,
           updatedAt: progress.updatedAt,
           running: progress.running,
         };

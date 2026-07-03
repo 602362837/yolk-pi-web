@@ -48,6 +48,7 @@ function useMobile(): boolean {
 
 function statusColor(status: string): string {
   if (status === "succeeded" || status === "done") return "#22c55e";
+  if (status === "waiting_for_user") return "#f59e0b";
   if (status === "failed") return "#ef4444";
   if (status === "cancelled") return "var(--text-dim)";
   if (status === "running" || status === "active") return "var(--accent)";
@@ -58,6 +59,22 @@ function itemText(item: YpiStudioSubagentTranscriptItem): string {
   if (item.kind === "tool_call") return `${item.toolName}: ${item.inputPreview}`;
   if ("text" in item) return item.text;
   return "";
+}
+
+function phaseLabel(run: Pick<YpiStudioTaskWidgetSubagentRun, "phase" | "currentTool">): string | undefined {
+  if (run.phase === "starting") return "Starting";
+  if (run.phase === "waiting_model") return "Waiting model";
+  if (run.phase === "streaming") return "Streaming";
+  if (run.phase === "running_tool") return `Tool ${run.currentTool?.toolName ?? "running"}`;
+  if (run.phase === "waiting_for_user") return "Waiting user";
+  if (run.phase === "finished") return "Finished";
+  return undefined;
+}
+
+function statsLabel(run: Pick<YpiStudioTaskWidgetSubagentRun, "tokens" | "tps">): string | undefined {
+  const tokens = typeof run.tokens === "number" ? `${run.tokens} tok` : undefined;
+  const tps = typeof run.tps === "number" ? `${run.tps.toFixed(1)} t/s` : undefined;
+  return [tokens, tps].filter(Boolean).join(" · ") || undefined;
 }
 
 function previewForRun(run: YpiStudioTaskWidgetSubagentRun): string {
@@ -74,6 +91,10 @@ function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveR
     summary: overlay.lastTextPreview,
     model: overlay.model,
     thinking: overlay.thinking,
+    phase: overlay.phase,
+    tokens: overlay.tokens,
+    tps: overlay.tps,
+    currentTool: overlay.currentTool,
     lastItemsPreview: overlay.itemsPreview ?? [],
   }));
   const liveIds = new Set(liveRuns.map((run) => run.id));
@@ -167,8 +188,8 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
           {runs.length === 0 ? <div style={{ color: "var(--text-dim)", fontSize: 11 }}>暂无 Studio 成员执行记录</div> : runs.map((run) => (
             <div key={run.id} style={{ display: "grid", gridTemplateColumns: "54px 1fr auto", alignItems: "center", gap: 7, borderBottom: "1px solid color-mix(in srgb, var(--border) 55%, transparent)", padding: "4px 0" }}>
               <span style={{ color: "var(--text-dim)", fontSize: 9 }}>{new Date(run.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><span style={{ color: "var(--text)", fontWeight: 800 }}>{run.member}</span> · {previewForRun(run).slice(0, 70)}</span>
-              <span style={{ color: statusColor(run.status), fontSize: 9, fontWeight: 800 }}>{run.status}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><span style={{ color: "var(--text)", fontWeight: 800 }}>{run.member}</span> · {[phaseLabel(run), statsLabel(run), previewForRun(run).slice(0, 70)].filter(Boolean).join(" · ")}</span>
+              <span style={{ color: statusColor(run.status), fontSize: 9, fontWeight: 800 }}>{run.phase ?? run.status}</span>
             </div>
           ))}
         </div>

@@ -176,6 +176,73 @@ export interface YpiStudioTaskEvent {
 
 export type YpiStudioSubagentTranscriptStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
 
+export type YpiStudioPolicySource = "toolInput" | "memberConfig" | "defaultPolicy" | "followMain" | "piDefault" | "unset";
+
+export type YpiStudioPolicyWarningCode =
+  | "config_parse_error"
+  | "member_id_normalized"
+  | "tool_model_invalid"
+  | "tool_thinking_invalid"
+  | "tool_model_overrides_settings"
+  | "tool_thinking_overrides_settings"
+  | "member_policy_unset"
+  | "default_policy_unset"
+  | "follow_main_model_unavailable"
+  | "follow_main_thinking_unavailable";
+
+export interface YpiStudioPolicyWarning {
+  code: YpiStudioPolicyWarningCode;
+  message: string;
+}
+
+export interface YpiStudioPolicyResolution {
+  label: string;
+  arg?: string;
+  effectiveSource: YpiStudioPolicySource;
+  configuredSource?: "toolInput" | "memberConfig" | "defaultPolicy";
+  configuredMode?: string;
+  requested?: string;
+  fallbackChain: YpiStudioPolicySource[];
+  warnings?: YpiStudioPolicyWarning[];
+}
+
+export interface YpiStudioSubagentPolicyDiagnostics {
+  schemaVersion: 1;
+  memberInput: string;
+  member: string;
+  memberPolicyFound: boolean;
+  config: { exists: boolean; parseError?: string; pathLabel: "~/.pi/agent/pi-web.json" };
+  model: YpiStudioPolicyResolution;
+  thinking: YpiStudioPolicyResolution;
+  warnings?: YpiStudioPolicyWarning[];
+}
+
+export type YpiStudioSubagentRunPhase = "starting" | "waiting_model" | "streaming" | "running_tool" | "waiting_for_user" | "finished";
+
+export interface YpiStudioSubagentCurrentTool {
+  toolCallId: string;
+  toolName: string;
+  startedAt?: string;
+}
+
+export interface YpiStudioSubagentRunProgress {
+  schemaVersion: 1;
+  phase: YpiStudioSubagentRunPhase;
+  startedAt: string;
+  updatedAt: string;
+  eventCount: number;
+  lastTextPreview: string;
+  itemsPreview: YpiStudioSubagentTranscriptItem[];
+  warnings?: string[];
+  outputChars?: number;
+  tokens?: number;
+  tokenSource?: "estimated_chars" | "usage";
+  tps?: number;
+  firstTokenAt?: string;
+  lastTokenAt?: string;
+  currentTool?: YpiStudioSubagentCurrentTool;
+}
+
 export interface YpiStudioSubagentTranscriptRef {
   schemaVersion: 1;
   format: "ypi-studio-subagent-transcript";
@@ -223,6 +290,8 @@ export interface YpiStudioTaskSubagentRun {
   thinking?: string;
   modelSource?: string;
   thinkingSource?: string;
+  policy?: YpiStudioSubagentPolicyDiagnostics;
+  progress?: YpiStudioSubagentRunProgress;
   error?: string;
   transcript?: YpiStudioSubagentTranscriptRef;
 }
@@ -343,7 +412,7 @@ export interface YpiStudioTaskWidgetStep {
 export interface YpiStudioTaskWidgetSubagentRun {
   id: string;
   member: string;
-  status: "running" | "succeeded" | "failed" | "cancelled";
+  status: "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
   startedAt: string;
   finishedAt?: string;
   summary?: string;
@@ -352,6 +421,11 @@ export interface YpiStudioTaskWidgetSubagentRun {
   thinking?: string;
   modelSource?: string;
   thinkingSource?: string;
+  phase?: YpiStudioSubagentRunPhase;
+  tokens?: number;
+  tps?: number;
+  currentTool?: YpiStudioSubagentCurrentTool;
+  policy?: YpiStudioSubagentPolicyDiagnostics;
   transcriptMeta?: YpiStudioSubagentTranscriptRef;
   lastItemsPreview: YpiStudioSubagentTranscriptItem[];
   warnings?: string[];
@@ -403,9 +477,14 @@ export interface YpiStudioLiveRunOverlay {
   taskId?: string;
   taskKey?: string;
   member?: string;
-  status?: "running" | "succeeded" | "failed" | "cancelled";
+  status?: "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user";
   model?: string;
   thinking?: string;
+  phase?: YpiStudioSubagentRunPhase;
+  tokens?: number;
+  tps?: number;
+  currentTool?: YpiStudioSubagentCurrentTool;
+  policyWarnings?: string[];
   lastTextPreview?: string;
   itemsPreview?: YpiStudioSubagentTranscriptItem[];
   updatedAt: number;

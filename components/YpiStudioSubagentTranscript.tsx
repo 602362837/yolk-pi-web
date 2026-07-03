@@ -6,6 +6,9 @@ import { MarkdownBody } from "./MarkdownBody";
 import type { ToolExecutionProgress } from "@/hooks/useAgentSession";
 import type { ToolCallContent, ToolResultMessage } from "@/lib/types";
 import type {
+  YpiStudioSubagentCurrentTool,
+  YpiStudioSubagentPolicyDiagnostics,
+  YpiStudioSubagentRunPhase,
   YpiStudioSubagentTranscriptItem,
   YpiStudioSubagentTranscriptRef,
   YpiStudioSubagentTranscriptResponse,
@@ -22,12 +25,21 @@ interface Props {
 type StudioRunStatus = "running" | "succeeded" | "failed" | "cancelled" | "waiting_for_user" | "unavailable";
 
 interface StudioRunProgress {
+  schemaVersion?: 1;
+  phase?: YpiStudioSubagentRunPhase;
   startedAt?: string;
   updatedAt?: string;
   eventCount?: number;
   lastTextPreview?: string;
   itemsPreview?: YpiStudioSubagentTranscriptItem[];
   warnings?: string[];
+  outputChars?: number;
+  tokens?: number;
+  tokenSource?: "estimated_chars" | "usage";
+  tps?: number;
+  firstTokenAt?: string;
+  lastTokenAt?: string;
+  currentTool?: YpiStudioSubagentCurrentTool;
 }
 
 interface StudioRunProjection {
@@ -41,6 +53,7 @@ interface StudioRunProjection {
   thinking?: string;
   modelSource?: string;
   thinkingSource?: string;
+  policy?: YpiStudioSubagentPolicyDiagnostics;
   summary?: string;
   error?: string;
 }
@@ -111,15 +124,40 @@ function normalizeItems(value: unknown): YpiStudioSubagentTranscriptItem[] | und
   return value.filter((item): item is YpiStudioSubagentTranscriptItem => isRecord(item) && typeof item.kind === "string" && typeof item.at === "string");
 }
 
+function normalizePhase(value: unknown): YpiStudioSubagentRunPhase | undefined {
+  return value === "starting" || value === "waiting_model" || value === "streaming" || value === "running_tool" || value === "waiting_for_user" || value === "finished" ? value : undefined;
+}
+
+function normalizeCurrentTool(value: unknown): YpiStudioSubagentCurrentTool | undefined {
+  if (!isRecord(value)) return undefined;
+  const toolCallId = asString(value.toolCallId);
+  const toolName = asString(value.toolName);
+  if (!toolCallId || !toolName) return undefined;
+  return { toolCallId, toolName, startedAt: asString(value.startedAt) };
+}
+
+function normalizePolicy(value: unknown): YpiStudioSubagentPolicyDiagnostics | undefined {
+  return isRecord(value) && value.schemaVersion === 1 ? value as unknown as YpiStudioSubagentPolicyDiagnostics : undefined;
+}
+
 function normalizeProgress(value: unknown): StudioRunProgress | undefined {
   if (!isRecord(value)) return undefined;
   return {
+    schemaVersion: value.schemaVersion === 1 ? 1 : undefined,
+    phase: normalizePhase(value.phase),
     startedAt: asString(value.startedAt),
     updatedAt: asString(value.updatedAt),
     eventCount: typeof value.eventCount === "number" ? value.eventCount : undefined,
     lastTextPreview: asString(value.lastTextPreview),
     itemsPreview: normalizeItems(value.itemsPreview),
     warnings: Array.isArray(value.warnings) ? value.warnings.filter((item): item is string => typeof item === "string") : undefined,
+    outputChars: typeof value.outputChars === "number" ? value.outputChars : undefined,
+    tokens: typeof value.tokens === "number" ? value.tokens : undefined,
+    tokenSource: value.tokenSource === "estimated_chars" || value.tokenSource === "usage" ? value.tokenSource : undefined,
+    tps: typeof value.tps === "number" ? value.tps : undefined,
+    firstTokenAt: asString(value.firstTokenAt),
+    lastTokenAt: asString(value.lastTokenAt),
+    currentTool: normalizeCurrentTool(value.currentTool),
   };
 }
 
@@ -136,6 +174,7 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
     thinking: asString(value.thinking),
     modelSource: asString(value.modelSource),
     thinkingSource: asString(value.thinkingSource),
+    policy: normalizePolicy(value.policy),
     summary: asString(value.summary),
     error: asString(value.error),
   };
@@ -160,6 +199,7 @@ function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): Stud
       thinking: run.thinking ?? acc.thinking,
       modelSource: run.modelSource ?? acc.modelSource,
       thinkingSource: run.thinkingSource ?? acc.thinkingSource,
+      policy: run.policy ?? acc.policy,
       summary: run.summary ?? acc.summary,
       error: run.error ?? acc.error,
     };
@@ -188,6 +228,27 @@ function statusLabel(status: StudioRunStatus): string {
   if (status === "waiting_for_user") return "Waiting for user";
   if (status === "unavailable") return "Transcript unavailable";
   return "Running";
+}
+
+function phaseLabel(phase?: YpiStudioSubagentRunPhase, currentTool?: YpiStudioSubagentCurrentTool): string {
+  if (phase === "starting") return "Starting child";
+  if (phase === "waiting_model") return "Waiting model";
+  if (phase === "streaming") return "Streaming";
+  if (phase === "running_tool") return `Running tool${currentTool?.toolName ? `: ${currentTool.toolName}` : ""}`;
+  if (phase === "waiting_for_user") return "Waiting for user";
+  if (phase === "finished") return "Finished";
+  return "—";
+}
+
+function statsText(progress?: StudioRunProgress): string | undefined {
+  if (!progress) return undefined;
+  const tokens = typeof progress.tokens === "number" ? `${progress.tokens} tokens` : undefined;
+  const tps = typeof progress.tps === "number" ? `${progress.tps.toFixed(1)} t/s` : undefined;
+  return [tokens, tps].filter(Boolean).join(" · ") || undefined;
+}
+
+function policyWarningMessages(policy?: YpiStudioSubagentPolicyDiagnostics): string[] {
+  return policy?.warnings?.map((warning) => warning.message) ?? [];
 }
 
 function statusColor(status: StudioRunStatus): string {
@@ -233,6 +294,18 @@ function itemAccent(item: YpiStudioSubagentTranscriptItem): string {
   return "var(--text-muted)";
 }
 
+function compactItems(items: YpiStudioSubagentTranscriptItem[], debug: boolean): YpiStudioSubagentTranscriptItem[] {
+  if (debug) return items;
+  const visible = items.filter((item) => {
+    if (item.kind === "prompt" || item.kind === "status" || item.kind === "stderr") return false;
+    if (item.kind === "tool_result" && item.isError) return true;
+    return item.kind === "assistant" || item.kind === "tool_call" || item.kind === "tool_result" || item.kind === "error";
+  });
+  const assistant = visible.filter((item) => item.kind === "assistant").slice(-3);
+  const nonAssistant = visible.filter((item) => item.kind !== "assistant");
+  return [...nonAssistant, ...assistant].slice(-12);
+}
+
 function previewText(text: string, max = 180): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized;
@@ -241,6 +314,8 @@ function previewText(text: string, max = 180): string {
 export function YpiStudioSubagentTranscript({ block, result, progress, duration, cwd }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [inputExpanded, setInputExpanded] = useState(false);
+  const [debugExpanded, setDebugExpanded] = useState(false);
+  const [rawExpanded, setRawExpanded] = useState(false);
   const [finalExpanded, setFinalExpanded] = useState(false);
   const [apiResponse, setApiResponse] = useState<YpiStudioSubagentTranscriptResponse | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -263,7 +338,7 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   const finalText = resultText(result);
   const progressItems = run.progress?.itemsPreview ?? [];
   const items = apiResponse?.items ?? progressItems;
-  const warnings = [...(run.progress?.warnings ?? []), ...(apiResponse?.warnings ?? [])];
+  const warnings = [...policyWarningMessages(run.policy), ...(run.progress?.warnings ?? []), ...(apiResponse?.warnings ?? [])];
   const elapsed = formatElapsed(run.progress?.startedAt ?? transcript?.startedAt, transcript?.finishedAt, duration);
   const lastPreview = run.progress?.lastTextPreview ?? run.summary ?? run.error ?? previewText(finalText || "Waiting for Studio member output…");
   const taskId = transcript?.taskId ?? run.taskId ?? inputRun.taskId;
@@ -277,7 +352,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   }, [status]);
 
   useEffect(() => {
-    if (!expanded || !transcript || !taskId || !runId || !effectiveCwd || status === "running") return;
+    const needsFullTranscript = debugExpanded || rawExpanded;
+    if (!needsFullTranscript || !transcript || !taskId || !runId || !effectiveCwd || status === "running") return;
     let cancelled = false;
     setApiError(null);
     const url = `/api/studio/tasks/${encodeURIComponent(taskId)}/subagents/${encodeURIComponent(runId)}/transcript?cwd=${encodeURIComponent(effectiveCwd)}&limit=300`;
@@ -290,11 +366,15 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
       .then((body) => { if (!cancelled) setApiResponse(body); })
       .catch((error) => { if (!cancelled) setApiError(error instanceof Error ? error.message : String(error)); });
     return () => { cancelled = true; };
-  }, [effectiveCwd, expanded, runId, status, taskId, transcript]);
+  }, [debugExpanded, effectiveCwd, rawExpanded, runId, status, taskId, transcript]);
 
   const modelLabel = run.model ?? "Pi default";
   const thinkingLabel = run.thinking ?? "default";
-  const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)}${elapsed ? ` · ${elapsed}` : ""} · ${previewText(lastPreview, 120)}`;
+  const displayItems = compactItems(items, debugExpanded);
+  const phase = run.progress?.phase ?? (status === "running" ? "waiting_model" : status === "waiting_for_user" ? "waiting_for_user" : result ? "finished" : undefined);
+  const stats = statsText(run.progress);
+  const warningTitle = warnings.slice(0, 3).join("\n");
+  const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)} · ${phaseLabel(phase, run.progress?.currentTool)}${elapsed ? ` · ${elapsed}` : ""}${stats ? ` · ${stats}` : ""} · ${previewText(lastPreview, 120)}`;
   void tick;
 
   return (
@@ -328,6 +408,7 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
         <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{headerPreview}</span>
         <Chip title={run.modelSource ? `model source: ${run.modelSource}` : undefined}>model: {modelLabel}</Chip>
         <Chip title={run.thinkingSource ? `thinking source: ${run.thinkingSource}` : undefined}>thinking: {thinkingLabel}</Chip>
+        {warnings.length > 0 && <span title={warningTitle} style={{ color: "#eab308", fontSize: 12, flexShrink: 0 }}>⚠ {warnings.length}</span>}
         {run.progress?.eventCount !== undefined && <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>{run.progress.eventCount} events</span>}
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
           <polyline points="2 3.5 5 6.5 8 3.5" />
@@ -339,18 +420,20 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
           <div style={{ padding: "8px 10px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 6, color: "var(--text-muted)", background: "var(--bg-panel)", borderBottom: "1px solid var(--border)" }}>
             <Meta label="Member" value={run.member ?? "unknown"} />
             <Meta label="Status" value={statusLabel(status)} color={statusColor(status)} />
+            <Meta label="Phase" value={phaseLabel(phase, run.progress?.currentTool)} />
             <Meta label="Task" value={taskId ?? "unknown"} />
             <Meta label="Run" value={runId ?? "pending"} />
             <Meta label="Model" value={modelLabel} title={run.modelSource ? `source: ${run.modelSource}` : undefined} />
             <Meta label="Thinking" value={thinkingLabel} title={run.thinkingSource ? `source: ${run.thinkingSource}` : undefined} />
             <Meta label="Elapsed" value={elapsed ?? "—"} />
+            <Meta label="Tokens" value={stats ?? "—"} title={run.progress?.tokenSource === "estimated_chars" ? "estimated from output characters" : run.progress?.tokenSource} />
             <Meta label="Updated" value={run.progress?.updatedAt ? new Date(run.progress.updatedAt).toLocaleTimeString() : "—"} />
           </div>
 
-          <SectionHeader title="Delegated input" right={<button onClick={() => setInputExpanded((value) => !value)} style={plainButtonStyle}>{inputExpanded ? "Hide" : "Show"}</button>} />
-          {inputExpanded && <pre style={preStyle}>{safeJson(block.input)}</pre>}
+          <SectionHeader title="Delegated prompt" right={<button onClick={() => setInputExpanded((value) => !value)} style={plainButtonStyle}>{inputExpanded ? "Hide prompt" : "Show prompt"}</button>} />
+          <div style={{ padding: "8px 10px", color: "var(--text-muted)", fontSize: 12 }}>{inputExpanded ? (asString(block.input.prompt) ?? "(no prompt)") : previewText(asString(block.input.prompt) ?? "(no prompt)", 220)}</div>
 
-          <SectionHeader title="Child transcript" right={transcript?.pathLabel ? <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{transcript.pathLabel}</span> : null} />
+          <SectionHeader title="Child transcript" right={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>{transcript?.pathLabel ? <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{transcript.pathLabel}</span> : null}<button onClick={() => setDebugExpanded((value) => !value)} style={plainButtonStyle}>{debugExpanded ? "Hide debug" : "Show debug"}</button>{debugExpanded && <button onClick={() => setRawExpanded((value) => !value)} style={plainButtonStyle}>{rawExpanded ? "Hide raw" : "Show raw"}</button>}</div>} />
           <div style={{ maxHeight: "min(560px, 65vh)", overflow: "auto", background: "var(--bg)", padding: "8px 10px" }}>
             {status === "running" && items.length === 0 && (
               <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>Child Pi process started. Waiting for first JSON event…</div>
@@ -360,9 +443,9 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
             )}
             {apiError && <Warning text={`Transcript unavailable: ${apiError}. Showing cached preview/final output instead.`} />}
             {warnings.map((warning, index) => <Warning key={`${index}-${warning}`} text={warning} />)}
-            {items.length > 0 ? (
+            {displayItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {items.map((item, index) => <TranscriptItem key={`${item.at}-${item.kind}-${index}`} item={item} />)}
+                {displayItems.map((item, index) => <TranscriptItem key={`${item.at}-${item.kind}-${index}`} item={item} compact={!debugExpanded} />)}
               </div>
             ) : finalText ? (
               <MarkdownBody>{finalText}</MarkdownBody>
@@ -370,6 +453,13 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
               <div style={{ color: "var(--text-dim)", fontSize: 12, fontStyle: "italic" }}>(no transcript output yet)</div>
             )}
           </div>
+
+          {debugExpanded && rawExpanded && (
+            <>
+              <SectionHeader title="Raw debug" />
+              <pre style={{ ...preStyle, maxHeight: 420 }}>{safeJson({ input: block.input, progressDetails: progress?.partialResult?.details, resultDetails: result?.details, items })}</pre>
+            </>
+          )}
 
           <SectionHeader title="Final output" right={finalText ? <button onClick={() => setFinalExpanded((value) => !value)} style={plainButtonStyle}>{finalExpanded ? "Hide" : "Show"}</button> : null} />
           {finalText ? (
@@ -430,8 +520,8 @@ function Warning({ text }: { text: string }) {
   return <div style={{ marginBottom: 8, padding: "6px 8px", border: "1px solid rgba(234,179,8,0.28)", borderRadius: 6, background: "rgba(234,179,8,0.08)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{text}</div>;
 }
 
-function TranscriptItem({ item }: { item: YpiStudioSubagentTranscriptItem }) {
-  const text = itemText(item);
+function TranscriptItem({ item, compact = false }: { item: YpiStudioSubagentTranscriptItem; compact?: boolean }) {
+  const text = compact && !(item.kind === "error" || (item.kind === "tool_result" && item.isError)) ? previewText(itemText(item), 420) : itemText(item);
   const isMarkdown = item.kind === "assistant" || item.kind === "prompt";
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", background: "var(--bg-panel)" }}>

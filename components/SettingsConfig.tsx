@@ -1097,10 +1097,10 @@ export function SettingsConfig({
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
                       <div>
                         <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>默认策略</div>
-                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>当成员没有独立策略，或成员模型策略选择“本层不指定”时使用。显式工具调用入参会覆盖这里的配置。</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>当成员没有独立策略，或成员模型策略选择“本层不指定”时使用。显式工具调用入参优先级最高，并会在 Chat diagnostics 中标记为覆盖 Settings。</div>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
-                        <Field label="默认模型" description="推荐保持跟随主会话；无法解析时会退回 Pi 默认。">
+                        <Field label="默认模型" description="推荐保持跟随主会话；无法解析主会话模型时会记录 warning 并退回 Pi 默认。">
                           <ModelPolicySelect value={studio.defaultPolicy.model} onChange={(model) => updateStudioDefaultPolicy({ model })} models={modelList} />
                         </Field>
                         <Field label="默认思考强度" description="inherit 表示跟随当前聊天 thinking。">
@@ -1128,7 +1128,7 @@ export function SettingsConfig({
                       })}
                     </div>
                     <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
-                      优先级：工具入参 model/thinking &gt; 成员配置 &gt; 默认策略 &gt; 主会话 &gt; Pi 默认。YPI child 进程会设置 Trellis 子进程禁用标志，避免成员流程受 Trellis 注入影响。
+                      固定解析链：工具入参 model/thinking &gt; 成员配置 &gt; 默认策略 &gt; 主会话 &gt; Pi 默认。成员 id 会先规范化为小写；unset 不作为最终策略，成员 unset 会落到默认策略，默认 unset 会按 followMain → Pi default 回退。所有 fallback 与 warning 会显示在 Chat transcript/final details。YPI child 进程会设置 Trellis 子进程禁用标志，避免成员流程受 Trellis 注入影响。
                     </div>
                   </div>
                 ) : section === "usage" ? (
