@@ -581,6 +581,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
         break;
       }
+      case "chatgpt_account_failover":
+        setRetryInfo({
+          attempt: 1,
+          maxAttempts: 1,
+          errorMessage: event.status === "switched"
+            ? "ChatGPT 额度耗尽，已切换账号并重试…"
+            : event.status === "already_switched_by_other_session"
+              ? "其他会话已切换 ChatGPT 账号，正在重试…"
+              : `ChatGPT 账号自动切换：${String(event.status)}`,
+        });
+        break;
       case "auto_retry_start":
         setRetryInfo({ attempt: event.attempt as number, maxAttempts: event.maxAttempts as number, errorMessage: event.errorMessage as string | undefined });
         break;

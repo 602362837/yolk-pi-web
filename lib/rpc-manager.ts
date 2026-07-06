@@ -5,6 +5,7 @@ import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
 import { abortYpiStudioChildRunsForSession } from "./ypi-studio-subagent-runtime";
+import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
 // ============================================================================
@@ -32,7 +33,9 @@ export class AgentSessionWrapper {
   private onDestroyCallback: (() => void) | null = null;
   private _alive = true;
 
-  constructor(public readonly inner: AgentSessionLike, public readonly cwd: string) {}
+  constructor(public readonly inner: AgentSessionLike, public readonly cwd: string) {
+    this.patchChatGptAccountFailover();
+  }
 
   get sessionId(): string {
     return this.inner.sessionId;
@@ -44,6 +47,74 @@ export class AgentSessionWrapper {
 
   isAlive(): boolean {
     return this._alive;
+  }
+
+  private emitEvent(event: AgentEvent): void {
+    for (const l of this.listeners) l(event);
+  }
+
+  private patchChatGptAccountFailover(): void {
+    const inner = this.inner as AgentSessionLike & {
+      _handlePostAgentRun?: () => Promise<boolean>;
+      _runAgentPrompt?: (...args: unknown[]) => Promise<void>;
+      _lastAssistantMessage?: unknown;
+      _piWebChatGptFailoverPatched?: boolean;
+    };
+    const innerAny = inner as unknown as {
+      agent?: { state?: { messages?: unknown[] } };
+      model?: { provider?: string };
+    };
+    if (inner._piWebChatGptFailoverPatched || typeof inner._handlePostAgentRun !== "function") return;
+    inner._piWebChatGptFailoverPatched = true;
+    const original = inner._handlePostAgentRun.bind(inner);
+    const originalRunAgentPrompt = typeof inner._runAgentPrompt === "function" ? inner._runAgentPrompt.bind(inner) : null;
+    const budget: ChatGptAccountFailoverTurnBudget = { attempts: 0, switches: 0 };
+    let runTriggerAccountId: string | null = null;
+
+    if (originalRunAgentPrompt) {
+      inner._runAgentPrompt = async (...args: unknown[]) => {
+        runTriggerAccountId = innerAny.model?.provider === "openai-codex"
+          ? await getActiveOpenAICodexAccountId().catch(() => null)
+          : null;
+        try {
+          await originalRunAgentPrompt(...args);
+        } finally {
+          runTriggerAccountId = null;
+        }
+      };
+    }
+
+    inner._handlePostAgentRun = async () => {
+      const assistantMessage = inner._lastAssistantMessage as { role?: string; stopReason?: string } | undefined;
+      const shouldContinue = await original();
+      if (shouldContinue) return true;
+
+      if (assistantMessage?.role === "assistant" && assistantMessage.stopReason === "error") {
+        const result = await attemptChatGptAccountFailover({
+          provider: innerAny.model?.provider,
+          message: assistantMessage,
+          budget,
+          reloadAuthState: reloadRpcAuthState,
+          triggerAccountId: runTriggerAccountId,
+        });
+        if (result.status !== "not_openai_codex" && result.status !== "not_quota_error" && result.status !== "disabled") {
+          this.emitEvent({ type: "chatgpt_account_failover", sessionId: this.sessionId, ...result });
+        }
+        if (result.retry) {
+          const messages = innerAny.agent?.state?.messages;
+          if (Array.isArray(messages) && messages[messages.length - 1] === assistantMessage && innerAny.agent?.state) {
+            innerAny.agent.state.messages = messages.slice(0, -1);
+          }
+          return true;
+        }
+      }
+
+      if (assistantMessage?.stopReason && assistantMessage.stopReason !== "error") {
+        budget.attempts = 0;
+        budget.switches = 0;
+      }
+      return false;
+    };
   }
 
   start(): void {

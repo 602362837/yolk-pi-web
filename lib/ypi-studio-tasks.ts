@@ -1522,7 +1522,6 @@ export function getYpiStudioTaskDetail(cwd: string, taskIdOrKey: string): YpiStu
 
 export function getYpiStudioTaskIdForContext(cwd: string, contextId: string): string | null {
   const ctx = createContext(cwd);
-  if (contextId.startsWith("pi_process_")) return null;
   return readRuntimePointer(ctx, contextId);
 }
 

@@ -86,6 +86,15 @@ export interface PiWebChatGptWarmupConfig {
   times: string[];
 }
 
+export interface PiWebChatGptAutoFailoverConfig {
+  enabled: boolean;
+  maxAttemptsPerTurn: number;
+  maxAccountSwitchesPerTurn: number;
+  quotaCacheMaxAgeMs: number;
+  exhaustedCooldownMs: number;
+  minSwitchIntervalMs: number;
+}
+
 export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "cmd" | "powershell" | "pwsh" | "custom";
 
 export interface PiWebTerminalConfig {
@@ -100,6 +109,7 @@ export interface PiWebTerminalConfig {
 export interface PiWebChatGptConfig {
   usagePanelEnabled: boolean;
   warmup: PiWebChatGptWarmupConfig;
+  autoFailover: PiWebChatGptAutoFailoverConfig;
   autoRefreshEnabled: boolean;
   refreshCycleIntervalSeconds: number;
   refreshCycleSaltMinSeconds: number;
@@ -204,6 +214,14 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
       enabled: false,
       accountIds: [],
       times: ["07:00", "13:00"],
+    },
+    autoFailover: {
+      enabled: false,
+      maxAttemptsPerTurn: 1,
+      maxAccountSwitchesPerTurn: 1,
+      quotaCacheMaxAgeMs: 5 * 60 * 1000,
+      exhaustedCooldownMs: 30 * 60 * 1000,
+      minSwitchIntervalMs: 10 * 1000,
     },
     autoRefreshEnabled: false,
     refreshCycleIntervalSeconds: 1800,
@@ -471,6 +489,18 @@ function readChatGptWarmupConfig(value: unknown, fallback: PiWebChatGptWarmupCon
   };
 }
 
+function readChatGptAutoFailoverConfig(value: unknown, fallback: PiWebChatGptAutoFailoverConfig): PiWebChatGptAutoFailoverConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    maxAttemptsPerTurn: readInteger(root.maxAttemptsPerTurn, fallback.maxAttemptsPerTurn),
+    maxAccountSwitchesPerTurn: readInteger(root.maxAccountSwitchesPerTurn, fallback.maxAccountSwitchesPerTurn),
+    quotaCacheMaxAgeMs: readInteger(root.quotaCacheMaxAgeMs, fallback.quotaCacheMaxAgeMs),
+    exhaustedCooldownMs: readInteger(root.exhaustedCooldownMs, fallback.exhaustedCooldownMs),
+    minSwitchIntervalMs: readInteger(root.minSwitchIntervalMs, fallback.minSwitchIntervalMs),
+  };
+}
+
 function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const defaults = DEFAULT_PI_WEB_CONFIG;
   const root = isRecord(raw) ? raw : {};
@@ -515,6 +545,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     chatgpt: {
       usagePanelEnabled: readBoolean(chatgpt.usagePanelEnabled, defaults.chatgpt.usagePanelEnabled),
       warmup: readChatGptWarmupConfig(chatgpt.warmup, defaults.chatgpt.warmup),
+      autoFailover: readChatGptAutoFailoverConfig(chatgpt.autoFailover, defaults.chatgpt.autoFailover),
       autoRefreshEnabled: readBoolean(chatgpt.autoRefreshEnabled, defaults.chatgpt.autoRefreshEnabled),
       refreshCycleIntervalSeconds: readInteger(chatgpt.refreshCycleIntervalSeconds, defaults.chatgpt.refreshCycleIntervalSeconds),
       refreshCycleSaltMinSeconds: readInteger(chatgpt.refreshCycleSaltMinSeconds, defaults.chatgpt.refreshCycleSaltMinSeconds),
@@ -849,6 +880,19 @@ function validateChatGptWarmupConfig(value: unknown): PiWebChatGptWarmupConfig {
   };
 }
 
+function validateChatGptAutoFailoverConfig(value: unknown): PiWebChatGptAutoFailoverConfig {
+  if (value === undefined) return DEFAULT_PI_WEB_CONFIG.chatgpt.autoFailover;
+  if (!isRecord(value)) throw new PiWebConfigValidationError("chatgpt.autoFailover must be an object");
+  return {
+    enabled: requireBoolean(value.enabled, "chatgpt.autoFailover.enabled"),
+    maxAttemptsPerTurn: requireIntegerInRange(value.maxAttemptsPerTurn, "chatgpt.autoFailover.maxAttemptsPerTurn", 0, 3),
+    maxAccountSwitchesPerTurn: requireIntegerInRange(value.maxAccountSwitchesPerTurn, "chatgpt.autoFailover.maxAccountSwitchesPerTurn", 0, 3),
+    quotaCacheMaxAgeMs: requireIntegerInRange(value.quotaCacheMaxAgeMs, "chatgpt.autoFailover.quotaCacheMaxAgeMs", 0, 24 * 60 * 60 * 1000),
+    exhaustedCooldownMs: requireIntegerInRange(value.exhaustedCooldownMs, "chatgpt.autoFailover.exhaustedCooldownMs", 0, 24 * 60 * 60 * 1000),
+    minSwitchIntervalMs: requireIntegerInRange(value.minSwitchIntervalMs, "chatgpt.autoFailover.minSwitchIntervalMs", 0, 60 * 60 * 1000),
+  };
+}
+
 export function validatePiWebChatGptConfig(value: unknown): PiWebChatGptConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("chatgpt config must be an object");
@@ -858,6 +902,7 @@ export function validatePiWebChatGptConfig(value: unknown): PiWebChatGptConfig {
   return {
     usagePanelEnabled: requireBoolean(value.usagePanelEnabled, "chatgpt.usagePanelEnabled"),
     warmup: validateChatGptWarmupConfig(value.warmup),
+    autoFailover: validateChatGptAutoFailoverConfig(value.autoFailover),
     autoRefreshEnabled: requireBoolean(value.autoRefreshEnabled, "chatgpt.autoRefreshEnabled"),
     refreshCycleIntervalSeconds: requireIntegerInRange(value.refreshCycleIntervalSeconds, "chatgpt.refreshCycleIntervalSeconds", 300, 86400),
     refreshCycleSaltMinSeconds: cycleSalt.min,
@@ -948,6 +993,9 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     warmup: Object.prototype.hasOwnProperty.call(chatGptPatch, "warmup")
       ? chatGptPatch.warmup
       : currentConfig.chatgpt.warmup,
+    autoFailover: Object.prototype.hasOwnProperty.call(chatGptPatch, "autoFailover")
+      ? chatGptPatch.autoFailover
+      : currentConfig.chatgpt.autoFailover,
   } : chatGptPatch) : undefined;
   const normalizedEditor = hasEditor ? validatePiWebEditorConfig(patch.editor) : undefined;
   const nextRaw: Record<string, unknown> = { ...raw };
