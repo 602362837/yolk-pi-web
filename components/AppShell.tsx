@@ -294,7 +294,17 @@ export function AppShell() {
   // Called by ChatWindow when a new session gets its real id from pi
   const handleSessionCreated = useCallback((session: SessionInfo) => {
     setNewSessionCwd(null);
-    setSelectedSession(session);
+    setSelectedSession((prev) => {
+      if (prev?.id !== session.id) return session;
+      return {
+        ...prev,
+        ...session,
+        name: session.name ?? prev.name,
+        firstMessage: session.firstMessage || prev.firstMessage,
+        messageCount: Math.max(prev.messageCount ?? 0, session.messageCount ?? 0),
+        modified: session.modified || prev.modified,
+      };
+    });
     setRefreshKey((k) => k + 1);
     router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
   }, [router]);

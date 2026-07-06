@@ -1,7 +1,9 @@
 export type BrowserSharePermissionMode = "readonly" | "interactive";
 export type BrowserShareConnectionStatus = "pending" | "bound" | "disconnected" | "expired";
 export type BrowserShareCommandType = "click" | "type" | "scroll" | "navigate";
-export type BrowserShareCommandStatus = "pending_approval" | "queued" | "running" | "succeeded" | "failed" | "rejected";
+export type BrowserShareActiveCommandStatus = "pending_approval" | "queued" | "running";
+export type BrowserShareTerminalCommandStatus = "succeeded" | "failed" | "rejected" | "timeout";
+export type BrowserShareCommandStatus = BrowserShareActiveCommandStatus | BrowserShareTerminalCommandStatus;
 
 export interface BrowserShareTabInfo {
   url: string;
@@ -56,7 +58,12 @@ export interface BrowserShareSessionState {
   boundAt?: string;
   expiresAt?: string;
   lastSnapshotAt?: string;
+  lastSeenAt?: string;
+  lastCommandPollAt?: string;
+  lastResultAt?: string;
   pendingCommands?: BrowserShareCommand[];
+  activeCommands?: BrowserShareCommand[];
+  recentCommands?: BrowserShareCommand[];
 }
 
 export interface BrowserShareCommand {
@@ -74,6 +81,7 @@ export interface BrowserShareCommand {
   deltaY?: number;
   reason?: string;
   result?: BrowserShareCommandResult;
+  terminalAt?: string;
 }
 
 export interface BrowserShareCommandResult {

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { TrellisSetupStatus } from "@/lib/trellis-setup-types";
 import type { GitInfo, SessionInfo, WorktreeInfo } from "@/lib/types";
 import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
+import { displayTitleForSession } from "@/lib/session-title";
 import { Checkbox } from "./Checkbox";
 import { FileExplorer } from "./FileExplorer";
 
@@ -528,7 +529,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, [selectedCwd, loadSessions]);
 
   const handleDeleteSession = useCallback(async (session: SessionInfo) => {
-    const title = session.name || session.firstMessage.slice(0, 50) || session.id.slice(0, 12);
+    const title = displayTitleForSession(session);
     if (!window.confirm(`删除会话 “${title}”？此操作不可恢复。`)) return;
     try {
       const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
@@ -1902,7 +1903,7 @@ function SessionItem({
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const title = session.name || session.firstMessage.slice(0, 50) || session.id.slice(0, 12);
+  const title = displayTitleForSession(session);
 
   const startRename = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2239,7 +2240,7 @@ function ArchivedSessionItem({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const title = session.name || session.firstMessage.slice(0, 50) || session.id.slice(0, 12);
+  const title = displayTitleForSession(session);
 
   const handleUnarchiveClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

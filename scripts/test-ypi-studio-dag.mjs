@@ -155,6 +155,22 @@ function progressFor(implementationPlan, statuses = {}) {
 }
 
 {
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-inline-approval-"));
+  try {
+    const contextId = "pi_inline_approval";
+    const approvalContextId = "pi_inline_approval_current_chat";
+    const task = createYpiStudioTask({ cwd, title: "Inline approval", workflowId: "feature-dev", contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    const transitioned = transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId: approvalContextId, reason: "用户批准开始实现" });
+    assert.equal(transitioned.status, "implementing");
+    assert.equal(transitioned.meta.approvalGrant?.contextId, approvalContextId);
+    assert.ok(transitioned.contextIds.includes(approvalContextId));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
   const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-approval-"));
   try {
     const contextId = "pi_approval_fallback";

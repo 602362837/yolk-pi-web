@@ -25,6 +25,7 @@ interface Props {
   onSend: (message: string, images?: AttachedImage[]) => void;
   cwd?: string | null;
   sessionId?: string | null;
+  onEnsureBrowserShareSession?: () => Promise<string | null>;
   onAbort: () => void;
   onSteer?: (message: string, images?: AttachedImage[]) => void;
   onFollowUp?: (message: string, images?: AttachedImage[]) => void;
@@ -394,7 +395,7 @@ function hasContent(el: HTMLElement): boolean {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
-  onSend, cwd, sessionId, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
+  onSend, cwd, sessionId, onEnsureBrowserShareSession, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
   onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
@@ -1566,7 +1567,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 <polyline points="13 2 13 9 20 9" />
               </svg>
             </button>
-            <BrowserShareControl sessionId={sessionId} disabled={isStreaming} />
+            <BrowserShareControl cwd={cwd} sessionId={sessionId} ensureSession={onEnsureBrowserShareSession} disabled={isStreaming} />
 
             {/* Model selector — visible always, disabled during streaming */}
             {modelSelectOptions.length > 0 && currentModelValue && onModelChange && (

@@ -1631,6 +1631,15 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   const transition = findYpiStudioTransition(workflow, from, body.to);
   if (!transition && !body.override) throw new Error(`Invalid Studio transition: ${from} -> ${body.to}`);
   if (isApprovalImplementationEdge(from, body.to)) {
+    if (body.contextId && body.reason && isExplicitYpiStudioApprovalText(body.reason)) {
+      if (!record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+      const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, from, body.contextId);
+      record.raw.meta = {
+        ...record.raw.meta,
+        approvalGate: existingGate,
+        approvalGrant: approvalGrant(nowIso(), body.contextId, body.reason),
+      };
+    }
     assertYpiStudioImplementationApproved(record.raw, body.contextId);
   } else if (transition?.requiresUserApproval && !body.reason && !body.override) {
     throw new Error(`Transition ${from} -> ${body.to} requires user approval reason`);
