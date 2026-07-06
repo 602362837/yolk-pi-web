@@ -4,6 +4,7 @@ import { cacheSessionPath } from "./session-reader";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
+import { createBrowserShareExtension } from "./browser-share-extension";
 import { abortYpiStudioChildRunsForSession } from "./ypi-studio-subagent-runtime";
 import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
@@ -442,7 +443,7 @@ export async function startRpcSession(
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
-      extensionFactories: [createYpiStudioExtension(cwd)],
+      extensionFactories: [createYpiStudioExtension(cwd), createBrowserShareExtension()],
     });
     await resourceLoader.reload();
 

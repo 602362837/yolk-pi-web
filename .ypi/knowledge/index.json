@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-06T01:46:23.345Z",
+  "updatedAt": "2026-07-06T02:10:54.878Z",
   "entries": [
+    {
+      "id": "20260706-101054-设计-chrome-插件式-browser-share-能力",
+      "title": "设计 Chrome 插件式 Browser Share 能力",
+      "taskId": "20260706-084928-设计-chrome-插件式-browser-share-能力",
+      "taskKey": "archived:2026-07:20260706-084928-设计-chrome-插件式-browser-share-能力",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：Chrome 插件式 Browser Share 能力。可复用结论：插件应作为 ypi web 外部独立项目放在 `~/gitProjects/ypi-browser-share-extension` 并单独发布到 GitHub，避免进入 ypi web npm/Next build；多 session 防误分享采用“Chrome 插件生成短期单次分享码 + 用户在目标 chat/session 填码绑定”，agent 工具必须从当前 session 上下文推导绑定，不接受 shareId。ypi web 侧新增 `app/api/browser-share/**`、`lib/browser-share-manager.ts`、`lib/browser-share-extension.ts`，提供 health/create share/bind/state/snapshot/commands/result API 和 browser_share_status/snapshot/get_selection/click/type/scroll/navigate 工具。安全边界：默认 readonly，写/导航/高风险操作需 UI 确认；快照限制长度并过滤 password/payment/token/hidden 字段值，不读 cookie/localStorage。验证通过 lint、tsc、插件 build；插件文档已补充并推送到 GitHub 仓库 `602362837/ypi-browser-share-extension`。",
+      "tags": [
+        "browser-share",
+        "chrome-extension",
+        "ypi-web",
+        "agent-tools",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-084928-设计-chrome-插件式-browser-share-能力",
+      "knowledgePath": ".ypi/knowledge/20260706-101054-设计-chrome-插件式-browser-share-能力.md",
+      "createdAt": "2026-07-06T02:10:54.878Z",
+      "archivedAt": "2026-07-06T02:10:54.878Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260706-094623-设计-chatgpt-额度耗尽自动切换可用账号",
       "title": "设计 ChatGPT 额度耗尽自动切换可用账号",

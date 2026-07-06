@@ -131,6 +131,7 @@ All durable project knowledge belongs under `docs/`. Add or update docs first, t
 Current docs index:
 
 - `docs/architecture/overview.md` — runtime flow, invariants, session JSONL format.
+- `docs/architecture/browser-share.md` — Chrome extension Browser Share bridge, binding flow, API, tools, and safety boundaries.
 - `docs/architecture/decisions/README.md` — archive location for durable technical decisions.
 - `docs/modules/api.md` — API route map and route implementation pointers.
 - `docs/modules/frontend.md` — component/hook/style map.

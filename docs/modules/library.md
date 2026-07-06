@@ -10,6 +10,9 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/pi-types.ts` | `AgentSessionLike` wrapper interface expected by hooks/components. |
 | `lib/normalize.ts` | Normalize pi tool-call fields to web UI shape. |
 | `lib/session-file-changes.ts` | Non-Git session file-change tracker: observes edit/write tool events, persists sidecar summaries, and serves browser-safe changed-file projections. |
+| `lib/browser-share-types.ts` | Browser Share wire types for share codes, session binding, sanitized snapshots, commands, and command results. |
+| `lib/browser-share-manager.ts` | In-memory localhost Browser Share bridge state: short-lived share codes, explicit session bindings, sanitized snapshots, command queue, approval state, and command results. |
+| `lib/browser-share-extension.ts` | Built-in Pi extension factory registering Browser Share agent tools scoped to the current session id. |
 | `lib/unified-diff.ts` | Wrapper around the `diff` package for bounded unified diff generation and addition/deletion counting. |
 | `lib/agent-client.ts` | Client-side helper for `POST /api/agent/[id]`. |
 | `lib/file-paths.ts` | Path normalization utilities for file viewer APIs. |
