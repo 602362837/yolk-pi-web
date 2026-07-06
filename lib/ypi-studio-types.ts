@@ -610,6 +610,39 @@ export interface YpiStudioImplementationSubtaskProjection extends YpiStudioImple
   runs: YpiStudioImplementationRunProjection[];
 }
 
+export interface YpiStudioImplementationCompactTimelineItem {
+  id: string;
+  title: string;
+  status: YpiStudioImplementationSubtaskStatus;
+  displayStatus: "waiting" | Exclude<YpiStudioImplementationSubtaskStatus, "pending">;
+  member?: string;
+  runId?: string;
+  runStatus?: YpiStudioSubagentRunStatus | "runtime_lost";
+  reason?: string;
+  summary?: string;
+  updatedAt: string;
+}
+
+export type YpiStudioSessionRuntimeStatus =
+  | "idle"
+  | "running_model"
+  | "running_tool"
+  | "waiting_for_studio_children"
+  | "needs_user"
+  | "completed";
+
+export interface YpiStudioSessionRuntimeProjection {
+  status: YpiStudioSessionRuntimeStatus;
+  message: string;
+  activeRunCount: number;
+  queuedRunCount: number;
+  readySubtaskCount: number;
+  blockedSubtaskCount: number;
+  failedSubtaskCount: number;
+  timeline: YpiStudioImplementationCompactTimelineItem[];
+  updatedAt: string;
+}
+
 export interface YpiStudioImplementationProjection {
   schemaVersion: 1 | 2;
   maxConcurrency: number;
@@ -620,6 +653,8 @@ export interface YpiStudioImplementationProjection {
   subtasksWithStatus: YpiStudioImplementationSubtaskProjection[];
   runsBySubtask: Record<string, YpiStudioImplementationRunProjection[]>;
   nonTerminalSubtasks: YpiStudioImplementationSubtaskProjection[];
+  compactTimeline: YpiStudioImplementationCompactTimelineItem[];
+  sessionRuntime?: YpiStudioSessionRuntimeProjection;
 }
 
 export interface YpiStudioTaskDetail extends YpiStudioTaskSummary {
@@ -719,7 +754,7 @@ export interface YpiStudioTaskWidgetProjection {
   subagents: YpiStudioTaskWidgetSubagentRun[];
   events?: YpiStudioTaskWidgetEvent[];
   implementation?: YpiStudioImplementationSummary;
-  implementationProjection?: Pick<YpiStudioImplementationProjection, "maxConcurrency" | "statusCounts" | "activeSubtaskIds" | "queuedSubtaskIds" | "nextSubtaskIds" | "nonTerminalSubtasks">;
+  implementationProjection?: Pick<YpiStudioImplementationProjection, "maxConcurrency" | "statusCounts" | "activeSubtaskIds" | "queuedSubtaskIds" | "nextSubtaskIds" | "nonTerminalSubtasks" | "compactTimeline" | "sessionRuntime">;
 }
 
 export type YpiStudioSessionTaskLinkResult =

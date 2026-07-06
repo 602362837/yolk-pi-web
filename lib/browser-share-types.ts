@@ -1,5 +1,7 @@
 export type BrowserSharePermissionMode = "readonly" | "interactive";
 export type BrowserShareConnectionStatus = "pending" | "bound" | "disconnected" | "expired";
+export type BrowserShareLifecycleStatus = "pending_code" | "bound" | "stale" | "offline" | "stopped" | "unbound" | "replaced" | "expired" | "tab_closed" | "not_found";
+export type BrowserShareDebuggerState = "unsupported" | "attaching" | "attached" | "detached" | "blocked" | "failed";
 export type BrowserShareCommandType = "click" | "type" | "scroll" | "navigate";
 export type BrowserShareActiveCommandStatus = "pending_approval" | "queued" | "running";
 export type BrowserShareTerminalCommandStatus = "succeeded" | "failed" | "rejected" | "timeout";
@@ -49,9 +51,14 @@ export interface BrowserShareScreenshotSummary {
 export interface BrowserShareDebuggerSummary {
   enabled: boolean;
   attached?: boolean;
+  persistent?: boolean;
+  desired?: boolean;
+  state?: BrowserShareDebuggerState;
+  attachedAt?: string;
+  detachedAt?: string;
+  detachReason?: string;
   protocolVersion?: string;
   lastError?: string;
-  detachedAt?: string;
   screenshotAvailable?: boolean;
 }
 
@@ -113,11 +120,54 @@ export interface BrowserShareCreateResponse {
   expiresAt: string;
 }
 
+export interface BrowserShareOperatorInfo {
+  bindingStatus: "none" | "pending_code" | "bound" | "unbound";
+  serviceBaseUrl?: string;
+  boundSessionId?: string;
+  boundSessionLabel?: string;
+  permissionMode?: BrowserSharePermissionMode;
+  canRead: boolean;
+  canOperate: boolean;
+  autoAllowedCommands: BrowserShareCommandType[];
+  approvalRequiredCommands: BrowserShareCommandType[];
+}
+
+export interface BrowserShareControlProjection {
+  shareId: string;
+  lifecycleStatus: BrowserShareLifecycleStatus;
+  detachRequested?: boolean;
+  detachReason?: string;
+  boundSessionId?: string;
+  permissionMode?: BrowserSharePermissionMode;
+  expiresAt?: string;
+  operator?: BrowserShareOperatorInfo;
+  debugger?: BrowserShareDebuggerSummary;
+}
+
+export interface BrowserShareRuntimeUpdate {
+  tab?: BrowserShareTabInfo;
+  lifecycleStatus?: BrowserShareLifecycleStatus;
+  debugger?: BrowserShareDebuggerSummary;
+  captureMode?: BrowserShareCaptureMode;
+  screenshot?: BrowserShareScreenshotSummary;
+  source?: BrowserShareSourceInfo;
+  capabilities?: BrowserShareCapabilities;
+  transport?: {
+    serviceOnline?: boolean;
+    lastHeartbeatAt?: string;
+    lastError?: string;
+  };
+}
+
 export interface BrowserShareSessionState {
   sessionId: string;
   bound: boolean;
   shareId?: string;
   status: BrowserShareConnectionStatus;
+  lifecycleStatus?: BrowserShareLifecycleStatus;
+  operator?: BrowserShareOperatorInfo;
+  detachRequested?: boolean;
+  detachReason?: string;
   permissionMode?: BrowserSharePermissionMode;
   tab?: BrowserShareTabInfo;
   snapshot?: BrowserSharePageSnapshot;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import type { YpiStudioImplementationSubtaskProjection, YpiStudioImplementationSubtaskStatus, YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection, YpiStudioTaskWidgetSubagentRun, YpiStudioSubagentTranscriptItem } from "@/lib/ypi-studio-types";
+import type { YpiStudioImplementationCompactTimelineItem, YpiStudioImplementationSubtaskProjection, YpiStudioImplementationSubtaskStatus, YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection, YpiStudioTaskWidgetSubagentRun, YpiStudioSubagentTranscriptItem } from "@/lib/ypi-studio-types";
 
 interface Props {
   task: YpiStudioTaskWidgetProjection;
@@ -99,8 +99,24 @@ function implementationCountSummary(task: YpiStudioTaskWidgetProjection): string
   return pieces.filter((piece) => !/ (0)(\D|$)/.test(piece) || piece.startsWith("完成")).join(" · ");
 }
 
-function visibleSubtasks(task: YpiStudioTaskWidgetProjection): YpiStudioImplementationSubtaskProjection[] {
-  return task.implementationProjection?.nonTerminalSubtasks ?? [];
+function visibleSubtasks(task: YpiStudioTaskWidgetProjection): YpiStudioImplementationCompactTimelineItem[] {
+  const timeline = task.implementationProjection?.compactTimeline;
+  if (timeline?.length) return timeline.slice(0, 5);
+  return (task.implementationProjection?.nonTerminalSubtasks ?? []).slice(0, 5).map((subtask) => ({
+    id: subtask.id,
+    title: subtask.title,
+    status: subtask.status,
+    displayStatus: subtask.displayStatus,
+    member: subtask.member,
+    runId: subtask.currentRunId ?? subtask.lastRunId,
+    reason: subtaskReason(subtask),
+    summary: subtask.summary,
+    updatedAt: subtask.updatedAt,
+  }));
+}
+
+function timelineReason(item: YpiStudioImplementationCompactTimelineItem): string {
+  return item.summary ?? item.reason ?? (item.runId ? `run ${item.runId}` : item.member ? `成员 ${item.member}` : "");
 }
 
 function itemText(item: YpiStudioSubagentTranscriptItem): string {
@@ -216,6 +232,7 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
   const completedCount = task.artifacts.completed.filter((artifact) => task.artifacts.required.includes(artifact)).length;
   const implementation = task.implementation;
   const implementationSummary = implementationCountSummary(task);
+  const runtime = task.implementationProjection?.sessionRuntime;
   const subtasks = visibleSubtasks(task);
   const stepFlow = buildStepFlow(task);
   return (
@@ -231,6 +248,12 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
           <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", color: "var(--text-dim)", fontSize: 10 }}>
             <span>{task.statusLabel}</span><span>·</span><span>负责人 {task.currentMember ?? "—"}</span><span>·</span><span>产物 {completedCount}/{task.artifacts.required.length}</span>{implementation && <><span>·</span><span>子任务 {implementation.done + implementation.skipped}/{implementation.total}</span></>}
           </div>
+          {runtime && runtime.status !== "idle" && (
+            <div style={{ marginTop: 5, display: "flex", gap: 6, alignItems: "center", color: runtime.status === "needs_user" ? "#f59e0b" : runtime.status === "completed" ? "#22c55e" : "var(--accent)", fontSize: 10, fontWeight: 800, overflow: "hidden" }}>
+              <span className={runtime.status === "waiting_for_studio_children" ? "ypi-studio-widget-pulse" : undefined} style={{ width: 7, height: 7, borderRadius: 999, background: "currentColor", flexShrink: 0 }} />
+              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{runtime.status === "waiting_for_studio_children" ? `等待并行子任务：运行 ${runtime.activeRunCount} · 队列 ${runtime.queuedRunCount} · 就绪 ${runtime.readySubtaskCount}` : runtime.message}</span>
+            </div>
+          )}
           {implementationSummary && <div style={{ marginTop: 5, color: implementationCount(task, "failed") > 0 || implementationCount(task, "blocked") > 0 ? "#f59e0b" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{implementationSummary}</div>}
         </div>
       </div>
@@ -254,7 +277,7 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
         {subtasks.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 120, overflowY: "auto", paddingRight: 2 }}>
             {subtasks.map((subtask) => {
-              const reason = subtaskReason(subtask);
+              const reason = timelineReason(subtask);
               return (
                 <div key={subtask.id} title={reason || subtask.title} style={{ display: "grid", gridTemplateColumns: "54px 1fr", alignItems: "center", gap: 7, borderBottom: "1px solid color-mix(in srgb, var(--border) 45%, transparent)", padding: "3px 0" }}>
                   <span style={{ color: statusColor(subtask.status), fontSize: 9, fontWeight: 900 }}>{subtaskStatusLabel(subtask.status)}</span>

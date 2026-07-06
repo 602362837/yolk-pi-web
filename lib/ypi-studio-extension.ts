@@ -34,7 +34,7 @@ import {
   readYpiStudioSubagentTranscriptPreview,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
-import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
+import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
@@ -486,6 +486,7 @@ interface ChildRunMeta {
   startedAt: string;
   parentSessionId?: string;
   subtaskId?: string;
+  continuationOnFinal?: boolean;
 }
 
 
@@ -943,6 +944,19 @@ function runChildPi(
       } catch (error) {
         addWarning(`Final run persistence failed: ${error instanceof Error ? error.message : String(error)}`);
       }
+      if (meta.continuationOnFinal && meta.parentSessionId) {
+        scheduleYpiStudioChildRunContinuation({
+          runId: meta.runId,
+          taskId: meta.taskId,
+          subtaskId: meta.subtaskId,
+          member: meta.member,
+          cwd: root,
+          parentSessionId: meta.parentSessionId,
+          status,
+          summary: finalRun.summary,
+          finishedAt: finalRun.finishedAt,
+        });
+      }
       unregisterYpiStudioChildRun(meta.runId);
       resolveResult(childResult);
     };
@@ -1347,7 +1361,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
       "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
       "When dispatching implementer for a task with implementationPlan, pass subtaskId for exactly one claimed subtask; without subtaskId the implementer must not perform full implementation.",
-      "Omitting action/mode preserves the current synchronous behavior. Future async orchestration uses action=start with mode=async, then poll/collect/cancel by runId.",
+      "Omitting action/mode preserves the current synchronous behavior. Async orchestration uses action=start with mode=async; when an async child reaches a terminal state, the same parent session is automatically nudged to collect the run and continue the implementation plan. poll/collect/cancel by runId remain available and must be idempotent.",
     ],
     parameters: {
       type: "object",
@@ -1501,7 +1515,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           root,
           childPrompt,
           policy,
-          { runId, taskId, member, startedAt, parentSessionId: callStr(ctx?.sessionManager?.getSessionId) ?? undefined, subtaskId },
+          { runId, taskId, member, startedAt, parentSessionId: callStr(ctx?.sessionManager?.getSessionId) ?? undefined, subtaskId, continuationOnFinal: mode === "async" },
           writer,
           signal,
           onUpdate,
@@ -1510,7 +1524,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         if (mode === "async") {
           childPromise.catch(() => {});
           return {
-            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. Use action=poll or action=collect with runId to refresh.` }],
+            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. The parent session will be nudged automatically when it finishes; action=poll or action=collect with runId remains available.` }],
             details: { action: "start", mode: "async", task: taskAfterInitialRun, run: projectSubagentRun(root, taskId, runningRun), warnings: [...policy.warnings, ...warnings].length ? [...policy.warnings, ...warnings] : undefined },
           };
         }

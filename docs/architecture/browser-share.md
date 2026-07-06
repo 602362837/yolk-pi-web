@@ -37,6 +37,8 @@ The MVP does not write an automatic persistent generated `name` and does not run
 - Default permission mode is `readonly`.
 - In `readonly`, every action command requires one-time approval.
 - In `interactive`, `type` and `navigate` still require one-time approval; `click` and `scroll` may be queued directly.
+- The Chrome debugger infobar, tab badge, extension popup, and ypi `BrowserShareControl` are the durable user-visible signals for who can operate the shared tab.
+- Browser Share action tools require the persistent debugger to be attached; if it is detached/blocked/failed, commands fail with an explanation instead of silently falling back to content-script actions.
 - Snapshots include URL/title, visible text, selection, and bounded interactive element summaries.
 - Password, payment, token-like, and hidden field values are not collected by the extension and server snapshots are length-limited.
 - Share codes expire before binding, are single-use, and are deleted when bound.
@@ -64,23 +66,26 @@ The default action wait is 90 seconds. Terminal statuses are `succeeded`, `faile
 
 ## Extension transport
 
-The extension uses debugger-first capture/action execution plus an extension-initiated command channel:
+The extension uses persistent debugger-first capture/action execution plus extension-initiated control channels:
 
-- `GET /api/browser-share/shares/[shareId]/commands?waitMs=25000` is the primary long-poll path.
-- The route updates heartbeat state, never returns pending-approval commands, and marks returned queued commands as `running`.
-- The extension service worker keeps one guarded poll in flight per active share, retries with backoff on errors, and uses `chrome.alarms` to restart best-effort when MV3 suspends the worker.
+- `POST /api/browser-share/shares/[shareId]/heartbeat` lets the extension report lifecycle, debugger, tab, capture/screenshot, and transport state. It returns a share control projection and uses `410` when a tombstone/not-found share requires the extension to detach.
+- `GET /api/browser-share/shares/[shareId]/commands?waitMs=25000` is the primary long-poll path. The route updates command-poll heartbeat state, never returns pending-approval commands, marks returned queued commands as `running`, and returns the same share control projection or `410` tombstone detach data.
+- `DELETE /api/browser-share/shares/[shareId]` is the extension stop/tab-close notification. It clears the session binding, fails active commands, and writes a short-lived detach tombstone.
+- The extension service worker keeps one guarded poll in flight per active share, sends heartbeat/runtime updates, retries with backoff on errors, and uses `chrome.alarms` to restart best-effort when MV3 suspends the worker.
 - The popup is status/manual-control UI only; it is not required to stay open for command execution.
 - The active share stores the base URL used when it was created, so changing popup settings only affects the next share and cannot silently send command results to another ypi service.
 - Post-action debugger snapshots are uploaded automatically when possible, with manual refresh remaining as a fallback.
 
-## Debugger/CDP mode
+## Persistent debugger lifecycle
 
-The current extension is debugger-first and includes Chrome `debugger` permission in its main manifest:
+The current extension is debugger-first and includes Chrome `debugger` permission in its main manifest. A successful share keeps Chrome debugger attached to the selected tab until an explicit terminal event:
 
 - ypi web and server-side agent tools still never call `chrome.debugger`; all CDP calls happen inside the extension against the active shared tab.
-- Snapshots prefer CDP/`Runtime.evaluate` summaries and may include viewport, element bounds, AX-like role/name fields, selectors, debugger refs, and bounded screenshot data/metadata.
-- Commands prefer CDP `Input.dispatchMouseEvent`, `Input.insertText`, and `Page.navigate`; failures fall back to the existing content-script/tabs paths.
-- The extension detaches debugger sessions after capture/action attempts and when a share is stopped.
+- Creating a share attaches debugger, enables CDP domains, captures the initial snapshot, then creates the share code. If attach or share creation fails, the extension releases debugger and does not create an operable share.
+- Snapshots and action commands reuse the persistent debugger. Snapshot may report `captureMode: "debugger_fallback"` when a read fallback was needed, but action commands fail safe when debugger is detached, blocked, unsupported, or failed.
+- Detach happens only for explicit events: popup stop, ypi unbind/rebind, share-code expiry, tab close, server tombstone/not-found after restart, extension/browser cleanup, or Chrome debugger being taken by DevTools/another debugger.
+- Runtime state is projected with `lifecycleStatus` (`pending_code`, `bound`, `stale`, `offline`, terminal states), `debugger` (`persistent`, `desired`, `state`, timestamps/errors), and `operator` (bound session, service base URL, permission mode, auto-allowed vs approval-required commands).
+- Short-lived in-memory tombstones (10 minutes) let the extension learn about unbind/rebind/expired/tab-closed states and release debugger instead of polling forever. Server restart loses in-memory shares; the extension treats `not_found` as detach-and-recreate.
 - Server-side sanitization whitelists and bounds debugger/screenshot fields before exposing them to UI or tools.
 
 ## API summary
@@ -89,6 +94,8 @@ The current extension is debugger-first and includes Chrome `debugger` permissio
 - `GET /api/browser-share/health`
 - `POST /api/browser-share/shares`
 - `POST /api/browser-share/shares/[shareId]/snapshot`
+- `POST /api/browser-share/shares/[shareId]/heartbeat`
+- `DELETE /api/browser-share/shares/[shareId]`
 - `GET /api/browser-share/shares/[shareId]/commands`
 - `POST /api/browser-share/sessions/[sessionId]/bind`
 - `DELETE /api/browser-share/sessions/[sessionId]/bind`

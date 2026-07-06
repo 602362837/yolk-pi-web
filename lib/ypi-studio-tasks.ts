@@ -34,9 +34,11 @@ import type {
   YpiStudioImplementationProgress,
   YpiStudioImplementationSubtaskPlan,
   YpiStudioImplementationSubtaskProgress,
+  YpiStudioImplementationSubtaskProjection,
   YpiStudioImplementationSubtaskRelation,
   YpiStudioImplementationSubtaskStatus,
   YpiStudioImplementationLocalReviewStatus,
+  YpiStudioImplementationCompactTimelineItem,
   YpiStudioImplementationProjection,
   YpiStudioImplementationRunProjection,
   YpiStudioImplementationSummary,
@@ -436,10 +438,94 @@ function isTerminalImplementationStatus(status: YpiStudioImplementationSubtaskSt
   return status === "done" || status === "skipped";
 }
 
+function timelineReason(subtask: YpiStudioImplementationSubtaskProjection): string | undefined {
+  const waiting = subtask.waitingOn?.map((dependency) => dependency.title ?? dependency.id).join("、");
+  if (waiting) return `等待 ${waiting}`;
+  if (subtask.blockedReason) return subtask.blockedReason;
+  if (subtask.blockedBy?.length) return `受阻于 ${subtask.blockedBy.join("、")}`;
+  if (subtask.terminationReason) return subtask.terminationReason;
+  const runError = subtask.runs.find((run) => run.error)?.error;
+  return runError ?? subtask.summary;
+}
+
+function buildCompactTimeline(subtasks: YpiStudioImplementationSubtaskProjection[]): YpiStudioImplementationCompactTimelineItem[] {
+  const severity = (status: YpiStudioImplementationSubtaskStatus): number => {
+    if (status === "failed" || status === "blocked") return 0;
+    if (status === "running" || status === "queued") return 1;
+    if (status === "ready") return 2;
+    if (status === "waiting" || status === "pending") return 3;
+    if (status === "done" || status === "skipped") return 4;
+    return 5;
+  };
+  return [...subtasks]
+    .sort((a, b) => severity(a.status) - severity(b.status) || a.order - b.order || a.id.localeCompare(b.id))
+    .map((subtask) => {
+      const currentRun = subtask.currentRunId ? subtask.runs.find((run) => run.id === subtask.currentRunId) : undefined;
+      const latestRun = currentRun ?? subtask.runs[0];
+      return {
+        id: subtask.id,
+        title: subtask.title,
+        status: subtask.status,
+        displayStatus: subtask.displayStatus,
+        member: subtask.member ?? latestRun?.member,
+        runId: latestRun?.id ?? subtask.currentRunId ?? subtask.lastRunId,
+        runStatus: latestRun?.registryStatus ?? latestRun?.status,
+        reason: timelineReason(subtask),
+        summary: subtask.summary ?? latestRun?.summary,
+        updatedAt: subtask.updatedAt,
+      };
+    })
+    .slice(0, 12);
+}
+
+function buildSessionRuntimeProjection(
+  taskStatus: string,
+  projection: Omit<YpiStudioImplementationProjection, "sessionRuntime">,
+): YpiStudioImplementationProjection["sessionRuntime"] {
+  const running = projection.statusCounts.running;
+  const queued = projection.statusCounts.queued;
+  const ready = projection.statusCounts.ready;
+  const blocked = projection.statusCounts.blocked;
+  const failed = projection.statusCounts.failed;
+  const waiting = projection.statusCounts.waiting + projection.statusCounts.pending;
+  const total = projection.subtasksWithStatus.length;
+  const done = projection.statusCounts.done + projection.statusCounts.skipped;
+  const activeRunCount = running;
+  const queuedRunCount = queued;
+  const status = failed > 0 || blocked > 0
+    ? "needs_user"
+    : taskStatus === "completed" || (total > 0 && done === total)
+      ? "completed"
+      : running + queued > 0
+        ? "waiting_for_studio_children"
+        : "idle";
+  const message = status === "waiting_for_studio_children"
+    ? `正在等待并行子任务完成：运行中 ${running}、队列 ${queued}、就绪 ${ready}、等待 ${waiting}、阻塞 ${blocked}。`
+    : status === "needs_user"
+      ? `Studio 需要你处理：失败 ${failed}、阻塞 ${blocked}。`
+      : status === "completed"
+        ? "实现子任务已完成。"
+        : ready > 0
+          ? `有 ${ready} 个子任务已就绪，等待主 Chat 派发。`
+          : "Studio 当前没有正在等待的并行子任务。";
+  return {
+    status,
+    message,
+    activeRunCount,
+    queuedRunCount,
+    readySubtaskCount: ready,
+    blockedSubtaskCount: blocked,
+    failedSubtaskCount: failed,
+    timeline: projection.compactTimeline,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 function buildImplementationProjection(
   plan: YpiStudioImplementationPlan | undefined,
   progress: YpiStudioImplementationProgress | undefined,
   runs: YpiStudioTaskSubagentRun[],
+  taskStatus = "",
 ): YpiStudioImplementationProjection | undefined {
   if (!plan || !progress) return undefined;
   const projectedRuns = runs.map(projectImplementationRun);
@@ -480,7 +566,8 @@ function buildImplementationProjection(
       runs: taskRuns,
     };
   });
-  return {
+  const compactTimeline = buildCompactTimeline(subtasksWithStatus);
+  const baseProjection: Omit<YpiStudioImplementationProjection, "sessionRuntime"> = {
     schemaVersion: plan.schemaVersion,
     maxConcurrency: Math.max(1, plan.maxConcurrency ?? plan.execution?.maxParallel ?? 1),
     statusCounts,
@@ -490,6 +577,11 @@ function buildImplementationProjection(
     subtasksWithStatus,
     runsBySubtask,
     nonTerminalSubtasks: subtasksWithStatus.filter((subtask) => !isTerminalImplementationStatus(subtask.status) || subtask.status === "failed" || subtask.status === "blocked"),
+    compactTimeline,
+  };
+  return {
+    ...baseProjection,
+    sessionRuntime: buildSessionRuntimeProjection(taskStatus, baseProjection),
   };
 }
 
@@ -803,6 +895,13 @@ function isAfterIso(candidate: string, baseline: string): boolean {
   const candidateMs = Date.parse(candidate);
   const baselineMs = Date.parse(baseline);
   return Number.isFinite(candidateMs) && Number.isFinite(baselineMs) && candidateMs > baselineMs;
+}
+
+function isoAfter(baseline: string): string {
+  const baselineMs = Date.parse(baseline);
+  const currentMs = Date.now();
+  if (!Number.isFinite(baselineMs) || currentMs > baselineMs) return new Date(currentMs).toISOString();
+  return new Date(baselineMs + 1).toISOString();
 }
 
 const APPROVAL_TEXT_RE = /确认|批准|同意|可以实现|开始实现|按方案做|继续制作|approve|approved|go ahead|start implementation|proceed/i;
@@ -1198,7 +1297,7 @@ function recordToDetail(ctx: TaskContext, record: TaskRecordOnDisk): YpiStudioTa
     events: readEvents(record.dirPath),
     implementationPlan: record.raw.implementationPlan,
     implementationProgress: record.raw.implementationProgress,
-    implementationProjection: buildImplementationProjection(record.raw.implementationPlan, record.raw.implementationProgress, record.raw.subagents),
+    implementationProjection: buildImplementationProjection(record.raw.implementationPlan, record.raw.implementationProgress, record.raw.subagents, record.raw.status),
   };
 }
 
@@ -1606,8 +1705,8 @@ export function recordYpiStudioUserApproval(cwd: string, contextId: string, inpu
   const ctx = createContext(cwd);
   const record = findAwaitingApprovalTaskForContext(ctx, contextId);
   if (!record?.raw || record.archived || record.raw.status !== "awaiting_approval") return null;
-  const approvedAt = nowIso();
   const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, "unknown", contextId);
+  const approvedAt = isoAfter(existingGate.enteredAt);
   record.raw.meta = {
     ...record.raw.meta,
     approvalGate: existingGate,
@@ -1637,7 +1736,7 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
       record.raw.meta = {
         ...record.raw.meta,
         approvalGate: existingGate,
-        approvalGrant: approvalGrant(nowIso(), body.contextId, body.reason),
+        approvalGrant: approvalGrant(isoAfter(existingGate.enteredAt), body.contextId, body.reason),
       };
     }
     assertYpiStudioImplementationApproved(record.raw, body.contextId);

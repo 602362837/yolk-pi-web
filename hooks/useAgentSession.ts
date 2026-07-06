@@ -119,9 +119,16 @@ function resultIndexForRun(runId: string, toolCallId: string): number | null {
   return null;
 }
 
+export type AgentRuntimeStatus =
+  | "idle"
+  | "waiting_model"
+  | "running_tools"
+  | "waiting_for_studio_children";
+
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_tools"; tools: { id: string; name: string }[] }
+  | { kind: "waiting_for_studio_children"; activeRunCount: number; message?: string }
   | null;
 
 export interface ToolExecutionProgress {

@@ -1,0 +1,1505 @@
+{
+  "schemaVersion": 1,
+  "id": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+  "title": "优化 YPI Studio 异步子任务编排的等待与自动续跑交互",
+  "workflowId": "feature-dev",
+  "status": "completed",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-06T06:59:15.608Z",
+  "updatedAt": "2026-07-06T07:54:47.804Z",
+  "completedAt": "2026-07-06T07:54:47.804Z",
+  "contextIds": [
+    "pi_process_44b75d41c193e9013faeea58",
+    "pi_019f363a-4cb3-7f37-9511-8d89be5ddb4f",
+    "pi_process_1b83d60c5ef6ed65e3a2d4e1"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-d457e765c4036040154b8ba8",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:03:38.940Z",
+      "finishedAt": "2026-07-06T07:13:19.395Z",
+      "prompt": "请为当前 YPI Studio 任务形成技术方案。背景：用户反馈“并行情况 chat 竟然直接停止，整个体系有问题；并行本来为了方便用户，现在让用户更困难”。现有 brief 已描述：implementationPlan 中 async implementer 子任务完成后主 session 不会自动 collect/续跑，用户必须反复输入继续；并行/后台语义不清。请重点设计：1) 自动续跑/continuation 机制，如何在子进程 terminal 后推进主编排；2)…",
+      "summary": "Handoff: - Produced/updated artifacts: - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/prd.md` - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/design.md` - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/implement.md` - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md` - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md` - Key design decision proposed: - Add deterministic YPI Studio implementation orchestrator. - Auto dispatch ready `subtaskId` implementer runs after approval. - Do not wake the main LLM for every subtask; only notify/continue Chat at terminal boundaries such as completed or needs_attention. - Preserve `awaiting_approval` gate. - Validation run: - Parsed the `json ypi-implementation-plan` block in `implement.md` successfully. - Did not run lint/tsc because only planning docs were changed. - Remaining decisions needed from main session/user: 1. Should “开始实现” default to auto-run full implem…",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:03:38.940Z",
+        "updatedAt": "2026-07-06T07:13:19.390Z",
+        "eventCount": 16890,
+        "lastTextPreview": "Handoff:\n\n- Produced/updated artifacts:\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/prd.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/design.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/implement.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md`\n\n- Key design decision proposed:\n  - Add deterministic YPI Studio implementation orchestrator.\n  - Auto dispatch ready `subtaskId` implementer runs after approval.\n  - Do not wake the main LLM for every subtask; only notify/continue Chat at terminal boundaries such as completed or needs_attention.\n  - Preserve `awaiting_approval` gate.\n\n- Validation run:\n  - Parsed the `json ypi-implementation-plan` block in `implement.md` successfully.\n  - Did not run lint/tsc because only planning docs were changed.\n\n- Remaining decisions needed from main session/user:\n  1. Should “开始实现” default to auto-run full implementationPlan?\n  2. After all implementation subtasks complete, should MVP auto transition to `checking`, or only show `checker_required` attention?\n  3. Should normal Chat Abort pause Studio auto-run, or should Studio have separate Pause/Cancel controls? Current recommendation: separate controls.\n\nNo production code changed; no commit/push/merge performed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:12:58.837Z",
+            "toolCallId": "call_kecpX1g3RDLxlwtnWIrxAxl4|fc_0cbef8f7af7e8ba1016a4b5578ba80819a9063e338a47aca79",
+            "toolName": "bash",
+            "text": "91 .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/prd.md\n     351 .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/design.md\n     396 .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/implement.md\n      57 .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md\n      22 .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md\n     917 total",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:13:05.812Z",
+            "toolCallId": "call_NjC4B2Iz89pnjz3Iv4zmZsaA|fc_0cbef8f7af7e8ba1016a4b557f8370819ab78d076683811f24",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport re,json\\np=Path('.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/implement.md')\\ns=p.read_text()\\nm=re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```', s, re.S)\\nassert m, 'missing block'\\nobj=json.loads(m.group(1))\\nprint('ok', len(obj['subtasks']))\\nPY\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:13:05.883Z",
+            "toolCallId": "call_NjC4B2Iz89pnjz3Iv4zmZsaA|fc_0cbef8f7af7e8ba1016a4b557f8370819ab78d076683811f24",
+            "toolName": "bash",
+            "text": "ok 7",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:13:17.190Z",
+            "text": "Handoff:\n\n- Produced/updated artifacts:\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/prd.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/design.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/implement.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md`\n  - `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md`\n\n- Key design decision proposed:\n  - Add deterministic YPI Studio implementation orchestrator.\n  - Auto dispatch ready `subtaskId` implementer runs after approval.\n  - Do not wake the main LLM for every subtask; only notify/continue Chat at terminal boundaries such as completed or needs_attention.\n  - Preserve `awaiting_approval` gate.\n\n- Validation run:\n  - Parsed the `json ypi-implementation-plan` block in `implement.md` successfully.\n  - Did not run lint/tsc because only planning docs were changed.\n\n- Remaining decisions needed from main session/user:\n  1. Should “开始实现” default to auto-run full implementationPlan?\n  2. After all implementation subtasks complete, should MVP auto transition to `checking`, or only show `checker_required` attention?\n  3. Should normal Chat Abort pause Studio auto-run, or should Studio have separate Pause/Cancel controls? Current recommendation: separate controls.\n\nNo production code changed; no commit/push/merge performed.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:13:17.194Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2770,
+        "tokens": 482,
+        "tokenSource": "usage",
+        "tps": 79.46,
+        "firstTokenAt": "2026-07-06T07:13:11.124Z",
+        "lastTokenAt": "2026-07-06T07:13:17.190Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-d457e765c4036040154b8ba8",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/architect-d457e765c4036040154b8ba8.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:03:38.940Z",
+        "finishedAt": "2026-07-06T07:13:19.390Z",
+        "updatedAt": "2026-07-06T07:13:19.390Z",
+        "itemCount": 91,
+        "messageCount": 1,
+        "toolCallCount": 43,
+        "stderrBytes": 0,
+        "bytes": 446456,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d180c83fc9733ea3ed5649ee",
+      "subtaskId": "chat-waiting-state-contract",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:24:20.085Z",
+      "finishedAt": "2026-07-06T07:29:06.148Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts` — 新增 compact subtask timeline、`YpiStudioSessionRuntimeProjection`、`waiting_for_studio_children` 状态契约；widget projection 兼容携带新字段。\n- `lib/ypi-studio-tasks.ts` — 从现有 implementation progress 派生 `compactTimeline` 与 `sessionRuntime`，旧任务无 plan/progress 时仍返回 undefined。\n- `lib/ypi-studio-session-link.ts` — 将 compact timeline / session runtime 裁剪后投影到 session widget/chat API。\n- `hooks/useAgentSession.ts` — 增加共享 runtime 状态类型，包含 `waiting_for_studio_children`。\n- `components/AppShell.tsx` — 将当前 Studio session task projection 传入 Chat。\n- `components/ChatWindow.tsx` — 当主 agent idle 但 Studio implementation 有 queued/running 子任务时显示“Studio 后台仍在工作 / 正在等待并行子任务”横幅，并展示 compact timeline；needs_user 时显示需处理状态。\n- `docs/architecture/overview.md`、`docs/modules/api.md`、`docs/modules/frontend.md`、`docs/modules/library.md` — 更新 projection / Chat waiting state 文档。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 本子任务只实现状态契约、projection 与 Chat 可见等待态；未实现 terminal callback / 主 Chat continuation loop。\n- 工作区已有与 Browser Share 相关的未提交/未跟踪改动，本次未处理。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:24:20.085Z",
+        "updatedAt": "2026-07-06T07:29:06.148Z",
+        "eventCount": 9314,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts` — 新增 compact subtask timeline、`YpiStudioSessionRuntimeProjection`、`waiting_for_studio_children` 状态契约；widget projection 兼容携带新字段。\n- `lib/ypi-studio-tasks.ts` — 从现有 implementation progress 派生 `compactTimeline` 与 `sessionRuntime`，旧任务无 plan/progress 时仍返回 undefined。\n- `lib/ypi-studio-session-link.ts` — 将 compact timeline / session runtime 裁剪后投影到 session widget/chat API。\n- `hooks/useAgentSession.ts` — 增加共享 runtime 状态类型，包含 `waiting_for_studio_children`。\n- `components/AppShell.tsx` — 将当前 Studio session task projection 传入 Chat。\n- `components/ChatWindow.tsx` — 当主 agent idle 但 Studio implementation 有 queued/running 子任务时显示“Studio 后台仍在工作 / 正在等待并行子任务”横幅，并展示 compact timeline；needs_user 时显示需处理状态。\n- `docs/architecture/overview.md`、`docs/modules/api.md`、`docs/modules/frontend.md`、`docs/modules/library.md` — 更新 projection / Chat waiting state 文档。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 本子任务只实现状态契约、projection 与 Chat 可见等待态；未实现 terminal callback / 主 Chat continuation loop。\n- 工作区已有与 Browser Share 相关的未提交/未跟踪改动，本次未处理。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:28:46.647Z",
+            "toolCallId": "call_A1ckbcTtLewyzvFe9LlJi1uz|fc_0293467d8b69539a016a4b592e502c8199920b843e0b8fed20",
+            "toolName": "bash",
+            "text": "diff --git a/components/AppShell.tsx b/components/AppShell.tsx\nindex a2ab485..a5734cd 100644\n--- a/components/AppShell.tsx\n+++ b/components/AppShell.tsx\n@@ -1202,6 +1202,7 @@ export function AppShell() {\n               onContextUsageChange={handleContextUsageChange}\n               onSubagentChange={handleSubagentChange}\n               onStudioToolProgressChange={handleStudioToolProgressChange}\n+              studioTask={studioSessionTask?.task ?? null}\n               defaultToolPreset={webConfig?.yolk.defaultToolPreset}\n               defaultThinkingLevel={webConfig?.yolk.defaultThinkingLevel}\n             />\ndiff --git a/docs/architecture/overview.md b/docs/architecture/overview.md\nindex aca4e88..49377ea 100644\n--- a/docs/architecture/overview.md\n+++ b/docs/architecture/overview.md\n@@ -81,7 +81,7 @@ The archive directory is scanned separately from `SessionManager.listAll()` (whi\n - Auth changes call `reloadRpcAuthState()` so live AgentSessions reload auth/model state. The same path also cleans pi-ai session resources because OpenAI Codex keeps reusable WebSockets keyed by session id, and those sockets must reconnect after ChatGPT account activation to pick up new auth headers.\n - ChatGPT usage auto-refresh is backend-owned, not browser-tab-owned. The scheduler state lives on `globalThis.__piChatGptUsageRefreshScheduler` and uses `~/.pi/agent/chatgpt-usage-refresh.lock` to reduce duplicate refresh loops across Node processes. Stale lock detection follows the configured refresh cycle dynamically.\n - Trellis subagent child processes resolve model policy from `pi-web.json` `trellis.subagents`: explicit tool input wins, then per-agent fixed policy, then optional route table policy, then default policy, then `.pi/agents/*` frontmatter, then Pi CLI defaults. Automatic routing is opt-in and classifies `text`/`multimodal` plus `simple`/`standard`/`complex`/`critical`; router failures fall back to configured safe route/default behavior. The default policy follows the main session model when the Pi extension context exposes it; otherwise it safely falls back to Pi default. If the selected child model process fails, existing `.pi/agents/*` `fallbackModels` frontmatter entries are retried in order; if those also fail and the main session model is known, the child finally falls back to the main session model.\n-- YPI Studio workflow orchestration is loaded as a built-in extension factory from `lib/rpc-manager.ts` so every web-created AgentSession receives the `ypi_studio_task` and `ypi_studio_subagent` tools plus `/studio-init`, `/studio-start`, `/studio-feature`, `/studio-bugfix`, `/studio-ui`, `/studio-continue`, `/studio-check`, and `/studio-archive` commands regardless of the selected workspace's project-local `.pi` files. The extension injects `.ypi/tasks` workflow state and bounded `.ypi/knowledge` summaries into each turn, binds sessions through stable context ids (`pi_<sessionId>` first, transcript hash second, process fallback last), resolves Studio member model/thinking policies through the pure `lib/ypi-studio-policy.ts` chain `toolInput > memberConfig > defaultPolicy > followMain > piDefault`, canonicalizes member ids before config/member-file lookup, emits policy diagnostics/warnings in live progress and final tool results, isolates child member Pi processes from Trellis injection with child env flags, and stores structured task progress under the selected workspace's `.ypi/` directory. Studio tasks may also contain `implementationPlan` plus `implementationProgress`: architects save a structured subtask plan before `awaiting_approval`, and after user approval the parent session claims ready subtasks before dispatching implementer with `subtaskId`. The schemaVersion 2 contract treats `implementationPlan.subtasks[].dependsOn` as the DAG scheduling source for serial, parallel, and mixed work; `execution.groups` is only a UI/readability projection. Progress remains legacy-compatible while adding `waiting` (with `pending` displayed as waiting), `queued`, `failed`, multi active/queued/next ids, run ids, and derived `waitingOn`…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:28:53.517Z",
+            "toolCallId": "call_nS8oJM9dwQv4DxqBKOreQ2Sj|fc_0293467d8b69539a016a4b59354df481999b8b27b575dd7e02",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:28:53.558Z",
+            "toolCallId": "call_nS8oJM9dwQv4DxqBKOreQ2Sj|fc_0293467d8b69539a016a4b59354df481999b8b27b575dd7e02",
+            "toolName": "bash",
+            "text": "M app/api/browser-share/health/route.ts\n M app/api/browser-share/sessions/[sessionId]/state/route.ts\n M app/api/browser-share/shares/[shareId]/commands/route.ts\n M components/AppShell.tsx\n M components/BrowserShareControl.tsx\n M components/ChatWindow.tsx\n M docs/architecture/browser-share.md\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M hooks/useAgentSession.ts\n M lib/browser-share-extension.ts\n M lib/browser-share-manager.ts\n M lib/browser-share-types.ts\n M lib/ypi-studio-session-link.ts\n M lib/ypi-studio-tasks.ts\n M lib/ypi-studio-types.ts\n?? \".ypi/tasks/20260706-144620-\\344\\274\\230\\345\\214\\226-browser-share-\\345\\270\\270\\351\\251\\273-tab-\\345\\205\\261\\344\\272\\253\\344\\270\\216-debugger-\\345\\217\\257\\346\\204\\237\\347\\237\\245\\347\\212\\266\\346\\200\\201/\"\n?? \".ypi/tasks/20260706-145915-\\344\\274\\230\\345\\214\\226-ypi-studio-\\345\\274\\202\\346\\255\\245\\345\\255\\220\\344\\273\\273\\345\\212\\241\\347\\274\\226\\346\\216\\222\\347\\232\\204\\347\\255\\211\\345\\276\\205\\344\\270\\216\\350\\207\\252\\345\\212\\250\\347\\273\\255\\350\\267\\221\\344\\272\\244\\344\\272\\222/\"\n?? app/api/browser-share/shares/[shareId]/heartbeat/\n?? app/api/browser-share/shares/[shareId]/route.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:29:03.768Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts` — 新增 compact subtask timeline、`YpiStudioSessionRuntimeProjection`、`waiting_for_studio_children` 状态契约；widget projection 兼容携带新字段。\n- `lib/ypi-studio-tasks.ts` — 从现有 implementation progress 派生 `compactTimeline` 与 `sessionRuntime`，旧任务无 plan/progress 时仍返回 undefined。\n- `lib/ypi-studio-session-link.ts` — 将 compact timeline / session runtime 裁剪后投影到 session widget/chat API。\n- `hooks/useAgentSession.ts` — 增加共享 runtime 状态类型，包含 `waiting_for_studio_children`。\n- `components/AppShell.tsx` — 将当前 Studio session task projection 传入 Chat。\n- `components/ChatWindow.tsx` — 当主 agent idle 但 Studio implementation 有 queued/running 子任务时显示“Studio 后台仍在工作 / 正在等待并行子任务”横幅，并展示 compact timeline；needs_user 时显示需处理状态。\n- `docs/architecture/overview.md`、`docs/modules/api.md`、`docs/modules/frontend.md`、`docs/modules/library.md` — 更新 projection / Chat waiting state 文档。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 本子任务只实现状态契约、projection 与 Chat 可见等待态；未实现 terminal callback / 主 Chat continuation loop。\n- 工作区已有与 Browser Share 相关的未提交/未跟踪改动，本次未处理。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:29:03.786Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2314,
+        "tokens": 451,
+        "tokenSource": "usage",
+        "tps": 113.72,
+        "firstTokenAt": "2026-07-06T07:28:59.799Z",
+        "lastTokenAt": "2026-07-06T07:29:03.765Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d180c83fc9733ea3ed5649ee",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/implementer-d180c83fc9733ea3ed5649ee.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:24:20.085Z",
+        "finishedAt": "2026-07-06T07:29:06.143Z",
+        "updatedAt": "2026-07-06T07:29:06.143Z",
+        "itemCount": 87,
+        "messageCount": 1,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 296605,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-6d6beffcf12819e1730c6eb8",
+      "subtaskId": "child-terminal-continuation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:29:53.664Z",
+      "finishedAt": "2026-07-06T07:33:04.765Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-subagent-runtime.ts` — added parent-session continuation callback registry and idempotent terminal continuation scheduling keyed by `parentSessionId:taskId:runId`.\n- `lib/rpc-manager.ts` — registers live session continuation callbacks and sends a lightweight `followUp` prompt to the same parent session after async child terminal, retrying while parent is streaming.\n- `lib/ypi-studio-extension.ts` — async `ypi_studio_subagent` runs now carry continuation metadata and schedule parent continuation after final persistence.\n- `docs/architecture/overview.md` — documented async child terminal continuation behavior.\n- `docs/modules/library.md` — documented runtime continuation registry responsibility.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Continuation is best-effort and requires the parent session wrapper to still be alive; if unavailable, persisted run can still be collected manually.\n- This subtask only implements terminal wake-up/continuation. UI waiting-state work remains for the next planned subtask.\n- No independent orchestrator was introduced; the follow-up prompt tells the main session to use existing `collect -> implementation_next -> claim/dispatch` flow and not bypass approval gates.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:29:53.664Z",
+        "updatedAt": "2026-07-06T07:33:04.765Z",
+        "eventCount": 4853,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-subagent-runtime.ts` — added parent-session continuation callback registry and idempotent terminal continuation scheduling keyed by `parentSessionId:taskId:runId`.\n- `lib/rpc-manager.ts` — registers live session continuation callbacks and sends a lightweight `followUp` prompt to the same parent session after async child terminal, retrying while parent is streaming.\n- `lib/ypi-studio-extension.ts` — async `ypi_studio_subagent` runs now carry continuation metadata and schedule parent continuation after final persistence.\n- `docs/architecture/overview.md` — documented async child terminal continuation behavior.\n- `docs/modules/library.md` — documented runtime continuation registry responsibility.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Continuation is best-effort and requires the parent session wrapper to still be alive; if unavailable, persisted run can still be collected manually.\n- This subtask only implements terminal wake-up/continuation. UI waiting-state work remains for the next planned subtask.\n- No independent orchestrator was introduced; the follow-up prompt tells the main session to use existing `collect -> implementation_next -> claim/dispatch` flow and not bypass approval gates.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:32:36.565Z",
+            "toolCallId": "call_udKgLeZs04yNpHBfK5fvUkpJ|fc_03a609c433a7e277016a4b5a1282008198b040518cf179ef8f",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in lib/ypi-studio-subagent-runtime.ts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:32:38.905Z",
+            "toolCallId": "call_z0WdaJqcQoAbcaU5H6ptd4tY|fc_03a609c433a7e277016a4b5a16a5bc8198b71ccb81cd3a0a33",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit && npm run lint\",\n  \"timeout\": 180\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:32:53.609Z",
+            "toolCallId": "call_z0WdaJqcQoAbcaU5H6ptd4tY|fc_03a609c433a7e277016a4b5a16a5bc8198b71ccb81cd3a0a33",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.7 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:33:02.554Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-subagent-runtime.ts` — added parent-session continuation callback registry and idempotent terminal continuation scheduling keyed by `parentSessionId:taskId:runId`.\n- `lib/rpc-manager.ts` — registers live session continuation callbacks and sends a lightweight `followUp` prompt to the same parent session after async child terminal, retrying while parent is streaming.\n- `lib/ypi-studio-extension.ts` — async `ypi_studio_subagent` runs now carry continuation metadata and schedule parent continuation after final persistence.\n- `docs/architecture/overview.md` — documented async child terminal continuation behavior.\n- `docs/modules/library.md` — documented runtime continuation registry responsibility.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Continuation is best-effort and requires the parent session wrapper to still be alive; if unavailable, persisted run can still be collected manually.\n- This subtask only implements terminal wake-up/continuation. UI waiting-state work remains for the next planned subtask.\n- No independent orchestrator was introduced; the follow-up prompt tells the main session to use existing `collect -> implementation_next -> claim/dispatch` flow and not bypass approval gates.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:33:02.572Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2694,
+        "tokens": 407,
+        "tokenSource": "usage",
+        "tps": 154.23,
+        "firstTokenAt": "2026-07-06T07:32:59.911Z",
+        "lastTokenAt": "2026-07-06T07:33:02.550Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-6d6beffcf12819e1730c6eb8",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/implementer-6d6beffcf12819e1730c6eb8.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:29:53.664Z",
+        "finishedAt": "2026-07-06T07:33:04.765Z",
+        "updatedAt": "2026-07-06T07:33:04.765Z",
+        "itemCount": 59,
+        "messageCount": 1,
+        "toolCallCount": 27,
+        "stderrBytes": 0,
+        "bytes": 183017,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-109285990d93cf6b75888151",
+      "subtaskId": "keep-chat-active-ui",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:30:06.496Z",
+      "finishedAt": "2026-07-06T07:33:40.338Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — 接入 `studioTask` runtime projection；在 `waiting_for_studio_children` / `needs_user` 时显示“正在等待 N 个并行子任务完成，后台仍在工作”、状态计数和 compact timeline。\n- `components/YpiStudioSessionWidget.tsx` — Widget 显示 runtime 状态、active/queued/ready counts，并优先展示 3–5 个异常/活跃/最近子任务。\n- `components/AppShell.tsx` — Studio task polling 在等待子任务或需要用户处理时保持快速刷新。\n- `docs/modules/frontend.md` — 更新前端模块说明。\n- `.ypi/tasks/.../handoff.md` — 更新本子任务交付记录。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未做浏览器手工验收；建议用一个含并行 implementation subtasks 的 Studio task 验证 Chat banner 与 Widget 状态。\n- 本子任务仅覆盖前端等待态展示，不实现后端 terminal callback / continuation loop。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:30:06.496Z",
+        "updatedAt": "2026-07-06T07:33:40.338Z",
+        "eventCount": 7495,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — 接入 `studioTask` runtime projection；在 `waiting_for_studio_children` / `needs_user` 时显示“正在等待 N 个并行子任务完成，后台仍在工作”、状态计数和 compact timeline。\n- `components/YpiStudioSessionWidget.tsx` — Widget 显示 runtime 状态、active/queued/ready counts，并优先展示 3–5 个异常/活跃/最近子任务。\n- `components/AppShell.tsx` — Studio task polling 在等待子任务或需要用户处理时保持快速刷新。\n- `docs/modules/frontend.md` — 更新前端模块说明。\n- `.ypi/tasks/.../handoff.md` — 更新本子任务交付记录。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未做浏览器手工验收；建议用一个含并行 implementation subtasks 的 Studio task 验证 Chat banner 与 Widget 状态。\n- 本子任务仅覆盖前端等待态展示，不实现后端 terminal callback / continuation loop。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:33:16.081Z",
+            "toolCallId": "call_sQb7nayt0Oi8wxGgYYnwrKq7|fc_02f45e13ccf3331b016a4b5a3bdf488198b4cf7cf6f8db72bf",
+            "toolName": "read",
+            "text": "# handoff\n\n## Artifacts produced\n\n- `prd.md`：定义自动续跑目标、范围、验收标准、非目标和待确认产品决策。\n- `design.md`：提出 deterministic implementation orchestrator + terminal boundary Chat continuation 方案，覆盖后端状态契约、运行流、UI 状态、API/tool、失败边界、风险与分阶段落地。\n- `implement.md`：给出实现拆解和 `json ypi-implementation-plan` 草案，尚未保存到 `task.json` implementationPlan。\n- `checks.md`：给出需求覆盖、自动验证、人工验收和回归风险清单。\n\n## Validation run\n\n- 未运行代码验证；本轮仅更新 Studio 规划文档，未改生产代码。\n\n## Remaining risks\n\n- 已确认：用户说“开始实现”后默认自动跑完整 implementationPlan。\n- 已确认：implementation 全部完成后自动 transition 到 `checking` 并派发 checker，保持非并行流程一致体验。\n- 已修正表达：面向用户不说 Abort/managed run，统一用“先停一下/继续跑/取消正在跑的任务”等人话。\n- 技术风险集中在 child runner 抽取、orchestrator tick 幂等、session_destroy 不误杀后台 run、runtime_lost 恢复语义。\n\n## Recommended next step\n\n主会话审阅 PRD/Design 后，将 `implement.md` 中的 machine-readable plan 保存为任务 `implementationPlan`，把任务切到 `awaiting_approval`，等待用户确认后再进入实现。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:33:27.915Z",
+            "toolCallId": "call_fo1H82kLaHse8hO2oesEYaCl|fc_02f45e13ccf3331b016a4b5a3e29c48198961c83488f41858a",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md\",\n  \"content\": \"# handoff\\n\\n## Artifacts produced\\n\\n- `prd.md`：定义自动续跑目标、范围、验收标准、非目标和待确认产品决策。\\n- `design.md`：提出 deterministic implementation orchestrator + terminal boundary Chat continuation 方案，覆盖后端状态契约、运行流、UI 状态、API/tool、失败边界、风险与分阶段落地。\\n- `implement.md`：给出实现拆解和 `json ypi-implementation-plan` 草案。\\n- `checks.md`：给出需求覆盖、自动验证、人工验收和回归风险清单。\\n- 子任务 `keep-chat-active-ui` 实现：Chat / Session Widget 复用 `sessionRuntime` 与 compact timeline 显示等待并行子任务、后台仍在工作、需要用户处理和精简子任务状态。\\n\\n## Files changed in `keep-chat-active-ui`\\n\\n- `components/ChatWindow.tsx`：接入 `studioTask` projection；当主 agent 不在 streaming 但 Studio runtime 为 `waiting_for_studio_children` / `needs_user` 时显示后台等待 banner、运行/完成/等待/失败/阻塞摘要和 5 条 compact timeline。\\n- `components/YpiStudioSessionWidget.tsx`：显示 runtime 状态、active/queued/ready counts，并优先使用 compact timeline 展示 3–5 个异常/活跃/最近子任务。\\n- `components/AppShell.tsx`：Studio task polling 在等待子任务或需要用户处理时保持快速刷新。\\n- `docs/modules/frontend.md`：更新 Chat、Widget、AppShell 前端模块说明。\\n\\n## Validation run\\n\\n- `npm run lint` — passed。\\n- `node_modules/.bin/tsc --noEmit` — passed。\\n\\n## Remaining risks\\n\\n- 未做浏览器手工验收；建议主会话/检查员用一个含并行子任务的 Studio task 验证 banner、widget 与轮询节奏。\\n- 本子任务只实现前端等待态展示，不实现 terminal callback / 自动续跑后端状态机。\\n\\n## Recommended next step\\n\\n继续后续子任务：让子任务 terminal 自动唤醒同一主 session 的 continuation loop，并由主 session 继续 collect / dispatch / checking。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:33:27.919Z",
+            "toolCallId": "call_fo1H82kLaHse8hO2oesEYaCl|fc_02f45e13ccf3331b016a4b5a3e29c48198961c83488f41858a",
+            "toolName": "write",
+            "text": "Successfully wrote 1306 bytes to .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:33:38.107Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — 接入 `studioTask` runtime projection；在 `waiting_for_studio_children` / `needs_user` 时显示“正在等待 N 个并行子任务完成，后台仍在工作”、状态计数和 compact timeline。\n- `components/YpiStudioSessionWidget.tsx` — Widget 显示 runtime 状态、active/queued/ready counts，并优先展示 3–5 个异常/活跃/最近子任务。\n- `components/AppShell.tsx` — Studio task polling 在等待子任务或需要用户处理时保持快速刷新。\n- `docs/modules/frontend.md` — 更新前端模块说明。\n- `.ypi/tasks/.../handoff.md` — 更新本子任务交付记录。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未做浏览器手工验收；建议用一个含并行 implementation subtasks 的 Studio task 验证 Chat banner 与 Widget 状态。\n- 本子任务仅覆盖前端等待态展示，不实现后端 terminal callback / continuation loop。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:33:38.124Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1494,
+        "tokens": 314,
+        "tokenSource": "usage",
+        "tps": 118.18,
+        "firstTokenAt": "2026-07-06T07:33:35.433Z",
+        "lastTokenAt": "2026-07-06T07:33:38.090Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-109285990d93cf6b75888151",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/implementer-109285990d93cf6b75888151.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:30:06.496Z",
+        "finishedAt": "2026-07-06T07:33:40.332Z",
+        "updatedAt": "2026-07-06T07:33:40.332Z",
+        "itemCount": 67,
+        "messageCount": 1,
+        "toolCallCount": 31,
+        "stderrBytes": 0,
+        "bytes": 254098,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-cc07df1af487941bfadac987",
+      "subtaskId": "main-session-state-machine-loop",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:34:38.999Z",
+      "finishedAt": "2026-07-06T07:36:56.681Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/rpc-manager.ts` — strengthened Studio child terminal continuation prompt so main session collects terminal runs, advances `implementation_next`/claim/dispatch, handles failure/user-attention boundaries, and transitions to checking when implementation subtasks finish. Added idle-timeout deferral while Studio child runs are still active.\n- `lib/ypi-studio-subagent-runtime.ts` — added active child-run counting per parent session for continuation lifecycle support.\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for active child-run counting.\n- `docs/architecture/overview.md` — documented parent session continuation and idle-timeout behavior.\n- `docs/modules/library.md` — updated module map for RPC/runtime continuation responsibilities.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\n#### Notes / Risks\n\n- Continuation advancement remains main-session/LLM-driven by design, not a deterministic background orchestrator.\n- No browser/manual Studio flow validation was run.\n- Existing explicit `abort` / explicit `destroy()` still cancels child runs; idle timeout is the path now deferred while children are active.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:34:38.999Z",
+        "updatedAt": "2026-07-06T07:36:56.680Z",
+        "eventCount": 3243,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/rpc-manager.ts` — strengthened Studio child terminal continuation prompt so main session collects terminal runs, advances `implementation_next`/claim/dispatch, handles failure/user-attention boundaries, and transitions to checking when implementation subtasks finish. Added idle-timeout deferral while Studio child runs are still active.\n- `lib/ypi-studio-subagent-runtime.ts` — added active child-run counting per parent session for continuation lifecycle support.\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for active child-run counting.\n- `docs/architecture/overview.md` — documented parent session continuation and idle-timeout behavior.\n- `docs/modules/library.md` — updated module map for RPC/runtime continuation responsibilities.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\n#### Notes / Risks\n\n- Continuation advancement remains main-session/LLM-driven by design, not a deterministic background orchestrator.\n- No browser/manual Studio flow validation was run.\n- Existing explicit `abort` / explicit `destroy()` still cancels child runs; idle timeout is the path now deferred while children are active.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:36:30.724Z",
+            "toolCallId": "call_rL8G9tOzfjeCbHk4xQYmhuUZ|fc_0d1c7312c8a411bd016a4b5af614ec819bbf8d11a7147216ef",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.7 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:36:35.367Z",
+            "toolCallId": "call_8rMWnTBBD7WQtdC0UvB8qhLM|fc_0d1c7312c8a411bd016a4b5b030d98819ba14235b1e621c214",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/rpc-manager.ts lib/ypi-studio-subagent-runtime.ts docs/architecture/overview.md docs/modules/library.md scripts/test-ypi-studio-dag.mjs && git status --short lib/rpc-manager.ts lib/ypi-studio-subagent-runtime.ts docs/architecture/overview.md docs/modules/library.md scripts/test-ypi-studio-dag.mjs\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:36:35.429Z",
+            "toolCallId": "call_8rMWnTBBD7WQtdC0UvB8qhLM|fc_0d1c7312c8a411bd016a4b5b030d98819ba14235b1e621c214",
+            "toolName": "bash",
+            "text": "diff --git a/docs/architecture/overview.md b/docs/architecture/overview.md\nindex aca4e88..27d9878 100644\n--- a/docs/architecture/overview.md\n+++ b/docs/architecture/overview.md\n@@ -81,7 +81,7 @@ The archive directory is scanned separately from `SessionManager.listAll()` (whi\n - Auth changes call `reloadRpcAuthState()` so live AgentSessions reload auth/model state. The same path also cleans pi-ai session resources because OpenAI Codex keeps reusable WebSockets keyed by session id, and those sockets must reconnect after ChatGPT account activation to pick up new auth headers.\n - ChatGPT usage auto-refresh is backend-owned, not browser-tab-owned. The scheduler state lives on `globalThis.__piChatGptUsageRefreshScheduler` and uses `~/.pi/agent/chatgpt-usage-refresh.lock` to reduce duplicate refresh loops across Node processes. Stale lock detection follows the configured refresh cycle dynamically.\n - Trellis subagent child processes resolve model policy from `pi-web.json` `trellis.subagents`: explicit tool input wins, then per-agent fixed policy, then optional route table policy, then default policy, then `.pi/agents/*` frontmatter, then Pi CLI defaults. Automatic routing is opt-in and classifies `text`/`multimodal` plus `simple`/`standard`/`complex`/`critical`; router failures fall back to configured safe route/default behavior. The default policy follows the main session model when the Pi extension context exposes it; otherwise it safely falls back to Pi default. If the selected child model process fails, existing `.pi/agents/*` `fallbackModels` frontmatter entries are retried in order; if those also fail and the main session model is known, the child finally falls back to the main session model.\n-- YPI Studio workflow orchestration is loaded as a built-in extension factory from `lib/rpc-manager.ts` so every web-created AgentSession receives the `ypi_studio_task` and `ypi_studio_subagent` tools plus `/studio-init`, `/studio-start`, `/studio-feature`, `/studio-bugfix`, `/studio-ui`, `/studio-continue`, `/studio-check`, and `/studio-archive` commands regardless of the selected workspace's project-local `.pi` files. The extension injects `.ypi/tasks` workflow state and bounded `.ypi/knowledge` summaries into each turn, binds sessions through stable context ids (`pi_<sessionId>` first, transcript hash second, process fallback last), resolves Studio member model/thinking policies through the pure `lib/ypi-studio-policy.ts` chain `toolInput > memberConfig > defaultPolicy > followMain > piDefault`, canonicalizes member ids before config/member-file lookup, emits policy diagnostics/warnings in live progress and final tool results, isolates child member Pi processes from Trellis injection with child env flags, and stores structured task progress under the selected workspace's `.ypi/` directory. Studio tasks may also contain `implementationPlan` plus `implementationProgress`: architects save a structured subtask plan before `awaiting_approval`, and after user approval the parent session claims ready subtasks before dispatching implementer with `subtaskId`. The schemaVersion 2 contract treats `implementationPlan.subtasks[].dependsOn` as the DAG scheduling source for serial, parallel, and mixed work; `execution.groups` is only a UI/readability projection. Progress remains legacy-compatible while adding `waiting` (with `pending` displayed as waiting), `queued`, `failed`, multi active/queued/next ids, run ids, and derived `waitingOn`/`blockedBy` reasons. Child Studio progress uses optional `details.run.progress` fields (`phase`, `tokens`, `tokenSource`, `tps`, `currentTool`, `itemsPreview`, `warnings`, `display`, `terminationReason`) so Chat and the session widget can distinguish `starting`, `waiting_model`, `streaming`, `running_tool`, `waiting_for_user`, and `finished` while showing only bounded recent activity by default. Preview/transcript/API projection clipping is display/storage protection and is surfaced as neutral display metadata; it does not by itself mark the child run failed. Studio child process output is projected rather th…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:36:54.479Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/rpc-manager.ts` — strengthened Studio child terminal continuation prompt so main session collects terminal runs, advances `implementation_next`/claim/dispatch, handles failure/user-attention boundaries, and transitions to checking when implementation subtasks finish. Added idle-timeout deferral while Studio child runs are still active.\n- `lib/ypi-studio-subagent-runtime.ts` — added active child-run counting per parent session for continuation lifecycle support.\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for active child-run counting.\n- `docs/architecture/overview.md` — documented parent session continuation and idle-timeout behavior.\n- `docs/modules/library.md` — updated module map for RPC/runtime continuation responsibilities.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\n#### Notes / Risks\n\n- Continuation advancement remains main-session/LLM-driven by design, not a deterministic background orchestrator.\n- No browser/manual Studio flow validation was run.\n- Existing explicit `abort` / explicit `destroy()` still cancels child runs; idle timeout is the path now deferred while children are active.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:36:54.491Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2600,
+        "tokens": 535,
+        "tokenSource": "usage",
+        "tps": 718.12,
+        "firstTokenAt": "2026-07-06T07:36:53.721Z",
+        "lastTokenAt": "2026-07-06T07:36:54.466Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-cc07df1af487941bfadac987",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/implementer-cc07df1af487941bfadac987.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:34:38.999Z",
+        "finishedAt": "2026-07-06T07:36:56.680Z",
+        "updatedAt": "2026-07-06T07:36:56.680Z",
+        "itemCount": 63,
+        "messageCount": 1,
+        "toolCallCount": 29,
+        "stderrBytes": 0,
+        "bytes": 241014,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-b268c83ae93dc6b2cc02cf94",
+      "subtaskId": "studio-panel-progress",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:39:09.083Z",
+      "finishedAt": "2026-07-06T07:42:44.430Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioPanel.tsx`\n  - Added Implementation tab “状态机推进” card.\n  - Shows chips: `等待子任务` / `继续派发` / `正在检查` / `需要处理` / `已完成`.\n  - Displays next-action guidance, active/queued/ready/blocked/done counts, compact timeline, waiting subtasks, ready subtasks, failed/blocked subtasks, recent completed subtasks.\n  - Reuses existing `implementationProjection`, `compactTimeline`, and `sessionRuntime`; legacy tasks still fall back to plan/progress.\n  - Adds task-detail header chip for current implementation machine phase.\n\n- `docs/modules/frontend.md`\n  - Updated `YpiStudioPanel.tsx` description to document the new state-machine progress card and chips.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Browser manual validation not run.\n- Many unrelated repository files already had modifications; I only changed `components/YpiStudioPanel.tsx` and `docs/modules/frontend.md`.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:39:09.083Z",
+        "updatedAt": "2026-07-06T07:42:44.430Z",
+        "eventCount": 6353,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioPanel.tsx`\n  - Added Implementation tab “状态机推进” card.\n  - Shows chips: `等待子任务` / `继续派发` / `正在检查` / `需要处理` / `已完成`.\n  - Displays next-action guidance, active/queued/ready/blocked/done counts, compact timeline, waiting subtasks, ready subtasks, failed/blocked subtasks, recent completed subtasks.\n  - Reuses existing `implementationProjection`, `compactTimeline`, and `sessionRuntime`; legacy tasks still fall back to plan/progress.\n  - Adds task-detail header chip for current implementation machine phase.\n\n- `docs/modules/frontend.md`\n  - Updated `YpiStudioPanel.tsx` description to document the new state-machine progress card and chips.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Browser manual validation not run.\n- Many unrelated repository files already had modifications; I only changed `components/YpiStudioPanel.tsx` and `docs/modules/frontend.md`.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:42:28.260Z",
+            "toolCallId": "call_brE0xgSJpLubUzjwvKnbL0Ke|fc_0053e8f1fff4c9ac016a4b5c643a908199831ec2ed5564ed97",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:42:30.419Z",
+            "toolCallId": "call_brE0xgSJpLubUzjwvKnbL0Ke|fc_0053e8f1fff4c9ac016a4b5c643a908199831ec2ed5564ed97",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:42:36.053Z",
+            "toolCallId": "call_SHiPhTSUBoDRIFFBEdcxRmKJ|fc_0053e8f1fff4c9ac016a4b5c643a808199b80f56c1db83e3e2",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.7 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:42:42.209Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioPanel.tsx`\n  - Added Implementation tab “状态机推进” card.\n  - Shows chips: `等待子任务` / `继续派发` / `正在检查` / `需要处理` / `已完成`.\n  - Displays next-action guidance, active/queued/ready/blocked/done counts, compact timeline, waiting subtasks, ready subtasks, failed/blocked subtasks, recent completed subtasks.\n  - Reuses existing `implementationProjection`, `compactTimeline`, and `sessionRuntime`; legacy tasks still fall back to plan/progress.\n  - Adds task-detail header chip for current implementation machine phase.\n\n- `docs/modules/frontend.md`\n  - Updated `YpiStudioPanel.tsx` description to document the new state-machine progress card and chips.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Browser manual validation not run.\n- Many unrelated repository files already had modifications; I only changed `components/YpiStudioPanel.tsx` and `docs/modules/frontend.md`.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:42:42.219Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1998,
+        "tokens": 273,
+        "tokenSource": "usage",
+        "tps": 65.23,
+        "firstTokenAt": "2026-07-06T07:42:38.018Z",
+        "lastTokenAt": "2026-07-06T07:42:42.203Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-b268c83ae93dc6b2cc02cf94",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/implementer-b268c83ae93dc6b2cc02cf94.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:39:09.083Z",
+        "finishedAt": "2026-07-06T07:42:44.430Z",
+        "updatedAt": "2026-07-06T07:42:44.430Z",
+        "itemCount": 59,
+        "messageCount": 1,
+        "toolCallCount": 27,
+        "stderrBytes": 0,
+        "bytes": 176481,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-26d058574d0b7119678543a0",
+      "subtaskId": "docs-tests-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:43:53.091Z",
+      "finishedAt": "2026-07-06T07:46:58.571Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for:\n  - active child-run counting for parent session waiting state\n  - `waiting_for_studio_children` / `needs_user` runtime projection\n  - `waiting_for_user` blocking + dependent blocked propagation\n  - terminal continuation callback idempotency\n- `lib/ypi-studio-tasks.ts` — fixed same-millisecond approval gate/grant bug so explicit approval is always recorded after `awaiting_approval` gate time.\n- `docs/standards/code-style.md` — documented `npm run test:studio-dag`.\n- `.ypi/tasks/.../handoff.md` — updated final handoff.\n- `.ypi/tasks/.../checks.md` — updated validation checklist and remaining manual checks.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: Node prints an experimental loader warning; tests pass.\n\n#### Notes / Risks\n\n- Docs reviewed: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` are consistent with the current “main Chat continuation loop” design.\n- Remaining risk: no real browser E2E/manual validation run in this subtask. Main session/checker should validate Chat banner, Widget, Panel, terminal continuation wake-up, and auto transition into checking with an actual parallel Studio task.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:43:53.091Z",
+        "updatedAt": "2026-07-06T07:46:58.571Z",
+        "eventCount": 5689,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for:\n  - active child-run counting for parent session waiting state\n  - `waiting_for_studio_children` / `needs_user` runtime projection\n  - `waiting_for_user` blocking + dependent blocked propagation\n  - terminal continuation callback idempotency\n- `lib/ypi-studio-tasks.ts` — fixed same-millisecond approval gate/grant bug so explicit approval is always recorded after `awaiting_approval` gate time.\n- `docs/standards/code-style.md` — documented `npm run test:studio-dag`.\n- `.ypi/tasks/.../handoff.md` — updated final handoff.\n- `.ypi/tasks/.../checks.md` — updated validation checklist and remaining manual checks.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: Node prints an experimental loader warning; tests pass.\n\n#### Notes / Risks\n\n- Docs reviewed: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` are consistent with the current “main Chat continuation loop” design.\n- Remaining risk: no real browser E2E/manual validation run in this subtask. Main session/checker should validate Chat banner, Widget, Panel, terminal continuation wake-up, and auto transition into checking with an actual parallel Studio task.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:46:37.879Z",
+            "toolCallId": "call_Z9KuOrkTt3hLn70rSF3y1ZRR|fc_06e994236fcc69cb016a4b5d506718819aaece1e574ad951cd",
+            "toolName": "write",
+            "text": "Successfully wrote 1855 bytes to .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:46:45.055Z",
+            "toolCallId": "call_954J8rDgPd1r3uGRVLtQYB48|fc_06e994236fcc69cb016a4b5d630370819a99909887e897a4ed",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short -- scripts/test-ypi-studio-dag.mjs lib/ypi-studio-tasks.ts docs/standards/code-style.md .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md && git diff -- scripts/test-ypi-studio-dag.mjs docs/standards/code-style.md .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/handoff.md .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/checks.md | sed -n '1,220p'\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:46:45.133Z",
+            "toolCallId": "call_954J8rDgPd1r3uGRVLtQYB48|fc_06e994236fcc69cb016a4b5d630370819a99909887e897a4ed",
+            "toolName": "bash",
+            "text": "M docs/standards/code-style.md\n M lib/ypi-studio-tasks.ts\n M scripts/test-ypi-studio-dag.mjs\n?? \".ypi/tasks/20260706-145915-\\344\\274\\230\\345\\214\\226-ypi-studio-\\345\\274\\202\\346\\255\\245\\345\\255\\220\\344\\273\\273\\345\\212\\241\\347\\274\\226\\346\\216\\222\\347\\232\\204\\347\\255\\211\\345\\276\\205\\344\\270\\216\\350\\207\\252\\345\\212\\250\\347\\273\\255\\350\\267\\221\\344\\272\\244\\344\\272\\222/checks.md\"\n?? \".ypi/tasks/20260706-145915-\\344\\274\\230\\345\\214\\226-ypi-studio-\\345\\274\\202\\346\\255\\245\\345\\255\\220\\344\\273\\273\\345\\212\\241\\347\\274\\226\\346\\216\\222\\347\\232\\204\\347\\255\\211\\345\\276\\205\\344\\270\\216\\350\\207\\252\\345\\212\\250\\347\\273\\255\\350\\267\\221\\344\\272\\244\\344\\272\\222/handoff.md\"\ndiff --git a/docs/standards/code-style.md b/docs/standards/code-style.md\nindex b52e96b..3022c89 100644\n--- a/docs/standards/code-style.md\n+++ b/docs/standards/code-style.md\n@@ -35,6 +35,7 @@ Current lightweight scripts:\n \n ```bash\n npm run test:studio-policy\n+npm run test:studio-dag\n ```\n \n-This script exercises the pure YPI Studio member model/thinking policy resolver without introducing a test framework. If a broader test framework is introduced later, document it here and update `AGENTS.md`.\n+`test:studio-policy` exercises the pure YPI Studio member model/thinking policy resolver. `test:studio-dag` exercises YPI Studio implementation DAG readiness, approval gating, runtime waiting/needs-user projection, and terminal continuation idempotency without introducing a test framework. If a broader test framework is introduced later, document it here and update `AGENTS.md`.\ndiff --git a/scripts/test-ypi-studio-dag.mjs b/scripts/test-ypi-studio-dag.mjs\nindex 73119ef..56305fe 100644\n--- a/scripts/test-ypi-studio-dag.mjs\n+++ b/scripts/test-ypi-studio-dag.mjs\n@@ -9,6 +9,7 @@ import {\n   implementationCounts,\n   normalizeImplementationPlan,\n   propagateBlockedDependents,\n+  recordYpiStudioSubagentRun,\n   recordYpiStudioUserApproval,\n   refreshDerivedImplementationDAG,\n   selectNextYpiStudioImplementationSubtask,\n@@ -16,6 +17,14 @@ import {\n   transitionYpiStudioTask,\n   updateYpiStudioImplementationPlan,\n } from \"../lib/ypi-studio-tasks.ts\";\n+import {\n+  countActiveYpiStudioChildRunsForSession,\n+  registerYpiStudioChildRun,\n+  registerYpiStudioSessionContinuation,\n+  scheduleYpiStudioChildRunContinuation,\n+  unregisterYpiStudioChildRun,\n+  unregisterYpiStudioSessionContinuation,\n+} from \"../lib/ypi-studio-subagent-runtime.ts\";\n \n const now = \"2026-07-03T00:00:00.000Z\";\n \n@@ -154,6 +163,125 @@ function progressFor(implementationPlan, statuses = {}) {\n   }\n }\n \n+{\n+  const parentSessionId = \"pi_parent_waiting_children\";\n+  registerYpiStudioChildRun({\n+    runId: \"run-active\",\n+    taskId: \"task-active\",\n+    member: \"implementer\",\n+    cwd: process.cwd(),\n+    parentSessionId,\n+    startedAt: now,\n+    status: \"running\",\n+    abort: () => {},\n+  });\n+  registerYpiStudioChildRun({\n+    runId: \"run-done\",\n+    taskId: \"task-active\",\n+    member: \"implementer\",\n+    cwd: process.cwd(),\n+    parentSessionId,\n+    startedAt: now,\n+    status: \"succeeded\",\n+    abort: () => {},\n+  });\n+  try {\n+    assert.equal(countActiveYpiStudioChildRunsForSession(parentSessionId), 1);\n+  } finally {\n+    unregisterYpiStudioChildRun(\"run-active\");\n+    unregisterYpiStudioChildRun(\"run-done\");\n+  }\n+  assert.equal(countActiveYpiStudioChildRunsForSession(parentSessionId), 0);\n+}\n+\n+{\n+  const cwd = mkdtempSync(join(tmpdir(), \"ypi-studio-runtime-projection-\"));\n+  try {\n+    const contextId = \"pi_runtime_projection\";\n+    const task = createYpiStudioTask({ cwd, title: \"Runtime projection\", workflowId: \"feature-dev\", contextId });\n+    transitionYpiStudioTask(task.id, { cwd, to: \"planning\", override: true, contextId });\n+    updateYpiStudioImplementationPlan(task.id, {\n+      cwd,\n+      action: \"update_implementation_plan\",\n+      contextId,\n+      implementationPlan: {\n+        schemaVersion: 2,\n+        maxConcurrency: 2,\n+        subtasks: [\n+          { id: \"A\", title: \"A\", order: 10, dependsOn: [] },\n+          { id: \"B\", title: \"B\", order: 20, dependsOn: [\"A\"] },\n+        ],\n+      },\n+    });\n+    tr…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:46:56.589Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for:\n  - active child-run counting for parent session waiting state\n  - `waiting_for_studio_children` / `needs_user` runtime projection\n  - `waiting_for_user` blocking + dependent blocked propagation\n  - terminal continuation callback idempotency\n- `lib/ypi-studio-tasks.ts` — fixed same-millisecond approval gate/grant bug so explicit approval is always recorded after `awaiting_approval` gate time.\n- `docs/standards/code-style.md` — documented `npm run test:studio-dag`.\n- `.ypi/tasks/.../handoff.md` — updated final handoff.\n- `.ypi/tasks/.../checks.md` — updated validation checklist and remaining manual checks.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: Node prints an experimental loader warning; tests pass.\n\n#### Notes / Risks\n\n- Docs reviewed: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` are consistent with the current “main Chat continuation loop” design.\n- Remaining risk: no real browser E2E/manual validation run in this subtask. Main session/checker should validate Chat banner, Widget, Panel, terminal continuation wake-up, and auto transition into checking with an actual parallel Studio task.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:46:56.591Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2832,
+        "tokens": 463,
+        "tokenSource": "usage",
+        "tps": 76.54,
+        "firstTokenAt": "2026-07-06T07:46:50.540Z",
+        "lastTokenAt": "2026-07-06T07:46:56.589Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-26d058574d0b7119678543a0",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/implementer-26d058574d0b7119678543a0.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:43:53.091Z",
+        "finishedAt": "2026-07-06T07:46:58.570Z",
+        "updatedAt": "2026-07-06T07:46:58.570Z",
+        "itemCount": 73,
+        "messageCount": 1,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 214085,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-22b746cc107b7fe417f4c2b8",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T07:49:44.963Z",
+      "finishedAt": "2026-07-06T07:52:01.679Z",
+      "summary": "Handoff:\n\n- Artifact produced: `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/review.md`\n- Reviewed code/docs/tests around:\n  - `lib/rpc-manager.ts`\n  - `lib/ypi-studio-subagent-runtime.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `lib/ypi-studio-tasks.ts`\n  - `lib/ypi-studio-session-link.ts`\n  - `lib/ypi-studio-types.ts`\n  - `components/ChatWindow.tsx`\n  - `components/YpiStudioSessionWidget.tsx`\n  - `components/YpiStudioPanel.tsx`\n  - `components/AppShell.tsx`\n  - `scripts/test-ypi-studio-dag.mjs`\n\nValidation run:\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\nVerdict:\n\n- Pass\n\nRemaining risks:\n\n- Non-blocking: `useAgentSession` added runtime types but current UX mainly depends on `studioTask.implementationProjection.sessionRuntime`; future UI that only checks `agentRunning` could still misread waiting as idle.\n- Non-blocking: no recorded real-browser E2E for the full “implementation done -> auto checking -> checker dispatch” flow yet.\n\nDecisions needed from main session:\n\n- None blocking.\n- Optional: whether to add a manual browser acceptance pass before closing the task.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T07:49:44.963Z",
+        "updatedAt": "2026-07-06T07:52:01.679Z",
+        "eventCount": 2788,
+        "lastTextPreview": "Handoff:\n\n- Artifact produced: `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/review.md`\n- Reviewed code/docs/tests around:\n  - `lib/rpc-manager.ts`\n  - `lib/ypi-studio-subagent-runtime.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `lib/ypi-studio-tasks.ts`\n  - `lib/ypi-studio-session-link.ts`\n  - `lib/ypi-studio-types.ts`\n  - `components/ChatWindow.tsx`\n  - `components/YpiStudioSessionWidget.tsx`\n  - `components/YpiStudioPanel.tsx`\n  - `components/AppShell.tsx`\n  - `scripts/test-ypi-studio-dag.mjs`\n\nValidation run:\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\nVerdict:\n\n- Pass\n\nRemaining risks:\n\n- Non-blocking: `useAgentSession` added runtime types but current UX mainly depends on `studioTask.implementationProjection.sessionRuntime`; future UI that only checks `agentRunning` could still misread waiting as idle.\n- Non-blocking: no recorded real-browser E2E for the full “implementation done -> auto checking -> checker dispatch” flow yet.\n\nDecisions needed from main session:\n\n- None blocking.\n- Optional: whether to add a manual browser acceptance pass before closing the task.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:51:17.567Z",
+            "toolCallId": "call_sJAZ7LoG6q2Yw62fPFQUEBvz|fc_0bcd01e076e10c7b016a4b5e75771c819a9628d0d3a884eaa6",
+            "toolName": "bash",
+            "text": "components/ChatWindow.tsx:387:      onSteer={agentRunning ? handleSteer : undefined}\ncomponents/ChatWindow.tsx:388:      onFollowUp={agentRunning ? handleFollowUp : undefined}\ncomponents/ChatWindow.tsx:389:      isStreaming={agentRunning}\ncomponents/ChatWindow.tsx:554:                    onNavigate={agentRunning ? undefined : handleNavigate}\ncomponents/ChatWindow.tsx:555:                    prevAssistantEntryId={agentRunning ? undefined : prevAssistantEntryId}\ncomponents/SessionChangesFloatingPanel.tsx:341:          <span>{loading && agentRunning ? \"Changes updating…\" : fileCountLabel(files.length)}</span>\ncomponents/ChatInput.tsx:1509:          {/* LEFT: attach + model selector (idle) or steer/followup toggle (streaming) */}\ncomponents/ChatInput.tsx:1590:          {/* RIGHT: thinking + tools preset + compact + scroll/sound toggles (idle) | Stop + toggles (streaming) */}\ncomponents/YpiStudioSessionWidget.tsx:251:          {runtime && runtime.status !== \"idle\" && (\ncomponents/ModelsConfig.tsx:137:  | { phase: \"idle\" }\ncomponents/ModelsConfig.tsx:196:  | { phase: \"idle\" }\ncomponents/ModelsConfig.tsx:576:  const [testState, setTestState] = useState<ModelTestState>({ phase: \"idle\" });\ncomponents/ModelsConfig.tsx:584:    if (testState.phase === \"idle\") return null;\ncomponents/ModelsConfig.tsx:597:    setTestState({ phase: \"idle\" });\ncomponents/ModelsConfig.tsx:1380:  const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: \"idle\" });\ncomponents/ModelsConfig.tsx:1408:    setLoginState({ phase: \"idle\" });\ncomponents/ModelsConfig.tsx:1544:        setLoginState({ phase: \"idle\" });\ncomponents/ModelsConfig.tsx:1555:    setLoginState({ phase: \"idle\" });\ncomponents/ModelsConfig.tsx:1776:        {loginState.phase === \"idle\" && (\ncomponents/ModelsConfig.tsx:1868:            onClick={() => { eventSourceRef.current?.close(); setLoginState({ phase: \"idle\" }); }}\ncomponents/YpiStudioSubagentTranscript.tsx:508:            {(status === \"failed\" || status === \"cancelled\") && <Warning text={`This member run stopped before completion${run.terminationReason ? ` (${run.terminationReason})` : \"\"}. You can ask the main session to retry the same member, continue from the current Studio phase, or mark the task blocked/cancelled if the failure is persistent.`} />}\ncomponents/YpiStudioPanel.tsx:39:type LoadState = \"idle\" | \"loading\" | \"ready\" | \"error\";\ncomponents/YpiStudioPanel.tsx:138:  const [loadState, setLoadState] = useState<LoadState>(\"idle\");\ncomponents/YpiStudioPanel.tsx:139:  const [workflowLoadState, setWorkflowLoadState] = useState<LoadState>(\"idle\");\ncomponents/YpiStudioPanel.tsx:140:  const [taskLoadState, setTaskLoadState] = useState<LoadState>(\"idle\");\ncomponents/YpiStudioPanel.tsx:160:      setLoadState(\"idle\");\ncomponents/YpiStudioPanel.tsx:188:      setWorkflowLoadState(\"idle\");\ncomponents/YpiStudioPanel.tsx:209:      setTaskLoadState(\"idle\");\ncomponents/YpiStudioPanel.tsx:279:    if (activeTab === \"members\" && loadState === \"idle\") void loadAgents(controller.signal);\ncomponents/YpiStudioPanel.tsx:280:    if (activeTab === \"workflows\" && workflowLoadState === \"idle\") void loadWorkflows(controller.signal);\ncomponents/YpiStudioPanel.tsx:281:    if (activeTab === \"tasks\" && taskLoadState === \"idle\") void loadTasks(controller.signal);\ncomponents/YpiStudioPanel.tsx:488:  const [detailLoadState, setDetailLoadState] = useState<LoadState>(\"idle\");\ncomponents/YpiStudioPanel.tsx:516:      setDetailLoadState(\"idle\");\ncomponents/BrowserShareControl.tsx:57:  if (value === \"stopped\") return \"已停止\";",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T07:51:50.750Z",
+            "toolCallId": "call_cR1i0JyuyoHs2crHIMfSsaqP|fc_0bcd01e076e10c7b016a4b5e8bfcb8819aaf899c45bd338e4c",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/review.md\",\n  \"content\": \"# review\\n\\n## Check Complete\\n\\n### Findings Fixed\\n\\n- None（本轮以审查与验证为主，未额外改码）。\\n\\n### Remaining Findings\\n\\n- 非阻塞：`hooks/useAgentSession.ts` 里新增了 `waiting_for_studio_children` 相关类型，但当前主要仍靠 `studioTask.implementationProjection.sessionRuntime` 驱动 Chat banner / Widget / Panel；若后续还有别的 UI 只看 `agentRunning`，仍可能把该状态当作普通 idle。当前本任务覆盖的主要入口已补齐，不影响本次通过。\\n- 非阻塞：尚缺真实浏览器端到端人工验收记录，尤其是“全部 implementation subtasks 完成后自动进入 checking 并派发 checker”的完整交互链路；现有为代码审查 + 轻量脚本验证。\\n\\n### Verification\\n\\n- `npm run lint` — Passed\\n- `node_modules/.bin/tsc --noEmit` — Passed\\n- `npm run test:studio-policy` — Passed\\n- `npm run test:studio-dag` — Passed（Node `--experimental-loader` warning only，不影响结果）\\n\\n### Verdict\\n\\n- Pass：当前实现已满足本任务的核心 PRD/Design/Checks 要求。\\n  - 主 Chat 在并行子任务运行时通过 `sessionRuntime=waiting_for_studio_children` + Chat banner 明确显示“后台仍在工作”，不再只表现为 stopped/idle。\\n  - async 子任务 terminal 后会通过 parent-session continuation 回调自动 nudge 同一主 session，继续 collect / implementation_next / claim / dispatch。\\n  - `implementationProjection` / widget / panel 已增加 compact timeline、runtime message、waiting/blocked/failed 摘要，且文案使用人话。\\n  - approval gate 同毫秒问题已修复，并补了 continuation 幂等、runtime waiting/needs_user、active child run 计数等脚本验证。\\n\\n## Notes\\n\\n- 重点审阅文件：`lib/rpc-manager.ts`、`lib/ypi-studio-subagent-runtime.ts`、`lib/ypi-studio-extension.ts`、`lib/ypi-studio-tasks.ts`、`lib/ypi-studio-session-link.ts`、`lib/ypi-studio-types.ts`、`components/ChatWindow.tsx`、`components/YpiStudioSessionWidget.tsx`、`components/YpiStudioPanel.tsx`、`components/AppShell.tsx`、`scripts/test-ypi-studio-dag.mjs`。\\n- 文档同步检查通过：`docs/architecture/overview.md`、`docs/modules/api.md`、`docs/modules/frontend.md`、`docs/modules/library.md`、`docs/standards/code-style.md` 已覆盖本轮口径。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T07:51:50.757Z",
+            "toolCallId": "call_cR1i0JyuyoHs2crHIMfSsaqP|fc_0bcd01e076e10c7b016a4b5e8bfcb8819aaf899c45bd338e4c",
+            "toolName": "write",
+            "text": "Successfully wrote 1698 bytes to .ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T07:51:59.443Z",
+            "text": "Handoff:\n\n- Artifact produced: `.ypi/tasks/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互/review.md`\n- Reviewed code/docs/tests around:\n  - `lib/rpc-manager.ts`\n  - `lib/ypi-studio-subagent-runtime.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `lib/ypi-studio-tasks.ts`\n  - `lib/ypi-studio-session-link.ts`\n  - `lib/ypi-studio-types.ts`\n  - `components/ChatWindow.tsx`\n  - `components/YpiStudioSessionWidget.tsx`\n  - `components/YpiStudioPanel.tsx`\n  - `components/AppShell.tsx`\n  - `scripts/test-ypi-studio-dag.mjs`\n\nValidation run:\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\nVerdict:\n\n- Pass\n\nRemaining risks:\n\n- Non-blocking: `useAgentSession` added runtime types but current UX mainly depends on `studioTask.implementationProjection.sessionRuntime`; future UI that only checks `agentRunning` could still misread waiting as idle.\n- Non-blocking: no recorded real-browser E2E for the full “implementation done -> auto checking -> checker dispatch” flow yet.\n\nDecisions needed from main session:\n\n- None blocking.\n- Optional: whether to add a manual browser acceptance pass before closing the task.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T07:51:59.452Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2404,
+        "tokens": 378,
+        "tokenSource": "usage",
+        "tps": 97.4,
+        "firstTokenAt": "2026-07-06T07:51:55.553Z",
+        "lastTokenAt": "2026-07-06T07:51:59.434Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-22b746cc107b7fe417f4c2b8",
+        "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-145915-_-ypi-studio-/checker-22b746cc107b7fe417f4c2b8.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T07:49:44.963Z",
+        "finishedAt": "2026-07-06T07:52:01.675Z",
+        "updatedAt": "2026-07-06T07:52:01.675Z",
+        "itemCount": 65,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 201695,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-06T07:21:11.743Z",
+      "contextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+      "from": "awaiting_approval",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-06T07:24:06.672Z",
+      "contextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+      "inputHash": "b772bd7592c8de098b1b3e8a",
+      "source": "user-input"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-06T07:21:11.743Z",
+    "sourceArtifact": "implement.md",
+    "summary": "改为低破坏性的主 Chat continuation loop：用户批准后主 Chat 派发并行子任务时不进入 stopped/idle，而进入 waiting_for_studio_children；子任务 terminal 后自动唤醒同一主 session 收集结果并推进现有 Studio 状态机，直到继续派发、进入 checking、完成或需要用户处理。",
+    "strategy": "不重写 Studio 状态机，不用独立后台 orchestrator 取代主会话。复用现有 implementationPlan、async subagent、transition、implementation_next/claim/update，只补齐主 Chat 等待态、子任务 terminal continuation、状态投影和人话 UI。",
+    "maxConcurrency": 2,
+    "scheduler": {
+      "mode": "dag",
+      "strategy": "ready_fifo",
+      "failFast": true,
+      "defaultFailurePolicy": "block_dependents"
+    },
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "chat-waiting-state-contract",
+          "title": "contract",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "chat-waiting-state-contract"
+          ]
+        },
+        {
+          "id": "child-terminal-continuation",
+          "title": "backend",
+          "relation": "serial",
+          "dependencies": [
+            "chat-waiting-state-contract"
+          ],
+          "subtaskIds": [
+            "child-terminal-continuation"
+          ]
+        },
+        {
+          "id": "main-session-state-machine-loop",
+          "title": "backend",
+          "relation": "serial",
+          "dependencies": [
+            "child-terminal-continuation"
+          ],
+          "subtaskIds": [
+            "main-session-state-machine-loop"
+          ]
+        },
+        {
+          "id": "keep-chat-active-ui",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [
+            "chat-waiting-state-contract"
+          ],
+          "subtaskIds": [
+            "keep-chat-active-ui"
+          ]
+        },
+        {
+          "id": "studio-panel-progress",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [
+            "main-session-state-machine-loop"
+          ],
+          "subtaskIds": [
+            "studio-panel-progress"
+          ]
+        },
+        {
+          "id": "docs-tests-validation",
+          "title": "validation",
+          "relation": "serial",
+          "dependencies": [
+            "keep-chat-active-ui",
+            "studio-panel-progress"
+          ],
+          "subtaskIds": [
+            "docs-tests-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "chat-waiting-state-contract",
+        "title": "定义主 Chat 等待并行子任务的运行态与 projection",
+        "phase": "contract",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-types.ts",
+          "hooks/useAgentSession.ts",
+          "components/ChatWindow.tsx"
+        ],
+        "instructions": [
+          "新增/复用 session runtime 状态 waiting_for_studio_children，表示主 Chat 仍在工作但正在等待 Studio 子任务结果。",
+          "task/session projection 显示 active child runs、等待原因、下一步动作，不把 agentRunning=false 简化为 stopped。"
+        ],
+        "acceptance": [
+          "派发并行子任务后 Chat 显示正在等待并行子任务，而不是停止。",
+          "旧 session 没有该字段时仍正常显示。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "child-terminal-continuation",
+        "title": "子任务 terminal 后唤醒同一主 session continuation",
+        "phase": "backend",
+        "order": 20,
+        "dependsOn": [
+          "chat-waiting-state-contract"
+        ],
+        "dependencies": [
+          "chat-waiting-state-contract"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-subagent-runtime.ts",
+          "lib/ypi-studio-extension.ts",
+          "lib/rpc-manager.ts"
+        ],
+        "instructions": [
+          "为 async Studio child run 增加 parent session continuation metadata。",
+          "child terminal 后触发同一主 session 的轻量 continuation/tick，而不是等待用户输入继续。",
+          "continuation 必须幂等，重复 terminal/poll 不重复更新或派发。"
+        ],
+        "acceptance": [
+          "子任务完成后无需用户输入，主 session 自动 collect 并继续。",
+          "重复 terminal callback 不产生重复派发。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "main-session-state-machine-loop",
+        "title": "主 session 继续推进现有 Studio 状态机",
+        "phase": "backend",
+        "order": 30,
+        "dependsOn": [
+          "child-terminal-continuation"
+        ],
+        "dependencies": [
+          "child-terminal-continuation"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-tasks.ts",
+          "lib/ypi-studio-extension.ts",
+          "lib/rpc-manager.ts"
+        ],
+        "instructions": [
+          "continuation 中按现有规则执行 collect/update/implementation_next/claim/dispatch。",
+          "全部 implementation subtasks 完成后由主 session 自动 transition 到 checking 并派发 checker。",
+          "失败、waiting_for_user、blocked、需要人工决策时进入 needs_attention，不绕过 awaiting_approval。"
+        ],
+        "acceptance": [
+          "A->B/C DAG 自动推进到检查。",
+          "状态机 transition 仍有现有门禁和事件记录。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-policy"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "keep-chat-active-ui",
+        "title": "Chat/Widget 显示主 Chat 等待态而非停止态",
+        "phase": "frontend",
+        "order": 40,
+        "dependsOn": [
+          "chat-waiting-state-contract"
+        ],
+        "dependencies": [
+          "chat-waiting-state-contract"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/ChatWindow.tsx",
+          "components/YpiStudioSessionWidget.tsx",
+          "components/AppShell.tsx"
+        ],
+        "instructions": [
+          "Chat 中展示：正在等待 N 个并行子任务完成，后台仍在工作。",
+          "输入区不误导为已停止；需要用户处理时才显示明确 action。",
+          "Widget 展示 active runs、ready/blocked、当前 workflow 状态。"
+        ],
+        "acceptance": [
+          "并行任务运行中，用户能看出主 Chat 仍在工作。",
+          "需要用户处理时文案清楚。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "studio-panel-progress",
+        "title": "Studio Panel 展示状态机推进和等待原因",
+        "phase": "frontend",
+        "order": 50,
+        "dependsOn": [
+          "main-session-state-machine-loop"
+        ],
+        "dependencies": [
+          "main-session-state-machine-loop"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/YpiStudioPanel.tsx"
+        ],
+        "instructions": [
+          "Implementation tab 显示主会话正在等待哪些子任务、下一步将做什么。",
+          "状态 chip 使用：等待子任务、继续派发、正在检查、需要处理、已完成。"
+        ],
+        "acceptance": [
+          "用户无需猜测是否要输入继续。",
+          "面板显示状态机当前阶段和下一步。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "docs-tests-validation",
+        "title": "文档、测试与验收",
+        "phase": "validation",
+        "order": 60,
+        "dependsOn": [
+          "keep-chat-active-ui",
+          "studio-panel-progress"
+        ],
+        "dependencies": [
+          "keep-chat-active-ui",
+          "studio-panel-progress"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md"
+        ],
+        "instructions": [
+          "文档说明：并行子任务不让主 Chat 进入停止态；状态机仍由主 session 推进。",
+          "测试覆盖等待态、terminal continuation、自动 checking、失败 needs_attention。"
+        ],
+        "acceptance": [
+          "lint、tsc 通过。",
+          "手工验证用户批准后并行任务期间 Chat 不显示停止，完成后自动交付。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-policy"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-06T07:54:47.803Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 6,
+      "skipped": 0
+    },
+    "subtasks": {
+      "chat-waiting-state-contract": {
+        "id": "chat-waiting-state-contract",
+        "status": "done",
+        "updatedAt": "2026-07-06T07:29:06.148Z",
+        "startedAt": "2026-07-06T07:24:13.164Z",
+        "finishedAt": "2026-07-06T07:29:06.148Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-d180c83fc9733ea3ed5649ee"
+        ],
+        "lastRunId": "implementer-d180c83fc9733ea3ed5649ee",
+        "claimedAt": "2026-07-06T07:24:13.164Z",
+        "claimedByContextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts` — 新增 compact subtask timeline、`YpiStudioSessionRuntimeProjection`、`waiting_for_studio_children` 状态契约；widget projection 兼容携带新字段。\n- `lib/ypi-studio-tasks.ts` — 从现有 implementation progress 派生 `compactTimeline` 与 `sessionRuntime`，旧任务无 plan/progress 时仍返回 undefined。\n- `lib/ypi-studio-session-link.ts` — 将 compact timeline / session runtime 裁剪后投影到 session widget/chat API。\n- `hooks/useAgentSession.ts` — 增加共享 runtime 状态类型，包含 `waiting_for_studio_children`。\n- `components/AppShell.tsx` — 将当前 Studio session task projection 传入 Chat。\n- `components/ChatWindow.tsx` — 当主 agent idle 但 Studio implementation 有 queued/running 子任务时显示“Studio 后台仍在工作 / 正在等待并行子任务”横幅，并展示 compact timeline；needs_user 时显示需处理状态。\n- `docs/architecture/overview.md`、`docs/modules/api.md`、`docs/modules/frontend.md`、`docs/modules/library.md` — 更新 projection / Chat waiting state 文档。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 本子任务只实现状态契约、projection 与 Chat 可见等待态；未实现 terminal callback / 主 Chat continuation loop。\n- 工作区已有与 Browser Share 相关的未提交/未跟踪改动，本次未处理。"
+      },
+      "child-terminal-continuation": {
+        "id": "child-terminal-continuation",
+        "status": "done",
+        "updatedAt": "2026-07-06T07:33:04.766Z",
+        "startedAt": "2026-07-06T07:29:46.271Z",
+        "finishedAt": "2026-07-06T07:33:04.765Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-6d6beffcf12819e1730c6eb8"
+        ],
+        "lastRunId": "implementer-6d6beffcf12819e1730c6eb8",
+        "claimedAt": "2026-07-06T07:29:46.271Z",
+        "claimedByContextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-subagent-runtime.ts` — added parent-session continuation callback registry and idempotent terminal continuation scheduling keyed by `parentSessionId:taskId:runId`.\n- `lib/rpc-manager.ts` — registers live session continuation callbacks and sends a lightweight `followUp` prompt to the same parent session after async child terminal, retrying while parent is streaming.\n- `lib/ypi-studio-extension.ts` — async `ypi_studio_subagent` runs now carry continuation metadata and schedule parent continuation after final persistence.\n- `docs/architecture/overview.md` — documented async child terminal continuation behavior.\n- `docs/modules/library.md` — documented runtime continuation registry responsibility.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Continuation is best-effort and requires the parent session wrapper to still be alive; if unavailable, persisted run can still be collected manually.\n- This subtask only implements terminal wake-up/continuation. UI waiting-state work remains for the next planned subtask.\n- No independent orchestrator was introduced; the follow-up prompt tells the main session to use existing `collect -> implementation_next -> claim/dispatch` flow and not bypass approval gates."
+      },
+      "main-session-state-machine-loop": {
+        "id": "main-session-state-machine-loop",
+        "status": "done",
+        "updatedAt": "2026-07-06T07:36:56.683Z",
+        "startedAt": "2026-07-06T07:34:32.078Z",
+        "finishedAt": "2026-07-06T07:36:56.681Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-cc07df1af487941bfadac987"
+        ],
+        "lastRunId": "implementer-cc07df1af487941bfadac987",
+        "claimedAt": "2026-07-06T07:34:32.078Z",
+        "claimedByContextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/rpc-manager.ts` — strengthened Studio child terminal continuation prompt so main session collects terminal runs, advances `implementation_next`/claim/dispatch, handles failure/user-attention boundaries, and transitions to checking when implementation subtasks finish. Added idle-timeout deferral while Studio child runs are still active.\n- `lib/ypi-studio-subagent-runtime.ts` — added active child-run counting per parent session for continuation lifecycle support.\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for active child-run counting.\n- `docs/architecture/overview.md` — documented parent session continuation and idle-timeout behavior.\n- `docs/modules/library.md` — updated module map for RPC/runtime continuation responsibilities.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed\n\n#### Notes / Risks\n\n- Continuation advancement remains main-session/LLM-driven by design, not a deterministic background orchestrator.\n- No browser/manual Studio flow validation was run.\n- Existing explicit `abort` / explicit `destroy()` still cancels child runs; idle timeout is the path now deferred while children are active."
+      },
+      "keep-chat-active-ui": {
+        "id": "keep-chat-active-ui",
+        "status": "done",
+        "updatedAt": "2026-07-06T07:33:40.339Z",
+        "startedAt": "2026-07-06T07:29:57.760Z",
+        "finishedAt": "2026-07-06T07:33:40.338Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-109285990d93cf6b75888151"
+        ],
+        "lastRunId": "implementer-109285990d93cf6b75888151",
+        "claimedAt": "2026-07-06T07:29:57.760Z",
+        "claimedByContextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — 接入 `studioTask` runtime projection；在 `waiting_for_studio_children` / `needs_user` 时显示“正在等待 N 个并行子任务完成，后台仍在工作”、状态计数和 compact timeline。\n- `components/YpiStudioSessionWidget.tsx` — Widget 显示 runtime 状态、active/queued/ready counts，并优先展示 3–5 个异常/活跃/最近子任务。\n- `components/AppShell.tsx` — Studio task polling 在等待子任务或需要用户处理时保持快速刷新。\n- `docs/modules/frontend.md` — 更新前端模块说明。\n- `.ypi/tasks/.../handoff.md` — 更新本子任务交付记录。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未做浏览器手工验收；建议用一个含并行 implementation subtasks 的 Studio task 验证 Chat banner 与 Widget 状态。\n- 本子任务仅覆盖前端等待态展示，不实现后端 terminal callback / continuation loop。"
+      },
+      "studio-panel-progress": {
+        "id": "studio-panel-progress",
+        "status": "done",
+        "updatedAt": "2026-07-06T07:42:44.431Z",
+        "startedAt": "2026-07-06T07:38:59.093Z",
+        "finishedAt": "2026-07-06T07:42:44.430Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-b268c83ae93dc6b2cc02cf94"
+        ],
+        "lastRunId": "implementer-b268c83ae93dc6b2cc02cf94",
+        "claimedAt": "2026-07-06T07:38:59.093Z",
+        "claimedByContextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioPanel.tsx`\n  - Added Implementation tab “状态机推进” card.\n  - Shows chips: `等待子任务` / `继续派发` / `正在检查` / `需要处理` / `已完成`.\n  - Displays next-action guidance, active/queued/ready/blocked/done counts, compact timeline, waiting subtasks, ready subtasks, failed/blocked subtasks, recent completed subtasks.\n  - Reuses existing `implementationProjection`, `compactTimeline`, and `sessionRuntime`; legacy tasks still fall back to plan/progress.\n  - Adds task-detail header chip for current implementation machine phase.\n\n- `docs/modules/frontend.md`\n  - Updated `YpiStudioPanel.tsx` description to document the new state-machine progress card and chips.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Browser manual validation not run.\n- Many unrelated repository files already had modifications; I only changed `components/YpiStudioPanel.tsx` and `docs/modules/frontend.md`."
+      },
+      "docs-tests-validation": {
+        "id": "docs-tests-validation",
+        "status": "done",
+        "updatedAt": "2026-07-06T07:46:58.572Z",
+        "startedAt": "2026-07-06T07:43:38.756Z",
+        "finishedAt": "2026-07-06T07:46:58.571Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-26d058574d0b7119678543a0"
+        ],
+        "lastRunId": "implementer-26d058574d0b7119678543a0",
+        "claimedAt": "2026-07-06T07:43:38.756Z",
+        "claimedByContextId": "pi_process_1b83d60c5ef6ed65e3a2d4e1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — added coverage for:\n  - active child-run counting for parent session waiting state\n  - `waiting_for_studio_children` / `needs_user` runtime projection\n  - `waiting_for_user` blocking + dependent blocked propagation\n  - terminal continuation callback idempotency\n- `lib/ypi-studio-tasks.ts` — fixed same-millisecond approval gate/grant bug so explicit approval is always recorded after `awaiting_approval` gate time.\n- `docs/standards/code-style.md` — documented `npm run test:studio-dag`.\n- `.ypi/tasks/.../handoff.md` — updated final handoff.\n- `.ypi/tasks/.../checks.md` — updated validation checklist and remaining manual checks.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-policy` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: Node prints an experimental loader warning; tests pass.\n\n#### Notes / Risks\n\n- Docs reviewed: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` are consistent with the current “main Chat continuation loop” design.\n- Remaining risk: no real browser E2E/manual validation run in this subtask. Main session/checker should validate Chat banner, Widget, Panel, terminal continuation wake-up, and auto transition into checking with an actual parallel Studio task."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-06T07:24:13.164Z",
+        "subtaskId": "chat-waiting-state-contract",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T07:29:46.271Z",
+        "subtaskId": "child-terminal-continuation",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T07:29:57.760Z",
+        "subtaskId": "keep-chat-active-ui",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T07:34:32.078Z",
+        "subtaskId": "main-session-state-machine-loop",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T07:38:59.093Z",
+        "subtaskId": "studio-panel-progress",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T07:43:38.756Z",
+        "subtaskId": "docs-tests-validation",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

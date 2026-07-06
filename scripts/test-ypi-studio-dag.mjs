@@ -9,6 +9,7 @@ import {
   implementationCounts,
   normalizeImplementationPlan,
   propagateBlockedDependents,
+  recordYpiStudioSubagentRun,
   recordYpiStudioUserApproval,
   refreshDerivedImplementationDAG,
   selectNextYpiStudioImplementationSubtask,
@@ -16,6 +17,14 @@ import {
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
 } from "../lib/ypi-studio-tasks.ts";
+import {
+  countActiveYpiStudioChildRunsForSession,
+  registerYpiStudioChildRun,
+  registerYpiStudioSessionContinuation,
+  scheduleYpiStudioChildRunContinuation,
+  unregisterYpiStudioChildRun,
+  unregisterYpiStudioSessionContinuation,
+} from "../lib/ypi-studio-subagent-runtime.ts";
 
 const now = "2026-07-03T00:00:00.000Z";
 
@@ -151,6 +160,125 @@ function progressFor(implementationPlan, statuses = {}) {
     assert.throws(() => claimYpiStudioImplementationSubtask(task.id, { cwd, action: "claim_implementation_subtask", subtaskId: "C", contextId }), /not ready|no concurrency slot|exceed available concurrency/i);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  const parentSessionId = "pi_parent_waiting_children";
+  registerYpiStudioChildRun({
+    runId: "run-active",
+    taskId: "task-active",
+    member: "implementer",
+    cwd: process.cwd(),
+    parentSessionId,
+    startedAt: now,
+    status: "running",
+    abort: () => {},
+  });
+  registerYpiStudioChildRun({
+    runId: "run-done",
+    taskId: "task-active",
+    member: "implementer",
+    cwd: process.cwd(),
+    parentSessionId,
+    startedAt: now,
+    status: "succeeded",
+    abort: () => {},
+  });
+  try {
+    assert.equal(countActiveYpiStudioChildRunsForSession(parentSessionId), 1);
+  } finally {
+    unregisterYpiStudioChildRun("run-active");
+    unregisterYpiStudioChildRun("run-done");
+  }
+  assert.equal(countActiveYpiStudioChildRunsForSession(parentSessionId), 0);
+}
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-runtime-projection-"));
+  try {
+    const contextId = "pi_runtime_projection";
+    const task = createYpiStudioTask({ cwd, title: "Runtime projection", workflowId: "feature-dev", contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    updateYpiStudioImplementationPlan(task.id, {
+      cwd,
+      action: "update_implementation_plan",
+      contextId,
+      implementationPlan: {
+        schemaVersion: 2,
+        maxConcurrency: 2,
+        subtasks: [
+          { id: "A", title: "A", order: 10, dependsOn: [] },
+          { id: "B", title: "B", order: 20, dependsOn: ["A"] },
+        ],
+      },
+    });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    recordYpiStudioUserApproval(cwd, contextId, "批准开始实现");
+    transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
+    claimYpiStudioImplementationSubtask(task.id, { cwd, action: "claim_implementation_subtask", subtaskId: "A", status: "queued", contextId });
+    const running = recordYpiStudioSubagentRun(cwd, task.id, {
+      id: "run-runtime-A",
+      taskId: task.id,
+      member: "implementer",
+      status: "running",
+      mode: "async",
+      subtaskId: "A",
+      startedAt: now,
+      updatedAt: now,
+    });
+    assert.equal(running.implementationProjection?.sessionRuntime?.status, "waiting_for_studio_children");
+    assert.equal(running.implementationProjection?.sessionRuntime?.activeRunCount, 1);
+    const blocked = recordYpiStudioSubagentRun(cwd, task.id, {
+      id: "run-runtime-A",
+      taskId: task.id,
+      member: "implementer",
+      status: "waiting_for_user",
+      mode: "async",
+      subtaskId: "A",
+      startedAt: now,
+      updatedAt: now,
+      summary: "Need user decision",
+      terminationReason: "waiting_for_user",
+    });
+    assert.equal(blocked.implementationProgress?.subtasks.A.status, "blocked");
+    assert.equal(blocked.implementationProgress?.subtasks.B.status, "blocked");
+    assert.equal(blocked.implementationProjection?.sessionRuntime?.status, "needs_user");
+    assert.match(blocked.implementationProjection?.sessionRuntime?.message ?? "", /失败 0、阻塞 2/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  const parentSessionId = "pi_terminal_continuation";
+  const payload = {
+    runId: "run-terminal-continuation",
+    taskId: "task-terminal-continuation",
+    subtaskId: "A",
+    member: "implementer",
+    cwd: process.cwd(),
+    parentSessionId,
+    status: "succeeded",
+    summary: "done",
+    finishedAt: now,
+  };
+  let calls = 0;
+  const received = new Promise((resolve) => {
+    registerYpiStudioSessionContinuation(parentSessionId, (actual) => {
+      calls += 1;
+      resolve(actual);
+    });
+  });
+  try {
+    assert.equal(scheduleYpiStudioChildRunContinuation(payload), true);
+    assert.equal(scheduleYpiStudioChildRunContinuation(payload), false);
+    const actual = await received;
+    assert.equal(actual.continuationKey, `${parentSessionId}:${payload.taskId}:${payload.runId}`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(calls, 1);
+  } finally {
+    unregisterYpiStudioSessionContinuation(parentSessionId);
   }
 }
 

@@ -24,9 +24,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ session
   const lastHeartbeatAt = state.lastCommandPollAt ?? state.lastSeenAt;
   const heartbeatAgeMs = ageMs(lastHeartbeatAt);
   const connectionStatus = getConnectionStatus(state.bound, heartbeatAgeMs);
+  const lifecycleStatus = state.bound && (connectionStatus === "stale" || connectionStatus === "offline") ? connectionStatus : state.lifecycleStatus;
 
   return NextResponse.json({
     ...state,
+    lifecycleStatus,
     connection: {
       status: connectionStatus,
       lastHeartbeatAt,

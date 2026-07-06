@@ -38,12 +38,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ shareId:
   const deadline = Date.now() + waitMs;
 
   do {
+    const share = manager.getShareControlProjection(shareId);
+    if (share.detachRequested) {
+      return NextResponse.json({ commands: [], share }, { status: 410, headers: { "Cache-Control": "no-store" } });
+    }
     const commands = manager.listCommandsForShare(shareId, false);
     if (commands.length > 0 || Date.now() >= deadline || req.signal.aborted) {
-      return NextResponse.json({ commands }, { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ commands, share: manager.getShareControlProjection(shareId) }, { headers: { "Cache-Control": "no-store" } });
     }
     await sleep(Math.min(POLL_INTERVAL_MS, deadline - Date.now()), req.signal);
   } while (Date.now() < deadline && !req.signal.aborted);
 
-  return NextResponse.json({ commands: [] }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ commands: [], share: manager.getShareControlProjection(shareId) }, { headers: { "Cache-Control": "no-store" } });
 }

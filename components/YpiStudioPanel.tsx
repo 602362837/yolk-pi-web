@@ -7,9 +7,11 @@ import type {
   YpiStudioAgentWarning,
   YpiStudioAgentsInitResponse,
   YpiStudioAgentsResponse,
+  YpiStudioImplementationCompactTimelineItem,
   YpiStudioImplementationRunProjection,
   YpiStudioImplementationSubtaskProjection,
   YpiStudioImplementationSubtaskStatus,
+  YpiStudioSessionRuntimeProjection,
   YpiStudioTaskDetail,
   YpiStudioTaskScope,
   YpiStudioTaskSummary,
@@ -830,6 +832,9 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
   if (!task) return <TaskDetailShell onBack={onBack}><PanelEmpty title="选择一个任务" description="点击任务卡片查看完整详情。" /></TaskDetailShell>;
   const canBind = !task.archived && !!currentSessionContextId;
   const alreadyBound = !!currentSessionContextId && task.contextIds.includes(currentSessionContextId);
+  const detailMachinePhase = task.implementationProjection
+    ? implementationMachinePhase(task, implementationStatusCounts(task, task.implementationProjection.subtasksWithStatus), task.implementationProjection.sessionRuntime)
+    : null;
 
   return (
     <TaskDetailShell onBack={onBack}>
@@ -838,6 +843,7 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <h3 style={{ margin: 0, color: "var(--text)", fontSize: 16, lineHeight: 1.3 }}>{task.title}</h3>
             <Badge label={task.status} tone={statusTone(task.status)} />
+            {detailMachinePhase && <Badge label={detailMachinePhase.label} tone={detailMachinePhase.tone} />}
           </div>
           <div style={{ marginTop: 4, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{task.key}</div>
         </div>
@@ -927,6 +933,14 @@ function TaskOverviewTab({ task, workflow }: { task: YpiStudioTaskDetail; workfl
 const IMPLEMENTATION_STATUS_ORDER: YpiStudioImplementationSubtaskStatus[] = ["running", "queued", "failed", "blocked", "ready", "waiting", "pending", "done", "skipped"];
 const IMPLEMENTATION_TERMINAL_STATUSES = new Set<YpiStudioImplementationSubtaskStatus>(["done", "skipped"]);
 
+type ImplementationMachineTone = "success" | "warning" | "error" | "neutral";
+type ImplementationMachinePhase = {
+  label: string;
+  tone: ImplementationMachineTone;
+  nextAction: string;
+  waitingLabel: string;
+};
+
 function displayImplementationStatus(status: YpiStudioImplementationSubtaskStatus | undefined): string {
   return status === "pending" ? "waiting" : status ?? "waiting";
 }
@@ -955,6 +969,26 @@ function implementationStatusCounts(task: YpiStudioTaskDetail, subtasks: YpiStud
   }
   for (const subtask of subtasks) counts[subtask.status] = (counts[subtask.status] ?? 0) + 1;
   return counts;
+}
+
+function implementationMachinePhase(task: YpiStudioTaskDetail, counts: Record<YpiStudioImplementationSubtaskStatus, number>, runtime?: YpiStudioSessionRuntimeProjection): ImplementationMachinePhase {
+  const active = counts.running + counts.queued;
+  const unfinished = counts.running + counts.queued + counts.ready + counts.waiting + counts.pending + counts.blocked + counts.failed;
+  if (runtime?.status === "needs_user" || counts.failed > 0 || counts.blocked > 0 || task.status === "blocked" || task.status === "changes_requested") {
+    return { label: "需要处理", tone: "error", waitingLabel: "需要用户处理", nextAction: runtime?.message ?? "请先查看失败、阻塞或等待用户输入的子任务，再决定重试、修复或调整计划。" };
+  }
+  if (task.status === "checking") return { label: "正在检查", tone: "warning", waitingLabel: "检查中", nextAction: "实现子任务已完成，主会话下一步会收集检查结果并决定完成或请求修改。" };
+  if (runtime?.status === "completed" || task.status === "completed" || (unfinished === 0 && counts.done + counts.skipped > 0)) {
+    return { label: "已完成", tone: "success", waitingLabel: "已完成", nextAction: "实现拆解已完成；如任务已归档，这里仅保留只读记录。" };
+  }
+  if (runtime?.status === "waiting_for_studio_children" || active > 0) {
+    return { label: "等待子任务", tone: "warning", waitingLabel: "正在等待并行子任务", nextAction: runtime?.message ?? "主会话正在等待运行中/队列中的子任务完成；完成后会继续收集结果并推进下一步。" };
+  }
+  if (counts.ready > 0 || task.implementationProjection?.nextSubtaskIds.length) {
+    return { label: "继续派发", tone: "neutral", waitingLabel: "有就绪子任务", nextAction: "依赖已满足；主会话下一步应 claim 并派发就绪子任务。" };
+  }
+  if (counts.waiting + counts.pending > 0) return { label: "等待子任务", tone: "neutral", waitingLabel: "等待依赖满足", nextAction: "仍有子任务在等待依赖完成；面板下方显示 waitingOn / blockedBy 摘要。" };
+  return { label: "等待子任务", tone: "neutral", waitingLabel: "等待状态刷新", nextAction: "暂无运行或就绪子任务；如长时间不变，请让主会话查看进度。" };
 }
 
 function buildImplementationSubtasks(task: YpiStudioTaskDetail): YpiStudioImplementationSubtaskProjection[] {
@@ -1062,12 +1096,38 @@ function TaskImplementationTab({ task }: { task: YpiStudioTaskDetail }) {
   if (!plan) return <PanelEmpty title="尚未保存实现拆解" description="旧任务或尚在规划中的任务可能没有 implementationPlan。请在架构师规划完成后保存结构化 Implementation Plan。" />;
 
   const counts = implementationStatusCounts(task, subtasks);
+  const runtime = task.implementationProjection?.sessionRuntime;
+  const machinePhase = implementationMachinePhase(task, counts, runtime);
   const activeSubtask = subtasks.find((subtask) => subtask.id === activeSubtaskId) ?? subtasks[0];
   const visibleSubtasks = statusFilter === "all" ? subtasks : subtasks.filter((subtask) => subtask.status === statusFilter);
   const waitingOrBlocked = subtasks.filter((subtask) => ["waiting", "pending", "blocked", "failed"].includes(subtask.status));
   const runningOrQueued = subtasks.filter((subtask) => subtask.status === "running" || subtask.status === "queued");
+  const readySubtasks = subtasks.filter((subtask) => subtask.status === "ready");
+  const doneSubtasks = subtasks.filter((subtask) => subtask.status === "done" || subtask.status === "skipped");
+  const timeline = task.implementationProjection?.compactTimeline ?? runtime?.timeline ?? [];
 
   return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <SectionCard title="状态机推进">
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <Badge label={machinePhase.label} tone={machinePhase.tone} />
+          <Badge label={machinePhase.waitingLabel} tone="neutral" />
+          <Badge label={`运行 ${counts.running}`} tone={counts.running ? "warning" : "neutral"} />
+          <Badge label={`队列 ${counts.queued}`} tone={counts.queued ? "warning" : "neutral"} />
+          <Badge label={`就绪 ${counts.ready}`} tone={counts.ready ? "success" : "neutral"} />
+          <Badge label={`阻塞 ${counts.blocked}`} tone={counts.blocked ? "warning" : "neutral"} />
+          <Badge label={`完成 ${counts.done + counts.skipped}/${subtasks.length}`} tone="success" />
+        </div>
+        <Notice tone={machinePhase.tone === "error" ? "error" : machinePhase.tone === "warning" ? "warning" : "info"} text={`下一步：${machinePhase.nextAction}`} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+          <DetailRow label="等待中的子任务" value={runningOrQueued.length ? runningOrQueued.map((subtask) => subtask.id).join("、") : "—"} mono />
+          <DetailRow label="下一批就绪" value={readySubtasks.length ? readySubtasks.map((subtask) => subtask.id).join("、") : task.implementationProjection?.nextSubtaskIds.join("、") || "—"} mono />
+          <DetailRow label="失败/阻塞" value={waitingOrBlocked.filter((subtask) => subtask.status === "failed" || subtask.status === "blocked").map((subtask) => subtask.id).join("、") || "—"} mono />
+          <DetailRow label="最近完成" value={doneSubtasks.slice(-3).map((subtask) => subtask.id).join("、") || "—"} mono />
+        </div>
+        {timeline.length > 0 && <ImplementationTimelinePreview timeline={timeline} />}
+      </div>
+    </SectionCard>
     <SectionCard title="实现拆解总览">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
         <DetailRow label="完成" value={`${counts.done + counts.skipped}/${subtasks.length}`} />
@@ -1144,6 +1204,20 @@ function ImplementationRunRow({ subtask }: { subtask: YpiStudioImplementationSub
     <DetailRow label="阶段" value={run?.phase ?? "—"} />
     <DetailRow label="工具" value={run?.currentTool?.toolName ?? "—"} />
     <DetailRow label="开始/排队" value={formatDateTime(subtask.startedAt ?? subtask.queuedAt ?? run?.startedAt ?? "")} />
+  </div>;
+}
+
+function ImplementationTimelinePreview({ timeline }: { timeline: YpiStudioImplementationCompactTimelineItem[] }) {
+  const items = timeline.slice(0, 6);
+  return <div style={{ border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)", padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 800 }}>关键子任务状态</div>
+    {items.map((item) => (
+      <div key={item.id} style={{ display: "grid", gridTemplateColumns: "minmax(90px, 1fr) minmax(70px, auto) minmax(120px, 2fr)", gap: 8, alignItems: "center", color: "var(--text-muted)", fontSize: 12 }}>
+        <span style={{ color: "var(--text)", fontWeight: 700, overflowWrap: "anywhere" }}>{item.id} · {item.title}</span>
+        <Badge label={displayImplementationStatus(item.status)} tone={statusTone(item.status)} />
+        <span style={{ color: item.status === "failed" || item.status === "blocked" ? "#f59e0b" : "var(--text-dim)", overflowWrap: "anywhere" }}>{item.reason ?? item.summary ?? item.runId ?? formatDateTime(item.updatedAt)}</span>
+      </div>
+    ))}
   </div>;
 }
 

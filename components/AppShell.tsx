@@ -470,19 +470,23 @@ export function AppShell() {
   }, [loadStudioSessionTask, studioSessionTaskRefreshKey]);
 
   const studioSessionTaskKey = studioSessionTask?.task?.key ?? null;
+  const studioRuntimeStatus = studioSessionTask?.task?.implementationProjection?.sessionRuntime?.status;
   const studioActiveRunCount =
     (studioSessionTask?.task?.subagents.filter((run) => run.status === "running" || run.status === "queued" || run.status === "waiting_for_user").length ?? 0)
     + studioLiveOverlays.filter((overlay) => overlay.running || overlay.status === "running" || overlay.status === "queued" || overlay.status === "waiting_for_user").length
     + (studioSessionTask?.task?.implementationProjection?.statusCounts.running ?? 0)
     + (studioSessionTask?.task?.implementationProjection?.statusCounts.queued ?? 0);
   const studioHasActiveRuns = studioActiveRunCount > 0;
+  const studioNeedsAttention = studioRuntimeStatus === "needs_user";
+  const studioWaitingForChildren = studioRuntimeStatus === "waiting_for_studio_children";
 
   useEffect(() => {
     if (!selectedSession || selectedSession.archived) return;
     if (!studioSessionTaskKey && !chatAgentRunning) return;
-    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), studioHasActiveRuns || chatAgentRunning ? 4000 : 20000);
+    const intervalMs = studioHasActiveRuns || chatAgentRunning || studioWaitingForChildren || studioNeedsAttention ? 4000 : 20000;
+    const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), intervalMs);
     return () => window.clearInterval(interval);
-  }, [chatAgentRunning, selectedSession, studioHasActiveRuns, studioSessionTaskKey]);
+  }, [chatAgentRunning, selectedSession, studioHasActiveRuns, studioNeedsAttention, studioSessionTaskKey, studioWaitingForChildren]);
 
   useEffect(() => () => {
     if (studioToolRefreshTimerRef.current !== null) window.clearTimeout(studioToolRefreshTimerRef.current);
@@ -1202,6 +1206,7 @@ export function AppShell() {
               onContextUsageChange={handleContextUsageChange}
               onSubagentChange={handleSubagentChange}
               onStudioToolProgressChange={handleStudioToolProgressChange}
+              studioTask={studioSessionTask?.task ?? null}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
               defaultThinkingLevel={webConfig?.yolk.defaultThinkingLevel}
             />

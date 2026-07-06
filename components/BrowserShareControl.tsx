@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { BrowserShareCommand, BrowserShareSessionState } from "@/lib/browser-share-types";
+import type { BrowserShareCommand, BrowserShareCommandType, BrowserShareDebuggerSummary, BrowserShareLifecycleStatus, BrowserShareOperatorInfo, BrowserShareSessionState } from "@/lib/browser-share-types";
 
 interface Props {
   cwd?: string | null;
@@ -42,6 +42,53 @@ function formatTime(value?: string): string {
 
 function commandSummary(command: BrowserShareUiCommand): string {
   return command.reason || command.elementId || command.url || command.result?.message || "agent 请求操作共享页面";
+}
+
+function shortSessionId(value?: string): string {
+  if (!value) return "—";
+  return value.length > 12 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
+}
+
+function lifecycleLabel(value?: BrowserShareLifecycleStatus): string {
+  if (value === "pending_code") return "待绑定";
+  if (value === "bound") return "已绑定";
+  if (value === "stale") return "连接变慢";
+  if (value === "offline") return "服务离线";
+  if (value === "stopped") return "已停止";
+  if (value === "unbound") return "已解绑";
+  if (value === "replaced") return "已替换";
+  if (value === "expired") return "已过期";
+  if (value === "tab_closed") return "Tab 已关闭";
+  if (value === "not_found") return "未找到";
+  return "未连接";
+}
+
+function debuggerLabel(debuggerState?: BrowserShareDebuggerSummary): string {
+  if (!debuggerState) return "旧版/未知";
+  const state = debuggerState.state;
+  if (debuggerState.attached || state === "attached") return debuggerState.persistent ? "常驻已连接" : "已连接";
+  if (state === "attaching") return "连接中";
+  if (state === "blocked") return "被其他调试器占用";
+  if (state === "failed") return "连接失败";
+  if (state === "detached") return "已断开";
+  if (state === "unsupported") return "不支持";
+  return debuggerState.enabled ? "已启用但未确认连接" : "未启用";
+}
+
+function debuggerUnavailable(debuggerState?: BrowserShareDebuggerSummary): boolean {
+  if (!debuggerState) return false;
+  if (debuggerState.state === "blocked" || debuggerState.state === "failed" || debuggerState.state === "detached" || debuggerState.state === "unsupported") return true;
+  return debuggerState.desired === true && debuggerState.attached === false;
+}
+
+function permissionLabel(operator?: BrowserShareOperatorInfo, fallback?: BrowserShareSessionState["permissionMode"]): string {
+  const mode = operator?.permissionMode ?? fallback;
+  if (mode === "interactive") return "interactive（click/scroll 可自动执行；type/navigate 仍需允许一次）";
+  return "readonly（所有操作都需要你允许一次）";
+}
+
+function commandListLabel(commands?: BrowserShareCommandType[]): string {
+  return commands?.length ? commands.join(" / ") : "无";
 }
 
 export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }: Props) {
@@ -150,15 +197,31 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
   };
 
   const bound = state?.bound === true;
-  const label = bound ? `Chrome: ${state?.tab?.title ?? "已共享"}` : "绑定浏览器分享";
+  const lifecycleStatus = state?.lifecycleStatus;
+  const operator = state?.operator;
+  const isDebuggerUnavailable = debuggerUnavailable(state?.debugger);
+  const isOffline = lifecycleStatus === "offline" || state?.connection?.status === "offline";
+  const isStale = lifecycleStatus === "stale" || state?.connection?.status === "stale";
+  const isAttached = state?.debugger?.attached === true || state?.debugger?.state === "attached";
+  const label = bound
+    ? isDebuggerUnavailable
+      ? "Chrome 共享异常"
+      : isOffline
+        ? "Chrome 共享离线"
+        : isAttached
+          ? `Chrome 已共享: ${state?.tab?.title ?? "当前 tab"}`
+          : `Chrome: ${state?.tab?.title ?? "已共享"}`
+    : state?.status === "pending"
+      ? "Browser Share：等待插件"
+      : "绑定浏览器分享";
   const canCreateSession = !!cwd && !!ensureSession;
   const canUse = (!!sessionId || canCreateSession) && !disabled;
-  const connectionLabel = state?.connection?.status === "active"
-    ? "在线"
-    : state?.connection?.status === "stale"
+  const connectionLabel = isOffline
+    ? "离线"
+    : isStale
       ? "连接变慢"
-      : state?.connection?.status === "offline"
-        ? "离线"
+      : state?.connection?.status === "active"
+        ? "在线"
         : state?.status === "bound"
           ? "已连接"
           : state?.status === "pending"
@@ -166,6 +229,15 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
             : state?.status === "expired"
               ? "已过期"
               : "未连接";
+  const pillStyle = isDebuggerUnavailable
+    ? { background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.34)", color: "#ef4444" }
+    : isOffline || isStale
+      ? { background: "rgba(234,179,8,0.10)", border: "1px solid rgba(234,179,8,0.34)", color: "#ca8a04" }
+      : bound && isAttached
+        ? { background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.28)", color: "#16a34a" }
+        : bound
+          ? { background: "rgba(59,130,246,0.10)", border: "1px solid rgba(59,130,246,0.28)", color: "#2563eb" }
+          : { background: "none", border: "none", color: "var(--text-muted)" };
 
   return (
     <div style={{ position: "relative" }}>
@@ -179,10 +251,10 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
           maxWidth: 190,
           padding: "8px 10px",
           height: 32,
-          background: bound ? "rgba(34,197,94,0.10)" : "none",
-          border: bound ? "1px solid rgba(34,197,94,0.28)" : "none",
+          background: pillStyle.background,
+          border: pillStyle.border,
           borderRadius: 9,
-          color: bound ? "#16a34a" : "var(--text-muted)",
+          color: pillStyle.color,
           cursor: canUse ? "pointer" : "not-allowed",
           fontSize: 12,
           opacity: canUse ? 1 : 0.5,
@@ -226,17 +298,31 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
               <div style={{ color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{state?.tab?.url}</div>
               {state?.tab?.origin && <div style={{ color: "var(--text-dim)", marginTop: 3 }}>Origin：{state.tab.origin}</div>}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8, color: "var(--text-muted)" }}>
-                <span>权限：{state?.permissionMode === "interactive" ? "可操作" : "只读"}</span>
+                <span>生命周期：{lifecycleLabel(lifecycleStatus)}</span>
                 <span>连接：{connectionLabel}</span>
+                <span>权限：{operator?.permissionMode === "interactive" || state?.permissionMode === "interactive" ? "interactive" : "readonly"}</span>
+                <span>Debugger：{debuggerLabel(state?.debugger)}</span>
                 <span>采集：{state?.captureMode === "debugger" ? "Debugger/CDP" : state?.captureMode === "debugger_fallback" ? "CDP fallback" : state?.captureMode ?? "DOM"}</span>
                 <span>截图：{state?.screenshot?.available || state?.screenshot?.data ? "可用" : state?.screenshot?.byteLength ? "已截取" : state?.screenshot?.error ? "失败" : "—"}</span>
                 <span>快照：{formatTime(state?.connection?.lastSnapshotAt ?? state?.lastSnapshotAt ?? state?.snapshot?.capturedAt)}</span>
-                <span>轮询：{formatTime(state?.connection?.lastCommandPollAt ?? state?.connection?.lastHeartbeatAt ?? state?.lastCommandPollAt ?? state?.lastSeenAt)}</span>
+                <span>心跳：{formatTime(state?.connection?.lastHeartbeatAt ?? state?.connection?.lastCommandPollAt ?? state?.lastCommandPollAt ?? state?.lastSeenAt)}</span>
               </div>
-              {(state?.source?.baseUrl || state?.debugger) && (
-                <div style={{ marginTop: 6, color: "var(--text-dim)", lineHeight: 1.4 }}>
-                  {state.source?.baseUrl && <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>服务：{state.source.baseUrl}</div>}
-                  {state.debugger && <div>Debugger：{state.debugger.attached ? "已连接" : state.debugger.enabled ? "已启用" : "未启用"}{state.debugger.lastError ? `（${state.debugger.lastError.slice(0, 90)}）` : ""}</div>}
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: "var(--bg-subtle)", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                <div style={{ fontWeight: 650, color: "var(--text)" }}>可操作对象</div>
+                <div>当前 ypi chat/session：{shortSessionId(operator?.boundSessionId ?? state?.sessionId)}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>服务：{operator?.serviceBaseUrl ?? state?.source?.baseUrl ?? "—"}</div>
+                <div>权限：{permissionLabel(operator, state?.permissionMode)}</div>
+                <div>可自动执行：{commandListLabel(operator?.autoAllowedCommands)}</div>
+                <div>需允许一次：{commandListLabel(operator?.approvalRequiredCommands)}</div>
+              </div>
+              <div style={{ marginTop: 8, color: isDebuggerUnavailable ? "#ef4444" : "var(--text-dim)", lineHeight: 1.4 }}>
+                Debugger：{debuggerLabel(state?.debugger)}{state?.debugger?.persistent ? "，Chrome 顶部会持续显示调试提示" : state?.debugger ? "（旧版或非持久模式，请更新插件以获得常驻提示）" : "（旧版插件未上报状态，请更新插件）"}
+                {state?.debugger?.lastError ? `；${state.debugger.lastError.slice(0, 120)}` : ""}
+                {state?.debugger?.detachReason ? `；${state.debugger.detachReason.slice(0, 120)}` : ""}
+              </div>
+              {isDebuggerUnavailable && (
+                <div style={{ marginTop: 6, padding: 8, border: "1px solid rgba(239,68,68,0.35)", borderRadius: 8, background: "rgba(239,68,68,0.08)", color: "#ef4444", lineHeight: 1.45 }}>
+                  Debugger 未连接。为避免不可感知操作，agent action tools 暂不会执行；请在 Chrome 插件中重试或重新分享，并关闭 DevTools/其他 debugger 冲突。
                 </div>
               )}
               {state?.snapshot?.visibleText && (

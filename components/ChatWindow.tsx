@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
-import type { YpiStudioLiveRunOverlay } from "@/lib/ypi-studio-types";
+import type { YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection } from "@/lib/ypi-studio-types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
@@ -28,6 +28,7 @@ interface Props {
   onSessionStatsChange?: (stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;
+  studioTask?: YpiStudioTaskWidgetProjection | null;
   defaultToolPreset?: PiWebToolPreset;
   defaultThinkingLevel?: PiWebThinkingLevel;
 }
@@ -59,6 +60,25 @@ function studioPolicyWarnings(value: unknown): string[] | undefined {
 function textFromContent(value: unknown): string | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.map((item) => isRecord(item) && item.type === "text" ? optionalString(item.text) : undefined).filter(Boolean).join(" ").slice(0, 300) || undefined;
+}
+
+function studioDisplayStatusLabel(status: string): string {
+  if (status === "running") return "运行中";
+  if (status === "queued") return "队列中";
+  if (status === "ready") return "就绪";
+  if (status === "done") return "完成";
+  if (status === "failed") return "失败";
+  if (status === "blocked") return "阻塞";
+  if (status === "skipped") return "跳过";
+  return "等待";
+}
+
+function studioDisplayStatusColor(status: string): string {
+  if (status === "failed" || status === "blocked") return "#f59e0b";
+  if (status === "running" || status === "queued") return "var(--accent)";
+  if (status === "done" || status === "skipped") return "#22c55e";
+  if (status === "ready") return "#38bdf8";
+  return "var(--text-dim)";
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -128,7 +148,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, defaultToolPreset, defaultThinkingLevel }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, studioTask, defaultToolPreset, defaultThinkingLevel }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -282,6 +302,53 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     : null;
 
   const isArchived = !!session?.archived;
+  const studioRuntime = studioTask?.implementationProjection?.sessionRuntime;
+  const studioRuntimeCounts = studioTask?.implementationProjection?.statusCounts;
+  const studioWaitingTotal = (studioRuntime?.activeRunCount ?? 0) + (studioRuntime?.queuedRunCount ?? 0);
+  const studioTimeline = studioRuntime?.timeline.slice(0, 5) ?? [];
+  const studioWaitingBannerElement = !agentRunning && studioRuntime && (studioRuntime.status === "waiting_for_studio_children" || studioRuntime.status === "needs_user") ? (
+    <div style={{
+      margin: "10px auto 4px",
+      maxWidth: 820,
+      padding: "10px 12px",
+      border: `1px solid ${studioRuntime.status === "needs_user" ? "rgba(245,158,11,0.35)" : "rgba(37,99,235,0.28)"}`,
+      borderRadius: 12,
+      background: studioRuntime.status === "needs_user" ? "rgba(245,158,11,0.08)" : "rgba(37,99,235,0.07)",
+      color: "var(--text-muted)",
+      fontSize: 12,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)", fontWeight: 800 }}>
+        <span className={studioRuntime.status === "waiting_for_studio_children" ? "animate-[pulse_1.8s_infinite]" : undefined} style={{ width: 8, height: 8, borderRadius: 999, background: studioRuntime.status === "needs_user" ? "#f59e0b" : "var(--accent)", flexShrink: 0 }} />
+        <span>{studioRuntime.status === "needs_user" ? "Studio 需要你处理" : `正在等待 ${studioWaitingTotal} 个并行子任务完成，后台仍在工作`}</span>
+      </div>
+      <div style={{ marginTop: 5 }}>{studioRuntime.message}</div>
+      {studioRuntimeCounts && (
+        <div style={{ marginTop: 7, display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {[
+            ["运行中", studioRuntimeCounts.running, "var(--accent)"],
+            ["完成", studioRuntimeCounts.done + studioRuntimeCounts.skipped, "#22c55e"],
+            ["等待", studioRuntimeCounts.waiting + studioRuntimeCounts.pending + studioRuntimeCounts.ready, "var(--text-dim)"],
+            ["失败", studioRuntimeCounts.failed, "#ef4444"],
+            ["阻塞", studioRuntimeCounts.blocked, "#f59e0b"],
+          ].filter(([, count]) => Number(count) > 0).map(([label, count, color]) => (
+            <span key={String(label)} style={{ padding: "2px 7px", borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)", color: color as string, background: "color-mix(in srgb, var(--bg-panel) 72%, transparent)", fontSize: 10, fontWeight: 800 }}>{label} {count}</span>
+          ))}
+        </div>
+      )}
+      {studioTimeline.length > 0 && (
+        <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+          {studioTimeline.map((item) => (
+            <div key={item.id} style={{ display: "grid", gridTemplateColumns: "54px 1fr", gap: 8, alignItems: "center" }}>
+              <span style={{ color: studioDisplayStatusColor(item.status), fontSize: 10, fontWeight: 900 }}>{studioDisplayStatusLabel(item.displayStatus)}</span>
+              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><span style={{ color: "var(--text)", fontWeight: 800 }}>{item.id}</span> · {item.title}{item.summary ? ` · ${item.summary}` : item.reason ? ` · ${item.reason}` : ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {studioRuntime.status === "waiting_for_studio_children" && <div style={{ marginTop: 7, color: "var(--text-dim)", fontSize: 11 }}>你可以等待，也可以输入“先停一下 / 继续跑 / 重试这个”来干预。</div>}
+    </div>
+  ) : null;
 
   const archivedBannerElement = isArchived ? (
     <div style={{
@@ -441,6 +508,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       <div className="relative flex flex-1 overflow-hidden">
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 [scrollbar-width:none]">
           <div className="mx-auto max-w-[820px] px-4">
+            {studioWaitingBannerElement}
 
             {(() => {
               const toolResultsMap = new Map<string, import("@/lib/types").ToolResultMessage>();

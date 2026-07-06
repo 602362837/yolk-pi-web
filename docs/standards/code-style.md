@@ -35,6 +35,7 @@ Current lightweight scripts:
 
 ```bash
 npm run test:studio-policy
+npm run test:studio-dag
 ```
 
-This script exercises the pure YPI Studio member model/thinking policy resolver without introducing a test framework. If a broader test framework is introduced later, document it here and update `AGENTS.md`.
+`test:studio-policy` exercises the pure YPI Studio member model/thinking policy resolver. `test:studio-dag` exercises YPI Studio implementation DAG readiness, approval gating, runtime waiting/needs-user projection, and terminal continuation idempotency without introducing a test framework. If a broader test framework is introduced later, document it here and update `AGENTS.md`.

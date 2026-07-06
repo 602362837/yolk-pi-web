@@ -1,6 +1,6 @@
 import type { AgentToolResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getBrowserShareManager } from "./browser-share-manager";
-import type { BrowserShareCommand, BrowserShareCommandStatus, BrowserShareCommandType, BrowserSharePageSnapshot } from "./browser-share-types";
+import type { BrowserShareCommand, BrowserShareCommandStatus, BrowserShareCommandType, BrowserSharePageSnapshot, BrowserShareSessionState } from "./browser-share-types";
 
 type PiToolResult = AgentToolResult<unknown>;
 type ToolUpdateCallback = (result: PiToolResult) => void;
@@ -40,12 +40,22 @@ function isToolUpdateCallback(value: unknown): value is ToolUpdateCallback {
 
 function commandStatusMessage(status: BrowserShareCommandStatus): string {
   if (status === "pending_approval") return "Browser Share command is waiting for one-time user approval.";
-  if (status === "queued") return "Browser Share command is queued for the Chrome extension.";
-  if (status === "running") return "Browser Share command is running in the shared Chrome tab.";
+  if (status === "queued") return "Browser Share command is queued for the Chrome extension with persistent debugger required.";
+  if (status === "running") return "Browser Share command is running in the shared Chrome tab through the persistent debugger.";
   if (status === "succeeded") return "Browser Share command succeeded.";
-  if (status === "failed") return "Browser Share command failed.";
+  if (status === "failed") return "Browser Share command failed. If the debugger is detached, blocked, or lost, re-share the tab or close conflicting DevTools/other debuggers.";
   if (status === "rejected") return "Browser Share command was rejected by the user.";
   return "Browser Share command timed out before completion.";
+}
+
+function debuggerUnavailableReason(state: BrowserShareSessionState): string | undefined {
+  const debuggerState = state.debugger;
+  if (!debuggerState) return undefined;
+  const status = debuggerState.state;
+  const unavailable = status === "blocked" || status === "failed" || status === "detached" || status === "unsupported" || (debuggerState.desired === true && debuggerState.attached === false);
+  if (!unavailable) return undefined;
+  const detail = debuggerState.lastError ?? debuggerState.detachReason;
+  return `Browser Share action tools require the shared tab's persistent Chrome debugger to be attached. Current debugger state is ${status ?? (debuggerState.attached ? "attached" : "detached")}${detail ? `: ${detail}` : ""}. Close DevTools/other debuggers or re-share the tab, then retry.`;
 }
 
 function emitCommandUpdate(onUpdate: unknown, command: BrowserShareCommand): void {
@@ -118,6 +128,9 @@ function compactCommandResult(command: BrowserShareCommand): unknown {
     debugger: command.result?.debugger ?? snapshot?.debugger ?? state.debugger,
     screenshot: command.result?.screenshot ?? snapshot?.screenshot ?? state.screenshot,
     source: state.source,
+    lifecycleStatus: state.lifecycleStatus,
+    operator: state.operator,
+    persistentDebuggerRequired: true,
     snapshot: summarizeSnapshot(snapshot),
   };
 }
@@ -209,12 +222,13 @@ function registerCommandTool(pi: Pick<ExtensionAPI, "registerTool">, name: strin
     name,
     label: name,
     description,
-    promptSnippet: `${name}: operate on the Browser Share tab for the current ypi session only and wait for the terminal result.`,
+    promptSnippet: `${name}: operate on the Browser Share tab for the current ypi session only, requiring the tab's persistent Chrome debugger to stay attached, and wait for the terminal result.`,
     promptGuidelines: [
-      "Use Browser Share command tools only after checking browser_share_status/snapshot.",
+      "Use Browser Share command tools only after checking browser_share_status/snapshot for the current session.",
       "These tools never accept shareId; the current ypi session binding is used to prevent cross-session access.",
+      "Action tools require the extension's persistent Chrome debugger to be attached. If status/debugger reports detached, blocked, failed, unsupported, stale, or offline, tell the user to reopen/re-share or close DevTools/other debuggers before retrying.",
       "Readonly mode requires approval for all actions; interactive mode still requires approval for type and navigate.",
-      "Action results are compact. Use browser_share_snapshot when you need the full latest sanitized page snapshot.",
+      "Action results include lifecycle/debugger/operator metadata and are compact. Use browser_share_snapshot when you need the full latest sanitized page snapshot.",
     ],
     parameters: commandParameters(type),
     execute: async (_id: string, inputValue: unknown, signal?: AbortSignal, onUpdate?: unknown, ctx?: ExtensionContext): Promise<PiToolResult> => {
@@ -223,6 +237,8 @@ function registerCommandTool(pi: Pick<ExtensionAPI, "registerTool">, name: strin
       const manager = getBrowserShareManager();
       const state = manager.getSessionState(sessionId);
       if (!state.bound) throw new Error("No Browser Share is bound to this session. Bind Browser Share before using action tools.");
+      const debuggerError = debuggerUnavailableReason(state);
+      if (debuggerError) throw new Error(debuggerError);
 
       const command = manager.enqueueCommand(sessionId, type, buildCommandPayload(type, input));
       emitCommandUpdate(onUpdate, command);
@@ -245,7 +261,11 @@ export function createBrowserShareExtension() {
       label: "Browser Share Status",
       description: "Read the Chrome Browser Share binding state for the current ypi session.",
       promptSnippet: "browser_share_status: check whether the current ypi session has a bound Chrome Browser Share.",
-      promptGuidelines: ["Do not ask for or pass shareId. Browser Share tools are scoped to the current ypi session."],
+      promptGuidelines: [
+        "Do not ask for or pass shareId. Browser Share tools are scoped to the current ypi session.",
+        "Check lifecycleStatus, operator, connection, and debugger before suggesting actions; persistent debugger must be attached for action tools.",
+        "If debugger is detached/blocked/failed or the share is offline, explain that Chrome is not currently operable and ask the user to re-share or resolve debugger conflicts.",
+      ],
       parameters: { type: "object", properties: {} },
       execute: async (_id: string, _inputValue: Record<string, never>, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: ExtensionContext): Promise<PiToolResult> => {
         return textResult(getBrowserShareManager().getSessionState(sessionIdFromContext(ctx)));
@@ -260,6 +280,8 @@ export function createBrowserShareExtension() {
       promptGuidelines: [
         "Use this only for the current session's bound Browser Share.",
         "Snapshots are sanitized and should not include password/payment/hidden token values.",
+        "Snapshot reads remain session-scoped; do not request or pass shareId.",
+        "If captureMode is debugger_fallback or debugger is not attached, treat action tools as unavailable until the user restores the persistent debugger.",
       ],
       parameters: { type: "object", properties: {} },
       execute: async (_id: string, _inputValue: Record<string, never>, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: ExtensionContext): Promise<PiToolResult> => {
@@ -275,7 +297,7 @@ export function createBrowserShareExtension() {
       label: "Browser Share Selection",
       description: "Read the latest selected text from the Chrome page shared to the current ypi session.",
       promptSnippet: "browser_share_get_selection: read selected text from the current shared Chrome page.",
-      promptGuidelines: ["Use after browser_share_status confirms a bound share."],
+      promptGuidelines: ["Use after browser_share_status confirms a bound share for the current session; do not request shareId."],
       parameters: { type: "object", properties: {} },
       execute: async (_id: string, _inputValue: Record<string, never>, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: ExtensionContext): Promise<PiToolResult> => {
         const state = getBrowserShareManager().getSessionState(sessionIdFromContext(ctx));

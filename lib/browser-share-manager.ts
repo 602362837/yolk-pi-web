@@ -7,13 +7,18 @@ import type {
   BrowserShareCommandStatus,
   BrowserShareCommandType,
   BrowserShareConnectionStatus,
+  BrowserShareControlProjection,
   BrowserShareCreateRequest,
   BrowserShareCreateResponse,
+  BrowserShareDebuggerState,
   BrowserShareDebuggerSummary,
+  BrowserShareLifecycleStatus,
+  BrowserShareOperatorInfo,
   BrowserShareElementBounds,
   BrowserSharePageSnapshot,
   BrowserSharePermissionMode,
   BrowserShareScreenshotSummary,
+  BrowserShareRuntimeUpdate,
   BrowserShareSessionState,
   BrowserShareSourceInfo,
   BrowserShareTabInfo,
@@ -29,6 +34,9 @@ const CAPABILITY_KEY_LIMIT = 40;
 const CAPABILITY_VALUE_LIMIT = 120;
 const COMPLETED_COMMAND_TTL_MS = 10 * 60 * 1000;
 const COMPLETED_COMMAND_LIMIT = 100;
+const TOMBSTONE_TTL_MS = 10 * 60 * 1000;
+
+const ALL_COMMAND_TYPES: BrowserShareCommandType[] = ["click", "type", "scroll", "navigate"];
 
 type ShareRecord = {
   shareId: string;
@@ -46,12 +54,24 @@ type ShareRecord = {
   lastCommandPollAt?: string;
   lastResultAt?: string;
   status: BrowserShareConnectionStatus;
+  lifecycleStatus: BrowserShareLifecycleStatus;
   extensionVersion?: string;
   source?: BrowserShareSourceInfo;
   capabilities?: BrowserShareCapabilities;
   captureMode?: BrowserShareCaptureMode;
   debugger?: BrowserShareDebuggerSummary;
   screenshot?: BrowserShareScreenshotSummary;
+};
+
+type ShareTombstone = {
+  shareId: string;
+  sessionId?: string;
+  lifecycleStatus: BrowserShareLifecycleStatus;
+  detachReason: string;
+  createdAt: string;
+  expiresAt: string;
+  permissionMode?: BrowserSharePermissionMode;
+  debugger?: BrowserShareDebuggerSummary;
 };
 
 type CommandWaiter = {
@@ -149,14 +169,23 @@ function sanitizeViewport(input: unknown): BrowserShareViewport | undefined {
   };
 }
 
+function sanitizeDebuggerState(value: unknown): BrowserShareDebuggerState | undefined {
+  return value === "unsupported" || value === "attaching" || value === "attached" || value === "detached" || value === "blocked" || value === "failed" ? value : undefined;
+}
+
 function sanitizeDebugger(input: unknown): BrowserShareDebuggerSummary | undefined {
   if (!isRecord(input)) return undefined;
   return {
     enabled: input.enabled === true,
     attached: typeof input.attached === "boolean" ? input.attached : undefined,
+    persistent: typeof input.persistent === "boolean" ? input.persistent : undefined,
+    desired: typeof input.desired === "boolean" ? input.desired : undefined,
+    state: sanitizeDebuggerState(input.state),
+    attachedAt: clampText(input.attachedAt, 80),
+    detachedAt: clampText(input.detachedAt, 80),
+    detachReason: clampText(input.detachReason, 500),
     protocolVersion: clampText(input.protocolVersion, 80),
     lastError: clampText(input.lastError, 500),
-    detachedAt: clampText(input.detachedAt, 80),
     screenshotAvailable: typeof input.screenshotAvailable === "boolean" ? input.screenshotAvailable : undefined,
   };
 }
@@ -242,10 +271,44 @@ function isTerminalStatus(status: BrowserShareCommandStatus): boolean {
   return status === "succeeded" || status === "failed" || status === "rejected" || status === "timeout";
 }
 
+function isPendingCommandStatus(status: BrowserShareCommandStatus): boolean {
+  return status === "pending_approval";
+}
+
+function isRunningCommandStatus(status: BrowserShareCommandStatus): boolean {
+  return status === "queued" || status === "running";
+}
+
+function terminalMessage(status: BrowserShareLifecycleStatus, fallback: string): string {
+  if (status === "expired") return "Browser share code expired";
+  if (status === "unbound") return "Browser share was unbound";
+  if (status === "replaced") return "Browser share was replaced";
+  if (status === "tab_closed") return "Shared browser tab was closed";
+  if (status === "stopped") return "Browser share was stopped";
+  if (status === "not_found") return "Browser share was not found";
+  return fallback;
+}
+
+function operatorForShare(share: ShareRecord): BrowserShareOperatorInfo {
+  const approvalRequiredCommands = ALL_COMMAND_TYPES.filter((type) => commandNeedsApproval(type, share.permissionMode));
+  const autoAllowedCommands = ALL_COMMAND_TYPES.filter((type) => !commandNeedsApproval(type, share.permissionMode));
+  return {
+    bindingStatus: share.sessionId ? "bound" : "pending_code",
+    serviceBaseUrl: share.source?.baseUrl,
+    boundSessionId: share.sessionId,
+    permissionMode: share.permissionMode,
+    canRead: Boolean(share.sessionId),
+    canOperate: Boolean(share.sessionId),
+    autoAllowedCommands,
+    approvalRequiredCommands,
+  };
+}
+
 export class BrowserShareManager {
   private shares = new Map<string, ShareRecord>();
   private shareCodes = new Map<string, string>();
   private sessionBindings = new Map<string, string>();
+  private tombstones = new Map<string, ShareTombstone>();
   private commands = new Map<string, BrowserShareCommand>();
   private commandWaiters = new Map<string, Set<CommandWaiter>>();
 
@@ -268,6 +331,7 @@ export class BrowserShareManager {
       createdAt,
       expiresAt,
       status: "pending",
+      lifecycleStatus: "pending_code",
       lastSnapshotAt: snapshot?.capturedAt,
       lastSeenAt: createdAt,
       extensionVersion: clampText(request.extensionVersion, 120),
@@ -291,11 +355,12 @@ export class BrowserShareManager {
     if (share.sessionId) throw new Error("Browser share code has already been used");
     this.shareCodes.delete(normalizedCode);
     const previousShareId = this.sessionBindings.get(sessionId);
-    if (previousShareId) this.removeShare(previousShareId, "Browser share was replaced");
+    if (previousShareId) this.removeShare(previousShareId, "replaced", "Browser share was replaced");
     const boundAt = nowIso();
     share.sessionId = sessionId;
     share.boundAt = boundAt;
     share.status = "bound";
+    share.lifecycleStatus = "bound";
     share.lastSeenAt = boundAt;
     this.sessionBindings.set(sessionId, shareId);
     return this.getSessionState(sessionId);
@@ -303,7 +368,7 @@ export class BrowserShareManager {
 
   unbindSession(sessionId: string): BrowserShareSessionState {
     const shareId = this.sessionBindings.get(sessionId);
-    if (shareId) this.removeShare(shareId, "Browser share was unbound");
+    if (shareId) this.removeShare(shareId, "unbound", "Browser share was unbound");
     return this.getSessionState(sessionId);
   }
 
@@ -311,13 +376,30 @@ export class BrowserShareManager {
     this.cleanupExpired();
     const shareId = this.sessionBindings.get(sessionId);
     const share = shareId ? this.shares.get(shareId) : undefined;
-    if (!share) return { sessionId, bound: false, status: "disconnected", pendingCommands: [], activeCommands: [], recentCommands: [] };
+    if (!share) return {
+      sessionId,
+      bound: false,
+      status: "disconnected",
+      lifecycleStatus: "not_found",
+      operator: {
+        bindingStatus: "none",
+        canRead: false,
+        canOperate: false,
+        autoAllowedCommands: [],
+        approvalRequiredCommands: [],
+      },
+      pendingCommands: [],
+      activeCommands: [],
+      recentCommands: [],
+    };
     const activeCommands = this.listActiveCommandsForSession(sessionId);
     return {
       sessionId,
       bound: true,
       shareId: share.shareId,
       status: share.status,
+      lifecycleStatus: share.lifecycleStatus,
+      operator: operatorForShare(share),
       permissionMode: share.permissionMode,
       tab: share.snapshot?.tab ?? share.tab,
       snapshot: share.snapshot,
@@ -328,8 +410,8 @@ export class BrowserShareManager {
       lastSeenAt: share.lastSeenAt,
       lastCommandPollAt: share.lastCommandPollAt,
       lastResultAt: share.lastResultAt,
-      pendingCommands: activeCommands,
-      activeCommands,
+      pendingCommands: activeCommands.filter((command) => isPendingCommandStatus(command.status)),
+      activeCommands: activeCommands.filter((command) => isRunningCommandStatus(command.status)),
       recentCommands: this.listRecentCommandsForSession(sessionId),
       extensionVersion: share.extensionVersion,
       source: share.source,
@@ -354,7 +436,81 @@ export class BrowserShareManager {
     share.lastSnapshotAt = sanitized.capturedAt;
     share.lastSeenAt = updatedAt;
     share.status = share.sessionId ? "bound" : "pending";
+    share.lifecycleStatus = share.sessionId ? "bound" : "pending_code";
     return share.sessionId ? this.getSessionState(share.sessionId) : { shareId, bound: false };
+  }
+
+  updateShareRuntime(shareId: string, runtime: BrowserShareRuntimeUpdate): BrowserShareControlProjection {
+    this.cleanupExpired();
+    const share = this.shares.get(shareId);
+    if (!share) {
+      const tombstone = this.tombstones.get(shareId);
+      if (tombstone) return this.projectionFromTombstone(tombstone);
+      return {
+        shareId,
+        lifecycleStatus: "not_found",
+        detachRequested: true,
+        detachReason: "Browser share was not found",
+      };
+    }
+
+    if (runtime.lifecycleStatus === "stopped" || runtime.lifecycleStatus === "tab_closed" || runtime.lifecycleStatus === "expired") {
+      this.removeShare(shareId, runtime.lifecycleStatus, terminalMessage(runtime.lifecycleStatus, "Browser share ended"));
+      const tombstone = this.tombstones.get(shareId);
+      return tombstone ? this.projectionFromTombstone(tombstone) : { shareId, lifecycleStatus: runtime.lifecycleStatus, detachRequested: true };
+    }
+
+    const updatedAt = nowIso();
+    if (runtime.tab) share.tab = sanitizeTab(runtime.tab);
+    share.captureMode = sanitizeCaptureMode(runtime.captureMode) ?? share.captureMode;
+    share.debugger = sanitizeDebugger(runtime.debugger) ?? share.debugger;
+    share.screenshot = sanitizeScreenshot(runtime.screenshot) ?? share.screenshot;
+    share.source = sanitizeSource(runtime.source) ?? share.source;
+    share.capabilities = sanitizeCapabilities(runtime.capabilities) ?? share.capabilities;
+    if (runtime.lifecycleStatus && runtime.lifecycleStatus !== "not_found") share.lifecycleStatus = runtime.lifecycleStatus;
+    if (share.lifecycleStatus === "stale" || share.lifecycleStatus === "offline") {
+      share.status = share.sessionId ? "bound" : "pending";
+    } else if (share.lifecycleStatus === "pending_code") {
+      share.status = "pending";
+    } else if (share.lifecycleStatus === "bound") {
+      share.status = "bound";
+    }
+    share.lastSeenAt = runtime.transport?.lastHeartbeatAt ? clampText(runtime.transport.lastHeartbeatAt, 80) : updatedAt;
+    return this.getShareControlProjection(shareId);
+  }
+
+  stopShareFromExtension(shareId: string, reason = "Browser share was stopped by the extension"): BrowserShareControlProjection {
+    this.cleanupExpired();
+    const share = this.shares.get(shareId);
+    if (!share) {
+      const tombstone = this.tombstones.get(shareId);
+      if (tombstone) return this.projectionFromTombstone(tombstone);
+      return { shareId, lifecycleStatus: "not_found", detachRequested: true, detachReason: "Browser share was not found" };
+    }
+    const status: BrowserShareLifecycleStatus = reason.toLowerCase().includes("tab") ? "tab_closed" : "stopped";
+    this.removeShare(shareId, status, reason);
+    const tombstone = this.tombstones.get(shareId);
+    return tombstone ? this.projectionFromTombstone(tombstone) : { shareId, lifecycleStatus: status, detachRequested: true, detachReason: reason };
+  }
+
+  getShareControlProjection(shareId: string): BrowserShareControlProjection {
+    this.cleanupExpired();
+    const share = this.shares.get(shareId);
+    if (!share) {
+      const tombstone = this.tombstones.get(shareId);
+      if (tombstone) return this.projectionFromTombstone(tombstone);
+      return { shareId, lifecycleStatus: "not_found", detachRequested: true, detachReason: "Browser share was not found" };
+    }
+    return {
+      shareId,
+      lifecycleStatus: share.lifecycleStatus,
+      detachRequested: false,
+      boundSessionId: share.sessionId,
+      permissionMode: share.permissionMode,
+      expiresAt: share.expiresAt,
+      operator: operatorForShare(share),
+      debugger: share.debugger,
+    };
   }
 
   enqueueCommand(sessionId: string, type: BrowserShareCommandType, payload: Partial<BrowserShareCommand>): BrowserShareCommand {
@@ -539,13 +695,48 @@ export class BrowserShareManager {
       .slice(0, 10);
   }
 
-  private removeShare(shareId: string, message: string): void {
+  private removeShare(shareId: string, lifecycleStatus: BrowserShareLifecycleStatus, message: string): void {
     const share = this.shares.get(shareId);
     if (share?.sessionId) this.sessionBindings.delete(share.sessionId);
-    if (share) this.shareCodes.delete(share.shareCode);
+    if (share) {
+      this.shareCodes.delete(share.shareCode);
+      const createdAt = nowIso();
+      this.tombstones.set(shareId, {
+        shareId,
+        sessionId: share.sessionId,
+        lifecycleStatus,
+        detachReason: terminalMessage(lifecycleStatus, message),
+        createdAt,
+        expiresAt: new Date(Date.now() + TOMBSTONE_TTL_MS).toISOString(),
+        permissionMode: share.permissionMode,
+        debugger: share.debugger,
+      });
+    }
     this.failActiveCommandsForShare(shareId, message);
     this.shares.delete(shareId);
     this.trimCompletedCommands();
+  }
+
+  private projectionFromTombstone(tombstone: ShareTombstone): BrowserShareControlProjection {
+    return {
+      shareId: tombstone.shareId,
+      lifecycleStatus: tombstone.lifecycleStatus,
+      detachRequested: true,
+      detachReason: tombstone.detachReason,
+      boundSessionId: tombstone.sessionId,
+      permissionMode: tombstone.permissionMode,
+      expiresAt: tombstone.expiresAt,
+      debugger: tombstone.debugger,
+      operator: {
+        bindingStatus: "unbound",
+        boundSessionId: tombstone.sessionId,
+        permissionMode: tombstone.permissionMode,
+        canRead: false,
+        canOperate: false,
+        autoAllowedCommands: [],
+        approvalRequiredCommands: [],
+      },
+    };
   }
 
   private failActiveCommandsForShare(shareId: string, message: string): void {
@@ -595,9 +786,11 @@ export class BrowserShareManager {
     const now = Date.now();
     for (const [shareId, share] of this.shares.entries()) {
       if (!share.sessionId && Date.parse(share.expiresAt) <= now) {
-        this.shareCodes.delete(share.shareCode);
-        this.shares.delete(shareId);
+        this.removeShare(shareId, "expired", "Browser share code expired");
       }
+    }
+    for (const [shareId, tombstone] of this.tombstones.entries()) {
+      if (Date.parse(tombstone.expiresAt) <= now) this.tombstones.delete(shareId);
     }
     this.trimCompletedCommands();
   }

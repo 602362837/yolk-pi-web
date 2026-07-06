@@ -5,7 +5,13 @@ import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
 import { createBrowserShareExtension } from "./browser-share-extension";
-import { abortYpiStudioChildRunsForSession } from "./ypi-studio-subagent-runtime";
+import {
+  abortYpiStudioChildRunsForSession,
+  countActiveYpiStudioChildRunsForSession,
+  registerYpiStudioSessionContinuation,
+  unregisterYpiStudioSessionContinuation,
+  type YpiStudioChildRunContinuationPayload,
+} from "./ypi-studio-subagent-runtime";
 import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
@@ -21,6 +27,28 @@ export interface AgentEvent {
 type EventListener = (event: AgentEvent) => void;
 
 const ABORT_WAIT_TIMEOUT_MS = 3_000;
+const STUDIO_CONTINUATION_RETRY_MS = 2_000;
+const STUDIO_CONTINUATION_MAX_RETRIES = 30;
+
+function buildYpiStudioChildContinuationPrompt(payload: YpiStudioChildRunContinuationPayload): string {
+  return [
+    "YPI Studio 并行子任务已结束，请继续推进当前 Studio implementationPlan。",
+    "",
+    `- taskId: ${payload.taskId}`,
+    `- runId: ${payload.runId}`,
+    payload.subtaskId ? `- subtaskId: ${payload.subtaskId}` : undefined,
+    `- member: ${payload.member}`,
+    `- status: ${payload.status}`,
+    payload.summary ? `- summary: ${payload.summary}` : undefined,
+    "",
+    "请按现有 Studio 状态机继续，不要停下来等用户输入：",
+    "1. 先调用 ypi_studio_subagent(action=collect, runId=<上面的 runId>) 刷新/确认结果；如当前 task 还有其他 terminal async run，也一并 collect。",
+    "2. 重新读取当前 task / implementationProgress。若出现 failed、cancelled、waiting_for_user、blocked 或需要产品/人工决策的结果，停止派发新子任务并用人话说明需要用户处理。",
+    "3. 若 task 仍是 implementing 且有运行中的子任务，按 maxConcurrency 只补足空闲并发槽：调用 ypi_studio_task(action=implementation_next, limit=<可用槽位>)，只 claim ready 子任务，再用 ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<单个已 claim id>) 逐个派发。不要重复 claim/dispatch already queued/running/done 的子任务。",
+    "4. 若全部 implementation subtasks 都 done/skipped 且无 active run，自动将任务 transition 到 checking，并派发 checker；检查完成后按现有工作流完成/请求用户处理。",
+    "5. 严格遵守 awaiting_approval -> implementing 的服务器 approval gate；如果 task 未处于 implementing，不要 claim 或派发 implementer。",
+  ].filter(Boolean).join("\n");
+}
 
 // ============================================================================
 // AgentSessionWrapper
@@ -119,6 +147,7 @@ export class AgentSessionWrapper {
   }
 
   start(): void {
+    registerYpiStudioSessionContinuation(this.sessionId, (payload) => this.scheduleStudioChildContinuation(payload));
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       this.resetIdleTimer();
       let fileChangeUpdate: AgentEvent | null = null;
@@ -149,7 +178,27 @@ export class AgentSessionWrapper {
 
   private resetIdleTimer(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.destroy(), 10 * 60 * 1000);
+    this.idleTimer = setTimeout(() => this.handleIdleTimeout(), 10 * 60 * 1000);
+  }
+
+  private handleIdleTimeout(): void {
+    if (!this._alive) return;
+    if (countActiveYpiStudioChildRunsForSession(this.sessionId) > 0) {
+      this.resetIdleTimer();
+      return;
+    }
+    this.destroy();
+  }
+
+  private scheduleStudioChildContinuation(payload: YpiStudioChildRunContinuationPayload, attempt = 0): void {
+    if (!this._alive || payload.parentSessionId !== this.sessionId) return;
+    this.resetIdleTimer();
+    if (this.inner.isStreaming) {
+      if (attempt >= STUDIO_CONTINUATION_MAX_RETRIES) return;
+      setTimeout(() => this.scheduleStudioChildContinuation(payload, attempt + 1), STUDIO_CONTINUATION_RETRY_MS);
+      return;
+    }
+    this.inner.followUp(buildYpiStudioChildContinuationPrompt(payload)).catch(() => {});
   }
 
   onEvent(listener: EventListener): () => void {
@@ -337,6 +386,7 @@ export class AgentSessionWrapper {
     if (!this._alive) return;
     this._alive = false;
     if (this.idleTimer) clearTimeout(this.idleTimer);
+    unregisterYpiStudioSessionContinuation(this.sessionId);
     abortYpiStudioChildRunsForSession(this.sessionId, "session_destroy");
     this.unsubscribe?.();
     try {

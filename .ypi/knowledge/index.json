@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-06T06:26:57.681Z",
+  "updatedAt": "2026-07-06T07:41:45.095Z",
   "entries": [
+    {
+      "id": "20260706-154145-优化-browser-share-常驻-tab-共享与-debugger-可感知状态",
+      "title": "优化 Browser Share 常驻 Tab 共享与 debugger 可感知状态",
+      "taskId": "20260706-144620-优化-browser-share-常驻-tab-共享与-debugger-可感知状态",
+      "taskKey": "archived:2026-07:20260706-144620-优化-browser-share-常驻-tab-共享与-debugger-可感知状态",
+      "workflowId": "feature-dev",
+      "summary": "已完成 Browser Share 常驻 Tab 共享与 debugger 可感知状态。关键可复用结论：Browser Share 扩展仍保持独立仓库 `~/gitProjects/ypi-browser-share-extension`，不并入 ypi web build；分享创建成功即常驻 attach Chrome debugger，snapshot/action 复用 debugger，不再按需 finally detach；detach 只由停止分享、ypi 解绑/替换、分享码过期、tab close、server tombstone/410、debugger 被接管等显式生命周期触发。ypi web 侧新增 lifecycle/debugger/operator/control projection、heartbeat、DELETE share stop、短 TTL tombstone；agent tools 仍只按当前 session 绑定推导 share，不能接受 shareId。debugger detached/blocked/failed/unsupported 时 action 必须 fail-safe，不可静默降级 content-script action。用户可感知状态由 Chrome debugger infobar、tab badge、extension popup 和 ypi BrowserShareControl 共同展示 baseUrl/session/permission/debugger/lifecycle。自动验证 lint、tsc、extension build 通过；真实 Chrome 手工回归仍需单独验证。",
+      "tags": [
+        "browser-share",
+        "chrome-extension",
+        "persistent-debugger",
+        "ypi-web",
+        "feature-dev",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-144620-优化-browser-share-常驻-tab-共享与-debugger-可感知状态",
+      "knowledgePath": ".ypi/knowledge/20260706-154145-优化-browser-share-常驻-tab-共享与-debugger-可感知状态.md",
+      "createdAt": "2026-07-06T07:41:45.095Z",
+      "archivedAt": "2026-07-06T07:41:45.095Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260706-142657-增强-browser-share-插件服务地址配置与-debugger-模式",
       "title": "增强 Browser Share 插件服务地址配置与 debugger 模式",

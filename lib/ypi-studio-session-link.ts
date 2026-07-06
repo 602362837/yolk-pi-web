@@ -303,6 +303,15 @@ function buildWidgetImplementationProjection(detail: YpiStudioTaskDetail): YpiSt
       blockedReason: clip(subtask.blockedReason, 300),
       runs: subtask.runs.slice(0, 3).map((run) => ({ ...run, summary: clip(run.summary, 240), error: clip(run.error, 240) })),
     })),
+    compactTimeline: projection.compactTimeline.map((item) => ({
+      ...item,
+      reason: clip(item.reason, 180),
+      summary: clip(item.summary, 180),
+    })),
+    sessionRuntime: projection.sessionRuntime ? {
+      ...projection.sessionRuntime,
+      timeline: projection.sessionRuntime.timeline.map((item) => ({ ...item, reason: clip(item.reason, 180), summary: clip(item.summary, 180) })),
+    } : undefined,
   };
 }
 

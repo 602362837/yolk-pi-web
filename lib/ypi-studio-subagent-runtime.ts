@@ -33,8 +33,25 @@ export interface YpiStudioChildRunHandle {
   onAbortPersist?: (reason: string) => void;
 }
 
+export interface YpiStudioChildRunContinuationPayload {
+  runId: string;
+  taskId: string;
+  subtaskId?: string;
+  member: string;
+  cwd: string;
+  parentSessionId: string;
+  status: YpiStudioSubagentRunStatus;
+  summary?: string;
+  finishedAt?: string;
+  continuationKey: string;
+}
+
+export type YpiStudioSessionContinuationCallback = (payload: YpiStudioChildRunContinuationPayload) => void | Promise<void>;
+
 declare global {
   var __ypiStudioSubagentChildRuns: Map<string, YpiStudioChildRunHandle> | undefined;
+  var __ypiStudioSessionContinuations: Map<string, YpiStudioSessionContinuationCallback> | undefined;
+  var __ypiStudioTerminalContinuationKeys: Set<string> | undefined;
 }
 
 function registry(): Map<string, YpiStudioChildRunHandle> {
@@ -42,6 +59,20 @@ function registry(): Map<string, YpiStudioChildRunHandle> {
     globalThis.__ypiStudioSubagentChildRuns = new Map();
   }
   return globalThis.__ypiStudioSubagentChildRuns;
+}
+
+function continuationRegistry(): Map<string, YpiStudioSessionContinuationCallback> {
+  if (!globalThis.__ypiStudioSessionContinuations) {
+    globalThis.__ypiStudioSessionContinuations = new Map();
+  }
+  return globalThis.__ypiStudioSessionContinuations;
+}
+
+function terminalContinuationKeys(): Set<string> {
+  if (!globalThis.__ypiStudioTerminalContinuationKeys) {
+    globalThis.__ypiStudioTerminalContinuationKeys = new Set();
+  }
+  return globalThis.__ypiStudioTerminalContinuationKeys;
 }
 
 export function registerYpiStudioChildRun(handle: YpiStudioChildRunHandle): void {
@@ -64,6 +95,38 @@ export function getYpiStudioChildRun(runId: string): YpiStudioChildRunHandle | u
 
 export function unregisterYpiStudioChildRun(runId: string): void {
   registry().delete(runId);
+}
+
+export function registerYpiStudioSessionContinuation(
+  parentSessionId: string,
+  callback: YpiStudioSessionContinuationCallback,
+): void {
+  continuationRegistry().set(parentSessionId, callback);
+}
+
+export function unregisterYpiStudioSessionContinuation(parentSessionId: string): void {
+  continuationRegistry().delete(parentSessionId);
+}
+
+export function scheduleYpiStudioChildRunContinuation(payload: Omit<YpiStudioChildRunContinuationPayload, "continuationKey">): boolean {
+  const continuationKey = `${payload.parentSessionId}:${payload.taskId}:${payload.runId}`;
+  const delivered = terminalContinuationKeys();
+  if (delivered.has(continuationKey)) return false;
+  const callback = continuationRegistry().get(payload.parentSessionId);
+  if (!callback) return false;
+  delivered.add(continuationKey);
+  setTimeout(() => {
+    try {
+      Promise.resolve(callback({ ...payload, continuationKey })).catch(() => {
+        // Continuation is best-effort. The terminal run is already persisted and can
+        // still be collected manually if the parent session is busy or unavailable.
+      });
+    } catch {
+      // Continuation is best-effort. The terminal run is already persisted and can
+      // still be collected manually if the parent session is busy or unavailable.
+    }
+  }, 0);
+  return true;
 }
 
 export function abortYpiStudioChildRun(runId: string, reason = "abort"): boolean {
@@ -89,6 +152,15 @@ export function abortYpiStudioChildRunsForSession(parentSessionId: string, reaso
 
 export function listYpiStudioChildRuns(): YpiStudioChildRunHandle[] {
   return Array.from(registry().values());
+}
+
+export function countActiveYpiStudioChildRunsForSession(parentSessionId: string): number {
+  let count = 0;
+  for (const handle of registry().values()) {
+    if (handle.parentSessionId !== parentSessionId) continue;
+    if (handle.status === "queued" || handle.status === "running") count += 1;
+  }
+  return count;
 }
 
 export function projectYpiStudioRuntimeLostRun(
