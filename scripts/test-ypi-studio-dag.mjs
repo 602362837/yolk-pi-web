@@ -121,6 +121,23 @@ function progressFor(implementationPlan, statuses = {}) {
 }
 
 {
+  const p = plan([{ id: "A" }, { id: "B", dependsOn: ["A"] }, { id: "C", dependsOn: ["B"] }]);
+  const g = refreshDerivedImplementationDAG(p, progressFor(p, { A: "failed", B: "waiting", C: "waiting" }));
+  assert.equal(g.subtasks.B.status, "blocked");
+  assert.equal(g.subtasks.C.status, "blocked");
+  g.subtasks.A.status = "done";
+  refreshDerivedImplementationDAG(p, g);
+  assert.equal(g.subtasks.B.status, "ready");
+  assert.equal(g.subtasks.B.blockedReason, undefined);
+  assert.equal(g.subtasks.B.blockedBy, undefined);
+  assert.equal(g.subtasks.C.status, "waiting");
+  assert.deepEqual(g.subtasks.C.waitingOn?.map((item) => item.id), ["B"]);
+  g.subtasks.B.status = "done";
+  refreshDerivedImplementationDAG(p, g);
+  assert.equal(g.subtasks.C.status, "ready");
+}
+
+{
   const legacy = normalizeImplementationPlan({ schemaVersion: 1, subtasks: [{ id: "A", title: "A", dependsOn: ["missing", "A"] }, { id: "B", title: "B", dependsOn: ["A"] }] });
   assert.ok(legacy);
   assert.deepEqual(legacy.subtasks.find((item) => item.id === "A")?.dependsOn, []);
