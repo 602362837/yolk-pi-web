@@ -679,6 +679,40 @@ function assertTaskStatusForImplementationMutation(task: YpiStudioTaskRecord, st
   }
 }
 
+const DERIVED_DEPENDENCY_BLOCK_PREFIX = "Blocked by failed/blocked dependency:";
+
+function isDerivedDependencyBlock(subtask: YpiStudioImplementationSubtaskPlan, item: YpiStudioImplementationSubtaskProgress): boolean {
+  if (item.status !== "blocked") return false;
+  if (!item.blockedReason?.startsWith(DERIVED_DEPENDENCY_BLOCK_PREFIX)) return false;
+  const dependencyIds = new Set(subtask.dependsOn);
+  return (item.blockedBy ?? []).every((id) => dependencyIds.has(id));
+}
+
+function clearRecoveredDependencyBlocks(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): void {
+  const now = nowIso();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const subtask of plan.subtasks) {
+      const item = progress.subtasks[subtask.id];
+      if (!item || !isDerivedDependencyBlock(subtask, item)) continue;
+      const blockedBy = subtask.dependsOn.filter((dep) => dependencyBlocks(progress, dep));
+      if (blockedBy.length) {
+        item.blockedBy = blockedBy;
+        item.waitingOn = waitingDependencies(plan, progress, subtask);
+        item.blockedReason = `${DERIVED_DEPENDENCY_BLOCK_PREFIX} ${blockedBy.join(", ")}`;
+        continue;
+      }
+      item.status = plan.schemaVersion === 2 ? "waiting" : "pending";
+      item.blockedBy = undefined;
+      item.blockedReason = undefined;
+      item.waitingOn = waitingDependencies(plan, progress, subtask);
+      item.updatedAt = now;
+      changed = true;
+    }
+  }
+}
+
 export function propagateBlockedDependents(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): void {
   const now = nowIso();
   let changed = true;
@@ -691,9 +725,9 @@ export function propagateBlockedDependents(plan: YpiStudioImplementationPlan, pr
       if (!blockedBy.length) continue;
       const previous = item.status;
       item.status = "blocked";
-      item.blockedBy = Array.from(new Set([...(item.blockedBy ?? []), ...blockedBy]));
+      item.blockedBy = blockedBy;
       item.waitingOn = waitingDependencies(plan, progress, subtask);
-      item.blockedReason ??= `Blocked by failed/blocked dependency: ${blockedBy.join(", ")}`;
+      item.blockedReason = `${DERIVED_DEPENDENCY_BLOCK_PREFIX} ${blockedBy.join(", ")}`;
       item.updatedAt = now;
       if (previous !== "blocked") changed = true;
     }
@@ -701,6 +735,7 @@ export function propagateBlockedDependents(plan: YpiStudioImplementationPlan, pr
 }
 
 export function refreshDerivedImplementationDAG(plan: YpiStudioImplementationPlan, progress: YpiStudioImplementationProgress): YpiStudioImplementationProgress {
+  clearRecoveredDependencyBlocks(plan, progress);
   propagateBlockedDependents(plan, progress);
   const now = nowIso();
   for (const subtask of plan.subtasks) {

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
-import type { YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection } from "@/lib/ypi-studio-types";
+import type { YpiStudioLiveRunOverlay, YpiStudioTaskWidgetProjection, YpiStudioTaskWidgetSubagentRun, YpiStudioSubagentTranscriptItem } from "@/lib/ypi-studio-types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
@@ -79,6 +79,57 @@ function studioDisplayStatusColor(status: string): string {
   if (status === "done" || status === "skipped") return "#22c55e";
   if (status === "ready") return "#38bdf8";
   return "var(--text-dim)";
+}
+
+function studioRunStatusColor(status: string): string {
+  if (status === "failed" || status === "cancelled") return "#ef4444";
+  if (status === "waiting_for_user") return "#f59e0b";
+  if (status === "succeeded") return "#22c55e";
+  if (status === "queued") return "#38bdf8";
+  if (status === "running") return "var(--accent)";
+  return "var(--text-dim)";
+}
+
+function studioRunPhaseLabel(run: Pick<YpiStudioTaskWidgetSubagentRun, "phase" | "currentTool" | "status">): string {
+  if (run.status === "queued") return "排队";
+  if (run.phase === "starting") return "启动中";
+  if (run.phase === "waiting_model") return "等待模型";
+  if (run.phase === "streaming") return "输出中";
+  if (run.phase === "running_tool") return `工具 ${run.currentTool?.toolName ?? "运行中"}`;
+  if (run.phase === "waiting_for_user") return "等待用户";
+  if (run.phase === "finished") return "已结束";
+  return run.status === "running" ? "运行中" : run.status;
+}
+
+function studioTranscriptItemText(item: YpiStudioSubagentTranscriptItem): string {
+  if (item.kind === "tool_call") return `调用 ${item.toolName}`;
+  if (item.kind === "tool_result") return `${item.toolName ?? "工具"}${item.isError ? "失败" : "完成"}${item.text ? `：${item.text}` : ""}`;
+  if ("text" in item) return item.text;
+  return "";
+}
+
+function studioRunPreview(run: YpiStudioTaskWidgetSubagentRun): string {
+  const activity = run.lastItemsPreview.map(studioTranscriptItemText).filter(Boolean).slice(-2).join(" · ");
+  return activity || run.summary || run.error || "等待成员输出…";
+}
+
+function studioRunStats(run: YpiStudioTaskWidgetSubagentRun): string | undefined {
+  const stats = [
+    typeof run.tokens === "number" ? `${run.tokens} tok` : undefined,
+    typeof run.tps === "number" ? `${run.tps.toFixed(1)} t/s` : undefined,
+  ].filter(Boolean);
+  return stats.join(" · ") || undefined;
+}
+
+function studioRunTimeLabel(run: YpiStudioTaskWidgetSubagentRun): string {
+  const updatedAt = run.transcriptMeta?.updatedAt ?? run.finishedAt ?? run.startedAt;
+  const date = new Date(updatedAt);
+  if (Number.isNaN(date.getTime())) return "刚刚";
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s 前`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m 前`;
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -304,13 +355,18 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   const isArchived = !!session?.archived;
   const studioRuntime = studioTask?.implementationProjection?.sessionRuntime;
   const studioRuntimeCounts = studioTask?.implementationProjection?.statusCounts;
-  const studioWaitingTotal = (studioRuntime?.activeRunCount ?? 0) + (studioRuntime?.queuedRunCount ?? 0);
+  const studioWaitingTotal = (studioRuntime?.activeRunCount ?? 0) + (studioRuntime?.queuedRunCount ?? 0) || (agentPhase?.kind === "waiting_for_studio_children" ? agentPhase.activeRunCount : 0);
   const studioTimeline = studioRuntime?.timeline.slice(0, 5) ?? [];
-  const studioWaitingBannerElement = !agentRunning && studioRuntime && (studioRuntime.status === "waiting_for_studio_children" || studioRuntime.status === "needs_user") ? (
+  const activeStudioRuns = (studioTask?.subagents ?? [])
+    .filter((run) => run.status === "running" || run.status === "queued" || run.status === "waiting_for_user")
+    .sort((a, b) => (b.transcriptMeta?.updatedAt ?? b.startedAt).localeCompare(a.transcriptMeta?.updatedAt ?? a.startedAt))
+    .slice(0, 4);
+  const showStudioWaitingBanner = !!studioRuntime && (studioRuntime.status === "waiting_for_studio_children" || studioRuntime.status === "needs_user" || agentPhase?.kind === "waiting_for_studio_children");
+  const studioWaitingBannerElement = showStudioWaitingBanner && studioRuntime ? (
     <div style={{
       margin: "10px auto 4px",
-      maxWidth: 820,
-      padding: "10px 12px",
+      maxWidth: 860,
+      padding: "11px 12px",
       border: `1px solid ${studioRuntime.status === "needs_user" ? "rgba(245,158,11,0.35)" : "rgba(37,99,235,0.28)"}`,
       borderRadius: 12,
       background: studioRuntime.status === "needs_user" ? "rgba(245,158,11,0.08)" : "rgba(37,99,235,0.07)",
@@ -318,17 +374,20 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       fontSize: 12,
       boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)", fontWeight: 800 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)", fontWeight: 850 }}>
         <span className={studioRuntime.status === "waiting_for_studio_children" ? "animate-[pulse_1.8s_infinite]" : undefined} style={{ width: 8, height: 8, borderRadius: 999, background: studioRuntime.status === "needs_user" ? "#f59e0b" : "var(--accent)", flexShrink: 0 }} />
-        <span>{studioRuntime.status === "needs_user" ? "Studio 需要你处理" : `正在等待 ${studioWaitingTotal} 个并行子任务完成，后台仍在工作`}</span>
+        <span>{studioRuntime.status === "needs_user" ? "Studio 需要你处理" : `Studio 后台仍在工作：${studioWaitingTotal} 个子任务活跃`}</span>
+        <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>自动续跑 · 每几秒刷新</span>
       </div>
       <div style={{ marginTop: 5 }}>{studioRuntime.message}</div>
       {studioRuntimeCounts && (
         <div style={{ marginTop: 7, display: "flex", gap: 6, flexWrap: "wrap" }}>
           {[
             ["运行中", studioRuntimeCounts.running, "var(--accent)"],
+            ["队列", studioRuntimeCounts.queued, "#38bdf8"],
+            ["就绪", studioRuntimeCounts.ready, "#38bdf8"],
             ["完成", studioRuntimeCounts.done + studioRuntimeCounts.skipped, "#22c55e"],
-            ["等待", studioRuntimeCounts.waiting + studioRuntimeCounts.pending + studioRuntimeCounts.ready, "var(--text-dim)"],
+            ["等待", studioRuntimeCounts.waiting + studioRuntimeCounts.pending, "var(--text-dim)"],
             ["失败", studioRuntimeCounts.failed, "#ef4444"],
             ["阻塞", studioRuntimeCounts.blocked, "#f59e0b"],
           ].filter(([, count]) => Number(count) > 0).map(([label, count, color]) => (
@@ -336,7 +395,27 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           ))}
         </div>
       )}
-      {studioTimeline.length > 0 && (
+      {activeStudioRuns.length > 0 && (
+        <div style={{ marginTop: 9, display: "grid", gap: 6 }}>
+          {activeStudioRuns.map((run) => {
+            const preview = studioRunPreview(run);
+            const stats = studioRunStats(run);
+            return (
+              <div key={run.id} style={{ display: "grid", gridTemplateColumns: "74px 1fr auto", gap: 8, alignItems: "center", padding: "5px 7px", borderRadius: 9, border: "1px solid color-mix(in srgb, var(--border) 55%, transparent)", background: "color-mix(in srgb, var(--bg-panel) 62%, transparent)" }}>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: studioRunStatusColor(run.status), fontSize: 10, fontWeight: 900 }}>{run.member}</span>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ color: "var(--text)", fontWeight: 800 }}>{run.subtaskId ?? run.id}</span>
+                  <span> · {studioRunPhaseLabel(run)}</span>
+                  {stats && <span> · {stats}</span>}
+                  <span> · {preview}</span>
+                </span>
+                <span title={run.transcriptMeta?.updatedAt ?? run.startedAt} style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 750 }}>{studioRunTimeLabel(run)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {activeStudioRuns.length === 0 && studioTimeline.length > 0 && (
         <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
           {studioTimeline.map((item) => (
             <div key={item.id} style={{ display: "grid", gridTemplateColumns: "54px 1fr", gap: 8, alignItems: "center" }}>
@@ -346,7 +425,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           ))}
         </div>
       )}
-      {studioRuntime.status === "waiting_for_studio_children" && <div style={{ marginTop: 7, color: "var(--text-dim)", fontSize: 11 }}>你可以等待，也可以输入“先停一下 / 继续跑 / 重试这个”来干预。</div>}
+      {studioRuntime.status === "waiting_for_studio_children" && <div style={{ marginTop: 7, color: "var(--text-dim)", fontSize: 11 }}>主 Chat 会在子任务结束后自动 collect 并继续派发；你也可以输入“先停一下 / 继续跑 / 重试这个”来干预。</div>}
     </div>
   ) : null;
 
