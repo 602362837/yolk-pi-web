@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-06T05:28:50.300Z",
+  "updatedAt": "2026-07-06T06:26:57.681Z",
   "entries": [
+    {
+      "id": "20260706-142657-增强-browser-share-插件服务地址配置与-debugger-模式",
+      "title": "增强 Browser Share 插件服务地址配置与 debugger 模式",
+      "taskId": "20260706-134325-增强-browser-share-插件服务地址配置与-debugger-模式",
+      "taskKey": "archived:2026-07:20260706-134325-增强-browser-share-插件服务地址配置与-debugger-模式",
+      "workflowId": "feature-dev",
+      "summary": "已完成 Browser Share 插件服务地址配置与 debugger-first/CDP 能力。关键结论：扩展端应在 popup 保存并测试 ypi web baseUrl，默认保持 http://localhost:30141，支持自定义端口、LAN、HTTPS 反代和 path prefix；所有 extension transport 必须通过统一 apiUrl/baseUrl helper，activeShare 固化创建时 baseUrl，避免设置切换后串服务。用户本轮决策为单一 debugger-first manifest 并纳入截图，安全额外加固 deferred。CDP 能力只在扩展 service worker 内执行，ypi web 不直接接 Chrome debugger；上报内容必须是白名单摘要，如 captureMode、viewport、bounds、selector、AX-like role/name、debugger/source/screenshot metadata，并由 BrowserShareManager 服务端 sanitize。CDP click/type/scroll/navigate 需保留 content-script/tabs fallback，且不改变 ypi web readonly/interactive 审批矩阵。Agent tools 仍禁止 shareId/tabId/baseUrl 参数，只从当前 session binding 推导。验证通过 npm run lint、tsc --noEmit、extension npm run build；真实 Chrome custom baseUrl、attach 冲突、fallback、截图端到端仍需人工验证。",
+      "tags": [
+        "browser-share",
+        "chrome-extension",
+        "debugger",
+        "cdp",
+        "ypi-web",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-134325-增强-browser-share-插件服务地址配置与-debugger-模式",
+      "knowledgePath": ".ypi/knowledge/20260706-142657-增强-browser-share-插件服务地址配置与-debugger-模式.md",
+      "createdAt": "2026-07-06T06:26:57.681Z",
+      "archivedAt": "2026-07-06T06:26:57.681Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260706-132850-优化-browser-share-new-chat-绑定与-chat-直接操作-tab-交互",
       "title": "优化 Browser Share New Chat 绑定与 Chat 直接操作 Tab 交互",

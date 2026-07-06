@@ -1,5 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type {
+  BrowserShareCapabilities,
+  BrowserShareCaptureMode,
   BrowserShareCommand,
   BrowserShareCommandResult,
   BrowserShareCommandStatus,
@@ -7,16 +9,24 @@ import type {
   BrowserShareConnectionStatus,
   BrowserShareCreateRequest,
   BrowserShareCreateResponse,
+  BrowserShareDebuggerSummary,
+  BrowserShareElementBounds,
   BrowserSharePageSnapshot,
   BrowserSharePermissionMode,
+  BrowserShareScreenshotSummary,
   BrowserShareSessionState,
+  BrowserShareSourceInfo,
   BrowserShareTabInfo,
+  BrowserShareViewport,
 } from "./browser-share-types";
 
 const SHARE_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_TEXT_LIMIT = 12_000;
 const SELECTION_LIMIT = 4_000;
 const ELEMENT_LIMIT = 80;
+const WARNING_LIMIT = 10;
+const CAPABILITY_KEY_LIMIT = 40;
+const CAPABILITY_VALUE_LIMIT = 120;
 const COMPLETED_COMMAND_TTL_MS = 10 * 60 * 1000;
 const COMPLETED_COMMAND_LIMIT = 100;
 
@@ -36,6 +46,12 @@ type ShareRecord = {
   lastCommandPollAt?: string;
   lastResultAt?: string;
   status: BrowserShareConnectionStatus;
+  extensionVersion?: string;
+  source?: BrowserShareSourceInfo;
+  capabilities?: BrowserShareCapabilities;
+  captureMode?: BrowserShareCaptureMode;
+  debugger?: BrowserShareDebuggerSummary;
+  screenshot?: BrowserShareScreenshotSummary;
 };
 
 type CommandWaiter = {
@@ -56,6 +72,109 @@ function nowIso(): string {
 function clampText(value: unknown, limit: number): string | undefined {
   if (typeof value !== "string") return undefined;
   return value.length > limit ? `${value.slice(0, limit)}…` : value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function finiteNumber(value: unknown, min: number, max: number): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(max, Math.max(min, value));
+}
+
+function sanitizeCaptureMode(value: unknown): BrowserShareCaptureMode | undefined {
+  return value === "dom" || value === "debugger" || value === "debugger_fallback" ? value : undefined;
+}
+
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
+}
+
+function sanitizeSource(input: unknown): BrowserShareSourceInfo | undefined {
+  if (!isRecord(input)) return undefined;
+  const baseUrl = clampText(input.baseUrl, 2_000);
+  let origin = clampText(input.origin, 300);
+  if (!origin && baseUrl) {
+    try {
+      origin = new URL(baseUrl).origin;
+    } catch {
+      // Keep only the bounded base URL when it cannot be parsed as an origin.
+    }
+  }
+  if (!baseUrl && !origin) return undefined;
+  return { baseUrl, origin };
+}
+
+function sanitizeCapabilities(input: unknown): BrowserShareCapabilities | undefined {
+  if (!isRecord(input)) return undefined;
+  const output: BrowserShareCapabilities = {};
+  for (const [key, value] of Object.entries(input).slice(0, 20)) {
+    const safeKey = clampText(key, CAPABILITY_KEY_LIMIT);
+    if (!safeKey) continue;
+    if (Array.isArray(value)) {
+      output[safeKey] = value.map((item) => clampText(item, CAPABILITY_VALUE_LIMIT)).filter(isDefined).slice(0, 20);
+    } else if (typeof value === "string") {
+      output[safeKey] = clampText(value, CAPABILITY_VALUE_LIMIT);
+    } else if (typeof value === "boolean" || typeof value === "number" || value === null) {
+      output[safeKey] = value;
+    }
+  }
+  const modes = Array.isArray(input.captureModes) ? input.captureModes.map(sanitizeCaptureMode).filter(isDefined) : undefined;
+  if (modes?.length) output.captureModes = modes;
+  return Object.keys(output).length ? output : undefined;
+}
+
+function sanitizeBounds(input: unknown): BrowserShareElementBounds | undefined {
+  if (!isRecord(input)) return undefined;
+  const x = finiteNumber(input.x, -100_000, 100_000);
+  const y = finiteNumber(input.y, -100_000, 100_000);
+  const width = finiteNumber(input.width, 0, 100_000);
+  const height = finiteNumber(input.height, 0, 100_000);
+  if (x === undefined || y === undefined || width === undefined || height === undefined) return undefined;
+  return { x, y, width, height };
+}
+
+function sanitizeViewport(input: unknown): BrowserShareViewport | undefined {
+  if (!isRecord(input)) return undefined;
+  const width = finiteNumber(input.width, 0, 50_000);
+  const height = finiteNumber(input.height, 0, 50_000);
+  if (width === undefined || height === undefined) return undefined;
+  return {
+    width,
+    height,
+    deviceScaleFactor: finiteNumber(input.deviceScaleFactor, 0, 10),
+    scrollX: finiteNumber(input.scrollX, -1_000_000, 1_000_000),
+    scrollY: finiteNumber(input.scrollY, -1_000_000, 1_000_000),
+  };
+}
+
+function sanitizeDebugger(input: unknown): BrowserShareDebuggerSummary | undefined {
+  if (!isRecord(input)) return undefined;
+  return {
+    enabled: input.enabled === true,
+    attached: typeof input.attached === "boolean" ? input.attached : undefined,
+    protocolVersion: clampText(input.protocolVersion, 80),
+    lastError: clampText(input.lastError, 500),
+    detachedAt: clampText(input.detachedAt, 80),
+    screenshotAvailable: typeof input.screenshotAvailable === "boolean" ? input.screenshotAvailable : undefined,
+  };
+}
+
+function sanitizeScreenshot(input: unknown): BrowserShareScreenshotSummary | undefined {
+  if (!isRecord(input)) return undefined;
+  return {
+    enabled: typeof input.enabled === "boolean" ? input.enabled : undefined,
+    available: typeof input.available === "boolean" ? input.available : undefined,
+    mimeType: clampText(input.mimeType, 80),
+    width: finiteNumber(input.width, 0, 50_000),
+    height: finiteNumber(input.height, 0, 50_000),
+    byteLength: finiteNumber(input.byteLength, 0, 20_000_000),
+    capturedAt: clampText(input.capturedAt, 80),
+    data: clampText(input.data, 1_500_000),
+    truncated: typeof input.truncated === "boolean" ? input.truncated : undefined,
+    error: clampText(input.error, 500),
+  };
 }
 
 function sanitizeTab(tab: BrowserShareTabInfo): BrowserShareTabInfo {
@@ -81,7 +200,11 @@ function sanitizeSnapshot(input: BrowserSharePageSnapshot | Partial<BrowserShare
     visibleText: clampText(input.visibleText, SNAPSHOT_TEXT_LIMIT) ?? "",
     selection: clampText(input.selection, SELECTION_LIMIT),
     focusedElementId: clampText(input.focusedElementId, 120),
-    warnings: Array.isArray(input.warnings) ? input.warnings.filter((v): v is string => typeof v === "string").slice(0, 10) : undefined,
+    warnings: Array.isArray(input.warnings) ? input.warnings.filter((v): v is string => typeof v === "string").map((v) => clampText(v, 300)).filter(isDefined).slice(0, WARNING_LIMIT) : undefined,
+    captureMode: sanitizeCaptureMode(input.captureMode),
+    viewport: sanitizeViewport(input.viewport),
+    debugger: sanitizeDebugger(input.debugger),
+    screenshot: sanitizeScreenshot(input.screenshot),
     elements: Array.isArray(input.elements) ? input.elements.slice(0, ELEMENT_LIMIT).map((el) => ({
       elementId: clampText(el.elementId, 120) ?? "",
       tagName: clampText(el.tagName, 40) ?? "",
@@ -91,6 +214,12 @@ function sanitizeSnapshot(input: BrowserSharePageSnapshot | Partial<BrowserShare
       inputType: clampText(el.inputType, 80),
       href: clampText(el.href, 1_000),
       isSensitive: el.isSensitive === true,
+      bounds: sanitizeBounds(el.bounds),
+      axRole: clampText(el.axRole, 80),
+      axName: clampText(el.axName, 300),
+      selector: clampText(el.selector, 500),
+      frameId: clampText(el.frameId, 120),
+      debuggerRef: clampText(el.debuggerRef, 120),
     })).filter((el) => el.elementId && el.tagName) : [],
   };
 }
@@ -128,6 +257,7 @@ export class BrowserShareManager {
     const createdAt = nowIso();
     const expiresAt = new Date(Date.now() + SHARE_TTL_MS).toISOString();
     const snapshot = request.pagePreview ? sanitizeSnapshot(request.pagePreview, tab) : undefined;
+    const source = sanitizeSource(request.source) ?? sanitizeSource({ baseUrl: request.baseUrl });
     this.shares.set(shareId, {
       shareId,
       shareCode,
@@ -140,6 +270,12 @@ export class BrowserShareManager {
       status: "pending",
       lastSnapshotAt: snapshot?.capturedAt,
       lastSeenAt: createdAt,
+      extensionVersion: clampText(request.extensionVersion, 120),
+      source,
+      capabilities: sanitizeCapabilities(request.capabilities),
+      captureMode: sanitizeCaptureMode(request.captureMode) ?? snapshot?.captureMode,
+      debugger: sanitizeDebugger(request.debugger) ?? snapshot?.debugger,
+      screenshot: sanitizeScreenshot(request.screenshot) ?? snapshot?.screenshot,
     });
     this.shareCodes.set(shareCode, shareId);
     return { shareId, shareCode, expiresAt };
@@ -195,6 +331,12 @@ export class BrowserShareManager {
       pendingCommands: activeCommands,
       activeCommands,
       recentCommands: this.listRecentCommandsForSession(sessionId),
+      extensionVersion: share.extensionVersion,
+      source: share.source,
+      capabilities: share.capabilities,
+      captureMode: share.snapshot?.captureMode ?? share.captureMode,
+      debugger: share.snapshot?.debugger ?? share.debugger,
+      screenshot: share.snapshot?.screenshot ?? share.screenshot,
     };
   }
 
@@ -206,6 +348,9 @@ export class BrowserShareManager {
     const updatedAt = nowIso();
     share.snapshot = sanitized;
     share.tab = sanitized.tab;
+    share.captureMode = sanitized.captureMode ?? share.captureMode;
+    share.debugger = sanitized.debugger ?? share.debugger;
+    share.screenshot = sanitized.screenshot ?? share.screenshot;
     share.lastSnapshotAt = sanitized.capturedAt;
     share.lastSeenAt = updatedAt;
     share.status = share.sessionId ? "bound" : "pending";
@@ -282,15 +427,28 @@ export class BrowserShareManager {
     const command = this.commands.get(commandId);
     if (!command) throw new Error("Browser share command not found");
     if (isTerminalStatus(command.status)) return command;
-    command.result = result;
-    this.setCommandTerminal(command, result.ok ? "succeeded" : "failed", result);
+    const sanitizedResult: BrowserShareCommandResult = {
+      ok: result.ok,
+      message: clampText(result.message, 1_000),
+      snapshot: result.snapshot ? sanitizeSnapshot(result.snapshot, this.shares.get(command.shareId)?.tab ?? { url: "", title: "Untitled" }) : undefined,
+      captureMode: sanitizeCaptureMode(result.captureMode),
+      debugger: sanitizeDebugger(result.debugger),
+      screenshot: sanitizeScreenshot(result.screenshot),
+    };
+    command.result = sanitizedResult;
+    this.setCommandTerminal(command, sanitizedResult.ok ? "succeeded" : "failed", sanitizedResult);
     const share = this.shares.get(command.shareId);
     if (share) {
       const resultAt = command.updatedAt;
       share.lastResultAt = resultAt;
       share.lastSeenAt = resultAt;
     }
-    if (result.snapshot) this.updateSnapshot(command.shareId, result.snapshot);
+    if (share) {
+      share.captureMode = sanitizedResult.captureMode ?? sanitizedResult.snapshot?.captureMode ?? share.captureMode;
+      share.debugger = sanitizedResult.debugger ?? sanitizedResult.snapshot?.debugger ?? share.debugger;
+      share.screenshot = sanitizedResult.screenshot ?? sanitizedResult.snapshot?.screenshot ?? share.screenshot;
+    }
+    if (sanitizedResult.snapshot) this.updateSnapshot(command.shareId, sanitizedResult.snapshot);
     this.notifyCommandChanged(command.commandId);
     this.trimCompletedCommands();
     return command;

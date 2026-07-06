@@ -17,6 +17,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ command
       ok: body.ok,
       message: typeof body.message === "string" ? body.message : undefined,
       snapshot: body.snapshot,
+      captureMode: body.captureMode,
+      debugger: body.debugger,
+      screenshot: body.screenshot,
     });
     return NextResponse.json(command);
   } catch (error) {

@@ -228,9 +228,17 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8, color: "var(--text-muted)" }}>
                 <span>权限：{state?.permissionMode === "interactive" ? "可操作" : "只读"}</span>
                 <span>连接：{connectionLabel}</span>
+                <span>采集：{state?.captureMode === "debugger" ? "Debugger/CDP" : state?.captureMode === "debugger_fallback" ? "CDP fallback" : state?.captureMode ?? "DOM"}</span>
+                <span>截图：{state?.screenshot?.available || state?.screenshot?.data ? "可用" : state?.screenshot?.byteLength ? "已截取" : state?.screenshot?.error ? "失败" : "—"}</span>
                 <span>快照：{formatTime(state?.connection?.lastSnapshotAt ?? state?.lastSnapshotAt ?? state?.snapshot?.capturedAt)}</span>
                 <span>轮询：{formatTime(state?.connection?.lastCommandPollAt ?? state?.connection?.lastHeartbeatAt ?? state?.lastCommandPollAt ?? state?.lastSeenAt)}</span>
               </div>
+              {(state?.source?.baseUrl || state?.debugger) && (
+                <div style={{ marginTop: 6, color: "var(--text-dim)", lineHeight: 1.4 }}>
+                  {state.source?.baseUrl && <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>服务：{state.source.baseUrl}</div>}
+                  {state.debugger && <div>Debugger：{state.debugger.attached ? "已连接" : state.debugger.enabled ? "已启用" : "未启用"}{state.debugger.lastError ? `（${state.debugger.lastError.slice(0, 90)}）` : ""}</div>}
+                </div>
+              )}
               {state?.snapshot?.visibleText && (
                 <div style={{ marginTop: 8, color: "var(--text-dim)", lineHeight: 1.4, maxHeight: 48, overflow: "hidden" }}>
                   {state.snapshot.visibleText.slice(0, 180)}{state.snapshot.visibleText.length > 180 ? "…" : ""}
