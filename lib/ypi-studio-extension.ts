@@ -274,7 +274,7 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     state?.requiresSubagent ? "The next owner must be dispatched through ypi_studio_subagent." : "The main session may handle orchestration for this state.",
     current.implementationPlan ? `Implementation subtasks: ${current.implementation?.done ?? 0}/${current.implementation?.total ?? current.implementationPlan.subtasks.length} done; active=${current.implementation?.activeTitle ?? current.implementation?.activeSubtaskId ?? "none"}; next=${current.implementation?.nextTitle ?? current.implementation?.nextSubtaskId ?? "none"}; blocked=${current.implementation?.blocked ?? 0}.` : "Implementation plan: not saved yet.",
     current.status === "planning" ? "When planning/design artifacts are complete, save implementationPlan with ypi_studio_task(action=update_implementation_plan), transition only to awaiting_approval, and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
-    current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: first call ypi_studio_task(action=claim_implementation_subtask) to claim exactly one ready subtask, then call ypi_studio_subagent(member=implementer, subtaskId=<claimed id>). Do not delegate the whole implementation at once." : "",
+    current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: fill available concurrency slots, not just one. First inspect ready work with ypi_studio_task(action=implementation_next, limit=<available slots>). Then claim ready subtask(s) up to maxConcurrency with ypi_studio_task(action=claim_implementation_subtask, limit=<available slots>, status=running) or explicit subtaskIds, and start one ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<claimed id>) per claimed subtask. Each implementer run handles exactly one subtaskId, but a single orchestration turn should launch multiple async runs when multiple ready subtasks and free slots exist. Do not delegate the whole implementation at once." : "",
     current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
     current.status === "awaiting_approval" && !approvalGranted ? "Current task is awaiting approval: summarize the plan/artifacts and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
     state?.requiresUserApproval && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
@@ -1136,7 +1136,7 @@ function buildMemberPrompt(root: string, taskId: string, member: string, delegat
   ].join("\n");
 }
 
-export function createYpiStudioExtension(workspaceRoot: string) {
+export function createYpiStudioExtension(workspaceRoot: string, sessionContext?: { sessionId?: string; sessionFile?: string }) {
   return function ypiStudioExtension(pi: Pick<ExtensionAPI, "registerTool" | "registerCommand" | "sendUserMessage" | "on" | "getThinkingLevel">): void {
   if (process.env.YPI_STUDIO_SUBAGENT_CHILD === "1") return;
 
@@ -1146,9 +1146,18 @@ export function createYpiStudioExtension(workspaceRoot: string) {
   const startupKeys = new Set<string>();
 
   const getKey = (input?: unknown, ctx?: PiExtensionContext) => {
-    const key = contextKey(input, ctx) ?? currentKey ?? procKey;
+    const key = sessionContext?.sessionId
+      ? `pi_${sanitizeContextId(sessionContext.sessionId)}`
+      : contextKey(input, ctx) ?? currentKey ?? procKey;
     currentKey = key;
     return key;
+  };
+
+  const getParentSessionContinuationId = (input?: unknown, ctx?: PiExtensionContext): string | undefined => {
+    return sessionContext?.sessionId
+      ?? callStr(ctx?.sessionManager?.getSessionId)
+      ?? lookupStr(input, ["parentSessionId", "session_id", "sessionId", "sessionID"])
+      ?? getKey(input, ctx);
   };
 
   pi.registerCommand("studio-init", {
@@ -1230,7 +1239,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
       "Use ypi_studio_task before doing non-trivial YPI Studio work; do not invent task state outside .ypi/tasks/task.json.",
       "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
-      "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit to inspect ready batches, then claim ready subtask(s) without exceeding maxConcurrency before dispatching members with subtaskId.",
+      "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit=<available concurrency slots> to inspect the ready batch, then claim all ready subtask(s) that fit the free slots before dispatching one async implementer per claimed subtaskId.",
     ],
     parameters: {
       type: "object",
@@ -1316,10 +1325,23 @@ export function createYpiStudioExtension(workspaceRoot: string) {
         }
         if (action === "claim_implementation_subtask") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const before = getYpiStudioTaskDetail(root, taskId);
+          const beforeNonTerminalIds = new Set([
+            ...(before?.implementationProgress?.activeSubtaskIds ?? []),
+            ...(before?.implementationProgress?.queuedSubtaskIds ?? []),
+          ]);
           const targetStatus = input.status === "queued" || input.status === "running" ? input.status : undefined;
           const task = claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId: input.subtaskId, subtaskIds: input.subtaskIds, limit: input.limit, runId: input.runId, runIds: input.runIds, status: targetStatus, message: input.reason, contextId: key });
-          const claimedIds = [...(task.implementationProgress?.activeSubtaskIds ?? []), ...(task.implementationProgress?.queuedSubtaskIds ?? [])];
-          return { content: [{ type: "text", text: `Claimed implementation subtask(s) ${claimedIds.join(", ") || input.subtaskIds?.join(", ") || input.subtaskId || "unknown"} for ${task.id}.` }], details: { task, subtaskIds: claimedIds, subtaskId: task.implementationProgress?.activeSubtaskId } };
+          const activeSubtaskIds = task.implementationProgress?.activeSubtaskIds ?? [];
+          const queuedSubtaskIds = task.implementationProgress?.queuedSubtaskIds ?? [];
+          const nonTerminalIds = [...activeSubtaskIds, ...queuedSubtaskIds];
+          const newlyClaimedSubtaskIds = nonTerminalIds.filter((id) => !beforeNonTerminalIds.has(id));
+          const fallbackClaimedIds = input.subtaskIds?.length ? input.subtaskIds : input.subtaskId ? [input.subtaskId] : [];
+          const claimedIds = newlyClaimedSubtaskIds.length ? newlyClaimedSubtaskIds : fallbackClaimedIds;
+          return {
+            content: [{ type: "text", text: `Claimed implementation subtask(s) ${claimedIds.join(", ") || "unknown"} for ${task.id}. Active=${activeSubtaskIds.join(", ") || "none"}; queued=${queuedSubtaskIds.join(", ") || "none"}. Dispatch one async implementer per newly claimed subtask until maxConcurrency is full.` }],
+            details: { task, newlyClaimedSubtaskIds, subtaskIds: claimedIds, activeSubtaskIds, queuedSubtaskIds, subtaskId: claimedIds[0] ?? task.implementationProgress?.activeSubtaskId },
+          };
         }
         if (action === "update_implementation_subtask") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
@@ -1360,7 +1382,7 @@ export function createYpiStudioExtension(workspaceRoot: string) {
     promptGuidelines: [
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
       "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
-      "When dispatching implementer for a task with implementationPlan, pass subtaskId for exactly one claimed subtask; without subtaskId the implementer must not perform full implementation.",
+      "When dispatching implementer for a task with implementationPlan, each ypi_studio_subagent run must pass exactly one claimed subtaskId; to use parallelism, launch multiple async implementer runs in the same orchestration turn until maxConcurrency is full.",
       "Omitting action/mode preserves the current synchronous behavior. Async orchestration uses action=start with mode=async; when an async child reaches a terminal state, the same parent session is automatically nudged to collect the run and continue the implementation plan. poll/collect/cancel by runId remain available and must be idempotent.",
     ],
     parameters: {
@@ -1507,6 +1529,17 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           transcript: writer ? { ...writer.ref } : undefined,
         };
         const taskAfterInitialRun = recordYpiStudioSubagentRun(root, taskId, runningRun);
+        const persistRunSnapshot = (run: YpiStudioTaskSubagentRun): void => {
+          const latestTask = getYpiStudioTaskDetail(root, taskId);
+          const existing = latestTask?.subagents.find((item) => item.id === run.id);
+          recordYpiStudioSubagentRun(root, taskId, {
+            ...existing,
+            ...run,
+            prompt: run.prompt ?? existing?.prompt ?? runningRun.prompt,
+            summary: run.summary ?? existing?.summary ?? runningRun.summary,
+            transcript: run.transcript ?? existing?.transcript ?? runningRun.transcript,
+          });
+        };
         onUpdate?.({
           content: [{ type: "text", text: `${member} running · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · child process starting` }],
           details: { run: projectSubagentRun(root, taskId, runningRun) },
@@ -1515,11 +1548,14 @@ export function createYpiStudioExtension(workspaceRoot: string) {
           root,
           childPrompt,
           policy,
-          { runId, taskId, member, startedAt, parentSessionId: callStr(ctx?.sessionManager?.getSessionId) ?? undefined, subtaskId, continuationOnFinal: mode === "async" },
+          { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), subtaskId, continuationOnFinal: mode === "async" },
           writer,
           signal,
           onUpdate,
-          { onFinal: (run) => { recordYpiStudioSubagentRun(root, taskId, run); } },
+          {
+            onProgress: persistRunSnapshot,
+            onFinal: (run) => { persistRunSnapshot(run); },
+          },
         );
         if (mode === "async") {
           childPromise.catch(() => {});

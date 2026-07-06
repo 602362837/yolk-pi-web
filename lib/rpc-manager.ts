@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath } from "./session-reader";
@@ -30,6 +31,22 @@ const ABORT_WAIT_TIMEOUT_MS = 3_000;
 const STUDIO_CONTINUATION_RETRY_MS = 2_000;
 const STUDIO_CONTINUATION_MAX_RETRIES = 30;
 
+function sanitizeYpiStudioContextId(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180) || "session";
+}
+
+function hashYpiStudioContext(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 24);
+}
+
+function ypiStudioContinuationKeys(sessionId: string, sessionFile?: string): string[] {
+  return [
+    sessionId,
+    `pi_${sanitizeYpiStudioContextId(sessionId)}`,
+    sessionFile ? `pi_transcript_${hashYpiStudioContext(sessionFile)}` : "",
+  ].filter(Boolean);
+}
+
 function buildYpiStudioChildContinuationPrompt(payload: YpiStudioChildRunContinuationPayload): string {
   return [
     "YPI Studio 并行子任务已结束，请继续推进当前 Studio implementationPlan。",
@@ -44,7 +61,7 @@ function buildYpiStudioChildContinuationPrompt(payload: YpiStudioChildRunContinu
     "请按现有 Studio 状态机继续，不要停下来等用户输入：",
     "1. 先调用 ypi_studio_subagent(action=collect, runId=<上面的 runId>) 刷新/确认结果；如当前 task 还有其他 terminal async run，也一并 collect。",
     "2. 重新读取当前 task / implementationProgress。若出现 failed、cancelled、waiting_for_user、blocked 或需要产品/人工决策的结果，停止派发新子任务并用人话说明需要用户处理。",
-    "3. 若 task 仍是 implementing 且有运行中的子任务，按 maxConcurrency 只补足空闲并发槽：调用 ypi_studio_task(action=implementation_next, limit=<可用槽位>)，只 claim ready 子任务，再用 ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<单个已 claim id>) 逐个派发。不要重复 claim/dispatch already queued/running/done 的子任务。",
+    "3. 若 task 仍是 implementing，必须按 maxConcurrency 补足所有空闲并发槽：计算 availableSlots=maxConcurrency-(running+queued)，调用 ypi_studio_task(action=implementation_next, limit=availableSlots) 查看 ready batch；若返回多个 ready，使用 ypi_studio_task(action=claim_implementation_subtask, limit=availableSlots, status=running) 或对这些 ready id 连续 claim，随后为每个 claimed subtaskId 各启动一个 ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<该子任务id>)，直到槽位满或无 ready。每个 implementer run 只处理一个 subtaskId，但同一轮必须派发多个 run 来填满并发槽。不要重复 claim/dispatch already queued/running/done 的子任务。",
     "4. 若全部 implementation subtasks 都 done/skipped 且无 active run，自动将任务 transition 到 checking，并派发 checker；检查完成后按现有工作流完成/请求用户处理。",
     "5. 严格遵守 awaiting_approval -> implementing 的服务器 approval gate；如果 task 未处于 implementing，不要 claim 或派发 implementer。",
   ].filter(Boolean).join("\n");
@@ -147,7 +164,9 @@ export class AgentSessionWrapper {
   }
 
   start(): void {
-    registerYpiStudioSessionContinuation(this.sessionId, (payload) => this.scheduleStudioChildContinuation(payload));
+    for (const key of ypiStudioContinuationKeys(this.sessionId, this.sessionFile)) {
+      registerYpiStudioSessionContinuation(key, (payload) => this.scheduleStudioChildContinuation(payload));
+    }
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       this.resetIdleTimer();
       let fileChangeUpdate: AgentEvent | null = null;
@@ -168,7 +187,10 @@ export class AgentSessionWrapper {
       } catch {
         // File-change projection must never interrupt normal agent event delivery.
       }
-      for (const l of this.listeners) l(event);
+      const deliveredEvent = event.type === "agent_end"
+        ? { ...event, studioChildRunCount: countActiveYpiStudioChildRunsForSession(this.sessionId) }
+        : event;
+      for (const l of this.listeners) l(deliveredEvent);
       if (fileChangeUpdate) {
         for (const l of this.listeners) l(fileChangeUpdate);
       }
@@ -191,7 +213,7 @@ export class AgentSessionWrapper {
   }
 
   private scheduleStudioChildContinuation(payload: YpiStudioChildRunContinuationPayload, attempt = 0): void {
-    if (!this._alive || payload.parentSessionId !== this.sessionId) return;
+    if (!this._alive || !ypiStudioContinuationKeys(this.sessionId, this.sessionFile).includes(payload.parentSessionId)) return;
     this.resetIdleTimer();
     if (this.inner.isStreaming) {
       if (attempt >= STUDIO_CONTINUATION_MAX_RETRIES) return;
@@ -242,6 +264,7 @@ export class AgentSessionWrapper {
           sessionId: this.inner.sessionId,
           sessionFile: this.inner.sessionFile ?? "",
           isStreaming: this.inner.isStreaming,
+          studioChildRunCount: countActiveYpiStudioChildRunsForSession(this.sessionId),
           isCompacting: this.inner.isCompacting,
           autoCompactionEnabled: this.inner.autoCompactionEnabled,
           autoRetryEnabled: this.inner.autoRetryEnabled,
@@ -386,7 +409,9 @@ export class AgentSessionWrapper {
     if (!this._alive) return;
     this._alive = false;
     if (this.idleTimer) clearTimeout(this.idleTimer);
-    unregisterYpiStudioSessionContinuation(this.sessionId);
+    for (const key of ypiStudioContinuationKeys(this.sessionId, this.sessionFile)) {
+      unregisterYpiStudioSessionContinuation(key);
+    }
     abortYpiStudioChildRunsForSession(this.sessionId, "session_destroy");
     this.unsubscribe?.();
     try {
@@ -493,7 +518,10 @@ export async function startRpcSession(
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
-      extensionFactories: [createYpiStudioExtension(cwd), createBrowserShareExtension()],
+      extensionFactories: [createYpiStudioExtension(cwd, {
+        sessionId: sessionManager.getSessionId(),
+        sessionFile: sessionManager.getSessionFile() ?? undefined,
+      }), createBrowserShareExtension()],
     });
     await resourceLoader.reload();
 
