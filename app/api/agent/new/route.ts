@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { statSync } from "fs";
-import { startRpcSession } from "@/lib/rpc-manager";
-import { canonicalizeCwd } from "@/lib/cwd";
-import { registerAllowedRoot } from "@/lib/allowed-roots";
+import { AgentSessionBootstrapError, createConfiguredEmptyAgentSession } from "@/lib/agent-session-bootstrap";
 
 // POST /api/agent/new  body: { cwd: string; type: string; message: string; ... }
 // Spawns a brand-new pi session and immediately sends the first command.
@@ -12,41 +9,22 @@ export async function POST(req: Request) {
     const body = await req.json() as { cwd?: string; [key: string]: unknown };
     const { cwd, ...command } = body;
 
-    if (!cwd || typeof cwd !== "string") {
-      return NextResponse.json({ error: "cwd is required" }, { status: 400 });
-    }
-    const canonicalCwd = canonicalizeCwd(cwd);
-    try {
-      if (!statSync(canonicalCwd).isDirectory()) {
-        return NextResponse.json({ error: `Path is not a directory: ${cwd}` }, { status: 400 });
-      }
-    } catch {
-      return NextResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
-    }
-
-    // Use a one-time key so startRpcSession's lock doesn't conflict with real session ids
     const { provider, modelId, toolNames, thinkingLevel, ...promptCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; [key: string]: unknown };
-
-    const tempKey = `__new__${Date.now()}`;
-    const { session, realSessionId } = await startRpcSession(tempKey, "", canonicalCwd, toolNames);
-
-    // Keep allowed workspace roots in sync so brand-new cwd file/Trellis
-    // requests do not have to wait for a session-list cache refresh.
-    registerAllowedRoot(canonicalCwd);
-    // Apply pre-selected model before sending the prompt
-    if (provider && modelId) {
-      await session.send({ type: "set_model", provider, modelId });
-    }
-
-    // Apply pre-selected thinking level before sending the prompt
-    if (thinkingLevel) {
-      await session.send({ type: "set_thinking_level", level: thinkingLevel });
-    }
+    const { session, sessionId } = await createConfiguredEmptyAgentSession({
+      cwd,
+      provider,
+      modelId,
+      toolNames,
+      thinkingLevel,
+    });
 
     const result = await session.send(promptCommand);
 
-    return NextResponse.json({ success: true, sessionId: realSessionId, data: result });
+    return NextResponse.json({ success: true, sessionId, data: result });
   } catch (error) {
+    if (error instanceof AgentSessionBootstrapError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

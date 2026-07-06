@@ -13,18 +13,19 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `sessions/[id]/studio-task/` | GET | Resolve the high-confidence YPI Studio task associated with one pi session and return a lightweight widget projection (no artifact bodies or full transcripts). |
 | `sessions/[id]/export/` | GET | Export session as Markdown. |
 | `sessions/new/` | 410 | Deprecated route kept for compatibility. |
-| `agent/new/` | POST | Create a new session and send the first message. |
+| `agent/new/` | POST | Create a new session and send the first message when no precreated/effective session exists. |
+| `agent/draft/` | POST | Create a real empty session for a validated cwd, applying optional tool/model/thinking selections without sending a prompt. |
 | `agent/[id]/` | GET/POST | Get agent state or send a command. |
 | `agent/[id]/events/` | GET | SSE event stream. |
 | `browser-share/health/` | GET | Local Chrome extension health check for Browser Share. |
 | `browser-share/shares/` | POST | Create a short-lived Browser Share from the Chrome extension and return a one-time share code. |
 | `browser-share/shares/[shareId]/snapshot/` | POST | Extension upload of a sanitized, bounded page snapshot for one share. |
-| `browser-share/shares/[shareId]/commands/` | GET | Extension polling endpoint for queued Browser Share commands. |
+| `browser-share/shares/[shareId]/commands/` | GET | Extension polling/long-poll endpoint for executable queued Browser Share commands; updates command heartbeat, never returns pending-approval commands, and marks returned commands `running`. Supports bounded `waitMs` (max 30s). |
 | `browser-share/sessions/[sessionId]/bind/` | POST/DELETE | Bind a share code to the explicit target chat/session, or unbind the current Browser Share. |
-| `browser-share/sessions/[sessionId]/state/` | GET | Return the current session-scoped Browser Share status, tab, snapshot, and pending commands. |
+| `browser-share/sessions/[sessionId]/state/` | GET | Return the current session-scoped Browser Share status, tab, snapshot, heartbeat/connection projection, active commands, and recent terminal commands. |
 | `browser-share/sessions/[sessionId]/commands/` | POST | Queue a Browser Share action command for the current session binding only. |
-| `browser-share/sessions/[sessionId]/commands/[commandId]/approval/` | POST | Approve or reject a pending Browser Share action command. |
-| `browser-share/commands/[commandId]/result/` | POST | Extension result callback for a Browser Share command. |
+| `browser-share/sessions/[sessionId]/commands/[commandId]/approval/` | POST | Approve a pending command into `queued` or reject it into terminal `rejected`, notifying command waiters. |
+| `browser-share/commands/[commandId]/result/` | POST | Extension result callback for a Browser Share command; records terminal success/failure, stores an included snapshot, updates heartbeat, and ignores late terminal overwrites. |
 | `files/[...path]/` | GET/PUT | List/read/watch/preview workspace files for the file viewer and safely save existing editable text files; directory listing returns truncation metadata for very large folders. |
 | `files/search/` | GET | Search files in the selected workspace. |
 | `files/definitions/` | GET | Lightweight workspace text/code symbol definition search for editor drill-down actions. |

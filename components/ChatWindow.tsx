@@ -136,7 +136,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, displayModel: displayModelValue, sessionStats,
     agentPhase, toolProgressById,
-    isNew,
+    isNew, effectiveSessionId, ensureBrowserShareSession,
     messagesEndRef, scrollContainerRef,
     lastUserMsgRef,
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
@@ -314,7 +314,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       ref={chatInputRef}
       onSend={handleSend}
       cwd={session?.cwd ?? newSessionCwd}
-      sessionId={session?.id ?? null}
+      sessionId={effectiveSessionId ?? null}
+      onEnsureBrowserShareSession={ensureBrowserShareSession}
       onAbort={handleAbort}
       onSteer={agentRunning ? handleSteer : undefined}
       onFollowUp={agentRunning ? handleFollowUp : undefined}

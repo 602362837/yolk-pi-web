@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-06T02:10:54.878Z",
+  "updatedAt": "2026-07-06T05:28:50.300Z",
   "entries": [
+    {
+      "id": "20260706-132850-优化-browser-share-new-chat-绑定与-chat-直接操作-tab-交互",
+      "title": "优化 Browser Share New Chat 绑定与 Chat 直接操作 Tab 交互",
+      "taskId": "20260706-103256-优化-browser-share-new-chat-绑定与-chat-直接操作-tab-交互",
+      "taskKey": "archived:2026-07:20260706-103256-优化-browser-share-new-chat-绑定与-chat-直接操作-tab-交互",
+      "workflowId": "feature-dev",
+      "summary": "已完成 Browser Share New Chat 绑定与直接操作 tab 的 MVP。关键结论：New Chat 绑定应采用“懒创建真实空 session + 复用首条 prompt”的方式，避免 draft transfer 复杂度；首条消息后用第一条用户消息截断刷新标题，并保持 manual name 优先。Browser Share action tools 不应只返回 queued，而应等待 terminal 状态，默认 90 秒超时，并通过 onUpdate 暴露 pending_approval/queued/running/terminal。扩展侧采用 content-script 执行 + service worker background long-poll/alarms transport；popup 只做状态/手动控制，不再依赖常驻。Chrome debugger/CDP 可增强截图/坐标输入/导航/DOM/AX，但不能消除 extension 与 ypi web 间命令通道，因此本轮 deferred，不启用 debugger 权限。另修复了 Studio awaiting_approval→implementing 因绑定/上下文抖动导致无法继续的问题：允许在同次 transition 中基于明确批准 reason 记录 approvalGrant，再走原有断言。",
+      "tags": [
+        "feature-dev",
+        "browser-share",
+        "chrome-extension",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-103256-优化-browser-share-new-chat-绑定与-chat-直接操作-tab-交互",
+      "knowledgePath": ".ypi/knowledge/20260706-132850-优化-browser-share-new-chat-绑定与-chat-直接操作-tab-交互.md",
+      "createdAt": "2026-07-06T05:28:50.300Z",
+      "archivedAt": "2026-07-06T05:28:50.300Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260706-101054-设计-chrome-插件式-browser-share-能力",
       "title": "设计 Chrome 插件式 Browser Share 能力",

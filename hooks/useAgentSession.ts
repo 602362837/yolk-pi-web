@@ -7,6 +7,7 @@ import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ToolEntry } from "@/components/ToolPanel";
 import type { TrellisTaskChatContext } from "@/lib/trellis-chat-context";
+import { sessionTitleSeedFromUserMessage } from "@/lib/session-title";
 
 export interface SessionData {
   sessionId: string;
@@ -284,9 +285,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
   const [subagentRuns, setSubagentRuns] = useState<SubagentRun[]>([]);
   const [toolProgressById, setToolProgressById] = useState<Record<string, ToolExecutionProgress>>({});
+  const [precreatedSessionId, setPrecreatedSessionId] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
+  const precreatedSessionIdRef = useRef<string | null>(null);
+  const ensureBrowserShareSessionPromiseRef = useRef<Promise<string | null> | null>(null);
   const agentRunningRef = useRef(false);
   const handleAgentEventRef = useRef<((event: AgentEvent) => void) | null>(null);
   const initialScrollDoneRef = useRef(false);
@@ -303,6 +307,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
 
   const currentModel = currentModelOverride ?? data?.context.model ?? pendingModel ?? null;
+  const effectiveSessionId = session?.id ?? precreatedSessionId;
   const displayModel = isNew ? newSessionModel : currentModel;
 
   useEffect(() => {
@@ -435,6 +440,57 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       onSubagentChange?.(subagentRuns);
     }
   });
+
+  const ensureBrowserShareSession = useCallback(async (): Promise<string | null> => {
+    if (sessionIdRef.current) return sessionIdRef.current;
+    if (!isNew || !newSessionCwd) return null;
+    if (ensureBrowserShareSessionPromiseRef.current) return ensureBrowserShareSessionPromiseRef.current;
+
+    ensureBrowserShareSessionPromiseRef.current = (async () => {
+      try {
+        const selectedModel = newSessionModel;
+        if (selectedModel) setPendingModel(selectedModel);
+        const { PRESET_NONE, PRESET_DEFAULT, PRESET_FULL, PRESET_SUBAGENT } = await import("@/components/ToolPanel");
+        const toolNames = toolPreset === "none" ? PRESET_NONE : toolPreset === "default" ? PRESET_DEFAULT : toolPreset === "subagent" ? PRESET_SUBAGENT : PRESET_FULL;
+        const res = await fetch("/api/agent/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cwd: newSessionCwd,
+            toolNames,
+            ...(selectedModel ? { provider: selectedModel.provider, modelId: selectedModel.modelId } : {}),
+            ...(thinkingLevel !== "auto" ? { thinkingLevel } : {}),
+          }),
+        });
+        const result = await res.json().catch(() => ({})) as { sessionId?: string; error?: string };
+        if (!res.ok || !result.sessionId) throw new Error(result.error ?? `HTTP ${res.status}`);
+        const realId = result.sessionId;
+        sessionIdRef.current = realId;
+        precreatedSessionIdRef.current = realId;
+        setPrecreatedSessionId(realId);
+        const now = new Date().toISOString();
+        onSessionCreated?.({
+          id: realId,
+          path: "",
+          cwd: newSessionCwd,
+          name: undefined,
+          created: now,
+          modified: now,
+          messageCount: 0,
+          firstMessage: "",
+        });
+        return realId;
+      } catch (error) {
+        console.error("Failed to create Browser Share session:", error);
+        setError(error instanceof Error ? error.message : String(error));
+        return null;
+      } finally {
+        ensureBrowserShareSessionPromiseRef.current = null;
+      }
+    })();
+
+    return ensureBrowserShareSessionPromiseRef.current;
+  }, [isNew, newSessionCwd, newSessionModel, onSessionCreated, thinkingLevel, toolPreset]);
 
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
@@ -637,7 +693,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const piImages = images?.map((img) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType }));
 
     try {
-      if (isNew && newSessionCwd) {
+      const existingSessionId = sessionIdRef.current;
+      if (isNew && newSessionCwd && !existingSessionId) {
         const selectedModel = newSessionModel;
         if (selectedModel) setPendingModel(selectedModel);
         const { PRESET_NONE, PRESET_DEFAULT, PRESET_FULL, PRESET_SUBAGENT } = await import("@/components/ToolPanel");
@@ -660,19 +717,38 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const realId = result.sessionId;
         sessionIdRef.current = realId;
         connectEvents(realId);
+        const now = new Date().toISOString();
         onSessionCreated?.({
           id: realId,
           path: "",
           cwd: newSessionCwd,
           name: undefined,
-          created: new Date().toISOString(),
-          modified: new Date().toISOString(),
+          created: now,
+          modified: now,
           messageCount: 1,
-          firstMessage: message,
+          firstMessage: sessionTitleSeedFromUserMessage(message),
         });
-      } else if (session) {
-        connectEvents(session.id);
-        await sendAgentCommand(session.id, {
+      } else {
+        const sid = existingSessionId ?? session?.id;
+        if (!sid) return;
+        const wasPrecreated = !!precreatedSessionIdRef.current && sid === precreatedSessionIdRef.current && messages.length === 0;
+        connectEvents(sid);
+        if (wasPrecreated) {
+          const now = new Date().toISOString();
+          onSessionCreated?.({
+            id: sid,
+            path: session?.path ?? "",
+            cwd: session?.cwd ?? newSessionCwd ?? "",
+            name: session?.name,
+            created: session?.created ?? now,
+            modified: now,
+            messageCount: 1,
+            firstMessage: sessionTitleSeedFromUserMessage(message),
+          });
+          precreatedSessionIdRef.current = null;
+          setPrecreatedSessionId(null);
+        }
+        await sendAgentCommand(sid, {
           type: "prompt",
           message,
           ...(piImages?.length ? { images: piImages } : {}),
@@ -684,7 +760,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setAgentPhase(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, toolPreset, thinkingLevel, session, agentRunning, connectEvents, onSessionCreated]);
+  }, [isNew, newSessionCwd, newSessionModel, toolPreset, thinkingLevel, session, agentRunning, connectEvents, onSessionCreated, messages.length]);
 
   const handleAbort = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -737,6 +813,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const handleModelChange = useCallback(async (provider: string, modelId: string) => {
     if (isNew) {
       setNewSessionModel({ provider, modelId });
+      const draftSid = sessionIdRef.current;
+      if (!draftSid) return;
+      try {
+        await sendAgentCommand(draftSid, { type: "set_model", provider, modelId });
+        setCurrentModelOverride({ provider, modelId });
+      } catch (e) {
+        console.error("Failed to set model:", e);
+      }
       return;
     }
     const sid = sessionIdRef.current;
@@ -850,6 +934,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const elAbsTop = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
     container.scrollTo({ top: elAbsTop - 16, behavior: "smooth" });
   }, []);
+
+  useEffect(() => {
+    if (session?.id) {
+      sessionIdRef.current = session.id;
+      if (precreatedSessionId && precreatedSessionId !== session.id) {
+        precreatedSessionIdRef.current = null;
+        setPrecreatedSessionId(null);
+      }
+    }
+  }, [precreatedSessionId, session?.id]);
 
   // Load session on mount
   useEffect(() => {
@@ -969,14 +1063,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
     agentPhase, subagentRuns, toolProgressById,
-    isNew,
+    isNew, precreatedSessionId, effectiveSessionId,
     // Refs
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,
     lastUserMsgRef, pendingScrollToUserRef, initialScrollDoneRef,
     // Actions
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handleAbortCompaction,
-    handleToolPresetChange, handleThinkingLevelChange, loadTools, setActiveLeafId, setData, setMessages,
+    handleToolPresetChange, handleThinkingLevelChange, ensureBrowserShareSession, loadTools, setActiveLeafId, setData, setMessages,
     dispatch, setAgentRunning, setForkingEntryId,
     // Subscriptions
     handleAgentEventRef,
