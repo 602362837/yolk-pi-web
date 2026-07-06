@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-03T09:11:51.200Z",
+  "updatedAt": "2026-07-06T01:46:23.345Z",
   "entries": [
+    {
+      "id": "20260706-094623-设计-chatgpt-额度耗尽自动切换可用账号",
+      "title": "设计 ChatGPT 额度耗尽自动切换可用账号",
+      "taskId": "20260706-090533-设计-chatgpt-额度耗尽自动切换可用账号",
+      "taskKey": "archived:2026-07:20260706-090533-设计-chatgpt-额度耗尽自动切换可用账号",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：ChatGPT/OpenAI Codex 多账号额度耗尽自动切换。关键可复用结论：自动 failover 必须默认关闭，仅对 openai-codex 明确 quota/usage exhausted 触发，普通 transient 429/rate-limit 不切号；切号是全局副作用，需进程级 mutex、触发账号 run-start 捕获、锁内 active changed guard 和 activate 前 double-check，确保 session1 A→B 后 session2 只 retry B，不级联 B→C；每 turn 维护 attempts/switches budget，默认最多一次 retry/一次切号，避免无限循环；候选账号应跳过 active、cooldown、已尝试/满额/认证失败账号，优先使用新鲜 quota cache，必要时受控刷新；激活后调用 reloadRpcAuthState/cleanupSessionResources；接入点应先让 pi 原生 retry/compaction 处理，只有原逻辑返回 false 后才 failover。附带修复：YPI Studio `getYpiStudioTaskIdForContext` 不应无条件忽略 `pi_process_*` runtime pointer，否则当前 session 任务绑定/approval 恢复会失败。",
+      "tags": [
+        "feature-dev",
+        "chatgpt",
+        "openai-codex",
+        "auto-failover",
+        "oauth-accounts",
+        "rpc-manager",
+        "ypi-studio",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-090533-设计-chatgpt-额度耗尽自动切换可用账号",
+      "knowledgePath": ".ypi/knowledge/20260706-094623-设计-chatgpt-额度耗尽自动切换可用账号.md",
+      "createdAt": "2026-07-06T01:46:23.345Z",
+      "archivedAt": "2026-07-06T01:46:23.345Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260703-171151-在-ypi-studio-成员-tab-显示并快速修改成员模型配置",
       "title": "在 YPI Studio 成员 tab 显示并快速修改成员模型配置",

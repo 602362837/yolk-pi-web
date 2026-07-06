@@ -1024,7 +1024,7 @@ export function SettingsConfig({
             {renderSectionButton("studio", "Studio", "YPI Studio 成员模型")}
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
             {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
-            {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量悬浮面板")}
+            {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量与自动切换")}
             {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
           </div>
@@ -1358,6 +1358,12 @@ export function SettingsConfig({
                       description="开启后顶部右侧会显示当前激活 ChatGPT/Codex 账号的半透明用量入口。展开后可手动刷新，并与 Models 中的额度缓存保持一致。"
                       checked={chatgpt.usagePanelEnabled}
                       onChange={(usagePanelEnabled) => updateChatgpt({ usagePanelEnabled })}
+                    />
+                    <ToggleField
+                      label="额度耗尽时自动切换可用账号"
+                      description="默认关闭。开启后仅对 openai-codex 生效：运行中遇到明确额度/用量耗尽时，后端会在全局锁内切换到下一个可用账号并安全重试一次；普通临时 429/rate limit 不触发切换。"
+                      checked={chatgpt.autoFailover.enabled}
+                      onChange={(enabled) => updateChatgpt({ autoFailover: { ...chatgpt.autoFailover, enabled } })}
                     />
                     <ToggleField
                       label="后台自动刷新所有账号"
