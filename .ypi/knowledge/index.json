@@ -1,7 +1,37 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-06T07:41:45.095Z",
+  "updatedAt": "2026-07-06T08:01:53.280Z",
   "entries": [
+    {
+      "id": "20260706-160153-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+      "title": "优化 YPI Studio 异步子任务编排的等待与自动续跑交互",
+      "taskId": "20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+      "taskKey": "archived:2026-07:20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+      "workflowId": "feature-dev",
+      "summary": "已完成 YPI Studio 异步/并行子任务等待与自动续跑优化。可复用结论：不要用独立后台 orchestrator 取代 Studio 状态机；采用主 Chat continuation loop。用户批准后，主 Chat 派发 async implementer/checker 后进入 `waiting_for_studio_children`，即使模型未 streaming 也不能显示 stopped/idle。child terminal 后用 parent session continuation 幂等唤醒同一主会话，由主会话继续 `collect -> update subtask -> implementation_next -> claim/dispatch -> checking/completed`。UI/Widget/Panel 使用 `sessionRuntime` 与 compact subtask timeline 展示 running/queued/ready/done/failed/blocked/waiting_for_user，文案用“后台仍在工作/正在等待并行子任务/需要你处理”。approval gate 仍必须由服务器记录 approvalGrant 后才能进入 implementing；同毫秒 grant/gate 需确保 grant 晚于 gate。验证：lint、tsc、test:studio-policy、test:studio-dag。",
+      "tags": [
+        "feature-dev",
+        "ypi-studio",
+        "async-subtasks",
+        "continuation",
+        "chat-waiting-state",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-145915-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
+      "knowledgePath": ".ypi/knowledge/20260706-160153-优化-ypi-studio-异步子任务编排的等待与自动续跑交互.md",
+      "createdAt": "2026-07-06T08:01:53.280Z",
+      "archivedAt": "2026-07-06T08:01:53.280Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260706-154145-优化-browser-share-常驻-tab-共享与-debugger-可感知状态",
       "title": "优化 Browser Share 常驻 Tab 共享与 debugger 可感知状态",
