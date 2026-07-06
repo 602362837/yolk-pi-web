@@ -5,7 +5,7 @@ Browser Share lets a user explicitly share the active Chrome tab with one select
 ## Runtime model
 
 - Chrome MV3 extension lives outside this package at `~/gitProjects/ypi-browser-share-extension` and is not imported into the ypi web npm package or Next.js build.
-- ypi web exposes a localhost-only bridge under `app/api/browser-share/**`.
+- ypi web exposes a Browser Share bridge under `app/api/browser-share/**`; the extension defaults to `http://localhost:30141` but its popup can store a custom ypi web base URL for custom ports, LAN, HTTPS reverse proxies, and path prefixes.
 - The extension creates a short-lived one-time share code. The user enters that code in the target chat input to bind the page to that session.
 - Agent tools are scoped to the current session id and never accept arbitrary `shareId` input.
 
@@ -64,22 +64,24 @@ The default action wait is 90 seconds. Terminal statuses are `succeeded`, `faile
 
 ## Extension transport
 
-The MVP keeps content-script execution plus an extension-initiated command channel:
+The extension uses debugger-first capture/action execution plus an extension-initiated command channel:
 
 - `GET /api/browser-share/shares/[shareId]/commands?waitMs=25000` is the primary long-poll path.
 - The route updates heartbeat state, never returns pending-approval commands, and marks returned queued commands as `running`.
 - The extension service worker keeps one guarded poll in flight per active share, retries with backoff on errors, and uses `chrome.alarms` to restart best-effort when MV3 suspends the worker.
 - The popup is status/manual-control UI only; it is not required to stay open for command execution.
-- Post-action snapshots are uploaded automatically when possible, with manual refresh remaining as a fallback.
+- The active share stores the base URL used when it was created, so changing popup settings only affects the next share and cannot silently send command results to another ypi service.
+- Post-action debugger snapshots are uploaded automatically when possible, with manual refresh remaining as a fallback.
 
-## Debugger/CDP deferral
+## Debugger/CDP mode
 
-The MVP intentionally does not use Chrome `debugger` / CDP:
+The current extension is debugger-first and includes Chrome `debugger` permission in its main manifest:
 
-- ypi web and server-side agent tools cannot call `chrome.debugger`; execution would still have to go through the extension.
-- Debugger/CDP could improve screenshot, coordinate input, navigation waiting, and DOM/AX inspection, but it adds high-risk `debugger` permission, user-visible debug prompts, DevTools conflicts, and larger privacy exposure.
-- The extension manifest must not add `debugger` or `<all_urls>` for this MVP.
-- A debugger-first mode should be treated as a future opt-in spike with separate product approval.
+- ypi web and server-side agent tools still never call `chrome.debugger`; all CDP calls happen inside the extension against the active shared tab.
+- Snapshots prefer CDP/`Runtime.evaluate` summaries and may include viewport, element bounds, AX-like role/name fields, selectors, debugger refs, and bounded screenshot data/metadata.
+- Commands prefer CDP `Input.dispatchMouseEvent`, `Input.insertText`, and `Page.navigate`; failures fall back to the existing content-script/tabs paths.
+- The extension detaches debugger sessions after capture/action attempts and when a share is stopped.
+- Server-side sanitization whitelists and bounds debugger/screenshot fields before exposing them to UI or tools.
 
 ## API summary
 
