@@ -47,6 +47,19 @@ function ypiStudioContinuationKeys(sessionId: string, sessionFile?: string): str
   ].filter(Boolean);
 }
 
+function buildYpiStudioReadyContinuationPrompt(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; reason?: string }): string {
+  return [
+    "YPI Studio implementationPlan 仍有 ready 子任务且存在空闲并发槽，请继续自动推进，不要等待用户输入。",
+    "",
+    `- taskId: ${input.taskId}`,
+    typeof input.readySubtaskCount === "number" ? `- readySubtaskCount: ${input.readySubtaskCount}` : undefined,
+    typeof input.availableSlots === "number" ? `- availableSlots: ${input.availableSlots}` : undefined,
+    input.reason ? `- reason: ${input.reason}` : undefined,
+    "",
+    "请按现有 Studio 状态机继续：先调用 ypi_studio_task(action=current) 或 ypi_studio_task(action=get, taskId=<上面的 taskId>) 确认状态；若 task 仍是 implementing，调用 implementation_next(limit=<available slots>)，claim ready 子任务，并为每个 claimed subtaskId 启动一个 async implementer，直到 maxConcurrency 填满或无 ready。每个 implementer run 只处理一个 subtaskId。",
+  ].filter(Boolean).join("\n");
+}
+
 function buildYpiStudioChildContinuationPrompt(payload: YpiStudioChildRunContinuationPayload): string {
   return [
     "YPI Studio 并行子任务已结束，请继续推进当前 Studio implementationPlan。",
@@ -77,6 +90,7 @@ export class AgentSessionWrapper {
   private unsubscribe: (() => void) | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private onDestroyCallback: (() => void) | null = null;
+  private studioAutoContinueKeys = new Map<string, number>();
   private _alive = true;
 
   constructor(public readonly inner: AgentSessionLike, public readonly cwd: string) {
@@ -223,6 +237,19 @@ export class AgentSessionWrapper {
     this.inner.followUp(buildYpiStudioChildContinuationPrompt(payload)).catch(() => {});
   }
 
+  private scheduleStudioReadyContinuation(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; stateKey?: string; reason?: string }): { queued: boolean; skippedReason?: string } {
+    if (!this._alive) return { queued: false, skippedReason: "session_not_alive" };
+    this.resetIdleTimer();
+    if (this.inner.isStreaming) return { queued: false, skippedReason: "session_streaming" };
+    const key = `${input.taskId}:${input.stateKey ?? "ready"}`;
+    const now = Date.now();
+    const last = this.studioAutoContinueKeys.get(key) ?? 0;
+    if (now - last < 30_000) return { queued: false, skippedReason: "recently_queued" };
+    this.studioAutoContinueKeys.set(key, now);
+    this.inner.followUp(buildYpiStudioReadyContinuationPrompt(input)).catch(() => {});
+    return { queued: true };
+  }
+
   onEvent(listener: EventListener): () => void {
     this.listeners.push(listener);
     return () => {
@@ -255,6 +282,18 @@ export class AgentSessionWrapper {
         ]);
         if ("error" in abortResult) throw abortResult.error;
         return { abortedChildren, abortTimedOut: abortResult.timedOut };
+      }
+
+      case "studio_autocontinue": {
+        const taskId = typeof command.taskId === "string" ? command.taskId : "";
+        if (!taskId) throw new Error("taskId is required");
+        return this.scheduleStudioReadyContinuation({
+          taskId,
+          readySubtaskCount: typeof command.readySubtaskCount === "number" ? command.readySubtaskCount : undefined,
+          availableSlots: typeof command.availableSlots === "number" ? command.availableSlots : undefined,
+          stateKey: typeof command.stateKey === "string" ? command.stateKey : undefined,
+          reason: typeof command.reason === "string" ? command.reason : undefined,
+        });
       }
 
       case "get_state": {
