@@ -359,8 +359,15 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   const studioTimeline = studioRuntime?.timeline.slice(0, 5) ?? [];
   const activeStudioRuns = (studioTask?.subagents ?? [])
     .filter((run) => run.status === "running" || run.status === "queued" || run.status === "waiting_for_user")
-    .sort((a, b) => (b.transcriptMeta?.updatedAt ?? b.startedAt).localeCompare(a.transcriptMeta?.updatedAt ?? a.startedAt))
-    .slice(0, 4);
+    .sort((a, b) => (b.transcriptMeta?.updatedAt ?? b.startedAt).localeCompare(a.transcriptMeta?.updatedAt ?? a.startedAt));
+  const activeStudioRunIds = new Set(activeStudioRuns.map((run) => run.id));
+  const visibleStudioRuns = [
+    ...activeStudioRuns,
+    ...(studioTask?.subagents ?? [])
+      .filter((run) => !activeStudioRunIds.has(run.id))
+      .sort((a, b) => (b.transcriptMeta?.updatedAt ?? b.finishedAt ?? b.startedAt).localeCompare(a.transcriptMeta?.updatedAt ?? a.finishedAt ?? a.startedAt))
+      .slice(0, Math.max(0, 4 - activeStudioRuns.length)),
+  ].slice(0, 4);
   const showStudioWaitingBanner = !!studioRuntime && (studioRuntime.status === "waiting_for_studio_children" || studioRuntime.status === "needs_user" || agentPhase?.kind === "waiting_for_studio_children");
   const studioWaitingBannerElement = showStudioWaitingBanner && studioRuntime ? (
     <div style={{
@@ -395,9 +402,10 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           ))}
         </div>
       )}
-      {activeStudioRuns.length > 0 && (
+      {visibleStudioRuns.length > 0 && (
         <div style={{ marginTop: 9, display: "grid", gap: 6 }}>
-          {activeStudioRuns.map((run) => {
+          <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 800 }}>成员运行 · 活跃 {activeStudioRuns.length} · 最近 {visibleStudioRuns.length}</div>
+          {visibleStudioRuns.map((run) => {
             const preview = studioRunPreview(run);
             const stats = studioRunStats(run);
             return (
@@ -415,7 +423,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           })}
         </div>
       )}
-      {activeStudioRuns.length === 0 && studioTimeline.length > 0 && (
+      {visibleStudioRuns.length === 0 && studioTimeline.length > 0 && (
         <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
           {studioTimeline.map((item) => (
             <div key={item.id} style={{ display: "grid", gridTemplateColumns: "54px 1fr", gap: 8, alignItems: "center" }}>
