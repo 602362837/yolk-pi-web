@@ -361,7 +361,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         return null;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const d = await res.json() as SessionData & { agentState?: { running: boolean; state?: { isStreaming?: boolean; isCompacting?: boolean; contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; thinkingLevel?: string } } };
+      const d = await res.json() as SessionData & { agentState?: { running: boolean; state?: { isStreaming?: boolean; studioChildRunCount?: number; isCompacting?: boolean; contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; thinkingLevel?: string } } };
       setData(d);
       setActiveLeafId(d.leafId);
       setMessages(d.context.messages);
@@ -508,9 +508,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setToolProgressById({});
         dispatch({ type: "start" });
         break;
-      case "agent_end":
-        setAgentRunning(false);
-        setAgentPhase(null);
+      case "agent_end": {
+        const studioChildRunCount = typeof event.studioChildRunCount === "number" ? event.studioChildRunCount : 0;
+        if (studioChildRunCount > 0) {
+          setAgentRunning(true);
+          setAgentPhase({ kind: "waiting_for_studio_children", activeRunCount: studioChildRunCount, message: "Studio 子任务仍在后台运行，主会话会在子任务结束后自动续跑。" });
+        } else {
+          setAgentRunning(false);
+          setAgentPhase(null);
+        }
         setRetryInfo(null);
         dispatch({ type: "end" });
         if (sessionIdRef.current) {
@@ -525,6 +531,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         onAgentEnd?.();
         break;
+      }
       case "message_start":
       case "message_update": {
         const msg = event.message as Partial<AgentMessage> | undefined;
@@ -959,9 +966,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       loadSession(session.id, true, true).then((agentState) => {
         if (agentState?.running) {
           loadTools(session.id);
-          if (agentState.state?.isStreaming) {
+          const studioChildRunCount = agentState.state?.studioChildRunCount ?? 0;
+          if (agentState.state?.isStreaming || studioChildRunCount > 0) {
             setAgentRunning(true);
-            setAgentPhase({ kind: "waiting_model" });
+            setAgentPhase(studioChildRunCount > 0 && !agentState.state?.isStreaming
+              ? { kind: "waiting_for_studio_children", activeRunCount: studioChildRunCount, message: "Studio 子任务仍在后台运行，主会话会在子任务结束后自动续跑。" }
+              : { kind: "waiting_model" });
             connectEvents(session.id);
           }
         }
