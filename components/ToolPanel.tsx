@@ -10,9 +10,12 @@ export interface ToolEntry {
 
 export type ToolPreset = "none" | "default" | "full" | "subagent";
 export const PRESET_NONE: string[] = [];
-export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write", "ypi_studio_task"];
-export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "ypi_studio_task"];
-export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent", "ypi_studio_task", "ypi_studio_subagent"];
+const BROWSER_SHARE_READONLY_TOOLS = ["browser_share_status", "browser_share_snapshot", "browser_share_get_selection"];
+const BROWSER_SHARE_ACTION_TOOLS = ["browser_share_click", "browser_share_type", "browser_share_scroll", "browser_share_navigate"];
+
+export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write", "ypi_studio_task", ...BROWSER_SHARE_READONLY_TOOLS];
+export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "ypi_studio_task", ...BROWSER_SHARE_READONLY_TOOLS, ...BROWSER_SHARE_ACTION_TOOLS];
+export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent", "ypi_studio_task", "ypi_studio_subagent", ...BROWSER_SHARE_READONLY_TOOLS, ...BROWSER_SHARE_ACTION_TOOLS];
 const BUILTIN_TOOL_NAMES = new Set(PRESET_SUBAGENT);
 
 export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {
@@ -39,9 +42,9 @@ interface Props {
 
 const PRESETS: { id: ToolPreset; label: string; desc: string; tools: string[] }[] = [
   { id: "none",    label: "Off",  desc: "No tools",                                tools: PRESET_NONE },
-  { id: "default", label: "Low",  desc: "read · bash · edit · write · Studio task", tools: PRESET_DEFAULT },
-  { id: "full",    label: "High", desc: "read · bash · edit · write · grep · find · ls · Studio task", tools: PRESET_FULL },
-  { id: "subagent", label: "Agent", desc: "High + subagent and Studio delegation", tools: PRESET_SUBAGENT },
+  { id: "default", label: "Low",  desc: "read · bash · edit · write · Studio task · Browser read", tools: PRESET_DEFAULT },
+  { id: "full",    label: "High", desc: "read · bash · edit · write · grep · find · ls · Studio · Browser", tools: PRESET_FULL },
+  { id: "subagent", label: "Agent", desc: "High + subagent, Studio delegation and Browser", tools: PRESET_SUBAGENT },
 ];
 
 export function ToolPanel({ tools, onPreset, onClose }: Props) {

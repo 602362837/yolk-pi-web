@@ -314,6 +314,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       ref={chatInputRef}
       onSend={handleSend}
       cwd={session?.cwd ?? newSessionCwd}
+      sessionId={session?.id ?? null}
       onAbort={handleAbort}
       onSteer={agentRunning ? handleSteer : undefined}
       onFollowUp={agentRunning ? handleFollowUp : undefined}

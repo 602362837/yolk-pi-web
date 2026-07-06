@@ -16,6 +16,15 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `agent/new/` | POST | Create a new session and send the first message. |
 | `agent/[id]/` | GET/POST | Get agent state or send a command. |
 | `agent/[id]/events/` | GET | SSE event stream. |
+| `browser-share/health/` | GET | Local Chrome extension health check for Browser Share. |
+| `browser-share/shares/` | POST | Create a short-lived Browser Share from the Chrome extension and return a one-time share code. |
+| `browser-share/shares/[shareId]/snapshot/` | POST | Extension upload of a sanitized, bounded page snapshot for one share. |
+| `browser-share/shares/[shareId]/commands/` | GET | Extension polling endpoint for queued Browser Share commands. |
+| `browser-share/sessions/[sessionId]/bind/` | POST/DELETE | Bind a share code to the explicit target chat/session, or unbind the current Browser Share. |
+| `browser-share/sessions/[sessionId]/state/` | GET | Return the current session-scoped Browser Share status, tab, snapshot, and pending commands. |
+| `browser-share/sessions/[sessionId]/commands/` | POST | Queue a Browser Share action command for the current session binding only. |
+| `browser-share/sessions/[sessionId]/commands/[commandId]/approval/` | POST | Approve or reject a pending Browser Share action command. |
+| `browser-share/commands/[commandId]/result/` | POST | Extension result callback for a Browser Share command. |
 | `files/[...path]/` | GET/PUT | List/read/watch/preview workspace files for the file viewer and safely save existing editable text files; directory listing returns truncation metadata for very large folders. |
 | `files/search/` | GET | Search files in the selected workspace. |
 | `files/definitions/` | GET | Lightweight workspace text/code symbol definition search for editor drill-down actions. |

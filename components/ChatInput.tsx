@@ -7,6 +7,7 @@ import { encodeFilePathForApi, getFileName, getRelativeFilePath, joinFilePath } 
 import { buildTrellisTaskResumePrompt, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import { ModelSelect, type ModelSelectOption } from "./ModelSelect";
 import { SelectDropdown, type SelectDropdownOption } from "./SelectDropdown";
+import { BrowserShareControl } from "./BrowserShareControl";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -23,6 +24,7 @@ interface ModelOption {
 interface Props {
   onSend: (message: string, images?: AttachedImage[]) => void;
   cwd?: string | null;
+  sessionId?: string | null;
   onAbort: () => void;
   onSteer?: (message: string, images?: AttachedImage[]) => void;
   onFollowUp?: (message: string, images?: AttachedImage[]) => void;
@@ -392,7 +394,7 @@ function hasContent(el: HTMLElement): boolean {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
-  onSend, cwd, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
+  onSend, cwd, sessionId, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
   onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
@@ -1564,6 +1566,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 <polyline points="13 2 13 9 20 9" />
               </svg>
             </button>
+            <BrowserShareControl sessionId={sessionId} disabled={isStreaming} />
+
             {/* Model selector — visible always, disabled during streaming */}
             {modelSelectOptions.length > 0 && currentModelValue && onModelChange && (
               <ModelSelect
