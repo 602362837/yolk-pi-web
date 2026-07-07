@@ -10,6 +10,7 @@ import {
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
 import { registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
+import { getYpiStudioTaskDetail } from "./ypi-studio-tasks";
 import type { SessionHeader, StudioChildSessionInfo } from "./types";
 import type {
   YpiStudioSubagentCurrentTool,
@@ -104,6 +105,16 @@ function truncateBytes(value: string, maxBytes: number): { text: string; truncat
 function oneLine(value: string, max = 160): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;
+}
+
+function studioChildSessionInfoName(root: string, meta: StudioSdkChildRunMeta): string {
+  try {
+    const title = getYpiStudioTaskDetail(root, meta.taskId)?.title;
+    if (title?.trim()) return `YPI Studio ${oneLine(title, 80)} · ${meta.member} · ${meta.runId.slice(0, 8)}`;
+  } catch {
+    // Durable session_info is only a fallback; task.json remains the display authority.
+  }
+  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`;
 }
 
 function boundedAppendTail(previous: string, addition: string, maxBytes: number): string {
@@ -471,7 +482,7 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
       });
       if (header) markSessionManagerHeaderFlushed(sessionManager, header);
     }
-    try { sessionManager.appendSessionInfo(`YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`); } catch {}
+    try { sessionManager.appendSessionInfo(studioChildSessionInfoName(root, meta)); } catch {}
     if (writer) {
       writer.ref.runner = "sdk";
       writer.ref.childSessionId = childSessionId;

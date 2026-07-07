@@ -213,6 +213,8 @@ export function AppShell() {
   const [chatAgentRunning, setChatAgentRunning] = useState(false);
   const studioToolTaskSignatureRef = useRef("");
   const studioToolRefreshTimerRef = useRef<number | null>(null);
+  const sessionListRefreshTimerRef = useRef<number | null>(null);
+  const sessionListRefreshSignatureRef = useRef("");
   const [pendingTrellisTaskContext, setPendingTrellisTaskContext] = useState<TrellisTaskChatContext | null>(null);
 
   const handleAtMention = useCallback((relativePath: string) => {
@@ -498,6 +500,18 @@ export function AppShell() {
 
   useEffect(() => () => {
     if (studioToolRefreshTimerRef.current !== null) window.clearTimeout(studioToolRefreshTimerRef.current);
+    if (sessionListRefreshTimerRef.current !== null) window.clearTimeout(sessionListRefreshTimerRef.current);
+  }, []);
+
+  const handleStudioSessionListRefreshNeeded = useCallback((reason: { source: "studio_tool"; signature: string }) => {
+    if (!reason.signature || reason.signature === sessionListRefreshSignatureRef.current) return;
+    sessionListRefreshSignatureRef.current = reason.signature;
+    if (sessionListRefreshTimerRef.current !== null) window.clearTimeout(sessionListRefreshTimerRef.current);
+    sessionListRefreshTimerRef.current = window.setTimeout(() => {
+      sessionListRefreshTimerRef.current = null;
+      setRefreshKey((key) => key + 1);
+      setStudioSessionTaskRefreshKey((key) => key + 1);
+    }, 500);
   }, []);
 
   const handleStudioToolProgressChange = useCallback((snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => {
@@ -1229,6 +1243,7 @@ export function AppShell() {
               onContextUsageChange={handleContextUsageChange}
               onSubagentChange={handleSubagentChange}
               onStudioToolProgressChange={handleStudioToolProgressChange}
+              onSessionListRefreshNeeded={handleStudioSessionListRefreshNeeded}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
               defaultThinkingLevel={webConfig?.yolk.defaultThinkingLevel}
             />

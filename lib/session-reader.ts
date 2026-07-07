@@ -1,12 +1,13 @@
 import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
-import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage, StudioChildSessionInfo } from "./types";
+import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage, StudioChildSessionInfo, StudioChildSessionDisplay } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
 import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd, expandCwd } from "./cwd";
 import { parseSessionHeaderMetadata } from "./session-header-metadata";
+import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
 
 export { getAgentDir };
 
@@ -119,6 +120,37 @@ export interface ListAllSessionsOptions {
   includeGit?: boolean;
   /** Include YPI Studio child audit sessions as list roots. Defaults to false so project history stays focused on user chats. */
   includeStudioChildren?: boolean;
+  /** Populate UI-only Studio child title projection. Defaults to false to avoid extra task.json I/O in global scans. */
+  includeStudioChildDisplay?: boolean;
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+  return values.map((value) => value?.trim()).find((value): value is string => Boolean(value));
+}
+
+export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChildSessionInfo): StudioChildSessionDisplay | undefined {
+  if (!studioChild?.taskId) return undefined;
+  try {
+    let detail = getYpiStudioTaskDetail(cwd, studioChild.taskId);
+    if (!detail) {
+      const match = listYpiStudioTasks(cwd, { scope: "all" }).tasks.find((task) => task.id === studioChild.taskId);
+      if (match) detail = getYpiStudioTaskDetail(cwd, match.key);
+    }
+    if (!detail) return undefined;
+    const run = detail.subagents.find((item) => item.id === studioChild.runId);
+    const subtaskTitle = studioChild.subtaskId
+      ? detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === studioChild.subtaskId)?.title
+        ?? detail.implementationPlan?.subtasks.find((item) => item.id === studioChild.subtaskId)?.title
+      : undefined;
+    const runSummary = firstNonEmpty(run?.summary, run?.progress?.lastTextPreview);
+    return {
+      taskTitle: firstNonEmpty(detail.title),
+      subtaskTitle,
+      runSummary,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export { parseSessionHeaderMetadata } from "./session-header-metadata";
@@ -184,6 +216,7 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
       spaceId: projectLink.spaceId,
       legacyUnassigned: studioChild ? false : projectLink.legacyUnassigned,
       studioChild,
+      studioChildDisplay: options.includeStudioChildDisplay ? projectStudioChildDisplay(cwd ?? "", studioChild) : undefined,
       created: s.created instanceof Date ? s.created.toISOString() : String(s.created),
       modified: s.modified instanceof Date ? s.modified.toISOString() : String(s.modified),
       messageCount: s.messageCount,
@@ -445,6 +478,8 @@ export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, num
 export interface ListArchivedSessionsOptions {
   /** Include YPI Studio child audit sessions as archived list roots. Defaults to false so archived history stays focused on user chats. */
   includeStudioChildren?: boolean;
+  /** Populate UI-only Studio child title projection. Defaults to false to avoid extra task.json I/O in global scans. */
+  includeStudioChildDisplay?: boolean;
 }
 
 async function listArchivedSessionMetadata(cwd?: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
@@ -490,6 +525,7 @@ async function listArchivedSessionMetadata(cwd?: string, options: ListArchivedSe
           spaceId: metadata.projectLink.spaceId,
           legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,
           studioChild: metadata.studioChild,
+          studioChildDisplay: options.includeStudioChildDisplay ? projectStudioChildDisplay(sessionCwd, metadata.studioChild) : undefined,
           created: header.timestamp ?? modified,
           modified,
           messageCount: 0,
@@ -572,6 +608,7 @@ async function listArchivedSessions(cwd?: string, options: ListArchivedSessionsO
           spaceId: metadata.projectLink.spaceId,
           legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,
           studioChild: metadata.studioChild,
+          studioChildDisplay: options.includeStudioChildDisplay ? projectStudioChildDisplay(sessionCwd, metadata.studioChild) : undefined,
           created: header.timestamp ?? modified,
           modified,
           messageCount,

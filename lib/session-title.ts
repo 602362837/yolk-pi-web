@@ -25,7 +25,22 @@ export function sessionTitleSeedFromUserMessage(message: string): string {
   return truncateSessionTitle(message) || PENDING_SESSION_TITLE;
 }
 
-export function displayTitleForSession(session: Pick<SessionInfo, "id" | "name" | "firstMessage" | "messageCount">): string {
+function taskIdTitleFallback(taskId?: string): string {
+  const value = taskId?.trim();
+  if (!value) return "";
+  const parts = value.split(/[\\/]+/).filter(Boolean);
+  return truncateSessionTitle(parts[parts.length - 1] ?? value);
+}
+
+export function displayTitleForSession(session: Pick<SessionInfo, "id" | "name" | "firstMessage" | "messageCount" | "studioChild" | "studioChildDisplay">): string {
+  if (session.studioChild) {
+    const taskTitle = truncateSessionTitle(session.studioChildDisplay?.taskTitle ?? "");
+    if (taskTitle) return taskTitle;
+    const runSummary = truncateSessionTitle(session.studioChildDisplay?.runSummary ?? "");
+    if (runSummary) return runSummary;
+    const taskId = taskIdTitleFallback(session.studioChild.taskId);
+    if (taskId) return taskId;
+  }
   if (session.name?.trim()) return session.name.trim();
   const firstMessage = truncateSessionTitle(session.firstMessage ?? "");
   if (firstMessage) return firstMessage;

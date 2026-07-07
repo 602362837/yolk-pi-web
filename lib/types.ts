@@ -326,6 +326,12 @@ export interface WorktreeInfo {
   baseRef?: string;
 }
 
+export interface StudioChildSessionDisplay {
+  taskTitle?: string;
+  subtaskTitle?: string;
+  runSummary?: string;
+}
+
 export interface SessionInfo {
   path: string;
   id: string;
@@ -340,6 +346,8 @@ export interface SessionInfo {
   spaceId?: string;
   /** Present when this session is a YPI Studio child audit session, not a normal root chat history item. */
   studioChild?: StudioChildSessionInfo;
+  /** UI-only title projection for Studio child audit sessions. Task state remains authoritative in task.json. */
+  studioChildDisplay?: StudioChildSessionDisplay;
   legacyUnassigned?: boolean;
   archived?: boolean;       // true for archived sessions
   worktree?: WorktreeInfo;

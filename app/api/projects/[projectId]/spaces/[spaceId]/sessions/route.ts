@@ -18,7 +18,7 @@ export async function GET(req: Request, context: RouteContext) {
     const space = await getProjectSpace(decodedProjectId, decodedSpaceId);
     const includeLegacy = new URL(req.url).searchParams.get("includeLegacy") === "1";
 
-    const sessions = await listAllSessions({ includeStudioChildren: true });
+    const sessions = await listAllSessions({ includeStudioChildren: true, includeStudioChildDisplay: true });
     const linkedRoots = sessions.filter((session) => !session.studioChild && session.projectId === decodedProjectId && session.spaceId === decodedSpaceId);
     const linkedRootIds = new Set(linkedRoots.map((session) => session.id));
     const studioChildren = sessions.filter((session) => {

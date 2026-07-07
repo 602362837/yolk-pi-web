@@ -29,6 +29,7 @@ interface Props {
   onSessionStatsChange?: (stats: SessionUsageTopbarStats | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;
+  onSessionListRefreshNeeded?: (reason: { source: "studio_tool"; signature: string }) => void;
   defaultToolPreset?: PiWebToolPreset;
   defaultThinkingLevel?: PiWebThinkingLevel;
 }
@@ -47,6 +48,41 @@ function optionalNumber(value: unknown): number | undefined {
 
 function studioPhase(value: unknown): YpiStudioLiveRunOverlay["phase"] | undefined {
   return value === "starting" || value === "waiting_model" || value === "streaming" || value === "running_tool" || value === "waiting_for_user" || value === "finished" ? value : undefined;
+}
+
+function studioSessionRefreshRecord(value: Record<string, unknown>): string | null {
+  const progress = isRecord(value.progress) ? value.progress : null;
+  const currentTool = isRecord(progress?.currentTool) ? progress.currentTool : null;
+  const parts = [
+    optionalString(value.id) ?? optionalString(value.runId) ?? "",
+    optionalString(value.runId) ?? "",
+    optionalString(value.taskId) ?? optionalString(value.taskKey) ?? "",
+    optionalString(value.taskKey) ?? "",
+    optionalString(value.status) ?? "",
+    optionalString(value.subtaskId) ?? "",
+    optionalString(value.childSessionId) ?? "",
+    optionalString(value.childSessionFile) ?? "",
+    optionalString(value.finishedAt) ?? "",
+    optionalString(progress?.phase) ?? "",
+    optionalString(progress?.updatedAt) ?? "",
+    optionalString(currentTool?.toolName) ?? "",
+  ];
+  if (!parts.some(Boolean)) return null;
+  return parts.join(":");
+}
+
+function collectStudioSessionRefreshRecords(value: unknown, out: string[], depth = 0) {
+  if (depth > 5 || value == null || out.length > 80) return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectStudioSessionRefreshRecords(item, out, depth + 1);
+    return;
+  }
+  if (!isRecord(value)) return;
+  const record = studioSessionRefreshRecord(value);
+  if (record) out.push(record);
+  for (const key of ["task", "run", "runs", "result", "results", "progress", "details"] as const) {
+    if (key in value) collectStudioSessionRefreshRecords(value[key], out, depth + 1);
+  }
 }
 
 function studioPolicyWarnings(value: unknown): string[] | undefined {
@@ -129,7 +165,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, defaultToolPreset, defaultThinkingLevel }: Props) {
+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -276,6 +312,27 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     onStudioToolProgressChange({ agentRunning, overlays });
   }, [agentRunning, onStudioToolProgressChange, studioProgressSignature, toolProgressById]);
   useEffect(() => () => { onStudioToolProgressChange?.({ agentRunning: false, overlays: [] }); }, [onStudioToolProgressChange]);
+
+  const studioSessionListRefreshSignature = Object.values(toolProgressById)
+    .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent" || progress.toolName === "ypi_studio_wait")
+    .map((progress) => {
+      const records: string[] = [];
+      collectStudioSessionRefreshRecords(progress.args, records);
+      collectStudioSessionRefreshRecords(progress.partialResult?.details, records);
+      collectStudioSessionRefreshRecords(progress.result?.details, records);
+      const uniqueRecords = Array.from(new Set(records)).sort().join(";");
+      if (!uniqueRecords) return null;
+      return [progress.toolCallId, progress.toolName, progress.running ? "running" : "done", uniqueRecords].join("|");
+    })
+    .filter((signature): signature is string => !!signature)
+    .sort()
+    .join("||");
+  const lastStudioSessionListRefreshSignatureRef = useRef("");
+  useEffect(() => {
+    if (!studioSessionListRefreshSignature || studioSessionListRefreshSignature === lastStudioSessionListRefreshSignatureRef.current) return;
+    lastStudioSessionListRefreshSignatureRef.current = studioSessionListRefreshSignature;
+    onSessionListRefreshNeeded?.({ source: "studio_tool", signature: studioSessionListRefreshSignature });
+  }, [onSessionListRefreshNeeded, studioSessionListRefreshSignature]);
 
   const onDrop = useCallback((files: File[]) => {
     const imageFiles = files.filter((f) => f.type.startsWith("image/"));

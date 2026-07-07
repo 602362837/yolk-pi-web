@@ -378,17 +378,29 @@ function WorkspaceMenuButton({ children, danger = false, onClick }: { children: 
   );
 }
 
-function studioChildLabel(session: SessionInfo): string | null {
-  const child = session.studioChild;
-  if (!child) return null;
-  const run = child.runId ? child.runId.slice(0, 8) : "run";
-  return `Studio ${child.member}${child.subtaskId ? ` · ${child.subtaskId}` : ""} · ${child.status ?? "audit"} · ${run}`;
-}
-
 function studioChildBadgeText(session: SessionInfo): string | null {
   const child = session.studioChild;
   if (!child) return null;
   return `${child.member} · ${child.status ?? "audit"}`;
+}
+
+function studioChildDetailText(session: SessionInfo): string | null {
+  const child = session.studioChild;
+  if (!child) return null;
+  const run = child.runId ? child.runId.slice(0, 8) : undefined;
+  return [session.studioChildDisplay?.subtaskTitle ?? child.subtaskId, run ? `run ${run}` : undefined].filter(Boolean).join(" · ") || null;
+}
+
+function studioChildTitleTooltip(session: SessionInfo, title: string): string {
+  const child = session.studioChild;
+  if (!child) return title;
+  return [
+    title,
+    session.studioChildDisplay?.subtaskTitle ? `Subtask: ${session.studioChildDisplay.subtaskTitle}` : child.subtaskId ? `Subtask: ${child.subtaskId}` : undefined,
+    `Member: ${child.member}`,
+    `Status: ${child.status ?? "audit"}`,
+    child.runId ? `Run: ${child.runId}` : undefined,
+  ].filter(Boolean).join("\n");
 }
 
 function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
@@ -2298,8 +2310,10 @@ function SessionItem({
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const title = studioChildLabel(session) ?? displayTitleForSession(session);
+  const title = displayTitleForSession(session);
   const studioBadge = studioChildBadgeText(session);
+  const studioDetail = studioChildDetailText(session);
+  const titleTooltip = studioChildTitleTooltip(session, title);
 
   const startRename = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2488,7 +2502,7 @@ function SessionItem({
                   color: "var(--text)",
                   minWidth: 0,
                 }}
-                title={title}
+                title={titleTooltip}
               >
                 {title}
               </div>
@@ -2503,6 +2517,7 @@ function SessionItem({
               <span title={session.modified}>{formatRelativeTime(session.modified)}</span>
               <span>{session.messageCount} msgs</span>
               {session.legacyUnassigned && <span title="缺少 projectId/spaceId，按 cwd 匹配显示，不会自动回写">未关联</span>}
+              {studioDetail && <span title={studioDetail}>{studioDetail}</span>}
             </div>
           </div>
 

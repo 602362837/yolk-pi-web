@@ -1,0 +1,1561 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+  "title": "排查并优化 YPI Studio child session 实时刷新与标题",
+  "workflowId": "feature-dev",
+  "status": "completed",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-07T08:47:39.628Z",
+  "updatedAt": "2026-07-07T09:20:11.534Z",
+  "completedAt": "2026-07-07T09:20:11.534Z",
+  "contextIds": [
+    "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-70d2e552e8100f9d6e491579",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:47:56.976Z",
+      "finishedAt": "2026-07-07T09:01:01.446Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bc3-3646-71b8-b13a-63c518685527",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T08-47-56-999Z_019f3bc3-3646-71b8-b13a-63c518685527.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bc3-3646-71b8-b13a-63c518685527",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请排查 YPI Studio SDK child session 在单独打开子 session tab 时不会像普通 chat 一样实时刷新的原因，并设计修复方案；同时设计 child session 标题优先使用 Studio 任务名称的方案。 背景：child JSONL header 含 studioChild 元数据，child session 是只读审计视图，已有文案“Studio child session 为只读审计视图；请回到父 Chat 继续编排。”；用户…",
+      "summary": "交付完成（仅规划/排查，无生产代码改动）。\n\n## 根因\n\n- 普通 chat 实时刷新依赖 `lib/rpc-manager.ts` 注册的 `AgentSessionWrapper`（`globalThis.__piSessions`）和 `/api/agent/[id]/events`。\n- SDK child session 由 `lib/ypi-studio-child-session-runner.ts` 独立创建并写 JSONL，但没有注册到 `rpc-manager`，所以 `/api/sessions/[id]?includeState` 看不到 running wrapper，`useAgentSession` 不会连接 SSE，也不会轮询/重读 JSONL。\n- 当前 `/api/agent/[id]/events` 对没有 wrapper 的 session 会 `startRpcSession()`；若误用于 child，会把只读 child JSONL 当普通 chat 启动并注入 Web Studio/Browser Share 扩展，这是边界风险。\n\n## 修复设计\n\n- API/SSE：`app/api/agent/[id]/events/route.ts` 先读 header；若 `studioChild` 存在，进入只读 audit SSE，监听 child JSONL `mtime/size`，发送 `studio_child_audit_changed` / `studio_child_audit_end`；绝不调用 `startRpcSession()`。\n- Client：`hooks/useAgentSession.ts` 对 active `session.studioChild` 连接 audit SSE；收到 changed 后非阻塞 `loadSession()` 刷新消息；收到 end 后最后刷新并关闭 SSE。\n- 交互安全：保留 `ChatWindow` 只读 banner/禁用输入；POST child 非 abort 仍 403；child SSE 不创建 AgentSession、不加载 Studio orchestration tools。\n\n## 标题策略\n\n- 服务端为 child session 增加 UI projection：从 `.ypi/tasks/<taskId>/task.json` 读取 `task.title`，可补充 `subtaskTitle` / `runSummary`。\n- 客户端 `displayTitleForSession()` 对 child 优先：`task.title` → run summary/progress preview → header taskId/session name/firstMessage → `Studio <member> · <runId8>`。\n- Sidebar 主标题显示 task title，badge/tooltip 保留 member/status/run/subtask。\n\n## 产物\n\n已写入任务规划文档：\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/brief.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## 验证\n\n未运行验证命令（规划/文档产物，不改生产代码）。\n\n建议实现后运行：\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\nnpm run test:studio-sdk-runner\n```\n\n## 待主会话决策\n\n1. 是否接受复用 `/api/agent/[id]/events` 做 child audit SSE 分流，而不是新增 `/api/sessions/[id]/events`。\n2. child 手工 rename 是否应覆盖 Studio task title；当前建议 child audit 行主标题始终优先 task title。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:47:56.976Z",
+        "updatedAt": "2026-07-07T09:01:01.446Z",
+        "eventCount": 7421,
+        "lastTextPreview": "交付完成（仅规划/排查，无生产代码改动）。\n\n## 根因\n\n- 普通 chat 实时刷新依赖 `lib/rpc-manager.ts` 注册的 `AgentSessionWrapper`（`globalThis.__piSessions`）和 `/api/agent/[id]/events`。\n- SDK child session 由 `lib/ypi-studio-child-session-runner.ts` 独立创建并写 JSONL，但没有注册到 `rpc-manager`，所以 `/api/sessions/[id]?includeState` 看不到 running wrapper，`useAgentSession` 不会连接 SSE，也不会轮询/重读 JSONL。\n- 当前 `/api/agent/[id]/events` 对没有 wrapper 的 session 会 `startRpcSession()`；若误用于 child，会把只读 child JSONL 当普通 chat 启动并注入 Web Studio/Browser Share 扩展，这是边界风险。\n\n## 修复设计\n\n- API/SSE：`app/api/agent/[id]/events/route.ts` 先读 header；若 `studioChild` 存在，进入只读 audit SSE，监听 child JSONL `mtime/size`，发送 `studio_child_audit_changed` / `studio_child_audit_end`；绝不调用 `startRpcSession()`。\n- Client：`hooks/useAgentSession.ts` 对 active `session.studioChild` 连接 audit SSE；收到 changed 后非阻塞 `loadSession()` 刷新消息；收到 end 后最后刷新并关闭 SSE。\n- 交互安全：保留 `ChatWindow` 只读 banner/禁用输入；POST child 非 abort 仍 403；child SSE 不创建 AgentSession、不加载 Studio orchestration tools。\n\n## 标题策略\n\n- 服务端为 child session 增加 UI projection：从 `.ypi/tasks/<taskId>/task.json` 读取 `task.title`，可补充 `subtaskTitle` / `runSummary`。\n- 客户端 `displayTitleForSession()` 对 child 优先：`task.title` → run summary/progress preview → header taskId/session name/firstMessage → `Studio <member> · <runId8>`。\n- Sidebar 主标题显示 task title，badge/tooltip 保留 member/status/run/subtask。\n\n## 产物\n\n已写入任务规划文档：\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/brief.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## 验证\n\n未运行验证命令（规划/文档产物，不改生产代码）。\n\n建议实现后运行：\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\nnpm run test:studio-sdk-runner\n```\n\n## 待主会话决策\n\n1. 是否接受复用 `/api/agent/[id]/events` 做 child audit SSE 分流，而不是新增 `/api/sessions/[id]/events`。\n2. child 手工 rename 是否应覆盖 Studio task title；当前建议 child audit 行主标题始终优先 task title。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:55:15.121Z",
+            "toolCallId": "call_hT0mSxWSOp6eMiBVDVqYbmfJ|fc_0023f3a75382170a016a4cbeefefc4819ba6d71c4ef8815619",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260707-163525-\\347\\240\\224\\347\\251\\266\\345\\271\\266\\344\\277\\256\\345\\244\\215-browser-share-\\346\\217\\222\\344\\273\\266-debugger-\\344\\275\\234\\347\\224\\250\\345\\237\\237\\350\\257\\257\\346\\216\\247\\345\\210\\266\\346\\225\\264\\344\\270\\252-chrome/\"\n?? \".ypi/tasks/20260707-164739-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\274\\230\\345\\214\\226-ypi-studio-child-session-\\345\\256\\236\\346\\227\\266\\345\\210\\267\\346\\226\\260\\344\\270\\216\\346\\240\\207\\351\\242\\230/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:00:33.405Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:00:35.420Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:01:01.410Z",
+            "text": "交付完成（仅规划/排查，无生产代码改动）。\n\n## 根因\n\n- 普通 chat 实时刷新依赖 `lib/rpc-manager.ts` 注册的 `AgentSessionWrapper`（`globalThis.__piSessions`）和 `/api/agent/[id]/events`。\n- SDK child session 由 `lib/ypi-studio-child-session-runner.ts` 独立创建并写 JSONL，但没有注册到 `rpc-manager`，所以 `/api/sessions/[id]?includeState` 看不到 running wrapper，`useAgentSession` 不会连接 SSE，也不会轮询/重读 JSONL。\n- 当前 `/api/agent/[id]/events` 对没有 wrapper 的 session 会 `startRpcSession()`；若误用于 child，会把只读 child JSONL 当普通 chat 启动并注入 Web Studio/Browser Share 扩展，这是边界风险。\n\n## 修复设计\n\n- API/SSE：`app/api/agent/[id]/events/route.ts` 先读 header；若 `studioChild` 存在，进入只读 audit SSE，监听 child JSONL `mtime/size`，发送 `studio_child_audit_changed` / `studio_child_audit_end`；绝不调用 `startRpcSession()`。\n- Client：`hooks/useAgentSession.ts` 对 active `session.studioChild` 连接 audit SSE；收到 changed 后非阻塞 `loadSession()` 刷新消息；收到 end 后最后刷新并关闭 SSE。\n- 交互安全：保留 `ChatWindow` 只读 banner/禁用输入；POST child 非 abort 仍 403；child SSE 不创建 AgentSession、不加载 Studio orchestration tools。\n\n## 标题策略\n\n- 服务端为 child session 增加 UI projection：从 `.ypi/tasks/<taskId>/task.json` 读取 `task.title`，可补充 `subtaskTitle` / `runSummary`。\n- 客户端 `displayTitleForSession()` 对 child 优先：`task.title` → run summary/progress preview → header taskId/session name/firstMessage → `Studio <member> · <runId8>`。\n- Sidebar 主标题显示 task title，badge/tooltip 保留 member/status/run/subtask。\n\n## 产物\n\n已写入任务规划文档：\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/brief.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## 验证\n\n未运行验证命令（规划/文档产物，不改生产代码）。\n\n建议实现后运行：\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\nnpm run test:studio-sdk-runner\n```\n\n## 待主会话决策\n\n1. 是否接受复用 `/api/agent/[id]/events` 做 child audit SSE 分流，而不是新增 `/api/sessions/[id]/events`。\n2. child 手工 rename 是否应覆盖 Studio task title；当前建议 child audit 行主标题始终优先 task title。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:01:01.434Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1811,
+        "tokens": 1096,
+        "tokenSource": "usage",
+        "tps": 94.93,
+        "firstTokenAt": "2026-07-07T09:00:49.587Z",
+        "lastTokenAt": "2026-07-07T09:01:01.132Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-70d2e552e8100f9d6e491579",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/architect-70d2e552e8100f9d6e491579.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:47:56.976Z",
+        "finishedAt": "2026-07-07T09:01:01.440Z",
+        "updatedAt": "2026-07-07T09:01:01.440Z",
+        "itemCount": 101,
+        "messageCount": 1,
+        "toolCallCount": 47,
+        "stderrBytes": 0,
+        "bytes": 404395,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3bc3-3646-71b8-b13a-63c518685527",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T08-47-56-999Z_019f3bc3-3646-71b8-b13a-63c518685527.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-754bd4262bb93175d021044d",
+      "subtaskId": "audit-sse-guard",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:05:48.572Z",
+      "finishedAt": "2026-07-07T09:07:56.991Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bd3-903a-79be-807e-1e94dc238984",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-05-48-603Z_019f3bd3-903a-79be-807e-1e94dc238984.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bd3-903a-79be-807e-1e94dc238984",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请实现 subtask audit-sse-guard：为 YPI Studio child session 增加只读 audit SSE 分流。 要求： - 先阅读 docs/standards/code-style.md、app/api/agent/[id]/events/route.ts、相关 session header/parser helper。 - 在 /api/agent/[id]/events 中 resolveSessionPath 后先识别 heade…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/agent/[id]/events/route.ts` — added read-only Studio child audit SSE branch before normal `startRpcSession()` path.\n  - Emits `connected(mode=studio_child_audit)`.\n  - Watches JSONL `mtimeMs/size` via `statSync` polling.\n  - Emits `studio_child_audit_changed`.\n  - Emits `studio_child_audit_end` on terminal/missing file.\n  - Includes heartbeat, debounce, abort cleanup, and transient header parse retry.\n  - Does **not** call `startRpcSession()` for `studioChild` sessions.\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/handoff.md` — updated with implementation notes and validation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Live `curl -N /api/agent/<childId>/events` validation was not run because no running child session was available in this subtask.\n- Frontend handling for `studio_child_audit_changed/end` remains for the separate client subtask.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:05:48.572Z",
+        "updatedAt": "2026-07-07T09:07:56.991Z",
+        "eventCount": 3083,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/agent/[id]/events/route.ts` — added read-only Studio child audit SSE branch before normal `startRpcSession()` path.\n  - Emits `connected(mode=studio_child_audit)`.\n  - Watches JSONL `mtimeMs/size` via `statSync` polling.\n  - Emits `studio_child_audit_changed`.\n  - Emits `studio_child_audit_end` on terminal/missing file.\n  - Includes heartbeat, debounce, abort cleanup, and transient header parse retry.\n  - Does **not** call `startRpcSession()` for `studioChild` sessions.\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/handoff.md` — updated with implementation notes and validation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Live `curl -N /api/agent/<childId>/events` validation was not run because no running child session was available in this subtask.\n- Frontend handling for `studio_child_audit_changed/end` remains for the separate client subtask.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T09:07:38.842Z",
+            "toolCallId": "call_mV3Tmhjw2EXauaIn8I5AGtrz|fc_06ce8c54a79c6129016a4cc1daf02881999d2e14ab4ae5c6e7",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T09:07:41.113Z",
+            "toolCallId": "call_mV3Tmhjw2EXauaIn8I5AGtrz|fc_06ce8c54a79c6129016a4cc1daf02881999d2e14ab4ae5c6e7",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T09:07:47.589Z",
+            "toolCallId": "call_OXN8brFfZlsGNuW1yr0HP8gk|fc_06ce8c54a79c6129016a4cc1daf01881999adb11e860de3b88",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.8 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:07:56.970Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/agent/[id]/events/route.ts` — added read-only Studio child audit SSE branch before normal `startRpcSession()` path.\n  - Emits `connected(mode=studio_child_audit)`.\n  - Watches JSONL `mtimeMs/size` via `statSync` polling.\n  - Emits `studio_child_audit_changed`.\n  - Emits `studio_child_audit_end` on terminal/missing file.\n  - Includes heartbeat, debounce, abort cleanup, and transient header parse retry.\n  - Does **not** call `startRpcSession()` for `studioChild` sessions.\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/handoff.md` — updated with implementation notes and validation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Live `curl -N /api/agent/<childId>/events` validation was not run because no running child session was available in this subtask.\n- Frontend handling for `studio_child_audit_changed/end` remains for the separate client subtask.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:07:56.983Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1009,
+        "tokens": 291,
+        "tokenSource": "usage",
+        "tps": 65.99,
+        "firstTokenAt": "2026-07-07T09:07:52.442Z",
+        "lastTokenAt": "2026-07-07T09:07:56.852Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-754bd4262bb93175d021044d",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/implementer-754bd4262bb93175d021044d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:05:48.572Z",
+        "finishedAt": "2026-07-07T09:07:56.989Z",
+        "updatedAt": "2026-07-07T09:07:56.989Z",
+        "itemCount": 39,
+        "messageCount": 1,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 61637,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3bd3-903a-79be-807e-1e94dc238984",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-05-48-603Z_019f3bd3-903a-79be-807e-1e94dc238984.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-b6b146f12a33034aef5cf7ff",
+      "subtaskId": "child-title-projection",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:05:58.556Z",
+      "finishedAt": "2026-07-07T09:13:21.676Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bd3-b737-79ee-8e9e-0197e83cc9e0",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-05-58-583Z_019f3bd3-b737-79ee-8e9e-0197e83cc9e0.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bd3-b737-79ee-8e9e-0197e83cc9e0",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请实现 subtask child-title-projection：Studio child session 标题优先显示 task title。 要求： - 先阅读 docs/standards/code-style.md，以及 lib/types.ts、lib/session-title.ts、lib/session-reader.ts、app/api/sessions/[id]/route.ts、app/api/projects/[projectId]/spaces…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/types.ts` — added optional `studioChildDisplay` projection.\n- `lib/session-reader.ts` — added opt-in `projectStudioChildDisplay()` from Studio `task.json`.\n- `app/api/sessions/[id]/route.ts` — session detail now includes child display projection.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — project-space UI list enables child display projection.\n- `lib/session-title.ts` — child titles prefer task title, then run summary/taskId before normal fallback.\n- `components/SessionSidebar.tsx` — child rows use `displayTitleForSession`; member/status badge and run/subtask metadata preserved.\n- `lib/ypi-studio-child-session-runner.ts` — writes task-title-based `session_info` fallback when available.\n- `.ypi/tasks/.../handoff.md` — updated with subtask implementation/validation notes.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed.\n- `npm run test:studio-sdk-runner` — passed, with existing Node experimental loader warning.\n\n#### Notes / Risks\n\n- Title projection is opt-in; usage/global scans remain without extra task-title I/O.\n- Current behavior intentionally prioritizes Studio task title over manual child rename for child audit rows; main session should decide if rename override is desired later.\n- `app/api/agent/[id]/events/route.ts` has existing modifications from another subtask; I left it untouched.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:05:58.556Z",
+        "updatedAt": "2026-07-07T09:13:21.675Z",
+        "eventCount": 6854,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/types.ts` — added optional `studioChildDisplay` projection.\n- `lib/session-reader.ts` — added opt-in `projectStudioChildDisplay()` from Studio `task.json`.\n- `app/api/sessions/[id]/route.ts` — session detail now includes child display projection.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — project-space UI list enables child display projection.\n- `lib/session-title.ts` — child titles prefer task title, then run summary/taskId before normal fallback.\n- `components/SessionSidebar.tsx` — child rows use `displayTitleForSession`; member/status badge and run/subtask metadata preserved.\n- `lib/ypi-studio-child-session-runner.ts` — writes task-title-based `session_info` fallback when available.\n- `.ypi/tasks/.../handoff.md` — updated with subtask implementation/validation notes.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed.\n- `npm run test:studio-sdk-runner` — passed, with existing Node experimental loader warning.\n\n#### Notes / Risks\n\n- Title projection is opt-in; usage/global scans remain without extra task-title I/O.\n- Current behavior intentionally prioritizes Studio task title over manual child rename for child audit rows; main session should decide if rename override is desired later.\n- `app/api/agent/[id]/events/route.ts` has existing modifications from another subtask; I left it untouched.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T09:12:59.693Z",
+            "toolCallId": "call_uQfaQvv7pG9UTA49f2J7ub9Z|fc_07e898d8b6545699016a4cc319caa081988aa157b7f4b3c833",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T09:13:06.288Z",
+            "toolCallId": "call_2VU2bOvZJHmhWDIhIi5mNiXH|fc_07e898d8b6545699016a4cc3224ef08198be0619b0e82ea62f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T09:13:06.399Z",
+            "toolCallId": "call_2VU2bOvZJHmhWDIhIi5mNiXH|fc_07e898d8b6545699016a4cc3224ef08198be0619b0e82ea62f",
+            "toolName": "bash",
+            "text": "M app/api/agent/[id]/events/route.ts\n M app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts\n M app/api/sessions/[id]/route.ts\n M components/SessionSidebar.tsx\n M lib/session-reader.ts\n M lib/session-title.ts\n M lib/types.ts\n M lib/ypi-studio-child-session-runner.ts\n?? \".ypi/tasks/20260707-163525-\\347\\240\\224\\347\\251\\266\\345\\271\\266\\344\\277\\256\\345\\244\\215-browser-share-\\346\\217\\222\\344\\273\\266-debugger-\\344\\275\\234\\347\\224\\250\\345\\237\\237\\350\\257\\257\\346\\216\\247\\345\\210\\266\\346\\225\\264\\344\\270\\252-chrome/\"\n?? \".ypi/tasks/20260707-164739-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\274\\230\\345\\214\\226-ypi-studio-child-session-\\345\\256\\236\\346\\227\\266\\345\\210\\267\\346\\226\\260\\344\\270\\216\\346\\240\\207\\351\\242\\230/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:13:21.600Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/types.ts` — added optional `studioChildDisplay` projection.\n- `lib/session-reader.ts` — added opt-in `projectStudioChildDisplay()` from Studio `task.json`.\n- `app/api/sessions/[id]/route.ts` — session detail now includes child display projection.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — project-space UI list enables child display projection.\n- `lib/session-title.ts` — child titles prefer task title, then run summary/taskId before normal fallback.\n- `components/SessionSidebar.tsx` — child rows use `displayTitleForSession`; member/status badge and run/subtask metadata preserved.\n- `lib/ypi-studio-child-session-runner.ts` — writes task-title-based `session_info` fallback when available.\n- `.ypi/tasks/.../handoff.md` — updated with subtask implementation/validation notes.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed.\n- `npm run test:studio-sdk-runner` — passed, with existing Node experimental loader warning.\n\n#### Notes / Risks\n\n- Title projection is opt-in; usage/global scans remain without extra task-title I/O.\n- Current behavior intentionally prioritizes Studio task title over manual child rename for child audit rows; main session should decide if rename override is desired later.\n- `app/api/agent/[id]/events/route.ts` has existing modifications from another subtask; I left it untouched.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:13:21.659Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1438,
+        "tokens": 468,
+        "tokenSource": "usage",
+        "tps": 64.77,
+        "firstTokenAt": "2026-07-07T09:13:14.316Z",
+        "lastTokenAt": "2026-07-07T09:13:21.542Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-b6b146f12a33034aef5cf7ff",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/implementer-b6b146f12a33034aef5cf7ff.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:05:58.556Z",
+        "finishedAt": "2026-07-07T09:13:21.669Z",
+        "updatedAt": "2026-07-07T09:13:21.669Z",
+        "itemCount": 103,
+        "messageCount": 1,
+        "toolCallCount": 49,
+        "stderrBytes": 0,
+        "bytes": 251101,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3bd3-b737-79ee-8e9e-0197e83cc9e0",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-05-58-583Z_019f3bd3-b737-79ee-8e9e-0197e83cc9e0.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-0de3876a32efee6f7bf321b0",
+      "subtaskId": "client-audit-refresh",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:13:54.318Z",
+      "finishedAt": "2026-07-07T09:13:56.220Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bda-f9a2-7337-a1be-90f7a9715e81",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-13-54-338Z_019f3bda-f9a2-7337-a1be-90f7a9715e81.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bda-f9a2-7337-a1be-90f7a9715e81",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请实现 subtask client-audit-refresh：useAgentSession 支持 YPI Studio child audit 实时 reload。 要求： - 先阅读 docs/standards/code-style.md、hooks/useAgentSession.ts、components/ChatWindow.tsx，以及刚才已实现的 app/api/agent/[id]/events/route.ts child audit SSE 事件形…",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:13:54.318Z",
+        "updatedAt": "2026-07-07T09:13:56.220Z",
+        "eventCount": 8,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:13:54.318Z",
+            "text": "SDK child session created: 019f3bda-f9a2-7337-a1be-90f7a9715e81",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:13:54.390Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:13:56.201Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:13:56.218Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-0de3876a32efee6f7bf321b0",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/implementer-0de3876a32efee6f7bf321b0.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:13:54.318Z",
+        "finishedAt": "2026-07-07T09:13:56.219Z",
+        "updatedAt": "2026-07-07T09:13:56.219Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1569,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3bda-f9a2-7337-a1be-90f7a9715e81",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-13-54-338Z_019f3bda-f9a2-7337-a1be-90f7a9715e81.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a4ff9f6c2a1b92da2ee80d03",
+      "subtaskId": "docs-tests-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:14:18.688Z",
+      "finishedAt": "2026-07-07T09:14:20.398Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bdb-58df-7f1f-a97e-149498bf12a1",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-14-18-719Z_019f3bdb-58df-7f1f-a97e-149498bf12a1.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bdb-58df-7f1f-a97e-149498bf12a1",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请实现 subtask docs-tests-validation：更新文档与验证脚本/测试。 要求： - 先阅读 docs/standards/code-style.md，以及本轮已改动文件 diff。 - 更新 docs/architecture/overview.md、docs/modules/api.md、docs/modules/frontend.md、docs/modules/library.md 中关于 Studio child audit SSE 只读 fi…",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:14:18.688Z",
+        "updatedAt": "2026-07-07T09:14:20.398Z",
+        "eventCount": 8,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:14:18.688Z",
+            "text": "SDK child session created: 019f3bdb-58df-7f1f-a97e-149498bf12a1",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:14:18.769Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:14:20.387Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:14:20.397Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a4ff9f6c2a1b92da2ee80d03",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/implementer-a4ff9f6c2a1b92da2ee80d03.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:14:18.688Z",
+        "finishedAt": "2026-07-07T09:14:20.397Z",
+        "updatedAt": "2026-07-07T09:14:20.397Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1388,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3bdb-58df-7f1f-a97e-149498bf12a1",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-14-18-719Z_019f3bdb-58df-7f1f-a97e-149498bf12a1.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-e3dacf23c1f573ea3de9c0bc",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:14:40.572Z",
+      "finishedAt": "2026-07-07T09:14:42.433Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bdb-ae50-7d47-961d-57bbed573f54",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-14-40-592Z_019f3bdb-ae50-7d47-961d-57bbed573f54.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bdb-ae50-7d47-961d-57bbed573f54",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请检查本任务实现：YPI Studio child session 实时刷新与标题优化。 检查范围： - git diff 中所有改动。 - child audit SSE 分支是否只读、不会调用 startRpcSession/创建 wrapper/注入 Studio 或 Browser Share 工具。 - useAgentSession 对 child audit SSE 的连接、reload、end cleanup 是否正确且不影响普通 chat streamin…",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:14:40.572Z",
+        "updatedAt": "2026-07-07T09:14:42.433Z",
+        "eventCount": 8,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:14:40.572Z",
+            "text": "SDK child session created: 019f3bdb-ae50-7d47-961d-57bbed573f54",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:14:40.622Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:14:42.424Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:14:42.432Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-e3dacf23c1f573ea3de9c0bc",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/checker-e3dacf23c1f573ea3de9c0bc.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:14:40.572Z",
+        "finishedAt": "2026-07-07T09:14:42.432Z",
+        "updatedAt": "2026-07-07T09:14:42.432Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1389,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3bdb-ae50-7d47-961d-57bbed573f54",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-14-40-592Z_019f3bdb-ae50-7d47-961d-57bbed573f54.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-25b70ba286b6426707c9754f",
+      "subtaskId": "client-audit-refresh",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:15:59.473Z",
+      "finishedAt": "2026-07-07T09:16:01.199Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bdc-e28a-7fe0-b745-8e8d035ee595",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-15-59-498Z_019f3bdc-e28a-7fe0-b745-8e8d035ee595.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3bdc-e28a-7fe0-b745-8e8d035ee595",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "重做 subtask client-audit-refresh。上一次 run 没有实际修改 hooks/useAgentSession.ts。 必须实际编辑代码并确保 grep 能在 hooks/useAgentSession.ts 找到 studio_child_audit 处理。 要求： - 阅读 hooks/useAgentSession.ts 和 app/api/agent/[id]/events/route.ts。 - child session（session…",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:15:59.473Z",
+        "updatedAt": "2026-07-07T09:16:01.199Z",
+        "eventCount": 8,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:15:59.473Z",
+            "text": "SDK child session created: 019f3bdc-e28a-7fe0-b745-8e8d035ee595",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:15:59.547Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:16:01.186Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:16:01.198Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-25b70ba286b6426707c9754f",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/implementer-25b70ba286b6426707c9754f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:15:59.473Z",
+        "finishedAt": "2026-07-07T09:16:01.199Z",
+        "updatedAt": "2026-07-07T09:16:01.199Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1687,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3bdc-e28a-7fe0-b745-8e8d035ee595",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-15-59-498Z_019f3bdc-e28a-7fe0-b745-8e8d035ee595.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-8db3fedfc38d293e2853ab85",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:19:34.960Z",
+      "finishedAt": "2026-07-07T09:19:40.751Z",
+      "runner": "sdk",
+      "childSessionId": "019f3be0-2c4b-7e22-9242-523ec3ed4c91",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-19-34-988Z_019f3be0-2c4b-7e22-9242-523ec3ed4c91.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "childSessionId": "019f3be0-2c4b-7e22-9242-523ec3ed4c91",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请复查本任务最终实现。重点检查上次缺失的 hooks/useAgentSession.ts 是否已有 studio_child_audit connected/changed/end 处理，文档是否更新，且验证是否通过。 请阅读 git diff、handoff.md，并运行或确认： - grep -n \"studio_child_audit\" hooks/useAgentSession.ts - npm run lint - node_modules/.bin/tsc -…",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:19:34.960Z",
+        "updatedAt": "2026-07-07T09:19:40.751Z",
+        "eventCount": 8,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:19:34.960Z",
+            "text": "SDK child session created: 019f3be0-2c4b-7e22-9242-523ec3ed4c91",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:19:35.040Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:19:40.726Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:19:40.749Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-8db3fedfc38d293e2853ab85",
+        "taskId": "20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-164739-_-ypi-studio-child-session-/checker-8db3fedfc38d293e2853ab85.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:19:34.960Z",
+        "finishedAt": "2026-07-07T09:19:40.750Z",
+        "updatedAt": "2026-07-07T09:19:40.750Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1079,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3be0-2c4b-7e22-9242-523ec3ed4c91",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-19-34-988Z_019f3be0-2c4b-7e22-9242-523ec3ed4c91.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T09:02:47.288Z",
+      "contextId": "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-07T09:05:35.974Z",
+      "contextId": "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+      "inputHash": "b17db2a67bae84401b81bb31",
+      "source": "user-input"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T09:02:43.174Z",
+    "summary": "让 YPI Studio SDK child audit session 单独打开时通过只读 JSONL audit SSE 实时刷新，并让 child 标题优先使用 Studio task title。",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "audit-sse-guard",
+          "title": "api",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "audit-sse-guard"
+          ]
+        },
+        {
+          "id": "client-audit-refresh",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [
+            "audit-sse-guard"
+          ],
+          "subtaskIds": [
+            "client-audit-refresh"
+          ]
+        },
+        {
+          "id": "child-title-projection",
+          "title": "title",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "child-title-projection"
+          ]
+        },
+        {
+          "id": "docs-tests-validation",
+          "title": "quality",
+          "relation": "serial",
+          "dependencies": [
+            "audit-sse-guard",
+            "client-audit-refresh",
+            "child-title-projection"
+          ],
+          "subtaskIds": [
+            "docs-tests-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "audit-sse-guard",
+        "title": "为 child session 增加只读 audit SSE 分流",
+        "phase": "api",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "app/api/agent/[id]/events/route.ts"
+        ],
+        "instructions": [
+          "在 resolveSessionPath 后先读取 header；若 header.studioChild 存在，直接返回 read-only audit stream。",
+          "child 分支不得调用 startRpcSession，不得创建 ResourceLoader/AgentSessionWrapper。",
+          "用 stat mtime/size watch 或 fs.watchFile 检测 JSONL 变化，发送 connected(mode=studio_child_audit)、studio_child_audit_changed、studio_child_audit_end。",
+          "保留 heartbeat 和 abort/cancel cleanup；非 child 保持现有普通 agent SSE 行为。"
+        ],
+        "acceptance": [
+          "对 child session 调用 /api/agent/:id/events 不会启动普通 AgentSession。",
+          "child JSONL 追加时 SSE 至少发出一次 changed 事件。",
+          "child 终态 header 写入后 SSE 发出 end 事件并清理 watcher。"
+        ],
+        "validation": [
+          "curl -N /api/agent/<childId>/events 看到 connected mode=studio_child_audit。",
+          "确认日志/断点中 startRpcSession 未被 child SSE 调用。"
+        ],
+        "risks": [
+          "fs watch 可能重复/抖动；需要 debounce 和 idempotent reload。"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "client-audit-refresh",
+        "title": "useAgentSession 支持 child audit 实时 reload",
+        "phase": "frontend",
+        "order": 20,
+        "dependsOn": [
+          "audit-sse-guard"
+        ],
+        "dependencies": [
+          "audit-sse-guard"
+        ],
+        "relation": "serial",
+        "files": [
+          "hooks/useAgentSession.ts",
+          "components/ChatWindow.tsx"
+        ],
+        "instructions": [
+          "打开 session.studioChild 且状态 active 时连接 SSE，即使 includeState 没有 rpc wrapper。",
+          "收到 studio_child_audit_changed 时调用 loadSession(sid,false) 刷新 messages/tree；失败时保留旧视图。",
+          "收到 studio_child_audit_end 后最后 reload，关闭 EventSource，清除 running/phase，并触发 onAgentEnd 刷新列表。",
+          "不要为 child 调 loadTools，不要启用 ChatInput/model/tool 控件。"
+        ],
+        "acceptance": [
+          "单独打开 running child tab 能看到消息持续增加。",
+          "child tab 保持只读 banner 和禁用输入。",
+          "普通 chat 现有 streaming/fork/navigate 行为不变。"
+        ],
+        "validation": [
+          "手工打开正在运行的 SDK child session tab 验证刷新。"
+        ],
+        "risks": [
+          "SessionManager.open 读到瞬时半写文件会报错；loadSession 的非 loading 刷新要容错。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "child-title-projection",
+        "title": "Studio child session 标题优先显示 task title",
+        "phase": "title",
+        "order": 30,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "lib/types.ts",
+          "lib/session-title.ts",
+          "lib/session-reader.ts",
+          "app/api/sessions/[id]/route.ts",
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+          "components/SessionSidebar.tsx",
+          "lib/ypi-studio-child-session-runner.ts"
+        ],
+        "instructions": [
+          "为 SessionInfo 增加可选 studioChildDisplay projection，包含 taskTitle/subtaskTitle/runSummary。",
+          "服务端列表/detail接口对 UI 需要的 child session 从 task.json 解析 display projection；usage 等非 UI 扫描避免强制读取。",
+          "displayTitleForSession 对 child 优先 taskTitle，再 run summary/header taskId/session name/firstMessage/id fallback。",
+          "SessionSidebar 主标题使用 displayTitleForSession，badge 保留 member/status，tooltip 展示 run/subtask。",
+          "runner 初始 session_info 可改为 task title fallback，但不要作为权威来源。"
+        ],
+        "acceptance": [
+          "child row 主标题显示 Studio 任务名称。",
+          "任务缺失或旧 child session 仍有稳定 fallback。",
+          "普通 session 标题顺序不变。"
+        ],
+        "validation": [
+          "新增/扩展 title fallback 轻量测试；手工检查 Sidebar child row。"
+        ],
+        "risks": [
+          "读取 task title 不应拖慢 usage/global session scans；用 option 或 UI route 才启用。"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "docs-tests-validation",
+        "title": "更新文档与验证脚本",
+        "phase": "quality",
+        "order": 40,
+        "dependsOn": [
+          "audit-sse-guard",
+          "client-audit-refresh",
+          "child-title-projection"
+        ],
+        "dependencies": [
+          "audit-sse-guard",
+          "client-audit-refresh",
+          "child-title-projection"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "scripts/test-ypi-studio-sdk-runner.mjs"
+        ],
+        "instructions": [
+          "记录 child audit SSE 是 read-only file-follow，不创建 AgentSession、不注入 Studio orchestration tools。",
+          "记录 SessionInfo child title projection 与 fallback。",
+          "补充或新增轻量测试覆盖 child header/title fallback。"
+        ],
+        "acceptance": [
+          "文档描述与实现一致；验证命令通过。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-sdk-runner",
+          "必要时运行新增 title 测试"
+        ],
+        "risks": [
+          "事件 kind / type 变更要同步搜索所有消费者。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T09:20:11.533Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 4,
+      "skipped": 0
+    },
+    "subtasks": {
+      "audit-sse-guard": {
+        "id": "audit-sse-guard",
+        "status": "done",
+        "updatedAt": "2026-07-07T09:13:34.006Z",
+        "startedAt": "2026-07-07T09:05:41.325Z",
+        "finishedAt": "2026-07-07T09:13:34.006Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-754bd4262bb93175d021044d"
+        ],
+        "lastRunId": "implementer-754bd4262bb93175d021044d",
+        "claimedAt": "2026-07-07T09:05:41.325Z",
+        "claimedByContextId": "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/agent/[id]/events/route.ts` — added read-only Studio child audit SSE branch before normal `startRpcSession()` path.\n  - Emits `connected(mode=studio_child_audit)`.\n  - Watches JSONL `mtimeMs/size` via `statSync` polling.\n  - Emits `studio_child_audit_changed`.\n  - Emits `studio_child_audit_end` on terminal/missing file.\n  - Includes heartbeat, debounce, abort cleanup, and transient header parse retry.\n  - Does **not** call `startRpcSession()` for `studioChild` sessions.\n\n- `.ypi/tasks/20260707-164739-排查并优化-ypi-studio-child-session-实时刷新与标题/handoff.md` — updated with implementation notes and validation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Live `curl -N /api/agent/<childId>/events` validation was not run because no running child session was available in this subtask.\n- Frontend handling for `studio_child_audit_changed/end` remains for the separate client subtask.",
+        "validation": [
+          "Implementer run succeeded; pending checker review and project validation."
+        ]
+      },
+      "client-audit-refresh": {
+        "id": "client-audit-refresh",
+        "status": "done",
+        "updatedAt": "2026-07-07T09:19:01.181Z",
+        "startedAt": "2026-07-07T09:15:48.046Z",
+        "finishedAt": "2026-07-07T09:19:01.181Z",
+        "attempts": 2,
+        "runIds": [
+          "implementer-0de3876a32efee6f7bf321b0",
+          "implementer-25b70ba286b6426707c9754f"
+        ],
+        "lastRunId": "implementer-25b70ba286b6426707c9754f",
+        "claimedAt": "2026-07-07T09:15:48.046Z",
+        "claimedByContextId": "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "blockedReason": "Retry after missing implementation.",
+        "summary": "SDK child run finished without a captured final assistant message.",
+        "validation": [
+          "grep -n studio_child_audit hooks/useAgentSession.ts shows connected/changed/end handlers.",
+          "npm run lint passed.",
+          "node_modules/.bin/tsc --noEmit passed.",
+          "npm run test:studio-sdk-runner passed."
+        ]
+      },
+      "child-title-projection": {
+        "id": "child-title-projection",
+        "status": "done",
+        "updatedAt": "2026-07-07T09:13:37.623Z",
+        "startedAt": "2026-07-07T09:05:41.325Z",
+        "finishedAt": "2026-07-07T09:13:37.623Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-b6b146f12a33034aef5cf7ff"
+        ],
+        "lastRunId": "implementer-b6b146f12a33034aef5cf7ff",
+        "claimedAt": "2026-07-07T09:05:41.325Z",
+        "claimedByContextId": "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/types.ts` — added optional `studioChildDisplay` projection.\n- `lib/session-reader.ts` — added opt-in `projectStudioChildDisplay()` from Studio `task.json`.\n- `app/api/sessions/[id]/route.ts` — session detail now includes child display projection.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — project-space UI list enables child display projection.\n- `lib/session-title.ts` — child titles prefer task title, then run summary/taskId before normal fallback.\n- `components/SessionSidebar.tsx` — child rows use `displayTitleForSession`; member/status badge and run/subtask metadata preserved.\n- `lib/ypi-studio-child-session-runner.ts` — writes task-title-based `session_info` fallback when available.\n- `.ypi/tasks/.../handoff.md` — updated with subtask implementation/validation notes.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed.\n- `npm run test:studio-sdk-runner` — passed, with existing Node experimental loader warning.\n\n#### Notes / Risks\n\n- Title projection is opt-in; usage/global scans remain without extra task-title I/O.\n- Current behavior intentionally prioritizes Studio task title over manual child rename for child audit rows; main session should decide if rename override is desired later.\n- `app/api/agent/[id]/events/route.ts` has existing modifications from another subtask; I left it untouched.",
+        "validation": [
+          "Implementer run succeeded; pending checker review and project validation."
+        ]
+      },
+      "docs-tests-validation": {
+        "id": "docs-tests-validation",
+        "status": "done",
+        "updatedAt": "2026-07-07T09:19:06.978Z",
+        "startedAt": "2026-07-07T09:14:12.396Z",
+        "finishedAt": "2026-07-07T09:19:06.978Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-a4ff9f6c2a1b92da2ee80d03"
+        ],
+        "lastRunId": "implementer-a4ff9f6c2a1b92da2ee80d03",
+        "claimedAt": "2026-07-07T09:14:12.396Z",
+        "claimedByContextId": "pi_019f3bc2-663b-7f93-8a8c-072038a8f2aa",
+        "blockedReason": "Retry after missing docs/review updates.",
+        "summary": "SDK child run finished without a captured final assistant message.",
+        "validation": [
+          "Updated docs/architecture/overview.md, docs/modules/api.md, docs/modules/frontend.md, docs/modules/library.md.",
+          "npm run lint passed.",
+          "node_modules/.bin/tsc --noEmit passed.",
+          "npm run test:studio-sdk-runner passed."
+        ]
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-07T09:05:41.325Z",
+        "subtaskId": "audit-sse-guard",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T09:05:41.325Z",
+        "subtaskId": "child-title-projection",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T09:13:34.006Z",
+        "subtaskId": "audit-sse-guard",
+        "from": "done",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T09:13:37.623Z",
+        "subtaskId": "child-title-projection",
+        "from": "done",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T09:13:45.024Z",
+        "subtaskId": "client-audit-refresh",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T09:14:05.923Z",
+        "subtaskId": "client-audit-refresh",
+        "from": "done",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T09:14:12.396Z",
+        "subtaskId": "docs-tests-validation",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T09:14:29.943Z",
+        "subtaskId": "docs-tests-validation",
+        "from": "done",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T09:15:26.568Z",
+        "subtaskId": "client-audit-refresh",
+        "from": "done",
+        "to": "failed"
+      },
+      {
+        "at": "2026-07-07T09:15:29.933Z",
+        "subtaskId": "docs-tests-validation",
+        "from": "done",
+        "to": "failed"
+      },
+      {
+        "at": "2026-07-07T09:15:37.783Z",
+        "subtaskId": "client-audit-refresh",
+        "from": "failed",
+        "to": "pending"
+      },
+      {
+        "at": "2026-07-07T09:15:41.281Z",
+        "subtaskId": "docs-tests-validation",
+        "from": "failed",
+        "to": "pending"
+      },
+      {
+        "at": "2026-07-07T09:15:48.046Z",
+        "subtaskId": "client-audit-refresh",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T09:19:01.181Z",
+        "subtaskId": "client-audit-refresh",
+        "from": "done",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T09:19:06.978Z",
+        "subtaskId": "docs-tests-validation",
+        "from": "ready",
+        "to": "done"
+      }
+    ]
+  }
+}

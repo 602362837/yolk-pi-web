@@ -6,10 +6,12 @@ import {
   resolveSessionPath,
   invalidateSessionPathCache,
   buildSessionContext,
+  projectStudioChildDisplay,
 } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
 import { deleteSessionChangesSidecar } from "@/lib/session-file-changes";
 import { getSessionProjectLink } from "@/lib/session-project-link";
+import type { StudioChildSessionInfo } from "@/lib/types";
 
 // BranchNavigator still traverses recursively, so keep the response tree shallow.
 const MAX_PROJECTED_TREE_DEPTH = 200;
@@ -147,6 +149,7 @@ export async function GET(
       spaceId: projectLink.spaceId,
       legacyUnassigned: (header as { studioChild?: unknown }).studioChild ? false : projectLink.legacyUnassigned,
       studioChild: (header as { studioChild?: unknown }).studioChild,
+      studioChildDisplay: projectStudioChildDisplay(header.cwd ?? "", (header as { studioChild?: StudioChildSessionInfo }).studioChild),
       created: header.timestamp,
       modified,
       messageCount: context.messages.length,

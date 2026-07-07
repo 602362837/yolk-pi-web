@@ -49,6 +49,14 @@ function streamReducer(state: StreamingState, action: StreamAction): StreamingSt
 }
 
 const AUTO_SCROLL_BOTTOM_THRESHOLD = 96;
+const STUDIO_CHILD_AUDIT_TERMINAL_STATUSES = new Set(["succeeded", "failed", "cancelled", "runtime_lost"]);
+
+function isStudioChildAuditActive(session: SessionInfo | null): boolean {
+  const child = session?.studioChild;
+  if (!child) return false;
+  if (child.finishedAt) return false;
+  return !child.status || !STUDIO_CHILD_AUDIT_TERMINAL_STATUSES.has(child.status);
+}
 
 function isNearScrollBottom(container: HTMLDivElement): boolean {
   const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
@@ -432,7 +440,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   useEffect(() => () => usageRollupAbortRef.current?.abort(), []);
 
-  const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false) => {
+  const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false, suppressError = false) => {
     try {
       if (showLoading) setLoading(true);
       const url = includeState
@@ -462,7 +470,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       return d.agentState ?? null;
     } catch (e) {
-      setError(String(e));
+      if (!suppressError) setError(String(e));
       return null;
     } finally {
       if (showLoading) setLoading(false);
@@ -591,6 +599,39 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
+      case "connected":
+        if (event.mode === "studio_child_audit") {
+          setAgentRunning(true);
+          setAgentPhase(null);
+          dispatch({ type: "reset" });
+        }
+        break;
+      case "studio_child_audit_changed": {
+        const sid = typeof event.sessionId === "string" ? event.sessionId : sessionIdRef.current;
+        if (sid) {
+          loadSession(sid, false, false, true).catch((error) => {
+            console.warn("Failed to refresh Studio child audit session:", error);
+          });
+        }
+        break;
+      }
+      case "studio_child_audit_end": {
+        const sid = typeof event.sessionId === "string" ? event.sessionId : sessionIdRef.current;
+        const finish = () => {
+          setAgentRunning(false);
+          setAgentPhase(null);
+          dispatch({ type: "end" });
+          eventSourceRef.current?.close();
+          eventSourceRef.current = null;
+          onAgentEnd?.();
+        };
+        if (sid) {
+          loadSession(sid, false, false, true).finally(finish);
+        } else {
+          finish();
+        }
+        break;
+      }
       case "agent_start":
         setAgentRunning(true);
         setAgentPhase({ kind: "waiting_model" });
@@ -1062,9 +1103,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useEffect(() => {
     if (session) {
       sessionIdRef.current = session.id;
+      const shouldTrackStudioChildAudit = isStudioChildAuditActive(session);
       loadSession(session.id, true, true).then((agentState) => {
         if (agentState?.running) {
-          loadTools(session.id);
+          if (!session.studioChild) loadTools(session.id);
           const studioChildRunCount = agentState.state?.studioChildRunCount ?? 0;
           if (agentState.state?.isStreaming || studioChildRunCount > 0) {
             setAgentRunning(true);
@@ -1073,6 +1115,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               : { kind: "waiting_model" });
             connectEvents(session.id);
           }
+        } else if (shouldTrackStudioChildAudit) {
+          setAgentRunning(true);
+          setAgentPhase(null);
+          connectEvents(session.id);
         }
         if (agentState?.state) {
           if (agentState.state.isCompacting !== undefined) setIsCompacting(agentState.state.isCompacting);

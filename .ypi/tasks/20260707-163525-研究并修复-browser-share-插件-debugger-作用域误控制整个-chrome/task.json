@@ -1,0 +1,592 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome",
+  "title": "研究并修复 Browser Share 插件 debugger 作用域误控制整个 Chrome",
+  "workflowId": "feature-dev",
+  "status": "cancelled",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-07T08:35:25.145Z",
+  "updatedAt": "2026-07-07T09:46:19.042Z",
+  "completedAt": "2026-07-07T09:46:19.042Z",
+  "contextIds": [
+    "pi_019f3bb7-5620-7bbe-aeae-95f61b7c794c"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-d1d6bbe6b7fa01d9dae6f3e4",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:35:32.978Z",
+      "finishedAt": "2026-07-07T08:40:56.075Z",
+      "runner": "sdk",
+      "childSessionId": "019f3bb7-dc0a-7e40-976a-5e95c66dbb1c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T08-35-33-002Z_019f3bb7-dc0a-7e40-976a-5e95c66dbb1c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bb7-5620-7bbe-aeae-95f61b7c794c",
+        "childSessionId": "019f3bb7-dc0a-7e40-976a-5e95c66dbb1c",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请研究 Browser Share Chrome 插件一开启分享后似乎整个 Chrome 都进入被控制/调试状态的问题。目标：确认当前扩展 debugger attach/target 选择逻辑，判断是否错误 attach 到 browser/page 全局或多个 tab；给出只对开启分享的 tab attach debugger 的修复设计、涉及文件、风险、验证步骤。请先阅读 docs/architecture/browser-share.md 以及 ypi web 侧 …",
+      "summary": "已完成设计研究，未修改生产代码、未 commit/push。\n\n## 关键结论\n\n- 当前插件 **没有发现 attach 到 browser 全局 target 或多个 tab**。\n- `~/gitProjects/ypi-browser-share-extension/src/service-worker/service-worker.js` 当前逻辑是：\n  - `debuggerTarget(tabId) -> { tabId }`\n  - `chrome.debugger.attach({ tabId }, \"1.3\")`\n  - 创建分享时只取一次当前 active tab，后续都用 `activeShare.tabId`\n- ypi web 侧不调用 `chrome.debugger`，只做 bridge/state/command queue。\n- “整个 Chrome 被调试”的体感大概率来自 Chrome debugger infobar 的浏览器级展示/文案；即使 tab-scoped attach，Chrome 也可能显示全局感提示。\n\n## 产出 artifacts\n\n已更新规划文档：\n\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md`\n\n## 建议修复设计\n\n- 插件侧集中封装 share-scoped debugger wrapper，禁止裸 `tabId` 随处 attach/send/detach。\n- active share 记录并展示 `scope: tab`、`tabId/windowId/title/url` 诊断。\n- popup/docs 说明 Chrome infobar 可能看似全局，但 Browser Share target 应仅为分享 tab。\n- 可选：ypi web `BrowserShareControl` 也显示 sanitized target 诊断。\n- `scripts/validate.mjs` 增加静态 guard，防止未来误引入全局/multi-tab attach。\n\n## 验证\n\n已运行：\n\n```bash\ncd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build\n```\n\n结果：`YPI Browser Share extension validation passed.`\n\n## 需要主会话决策\n\n1. 是否接受“当前已 tab-scoped，主要做 guard/UI/docs 加固”的判断。\n2. target 诊断只放插件 popup，还是也同步到 ypi web。\n3. 是否继续保持 persistent debugger：切到其他 tab 时仍保持分享 tab attached，因此 Chrome 顶部提示可能继续存在。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:35:32.978Z",
+        "updatedAt": "2026-07-07T08:40:56.075Z",
+        "eventCount": 8021,
+        "lastTextPreview": "已完成设计研究，未修改生产代码、未 commit/push。\n\n## 关键结论\n\n- 当前插件 **没有发现 attach 到 browser 全局 target 或多个 tab**。\n- `~/gitProjects/ypi-browser-share-extension/src/service-worker/service-worker.js` 当前逻辑是：\n  - `debuggerTarget(tabId) -> { tabId }`\n  - `chrome.debugger.attach({ tabId }, \"1.3\")`\n  - 创建分享时只取一次当前 active tab，后续都用 `activeShare.tabId`\n- ypi web 侧不调用 `chrome.debugger`，只做 bridge/state/command queue。\n- “整个 Chrome 被调试”的体感大概率来自 Chrome debugger infobar 的浏览器级展示/文案；即使 tab-scoped attach，Chrome 也可能显示全局感提示。\n\n## 产出 artifacts\n\n已更新规划文档：\n\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md`\n\n## 建议修复设计\n\n- 插件侧集中封装 share-scoped debugger wrapper，禁止裸 `tabId` 随处 attach/send/detach。\n- active share 记录并展示 `scope: tab`、`tabId/windowId/title/url` 诊断。\n- popup/docs 说明 Chrome infobar 可能看似全局，但 Browser Share target 应仅为分享 tab。\n- 可选：ypi web `BrowserShareControl` 也显示 sanitized target 诊断。\n- `scripts/validate.mjs` 增加静态 guard，防止未来误引入全局/multi-tab attach。\n\n## 验证\n\n已运行：\n\n```bash\ncd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build\n```\n\n结果：`YPI Browser Share extension validation passed.`\n\n## 需要主会话决策\n\n1. 是否接受“当前已 tab-scoped，主要做 guard/UI/docs 加固”的判断。\n2. target 诊断只放插件 popup，还是也同步到 ypi web。\n3. 是否继续保持 persistent debugger：切到其他 tab 时仍保持分享 tab attached，因此 Chrome 顶部提示可能继续存在。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:40:35.077Z",
+            "toolCallId": "call_UGsVYePXnk2OARLuLl5jtjCo|fc_0e38b398ab013c07016a4cbb773dd88199ab6b7a0e52db006c",
+            "toolName": "write",
+            "text": "Successfully wrote 1498 bytes to .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T08:40:38.977Z",
+            "toolCallId": "call_0NSqy7qamFkteB1sYqOeRaZj|fc_0e38b398ab013c07016a4cbb866b68819991e2a8fe1ea3a03e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short && cd /Users/zyj/gitProjects/ypi-browser-share-extension && git status --short\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:40:39.078Z",
+            "toolCallId": "call_0NSqy7qamFkteB1sYqOeRaZj|fc_0e38b398ab013c07016a4cbb866b68819991e2a8fe1ea3a03e",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260707-163525-\\347\\240\\224\\347\\251\\266\\345\\271\\266\\344\\277\\256\\345\\244\\215-browser-share-\\346\\217\\222\\344\\273\\266-debugger-\\344\\275\\234\\347\\224\\250\\345\\237\\237\\350\\257\\257\\346\\216\\247\\345\\210\\266\\346\\225\\264\\344\\270\\252-chrome/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T08:40:56.053Z",
+            "text": "已完成设计研究，未修改生产代码、未 commit/push。\n\n## 关键结论\n\n- 当前插件 **没有发现 attach 到 browser 全局 target 或多个 tab**。\n- `~/gitProjects/ypi-browser-share-extension/src/service-worker/service-worker.js` 当前逻辑是：\n  - `debuggerTarget(tabId) -> { tabId }`\n  - `chrome.debugger.attach({ tabId }, \"1.3\")`\n  - 创建分享时只取一次当前 active tab，后续都用 `activeShare.tabId`\n- ypi web 侧不调用 `chrome.debugger`，只做 bridge/state/command queue。\n- “整个 Chrome 被调试”的体感大概率来自 Chrome debugger infobar 的浏览器级展示/文案；即使 tab-scoped attach，Chrome 也可能显示全局感提示。\n\n## 产出 artifacts\n\n已更新规划文档：\n\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md`\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md`\n\n## 建议修复设计\n\n- 插件侧集中封装 share-scoped debugger wrapper，禁止裸 `tabId` 随处 attach/send/detach。\n- active share 记录并展示 `scope: tab`、`tabId/windowId/title/url` 诊断。\n- popup/docs 说明 Chrome infobar 可能看似全局，但 Browser Share target 应仅为分享 tab。\n- 可选：ypi web `BrowserShareControl` 也显示 sanitized target 诊断。\n- `scripts/validate.mjs` 增加静态 guard，防止未来误引入全局/multi-tab attach。\n\n## 验证\n\n已运行：\n\n```bash\ncd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build\n```\n\n结果：`YPI Browser Share extension validation passed.`\n\n## 需要主会话决策\n\n1. 是否接受“当前已 tab-scoped，主要做 guard/UI/docs 加固”的判断。\n2. target 诊断只放插件 popup，还是也同步到 ypi web。\n3. 是否继续保持 persistent debugger：切到其他 tab 时仍保持分享 tab attached，因此 Chrome 顶部提示可能继续存在。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T08:40:56.066Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1643,
+        "tokens": 791,
+        "tokenSource": "usage",
+        "tps": 73.68,
+        "firstTokenAt": "2026-07-07T08:40:45.140Z",
+        "lastTokenAt": "2026-07-07T08:40:55.875Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-d1d6bbe6b7fa01d9dae6f3e4",
+        "taskId": "20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-163525-_-browser-share-_-debugger-_-chrome/architect-d1d6bbe6b7fa01d9dae6f3e4.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:35:32.978Z",
+        "finishedAt": "2026-07-07T08:40:56.072Z",
+        "updatedAt": "2026-07-07T08:40:56.072Z",
+        "itemCount": 97,
+        "messageCount": 1,
+        "toolCallCount": 46,
+        "stderrBytes": 0,
+        "bytes": 315813,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3bb7-dc0a-7e40-976a-5e95c66dbb1c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T08-35-33-002Z_019f3bb7-dc0a-7e40-976a-5e95c66dbb1c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-1d2c936314f1c15c3b394eb0",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T09:25:12.908Z",
+      "finishedAt": "2026-07-07T09:35:25.273Z",
+      "runner": "sdk",
+      "childSessionId": "019f3be5-546f-74c2-a93e-a2224521b379",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-25-12-943Z_019f3be5-546f-74c2-a93e-a2224521b379.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3bb7-5620-7bbe-aeae-95f61b7c794c",
+        "childSessionId": "019f3be5-546f-74c2-a93e-a2224521b379",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "用户反馈当前方案偏差：他们认可现有 debugger tab 定位本身没问题；真正诉求是希望“分享哪个 tab，哪个 tab 才出现 Chrome 顶部 debugger 提示”，并在被分享 tab 上打一个标记。请重新研究可行性：Chrome debugger infobar 是否能限定为单 tab 显示/是否由 Chrome 全局 UI 控制；Chrome extension 是否能控制 infobar 的显示位置/文案；如果不能，给出可行替代方案（例如仅在分享 tab…",
+      "summary": "已完成重新研究并更新规划文档；未修改生产代码、未提交。\n\n## 关键结论\n\n- 当前 `chrome.debugger.attach({ tabId })` 的 target 没问题，仍是 tab-scoped。\n- Chrome 原生 debugger infobar 是 Chromium 全局 UI：普通扩展不能让它只显示在被分享 tab，也不能改文案/位置。\n- 可行替代：保留 tab-scoped debugger，在被分享 tab 内注入 YPI 自有 overlay/badge；配合 action badge、popup、ypi web 状态说明真实共享目标。\n- 若要减少全局提示，只能考虑按需 attach / read-only non-debugger 模式，但会牺牲截图、操作可靠性，且仍不能做到 tab-only infobar。\n\n## 已更新 artifacts\n\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n其中 `implement.md` 已替换为新的 5 步计划：infobar 约束文档化、共享 tab overlay、状态表面增强、低提示模式决策、验证矩阵。\n\n## 验证\n\n```bash\ncd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build\n# YPI Browser Share extension validation passed.\n```\n\n## 剩余风险\n\n- Chrome 全局 debugger 警告仍会存在，overlay 只能补足 per-tab 标记。\n- 受限页面或跨 origin 导航后 overlay 可能注入失败，需要 fallback 状态。\n- 按需 attach/read-only 模式会改变现有 persistent debugger 安全与可靠性模型。\n\n## 需要主会话决策\n\n1. 是否确认默认方案：persistent debugger 保持不变 + 共享 tab 页面 overlay？\n2. ypi web 是否同步展示 target/marker 状态，还是先只做插件 overlay/popup/action badge？\n3. 是否需要另开低提示模式：按需 attach 或 read-only non-debugger？",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T09:25:12.908Z",
+        "updatedAt": "2026-07-07T09:35:25.273Z",
+        "eventCount": 14540,
+        "lastTextPreview": "已完成重新研究并更新规划文档；未修改生产代码、未提交。\n\n## 关键结论\n\n- 当前 `chrome.debugger.attach({ tabId })` 的 target 没问题，仍是 tab-scoped。\n- Chrome 原生 debugger infobar 是 Chromium 全局 UI：普通扩展不能让它只显示在被分享 tab，也不能改文案/位置。\n- 可行替代：保留 tab-scoped debugger，在被分享 tab 内注入 YPI 自有 overlay/badge；配合 action badge、popup、ypi web 状态说明真实共享目标。\n- 若要减少全局提示，只能考虑按需 attach / read-only non-debugger 模式，但会牺牲截图、操作可靠性，且仍不能做到 tab-only infobar。\n\n## 已更新 artifacts\n\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n其中 `implement.md` 已替换为新的 5 步计划：infobar 约束文档化、共享 tab overlay、状态表面增强、低提示模式决策、验证矩阵。\n\n## 验证\n\n```bash\ncd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build\n# YPI Browser Share extension validation passed.\n```\n\n## 剩余风险\n\n- Chrome 全局 debugger 警告仍会存在，overlay 只能补足 per-tab 标记。\n- 受限页面或跨 origin 导航后 overlay 可能注入失败，需要 fallback 状态。\n- 按需 attach/read-only 模式会改变现有 persistent debugger 安全与可靠性模型。\n\n## 需要主会话决策\n\n1. 是否确认默认方案：persistent debugger 保持不变 + 共享 tab 页面 overlay？\n2. ypi web 是否同步展示 target/marker 状态，还是先只做插件 overlay/popup/action badge？\n3. 是否需要另开低提示模式：按需 attach 或 read-only non-debugger？",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T09:34:52.533Z",
+            "toolCallId": "call_0U3L4MPPvYNbebM7jHkjll7i|fc_0622d469da61fa9c016a4cc82faac8819ab241eeecb50b41ce",
+            "toolName": "write",
+            "text": "Successfully wrote 1960 bytes to .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T09:35:04.407Z",
+            "toolCallId": "call_ctt8lf1dG14IyBaYF0vUdoxn|fc_0622d469da61fa9c016a4cc8463300819abfc4c26dc36ab3b2",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"wc -l .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/{brief.md,prd.md,ui.md,design.md,implement.md,checks.md,handoff.md} && rg -n \\\"GlobalConfirmInfoBar|tab-only|overlay|persistent debugger\\\" .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/{brief.md,prd.md,ui.md,design.md,implement.md,checks.md,handoff.md}\",\n  \"timeout\": 15\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T09:35:04.502Z",
+            "toolCallId": "call_ctt8lf1dG14IyBaYF0vUdoxn|fc_0622d469da61fa9c016a4cc8463300819abfc4c26dc36ab3b2",
+            "toolName": "bash",
+            "text": "50 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md\n      53 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md\n      48 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/ui.md\n     179 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md\n     219 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md\n      56 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md\n      41 .ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md\n     646 total\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:6:- Chrome 原生 debugger infobar **不能**由普通扩展限定为只在被分享 tab 顶部显示，也不能自定义文案/位置。Chromium 使用 `GlobalConfirmInfoBar`，其设计就是在 every tab / every browser 显示扩展 debugger 警告。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:7:- 可行替代是：保留 tab-scoped debugger target，把 Chrome infobar 当作全局安全警告；在被分享 tab 内注入 Browser Share 自有 overlay/badge，并强化 action badge、popup、ypi web 的 target 状态展示。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:8:- 如要减少全局提示停留时间，只能考虑按需 attach 或 read-only non-debugger 模式；这不能做到 tab-only infobar，并会牺牲截图/action 可靠性，需要单独产品决策。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:33:- Chrome 全局 debugger 警告仍会出现，overlay 只能补足 per-tab 标记，不能改变 Chrome UI。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:35:- 若改成按需 attach/read-only 模式，会影响现有 persistent debugger 生命周期和 action 工具可靠性。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:39:1. 是否确认默认方案：**persistent debugger 保持不变 + 共享 tab 页面 overlay 作为 per-tab 标记**？\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/handoff.md:40:2. 是否需要 ypi web `BrowserShareControl` 同步展示 target/marker 状态，还是先只做插件 overlay/popup/action badge？\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:12:- 设计 Browser Share 自有的被分享 tab 标记：页面 overlay/badge、action badge、popup、ypi web 状态。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:13:- 说明 persistent debugger、按需 attach、read-only non-debugger 模式的取舍。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:32:- 验收：设计提供只注入/显示在 `activeShare.tabId` 的页面 badge/overlay。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:44:- 验收：默认推荐仍保持 persistent debugger + per-tab overlay，以维持截图/action 可靠性。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:45:- 验收：如提供“降低全局提示”的模式，必须明确牺牲：原生 infobar 仍无法 tab-only，只能缩短 attach 时间；截图/action/后台恢复能力会下降。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:49:1. 主会话是否接受推荐默认：**persistent debugger 保持不变 + 页面 overlay 作为 per-tab 标记**？\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:50:2. overlay 是否默认开启且不可关闭，还是允许用户在 popup 中临时隐藏？安全上建议默认开启，隐藏只影响视觉不影响共享。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/prd.md:52:4. ypi web 是否也要显示 target 标记，还是先只做插件 popup + 页面 overlay？\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md:11:   - Chromium 实现把扩展 debugger 警告放进 `GlobalConfirmInfoBar`；它会在每个 tab / 每个 browser window 显示，而不是只显示在被 attach 的 tab。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md:18:   - 在被分享 tab 内注入 Browser Share 自有可见 badge/overlay，并配合 action badge、popup、ypi web 状态展示；\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md:33:  - `chrome/browser/devtools/global_confirm_info_bar.h`：`GlobalConfirmInfoBar is shown for every tab in every browser until it is dismissed or the close method is called.`\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md:47:2. 在分享 tab 内容区注入明显但低干扰的 YPI badge/overlay，作为真正的 per-tab 标记。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/ui.md:5:建议需要轻量 UI 设计员参与，重点不是重新设计 Browser Share 面板，而是定义“被分享 tab 自有标记”的视觉、文案和交互边界。Chrome 原生 debugger infobar 不能变成单 tab 标记，所以页面 overlay/badge 将成为主要可感知信号。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/ui.md:9:### 1. 分享 tab 页面 overlay（推荐主方案）\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/ui.md:25:- 局限：扩展未固定到工具栏时不够显眼，不能替代页面 overlay。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/ui.md:31:- 显示 overlay 状态：`已注入 / 注入失败 / 页面受限，仅使用 toolbar badge 标记`。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/ui.md:46:2. 是否需要用户可临时隐藏 overlay？若允许隐藏，如何保证仍有足够可见安全信号？\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:5:当前任务先等待主会话确认产品取舍，不应直接实现。修正后的推荐实现方向是：保持 persistent debugger target tab-scoped，但不要试图改变 Chrome 原生 debugger infobar；新增 Browser Share 自有 per-tab 标记，并在 popup/web/action badge 中解释和展示实际共享目标。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:31:| bs-tab-marker | extension | Add shared-tab overlay/marker lifecycle | 2 | [bs-infobar-doc] | required |\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:53:      \"instructions\": \"Record that chrome.debugger can target a tab, but Chrome's native debugger infobar is a global browser warning implemented by Chromium GlobalConfirmInfoBar. Do not promise tab-only native infobar. Update product wording to say Browser Share's own marker identifies the shared tab, while the Chrome warning may appear globally.\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:64:        \"Over-promising that overlay can replace Chrome's global security warning\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:72:      \"title\": \"Add shared-tab overlay/marker lifecycle\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:81:      \"instructions\": \"Implement a Browser Share-owned overlay that is injected only into activeShare.tabId. Add idempotent helpers such as injectShareMarker(activeShare), updateShareMarker(activeShare), removeShareMarker(activeShare), and record marker status/errors in activeShare. Use Shadow DOM and a stable root id. Reinject after share creation, refresh snapshot, navigation/action completion, service worker resume, and tab updates for the active shared tab. Remove on stop, replacement, unbind/detach request, expiry, and tab close. Keep injection best-effort and never attach or mark other tabs.\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:130:        \"Web projection increases scope and can be omitted if popup/action badge/overlay are sufficient.\"\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:148:      \"instructions\": \"Do not implement mode changes unless the main session explicitly chooses them. If chosen, design either on-demand debugger attach/detach or read-only non-debugger mode as a separate product change. Make clear that these modes reduce duration of the global Chrome warning but cannot make it tab-only. Preserve fail-safe behavior: action tools must not silently execute without the expected debugger capability.\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:151:        \"If rejected, persistent debugger remains default with overlay marker.\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:177:      \"instructions\": \"Extend validation/docs to cover the corrected behavior. Static checks should continue to prevent broad host permissions and raw debugger regressions where practical. Manual validation must assert that Chrome native infobar may be global, while Browser Share overlay/action badge appears only for the shared tab.\",\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:216:- 不把 Chrome 原生 debugger infobar 描述成可 tab-only 控制。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:218:- 不因为 overlay 存在就放松 session binding 和 approval 规则。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/implement.md:219:- 不在未获主会话确认前改变 persistent debugger 生命周期或新增低警告模式。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:7:- [ ] 共享 tab 自有标记方案存在：页面 overlay/badge、action badge、popup 状态；其他 tab 不显示 Browser Share 自有标记。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:9:- [ ] 若页面受限无法注入 overlay，popup/action badge/ypi web 会显示 fallback 状态。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:34:2. **Browser Share 自有标记隔离**：tab A 开启分享后，页面 overlay/action badge 只出现在 tab A；切到 tab B 不出现 overlay/badge。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:36:4. **导航/reload**：tab A reload 或由命令 navigate 后，overlay 能重注入；如注入失败，popup 显示 marker failure/fallback。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:37:5. **替换分享**：在 tab B 创建新分享后，tab A overlay/badge 被移除，tab B 出现 overlay/badge。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:38:6. **停止/解绑**：popup stop 或 ypi unbind 后，overlay/badge 清空，debugger detach，activeShare 移除。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:39:7. **关闭分享 tab**：关闭 tab A 后，本地 activeShare 清理，服务端收到 stop/tab_closed，badge/overlay 不残留。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:41:9. **DevTools 冲突**：其他 debugger 接管时，overlay/popup/web 显示异常状态，action tools fail-safe，不静默降级执行。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:49:- 为减少 infobar 改成按需 attach 可能破坏 persistent debugger 可靠性和安全模型。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:54:- 评审文案：只承诺 Browser Share target/overlay 是共享 tab，不承诺 Chrome 原生 infobar tab-only。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:55:- 评审 overlay 生命周期：replace/stop/unbind/tab close/navigation 都有清理或重注入路径。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/checks.md:56:- 评审权限：不要为了 overlay 默认请求 `<all_urls>`；如需要更广页面标记能力，必须单独做权限产品决策。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:11:3. 在共享 tab 内增加 Browser Share 自有可见标记（overlay/badge），并在 popup/web/action badge 中同步目标信息；\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:12:4. 若要减少全局警告停留时间，单独提供按需 attach 或 read-only non-debugger 模式作为产品取舍，而不是承诺 tab-only infobar。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:31:- Chromium `chrome/browser/devtools/global_confirm_info_bar.h`：`GlobalConfirmInfoBar is shown for every tab in every browser until it is dismissed or the close method is called.`\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:42:| 让 Chrome 原生 debugger infobar 只出现在被分享 tab | 不可行 | Chromium 使用 `GlobalConfirmInfoBar`。 |\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:45:| 在共享 tab 上显示自有标记 | 可行 | 页面 overlay、action badge、popup/web 状态。 |\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:50:### 1. 页面 overlay / badge（主标记）\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:52:在 `activeShare.tabId` 的页面内容区注入轻量 overlay：\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:62:- 可先用 `chrome.scripting.executeScript` 注入 overlay，复用现有 `activeTab/scripting` 权限路径。\n.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/design.md:63:- 对跨 origin 导航后 activeTab 权限可能失效的情况，可考虑在 persistent debugger 已附加…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T09:35:25.242Z",
+            "text": "已完成重新研究并更新规划文档；未修改生产代码、未提交。\n\n## 关键结论\n\n- 当前 `chrome.debugger.attach({ tabId })` 的 target 没问题，仍是 tab-scoped。\n- Chrome 原生 debugger infobar 是 Chromium 全局 UI：普通扩展不能让它只显示在被分享 tab，也不能改文案/位置。\n- 可行替代：保留 tab-scoped debugger，在被分享 tab 内注入 YPI 自有 overlay/badge；配合 action badge、popup、ypi web 状态说明真实共享目标。\n- 若要减少全局提示，只能考虑按需 attach / read-only non-debugger 模式，但会牺牲截图、操作可靠性，且仍不能做到 tab-only infobar。\n\n## 已更新 artifacts\n\n- `.ypi/tasks/20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n其中 `implement.md` 已替换为新的 5 步计划：infobar 约束文档化、共享 tab overlay、状态表面增强、低提示模式决策、验证矩阵。\n\n## 验证\n\n```bash\ncd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build\n# YPI Browser Share extension validation passed.\n```\n\n## 剩余风险\n\n- Chrome 全局 debugger 警告仍会存在，overlay 只能补足 per-tab 标记。\n- 受限页面或跨 origin 导航后 overlay 可能注入失败，需要 fallback 状态。\n- 按需 attach/read-only 模式会改变现有 persistent debugger 安全与可靠性模型。\n\n## 需要主会话决策\n\n1. 是否确认默认方案：persistent debugger 保持不变 + 共享 tab 页面 overlay？\n2. ypi web 是否同步展示 target/marker 状态，还是先只做插件 overlay/popup/action badge？\n3. 是否需要另开低提示模式：按需 attach 或 read-only non-debugger？",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T09:35:25.259Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1157,
+        "tokens": 724,
+        "tokenSource": "usage",
+        "tps": 97.17,
+        "firstTokenAt": "2026-07-07T09:35:17.659Z",
+        "lastTokenAt": "2026-07-07T09:35:25.110Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-1d2c936314f1c15c3b394eb0",
+        "taskId": "20260707-163525-研究并修复-browser-share-插件-debugger-作用域误控制整个-chrome",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-163525-_-browser-share-_-debugger-_-chrome/architect-1d2c936314f1c15c3b394eb0.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T09:25:12.908Z",
+        "finishedAt": "2026-07-07T09:35:25.270Z",
+        "updatedAt": "2026-07-07T09:35:25.270Z",
+        "itemCount": 79,
+        "messageCount": 1,
+        "toolCallCount": 37,
+        "stderrBytes": 0,
+        "bytes": 257201,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3be5-546f-74c2-a93e-a2224521b379",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-07T09-25-12-943Z_019f3be5-546f-74c2-a93e-a2224521b379.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T08:42:25.056Z",
+      "contextId": "pi_019f3bb7-5620-7bbe-aeae-95f61b7c794c",
+      "from": "planning",
+      "to": "awaiting_approval"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T08:42:17.895Z",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "bs-scope-guard",
+          "title": "extension",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "bs-scope-guard"
+          ]
+        },
+        {
+          "id": "bs-scope-ui",
+          "title": "extension-ui",
+          "relation": "parallel",
+          "dependencies": [
+            "bs-scope-guard"
+          ],
+          "subtaskIds": [
+            "bs-scope-ui"
+          ]
+        },
+        {
+          "id": "bs-web-projection",
+          "title": "web-optional",
+          "relation": "parallel",
+          "dependencies": [
+            "bs-scope-guard"
+          ],
+          "subtaskIds": [
+            "bs-web-projection"
+          ]
+        },
+        {
+          "id": "bs-validation",
+          "title": "validation",
+          "relation": "serial",
+          "dependencies": [
+            "bs-scope-guard",
+            "bs-scope-ui"
+          ],
+          "subtaskIds": [
+            "bs-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "bs-scope-guard",
+        "title": "Centralize tab-scoped debugger wrappers",
+        "phase": "extension",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/service-worker/service-worker.js"
+        ],
+        "acceptance": [
+          "Only createShare uses activeTab() to choose the initial target.",
+          "All chrome.debugger.attach/sendCommand/detach calls go through share-scoped wrappers.",
+          "No code path attaches to { targetId }, browser targets, or multiple tabs.",
+          "Replacing/stopping/closing a share detaches only the saved activeShare.tabId."
+        ],
+        "validation": [
+          "rg -n \"chrome\\.debugger\\.(attach|sendCommand|detach)|tabs\\.query|targetId\" /Users/zyj/gitProjects/ypi-browser-share-extension/src/service-worker/service-worker.js",
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build"
+        ],
+        "risks": [
+          "Changing wrapper signatures may break service worker resume/poll if any caller keeps passing raw tabId.",
+          "Chrome debugger infobar will still look browser-level even with correct tab target."
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "bs-scope-ui",
+        "title": "Surface scoped target diagnostics in popup and docs",
+        "phase": "extension-ui",
+        "order": 2,
+        "dependsOn": [
+          "bs-scope-guard"
+        ],
+        "dependencies": [
+          "bs-scope-guard"
+        ],
+        "relation": "parallel",
+        "files": [
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/popup/popup.js",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/popup/popup.html",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/popup/popup.css",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/README.md",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/INSTALL.md"
+        ],
+        "acceptance": [
+          "Popup active-share section clearly says debugger is scoped to the shared tab.",
+          "Popup does not imply all Chrome tabs are controllable.",
+          "README/INSTALL troubleshooting distinguishes Chrome infobar wording from actual target scope."
+        ],
+        "validation": [
+          "Manual popup check after sharing one tab",
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build"
+        ],
+        "risks": [
+          "Too much tabId detail may confuse users; make diagnostics compact and title/url primary."
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "bs-web-projection",
+        "title": "Optionally expose scoped debugger diagnostics in ypi web",
+        "phase": "web-optional",
+        "order": 3,
+        "dependsOn": [
+          "bs-scope-guard"
+        ],
+        "dependencies": [
+          "bs-scope-guard"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/browser-share-types.ts",
+          "lib/browser-share-manager.ts",
+          "components/BrowserShareControl.tsx",
+          "docs/architecture/browser-share.md"
+        ],
+        "acceptance": [
+          "Old extension payloads without target metadata still render normally.",
+          "New target metadata is bounded/sanitized and shown as diagnostic only.",
+          "Architecture doc records that ypi web never calls chrome.debugger."
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Adding web projection increases scope; omit if popup/docs are enough for this fix."
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "bs-validation",
+        "title": "Add static and manual validation gates",
+        "phase": "validation",
+        "order": 4,
+        "dependsOn": [
+          "bs-scope-guard",
+          "bs-scope-ui"
+        ],
+        "dependencies": [
+          "bs-scope-guard",
+          "bs-scope-ui"
+        ],
+        "relation": "serial",
+        "files": [
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/scripts/validate.mjs",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/README.md"
+        ],
+        "acceptance": [
+          "npm run build fails if debugger attach is introduced outside the approved wrapper pattern.",
+          "Manual validation checklist covers tab A/tab B isolation and lifecycle detach."
+        ],
+        "validation": [
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build",
+          "Manual Chrome two-tab test matrix"
+        ],
+        "risks": [
+          "Static string checks can be brittle; keep them focused and easy to update."
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T09:46:19.040Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 3,
+      "waiting": 0,
+      "ready": 1,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 0,
+      "skipped": 0
+    },
+    "subtasks": {
+      "bs-scope-guard": {
+        "id": "bs-scope-guard",
+        "status": "ready",
+        "updatedAt": "2026-07-07T08:42:17.895Z",
+        "attempts": 0,
+        "runIds": []
+      },
+      "bs-scope-ui": {
+        "id": "bs-scope-ui",
+        "status": "pending",
+        "updatedAt": "2026-07-07T08:42:17.895Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "bs-scope-guard",
+            "title": "Centralize tab-scoped debugger wrappers",
+            "status": "ready"
+          }
+        ]
+      },
+      "bs-web-projection": {
+        "id": "bs-web-projection",
+        "status": "pending",
+        "updatedAt": "2026-07-07T08:42:17.895Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "bs-scope-guard",
+            "title": "Centralize tab-scoped debugger wrappers",
+            "status": "ready"
+          }
+        ]
+      },
+      "bs-validation": {
+        "id": "bs-validation",
+        "status": "pending",
+        "updatedAt": "2026-07-07T08:42:17.895Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "bs-scope-guard",
+            "title": "Centralize tab-scoped debugger wrappers",
+            "status": "ready"
+          },
+          {
+            "id": "bs-scope-ui",
+            "title": "Surface scoped target diagnostics in popup and docs",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    "nextSubtaskId": "bs-scope-guard",
+    "nextSubtaskIds": [
+      "bs-scope-guard"
+    ]
+  }
+}
