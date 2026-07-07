@@ -316,7 +316,7 @@ function currentTaskIdOrThrow(root: string, key: string | null, requested?: stri
   return current.id;
 }
 
-function shouldReturnFullTaskDetail(input: StudioTaskToolInput): boolean {
+function isFullTaskDetailRequested(input: StudioTaskToolInput): boolean {
   return input.detail === "full" || input.includeFullDetail === true;
 }
 
@@ -567,13 +567,28 @@ function compactYpiStudioTaskForTool(root: string, task: YpiStudioTaskDetail): R
     readHints: [
       `Artifacts live under ${task.pathLabel}; read specific files from the artifacts.files map when their content is needed.`,
       `Events are omitted except the recent ${recentEvents.recentLimit}; totalCount=${recentEvents.totalCount}. Read ${recentEvents.path} manually only if old event history is needed.`,
-      "Default ypi_studio_task current/get output is compact. Use detail='full' or includeFullDetail=true only when full JSON is truly necessary.",
+      "YPI Studio tools never inject complete task JSON into the main chat. detail='full' only adds summary metadata and file paths; read specific task/artifact/event files only when needed."
     ],
   };
 }
 
-function taskToolPayload(root: string, task: YpiStudioTaskDetail, input: StudioTaskToolInput): YpiStudioTaskDetail | Record<string, unknown> {
-  return shouldReturnFullTaskDetail(input) ? task : compactYpiStudioTaskForTool(root, task);
+function taskToolPayload(root: string, task: YpiStudioTaskDetail, input: StudioTaskToolInput): Record<string, unknown> {
+  const payload = compactYpiStudioTaskForTool(root, task);
+  if (!isFullTaskDetailRequested(input)) return payload;
+  return {
+    ...payload,
+    fullDetail: {
+      requested: true,
+      returned: "summary_and_paths_only",
+      reason: "Full task JSON is intentionally not injected into the main chat context. Read the specific files below only when their content is required.",
+      files: {
+        taskJson: `${task.pathLabel}/task.json`,
+        eventsJsonl: `${task.pathLabel}/events.jsonl`,
+        artifactsDirectory: task.pathLabel,
+        runtimeDirectory: ".ypi/.runtime/studio-subagents/",
+      },
+    },
+  };
 }
 
 function isLocalReviewStatus(value: unknown): value is YpiStudioImplementationLocalReviewStatus {
@@ -1347,6 +1362,8 @@ interface StudioSubagentRunProjection {
   taskId: string;
   subtaskId?: string;
   member: string;
+  taskTitle?: string;
+  subtaskTitle?: string;
   status: YpiStudioTaskSubagentRun["status"];
   registryStatus?: string;
   registryActive: boolean;
@@ -1362,6 +1379,11 @@ interface StudioSubagentRunProjection {
 
 function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSubagentRun): StudioSubagentRunProjection {
   const handle = getYpiStudioChildRun(run.id);
+  const detail = getYpiStudioTaskDetail(root, taskId);
+  const subtaskTitle = run.subtaskId
+    ? detail?.implementationProjection?.subtasksWithStatus.find((subtask) => subtask.id === run.subtaskId)?.title
+      ?? detail?.implementationPlan?.subtasks.find((subtask) => subtask.id === run.subtaskId)?.title
+    : undefined;
   let transcriptPreview: unknown;
   try {
     transcriptPreview = run.transcript ? readYpiStudioSubagentTranscriptPreview(root, taskId, run, { limit: 5, maxItemBytes: 500 }) : undefined;
@@ -1373,6 +1395,8 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba
     taskId,
     subtaskId: run.subtaskId,
     member: run.member,
+    taskTitle: detail?.title,
+    subtaskTitle,
     status: handle?.status === "runtime_lost" ? run.status : handle?.status ?? run.status,
     registryStatus: handle?.status,
     registryActive: !!handle,
@@ -1381,6 +1405,44 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba
     transcriptPreview,
     summary: run.summary,
     error: run.error,
+    terminationReason: run.terminationReason,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+  };
+}
+
+function compactSubagentRunProjection(run: StudioSubagentRunProjection): Record<string, unknown> {
+  const progress = run.progress ? {
+    phase: run.progress.phase,
+    updatedAt: run.progress.updatedAt,
+    eventCount: run.progress.eventCount,
+    lastTextPreview: run.progress.lastTextPreview ? oneLine(run.progress.lastTextPreview, 500) : undefined,
+    itemsPreview: run.progress.itemsPreview?.slice(-3).map((item) => "text" in item && typeof item.text === "string" ? { ...item, text: oneLine(item.text, 500) } : item),
+    warnings: run.progress.warnings?.slice(-5),
+    tokens: run.progress.tokens,
+    tps: run.progress.tps,
+    currentTool: run.progress.currentTool,
+    display: run.progress.display,
+    terminationReason: run.progress.terminationReason,
+  } : undefined;
+  const transcriptPreview = isObj(run.transcriptPreview) && Array.isArray(run.transcriptPreview.items)
+    ? { ...run.transcriptPreview, items: run.transcriptPreview.items.slice(-3) }
+    : run.transcriptPreview;
+  return {
+    runId: run.runId,
+    taskId: run.taskId,
+    subtaskId: run.subtaskId,
+    member: run.member,
+    taskTitle: run.taskTitle,
+    subtaskTitle: run.subtaskTitle,
+    status: run.status,
+    registryStatus: run.registryStatus,
+    registryActive: run.registryActive,
+    progress,
+    transcript: run.transcript,
+    transcriptPreview,
+    summary: run.summary ? oneLine(run.summary, 1000) : undefined,
+    error: run.error ? oneLine(run.error, 1000) : undefined,
     terminationReason: run.terminationReason,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
@@ -1531,7 +1593,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
       "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit=<available concurrency slots> to inspect the ready batch, then claim all ready subtask(s) that fit the free slots before dispatching one async implementer per claimed subtaskId.",
-      "current/get return compact summaries by default, with artifact paths, recent 10 events, event totalCount, and nextRecommendedAction. Request detail='full' only when the compact summary is insufficient.",
+      "current/get return compact summaries by default, with artifact paths, recent 10 events, event totalCount, and nextRecommendedAction. detail='full' returns summary metadata plus file paths instead of complete task JSON; read specific files only when needed.",
     ],
     parameters: {
       type: "object",
@@ -1563,8 +1625,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         skippedReason: { type: "string" },
         terminationReason: { type: "string" },
         localReview: { type: "object" },
-        detail: { type: "string", enum: ["compact", "full"], description: "current/get default to compact task summaries. Use full only when the complete task JSON is truly needed." },
-        includeFullDetail: { type: "boolean", description: "Compatibility alias for detail='full'. Defaults to false." },
+        detail: { type: "string", enum: ["compact", "full"], description: "current/get default to compact task summaries. full returns summary metadata and file paths instead of injecting complete task JSON." },
+        includeFullDetail: { type: "boolean", description: "Compatibility alias for detail='full'. Defaults to false and does not inject complete task JSON." },
       },
     },
     execute: async (_id: string, inputValue: unknown, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: PiExtensionContext): Promise<PiToolResult> => {
@@ -1717,9 +1779,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;
           const projected = runs.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run));
           const unfinished = projected.filter((run) => run.status === "queued" || run.status === "running").length;
+          const compactRuns = projected.map(compactSubagentRunProjection);
           return {
             content: [{ type: "text", text: action === "collect" && unfinished === 0 ? `Collected ${projected.length} Studio subagent run(s).` : `${projected.length} Studio subagent run(s): ${projected.map((run) => `${run.runId}=${run.status}`).join(", ")}` }],
-            details: { action, mode, task: compactYpiStudioTaskForTool(root, refreshed), runs: projected, run: projected[0] },
+            details: { action, mode, task: compactYpiStudioTaskForTool(root, refreshed), runs: compactRuns, run: compactRuns[0] },
           };
         }
 
@@ -1748,7 +1811,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           });
           const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;
           const projected = cancelledRuns.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run));
-          return { content: [{ type: "text", text: `Cancelled Studio subagent run(s): ${requestedRunIds.join(", ")}.` }], details: { action, mode, task: compactYpiStudioTaskForTool(root, refreshed), runs: projected, run: projected[0] } };
+          const compactRuns = projected.map(compactSubagentRunProjection);
+          return { content: [{ type: "text", text: `Cancelled Studio subagent run(s): ${requestedRunIds.join(", ")}.` }], details: { action, mode, task: compactYpiStudioTaskForTool(root, refreshed), runs: compactRuns, run: compactRuns[0] } };
         }
 
         const requestedMember = str(input.member);
@@ -1837,7 +1901,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         };
         onUpdate?.({
           content: [{ type: "text", text: `${member} running · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · child process starting` }],
-          details: { run: projectSubagentRun(root, taskId, runningRun) },
+          details: { run: compactSubagentRunProjection(projectSubagentRun(root, taskId, runningRun)) },
         });
         const childPromise = runChildPi(
           root,
@@ -1856,7 +1920,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           childPromise.catch(() => {});
           return {
             content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. Next call ypi_studio_wait(runId=${runId}) so the main chat waits for the child result and continues from the tool result; action=poll or action=collect with runId remains available.` }],
-            details: { action: "start", mode: "async", task: compactYpiStudioTaskForTool(root, taskAfterInitialRun), run: projectSubagentRun(root, taskId, runningRun), wait: { tool: "ypi_studio_wait", taskId, runIds: [runId], until: "child_terminal" }, warnings: [...policy.warnings, ...warnings].length ? [...policy.warnings, ...warnings] : undefined },
+            details: { action: "start", mode: "async", task: compactYpiStudioTaskForTool(root, taskAfterInitialRun), run: compactSubagentRunProjection(projectSubagentRun(root, taskId, runningRun)), wait: { tool: "ypi_studio_wait", taskId, runIds: [runId], until: "child_terminal" }, warnings: [...policy.warnings, ...warnings].length ? [...policy.warnings, ...warnings] : undefined },
           };
         }
         const result = await childPromise;
@@ -1882,7 +1946,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           transcript: result.transcript,
         };
         const task = recordYpiStudioSubagentRun(root, taskId, run);
-        return { content: [{ type: "text", text: result.output }], details: { action: "start", mode: "sync", task: compactYpiStudioTaskForTool(root, task), run: projectSubagentRun(root, taskId, run), warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
+        return { content: [{ type: "text", text: result.output }], details: { action: "start", mode: "sync", task: compactYpiStudioTaskForTool(root, task), run: compactSubagentRunProjection(projectSubagentRun(root, taskId, run)), warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { content: [{ type: "text", text: message }], details: { error: message }, isError: true };
@@ -1942,13 +2006,14 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         const projected = runs.map((run) => projectSubagentRun(root, taskId, run));
         const terminal = projected.filter((run) => terminalStatuses.has(run.status));
         const running = projected.filter((run) => !terminalStatuses.has(run.status));
-        const firstRun = projected[0];
+        const compactRuns = projected.map(compactSubagentRunProjection);
+        const firstRun = compactRuns[0];
         const statusText = projected.length
           ? projected.map((run) => `${run.runId}=${run.status}`).join(", ")
           : "no active Studio subagent run";
         onUpdate?.({
           content: [{ type: "text", text: `Waiting for YPI Studio run(s): ${statusText}` }],
-          details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: projected, run: firstRun, status: running.length ? "waiting" : "terminal" },
+          details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: compactRuns, run: firstRun, status: running.length ? "waiting" : "terminal" },
         });
         if (!requestedRunIds.length && projected.length === 0) {
           return {
@@ -1961,14 +2026,14 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const text = `YPI Studio wait complete: ${statusText}. Next: ${buildNextStudioTaskAction(detail)}`;
           return {
             content: [{ type: "text", text }],
-            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: projected, run: firstRun, status: "terminal", nextRecommendedAction: buildNextStudioTaskAction(detail) },
+            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: compactRuns, run: firstRun, status: "terminal", nextRecommendedAction: buildNextStudioTaskAction(detail) },
             isError: failed.length > 0,
           };
         }
         if (Date.now() - startedAt >= timeoutMs) {
           return {
             content: [{ type: "text", text: `YPI Studio wait timed out; still running: ${statusText}` }],
-            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: projected, run: firstRun, status: "still_running", timeoutMs },
+            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: compactRuns, run: firstRun, status: "still_running", timeoutMs },
           };
         }
         await sleep(pollIntervalMs);

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { MarkdownBody } from "./MarkdownBody";
 import { YpiStudioSubagentTranscript } from "./YpiStudioSubagentTranscript";
+import { YpiStudioWaitPanel } from "./YpiStudioWaitPanel";
 import type { ToolExecutionProgress } from "@/hooks/useAgentSession";
 import type {
   AgentMessage,
@@ -591,6 +592,9 @@ function ToolCallBlock({ block, result, duration, progress, cwd }: { block: Tool
   const [expanded, setExpanded] = useState(false);
   if (block.toolName === "ypi_studio_subagent") {
     return <YpiStudioSubagentTranscript block={block} result={result} duration={duration} progress={progress} cwd={cwd} />;
+  }
+  if (block.toolName === "ypi_studio_wait") {
+    return <YpiStudioWaitPanel block={block} result={result} duration={duration} progress={progress} />;
   }
   const inputStr = JSON.stringify(block.input, null, 2);
 

@@ -183,14 +183,33 @@ function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveR
 }
 
 const FLOW_MAX_COLUMNS = 4;
-const FLOW_ROW_HEIGHT = 42;
+const FLOW_ROW_HEIGHT = 48;
 const FLOW_NODE_Y_OFFSET = 10;
 const FLOW_SIDE_PADDING = 20;
+const CHECKER_MEMBERS = new Set(["checker", "检查员", "reviewer"]);
 
 function stepDescription(status: "done" | "active" | "pending"): string {
   if (status === "active") return "当前阶段";
   if (status === "pending") return "未完成";
   return "";
+}
+
+function isCheckingTask(task: YpiStudioTaskWidgetProjection): boolean {
+  return task.status === "checking" || task.currentMember === "checker" || task.steps.some((step) => step.status === "active" && /check|检查|验收|review/i.test(`${step.id} ${step.label} ${step.owner}`));
+}
+
+function isCheckerRun(run: YpiStudioTaskWidgetSubagentRun): boolean {
+  return CHECKER_MEMBERS.has(run.member) || /check|检查|review/i.test(run.member);
+}
+
+function checkerStatusText(task: YpiStudioTaskWidgetProjection, runs: YpiStudioTaskWidgetSubagentRun[]): string {
+  const checkerRuns = runs.filter(isCheckerRun);
+  const active = checkerRuns.find((run) => run.status === "queued" || run.status === "running" || run.status === "waiting_for_user");
+  if (active) return `${active.member} ${active.status}${phaseLabel(active) ? ` · ${phaseLabel(active)}` : ""}${statsLabel(active) ? ` · ${statsLabel(active)}` : ""}`;
+  const latest = checkerRuns.slice(-1)[0];
+  if (latest) return `${latest.member} ${latest.status}${latest.summary ? ` · ${latest.summary}` : ""}`;
+  if (task.artifacts.missing.length) return `等待检查产物：${task.artifacts.missing.join("、")}`;
+  return task.statusLabel;
 }
 
 function buildStepFlow(task: YpiStudioTaskWidgetProjection) {
@@ -225,7 +244,7 @@ function buildStepFlow(task: YpiStudioTaskWidgetProjection) {
       pathParts.push(`L ${current.x} ${current.y}`);
     }
   }
-  return { points, path: pathParts.join(" "), height: rowCount * FLOW_ROW_HEIGHT, rowCount, columnCount };
+  return { points, path: pathParts.join(" "), height: rowCount * FLOW_ROW_HEIGHT + 12, rowCount, columnCount };
 }
 
 function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: YpiStudioTaskWidgetSubagentRun[] }) {
@@ -235,6 +254,8 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
   const runtime = task.implementationProjection?.sessionRuntime;
   const subtasks = visibleSubtasks(task);
   const stepFlow = buildStepFlow(task);
+  const showCheckingPanel = isCheckingTask(task);
+  const checkerText = checkerStatusText(task, runs);
   return (
     <>
       <div style={{ padding: "10px 38px 8px 12px", display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -274,8 +295,18 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
           ))}
         </div>
         {implementation && !task.implementationProjection && (implementation.activeTitle || implementation.nextTitle || implementation.blocked > 0) && <div style={{ color: implementation.blocked > 0 ? "#f59e0b" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{implementation.activeTitle ? `当前子任务：${implementation.activeTitle}` : implementation.nextTitle ? `下一个子任务：${implementation.nextTitle}` : `阻塞子任务：${implementation.blocked}`}</div>}
+        {showCheckingPanel && (
+          <div style={{ border: "1px solid rgba(59,130,246,0.25)", borderRadius: 9, background: "rgba(59,130,246,0.06)", padding: "7px 8px", display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--accent)", fontSize: 10, fontWeight: 900 }}>
+              <span className={task.status === "checking" ? "ypi-studio-widget-pulse" : undefined} style={{ width: 7, height: 7, borderRadius: 999, background: "currentColor", flexShrink: 0 }} />
+              <span>检查阶段</span>
+              <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontWeight: 700 }}>{task.statusLabel}</span>
+            </div>
+            <div style={{ color: "var(--text-muted)", fontSize: 10, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={checkerText}>{checkerText}</div>
+          </div>
+        )}
         {subtasks.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 120, overflowY: "auto", paddingRight: 2 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 180, overflowY: "auto", paddingRight: 2, overscrollBehavior: "contain" }}>
             {subtasks.map((subtask) => {
               const reason = timelineReason(subtask);
               return (
@@ -288,7 +319,8 @@ function Content({ task, runs }: { task: YpiStudioTaskWidgetProjection; runs: Yp
           </div>
         )}
         {task.artifacts.missing.length > 0 && <div style={{ color: "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>缺失：{task.artifacts.missing.join("、")}</div>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 150, overflowY: "auto", paddingRight: 2 }}>
+        <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 800, marginTop: 2 }}>成员执行</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 220, overflowY: "auto", paddingRight: 2, overscrollBehavior: "contain" }}>
           {runs.length === 0 ? <div style={{ color: "var(--text-dim)", fontSize: 11 }}>暂无 Studio 成员执行记录</div> : runs.map((run) => (
             <div key={run.id} style={{ display: "grid", gridTemplateColumns: "54px 1fr auto", alignItems: "center", gap: 7, borderBottom: "1px solid color-mix(in srgb, var(--border) 55%, transparent)", padding: "4px 0" }}>
               <span style={{ color: "var(--text-dim)", fontSize: 9 }}>{new Date(run.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -395,7 +427,7 @@ export function YpiStudioSessionWidget({ task, liveOverlays = [], onClick }: Pro
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      style={{ position: "absolute", zIndex: 250, width: 340, maxWidth: "calc(100% - 36px)", maxHeight: 390, overflow: "hidden", left: position?.left, top: position?.top, right: position ? undefined : DEFAULT_MARGIN, border: `1px solid ${dragging ? "var(--accent)" : "var(--border)"}`, borderRadius: 14, background: "color-mix(in srgb, var(--bg-panel) 88%, transparent)", color: "var(--text)", boxShadow: "0 16px 45px rgba(0,0,0,0.18)", backdropFilter: "blur(10px)", cursor: dragging ? "grabbing" : "grab", opacity: dragging ? 0.72 : 1, userSelect: "none" }}
+      style={{ position: "absolute", zIndex: 250, width: 360, maxWidth: "calc(100% - 36px)", maxHeight: "min(70vh, 560px)", overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", left: position?.left, top: position?.top, right: position ? undefined : DEFAULT_MARGIN, border: `1px solid ${dragging ? "var(--accent)" : "var(--border)"}`, borderRadius: 14, background: "color-mix(in srgb, var(--bg-panel) 88%, transparent)", color: "var(--text)", boxShadow: "0 16px 45px rgba(0,0,0,0.18)", backdropFilter: "blur(10px)", cursor: dragging ? "grabbing" : "grab", opacity: dragging ? 0.72 : 1, userSelect: "none" }}
     >
       <button type="button" aria-label="隐藏 Studio 卡片" onPointerDown={(event) => { event.stopPropagation(); }} onPointerUp={(event) => { event.stopPropagation(); }} onClick={(event) => { event.stopPropagation(); setDismissedKey(task.key); }} style={{ position: "absolute", top: 8, right: 9, width: 18, height: 18, lineHeight: "16px", borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 65%, transparent)", background: "color-mix(in srgb, var(--bg-panel) 80%, transparent)", color: "var(--text-dim)", cursor: "pointer", zIndex: 1, fontSize: 12, opacity: 0.72 }}>×</button>
       <Content task={task} runs={runs} />
