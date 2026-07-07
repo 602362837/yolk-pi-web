@@ -167,7 +167,7 @@ function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveR
     subtaskId: overlay.subtaskId,
     status: overlay.status ?? "running",
     startedAt: new Date(overlay.updatedAt).toISOString(),
-    summary: overlay.lastTextPreview,
+    summary: overlay.lastTextPreview ?? overlay.subtaskTitle ?? overlay.taskTitle,
     model: overlay.model,
     thinking: overlay.thinking,
     phase: overlay.phase,

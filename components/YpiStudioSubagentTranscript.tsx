@@ -56,11 +56,14 @@ interface StudioRunProgress {
 
 interface StudioRunProjection {
   id?: string;
+  runId?: string;
   member?: string;
   status?: StudioRunStatus;
   taskId?: string;
   taskKey?: string;
+  taskTitle?: string;
   subtaskId?: string;
+  subtaskTitle?: string;
   action?: string;
   mode?: string;
   transcript?: YpiStudioSubagentTranscriptRef;
@@ -222,13 +225,17 @@ function normalizeProgress(value: unknown): StudioRunProgress | undefined {
 
 function normalizeRun(value: unknown): StudioRunProjection | undefined {
   if (!isRecord(value)) return undefined;
+  const runId = asString(value.id) ?? asString(value.runId);
   return {
-    id: asString(value.id),
+    id: runId,
+    runId: asString(value.runId) ?? runId,
     member: asString(value.member),
     status: normalizeStatus(value.status),
     taskId: asString(value.taskId),
     taskKey: asString(value.taskKey),
+    taskTitle: asString(value.taskTitle),
     subtaskId: asString(value.subtaskId),
+    subtaskTitle: asString(value.subtaskTitle),
     transcript: normalizeTranscriptRef(value.transcript),
     progress: normalizeProgress(value.progress),
     model: asString(value.model),
@@ -248,7 +255,14 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
 
 function runFromDetails(details: unknown): StudioRunProjection | undefined {
   if (!isRecord(details)) return undefined;
-  return normalizeRun(details.run);
+  const run = normalizeRun(details.run);
+  if (!run || !isRecord(details.task)) return run;
+  return {
+    ...run,
+    taskId: run.taskId ?? asString(details.task.id),
+    taskKey: run.taskKey ?? asString(details.task.key),
+    taskTitle: run.taskTitle ?? asString(details.task.title),
+  };
 }
 
 function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): StudioRunProjection {
@@ -256,11 +270,14 @@ function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): Stud
     if (!run) return acc;
     return {
       id: run.id ?? acc.id,
+      runId: run.runId ?? acc.runId,
       member: run.member ?? acc.member,
       status: run.status ?? acc.status,
       taskId: run.taskId ?? acc.taskId,
       taskKey: run.taskKey ?? acc.taskKey,
+      taskTitle: run.taskTitle ?? acc.taskTitle,
       subtaskId: run.subtaskId ?? acc.subtaskId,
+      subtaskTitle: run.subtaskTitle ?? acc.subtaskTitle,
       action: run.action ?? acc.action,
       mode: run.mode ?? acc.mode,
       transcript: run.transcript ?? acc.transcript,
@@ -444,7 +461,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   const lastPreview = run.progress?.lastTextPreview ?? run.summary ?? run.error ?? previewText(finalText || "Waiting for Studio member output…");
   const taskId = transcript?.taskId ?? run.taskId ?? inputRun.taskId;
   const taskKey = run.taskKey ?? taskId;
-  const runId = transcript?.runId ?? run.id;
+  const taskTitle = run.subtaskTitle ?? run.taskTitle ?? taskId;
+  const runId = transcript?.runId ?? run.id ?? run.runId;
   const effectiveCwd = cwd ?? (isRecord(result?.details) && isRecord(result.details.task) ? asString(result.details.task.cwd) : undefined);
 
   useEffect(() => {
@@ -490,7 +508,7 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   ].filter((note): note is string => !!note);
   const warningNotes = warnings.filter((warning) => !isDisplayNote(warning));
   const warningTitle = warningNotes.slice(0, 3).join("\n");
-  const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)} · ${phaseLabel(phase, run.progress?.currentTool)}${elapsed ? ` · ${elapsed}` : ""} · ${previewText(lastPreview, 120)}`;
+  const headerPreview = `${run.member ?? "member"} · ${statusLabel(status)}${taskTitle ? ` · ${taskTitle}` : ""} · ${phaseLabel(phase, run.progress?.currentTool)}${elapsed ? ` · ${elapsed}` : ""} · ${previewText(lastPreview, 120)}`;
   void tick;
 
   return (
@@ -540,7 +558,8 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
             <Meta label="Member" value={run.member ?? "unknown"} />
             <Meta label="Status" value={statusLabel(status)} color={statusColor(status)} />
             <Meta label="Phase" value={phaseLabel(phase, run.progress?.currentTool)} />
-            <Meta label="Task" value={taskId ?? "unknown"} />
+            <Meta label="Task" value={taskTitle ?? "unknown"} title={taskId} />
+            {run.subtaskId && <Meta label="Subtask" value={run.subtaskTitle ?? run.subtaskId} title={run.subtaskId} />}
             <Meta label="Run" value={runId ?? "pending"} />
             <Meta label="Runner" value={runnerLabel ?? "legacy"} />
             <Meta label="Child session" value={childSessionId ? shortId(childSessionId) ?? childSessionId : "—"} title={childSessionFile ?? childSessionId} />

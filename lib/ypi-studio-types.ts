@@ -787,9 +787,11 @@ export interface YpiStudioLiveRunOverlay {
   toolName: "ypi_studio_task" | "ypi_studio_subagent" | "ypi_studio_wait";
   taskId?: string;
   taskKey?: string;
+  taskTitle?: string;
   runId?: string;
   member?: string;
   subtaskId?: string;
+  subtaskTitle?: string;
   status?: YpiStudioSubagentRunStatus;
   model?: string;
   thinking?: string;

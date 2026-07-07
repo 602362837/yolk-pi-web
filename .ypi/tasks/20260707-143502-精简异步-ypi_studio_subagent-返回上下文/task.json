@@ -1,0 +1,1503 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+  "title": "精简异步 ypi_studio_subagent 返回上下文",
+  "workflowId": "feature-dev",
+  "status": "completed",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-07T06:35:02.238Z",
+  "updatedAt": "2026-07-07T07:01:17.971Z",
+  "completedAt": "2026-07-07T07:01:17.971Z",
+  "contextIds": [
+    "pi_019f3b45-a3ab-7163-acb8-422958af61fb",
+    "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-83fc0c089041ae75ecdbfbff",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:35:45.763Z",
+      "finishedAt": "2026-07-07T06:42:22.330Z",
+      "runner": "cli",
+      "prompt": "请为“精简异步 ypi_studio_subagent 返回上下文”做技术设计。重点阅读 docs/modules/library.md、docs/modules/frontend.md、lib/ypi-studio-extension.ts 中 ypi_studio_subagent/ypi_studio_wait 的返回投影、components/YpiStudioSubagentTranscript.tsx、components/YpiStudioWaitPanel.…",
+      "summary": "已完成规划与技术设计（仅文档，无生产代码改动）。\n\n## 产出/修改文件\n\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/prd.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/design.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/implement.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/checks.md`\n\n## 核心设计决策\n\n- `ypi_studio_subagent(action=start, mode=async)` 改为极轻量 projection：仅保留 task identity、runId/id、member、model/thinking、status、title、wait hint。\n- async start 不再继续接收 child runner 后续 `onUpdate`；进展由 `ypi_studio_wait` 承接。\n- `poll/collect/cancel` 同步改为轻量 lifecycle projection，避免 wait 后 collect 再次注入厚上下文。\n- `ypi_studio_wait` 保持 compact，仅建议补 `id: runId`/`taskKey` 小兼容字段。\n- UI 需兼容 `run.id ?? run.runId`，并显示 task/subtask title。\n\n## Validation\n\n- 已验证 `implement.md` 中 fenced `json ypi-implementation-plan` 可解析，包含 5 个子任务。\n- 未运行 `npm run lint` / `tsc`，因为本轮仅规划文档，无代码实现。\n\n## 剩余风险 / 主会话需确认\n\n- 请确认是否接受“async child 后续 progress 不再注入 start tool，只通过 wait/session widget 观察”的取舍。\n- 请由主 session 保存 `implement.md` 中 implementationPlan，并按流程进入 `awaiting_approval` 等待用户确认后再实现。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:35:45.763Z",
+        "updatedAt": "2026-07-07T06:42:22.330Z",
+        "eventCount": 10458,
+        "lastTextPreview": "已完成规划与技术设计（仅文档，无生产代码改动）。\n\n## 产出/修改文件\n\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/prd.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/design.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/implement.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/checks.md`\n\n## 核心设计决策\n\n- `ypi_studio_subagent(action=start, mode=async)` 改为极轻量 projection：仅保留 task identity、runId/id、member、model/thinking、status、title、wait hint。\n- async start 不再继续接收 child runner 后续 `onUpdate`；进展由 `ypi_studio_wait` 承接。\n- `poll/collect/cancel` 同步改为轻量 lifecycle projection，避免 wait 后 collect 再次注入厚上下文。\n- `ypi_studio_wait` 保持 compact，仅建议补 `id: runId`/`taskKey` 小兼容字段。\n- UI 需兼容 `run.id ?? run.runId`，并显示 task/subtask title。\n\n## Validation\n\n- 已验证 `implement.md` 中 fenced `json ypi-implementation-plan` 可解析，包含 5 个子任务。\n- 未运行 `npm run lint` / `tsc`，因为本轮仅规划文档，无代码实现。\n\n## 剩余风险 / 主会话需确认\n\n- 请确认是否接受“async child 后续 progress 不再注入 start tool，只通过 wait/session widget 观察”的取舍。\n- 请由主 session 保存 `implement.md` 中 implementationPlan，并按流程进入 `awaiting_approval` 等待用户确认后再实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:41:59.899Z",
+            "toolCallId": "call_hYgOre7btnM2QpF9oriL3fZW|fc_0ef1709abd8c6cc8016a4c9fadf5dc81999a6de9d1110cca56",
+            "toolName": "write",
+            "text": "Successfully wrote 1411 bytes to .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/checks.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:42:06.213Z",
+            "toolCallId": "call_m7Pw8qCehLbEFTey7Tk0mqzO|fc_0ef1709abd8c6cc8016a4c9fbc5c648199a13650df9ce7b504",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport re,json\\np=Path('.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/implement.md')\\ns=p.read_text()\\nm=re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```',s,re.S)\\nassert m, 'no plan block'\\nobj=json.loads(m.group(1))\\nassert obj['subtasks'] and all('id' in x for x in obj['subtasks'])\\nprint('implementation plan json ok:', len(obj['subtasks']), 'subtasks')\\nPY\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:42:06.282Z",
+            "toolCallId": "call_m7Pw8qCehLbEFTey7Tk0mqzO|fc_0ef1709abd8c6cc8016a4c9fbc5c648199a13650df9ce7b504",
+            "toolName": "bash",
+            "text": "implementation plan json ok: 5 subtasks",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:42:20.095Z",
+            "text": "已完成规划与技术设计（仅文档，无生产代码改动）。\n\n## 产出/修改文件\n\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/prd.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/design.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/implement.md`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/checks.md`\n\n## 核心设计决策\n\n- `ypi_studio_subagent(action=start, mode=async)` 改为极轻量 projection：仅保留 task identity、runId/id、member、model/thinking、status、title、wait hint。\n- async start 不再继续接收 child runner 后续 `onUpdate`；进展由 `ypi_studio_wait` 承接。\n- `poll/collect/cancel` 同步改为轻量 lifecycle projection，避免 wait 后 collect 再次注入厚上下文。\n- `ypi_studio_wait` 保持 compact，仅建议补 `id: runId`/`taskKey` 小兼容字段。\n- UI 需兼容 `run.id ?? run.runId`，并显示 task/subtask title。\n\n## Validation\n\n- 已验证 `implement.md` 中 fenced `json ypi-implementation-plan` 可解析，包含 5 个子任务。\n- 未运行 `npm run lint` / `tsc`，因为本轮仅规划文档，无代码实现。\n\n## 剩余风险 / 主会话需确认\n\n- 请确认是否接受“async child 后续 progress 不再注入 start tool，只通过 wait/session widget 观察”的取舍。\n- 请由主 session 保存 `implement.md` 中 implementationPlan，并按流程进入 `awaiting_approval` 等待用户确认后再实现。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:42:20.117Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2164,
+        "tokens": 685,
+        "tokenSource": "usage",
+        "tps": 280.16,
+        "firstTokenAt": "2026-07-07T06:42:17.637Z",
+        "lastTokenAt": "2026-07-07T06:42:20.082Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-83fc0c089041ae75ecdbfbff",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/architect-83fc0c089041ae75ecdbfbff.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:35:45.763Z",
+        "finishedAt": "2026-07-07T06:42:22.322Z",
+        "updatedAt": "2026-07-07T06:42:22.322Z",
+        "itemCount": 73,
+        "messageCount": 1,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 256801,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-56b3cb8e0970d982be489e6a",
+      "subtaskId": "light-projection-helpers",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:45:33.895Z",
+      "finishedAt": "2026-07-07T06:48:36.972Z",
+      "runner": "cli",
+      "prompt": "请实现子任务 light-projection-helpers：建立 Studio subagent 轻量投影辅助函数。遵循任务 artifacts 中的设计与实现计划，尽量小步修改并运行相关验证。完成后汇报变更文件、验证结果和后续注意事项。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — Added lightweight task/run projection helpers, `projectSubagentRun` options with default transcript preview compatibility, model/thinking fields, and wait projection `id`/`taskKey`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — Wrote handoff artifact.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Only completed `light-projection-helpers` boundary.\n- New async-start and lifecycle helpers are ready but not yet wired into `start/poll/collect/cancel`; follow-up subtasks should do that.\n- `projectSubagentRun()` defaults to `includeTranscriptPreview: true` to preserve current sync/debug behavior.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:45:33.895Z",
+        "updatedAt": "2026-07-07T06:48:36.972Z",
+        "eventCount": 6643,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — Added lightweight task/run projection helpers, `projectSubagentRun` options with default transcript preview compatibility, model/thinking fields, and wait projection `id`/`taskKey`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — Wrote handoff artifact.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Only completed `light-projection-helpers` boundary.\n- New async-start and lifecycle helpers are ready but not yet wired into `start/poll/collect/cancel`; follow-up subtasks should do that.\n- `projectSubagentRun()` defaults to `includeTranscriptPreview: true` to preserve current sync/debug behavior.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:48:24.198Z",
+            "toolCallId": "call_MUka95iKzo2PFeOlCh8gZ5CY|fc_0e153adc42e2cf74016a4ca1336c008198bdda9a3be041be7c",
+            "toolName": "write",
+            "text": "Successfully wrote 982 bytes to .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:48:29.377Z",
+            "toolCallId": "call_qCXyeX42MbCaDdnnyApjImn0|fc_0e153adc42e2cf74016a4ca13d0dc08198aabddd8b9e51400d",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/ypi-studio-extension.ts .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md | sed -n '1,260p'\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:48:29.437Z",
+            "toolCallId": "call_qCXyeX42MbCaDdnnyApjImn0|fc_0e153adc42e2cf74016a4ca13d0dc08198aabddd8b9e51400d",
+            "toolName": "bash",
+            "text": "diff --git a/lib/ypi-studio-extension.ts b/lib/ypi-studio-extension.ts\nindex 0396132..604f5a2 100644\n--- a/lib/ypi-studio-extension.ts\n+++ b/lib/ypi-studio-extension.ts\n@@ -1432,6 +1432,7 @@ function sendStudioStartPrompt(\n interface StudioSubagentRunProjection {\n   runId: string;\n   taskId: string;\n+  taskKey?: string;\n   subtaskId?: string;\n   member: string;\n   taskTitle?: string;\n@@ -1449,11 +1450,99 @@ interface StudioSubagentRunProjection {\n   summary?: string;\n   error?: string;\n   terminationReason?: string;\n+  model?: string;\n+  thinking?: string;\n+  modelSource?: string;\n+  thinkingSource?: string;\n   startedAt: string;\n   finishedAt?: string;\n }\n \n-function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSubagentRun): StudioSubagentRunProjection {\n+interface ProjectSubagentRunOptions {\n+  includeTranscriptPreview?: boolean;\n+}\n+\n+function compactYpiStudioTaskIdentity(task: YpiStudioTaskDetail): Record<string, unknown> {\n+  return {\n+    id: task.id,\n+    key: task.key,\n+    title: task.title,\n+    status: task.status,\n+    workflowId: task.workflowId,\n+  };\n+}\n+\n+function compactProgressForLifecycle(progress: YpiStudioSubagentRunProgress | undefined, lastTextMax = 180): Record<string, unknown> | undefined {\n+  if (!progress) return undefined;\n+  return {\n+    phase: progress.phase,\n+    updatedAt: progress.updatedAt,\n+    eventCount: progress.eventCount,\n+    lastTextPreview: progress.lastTextPreview ? oneLine(progress.lastTextPreview, lastTextMax) : undefined,\n+    tokens: progress.tokens,\n+    tps: progress.tps,\n+    currentTool: progress.currentTool,\n+    terminationReason: progress.terminationReason,\n+  };\n+}\n+\n+function compactSubagentRunForAsyncStart(run: StudioSubagentRunProjection): Record<string, unknown> {\n+  return {\n+    id: run.runId,\n+    runId: run.runId,\n+    taskId: run.taskId,\n+    taskKey: run.taskKey,\n+    taskTitle: run.taskTitle,\n+    subtaskId: run.subtaskId,\n+    subtaskTitle: run.subtaskTitle,\n+    member: run.member,\n+    status: run.status,\n+    model: run.model,\n+    thinking: run.thinking,\n+    modelSource: run.modelSource,\n+    thinkingSource: run.thinkingSource,\n+    runner: run.runner,\n+    startedAt: run.startedAt,\n+    progress: {\n+      phase: run.progress?.phase ?? \"starting\",\n+      startedAt: run.startedAt,\n+      updatedAt: run.progress?.updatedAt ?? run.startedAt,\n+      eventCount: run.progress?.eventCount ?? 0,\n+      lastTextPreview: run.progress?.lastTextPreview ? oneLine(run.progress.lastTextPreview, 180) : \"Async child Pi process starting.\",\n+    },\n+  };\n+}\n+\n+function compactSubagentRunForLifecycle(run: StudioSubagentRunProjection): Record<string, unknown> {\n+  return {\n+    id: run.runId,\n+    runId: run.runId,\n+    taskId: run.taskId,\n+    taskKey: run.taskKey,\n+    taskTitle: run.taskTitle,\n+    subtaskId: run.subtaskId,\n+    subtaskTitle: run.subtaskTitle,\n+    member: run.member,\n+    status: run.status,\n+    registryStatus: run.registryStatus,\n+    registryActive: run.registryActive,\n+    model: run.model,\n+    thinking: run.thinking,\n+    modelSource: run.modelSource,\n+    thinkingSource: run.thinkingSource,\n+    runner: run.runner,\n+    startedAt: run.startedAt,\n+    finishedAt: run.finishedAt,\n+    progress: compactProgressForLifecycle(run.progress),\n+    transcript: run.transcript,\n+    summary: run.summary ? oneLine(run.summary, 600) : undefined,\n+    error: run.error ? oneLine(run.error, 800) : undefined,\n+    terminationReason: run.terminationReason,\n+  };\n+}\n+\n+function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSubagentRun, options: ProjectSubagentRunOptions = {}): StudioSubagentRunProjection {\n+  const { includeTranscriptPreview = true } = options;\n   const handle = getYpiStudioChildRun(run.id);\n   const detail = getYpiStudioTaskDetail(root, taskId);\n   const subtaskTitle = run.subtaskId\n@@ -1461,14 +1550,17 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba\n       ?? detail?.implementationPlan?.subtasks.find((subtask) => subtask.id === run.subtaskId)?.title\n     : undefi…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:48:34.746Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — Added lightweight task/run projection helpers, `projectSubagentRun` options with default transcript preview compatibility, model/thinking fields, and wait projection `id`/`taskKey`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — Wrote handoff artifact.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Only completed `light-projection-helpers` boundary.\n- New async-start and lifecycle helpers are ready but not yet wired into `start/poll/collect/cancel`; follow-up subtasks should do that.\n- `projectSubagentRun()` defaults to `includeTranscriptPreview: true` to preserve current sync/debug behavior.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:48:34.749Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1502,
+        "tokens": 229,
+        "tokenSource": "usage",
+        "tps": 161.15,
+        "firstTokenAt": "2026-07-07T06:48:33.324Z",
+        "lastTokenAt": "2026-07-07T06:48:34.745Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-56b3cb8e0970d982be489e6a",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/implementer-56b3cb8e0970d982be489e6a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:45:33.895Z",
+        "finishedAt": "2026-07-07T06:48:36.964Z",
+        "updatedAt": "2026-07-07T06:48:36.964Z",
+        "itemCount": 47,
+        "messageCount": 1,
+        "toolCallCount": 21,
+        "stderrBytes": 0,
+        "bytes": 126138,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3f73feab23988bd44650413a",
+      "subtaskId": "async-start-light-result",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:48:50.690Z",
+      "finishedAt": "2026-07-07T06:50:58.315Z",
+      "runner": "cli",
+      "prompt": "请实现子任务 async-start-light-result：将 async start final result 与启动 onUpdate 改为极轻量投影。遵循任务 artifacts 中的设计与实现计划，确保不影响 sync/collect/wait 的必要上下文。完成后汇报变更文件、验证结果和注意事项。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — async start `onUpdate` and final result now use lightweight `ypi_studio_subagent_async_start_v1` details with task identity, run identity/model/thinking/member/status/title, and wait hint.\n- `lib/ypi-studio-extension.ts` — async child SDK/CLI runners no longer receive parent tool `onUpdate`; persistence callbacks remain intact for task/transcript/runtime updates and `ypi_studio_wait`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint && node_modules/.bin/tsc --noEmit` — passed.\n  - ESLint reported one warning: `compactSubagentRunForLifecycle` is unused; this is expected until the later lifecycle subtask wires poll/collect/cancel.\n\n#### Notes / Risks\n\n- Sync start behavior remains on the existing projection path.\n- Poll/collect/cancel are intentionally not changed in this subtask.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:48:50.690Z",
+        "updatedAt": "2026-07-07T06:50:58.315Z",
+        "eventCount": 3359,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — async start `onUpdate` and final result now use lightweight `ypi_studio_subagent_async_start_v1` details with task identity, run identity/model/thinking/member/status/title, and wait hint.\n- `lib/ypi-studio-extension.ts` — async child SDK/CLI runners no longer receive parent tool `onUpdate`; persistence callbacks remain intact for task/transcript/runtime updates and `ypi_studio_wait`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint && node_modules/.bin/tsc --noEmit` — passed.\n  - ESLint reported one warning: `compactSubagentRunForLifecycle` is unused; this is expected until the later lifecycle subtask wires poll/collect/cancel.\n\n#### Notes / Risks\n\n- Sync start behavior remains on the existing projection path.\n- Poll/collect/cancel are intentionally not changed in this subtask.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:50:44.227Z",
+            "toolCallId": "call_V5zCsTKUUxfRfKZd7z47P6Kh|fc_05f212d7c251eade016a4ca1be96688199b901cfdb386f5931",
+            "toolName": "write",
+            "text": "Successfully wrote 1321 bytes to .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:50:50.047Z",
+            "toolCallId": "call_BTnCSJKS4Dt3WE2jqPvoxWdN|fc_05f212d7c251eade016a4ca1c9e1c081999a37aa42e38d76b0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:50:50.103Z",
+            "toolCallId": "call_BTnCSJKS4Dt3WE2jqPvoxWdN|fc_05f212d7c251eade016a4ca1c9e1c081999a37aa42e38d76b0",
+            "toolName": "bash",
+            "text": "M lib/ypi-studio-extension.ts\n?? \".ypi/tasks/20260707-143502-\\347\\262\\276\\347\\256\\200\\345\\274\\202\\346\\255\\245-ypi_studio_subagent-\\350\\277\\224\\345\\233\\236\\344\\270\\212\\344\\270\\213\\346\\226\\207/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:50:56.100Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — async start `onUpdate` and final result now use lightweight `ypi_studio_subagent_async_start_v1` details with task identity, run identity/model/thinking/member/status/title, and wait hint.\n- `lib/ypi-studio-extension.ts` — async child SDK/CLI runners no longer receive parent tool `onUpdate`; persistence callbacks remain intact for task/transcript/runtime updates and `ypi_studio_wait`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint && node_modules/.bin/tsc --noEmit` — passed.\n  - ESLint reported one warning: `compactSubagentRunForLifecycle` is unused; this is expected until the later lifecycle subtask wires poll/collect/cancel.\n\n#### Notes / Risks\n\n- Sync start behavior remains on the existing projection path.\n- Poll/collect/cancel are intentionally not changed in this subtask.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:50:56.112Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1920,
+        "tokens": 252,
+        "tokenSource": "usage",
+        "tps": 66.44,
+        "firstTokenAt": "2026-07-07T06:50:52.297Z",
+        "lastTokenAt": "2026-07-07T06:50:56.090Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3f73feab23988bd44650413a",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/implementer-3f73feab23988bd44650413a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:48:50.690Z",
+        "finishedAt": "2026-07-07T06:50:58.307Z",
+        "updatedAt": "2026-07-07T06:50:58.307Z",
+        "itemCount": 39,
+        "messageCount": 1,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 111570,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3d256498d1d81cba5361b775",
+      "subtaskId": "lifecycle-actions-light-result",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:51:08.045Z",
+      "finishedAt": "2026-07-07T06:53:05.240Z",
+      "runner": "cli",
+      "prompt": "请实现子任务 lifecycle-actions-light-result：精简 poll/collect/cancel 工具结果。遵循任务 artifacts 中的设计与实现计划，保留关键状态、runId、下一步提示和错误信息，避免大段 transcript/progress 泄入普通返回。完成后汇报变更文件、验证结果和注意事项。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — `poll` / `collect` / `cancel` now return lightweight lifecycle projections:\n  - task identity only\n  - compact run status/model/thinking/progress/summary/error\n  - no `implementationProjection`, `events`, `artifacts`, `subagents`, `transcriptPreview`, or `progress.itemsPreview`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `run.transcript` remains as metadata ref only for debug/API access; transcript preview content is not injected.\n- Existing earlier-subtask changes remain in `lib/ypi-studio-extension.ts`; this implementation only wires lifecycle `poll/collect/cancel`.\n\n#### Decisions Needed\n\n- None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:51:08.045Z",
+        "updatedAt": "2026-07-07T06:53:05.240Z",
+        "eventCount": 3697,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — `poll` / `collect` / `cancel` now return lightweight lifecycle projections:\n  - task identity only\n  - compact run status/model/thinking/progress/summary/error\n  - no `implementationProjection`, `events`, `artifacts`, `subagents`, `transcriptPreview`, or `progress.itemsPreview`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `run.transcript` remains as metadata ref only for debug/API access; transcript preview content is not injected.\n- Existing earlier-subtask changes remain in `lib/ypi-studio-extension.ts`; this implementation only wires lifecycle `poll/collect/cancel`.\n\n#### Decisions Needed\n\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:52:54.099Z",
+            "toolCallId": "call_WgUpan4k9ttsZcguA5buuUNE|fc_0a6884a3d38d7220016a4ca2438f84819a9706964efb75ef97",
+            "toolName": "write",
+            "text": "Successfully wrote 1176 bytes to .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:52:56.935Z",
+            "toolCallId": "call_1AI40VEHxXrS62uKygzOFwt1|fc_0a6884a3d38d7220016a4ca247d750819a8017ddfb8b1da5b6",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short && git diff -- .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md lib/ypi-studio-extension.ts | sed -n '1,260p'\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:52:57.022Z",
+            "toolCallId": "call_1AI40VEHxXrS62uKygzOFwt1|fc_0a6884a3d38d7220016a4ca247d750819a8017ddfb8b1da5b6",
+            "toolName": "bash",
+            "text": "M lib/ypi-studio-extension.ts\n?? \".ypi/tasks/20260707-143502-\\347\\262\\276\\347\\256\\200\\345\\274\\202\\346\\255\\245-ypi_studio_subagent-\\350\\277\\224\\345\\233\\236\\344\\270\\212\\344\\270\\213\\346\\226\\207/\"\ndiff --git a/lib/ypi-studio-extension.ts b/lib/ypi-studio-extension.ts\nindex 0396132..16702f6 100644\n--- a/lib/ypi-studio-extension.ts\n+++ b/lib/ypi-studio-extension.ts\n@@ -1432,6 +1432,7 @@ function sendStudioStartPrompt(\n interface StudioSubagentRunProjection {\n   runId: string;\n   taskId: string;\n+  taskKey?: string;\n   subtaskId?: string;\n   member: string;\n   taskTitle?: string;\n@@ -1449,11 +1450,99 @@ interface StudioSubagentRunProjection {\n   summary?: string;\n   error?: string;\n   terminationReason?: string;\n+  model?: string;\n+  thinking?: string;\n+  modelSource?: string;\n+  thinkingSource?: string;\n   startedAt: string;\n   finishedAt?: string;\n }\n \n-function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSubagentRun): StudioSubagentRunProjection {\n+interface ProjectSubagentRunOptions {\n+  includeTranscriptPreview?: boolean;\n+}\n+\n+function compactYpiStudioTaskIdentity(task: YpiStudioTaskDetail): Record<string, unknown> {\n+  return {\n+    id: task.id,\n+    key: task.key,\n+    title: task.title,\n+    status: task.status,\n+    workflowId: task.workflowId,\n+  };\n+}\n+\n+function compactProgressForLifecycle(progress: YpiStudioSubagentRunProgress | undefined, lastTextMax = 180): Record<string, unknown> | undefined {\n+  if (!progress) return undefined;\n+  return {\n+    phase: progress.phase,\n+    updatedAt: progress.updatedAt,\n+    eventCount: progress.eventCount,\n+    lastTextPreview: progress.lastTextPreview ? oneLine(progress.lastTextPreview, lastTextMax) : undefined,\n+    tokens: progress.tokens,\n+    tps: progress.tps,\n+    currentTool: progress.currentTool,\n+    terminationReason: progress.terminationReason,\n+  };\n+}\n+\n+function compactSubagentRunForAsyncStart(run: StudioSubagentRunProjection): Record<string, unknown> {\n+  return {\n+    id: run.runId,\n+    runId: run.runId,\n+    taskId: run.taskId,\n+    taskKey: run.taskKey,\n+    taskTitle: run.taskTitle,\n+    subtaskId: run.subtaskId,\n+    subtaskTitle: run.subtaskTitle,\n+    member: run.member,\n+    status: run.status,\n+    model: run.model,\n+    thinking: run.thinking,\n+    modelSource: run.modelSource,\n+    thinkingSource: run.thinkingSource,\n+    runner: run.runner,\n+    startedAt: run.startedAt,\n+    progress: {\n+      phase: run.progress?.phase ?? \"starting\",\n+      startedAt: run.startedAt,\n+      updatedAt: run.progress?.updatedAt ?? run.startedAt,\n+      eventCount: run.progress?.eventCount ?? 0,\n+      lastTextPreview: \"Async child Pi process starting.\",\n+    },\n+  };\n+}\n+\n+function compactSubagentRunForLifecycle(run: StudioSubagentRunProjection): Record<string, unknown> {\n+  return {\n+    id: run.runId,\n+    runId: run.runId,\n+    taskId: run.taskId,\n+    taskKey: run.taskKey,\n+    taskTitle: run.taskTitle,\n+    subtaskId: run.subtaskId,\n+    subtaskTitle: run.subtaskTitle,\n+    member: run.member,\n+    status: run.status,\n+    registryStatus: run.registryStatus,\n+    registryActive: run.registryActive,\n+    model: run.model,\n+    thinking: run.thinking,\n+    modelSource: run.modelSource,\n+    thinkingSource: run.thinkingSource,\n+    runner: run.runner,\n+    startedAt: run.startedAt,\n+    finishedAt: run.finishedAt,\n+    progress: compactProgressForLifecycle(run.progress),\n+    transcript: run.transcript,\n+    summary: run.summary ? oneLine(run.summary, 600) : undefined,\n+    error: run.error ? oneLine(run.error, 800) : undefined,\n+    terminationReason: run.terminationReason,\n+  };\n+}\n+\n+function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSubagentRun, options: ProjectSubagentRunOptions = {}): StudioSubagentRunProjection {\n+  const { includeTranscriptPreview = true } = options;\n   const handle = getYpiStudioChildRun(run.id);\n   const detail = getYpiStudioTaskDetail(root, taskId);\n   const subtaskTitle = run.subtaskId\n@@ -1461,14 +1550,17 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:53:03.017Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — `poll` / `collect` / `cancel` now return lightweight lifecycle projections:\n  - task identity only\n  - compact run status/model/thinking/progress/summary/error\n  - no `implementationProjection`, `events`, `artifacts`, `subagents`, `transcriptPreview`, or `progress.itemsPreview`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `run.transcript` remains as metadata ref only for debug/API access; transcript preview content is not injected.\n- Existing earlier-subtask changes remain in `lib/ypi-studio-extension.ts`; this implementation only wires lifecycle `poll/collect/cancel`.\n\n#### Decisions Needed\n\n- None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:53:03.024Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1734,
+        "tokens": 272,
+        "tokenSource": "usage",
+        "tps": 74.38,
+        "firstTokenAt": "2026-07-07T06:52:59.351Z",
+        "lastTokenAt": "2026-07-07T06:53:03.008Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3d256498d1d81cba5361b775",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/implementer-3d256498d1d81cba5361b775.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:51:08.045Z",
+        "finishedAt": "2026-07-07T06:53:05.228Z",
+        "updatedAt": "2026-07-07T06:53:05.228Z",
+        "itemCount": 43,
+        "messageCount": 1,
+        "toolCallCount": 19,
+        "stderrBytes": 0,
+        "bytes": 130631,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-349b09153df06f3b595bacbc",
+      "subtaskId": "ui-runid-title-compat",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:53:18.649Z",
+      "finishedAt": "2026-07-07T06:56:05.759Z",
+      "runner": "cli",
+      "prompt": "请实现子任务 ui-runid-title-compat：补齐 UI 对轻量 runId/title 投影的兼容。遵循任务 artifacts 中的设计与实现计划，确保 Chat/Studio 面板仍能展示 run id、member、状态、标题/摘要，并能通过 runId 继续 poll/collect/wait。完成后汇报变更文件、验证结果和注意事项。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioSubagentTranscript.tsx` — added `runId` fallback, `taskTitle`/`subtaskTitle` normalization, and title-aware header/meta display.\n- `components/ChatWindow.tsx` — Studio live overlay now reads `run.id ?? run.runId ?? args.runId` and carries task/subtask titles.\n- `components/YpiStudioSessionWidget.tsx` — uses subtask/task title as live overlay summary fallback.\n- `lib/ypi-studio-types.ts` — added optional `taskTitle` / `subtaskTitle` to `YpiStudioLiveRunOverlay`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- `YpiStudioWaitPanel.tsx` already supports `runId`/`id` and task/subtask title fields; no code change needed.\n- Lightweight async-start cards without transcript metadata now degrade to title/status/model/runId display; progress remains via `ypi_studio_wait`.\n\n#### Decisions Needed\n\n- None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:53:18.649Z",
+        "updatedAt": "2026-07-07T06:56:05.758Z",
+        "eventCount": 3824,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioSubagentTranscript.tsx` — added `runId` fallback, `taskTitle`/`subtaskTitle` normalization, and title-aware header/meta display.\n- `components/ChatWindow.tsx` — Studio live overlay now reads `run.id ?? run.runId ?? args.runId` and carries task/subtask titles.\n- `components/YpiStudioSessionWidget.tsx` — uses subtask/task title as live overlay summary fallback.\n- `lib/ypi-studio-types.ts` — added optional `taskTitle` / `subtaskTitle` to `YpiStudioLiveRunOverlay`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- `YpiStudioWaitPanel.tsx` already supports `runId`/`id` and task/subtask title fields; no code change needed.\n- Lightweight async-start cards without transcript metadata now degrade to title/status/model/runId display; progress remains via `ypi_studio_wait`.\n\n#### Decisions Needed\n\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:55:47.662Z",
+            "toolCallId": "call_78z4REoedpJ5X4w4AJNuIbmC|fc_0a16cf7da622d869016a4ca2f35b38819993cca8fabb49ea5c",
+            "toolName": "read",
+            "text": "# Handoff — lifecycle-actions-light-result\n\n## Files Changed\n\n- `lib/ypi-studio-extension.ts` — wired `ypi_studio_subagent(action=poll|collect)` to `ypi_studio_subagent_lifecycle_v1` with task identity plus lifecycle run projections, skipping transcript preview reads.\n- `lib/ypi-studio-extension.ts` — wired `ypi_studio_subagent(action=cancel)` to the same lightweight lifecycle projection, preserving idempotent abort/cancel behavior and returning short cancel reason/run status.\n- `lib/ypi-studio-extension.ts` — added terminal `collect` nextRecommendedAction while avoiding thick task compact, transcriptPreview, progress.itemsPreview, implementationProjection, events, artifacts, and subagents in lifecycle details.\n\n## Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n## Notes / Risks\n\n- Lifecycle `run.transcript` still returns only transcript ref metadata so debug/API entry points remain available without injecting transcript preview content.\n- Existing uncommitted changes from earlier subtasks remain in `lib/ypi-studio-extension.ts`; this handoff covers only lifecycle poll/collect/cancel wiring.\n\n## Decisions Needed\n\n- None.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:55:56.032Z",
+            "toolCallId": "call_tLEAkLA97qkOJujm9iyQPemn|fc_0a16cf7da622d869016a4ca2f746208199908e01fcc51535d1",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md\",\n  \"content\": \"# Handoff — ui-runid-title-compat\\n\\n## Files Changed\\n\\n- `components/YpiStudioSubagentTranscript.tsx` — normalized `run.id ?? run.runId`, added `taskTitle`/`subtaskTitle` parsing and task-title display fallbacks for the subagent card header/meta.\\n- `components/ChatWindow.tsx` — live Studio overlays now read `run.id ?? run.runId ?? args.runId` and include task/subtask title fields in the overlay signature/payload.\\n- `components/YpiStudioSessionWidget.tsx` — live overlay rows can use subtask/task title as summary fallback when progress preview is absent.\\n- `lib/ypi-studio-types.ts` — extended `YpiStudioLiveRunOverlay` with optional `taskTitle` and `subtaskTitle`.\\n\\n## Validation\\n\\n- `npm run lint` — passed.\\n- `node_modules/.bin/tsc --noEmit` — passed.\\n\\n## Notes / Risks\\n\\n- `components/YpiStudioWaitPanel.tsx` already accepted `runId`/`id` and task/subtask titles, so no code change was needed there.\\n- Full transcript/debug fetching still requires transcript metadata and cwd; lightweight async-start cards without transcript ref degrade to title/status/model/runId display and wait remains the progress path.\\n\\n## Decisions Needed\\n\\n- None.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:55:56.038Z",
+            "toolCallId": "call_tLEAkLA97qkOJujm9iyQPemn|fc_0a16cf7da622d869016a4ca2f746208199908e01fcc51535d1",
+            "toolName": "write",
+            "text": "Successfully wrote 1144 bytes to .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:56:03.549Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioSubagentTranscript.tsx` — added `runId` fallback, `taskTitle`/`subtaskTitle` normalization, and title-aware header/meta display.\n- `components/ChatWindow.tsx` — Studio live overlay now reads `run.id ?? run.runId ?? args.runId` and carries task/subtask titles.\n- `components/YpiStudioSessionWidget.tsx` — uses subtask/task title as live overlay summary fallback.\n- `lib/ypi-studio-types.ts` — added optional `taskTitle` / `subtaskTitle` to `YpiStudioLiveRunOverlay`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- `YpiStudioWaitPanel.tsx` already supports `runId`/`id` and task/subtask title fields; no code change needed.\n- Lightweight async-start cards without transcript metadata now degrade to title/status/model/runId display; progress remains via `ypi_studio_wait`.\n\n#### Decisions Needed\n\n- None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:56:03.554Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2086,
+        "tokens": 305,
+        "tokenSource": "usage",
+        "tps": 364.83,
+        "firstTokenAt": "2026-07-07T06:56:02.707Z",
+        "lastTokenAt": "2026-07-07T06:56:03.543Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-349b09153df06f3b595bacbc",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/implementer-349b09153df06f3b595bacbc.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:53:18.649Z",
+        "finishedAt": "2026-07-07T06:56:05.751Z",
+        "updatedAt": "2026-07-07T06:56:05.751Z",
+        "itemCount": 59,
+        "messageCount": 1,
+        "toolCallCount": 27,
+        "stderrBytes": 0,
+        "bytes": 159162,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-2c1e2363f97996041236d8fb",
+      "subtaskId": "docs-and-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:56:16.124Z",
+      "finishedAt": "2026-07-07T06:58:04.119Z",
+      "runner": "cli",
+      "prompt": "请实现子任务 docs-and-validation：更新模块文档并完成验证。遵循任务 artifacts 中的设计与实现计划，更新相关 docs/modules 或架构文档，运行至少 lint 与 TypeScript 检查（如受环境影响请记录）。完成后汇报变更文件、验证结果和注意事项。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/library.md` — documented async-start light projection, lifecycle projections, compact wait behavior, and async progress handoff to `ypi_studio_wait`.\n- `docs/modules/frontend.md` — documented UI compatibility for `run.id ?? run.runId`, task/subtask title fallbacks, lightweight async-start cards, and compact wait payloads.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No production code changes were made in this subtask.\n- Manual async start + wait UI smoke test was not run; recommend reviewer verify if needed.\n\n#### Decisions Needed\n\n- None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:56:16.124Z",
+        "updatedAt": "2026-07-07T06:58:04.119Z",
+        "eventCount": 3919,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/library.md` — documented async-start light projection, lifecycle projections, compact wait behavior, and async progress handoff to `ypi_studio_wait`.\n- `docs/modules/frontend.md` — documented UI compatibility for `run.id ?? run.runId`, task/subtask title fallbacks, lightweight async-start cards, and compact wait payloads.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No production code changes were made in this subtask.\n- Manual async start + wait UI smoke test was not run; recommend reviewer verify if needed.\n\n#### Decisions Needed\n\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:57:50.526Z",
+            "toolCallId": "call_2lYBCob2XIhCplznWLFJkpki|fc_0e9d107ac64edc00016a4ca36af378819a88d25daccce2e5a1",
+            "toolName": "write",
+            "text": "Successfully wrote 916 bytes to .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:57:55.235Z",
+            "toolCallId": "call_GHeszf53S1pmAeQZQyQ6SaKe|fc_0e9d107ac64edc00016a4ca372f424819aa330b46e7d1f4fc4",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat && git diff -- docs/modules/library.md docs/modules/frontend.md .ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md | sed -n '1,220p'\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:57:55.319Z",
+            "toolCallId": "call_GHeszf53S1pmAeQZQyQ6SaKe|fc_0e9d107ac64edc00016a4ca372f424819aa330b46e7d1f4fc4",
+            "toolName": "bash",
+            "text": "components/ChatWindow.tsx                  |  10 +-\n components/YpiStudioSessionWidget.tsx      |   2 +-\n components/YpiStudioSubagentTranscript.tsx |  29 ++++-\n docs/modules/frontend.md                   |   8 +-\n docs/modules/library.md                    |   2 +-\n lib/ypi-studio-extension.ts                | 172 ++++++++++++++++++++++++-----\n lib/ypi-studio-types.ts                    |   2 +\n 7 files changed, 186 insertions(+), 39 deletions(-)\ndiff --git a/docs/modules/frontend.md b/docs/modules/frontend.md\nindex e207c4c..a6005cb 100644\n--- a/docs/modules/frontend.md\n+++ b/docs/modules/frontend.md\n@@ -7,7 +7,7 @@\n | `components/AppShell.tsx` | Top-level layout, URL state, active Project Registry space context, browser tab title as `Project(Space)`, tab management, Web Terminal bottom-dock toggling, resizable left drawer, right drawer mode switching between files and optional Trellis tasks, Trellis-task-to-chat context block insertion, and session-scoped Studio widget polling that stays fast while implementation subtasks are running, waiting, or need attention. |\n | `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, lazy-loads linked sessions for the selected project space, hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, registers new project paths from manual input or the local OS directory picker, provides minimal project/space metadata editing for display name, tags, pinned, and archive state, keeps WorkTree actions available for worktree spaces, and includes archive/unarchive actions plus the integrated file explorer with a resizable session/explorer split. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. |\n | `components/Checkbox.tsx` | Shared theme-aware checkbox control with custom focus, hover, checked visuals, optional label text, and native input semantics. |\n-| `components/ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic. Shows archived banner and disables input for archived sessions, treats opened YPI Studio child sessions as read-only audit views, wires the effective session id and optional project/space context for precreated empty sessions into chat input controls, and reports compact YPI Studio tool live-progress overlays, including created/bound task ids/keys, phase/tokens/tps/current tool, recent preview changes, and display-limit flags, to `AppShell` for the session widget. Global Studio background/waiting state is shown by the floating `YpiStudioSessionWidget`, not a fixed card inside the chat scroll. |\n+| `components/ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic. Shows archived banner and disables input for archived sessions, treats opened YPI Studio child sessions as read-only audit views, wires the effective session id and optional project/space context for precreated empty sessions into chat input controls, and reports compact YPI Studio tool live-progress overlays, including created/bound task ids/keys, `run.id ?? run.runId` fallback, task/subtask titles, phase/tokens/tps/current tool, recent preview changes, and display-limit flags, to `AppShell` for the session widget. Global Studio background/waiting state is shown by the floating `YpiStudioSessionWidget`, not a fixed card inside the chat scroll. |\n | `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload, Browser Share binding entry, file-reference chips, slash-command autocomplete for extension commands/skills/prompt templates, and…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:58:01.904Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/library.md` — documented async-start light projection, lifecycle projections, compact wait behavior, and async progress handoff to `ypi_studio_wait`.\n- `docs/modules/frontend.md` — documented UI compatibility for `run.id ?? run.runId`, task/subtask title fallbacks, lightweight async-start cards, and compact wait payloads.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No production code changes were made in this subtask.\n- Manual async start + wait UI smoke test was not run; recommend reviewer verify if needed.\n\n#### Decisions Needed\n\n- None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:58:01.912Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1598,
+        "tokens": 274,
+        "tokenSource": "usage",
+        "tps": 145.9,
+        "firstTokenAt": "2026-07-07T06:58:00.020Z",
+        "lastTokenAt": "2026-07-07T06:58:01.898Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-2c1e2363f97996041236d8fb",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/implementer-2c1e2363f97996041236d8fb.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:56:16.124Z",
+        "finishedAt": "2026-07-07T06:58:04.108Z",
+        "updatedAt": "2026-07-07T06:58:04.108Z",
+        "itemCount": 33,
+        "messageCount": 1,
+        "toolCallCount": 14,
+        "stderrBytes": 0,
+        "bytes": 104359,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-54e530bcdc2f0b4b4af6f00f",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:58:14.005Z",
+      "finishedAt": "2026-07-07T06:58:31.748Z",
+      "runner": "cli",
+      "prompt": "请对任务“精简异步 ypi_studio_subagent 返回上下文”进行最终检查：审查实现是否符合 prd/design/implement/checks，重点验证 async start、poll/collect/cancel 返回是否为轻量投影且 UI 兼容 runId/title；检查文档更新和验证结果。请汇报通过/失败、问题清单和是否可归档。",
+      "summary": "Child Pi run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:58:14.005Z",
+        "updatedAt": "2026-07-07T06:58:31.748Z",
+        "eventCount": 264,
+        "lastTextPreview": "Child Pi run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:58:28.938Z",
+            "toolCallId": "call_ZswZT0hPEwfrpv4pkFUmbxEz|fc_0b6cce1f8c858eba016a4ca394d538819ab6bf465812148ce1",
+            "toolName": "read",
+            "text": "if (!taskDetail) throw new Error(\"Task not found\");\n\n        if (action === \"poll\" || action === \"collect\") {\n          const requestedRunIds = input.runIds?.length ? input.runIds : input.runId ? [input.runId] : [];\n          if (!requestedRunIds.length) throw new Error(\"runId or runIds is required for poll/collect\");\n          const runs = requestedRunIds.map((id) => {\n            const persisted = taskDetail.subagents.find((run) => run.id === id);\n            if (!persisted) throw new Error(`Studio subagent run not found: ${id}`);\n            return reconcileYpiStudioRuntimeLostSubagentRun(root, taskId, persisted);\n          });\n          const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;\n          const projected = runs.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run, { includeTranscriptPreview: false }));\n          const unfinished = projected.filter((run) => run.status === \"queued\" || run.status === \"running\").length;\n          const compactRuns = projected.map(compactSubagentRunForLifecycle);\n          const nextRecommendedAction = action === \"collect\" && unfinished === 0 ? buildNextStudioTaskAction(refreshed) : undefined;\n          return {\n            content: [{ type: \"text\", text: action === \"collect\" && unfinished === 0 ? `Collected ${projected.length} Studio subagent run(s). Next: ${nextRecommendedAction}` : `${projected.length} Studio subagent run(s): ${projected.map((run) => `${run.runId}=${run.status}`).join(\", \")}` }],\n            details: {\n              action,\n              mode,\n              projection: \"ypi_studio_subagent_lifecycle_v1\",\n              task: compactYpiStudioTaskIdentity(refreshed),\n              runs: compactRuns,\n              run: compactRuns[0],\n              status: unfinished === 0 ? \"terminal\" : \"running\",\n              nextRecommendedAction,\n            },\n          };\n        }\n\n        if (action === \"cancel\") {\n          const requestedRunIds = input.runIds?.length ? input.runIds : input.runId ? [input.runId] : [];\n          if (!requestedRunIds.length) throw new Error(\"runId or runIds is required for cancel\");\n          const reason = input.cancelReason ?? \"cancel_requested\";\n          const cancelledRuns = requestedRunIds.map((id) => {\n            const persisted = taskDetail.subagents.find((run) => run.id === id);\n            if (!persisted) throw new Error(`Studio subagent run not found: ${id}`);\n            const aborted = abortYpiStudioChildRun(id, reason);\n            if (aborted) return persisted;\n            const finishedAt = new Date().toISOString();\n            const cancelled: YpiStudioTaskSubagentRun = {\n              ...persisted,\n              status: \"cancelled\",\n              finishedAt,\n              summary: persisted.summary ?? `Studio subagent run cancelled: ${reason}`,\n              error: `Studio subagent run cancelled: ${reason}`,\n              terminationReason: reason,\n              progress: persisted.progress ? { ...persisted.progress, phase: \"finished\", updatedAt: finishedAt, terminationReason: reason } : persisted.progress,\n              transcript: persisted.transcript ? { ...persisted.transcript, status: \"cancelled\", finishedAt, updatedAt: finishedAt } : persisted.transcript,\n            };\n            recordYpiStudioSubagentRun(root, taskId, cancelled);\n            return cancelled;\n          });\n          const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;\n          const projected = cancelledRuns.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run, { includeTranscriptPreview: false }));\n          const compactRuns = projected.map(compactSubagentRunForLifecycle);\n          return {\n            content: [{ type: \"text\", text: `Cancelled Studio subagent run(s): ${requestedRunIds.join(\", \")}.` }],\n            details: {\n              action,\n              mode,\n              projection: \"ypi_studio_subagent_lifecycle_v1\",\n              task: compactYpiStudioTaskIdentity(refreshed),\n         …",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:58:28.939Z",
+            "toolCallId": "call_r0GpbeBRfvlSDydBHonTJHJI|fc_0b6cce1f8c858eba016a4ca394d518819a958b36753cdfd112",
+            "toolName": "read",
+            "text": "\"\",\n    `目标：${goal}`,\n    \"\",\n    \"请按 YPI Studio 状态机执行：\",\n    workflowLine,\n    \"2. 接单和设计阶段使用 ypi_studio_subagent(member=architect) 指派架构师。\",\n    \"3. 涉及界面时使用 ypi_studio_subagent(member=ui-designer)。\",\n    \"4. 方案稳定后只切到 awaiting_approval；本轮必须停止，向我展示 PRD/Design/Implement/Checks 摘要并请求确认或修改意见。\",\n    \"5. 未收到后续用户明确确认前，不得进入 implementing，不得调用 implementer；确认后先领取一个 ready implementation subtask，再通过 ypi_studio_subagent(member=implementer, subtaskId=...) 逐项指派。\"\n  ].join(\"\\n\"));\n}\n\ninterface StudioSubagentRunProjection {\n  runId: string;\n  taskId: string;\n  taskKey?: string;\n  subtaskId?: string;\n  member: string;\n  taskTitle?: string;\n  subtaskTitle?: string;\n  status: YpiStudioTaskSubagentRun[\"status\"];\n  registryStatus?: string;\n  registryActive: boolean;\n  runner?: YpiStudioTaskSubagentRun[\"runner\"];\n  childSessionId?: string;\n  childSessionFile?: string;\n  requestAffinity?: YpiStudioTaskSubagentRun[\"requestAffinity\"];\n  progress?: YpiStudioSubagentRunProgress;\n  transcript?: YpiStudioSubagentTranscriptRef;\n  transcriptPreview?: unknown;\n  summary?: string;\n  error?: string;\n  terminationReason?: string;\n  model?: string;\n  thinking?: string;\n  modelSource?: string;\n  thinkingSource?: string;\n  startedAt: string;\n  finishedAt?: string;\n}\n\ninterface ProjectSubagentRunOptions {\n  includeTranscriptPreview?: boolean;\n}\n\nfunction compactYpiStudioTaskIdentity(task: YpiStudioTaskDetail): Record<string, unknown> {\n  return {\n    id: task.id,\n    key: task.key,\n    title: task.title,\n    status: task.status,\n    workflowId: task.workflowId,\n  };\n}\n\nfunction compactProgressForLifecycle(progress: YpiStudioSubagentRunProgress | undefined, lastTextMax = 180): Record<string, unknown> | undefined {\n  if (!progress) return undefined;\n  return {\n    phase: progress.phase,\n    updatedAt: progress.updatedAt,\n    eventCount: progress.eventCount,\n    lastTextPreview: progress.lastTextPreview ? oneLine(progress.lastTextPreview, lastTextMax) : undefined,\n    tokens: progress.tokens,\n    tps: progress.tps,\n    currentTool: progress.currentTool,\n    terminationReason: progress.terminationReason,\n  };\n}\n\nfunction compactSubagentRunForAsyncStart(run: StudioSubagentRunProjection): Record<string, unknown> {\n  return {\n    id: run.runId,\n    runId: run.runId,\n    taskId: run.taskId,\n    taskKey: run.taskKey,\n    taskTitle: run.taskTitle,\n    subtaskId: run.subtaskId,\n    subtaskTitle: run.subtaskTitle,\n    member: run.member,\n    status: run.status,\n    model: run.model,\n    thinking: run.thinking,\n    modelSource: run.modelSource,\n    thinkingSource: run.thinkingSource,\n    runner: run.runner,\n    startedAt: run.startedAt,\n    progress: {\n      phase: run.progress?.phase ?? \"starting\",\n      startedAt: run.startedAt,\n      updatedAt: run.progress?.updatedAt ?? run.startedAt,\n      eventCount: run.progress?.eventCount ?? 0,\n      lastTextPreview: \"Async child Pi process starting.\",\n    },\n  };\n}\n\nfunction compactSubagentRunForLifecycle(run: StudioSubagentRunProjection): Record<string, unknown> {\n  return {\n    id: run.runId,\n    runId: run.runId,\n    taskId: run.taskId,\n    taskKey: run.taskKey,\n    taskTitle: run.taskTitle,\n    subtaskId: run.subtaskId,\n    subtaskTitle: run.subtaskTitle,\n    member: run.member,\n    status: run.status,\n    registryStatus: run.registryStatus,\n    registryActive: run.registryActive,\n    model: run.model,\n    thinking: run.thinking,\n    modelSource: run.modelSource,\n    thinkingSource: run.thinkingSource,\n    runner: run.runner,\n    startedAt: run.startedAt,\n    finishedAt: run.finishedAt,\n    progress: compactProgressForLifecycle(run.progress),\n    transcript: run.transcript,\n    summary: run.summary ? oneLine(run.summary, 600) : undefined,\n    error: run.error ? oneLine(run.error, 800) : undefined,\n    terminationReason: run.terminationReason,\n  };\n}\n\nfunction projectSubagentRun(root: string, taskId: string, run: YpiS…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:58:28.946Z",
+            "toolCallId": "call_2T9wlkY6IX3VzzKxJlC08Bjn|fc_0b6cce1f8c858eba016a4ca394d554819aab1423ae194c8df7",
+            "toolName": "bash",
+            "text": "diff --git a/components/ChatWindow.tsx b/components/ChatWindow.tsx\nindex 0db37c7..800c410 100644\n--- a/components/ChatWindow.tsx\n+++ b/components/ChatWindow.tsx\n@@ -202,11 +202,14 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o\n         progress.running,\n         optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId) ?? \"\",\n         optionalString(task?.key) ?? optionalString(run?.taskKey) ?? \"\",\n-        optionalString(run?.id) ?? optionalString(progress.args?.runId) ?? \"\",\n+        optionalString(run?.id) ?? optionalString(run?.runId) ?? optionalString(progress.args?.runId) ?? \"\",\n         optionalString(task?.status) ?? optionalString(run?.status) ?? \"\",\n         optionalString(runProgress?.phase) ?? \"\",\n         optionalNumber(runProgress?.tokens) ?? \"\",\n         optionalNumber(runProgress?.tps) ?? \"\",\n+        optionalString(run?.subtaskId) ?? \"\",\n+        optionalString(task?.title) ?? optionalString(run?.taskTitle) ?? \"\",\n+        optionalString(run?.subtaskTitle) ?? \"\",\n         optionalString(isRecord(runProgress?.currentTool) ? runProgress.currentTool.toolName : undefined) ?? \"\",\n         Array.isArray(runProgress?.itemsPreview) ? runProgress.itemsPreview.length : \"\",\n         Array.isArray(runProgress?.itemsPreview) ? JSON.stringify(runProgress.itemsPreview.slice(-2).map((item) => isRecord(item) ? [optionalString(item.kind), optionalString(item.at), optionalString(item.text) ?? optionalString(item.inputPreview), item.truncated === true] : null)) : \"\",\n@@ -240,8 +243,11 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o\n           toolName: progress.toolName as \"ypi_studio_task\" | \"ypi_studio_subagent\" | \"ypi_studio_wait\",\n           taskId: optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId),\n           taskKey: optionalString(task?.key) ?? optionalString(run?.taskKey),\n-          runId: optionalString(run?.id) ?? optionalString(progress.args?.runId),\n+          taskTitle: optionalString(task?.title) ?? optionalString(run?.taskTitle),\n+          runId: optionalString(run?.id) ?? optionalString(run?.runId) ?? optionalString(progress.args?.runId),\n           member: optionalString(run?.member) ?? optionalString(progress.args?.member),\n+          subtaskId: optionalString(run?.subtaskId),\n+          subtaskTitle: optionalString(run?.subtaskTitle),\n           status: safeStatus,\n           model: optionalString(run?.model),\n           thinking: optionalString(run?.thinking),\ndiff --git a/components/YpiStudioSessionWidget.tsx b/components/YpiStudioSessionWidget.tsx\nindex a09d1ab..85b4de5 100644\n--- a/components/YpiStudioSessionWidget.tsx\n+++ b/components/YpiStudioSessionWidget.tsx\n@@ -167,7 +167,7 @@ function mergeRuns(task: YpiStudioTaskWidgetProjection, overlays: YpiStudioLiveR\n     subtaskId: overlay.subtaskId,\n     status: overlay.status ?? \"running\",\n     startedAt: new Date(overlay.updatedAt).toISOString(),\n-    summary: overlay.lastTextPreview,\n+    summary: overlay.lastTextPreview ?? overlay.subtaskTitle ?? overlay.taskTitle,\n     model: overlay.model,\n     thinking: overlay.thinking,\n     phase: overlay.phase,\ndiff --git a/components/YpiStudioSubagentTranscript.tsx b/components/YpiStudioSubagentTranscript.tsx\nindex e4d92e5..48aa6dd 100644\n--- a/components/YpiStudioSubagentTranscript.tsx\n+++ b/components/YpiStudioSubagentTranscript.tsx\n@@ -56,11 +56,14 @@ interface StudioRunProgress {\n \n interface StudioRunProjection {\n   id?: string;\n+  runId?: string;\n   member?: string;\n   status?: StudioRunStatus;\n   taskId?: string;\n   taskKey?: string;\n+  taskTitle?: string;\n   subtaskId?: string;\n+  subtaskTitle?: string;\n   action?: string;\n   mode?: string;\n   transcript?: YpiStudioSubagentTranscriptRef;\n@@ -222,13 +225,17 @@ function normalizeProgress(value: unknown): StudioRunProgress | undefined {\n \n function normalizeRun(value: unknown): StudioRunProjection | undefined {\n   if (!isRecord(value)) return undefined;\n+  const runId = asString(value.id) ?? asStr…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:58:29.590Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:58:31.734Z",
+            "text": "Child Pi run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 65,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-54e530bcdc2f0b4b4af6f00f",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/checker-54e530bcdc2f0b4b4af6f00f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:58:14.005Z",
+        "finishedAt": "2026-07-07T06:58:31.734Z",
+        "updatedAt": "2026-07-07T06:58:31.734Z",
+        "itemCount": 29,
+        "messageCount": 1,
+        "toolCallCount": 12,
+        "stderrBytes": 0,
+        "bytes": 190649,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-ef774a4d8bb53df5d2b9a325",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:58:55.087Z",
+      "finishedAt": "2026-07-07T06:59:56.901Z",
+      "runner": "cli",
+      "prompt": "上一次 checker 没有写入 review.md。请重新执行最终检查，并务必更新 artifact `review.md`：包含 verdict（pass/needs-work）、检查范围、验证命令结果、发现的问题（如无则写 none）、是否建议完成/归档。重点检查 async start/poll/collect/cancel 的轻量返回、UI runId/title 兼容、文档与 lint/tsc 验证。",
+      "summary": "Handoff:\n- Produced artifact: `review.md`\n\nValidation:\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\nRemaining risks:\n- No blocking findings.\n- Manual async start → wait → collect UI smoke was not run here; optional for extra confidence.\n\nDecisions needed:\n- None.\n\nSummary:\n- Final check passed.\n- Reviewed async `start/poll/collect/cancel` light projections, UI `run.id/run.runId` + title compatibility, and docs sync.\n- `review.md` now contains verdict, scope, validation, findings, and completion/archive recommendation.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:58:55.087Z",
+        "updatedAt": "2026-07-07T06:59:56.901Z",
+        "eventCount": 1509,
+        "lastTextPreview": "Handoff:\n- Produced artifact: `review.md`\n\nValidation:\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\nRemaining risks:\n- No blocking findings.\n- Manual async start → wait → collect UI smoke was not run here; optional for extra confidence.\n\nDecisions needed:\n- None.\n\nSummary:\n- Final check passed.\n- Reviewed async `start/poll/collect/cancel` light projections, UI `run.id/run.runId` + title compatibility, and docs sync.\n- `review.md` now contains verdict, scope, validation, findings, and completion/archive recommendation.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:59:39.237Z",
+            "toolCallId": "call_NMyLlxahOCvKC763TpBHWMyY|fc_014f8156ab86ceb8016a4ca3db0828819b8b1ac425e68a3e58",
+            "toolName": "read",
+            "text": "ENOENT: no such file or directory, access '/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/review.md'",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:59:50.512Z",
+            "toolCallId": "call_5XvsnHiK6FFvwUN52mRJsH7Q|fc_014f8156ab86ceb8016a4ca3e11b04819b90a2ff3924b3e583",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"review.md\",\n  \"content\": \"# Check Complete\\n\\n## Verdict\\nPass\\n\\n## 检查范围\\n- `lib/ypi-studio-extension.ts`：`ypi_studio_subagent` async start / poll / collect / cancel / wait 的轻量返回投影\\n- `components/YpiStudioSubagentTranscript.tsx`：`run.id ?? run.runId`、task/subtask title 兼容\\n- `components/ChatWindow.tsx`、`components/YpiStudioSessionWidget.tsx`、`components/YpiStudioWaitPanel.tsx`：轻量 run/title overlay 与 wait 展示兼容\\n- `lib/ypi-studio-types.ts`：overlay title 字段补充\\n- `docs/modules/library.md`、`docs/modules/frontend.md`：文档同步\\n\\n## Verification\\n- `npm run lint` — passed\\n- `node_modules/.bin/tsc --noEmit` — passed\\n\\n## Findings Fixed\\n- None\\n\\n## Remaining Findings\\n- None\\n\\n## Notes\\n- 代码检查确认 async start 已切到 `ypi_studio_subagent_async_start_v1` 轻量投影，仅保留 task identity、run identity/member/model/thinking/startedAt、小 progress、wait hint、短 warnings。\\n- `poll` / `collect` / `cancel` 已切到 `ypi_studio_subagent_lifecycle_v1`，不再返回 task compact、implementationProjection、recent events、transcriptPreview、progress.itemsPreview。\\n- `ypi_studio_wait` 仍保持 compact，并补了 `id`/`runId`、`taskKey` 兼容字段。\\n- UI 已兼容 `run.id ?? run.runId`，并优先显示 `subtaskTitle ?? taskTitle ?? taskId`。\\n- 本次未做真实 async start + wait 的手工 UI smoke；但静态检查、文档对齐、lint/tsc 已通过。\\n\\n## 建议\\n- 建议主会话标记完成并归档；如需更高信心，可补做一次 async start → wait → collect 的手工 smoke。\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:59:50.513Z",
+            "toolCallId": "call_5XvsnHiK6FFvwUN52mRJsH7Q|fc_014f8156ab86ceb8016a4ca3e11b04819b90a2ff3924b3e583",
+            "toolName": "write",
+            "text": "Successfully wrote 1253 bytes to review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:59:54.670Z",
+            "text": "Handoff:\n- Produced artifact: `review.md`\n\nValidation:\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\nRemaining risks:\n- No blocking findings.\n- Manual async start → wait → collect UI smoke was not run here; optional for extra confidence.\n\nDecisions needed:\n- None.\n\nSummary:\n- Final check passed.\n- Reviewed async `start/poll/collect/cancel` light projections, UI `run.id/run.runId` + title compatibility, and docs sync.\n- `review.md` now contains verdict, scope, validation, findings, and completion/archive recommendation.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:59:54.683Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1098,
+        "tokens": 167,
+        "tokenSource": "usage",
+        "tps": 389.28,
+        "firstTokenAt": "2026-07-07T06:59:54.231Z",
+        "lastTokenAt": "2026-07-07T06:59:54.660Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-ef774a4d8bb53df5d2b9a325",
+        "taskId": "20260707-143502-精简异步-ypi_studio_subagent-返回上下文",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-143502-_-ypi_studio_subagent-/checker-ef774a4d8bb53df5d2b9a325.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:58:55.087Z",
+        "finishedAt": "2026-07-07T06:59:56.887Z",
+        "updatedAt": "2026-07-07T06:59:56.887Z",
+        "itemCount": 37,
+        "messageCount": 1,
+        "toolCallCount": 16,
+        "stderrBytes": 0,
+        "bytes": 180757,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T06:43:17.346Z",
+      "contextId": "pi_019f3b45-a3ab-7163-acb8-422958af61fb",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-07T06:45:22.718Z",
+      "contextId": "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e",
+      "inputHash": "f4536e76b61a9377d14ba124",
+      "source": "user-input"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T06:43:13.419Z",
+    "summary": "为 ypi_studio_subagent(action=start, mode=async) 建立极轻量启动投影，poll/collect/cancel 使用轻量 lifecycle 投影，wait 保持 compact，并补齐 UI 对 runId/title 的兼容。",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "light-projection-helpers",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "light-projection-helpers"
+          ]
+        },
+        {
+          "id": "async-start-light-result",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [
+            "light-projection-helpers"
+          ],
+          "subtaskIds": [
+            "async-start-light-result"
+          ]
+        },
+        {
+          "id": "lifecycle-actions-light-result",
+          "title": "implementation",
+          "relation": "parallel",
+          "dependencies": [
+            "light-projection-helpers"
+          ],
+          "subtaskIds": [
+            "lifecycle-actions-light-result"
+          ]
+        },
+        {
+          "id": "ui-runid-title-compat",
+          "title": "implementation",
+          "relation": "parallel",
+          "dependencies": [
+            "async-start-light-result"
+          ],
+          "subtaskIds": [
+            "ui-runid-title-compat"
+          ]
+        },
+        {
+          "id": "docs-and-validation",
+          "title": "checks",
+          "relation": "serial",
+          "dependencies": [
+            "async-start-light-result",
+            "lifecycle-actions-light-result",
+            "ui-runid-title-compat"
+          ],
+          "subtaskIds": [
+            "docs-and-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "light-projection-helpers",
+        "title": "建立 Studio subagent 轻量投影辅助函数",
+        "phase": "implementation",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-extension.ts"
+        ],
+        "instructions": [
+          "新增 task identity helper，仅返回 id/key/title/status/workflowId。",
+          "新增 async start run projection helper，同时输出 id 与 runId，包含 taskId/taskKey/taskTitle/subtaskTitle/member/status/model/thinking/modelSource/thinkingSource/runner/startedAt/极短 progress。",
+          "新增 lifecycle run projection helper，用于 poll/collect/cancel，包含短 summary/error、terminal transcript ref metadata，但不包含 transcriptPreview/progress.itemsPreview/requestAffinity/policy。",
+          "为 projectSubagentRun 增加 options（例如 includeTranscriptPreview），默认保持旧行为；wait 和轻量 lifecycle 路径传 false，避免无用读取 transcript preview。",
+          "为 compactSubagentRunForWait 增加 id: runId 和 taskKey 小字段，保持 wait payload compact。"
+        ],
+        "acceptance": [
+          "轻量 task helper 不返回 artifacts/events/subagents/implementationProjection/readHints。",
+          "async start helper 不返回 prompt/transcript/transcriptPreview/progress.itemsPreview/full policy/requestAffinity。",
+          "原同步路径调用 compactSubagentRunProjection 的行为保持可用。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "helper 默认参数若设置错误可能影响同步 start 的 debug 展示；默认应保持 includeTranscriptPreview=true。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "async-start-light-result",
+        "title": "将 async start final result 与启动 onUpdate 改为极轻量投影",
+        "phase": "implementation",
+        "order": 2,
+        "dependsOn": [
+          "light-projection-helpers"
+        ],
+        "dependencies": [
+          "light-projection-helpers"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-extension.ts"
+        ],
+        "instructions": [
+          "在 mode === async 的初始 onUpdate 中使用 task identity + async start run projection；sync 模式保留原 onUpdate。",
+          "启动 child runner 时，async 模式不要把原始 onUpdate 继续传入 SDK/CLI child runner；只保留 persistence callbacks 写 task/transcript/runtime registry。",
+          "async final result details 使用 projection=ypi_studio_subagent_async_start_v1、task identity、async start run projection、wait hint（tool/taskId/taskKey/runId/runIds/until/recommended）。",
+          "warnings 仅保留短字符串数组；不注入 policy diagnostics 对象。",
+          "content 文本保持短启动确认，并明确建议调用 ypi_studio_wait(runId=...)。"
+        ],
+        "acceptance": [
+          "async start details 不再包含 compactYpiStudioTaskForTool 输出。",
+          "async start details.run 不包含 transcriptPreview/progress.itemsPreview/prompt/full policy。",
+          "async child 后续进展仍写入 task.json/transcript，并可被 ypi_studio_wait 读取。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "如果编排模型未调用 wait，start 卡片不会继续更新；通过 wait prompt guideline、session widget polling 和 terminal continuation 缓解。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "lifecycle-actions-light-result",
+        "title": "精简 poll/collect/cancel 工具结果",
+        "phase": "implementation",
+        "order": 3,
+        "dependsOn": [
+          "light-projection-helpers"
+        ],
+        "dependencies": [
+          "light-projection-helpers"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/ypi-studio-extension.ts"
+        ],
+        "instructions": [
+          "poll/collect 路径把 details.task 从 compactYpiStudioTaskForTool 改为 task identity。",
+          "poll/collect/cancel 的 details.runs/run 使用 lifecycle projection。",
+          "collect 在所有 requested runs terminal 时可返回短 nextRecommendedAction，便于未使用 wait 的旧编排继续；不要返回完整 task compact。",
+          "cancel 保持幂等取消语义，返回取消后的轻量 run 状态和短 error/terminationReason。",
+          "wait 路径调用 projectSubagentRun 时跳过 transcriptPreview 读取，并保持 compactSubagentRunForWait 输出小。"
+        ],
+        "acceptance": [
+          "poll/collect/cancel details 不含 implementationProjection/events/artifacts/subagents/transcriptPreview/progress.itemsPreview。",
+          "collect terminal 仍能看到 run status、member、summary/error、terminationReason、startedAt/finishedAt。",
+          "wait 返回结构仍被 YpiStudioWaitPanel 正常解析。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "旧调试习惯可能依赖 collect 的 transcriptPreview；保留 transcript ref metadata，并通过 transcript API 获取完整内容。"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "ui-runid-title-compat",
+        "title": "补齐 UI 对轻量 runId/title 投影的兼容",
+        "phase": "implementation",
+        "order": 4,
+        "dependsOn": [
+          "async-start-light-result"
+        ],
+        "dependencies": [
+          "async-start-light-result"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/YpiStudioSubagentTranscript.tsx",
+          "components/ChatWindow.tsx",
+          "components/YpiStudioWaitPanel.tsx",
+          "lib/ypi-studio-types.ts"
+        ],
+        "instructions": [
+          "YpiStudioSubagentTranscript.normalizeRun 使用 id ?? runId，增加 taskTitle/subtaskTitle 字段读取。",
+          "Subagent header/meta 显示 subtaskTitle ?? taskTitle ?? taskId，确保轻量 start 卡片有标题。",
+          "ChatWindow live overlay runId 读取改为 run.id ?? run.runId ?? progress.args.runId；如扩展 overlay type，加入 taskTitle/subtaskTitle 可选字段。",
+          "确认缺失 transcript、progress.itemsPreview、policy 时组件只降级展示，不报错。",
+          "YpiStudioWaitPanel 只需确认兼容；如 wait run 增加 id/taskKey，不破坏现有 runId 解析。"
+        ],
+        "acceptance": [
+          "async start 卡片至少展示 member/status/model/thinking/runId/title。",
+          "ChatWindow overlay 能从轻量 details 提取 runId/member/model/thinking/status。",
+          "wait 卡片继续显示 task title、run status、phase/current tool/tps/summary。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "新增 title 字段若只在 run projection 中提供，旧 result 不显示标题；应保持 taskId fallback。"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "docs-and-validation",
+        "title": "更新模块文档并完成验证",
+        "phase": "checks",
+        "order": 5,
+        "dependsOn": [
+          "async-start-light-result",
+          "lifecycle-actions-light-result",
+          "ui-runid-title-compat"
+        ],
+        "dependencies": [
+          "async-start-light-result",
+          "lifecycle-actions-light-result",
+          "ui-runid-title-compat"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/library.md",
+          "docs/modules/frontend.md"
+        ],
+        "instructions": [
+          "更新 library 文档中 ypi-studio-extension 描述：async start light projection、poll/collect/cancel lifecycle projection、wait compact、async child progress 由 wait 承接。",
+          "更新 frontend 文档中 YpiStudioSubagentTranscript/ChatWindow/YpiStudioWaitPanel 对轻量字段和 runId/title 兼容的描述。",
+          "运行 lint 与 TypeScript 检查。",
+          "人工检查 diff，确认没有生产代码外的无关改动。"
+        ],
+        "acceptance": [
+          "docs 与代码契约一致。",
+          "npm run lint 通过。",
+          "node_modules/.bin/tsc --noEmit 通过。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "文档若未同步，后续 agent 可能重新引入厚投影；需明确字段边界。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T07:01:17.970Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "light-projection-helpers": {
+        "id": "light-projection-helpers",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:48:36.975Z",
+        "startedAt": "2026-07-07T06:45:28.443Z",
+        "finishedAt": "2026-07-07T06:48:36.972Z",
+        "attempts": 1,
+        "runIds": [
+          "main",
+          "implementer-56b3cb8e0970d982be489e6a"
+        ],
+        "lastRunId": "implementer-56b3cb8e0970d982be489e6a",
+        "claimedAt": "2026-07-07T06:45:28.443Z",
+        "claimedByContextId": "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — Added lightweight task/run projection helpers, `projectSubagentRun` options with default transcript preview compatibility, model/thinking fields, and wait projection `id`/`taskKey`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — Wrote handoff artifact.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Only completed `light-projection-helpers` boundary.\n- New async-start and lifecycle helpers are ready but not yet wired into `start/poll/collect/cancel`; follow-up subtasks should do that.\n- `projectSubagentRun()` defaults to `includeTranscriptPreview: true` to preserve current sync/debug behavior."
+      },
+      "async-start-light-result": {
+        "id": "async-start-light-result",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:50:58.319Z",
+        "startedAt": "2026-07-07T06:48:46.531Z",
+        "finishedAt": "2026-07-07T06:50:58.315Z",
+        "attempts": 1,
+        "runIds": [
+          "main",
+          "implementer-3f73feab23988bd44650413a"
+        ],
+        "lastRunId": "implementer-3f73feab23988bd44650413a",
+        "claimedAt": "2026-07-07T06:48:46.531Z",
+        "claimedByContextId": "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — async start `onUpdate` and final result now use lightweight `ypi_studio_subagent_async_start_v1` details with task identity, run identity/model/thinking/member/status/title, and wait hint.\n- `lib/ypi-studio-extension.ts` — async child SDK/CLI runners no longer receive parent tool `onUpdate`; persistence callbacks remain intact for task/transcript/runtime updates and `ypi_studio_wait`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint && node_modules/.bin/tsc --noEmit` — passed.\n  - ESLint reported one warning: `compactSubagentRunForLifecycle` is unused; this is expected until the later lifecycle subtask wires poll/collect/cancel.\n\n#### Notes / Risks\n\n- Sync start behavior remains on the existing projection path.\n- Poll/collect/cancel are intentionally not changed in this subtask."
+      },
+      "lifecycle-actions-light-result": {
+        "id": "lifecycle-actions-light-result",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:53:05.244Z",
+        "startedAt": "2026-07-07T06:51:03.917Z",
+        "finishedAt": "2026-07-07T06:53:05.240Z",
+        "attempts": 1,
+        "runIds": [
+          "main",
+          "implementer-3d256498d1d81cba5361b775"
+        ],
+        "lastRunId": "implementer-3d256498d1d81cba5361b775",
+        "claimedAt": "2026-07-07T06:51:03.917Z",
+        "claimedByContextId": "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — `poll` / `collect` / `cancel` now return lightweight lifecycle projections:\n  - task identity only\n  - compact run status/model/thinking/progress/summary/error\n  - no `implementationProjection`, `events`, `artifacts`, `subagents`, `transcriptPreview`, or `progress.itemsPreview`\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `run.transcript` remains as metadata ref only for debug/API access; transcript preview content is not injected.\n- Existing earlier-subtask changes remain in `lib/ypi-studio-extension.ts`; this implementation only wires lifecycle `poll/collect/cancel`.\n\n#### Decisions Needed\n\n- None."
+      },
+      "ui-runid-title-compat": {
+        "id": "ui-runid-title-compat",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:56:05.761Z",
+        "startedAt": "2026-07-07T06:53:13.049Z",
+        "finishedAt": "2026-07-07T06:56:05.759Z",
+        "attempts": 1,
+        "runIds": [
+          "main",
+          "implementer-349b09153df06f3b595bacbc"
+        ],
+        "lastRunId": "implementer-349b09153df06f3b595bacbc",
+        "claimedAt": "2026-07-07T06:53:13.049Z",
+        "claimedByContextId": "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/YpiStudioSubagentTranscript.tsx` — added `runId` fallback, `taskTitle`/`subtaskTitle` normalization, and title-aware header/meta display.\n- `components/ChatWindow.tsx` — Studio live overlay now reads `run.id ?? run.runId ?? args.runId` and carries task/subtask titles.\n- `components/YpiStudioSessionWidget.tsx` — uses subtask/task title as live overlay summary fallback.\n- `lib/ypi-studio-types.ts` — added optional `taskTitle` / `subtaskTitle` to `YpiStudioLiveRunOverlay`.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- `YpiStudioWaitPanel.tsx` already supports `runId`/`id` and task/subtask title fields; no code change needed.\n- Lightweight async-start cards without transcript metadata now degrade to title/status/model/runId display; progress remains via `ypi_studio_wait`.\n\n#### Decisions Needed\n\n- None."
+      },
+      "docs-and-validation": {
+        "id": "docs-and-validation",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:58:04.124Z",
+        "startedAt": "2026-07-07T06:56:12.079Z",
+        "finishedAt": "2026-07-07T06:58:04.119Z",
+        "attempts": 1,
+        "runIds": [
+          "main",
+          "implementer-2c1e2363f97996041236d8fb"
+        ],
+        "lastRunId": "implementer-2c1e2363f97996041236d8fb",
+        "claimedAt": "2026-07-07T06:56:12.079Z",
+        "claimedByContextId": "pi_019f3b52-b2b9-7946-87d2-a9f0cc360a6e",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/library.md` — documented async-start light projection, lifecycle projections, compact wait behavior, and async progress handoff to `ypi_studio_wait`.\n- `docs/modules/frontend.md` — documented UI compatibility for `run.id ?? run.runId`, task/subtask title fallbacks, lightweight async-start cards, and compact wait payloads.\n- `.ypi/tasks/20260707-143502-精简异步-ypi_studio_subagent-返回上下文/handoff.md` — updated handoff artifact for this subtask.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No production code changes were made in this subtask.\n- Manual async start + wait UI smoke test was not run; recommend reviewer verify if needed.\n\n#### Decisions Needed\n\n- None."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-07T06:45:28.443Z",
+        "subtaskId": "light-projection-helpers",
+        "from": "ready",
+        "to": "running",
+        "runId": "main"
+      },
+      {
+        "at": "2026-07-07T06:48:46.531Z",
+        "subtaskId": "async-start-light-result",
+        "from": "ready",
+        "to": "running",
+        "runId": "main"
+      },
+      {
+        "at": "2026-07-07T06:51:03.917Z",
+        "subtaskId": "lifecycle-actions-light-result",
+        "from": "ready",
+        "to": "running",
+        "runId": "main"
+      },
+      {
+        "at": "2026-07-07T06:53:13.049Z",
+        "subtaskId": "ui-runid-title-compat",
+        "from": "ready",
+        "to": "running",
+        "runId": "main"
+      },
+      {
+        "at": "2026-07-07T06:56:12.079Z",
+        "subtaskId": "docs-and-validation",
+        "from": "ready",
+        "to": "running",
+        "runId": "main"
+      }
+    ]
+  }
+}
