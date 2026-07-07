@@ -5,6 +5,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | Route | Methods | Purpose |
 | --- | --- | --- |
 | `projects/` | GET/POST | List Project Registry records from `~/.pi/agent/pi-web-projects.json`, or register a project path and create its main space without scanning sessions. |
+| `projects/select-directory/` | POST | Open a local OS directory picker from the server process and return the selected project path; manual path entry remains the fallback when a picker is unavailable. |
 | `projects/[projectId]/` | GET/PATCH | Read or update project metadata (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`). |
 | `projects/[projectId]/spaces/` | GET | List spaces for one registered project. |
 | `projects/[projectId]/spaces/[spaceId]/` | GET/PATCH | Read or update project-space metadata, including the main space created at registration. |

@@ -9,11 +9,19 @@ import { displayTitleForSession } from "@/lib/session-title";
 import { Checkbox } from "./Checkbox";
 import { FileExplorer } from "./FileExplorer";
 
+export interface ProjectSpaceSelectionContext {
+  projectId: string;
+  projectName: string;
+  spaceId: string;
+  spaceName: string;
+  cwd: string;
+}
+
 interface Props {
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean) => void;
   onNewSession?: (sessionId: string, cwd: string, projectId?: string, spaceId?: string) => void;
-  onProjectSpaceChange?: (context: { projectId: string; spaceId: string; cwd: string } | null) => void;
+  onProjectSpaceChange?: (context: ProjectSpaceSelectionContext | null) => void;
   initialSessionId?: string | null;
   onInitialRestoreDone?: () => void;
   refreshKey?: number;
@@ -368,6 +376,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [customPathValue, setCustomPathValue] = useState("");
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [customPathValidating, setCustomPathValidating] = useState(false);
+  const [directoryPickerBusy, setDirectoryPickerBusy] = useState(false);
   const customPathInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
@@ -640,7 +649,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   useEffect(() => {
     const selected = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
-    onProjectSpaceChange?.(selected ? { projectId: selected.project.id, spaceId: selected.space.id, cwd: selected.space.path } : null);
+    onProjectSpaceChange?.(selected ? {
+      projectId: selected.project.id,
+      projectName: displayProjectName(selected.project),
+      spaceId: selected.space.id,
+      spaceName: displaySpaceName(selected.space),
+      cwd: selected.space.path,
+    } : null);
   }, [onProjectSpaceChange, projects, selectedProjectId, selectedSpaceId]);
 
   useEffect(() => {
@@ -732,6 +747,27 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }, [projects, selectedCwd, selectedProjectId, selectedSpaceId]);
 
+  const registerAndSelectProjectPath = useCallback(async (path: string) => {
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; error?: string };
+    if (!res.ok || data.error || !data.project) {
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+    const mainSpace = data.project.spaces.main;
+    setProjects((prev) => [data.project!, ...prev.filter((project) => project.id !== data.project!.id)]);
+    setSelectedProjectId(data.project.id);
+    setSelectedSpaceId(mainSpace.id);
+    setSelectedCwd(mainSpace.path);
+    setCustomPathOpen(false);
+    setCustomPathValue("");
+    setCustomPathError(null);
+    setDropdownOpen(false);
+  }, []);
+
   const commitCustomPath = useCallback(async () => {
     const path = customPathValue.trim();
     if (!path || customPathValidating) return;
@@ -739,60 +775,45 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     setCustomPathValidating(true);
     setCustomPathError(null);
     try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path }),
-      });
-      const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; error?: string };
-      if (!res.ok || data.error || !data.project) {
-        setCustomPathError(data.error ?? `HTTP ${res.status}`);
-        return;
-      }
-      const mainSpace = data.project.spaces.main;
-      setProjects((prev) => [data.project!, ...prev.filter((project) => project.id !== data.project!.id)]);
-      setSelectedProjectId(data.project.id);
-      setSelectedSpaceId(mainSpace.id);
-      setSelectedCwd(mainSpace.path);
-      setCustomPathOpen(false);
-      setCustomPathValue("");
-      setDropdownOpen(false);
+      await registerAndSelectProjectPath(path);
     } catch (e) {
       setCustomPathError(e instanceof Error ? e.message : String(e));
     } finally {
       setCustomPathValidating(false);
     }
-  }, [customPathValue, customPathValidating]);
+  }, [customPathValue, customPathValidating, registerAndSelectProjectPath]);
 
   const handleDefaultCwd = useCallback(async () => {
     try {
       const res = await fetch("/api/default-cwd", { method: "POST" });
       const data = await res.json() as { cwd?: string; error?: string };
       if (data.cwd) {
-        const projectRes = await fetch("/api/projects", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: data.cwd }),
-        });
-        const projectData = await projectRes.json().catch(() => ({})) as { project?: PiWebProjectRecord };
-        if (projectData.project?.spaces.main) {
-          const mainSpace = projectData.project.spaces.main;
-          setProjects((prev) => [projectData.project!, ...prev.filter((project) => project.id !== projectData.project!.id)]);
-          setSelectedProjectId(projectData.project.id);
-          setSelectedSpaceId(mainSpace.id);
-          setSelectedCwd(mainSpace.path);
-        } else {
-          setSelectedCwd(data.cwd);
-        }
-        setCustomPathOpen(false);
-        setCustomPathValue("");
-        setCustomPathError(null);
-        setDropdownOpen(false);
+        await registerAndSelectProjectPath(data.cwd);
       }
     } catch {
       // ignore
     }
-  }, []);
+  }, [registerAndSelectProjectPath]);
+
+  const handleDirectoryPicker = useCallback(async () => {
+    if (directoryPickerBusy) return;
+    setDirectoryPickerBusy(true);
+    setCustomPathError(null);
+    try {
+      const res = await fetch("/api/projects/select-directory", { method: "POST" });
+      const data = await res.json().catch(() => ({})) as { path?: string; canceled?: boolean; error?: string };
+      if (data.canceled) return;
+      if (!res.ok || data.error || !data.path) {
+        setCustomPathError(data.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      await registerAndSelectProjectPath(data.path);
+    } catch (e) {
+      setCustomPathError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDirectoryPickerBusy(false);
+    }
+  }, [directoryPickerBusy, registerAndSelectProjectPath]);
 
   // Close dropdown/context menu on outside click
   useEffect(() => {
@@ -1386,6 +1407,40 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                   </svg>
                   <span>Use default directory</span>
                 </button>
+              )}
+
+              {/* Directory picker shortcut */}
+              {!customPathOpen && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); void handleDirectoryPicker(); }}
+                  disabled={directoryPickerBusy}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    width: "100%",
+                    padding: "8px 10px",
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: directoryPickerBusy ? "wait" : "pointer",
+                    opacity: directoryPickerBusy ? 0.65 : 1,
+                    textAlign: "left",
+                    fontSize: 11,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
+                    <path d="M5 5.5h2.5" />
+                  </svg>
+                  <span>{directoryPickerBusy ? "Waiting for folder selection…" : "Choose project folder…"}</span>
+                </button>
+              )}
+
+              {!customPathOpen && customPathError && (
+                <div style={{ padding: "0 10px 7px", color: "#dc2626", fontSize: 11, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+                  {customPathError}
+                </div>
               )}
 
               {/* Custom path entry */}

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SessionSidebar } from "./SessionSidebar";
+import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
 import { FileViewer } from "./FileViewer";
 import { TabBar, type Tab } from "./TabBar";
@@ -58,7 +58,7 @@ export function AppShell() {
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   // When user clicks +, we only store the cwd/project context — no fake session id
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
-  const [activeProjectContext, setActiveProjectContext] = useState<{ projectId: string; spaceId: string; cwd: string } | null>(null);
+  const [activeProjectContext, setActiveProjectContext] = useState<ProjectSpaceSelectionContext | null>(null);
   const [newSessionProjectContext, setNewSessionProjectContext] = useState<{ projectId: string; spaceId: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
@@ -399,6 +399,7 @@ export function AppShell() {
   const rightPanelTogglePadding = rightPanelOpen ? 12 : 48 + 36 + (trellisEnabled ? 36 : 0);
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
+  const browserTitleProjectContext = activeProjectContext?.cwd === browserTitleCwd ? activeProjectContext : null;
 
   const loadTrellisSessionTask = useCallback(async (signal?: AbortSignal) => {
     if (!trellisEnabled || !selectedSession || selectedSession.archived) {
@@ -608,7 +609,9 @@ export function AppShell() {
   }, [activeCwd]);
 
   useEffect(() => {
-    const title = formatWorkspaceTitle(browserTitleCwd, browserTitleGit);
+    const title = browserTitleProjectContext
+      ? `${browserTitleProjectContext.projectName}(${browserTitleProjectContext.spaceName})`
+      : formatWorkspaceTitle(browserTitleCwd, browserTitleGit);
     const applyTitle = () => {
       if (document.title !== title) document.title = title;
     };
@@ -624,7 +627,7 @@ export function AppShell() {
       window.clearTimeout(timeout);
       observer.disconnect();
     };
-  }, [browserTitleCwd, browserTitleGit]);
+  }, [browserTitleCwd, browserTitleGit, browserTitleProjectContext]);
 
   const sidebarContainerStyle = {
     "--sidebar-width": `${sidebarWidth}px`,
