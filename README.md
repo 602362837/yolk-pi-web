@@ -15,6 +15,7 @@ npm 包名：`@alan-zhao/yolk-pi-web`
 | pi agent 数据目录 | 默认 `~/.pi/agent/` | Web UI 会读取本机 pi 会话、模型和设置文件。 |
 | Git | 可选但建议安装 | Git 状态、分支、WorkTree 功能需要。 |
 | 本地 shell | 可选 | 开启 Web Terminal 时需要系统 shell。 |
+| Chrome 浏览器 | 可选 | 安装 YPI Browser Share 扩展后，可把当前 Chrome 标签页分享给指定 YPI 会话。 |
 
 > `@lydell/node-pty` 是 Web Terminal 的原生 PTY 依赖。通常随 npm 安装自动处理；如果目标机器缺少原生依赖构建环境，可先关闭 Web Terminal 功能。
 
@@ -34,6 +35,20 @@ ypi
 ```
 
 默认监听 `http://localhost:30141`。服务就绪后，CLI 会尝试自动打开浏览器。
+
+## Chrome 标签页分享（Browser Share）
+
+`ypi` 支持通过独立的 Chrome 扩展 **YPI Browser Share**，把当前浏览器标签页安全地绑定到指定聊天/会话。绑定后，agent 可以读取经过脱敏的页面快照、当前选中文本和交互元素摘要；在用户授权下，还可以执行受控的 `click`、`type`、`scroll`、`navigate` 操作。
+
+扩展项目与安装说明见：[`ypi-browser-share-extension`](https://github.com/602362837/ypi-browser-share-extension/blob/main/README.md)。当前扩展未上架 Chrome Web Store，需要以“加载已解压的扩展程序”的方式安装：
+
+1. 启动 ypi web，默认地址为 `http://localhost:30141`。
+2. 克隆或下载扩展项目，并在 Chrome 打开 `chrome://extensions/`。
+3. 开启 **开发者模式**，点击 **加载已解压的扩展程序**，选择包含 `manifest.json` 的扩展目录。
+4. 建议把 **YPI Browser Share** 固定到 Chrome 工具栏。
+5. 如 ypi web 使用了自定义端口、局域网地址、HTTPS 反向代理或路径前缀，请在扩展弹窗中修改 **蛋黄派服务地址** 并点击 **保存并测试**。
+
+使用流程：在要分享的页面点击扩展的 **分享当前页** 生成一次性分享码，然后回到目标 YPI 聊天/会话，点击输入区工具栏的 **绑定浏览器分享** 并粘贴分享码。分享只绑定到当前会话；默认只读，风险操作会通过 ypi 侧确认流程保护。分享期间 Chrome 会显示 debugger 提示条，扩展弹窗和 ypi 面板会显示当前绑定、权限和 debugger 状态。
 
 ## 常用启动参数
 
@@ -86,6 +101,7 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent-data ypi
 - **会话分叉与分支导航**：从任意用户消息创建新会话，或在同一会话内回退节点继续探索。
 - **模型与工具配置**：在对话中切换模型、调整 thinking level、配置工具预设和可用模型。
 - **文件、Git 与终端辅助**：浏览当前工作区文件，查看 Git 状态，创建 WorkTree，并可按设置开启 Web Terminal。
+- **Chrome 标签页分享**：通过 YPI Browser Share 扩展把当前标签页绑定到指定会话，支持脱敏快照读取和经授权的受控浏览器操作。
 - **长会话管理**：支持压缩会话摘要，降低长上下文继续工作的成本。
 
 ## 从源码运行
