@@ -3,9 +3,10 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } fro
 import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { initializeYpiStudioAgents } from "./ypi-studio-agents";
-import { readPiWebConfigForApi } from "./pi-web-config";
+import { readPiWebConfigForApi, type PiWebStudioSubagentRunner } from "./pi-web-config";
 import { resolveYpiStudioMemberPolicy, type ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import {
   archiveYpiStudioTask,
@@ -35,6 +36,7 @@ import {
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
 import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
+import { runYpiStudioSdkChildSession } from "./ypi-studio-child-session-runner";
 import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskDetail, YpiStudioTaskEvent, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
@@ -711,15 +713,34 @@ function boundedAppendTail(current: string, addition: string, maxBytes: number):
   return combined.slice(start);
 }
 
+function resolvePiCodingAgentPackageDir(): string | null {
+  try {
+    const resolved = import.meta.resolve("@earendil-works/pi-coding-agent");
+    const entryPath = resolved.startsWith("file:") ? fileURLToPath(resolved) : resolved;
+    return dirname(dirname(entryPath));
+  } catch {
+    return null;
+  }
+}
+
+function pushPiCliCandidate(candidates: string[], candidate: string | null | undefined): void {
+  if (!candidate) return;
+  const resolved = resolve(candidate);
+  if (!candidates.includes(resolved)) candidates.push(resolved);
+}
+
 function resolvePiCli(): { command: string; args: string[] } {
   const candidates: string[] = [];
+  const packageDir = resolvePiCodingAgentPackageDir();
+  pushPiCliCandidate(candidates, packageDir ? join(packageDir, "dist", "cli.js") : null);
+  pushPiCliCandidate(candidates, join(process.cwd(), "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js"));
   for (const arg of process.argv) {
-    if (/pi-coding-agent[\\/]dist[\\/]cli\.js$/i.test(arg)) candidates.push(resolve(arg));
+    if (/pi-coding-agent[\\/]dist[\\/]cli\.js$/i.test(arg)) pushPiCliCandidate(candidates, arg);
   }
   const prefix = str(process.env.npm_config_prefix) ?? str(process.env.NPM_CONFIG_PREFIX);
   if (prefix) {
-    candidates.push(join(prefix, "lib", "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js"));
-    candidates.push(join(prefix, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js"));
+    pushPiCliCandidate(candidates, join(prefix, "lib", "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js"));
+    pushPiCliCandidate(candidates, join(prefix, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js"));
   }
   for (const candidate of candidates) {
     if (existsSync(candidate)) return { command: process.execPath, args: [candidate] };
@@ -791,8 +812,13 @@ interface ChildRunMeta {
   member: string;
   startedAt: string;
   parentSessionId?: string;
+  parentSessionFile?: string;
   subtaskId?: string;
   continuationOnFinal?: boolean;
+  runner?: YpiStudioTaskSubagentRun["runner"];
+  childSessionId?: string;
+  childSessionFile?: string;
+  requestAffinity?: YpiStudioTaskSubagentRun["requestAffinity"];
 }
 
 
@@ -803,6 +829,36 @@ interface ChildPiResult {
   warnings: string[];
   progress: YpiStudioSubagentRunProgress;
   terminationReason?: string;
+  runner?: YpiStudioTaskSubagentRun["runner"];
+  childSessionId?: string;
+  childSessionFile?: string;
+  requestAffinity?: YpiStudioTaskSubagentRun["requestAffinity"];
+}
+
+function resolveStudioSubagentRunner(configured: PiWebStudioSubagentRunner): { runner: YpiStudioTaskSubagentRun["runner"]; configured: PiWebStudioSubagentRunner; warnings: string[] } {
+  if (configured === "cli") return { runner: "cli", configured, warnings: [] };
+  if (configured === "sdk") return { runner: "sdk", configured, warnings: [] };
+  return {
+    runner: "sdk",
+    configured,
+    warnings: ["studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."],
+  };
+}
+
+function buildRequestAffinity(policy: ResolvedYpiStudioMemberPolicy, meta: Pick<ChildRunMeta, "parentSessionId" | "childSessionId" | "requestAffinity">): YpiStudioTaskSubagentRun["requestAffinity"] {
+  const childSessionId = meta.requestAffinity?.childSessionId ?? meta.childSessionId;
+  if (!childSessionId) return undefined;
+  return {
+    schemaVersion: 1,
+    providerSessionIdSource: "childSessionId",
+    parentSessionId: meta.requestAffinity?.parentSessionId ?? meta.parentSessionId,
+    childSessionId,
+    model: meta.requestAffinity?.model ?? policy.modelLabel,
+    modelSource: meta.requestAffinity?.modelSource ?? policy.modelSource,
+    thinking: meta.requestAffinity?.thinking ?? policy.thinkingLabel,
+    thinkingSource: meta.requestAffinity?.thinkingSource ?? policy.thinkingSource,
+    note: meta.requestAffinity?.note ?? "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id.",
+  };
 }
 
 interface ChildPiPersistenceCallbacks {
@@ -850,6 +906,7 @@ function runChildPi(
     let finalOutputTruncated = false;
     let status: YpiStudioTaskSubagentRun["status"] = "running";
     let terminationReason: string | undefined;
+    const requestAffinity = buildRequestAffinity(policy, meta);
     let settled = false;
     let terminating = false;
     let lastUpdateAt = 0;
@@ -957,6 +1014,10 @@ function runChildPi(
       subtaskId: meta.subtaskId,
       status: runStatus,
       startedAt: meta.startedAt,
+      runner: meta.runner ?? "cli",
+      childSessionId: meta.childSessionId,
+      childSessionFile: meta.childSessionFile,
+      requestAffinity,
       prompt: undefined,
       summary: summary ?? oneLine(lastTextPreview, 1000),
       model: policy.modelLabel,
@@ -982,6 +1043,10 @@ function runChildPi(
             member: meta.member,
             status,
             taskId: meta.taskId,
+            runner: meta.runner ?? "cli",
+            childSessionId: meta.childSessionId,
+            childSessionFile: meta.childSessionFile,
+            requestAffinity,
             model: policy.modelLabel,
             thinking: policy.thinkingLabel,
             modelSource: policy.modelSource,
@@ -1075,20 +1140,7 @@ function runChildPi(
       return truncated.text;
     };
 
-    const parseLine = (line: string): void => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      markActivity();
-      const at = new Date().toISOString();
-      let event: unknown;
-      try {
-        event = JSON.parse(trimmed) as unknown;
-      } catch {
-        lastTextPreview = "Ignored non-JSON stdout from child process.";
-        appendItem({ kind: "status", at, text: lastTextPreview, truncated: true });
-        emitProgress();
-        return;
-      }
+    const handleChildEvent = (event: unknown, at = new Date().toISOString()): void => {
       eventCount += 1;
       const eventType = isObj(event) && typeof event.type === "string" ? event.type : "json";
       if (eventType === "agent_start") {
@@ -1172,6 +1224,23 @@ function runChildPi(
       emitProgress();
     };
 
+    const parseLine = (line: string): void => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      markActivity();
+      const at = new Date().toISOString();
+      let event: unknown;
+      try {
+        event = JSON.parse(trimmed) as unknown;
+      } catch {
+        lastTextPreview = "Ignored non-JSON stdout from child process.";
+        appendItem({ kind: "status", at, text: lastTextPreview, truncated: true });
+        emitProgress();
+        return;
+      }
+      handleChildEvent(event, at);
+    };
+
     const flushStdoutLines = (chunk: Buffer): void => {
       if (settled) return;
       markActivity();
@@ -1238,7 +1307,7 @@ function runChildPi(
         tokenSource = "estimated_chars";
       }
       emitProgress(true);
-      const childResult = { output, status, transcript, warnings, progress: progressSnapshot(), terminationReason: terminationReason ?? undefined } satisfies ChildPiResult;
+      const childResult = { output, status, transcript, warnings, progress: progressSnapshot(), terminationReason: terminationReason ?? undefined, runner: meta.runner ?? "cli", childSessionId: meta.childSessionId, childSessionFile: meta.childSessionFile, requestAffinity } satisfies ChildPiResult;
       const finalRun = runSnapshot(status, output);
       finalRun.finishedAt = new Date().toISOString();
       finalRun.progress = childResult.progress;
@@ -1277,6 +1346,9 @@ function runChildPi(
       cwd: root,
       parentSessionId: meta.parentSessionId,
       pid: child.pid,
+      runner: meta.runner ?? "cli",
+      childSessionId: meta.childSessionId,
+      childSessionFile: meta.childSessionFile,
       startedAt: meta.startedAt,
       status: "running",
       abort: (reason) => terminateChild(reason, "cancelled"),
@@ -1285,7 +1357,7 @@ function runChildPi(
         cancelledRun.finishedAt = new Date().toISOString();
         cancelledRun.terminationReason = reason;
         try {
-          persistence?.onFinal?.(cancelledRun, { output: cancelledRun.summary ?? "cancelled", status: "cancelled", transcript: cancelledRun.transcript, warnings, progress: cancelledRun.progress!, terminationReason: reason });
+          persistence?.onFinal?.(cancelledRun, { output: cancelledRun.summary ?? "cancelled", status: "cancelled", transcript: cancelledRun.transcript, warnings, progress: cancelledRun.progress!, terminationReason: reason, runner: meta.runner ?? "cli", childSessionId: meta.childSessionId, childSessionFile: meta.childSessionFile, requestAffinity });
         } catch {
           // Best-effort persistence; terminateChild/finish will perform the normal finalizer if the parent tool remains alive.
         }
@@ -1367,6 +1439,10 @@ interface StudioSubagentRunProjection {
   status: YpiStudioTaskSubagentRun["status"];
   registryStatus?: string;
   registryActive: boolean;
+  runner?: YpiStudioTaskSubagentRun["runner"];
+  childSessionId?: string;
+  childSessionFile?: string;
+  requestAffinity?: YpiStudioTaskSubagentRun["requestAffinity"];
   progress?: YpiStudioSubagentRunProgress;
   transcript?: YpiStudioSubagentTranscriptRef;
   transcriptPreview?: unknown;
@@ -1400,6 +1476,10 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba
     status: handle?.status === "runtime_lost" ? run.status : handle?.status ?? run.status,
     registryStatus: handle?.status,
     registryActive: !!handle,
+    runner: handle?.runner ?? run.runner,
+    childSessionId: handle?.childSessionId ?? run.childSessionId,
+    childSessionFile: handle?.childSessionFile ?? run.childSessionFile,
+    requestAffinity: run.requestAffinity,
     progress: handle?.progress ?? run.progress,
     transcript: run.transcript,
     transcriptPreview,
@@ -1438,6 +1518,10 @@ function compactSubagentRunProjection(run: StudioSubagentRunProjection): Record<
     status: run.status,
     registryStatus: run.registryStatus,
     registryActive: run.registryActive,
+    runner: run.runner,
+    childSessionId: run.childSessionId,
+    childSessionFile: run.childSessionFile,
+    requestAffinity: run.requestAffinity,
     progress,
     transcript: run.transcript,
     transcriptPreview,
@@ -1511,6 +1595,13 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       ?? callStr(ctx?.sessionManager?.getSessionId)
       ?? lookupStr(input, ["parentSessionId", "session_id", "sessionId", "sessionID"])
       ?? getKey(input, ctx);
+  };
+
+  const getParentSessionFile = (input?: unknown, ctx?: PiExtensionContext): string | undefined => {
+    return sessionContext?.sessionFile
+      ?? callStr(ctx?.sessionManager?.getSessionFile)
+      ?? lookupStr(input, ["parentSessionFile", "transcript_path", "transcriptPath", "transcript"])
+      ?? undefined;
   };
 
   pi.registerCommand("studio-init", {
@@ -1820,6 +1911,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         if (!requestedMember || !prompt) throw new Error("member and prompt are required for start");
         const configResult = readPiWebConfigForApi();
         const policy = resolveYpiStudioMemberPolicy({ input, configResult, main: { model: ctx?.model, thinking: currentThinking(pi) } });
+        const runnerSelection = resolveStudioSubagentRunner(configResult.config.studio.subagents.runner);
         const member = policy.member;
         const startedAt = new Date().toISOString();
         const runId = str(input.runId) ?? `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
@@ -1846,9 +1938,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
 
         const childPrompt = buildMemberPrompt(root, taskId, member, prompt, subtaskId);
         let writer: YpiStudioSubagentTranscriptWriter | null = null;
-        const warnings: string[] = [];
+        const warnings: string[] = [...runnerSelection.warnings];
         try {
           writer = createYpiStudioSubagentTranscript(root, taskId, { runId, member, startedAt });
+          writer.ref.runner = runnerSelection.runner;
           appendYpiStudioSubagentTranscriptItem(writer, { kind: "prompt", at: startedAt, text: prompt });
         } catch (error) {
           warnings.push(`Transcript capture unavailable: ${error instanceof Error ? error.message : String(error)}`);
@@ -1867,6 +1960,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           subtaskId,
           status: "running",
           startedAt,
+          runner: runnerSelection.runner,
           prompt: oneLine(prompt, 240),
           summary: mode === "async" ? "Async child Pi process starting." : "Child Pi process starting.",
           model: policy.modelLabel,
@@ -1903,19 +1997,55 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           content: [{ type: "text", text: `${member} running · model: ${policy.modelLabel} · thinking: ${policy.thinkingLabel} · child process starting` }],
           details: { run: compactSubagentRunProjection(projectSubagentRun(root, taskId, runningRun)) },
         });
-        const childPromise = runChildPi(
-          root,
-          childPrompt,
-          policy,
-          { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), subtaskId, continuationOnFinal: false },
-          writer,
-          signal,
-          onUpdate,
-          {
-            onProgress: persistRunSnapshot,
-            onFinal: (run) => { persistRunSnapshot(run); },
-          },
-        );
+        const childMeta: ChildRunMeta = { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), parentSessionFile: getParentSessionFile(inputValue, ctx), subtaskId, continuationOnFinal: false, runner: runnerSelection.runner };
+        const childPromise = runnerSelection.runner === "sdk"
+          ? runYpiStudioSdkChildSession({
+            root,
+            prompt: childPrompt,
+            policy,
+            meta: childMeta,
+            writer,
+            signal,
+            onUpdate,
+            persistence: {
+              onProgress: persistRunSnapshot,
+              onFinal: (run) => { persistRunSnapshot(run); },
+            },
+          }).catch((error) => {
+            const isPreflight = error && typeof error === "object" && (error as { preflight?: boolean }).preflight === true;
+            if (runnerSelection.configured !== "auto" || !isPreflight) throw error;
+            const fallbackWarning = error instanceof Error ? error.message : String(error);
+            warnings.push(`${fallbackWarning}; falling back to bundled CLI runner because studio.subagents.runner=auto and no child prompt was executed.`);
+            if (writer) writer.ref.runner = "cli";
+            const fallbackRun: YpiStudioTaskSubagentRun = { ...runningRun, runner: "cli", summary: "SDK child runner preflight failed; falling back to CLI child process.", progress: runningRun.progress ? { ...runningRun.progress, warnings: [...(runningRun.progress.warnings ?? []), ...warnings], lastTextPreview: "SDK preflight failed; CLI fallback starting." } : undefined };
+            persistRunSnapshot(fallbackRun);
+            return runChildPi(
+              root,
+              childPrompt,
+              policy,
+              { ...childMeta, runner: "cli", childSessionId: undefined, childSessionFile: undefined, requestAffinity: undefined },
+              writer,
+              signal,
+              onUpdate,
+              {
+                onProgress: persistRunSnapshot,
+                onFinal: (run) => { persistRunSnapshot(run); },
+              },
+            );
+          })
+          : runChildPi(
+            root,
+            childPrompt,
+            policy,
+            childMeta,
+            writer,
+            signal,
+            onUpdate,
+            {
+              onProgress: persistRunSnapshot,
+              onFinal: (run) => { persistRunSnapshot(run); },
+            },
+          );
         if (mode === "async") {
           childPromise.catch(() => {});
           return {
@@ -1933,6 +2063,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           status: result.status,
           startedAt,
           finishedAt,
+          runner: result.runner ?? "cli",
+          childSessionId: result.childSessionId,
+          childSessionFile: result.childSessionFile,
+          requestAffinity: result.requestAffinity,
           prompt: oneLine(prompt, 240),
           summary: oneLine(result.output, 1000),
           model: policy.modelLabel,

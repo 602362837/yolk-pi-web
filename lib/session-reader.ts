@@ -1,12 +1,13 @@
 import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
-import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage } from "./types";
+import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage, StudioChildSessionInfo } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
 import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd, expandCwd } from "./cwd";
 import { getSessionProjectLink } from "./session-project-link";
+import { parseSessionHeaderMetadata } from "./session-header-metadata";
 
 export { getAgentDir };
 
@@ -117,7 +118,11 @@ export async function listSessionCwdsForAllowedRoots(): Promise<string[]> {
 
 export interface ListAllSessionsOptions {
   includeGit?: boolean;
+  /** Include YPI Studio child audit sessions as list roots. Defaults to false so project history stays focused on user chats. */
+  includeStudioChildren?: boolean;
 }
+
+export { parseSessionHeaderMetadata } from "./session-header-metadata";
 
 export async function listAllSessions(options: ListAllSessionsOptions = {}): Promise<SessionInfo[]> {
   let piSessions: PiSessionInfo[] = await SessionManager.listAll();
@@ -163,9 +168,11 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
     // Populate path cache so resolveSessionPath works without a full scan
     cache.set(s.id, s.path);
     let projectLink: { legacyUnassigned: boolean; projectId?: string; spaceId?: string } = { legacyUnassigned: true };
+    let studioChild: StudioChildSessionInfo | undefined;
     try {
-      const headerLine = readFirstLineSync(s.path);
-      projectLink = getSessionProjectLink(JSON.parse(headerLine) as never);
+      const metadata = parseSessionHeaderMetadata(readFirstLineSync(s.path));
+      projectLink = metadata.projectLink;
+      studioChild = metadata.studioChild;
     } catch {
       // Keep session listing tolerant of malformed/missing headers; orphan handling lives in detail routes.
     }
@@ -176,7 +183,8 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
       name: s.name,
       projectId: projectLink.projectId,
       spaceId: projectLink.spaceId,
-      legacyUnassigned: projectLink.legacyUnassigned,
+      legacyUnassigned: studioChild ? false : projectLink.legacyUnassigned,
+      studioChild,
       created: s.created instanceof Date ? s.created.toISOString() : String(s.created),
       modified: s.modified instanceof Date ? s.modified.toISOString() : String(s.modified),
       messageCount: s.messageCount,
@@ -185,7 +193,7 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
       worktree: options.includeGit && cwd ? worktreeByCwd.get(cwd) : undefined,
       git: options.includeGit && cwd ? gitByCwd.get(cwd) : undefined,
     };
-  });
+  }).filter((session) => options.includeStudioChildren || !session.studioChild);
 }
 
 // ============================================================================

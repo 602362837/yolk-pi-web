@@ -318,6 +318,19 @@ function WorkspaceMenuButton({ children, danger = false, onClick }: { children: 
   );
 }
 
+function studioChildLabel(session: SessionInfo): string | null {
+  const child = session.studioChild;
+  if (!child) return null;
+  const run = child.runId ? child.runId.slice(0, 8) : "run";
+  return `Studio ${child.member}${child.subtaskId ? ` · ${child.subtaskId}` : ""} · ${child.status ?? "audit"} · ${run}`;
+}
+
+function studioChildBadgeText(session: SessionInfo): string | null {
+  const child = session.studioChild;
+  if (!child) return null;
+  return `${child.member} · ${child.status ?? "audit"}`;
+}
+
 function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
   const byId = new Map<string, SessionTreeNode>();
   for (const s of sessions) {
@@ -2224,7 +2237,8 @@ function SessionItem({
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const title = displayTitleForSession(session);
+  const title = studioChildLabel(session) ?? displayTitleForSession(session);
+  const studioBadge = studioChildBadgeText(session);
 
   const startRename = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2418,6 +2432,11 @@ function SessionItem({
                 {title}
               </div>
               <WorktreeBadge worktree={session.worktree} />
+              {studioBadge && (
+                <span title="YPI Studio child audit session" style={{ flexShrink: 0, padding: "1px 5px", borderRadius: 999, background: "rgba(37,99,235,0.10)", border: "1px solid rgba(37,99,235,0.22)", color: "var(--accent)", fontSize: 9, fontWeight: 800 }}>
+                  {studioBadge}
+                </span>
+              )}
             </div>
             <div style={{ marginTop: 2, display: "flex", gap: 8, color: "var(--text-dim)", fontSize: 11 }}>
               <span title={session.modified}>{formatRelativeTime(session.modified)}</span>

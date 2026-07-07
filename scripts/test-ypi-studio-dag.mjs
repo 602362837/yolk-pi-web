@@ -25,8 +25,42 @@ import {
   unregisterYpiStudioChildRun,
   unregisterYpiStudioSessionContinuation,
 } from "../lib/ypi-studio-subagent-runtime.ts";
+import { parseSessionHeaderMetadata } from "../lib/session-header-metadata.ts";
 
 const now = "2026-07-03T00:00:00.000Z";
+
+{
+  const metadata = parseSessionHeaderMetadata(JSON.stringify({
+    type: "session",
+    id: "child-session",
+    timestamp: now,
+    cwd: process.cwd(),
+    parentSession: "/tmp/parent.jsonl",
+    projectId: "project-1",
+    spaceId: "main",
+    studioChild: {
+      schemaVersion: 1,
+      kind: "ypi-studio-child-session",
+      runner: "sdk",
+      visibility: "child",
+      status: "running",
+      parentSessionId: "parent-session",
+      parentSessionFile: "/tmp/parent.jsonl",
+      contextId: "pi_parent-session",
+      taskId: "task-1",
+      runId: "run-1",
+      member: "checker",
+      subtaskId: "check-docs",
+      createdAt: now,
+    },
+  }));
+  assert.equal(metadata.projectLink.projectId, "project-1");
+  assert.equal(metadata.projectLink.spaceId, "main");
+  assert.equal(metadata.studioChild?.kind, "ypi-studio-child-session");
+  assert.equal(metadata.studioChild?.runner, "sdk");
+  assert.equal(metadata.studioChild?.parentSessionId, "parent-session");
+  assert.equal(metadata.studioChild?.taskId, "task-1");
+}
 
 function plan(subtasks, extra = {}) {
   const normalized = normalizeImplementationPlan({

@@ -89,9 +89,16 @@ export interface PiWebTrellisConfig {
 
 export type PiWebStudioMemberId = "architect" | "ui-designer" | "implementer" | "checker" | string;
 
+export type PiWebStudioSubagentRunner = "auto" | "sdk" | "cli";
+
+export interface PiWebStudioSubagentsConfig {
+  runner: PiWebStudioSubagentRunner;
+}
+
 export interface PiWebStudioConfig {
   defaultPolicy: PiWebSubagentRunPolicy;
   members: Record<PiWebStudioMemberId, PiWebSubagentRunPolicy>;
+  subagents: PiWebStudioSubagentsConfig;
 }
 
 export interface PiWebUsageConfig {
@@ -271,6 +278,9 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   studio: {
     defaultPolicy: DEFAULT_STUDIO_POLICY,
     members: Object.fromEntries(PI_WEB_STUDIO_DEFAULT_MEMBERS.map((member) => [member, DEFAULT_STUDIO_POLICY])) as Record<string, PiWebSubagentRunPolicy>,
+    subagents: {
+      runner: "auto",
+    },
   },
   trellis: {
     enabled: false,
@@ -598,6 +608,10 @@ function readTrellisSubagentsConfig(value: unknown, fallback: PiWebTrellisSubage
   };
 }
 
+function readStudioSubagentRunner(value: unknown, fallback: PiWebStudioSubagentRunner): PiWebStudioSubagentRunner {
+  return value === "auto" || value === "sdk" || value === "cli" ? value : fallback;
+}
+
 function readStudioConfig(value: unknown, fallback: PiWebStudioConfig): PiWebStudioConfig {
   const root = isRecord(value) ? value : {};
   const defaultPolicy = readSubagentPolicy(root.defaultPolicy, fallback.defaultPolicy);
@@ -611,7 +625,14 @@ function readStudioConfig(value: unknown, fallback: PiWebStudioConfig): PiWebStu
   for (const member of PI_WEB_STUDIO_DEFAULT_MEMBERS) {
     members[member] = readSubagentPolicy(rawMembers[member], members[member] ?? defaultPolicy);
   }
-  return { defaultPolicy, members };
+  const rawSubagents = isRecord(root.subagents) ? root.subagents : {};
+  return {
+    defaultPolicy,
+    members,
+    subagents: {
+      runner: readStudioSubagentRunner(rawSubagents.runner, fallback.subagents.runner),
+    },
+  };
 }
 
 function readChatGptWarmupConfig(value: unknown, fallback: PiWebChatGptWarmupConfig): PiWebChatGptWarmupConfig {
@@ -920,6 +941,11 @@ function validateTrellisSubagentsConfig(value: unknown): PiWebTrellisSubagentsCo
   };
 }
 
+function validateStudioSubagentRunner(value: unknown): PiWebStudioSubagentRunner {
+  if (value === "auto" || value === "sdk" || value === "cli") return value;
+  throw new PiWebConfigValidationError("studio.subagents.runner must be auto, sdk, or cli");
+}
+
 export function validatePiWebStudioConfig(value: unknown): PiWebStudioConfig {
   if (!isRecord(value)) throw new PiWebConfigValidationError("studio config must be an object");
   const rawMembers = isRecord(value.members) ? value.members : {};
@@ -934,11 +960,17 @@ export function validatePiWebStudioConfig(value: unknown): PiWebStudioConfig {
     if (Object.prototype.hasOwnProperty.call(members, cleanMember)) continue;
     members[cleanMember] = validateSubagentPolicy(rawPolicy, `studio.members.${cleanMember}`);
   }
+  const rawSubagents = isRecord(value.subagents) ? value.subagents : {};
   return {
     defaultPolicy: value.defaultPolicy === undefined
       ? DEFAULT_PI_WEB_CONFIG.studio.defaultPolicy
       : validateSubagentPolicy(value.defaultPolicy, "studio.defaultPolicy"),
     members,
+    subagents: {
+      runner: rawSubagents.runner === undefined
+        ? DEFAULT_PI_WEB_CONFIG.studio.subagents.runner
+        : validateStudioSubagentRunner(rawSubagents.runner),
+    },
   };
 }
 

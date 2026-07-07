@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { resolveYpiStudioMemberPolicy } from "../lib/ypi-studio-policy.ts";
+import { DEFAULT_PI_WEB_CONFIG, validatePiWebStudioConfig } from "../lib/pi-web-config.ts";
 
 const policy = (model, thinking = "inherit") => ({ model, thinking });
 const configResult = (studio, extra = {}) => ({
@@ -84,6 +85,13 @@ const baseStudio = {
   assert.ok(codes.includes("tool_thinking_invalid"));
   assert.ok(codes.includes("follow_main_model_unavailable"));
   assert.ok(codes.includes("follow_main_thinking_unavailable"));
+}
+
+{
+  assert.equal(DEFAULT_PI_WEB_CONFIG.studio.subagents.runner, "auto");
+  assert.equal(validatePiWebStudioConfig({ members: {}, subagents: { runner: "sdk" } }).subagents.runner, "sdk");
+  assert.equal(validatePiWebStudioConfig({ members: {}, subagents: { runner: "cli" } }).subagents.runner, "cli");
+  assert.throws(() => validatePiWebStudioConfig({ members: {}, subagents: { runner: "bad" } }), /studio\.subagents\.runner must be auto, sdk, or cli/);
 }
 
 console.log("ypi-studio policy resolver tests passed");

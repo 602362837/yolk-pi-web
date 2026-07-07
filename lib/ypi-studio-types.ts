@@ -178,6 +178,20 @@ export type YpiStudioSubagentTranscriptStatus = "running" | "succeeded" | "faile
 
 export type YpiStudioSubagentRunStatus = "queued" | YpiStudioSubagentTranscriptStatus;
 
+export type YpiStudioSubagentRunner = "sdk" | "cli";
+
+export interface YpiStudioSubagentRequestAffinity {
+  schemaVersion: 1;
+  providerSessionIdSource: "childSessionId";
+  parentSessionId?: string;
+  childSessionId?: string;
+  model?: string;
+  modelSource?: YpiStudioPolicySource;
+  thinking?: string;
+  thinkingSource?: YpiStudioPolicySource;
+  note?: string;
+}
+
 export type YpiStudioPolicySource = "toolInput" | "memberConfig" | "defaultPolicy" | "followMain" | "piDefault" | "unset";
 
 export type YpiStudioPolicyWarningCode =
@@ -270,6 +284,9 @@ export interface YpiStudioSubagentTranscriptRef {
   taskId: string;
   member: string;
   pathLabel: string;
+  runner?: YpiStudioSubagentRunner;
+  childSessionId?: string;
+  childSessionFile?: string;
   status: YpiStudioSubagentTranscriptStatus;
   startedAt: string;
   finishedAt?: string;
@@ -473,6 +490,10 @@ export interface YpiStudioTaskSubagentRun {
   status: YpiStudioSubagentRunStatus;
   startedAt: string;
   finishedAt?: string;
+  runner?: YpiStudioSubagentRunner;
+  childSessionId?: string;
+  childSessionFile?: string;
+  requestAffinity?: YpiStudioSubagentRequestAffinity;
   prompt?: string;
   summary?: string;
   model?: string;

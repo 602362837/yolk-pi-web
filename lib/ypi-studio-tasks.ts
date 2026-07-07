@@ -58,6 +58,7 @@ import type {
   YpiStudioSubagentPolicyDiagnostics,
   YpiStudioSubagentRunProgress,
   YpiStudioSubagentTranscriptRef,
+  YpiStudioPolicySource,
   YpiStudioTaskSummary,
   YpiStudioTasksResponse,
   YpiStudioTaskScope,
@@ -144,6 +145,29 @@ function stringArray(value: unknown): string[] {
 
 function normalizePolicyDiagnostics(value: unknown): YpiStudioSubagentPolicyDiagnostics | undefined {
   return isRecord(value) && value.schemaVersion === 1 ? value as unknown as YpiStudioSubagentPolicyDiagnostics : undefined;
+}
+
+function normalizeSubagentRunner(value: unknown): YpiStudioTaskSubagentRun["runner"] | undefined {
+  return value === "sdk" || value === "cli" ? value : undefined;
+}
+
+function normalizePolicySource(value: unknown): YpiStudioPolicySource | undefined {
+  return value === "toolInput" || value === "memberConfig" || value === "defaultPolicy" || value === "followMain" || value === "piDefault" || value === "unset" ? value : undefined;
+}
+
+function normalizeRequestAffinity(value: unknown): YpiStudioTaskSubagentRun["requestAffinity"] | undefined {
+  if (!isRecord(value) || value.schemaVersion !== 1 || value.providerSessionIdSource !== "childSessionId") return undefined;
+  return {
+    schemaVersion: 1,
+    providerSessionIdSource: "childSessionId",
+    parentSessionId: optionalString(value.parentSessionId),
+    childSessionId: optionalString(value.childSessionId),
+    model: optionalString(value.model),
+    modelSource: normalizePolicySource(value.modelSource),
+    thinking: optionalString(value.thinking),
+    thinkingSource: normalizePolicySource(value.thinkingSource),
+    note: optionalString(value.note),
+  };
 }
 
 function normalizeRunProgress(value: unknown): YpiStudioSubagentRunProgress | undefined {
@@ -797,6 +821,9 @@ function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef 
     stderrBytes: typeof value.stderrBytes === "number" ? value.stderrBytes : 0,
     bytes: typeof value.bytes === "number" ? value.bytes : 0,
     truncated: value.truncated === true,
+    runner: normalizeSubagentRunner(value.runner),
+    childSessionId: optionalString(value.childSessionId),
+    childSessionFile: optionalString(value.childSessionFile),
     truncation: isRecord(value.truncation) ? {
       itemTruncated: value.truncation.itemTruncated === true,
       captureLimited: value.truncation.captureLimited === true,
@@ -1060,6 +1087,10 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
         status: run.status === "queued" || run.status === "running" || run.status === "succeeded" || run.status === "failed" || run.status === "cancelled" || run.status === "waiting_for_user" ? run.status : "failed",
         startedAt: optionalString(run.startedAt) ?? nowIso(),
         finishedAt: optionalString(run.finishedAt),
+        runner: normalizeSubagentRunner(run.runner),
+        childSessionId: optionalString(run.childSessionId),
+        childSessionFile: optionalString(run.childSessionFile),
+        requestAffinity: normalizeRequestAffinity(run.requestAffinity),
         prompt: optionalString(run.prompt),
         summary: optionalString(run.summary),
         model: optionalString(run.model),

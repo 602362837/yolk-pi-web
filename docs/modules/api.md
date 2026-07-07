@@ -9,10 +9,10 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `projects/[projectId]/` | GET/PATCH | Read or update project metadata (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`). |
 | `projects/[projectId]/spaces/` | GET | List spaces for one registered project. |
 | `projects/[projectId]/spaces/[spaceId]/` | GET/PATCH | Read or update project-space metadata, including the main space created at registration. |
-| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List sessions explicitly linked to one project space; optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. |
+| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List sessions explicitly linked to one project space; root `sessions` exclude Studio child audit roots but include child rows whose `studioChild.parentSessionId` belongs to a visible parent so the Sidebar can fold them under that parent. Optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. |
 | `projects/[projectId]/worktrees/refresh/` | POST | Discover `git worktree list --porcelain` entries for a registered project and upsert/archive worktree spaces without scanning sessions. |
-| `sessions/` | GET | List lightweight active session summaries grouped by cwd (includes `archivedCwds` and `archivedCounts`); Git/worktree metadata is omitted by default and only included with `includeGit=1`. |
-| `sessions/[id]/` | GET/PATCH/DELETE | Read session detail, rename, delete. Returns `archived: true` for archived sessions. |
+| `sessions/` | GET | List lightweight active session summaries grouped by cwd (includes `archivedCwds` and `archivedCounts`); Git/worktree metadata is omitted by default and only included with `includeGit=1`. YPI Studio child audit sessions are filtered unless `includeStudioChildren=1` is provided for debugging/audit views. |
+| `sessions/[id]/` | GET/PATCH/DELETE | Read session detail, rename, delete. Returns `archived: true` for archived sessions and includes optional `studioChild` metadata for child audit sessions. |
 | `sessions/[id]/context/` | GET | Get context for a specific `leafId`. |
 | `sessions/[id]/changes/` | GET | List files changed by tracked agent file tools in this session from non-Git sidecar data. |
 | `sessions/[id]/changes/file/` | GET | Return the stored unified diff or metadata-only reason for one tracked session-changed file. |
@@ -22,7 +22,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `sessions/new/` | 410 | Deprecated route kept for compatibility. |
 | `agent/new/` | POST | Create a new session and send the first message when no precreated/effective session exists. |
 | `agent/draft/` | POST | Create a real empty session for a validated cwd, applying optional tool/model/thinking selections without sending a prompt. |
-| `agent/[id]/` | GET/POST | Get agent state or send a command. |
+| `agent/[id]/` | GET/POST | Get agent state or send a command. POST rejects YPI Studio child audit sessions as read-only so they cannot be continued as ordinary Studio-enabled chats. |
 | `agent/[id]/events/` | GET | SSE event stream. |
 | `browser-share/health/` | GET | Chrome extension health check for Browser Share; returns versioned capabilities including service-address config, DOM/debugger capture modes, long-poll support, bounded screenshot support, persistent debugger, heartbeat, and control projection support. |
 | `browser-share/shares/` | POST | Create a short-lived Browser Share from the Chrome extension and return a one-time share code; accepts optional extension/source/capability/capture/debugger/screenshot metadata for newer extensions. |

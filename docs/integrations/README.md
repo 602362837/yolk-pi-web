@@ -24,6 +24,8 @@ When changing pi SDK usage, read the installed package documentation first:
 - `node_modules/@earendil-works/pi-coding-agent/docs/`
 - `node_modules/@earendil-works/pi-coding-agent/examples/`
 
+YPI Studio subagents support an in-process SDK runner selected by `studio.subagents.runner` (`auto`/`sdk`/`cli`). SDK child sessions use the same installed `@earendil-works/pi-coding-agent` dependency and auth/model configuration path as main Chat sessions, but they receive their own persistent child session id for provider request affinity. The legacy CLI runner remains as rollback and resolves the bundled package CLI before consulting `PATH`.
+
 ## Auth Providers
 
 Auth-related API routes live under `app/api/auth/`. Provider tokens and API-key status are stored/read through the pi configuration mechanisms; keep provider-specific network calls isolated in `lib/` helpers.

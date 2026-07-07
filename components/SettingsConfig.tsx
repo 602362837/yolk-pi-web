@@ -15,6 +15,7 @@ import type {
   PiWebSubagentDifficultyTier,
   PiWebSubagentModelRef,
   PiWebStudioConfig,
+  PiWebStudioSubagentRunner,
   PiWebSubagentModality,
   PiWebSubagentRunPolicy,
   PiWebTerminalConfig,
@@ -120,6 +121,11 @@ const MAIN_THINKING_OPTIONS: SelectDropdownOption[] = [
   { value: "medium", label: "medium", description: "中等推理" },
   { value: "high", label: "high", description: "高强度推理" },
   { value: "xhigh", label: "xhigh", description: "最高强度推理" },
+];
+const STUDIO_SUBAGENT_RUNNER_OPTIONS: SelectDropdownOption[] = [
+  { value: "auto", label: "auto", description: "优先 SDK；若 SDK 尚未发起模型请求且不可用，则回退 CLI" },
+  { value: "sdk", label: "sdk", description: "强制使用 in-process SDK child session；不可用时直接失败，不走 CLI" },
+  { value: "cli", label: "cli", description: "强制使用 legacy CLI runner，便于回滚" },
 ];
 
 function formatModelValue(model: PiWebSubagentModelRef): string {
@@ -655,6 +661,11 @@ export function SettingsConfig({
     setNotice(null);
   }, []);
 
+  const updateStudioSubagents = useCallback((patch: Partial<PiWebStudioConfig["subagents"]>) => {
+    setStudio((prev) => prev ? { ...prev, subagents: { ...prev.subagents, ...patch } } : prev);
+    setNotice(null);
+  }, []);
+
   const updateStudioMemberPolicy = useCallback((member: string, patch: Partial<PiWebSubagentRunPolicy>) => {
     setStudio((prev) => {
       if (!prev) return prev;
@@ -1136,6 +1147,22 @@ export function SettingsConfig({
                     </div>
                     {studioFocusDescription && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 11 }}>{studioFocusDescription}</div>}
                     {modelsError && <div style={{ padding: "7px 9px", borderRadius: 7, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 11 }}>{modelsError}</div>}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>子代理 runner</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>控制 ypi_studio_subagent 使用 SDK child session 还是 legacy CLI。auto 是默认灰度/迁移模式；cli 可作为回滚开关。</div>
+                      </div>
+                      <Field label="Studio subagent runner" description="sdk 强制不走 CLI；如果当前版本没有可用 SDK runner，会直接报错以避免重复执行。">
+                        <SelectDropdown
+                          value={studio.subagents.runner}
+                          options={STUDIO_SUBAGENT_RUNNER_OPTIONS}
+                          onChange={(runner) => updateStudioSubagents({ runner: runner as PiWebStudioSubagentRunner })}
+                          size="field"
+                          placement="auto"
+                          ariaLabel="选择 Studio subagent runner"
+                        />
+                      </Field>
+                    </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
                       <div>
                         <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>默认策略</div>

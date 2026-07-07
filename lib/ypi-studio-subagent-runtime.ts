@@ -1,6 +1,7 @@
 import type {
   YpiStudioSubagentRunProgress,
   YpiStudioSubagentRunStatus,
+  YpiStudioSubagentRunner,
   YpiStudioTaskSubagentRun,
 } from "./ypi-studio-types";
 
@@ -24,6 +25,9 @@ export interface YpiStudioChildRunHandle {
   cwd: string;
   parentSessionId?: string;
   pid?: number;
+  runner?: YpiStudioSubagentRunner;
+  childSessionId?: string;
+  childSessionFile?: string;
   startedAt: string;
   status: YpiStudioChildRunRegistryStatus;
   progress?: YpiStudioSubagentRunProgress;
@@ -143,7 +147,7 @@ export function registerYpiStudioChildRun(handle: YpiStudioChildRunHandle): void
 
 export function updateYpiStudioChildRun(
   runId: string,
-  patch: Partial<Pick<YpiStudioChildRunHandle, "status" | "progress" | "promise" | "result" | "pid">>,
+  patch: Partial<Pick<YpiStudioChildRunHandle, "status" | "progress" | "promise" | "result" | "pid" | "runner" | "childSessionId" | "childSessionFile">>,
 ): YpiStudioChildRunHandle | undefined {
   const handle = registry().get(runId);
   if (!handle) return undefined;

@@ -8,6 +8,7 @@ import type { ToolCallContent, ToolResultMessage } from "@/lib/types";
 import type {
   YpiStudioSubagentCurrentTool,
   YpiStudioSubagentPolicyDiagnostics,
+  YpiStudioSubagentRequestAffinity,
   YpiStudioSubagentRunPhase,
   YpiStudioSubagentTranscriptItem,
   YpiStudioSubagentTranscriptRef,
@@ -69,6 +70,10 @@ interface StudioRunProjection {
   modelSource?: string;
   thinkingSource?: string;
   policy?: YpiStudioSubagentPolicyDiagnostics;
+  runner?: "sdk" | "cli";
+  childSessionId?: string;
+  childSessionFile?: string;
+  requestAffinity?: YpiStudioSubagentRequestAffinity;
   summary?: string;
   error?: string;
   terminationReason?: string;
@@ -122,6 +127,9 @@ function normalizeTranscriptRef(value: unknown): YpiStudioSubagentTranscriptRef 
     taskId,
     member,
     pathLabel,
+    runner: value.runner === "sdk" || value.runner === "cli" ? value.runner : undefined,
+    childSessionId: asString(value.childSessionId),
+    childSessionFile: asString(value.childSessionFile),
     status,
     startedAt,
     finishedAt: asString(value.finishedAt),
@@ -174,6 +182,21 @@ function normalizePolicy(value: unknown): YpiStudioSubagentPolicyDiagnostics | u
   return isRecord(value) && value.schemaVersion === 1 ? value as unknown as YpiStudioSubagentPolicyDiagnostics : undefined;
 }
 
+function normalizeRequestAffinity(value: unknown): YpiStudioSubagentRequestAffinity | undefined {
+  if (!isRecord(value) || value.schemaVersion !== 1 || value.providerSessionIdSource !== "childSessionId") return undefined;
+  return {
+    schemaVersion: 1,
+    providerSessionIdSource: "childSessionId",
+    parentSessionId: asString(value.parentSessionId),
+    childSessionId: asString(value.childSessionId),
+    model: asString(value.model),
+    modelSource: asString(value.modelSource) as YpiStudioSubagentRequestAffinity["modelSource"],
+    thinking: asString(value.thinking),
+    thinkingSource: asString(value.thinkingSource) as YpiStudioSubagentRequestAffinity["thinkingSource"],
+    note: asString(value.note),
+  };
+}
+
 function normalizeProgress(value: unknown): StudioRunProgress | undefined {
   if (!isRecord(value)) return undefined;
   return {
@@ -213,6 +236,10 @@ function normalizeRun(value: unknown): StudioRunProjection | undefined {
     modelSource: asString(value.modelSource),
     thinkingSource: asString(value.thinkingSource),
     policy: normalizePolicy(value.policy),
+    runner: value.runner === "sdk" || value.runner === "cli" ? value.runner : undefined,
+    childSessionId: asString(value.childSessionId),
+    childSessionFile: asString(value.childSessionFile),
+    requestAffinity: normalizeRequestAffinity(value.requestAffinity),
     summary: asString(value.summary),
     error: asString(value.error),
     terminationReason: asString(value.terminationReason),
@@ -243,6 +270,10 @@ function mergeRunProjections(...runs: (StudioRunProjection | undefined)[]): Stud
       modelSource: run.modelSource ?? acc.modelSource,
       thinkingSource: run.thinkingSource ?? acc.thinkingSource,
       policy: run.policy ?? acc.policy,
+      runner: run.runner ?? acc.runner,
+      childSessionId: run.childSessionId ?? acc.childSessionId,
+      childSessionFile: run.childSessionFile ?? acc.childSessionFile,
+      requestAffinity: run.requestAffinity ?? acc.requestAffinity,
       summary: run.summary ?? acc.summary,
       error: run.error ?? acc.error,
       terminationReason: run.terminationReason ?? acc.terminationReason,
@@ -294,6 +325,25 @@ function statsText(progress?: StudioRunProgress): string | undefined {
 
 function policyWarningMessages(policy?: YpiStudioSubagentPolicyDiagnostics): string[] {
   return policy?.warnings?.map((warning) => warning.message) ?? [];
+}
+
+function shortId(value?: string): string | undefined {
+  if (!value) return undefined;
+  return value.length > 12 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
+}
+
+function affinityNote(affinity?: YpiStudioSubagentRequestAffinity): string | undefined {
+  if (!affinity) return undefined;
+  const child = shortId(affinity.childSessionId) ?? "child session";
+  const parent = shortId(affinity.parentSessionId);
+  const model = affinity.model ? `model=${affinity.model}${affinity.modelSource ? ` (${affinity.modelSource})` : ""}` : undefined;
+  const thinking = affinity.thinking ? `thinking=${affinity.thinking}${affinity.thinkingSource ? ` (${affinity.thinkingSource})` : ""}` : undefined;
+  return [
+    `SDK request affinity uses ${child} as provider session key${parent ? `; parent=${parent}` : ""}.`,
+    model,
+    thinking,
+    affinity.note,
+  ].filter(Boolean).join(" ");
 }
 
 function statusColor(status: StudioRunStatus): string {
@@ -427,7 +477,12 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
   const phase = run.progress?.phase ?? (status === "running" ? "waiting_model" : status === "queued" ? "starting" : status === "waiting_for_user" ? "waiting_for_user" : result ? "finished" : undefined);
   const stats = statsText(run.progress);
   const tpsLabel = typeof run.progress?.tps === "number" ? `${run.progress.tps.toFixed(1)} t/s` : undefined;
+  const childSessionId = run.childSessionId ?? transcript?.childSessionId;
+  const childSessionFile = run.childSessionFile ?? transcript?.childSessionFile;
+  const runnerLabel = run.runner ?? transcript?.runner;
+  const requestAffinityNote = affinityNote(run.requestAffinity);
   const displayNotes = [
+    requestAffinityNote,
     transcript?.truncated ? "Showing a bounded recent/debug preview. Transcript clipping does not by itself mean the member run failed." : undefined,
     run.progress?.display?.finalOutputTruncated ? "Final output was clipped for the parent result; the member run status is unchanged." : undefined,
     run.progress?.display?.previewTruncated ? "Recent activity text is clipped for display safety." : undefined,
@@ -470,6 +525,7 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
         {tpsLabel && <Chip title={run.progress?.tokenSource === "estimated_chars" ? "estimated from output characters" : "usage tokens"}>{tpsLabel}</Chip>}
         <Chip title={run.modelSource ? `model source: ${run.modelSource}` : undefined}>model: {modelLabel}</Chip>
         <Chip title={run.thinkingSource ? `thinking source: ${run.thinkingSource}` : undefined}>thinking: {thinkingLabel}</Chip>
+        {runnerLabel === "sdk" && <Chip title={requestAffinityNote ?? "SDK child session"}>SDK child{childSessionId ? `: ${shortId(childSessionId)}` : ""}</Chip>}
         {displayNotes.length > 0 && <span title={displayNotes.slice(0, 3).join("\n")} style={{ color: "var(--text-dim)", fontSize: 12, flexShrink: 0 }}>ⓘ {displayNotes.length}</span>}
         {warningNotes.length > 0 && <span title={warningTitle} style={{ color: "#eab308", fontSize: 12, flexShrink: 0 }}>⚠ {warningNotes.length}</span>}
         {run.progress?.eventCount !== undefined && <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>{run.progress.eventCount} events</span>}
@@ -486,6 +542,9 @@ export function YpiStudioSubagentTranscript({ block, result, progress, duration,
             <Meta label="Phase" value={phaseLabel(phase, run.progress?.currentTool)} />
             <Meta label="Task" value={taskId ?? "unknown"} />
             <Meta label="Run" value={runId ?? "pending"} />
+            <Meta label="Runner" value={runnerLabel ?? "legacy"} />
+            <Meta label="Child session" value={childSessionId ? shortId(childSessionId) ?? childSessionId : "—"} title={childSessionFile ?? childSessionId} />
+            <Meta label="Affinity" value={run.requestAffinity ? "childSessionId" : "—"} title={requestAffinityNote} />
             <Meta label="Model" value={modelLabel} title={run.modelSource ? `source: ${run.modelSource}` : undefined} />
             <Meta label="Thinking" value={thinkingLabel} title={run.thinkingSource ? `source: ${run.thinkingSource}` : undefined} />
             <Meta label="Elapsed" value={elapsed ?? "—"} />

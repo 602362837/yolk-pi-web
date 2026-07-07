@@ -3,6 +3,7 @@ import { resolveSessionPath } from "@/lib/session-reader";
 import { startRpcSession, getRpcSession } from "@/lib/rpc-manager";
 import { abortYpiStudioChildRunsForSession } from "@/lib/ypi-studio-subagent-runtime";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { readSessionHeaderFromFile } from "@/lib/session-project-link";
 
 // POST /api/agent/[id] - Send a command to an existing session
 export async function POST(
@@ -31,6 +32,10 @@ export async function POST(
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
+    const header = readSessionHeaderFromFile(filePath);
+    if (header?.studioChild && body.type !== "abort") {
+      return NextResponse.json({ error: "YPI Studio child sessions are read-only audit views. Return to the parent Chat to continue orchestration." }, { status: 403 });
+    }
     const cwd = SessionManager.open(filePath).getHeader()?.cwd ?? process.cwd();
 
     const { session } = await startRpcSession(id, filePath, cwd);

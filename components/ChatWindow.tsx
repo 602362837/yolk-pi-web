@@ -354,6 +354,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     : null;
 
   const isArchived = !!session?.archived;
+  const isStudioChildAudit = !!session?.studioChild;
   const studioRuntime = studioTask?.implementationProjection?.sessionRuntime;
   const studioRuntimeCounts = studioTask?.implementationProjection?.statusCounts;
   const studioWaitingTotal = (studioRuntime?.activeRunCount ?? 0) + (studioRuntime?.queuedRunCount ?? 0) || (agentPhase?.kind === "waiting_for_studio_children" ? agentPhase.activeRunCount : 0);
@@ -438,6 +439,24 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     </div>
   ) : null;
 
+  const studioChildBannerElement = isStudioChildAudit ? (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      padding: "8px 14px",
+      background: "rgba(37,99,235,0.08)",
+      borderBottom: "1px solid rgba(37,99,235,0.2)",
+      color: "var(--text-muted)",
+      fontSize: 12,
+      flexShrink: 0,
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent)" }} />
+      <span>这是 YPI Studio child session 审计视图（{session?.studioChild?.member} · {session?.studioChild?.status ?? "audit"}）。请回到父 Chat 继续编排。</span>
+    </div>
+  ) : null;
+
   const archivedBannerElement = isArchived ? (
     <div style={{
       display: "flex",
@@ -460,9 +479,9 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     </div>
   ) : null;
 
-  const chatInputElement = isArchived ? (
+  const chatInputElement = isArchived || isStudioChildAudit ? (
     <div style={{ padding: "12px 14px", textAlign: "center", color: "var(--text-dim)", fontSize: 12, flexShrink: 0 }}>
-      已归档的会话不可发送新消息。
+      {isArchived ? "已归档的会话不可发送新消息。" : "Studio child session 为只读审计视图；请回到父 Chat 继续编排。"}
     </div>
   ) : (
     <ChatInput
@@ -522,6 +541,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
       onDrop={handleDrop}
     >
       {archivedBannerElement}
+      {studioChildBannerElement}
       {session?.id && (
         <SessionChangesFloatingPanel sessionId={session.id} agentRunning={agentRunning} />
       )}

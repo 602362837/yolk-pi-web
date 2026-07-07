@@ -49,6 +49,10 @@ function projectRun(cwd: string, taskId: string, run: YpiStudioTaskSubagentRun) 
     status: handle?.status === "runtime_lost" ? run.status : handle?.status ?? run.status,
     registryStatus: handle?.status,
     registryActive: !!handle,
+    runner: handle?.runner ?? run.runner,
+    childSessionId: handle?.childSessionId ?? run.childSessionId,
+    childSessionFile: handle?.childSessionFile ?? run.childSessionFile,
+    requestAffinity: run.requestAffinity,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
     summary: run.summary,
@@ -127,6 +131,7 @@ export async function PATCH(
       summary: run.summary ?? `Studio subagent run cancelled: ${reason}`,
       error: `Studio subagent run cancelled: ${reason}`,
       terminationReason: reason,
+      progress: run.progress ? { ...run.progress, phase: "finished", updatedAt: finishedAt, terminationReason: reason } : run.progress,
       transcript: run.transcript ? { ...run.transcript, status: "cancelled", finishedAt, updatedAt: finishedAt } : run.transcript,
     };
     const updatedTask = recordYpiStudioSubagentRun(authorizedCwd, task.id, cancelled);

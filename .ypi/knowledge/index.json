@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-07T02:59:48.549Z",
+  "updatedAt": "2026-07-07T05:47:17.739Z",
   "entries": [
+    {
+      "id": "20260707-134717-设计-ypi-studio-subagent-in-process-sdk-子会话一致性改造",
+      "title": "设计 YPI Studio subagent in-process SDK 子会话一致性改造",
+      "taskId": "20260707-121400-设计-ypi-studio-subagent-in-process-sdk-子会话一致性改造",
+      "taskKey": "archived:2026-07:20260707-121400-设计-ypi-studio-subagent-in-process-sdk-子会话一致性改造",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：YPI Studio subagent in-process SDK 子会话一致性改造。关键可复用结论：Studio subagent 应采用一个 run 一个持久 child JSONL session，task.json 仍是 workflow/run 状态权威；child header 写入 studioChild 并继承父 session projectId/spaceId，run/transcript/API 投影填充 runner、childSessionId、childSessionFile、requestAffinity。runner 配置使用 studio.subagents.runner=auto|sdk|cli：auto 默认优先 SDK，只有 SDK preflight 在 prompt 发送前失败才回退 CLI；sdk 强制失败不回退；cli 是旧路径回滚。SDK child 必须不注入 Studio orchestration tools，并通过 createYpiStudioChildGuardExtension + excludeTools 阻断 ypi_studio_task/subagent/wait、subagent/trellis_subagent、Browser Share action tools，以及 best-effort 阻断 .ypi/tasks/**/task.json 写入，避免递归编排和 approval gate 绕过。Session/API/Sidebar/Chat 对 Studio child 默认隐藏普通历史，只在父 session 下折叠展示，打开后作为只读审计视图。验证需覆盖 lint、tsc、studio-policy、studio-dag；真实 provider E2E smoke（SDK child header、wait/cancel、Sidebar 审计链路）作为生产前建议。",
+      "tags": [
+        "feature-dev",
+        "ypi-studio",
+        "subagent",
+        "sdk-runner",
+        "child-session",
+        "archive",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260707-121400-设计-ypi-studio-subagent-in-process-sdk-子会话一致性改造",
+      "knowledgePath": ".ypi/knowledge/20260707-134717-设计-ypi-studio-subagent-in-process-sdk-子会话一致性改造.md",
+      "createdAt": "2026-07-07T05:47:17.739Z",
+      "archivedAt": "2026-07-07T05:47:17.739Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260707-105948-设计并改造项目注册表与项目空间层级",
       "title": "设计并改造项目注册表与项目空间层级",

@@ -1,14 +1,46 @@
 // Types mirrored from pi-mono coding-agent session-manager
 
+export type StudioChildSessionRunner = "sdk" | "cli";
+export type StudioChildSessionStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "waiting_for_user"
+  | "runtime_lost"
+  | (string & {});
+
+export interface StudioChildSessionInfo {
+  schemaVersion: 1;
+  kind: "ypi-studio-child-session";
+  runner: StudioChildSessionRunner;
+  visibility: "child";
+  status?: StudioChildSessionStatus;
+  parentSessionId?: string;
+  parentSessionFile?: string;
+  contextId?: string;
+  taskId: string;
+  runId: string;
+  member: string;
+  subtaskId?: string;
+  createdAt?: string;
+  finishedAt?: string;
+  terminationReason?: string;
+}
+
 export interface SessionHeader {
   type: "session";
   version?: number;
   id: string;
   timestamp: string;
   cwd: string;
+  /** Standard Pi fork/display parent session file path. For Studio child sessions, this points at the parent chat JSONL file. */
   parentSession?: string;
   projectId?: string;
   spaceId?: string;
+  /** YPI Studio audit metadata for persistent child sessions. Task/run state remains authoritative in task.json. */
+  studioChild?: StudioChildSessionInfo;
 }
 
 export interface SessionEntryBase {
@@ -304,6 +336,8 @@ export interface SessionInfo {
   parentSessionId?: string; // set if this session was forked from another
   projectId?: string;
   spaceId?: string;
+  /** Present when this session is a YPI Studio child audit session, not a normal root chat history item. */
+  studioChild?: StudioChildSessionInfo;
   legacyUnassigned?: boolean;
   archived?: boolean;       // true for archived sessions
   worktree?: WorktreeInfo;

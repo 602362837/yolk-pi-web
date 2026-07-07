@@ -29,7 +29,10 @@ Use `scripts/start-pi-web-proxy.sh` or `scripts/start-pi-web-proxy.ps1` when pro
 
 ## YPI Studio DAG and Async Runs
 
+- `studio.subagents.runner` in `~/.pi/agent/pi-web.json` controls new Studio subagent runs: `auto` (default rollout), `sdk` (force SDK and fail instead of using CLI if unavailable), or `cli` (legacy rollback). The runner is read when a new run starts; already running CLI children are not migrated or interrupted by config changes.
+- Studio subagents using the legacy CLI runner first resolve the bundled `@earendil-works/pi-coding-agent/dist/cli.js` from the web app dependency and only fall back to `pi` on `PATH` if no local CLI is found. If child startup fails with `ENOENT`, verify the package dependency is installed before requiring a global `pi` install.
 - If a task is bound to the current chat but `awaiting_approval -> implementing` is blocked, inspect `.ypi/tasks/<task>/task.json`: `contextIds` should include the current Studio context and `meta.approvalGrant` should be written only after a later explicit user confirmation.
-- If a queued/running async subagent disappears after server restart or dev hot reload, poll/collect may mark the run as `runtime_lost`; retry the affected subtask instead of assuming the whole task failed.
+- If a queued/running async subagent disappears after server restart or dev hot reload, poll/collect may mark the run as `runtime_lost`; retry the affected subtask instead of assuming the whole task failed. For rollback, set `studio.subagents.runner` to `cli`; child sessions already written by SDK runs remain hidden audit records and do not need deletion.
+- If child audit sessions appear in ordinary history during debugging, remove `includeStudioChildren=1` from the session-list request or reset the UI debug view. The underlying JSONL can remain for audit/replay.
 - Use `npm run test:studio-dag` for DAG scheduling regressions and `npm run test:studio-policy` for approval/policy regressions.
 - UI truncation flags on subagent transcripts are display limits, not failure signals; use run status, `result.isError`, and termination reason for severity.

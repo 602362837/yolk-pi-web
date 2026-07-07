@@ -60,6 +60,7 @@ Path matching uses `canonicalizeProjectPath()` from `lib/project-registry.ts`: e
 
 - `parentSession` is display metadata only and does not affect chat content.
 - `projectId`/`spaceId` are optional project-space linkage fields. New web-created linked sessions write both fields and update `pi-web-session-index.json`; old sessions without either field remain readable/openable and are reported as legacy unassigned.
+- YPI Studio child sessions are persistent audit sessions marked by a header `studioChild` object. The standard `parentSession` field still points to the parent chat JSONL file for Pi/fork display compatibility, while `studioChild.parentSessionId` stores the parent chat session id used by Studio runtime correlation. `.ypi/tasks/<task>/task.json` remains the workflow/run status source of truth; the child JSONL is only an audit, replay, and provider-affinity carrier.
 - Session files are fully rewritable when updating display metadata such as cascade reparenting on delete.
 - Deleting or archiving a linked Git WorkTree also deletes session JSONL files whose `cwd` points at that WorkTree; session listing also prunes stale missing `*.worktrees/*` cwd sessions left by older versions.
 - Orphaned sessions whose first line cannot be parsed as a valid header are marked `orphaned: true` and displayed as incomplete, not clickable.
@@ -124,5 +125,30 @@ Typical records:
 ```
 
 `projectId` and `spaceId` are optional. They are written for new project-space sessions and inherited on fork; legacy files that omit them are not migrated or backfilled automatically.
+
+YPI Studio SDK child sessions append optional `studioChild` metadata to the header without changing the standard Pi fields. SDK child profiles must not load the parent YPI Studio or Browser Share extensions; they should include the child guard extension from `lib/ypi-studio-child-guard.ts`, which blocks recursive Studio/subagent tools, Browser Share action tools, and best-effort direct `.ypi/tasks/**/task.json` mutations. Child members return lifecycle intentions to the parent chat; only the parent session uses Studio tools to update task state and approval-gated implementation progress:
+
+```json
+{
+  "studioChild": {
+    "schemaVersion": 1,
+    "kind": "ypi-studio-child-session",
+    "runner": "sdk",
+    "visibility": "child",
+    "status": "running",
+    "parentSessionId": "<parent chat session id>",
+    "parentSessionFile": "/abs/path/to/parent.jsonl",
+    "contextId": "pi_<parent chat session id>",
+    "taskId": "<studio task id>",
+    "runId": "<studio subagent run id>",
+    "member": "architect|implementer|checker|custom",
+    "subtaskId": "<optional implementation subtask id>",
+    "createdAt": "...",
+    "finishedAt": "..."
+  }
+}
+```
+
+`studioChild.status` is best-effort display/audit metadata. Studio task state, subagent run terminal status, approval gates, and implementation subtask progress remain authoritative in `.ypi/tasks/<task-id>/task.json`, so old tasks and sessions that omit `studioChild`, `runner`, or `childSessionId` require no migration.
 
 `entryIds[]` in `SessionContext` is parallel to `messages[]` and maps displayed messages back to `.jsonl` entry ids for fork and `navigate_tree` commands.
