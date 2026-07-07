@@ -1217,7 +1217,6 @@ export function AppShell() {
               onContextUsageChange={handleContextUsageChange}
               onSubagentChange={handleSubagentChange}
               onStudioToolProgressChange={handleStudioToolProgressChange}
-              studioTask={studioSessionTask?.task ?? null}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
               defaultThinkingLevel={webConfig?.yolk.defaultThinkingLevel}
             />

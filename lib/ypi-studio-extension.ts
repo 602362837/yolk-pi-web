@@ -1533,6 +1533,42 @@ function compactSubagentRunProjection(run: StudioSubagentRunProjection): Record<
   };
 }
 
+function compactYpiStudioTaskForWait(task: YpiStudioTaskDetail): Record<string, unknown> {
+  return {
+    id: task.id,
+    key: task.key,
+    title: task.title,
+    status: task.status,
+    workflowId: task.workflowId,
+  };
+}
+
+function compactSubagentRunForWait(run: StudioSubagentRunProjection): Record<string, unknown> {
+  const progress = run.progress ? {
+    phase: run.progress.phase,
+    updatedAt: run.progress.updatedAt,
+    tokens: run.progress.tokens,
+    tps: run.progress.tps,
+    currentTool: run.progress.currentTool,
+    terminationReason: run.progress.terminationReason,
+  } : undefined;
+  return {
+    runId: run.runId,
+    taskId: run.taskId,
+    subtaskId: run.subtaskId,
+    member: run.member,
+    taskTitle: run.taskTitle,
+    subtaskTitle: run.subtaskTitle,
+    status: run.status,
+    progress,
+    summary: run.summary ? oneLine(run.summary, 180) : undefined,
+    error: run.error ? oneLine(run.error, 240) : undefined,
+    terminationReason: run.terminationReason,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+  };
+}
+
 function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string, subtaskId?: string): string {
   const definition = readText(join(root, ".ypi", "agents", memberFile(member)));
   if (!definition.trim()) throw new Error(`Studio member definition not found: .ypi/agents/${memberFile(member)}`);
@@ -2140,19 +2176,20 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         const projected = runs.map((run) => projectSubagentRun(root, taskId, run));
         const terminal = projected.filter((run) => terminalStatuses.has(run.status));
         const running = projected.filter((run) => !terminalStatuses.has(run.status));
-        const compactRuns = projected.map(compactSubagentRunProjection);
+        const compactRuns = projected.map(compactSubagentRunForWait);
         const firstRun = compactRuns[0];
+        const compactTask = compactYpiStudioTaskForWait(detail);
         const statusText = projected.length
           ? projected.map((run) => `${run.runId}=${run.status}`).join(", ")
           : "no active Studio subagent run";
         onUpdate?.({
           content: [{ type: "text", text: `Waiting for YPI Studio run(s): ${statusText}` }],
-          details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: compactRuns, run: firstRun, status: running.length ? "waiting" : "terminal" },
+          details: { action: "wait", task: compactTask, runs: compactRuns, run: firstRun, status: running.length ? "waiting" : "terminal" },
         });
         if (!requestedRunIds.length && projected.length === 0) {
           return {
             content: [{ type: "text", text: "No active YPI Studio subagent run is currently waiting." }],
-            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: [], status: "no_active_runs", nextRecommendedAction: buildNextStudioTaskAction(detail) },
+            details: { action: "wait", task: compactTask, runs: [], status: "no_active_runs", nextRecommendedAction: buildNextStudioTaskAction(detail) },
           };
         }
         if (projected.length > 0 && running.length === 0) {
@@ -2160,14 +2197,14 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const text = `YPI Studio wait complete: ${statusText}. Next: ${buildNextStudioTaskAction(detail)}`;
           return {
             content: [{ type: "text", text }],
-            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: compactRuns, run: firstRun, status: "terminal", nextRecommendedAction: buildNextStudioTaskAction(detail) },
+            details: { action: "wait", task: compactTask, runs: compactRuns, run: firstRun, status: "terminal", nextRecommendedAction: buildNextStudioTaskAction(detail) },
             isError: failed.length > 0,
           };
         }
         if (Date.now() - startedAt >= timeoutMs) {
           return {
             content: [{ type: "text", text: `YPI Studio wait timed out; still running: ${statusText}` }],
-            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: compactRuns, run: firstRun, status: "still_running", timeoutMs },
+            details: { action: "wait", task: compactTask, runs: compactRuns, run: firstRun, status: "still_running", timeoutMs },
           };
         }
         await sleep(pollIntervalMs);
