@@ -4,7 +4,13 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 
 | Route | Methods | Purpose |
 | --- | --- | --- |
-| `sessions/` | GET | List sessions grouped by cwd (includes `archivedCwds` and `archivedCounts`). |
+| `projects/` | GET/POST | List Project Registry records from `~/.pi/agent/pi-web-projects.json`, or register a project path and create its main space without scanning sessions. |
+| `projects/[projectId]/` | GET/PATCH | Read or update project metadata (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`). |
+| `projects/[projectId]/spaces/` | GET | List spaces for one registered project. |
+| `projects/[projectId]/spaces/[spaceId]/` | GET/PATCH | Read or update project-space metadata, including the main space created at registration. |
+| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List sessions explicitly linked to one project space; optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. |
+| `projects/[projectId]/worktrees/refresh/` | POST | Discover `git worktree list --porcelain` entries for a registered project and upsert/archive worktree spaces without scanning sessions. |
+| `sessions/` | GET | List lightweight active session summaries grouped by cwd (includes `archivedCwds` and `archivedCounts`); Git/worktree metadata is omitted by default and only included with `includeGit=1`. |
 | `sessions/[id]/` | GET/PATCH/DELETE | Read session detail, rename, delete. Returns `archived: true` for archived sessions. |
 | `sessions/[id]/context/` | GET | Get context for a specific `leafId`. |
 | `sessions/[id]/changes/` | GET | List files changed by tracked agent file tools in this session from non-Git sidecar data. |
@@ -42,12 +48,12 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `skills/install/` | POST | Install a skill via `npx skills add`. |
 | `commands/` | GET | List slash commands from built-in YPI Studio extension commands plus skills and prompt templates for a cwd. |
 | `cwd/validate/` | POST | Validate a candidate workspace path. |
-| `git/worktrees/` | GET/POST/DELETE | Inspect, create, and remove Git worktrees from the selected cwd; removal also deletes sessions for that worktree cwd. |
+| `git/worktrees/` | GET/POST/DELETE | Inspect, create, and remove Git worktrees from the selected cwd; creation upserts a registered project worktree space when the main worktree is registered, and removal marks matching spaces archived/missing while still deleting sessions for that worktree cwd. |
 | `sessions/archive/` | POST | Archive one or more sessions (moves to `sessions-archive/`). |
 | `sessions/unarchive/` | POST | Unarchive one or more sessions (moves back to `sessions/`). |
 | `sessions/archive-all/` | POST | Archive all sessions for a cwd. |
 | `sessions/archived/` | GET | List archived sessions for a cwd. |
-| `git/worktrees/archive/` | POST | Squash, push, merge, and remove a Git worktree after user risk confirmation; archive also deletes sessions for that worktree cwd. |
+| `git/worktrees/archive/` | POST | Squash, push, merge, and remove a Git worktree after user risk confirmation; archive marks matching spaces archived/missing and deletes sessions for that worktree cwd. |
 | `git/info/` | GET | Return best-effort Git branch/worktree metadata for a cwd. |
 | `git/status/` | GET | Return detailed Git status (branch, commits, staged/unstaged changes, untracked files, stash) for a cwd. |
 | `git/graph/` | GET | Return decorated commit graph data (commits, parents, refs, local branches) for the Git panel branch visualization; optional `branch` previews one validated local branch. |
@@ -103,6 +109,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 ## Implementation Pointers
 
 - Agent command routes should go through `lib/rpc-manager.ts`.
+- Project Registry routes should use `lib/project-registry.ts` and shared wire/schema types in `lib/project-registry-types.ts`; sessions must not be scanned to synthesize the top-level project list. Project-space session routes may filter lightweight session summaries by explicit header links and may return legacy exact-cwd matches separately.
 - Session-file routes should use `lib/session-reader.ts` and shared types in `lib/types.ts`.
 - Client-side command calls should use `lib/agent-client.ts`.
 - Normalize streamed/file-loaded tool calls through `lib/normalize.ts`.

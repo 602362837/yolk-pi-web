@@ -154,6 +154,7 @@ export type OnSubagentChange = (runs: SubagentRun[]) => void;
 export interface UseAgentSessionOptions {
   session: SessionInfo | null;
   newSessionCwd: string | null;
+  newSessionProjectContext?: { projectId: string; spaceId: string } | null;
   onAgentEnd?: () => void;
   onSessionCreated?: (session: SessionInfo) => void;
   onSessionForked?: (newSessionId: string) => void;
@@ -257,7 +258,7 @@ function extractSubagentRuns(
 
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
-    session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
+    session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
     autoScrollEnabled = true,
     defaultToolPreset = "default",
@@ -465,6 +466,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           body: JSON.stringify({
             cwd: newSessionCwd,
             toolNames,
+            ...(newSessionProjectContext ? { projectId: newSessionProjectContext.projectId, spaceId: newSessionProjectContext.spaceId } : {}),
             ...(selectedModel ? { provider: selectedModel.provider, modelId: selectedModel.modelId } : {}),
             ...(thinkingLevel !== "auto" ? { thinkingLevel } : {}),
           }),
@@ -485,6 +487,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           modified: now,
           messageCount: 0,
           firstMessage: "",
+          ...(newSessionProjectContext ? { projectId: newSessionProjectContext.projectId, spaceId: newSessionProjectContext.spaceId } : {}),
         });
         return realId;
       } catch (error) {
@@ -497,7 +500,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     })();
 
     return ensureBrowserShareSessionPromiseRef.current;
-  }, [isNew, newSessionCwd, newSessionModel, onSessionCreated, thinkingLevel, toolPreset]);
+  }, [isNew, newSessionCwd, newSessionModel, newSessionProjectContext, onSessionCreated, thinkingLevel, toolPreset]);
 
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
@@ -651,6 +654,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
         break;
       }
+      case "agent_error":
+        setError(typeof event.errorMessage === "string" ? event.errorMessage : "Agent failed to start");
+        setAgentRunning(false);
+        setAgentPhase(null);
+        dispatch({ type: "end" });
+        break;
       case "chatgpt_account_failover":
         setRetryInfo({
           attempt: 1,
@@ -719,6 +728,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           body: JSON.stringify({
             cwd: newSessionCwd,
             type: "prompt",
+            ...(newSessionProjectContext ? { projectId: newSessionProjectContext.projectId, spaceId: newSessionProjectContext.spaceId } : {}),
             message,
             toolNames,
             ...(piImages?.length ? { images: piImages } : {}),
@@ -741,6 +751,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           modified: now,
           messageCount: 1,
           firstMessage: sessionTitleSeedFromUserMessage(message),
+          ...(newSessionProjectContext ? { projectId: newSessionProjectContext.projectId, spaceId: newSessionProjectContext.spaceId } : {}),
         });
       } else {
         const sid = existingSessionId ?? session?.id;
@@ -758,6 +769,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             modified: now,
             messageCount: 1,
             firstMessage: sessionTitleSeedFromUserMessage(message),
+            ...(newSessionProjectContext ? { projectId: newSessionProjectContext.projectId, spaceId: newSessionProjectContext.spaceId } : {}),
           });
           precreatedSessionIdRef.current = null;
           setPrecreatedSessionId(null);
@@ -774,7 +786,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setAgentPhase(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, toolPreset, thinkingLevel, session, agentRunning, connectEvents, onSessionCreated, messages.length]);
+  }, [isNew, newSessionCwd, newSessionModel, newSessionProjectContext, toolPreset, thinkingLevel, session, agentRunning, connectEvents, onSessionCreated, messages.length]);
 
   const handleAbort = useCallback(async () => {
     const sid = sessionIdRef.current;

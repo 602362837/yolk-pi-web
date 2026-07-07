@@ -9,13 +9,15 @@ export async function POST(req: Request) {
     const body = await req.json() as { cwd?: string; [key: string]: unknown };
     const { cwd, ...command } = body;
 
-    const { provider, modelId, toolNames, thinkingLevel, ...promptCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; [key: string]: unknown };
+    const { provider, modelId, toolNames, thinkingLevel, projectId, spaceId, ...promptCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; projectId?: string; spaceId?: string; [key: string]: unknown };
     const { session, sessionId } = await createConfiguredEmptyAgentSession({
       cwd,
       provider,
       modelId,
       toolNames,
       thinkingLevel,
+      projectId,
+      spaceId,
     });
 
     const result = await session.send(promptCommand);

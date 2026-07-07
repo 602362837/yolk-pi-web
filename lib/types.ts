@@ -7,6 +7,8 @@ export interface SessionHeader {
   timestamp: string;
   cwd: string;
   parentSession?: string;
+  projectId?: string;
+  spaceId?: string;
 }
 
 export interface SessionEntryBase {
@@ -300,6 +302,9 @@ export interface SessionInfo {
   messageCount: number;
   firstMessage: string;
   parentSessionId?: string; // set if this session was forked from another
+  projectId?: string;
+  spaceId?: string;
+  legacyUnassigned?: boolean;
   archived?: boolean;       // true for archived sessions
   worktree?: WorktreeInfo;
   git?: GitInfo;

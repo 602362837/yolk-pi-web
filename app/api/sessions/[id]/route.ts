@@ -6,10 +6,10 @@ import {
   resolveSessionPath,
   invalidateSessionPathCache,
   buildSessionContext,
-  listAllSessions,
 } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
 import { deleteSessionChangesSidecar } from "@/lib/session-file-changes";
+import { getSessionProjectLink } from "@/lib/session-project-link";
 
 // BranchNavigator still traverses recursively, so keep the response tree shallow.
 const MAX_PROJECTED_TREE_DEPTH = 200;
@@ -131,14 +131,21 @@ export async function GET(
     const header = sm.getHeader();
     let modified = header?.timestamp ?? new Date().toISOString();
     try { modified = statSync(filePath).mtime.toISOString(); } catch { /* use header timestamp */ }
-    const allSessions = await listAllSessions();
-    const parentSessionId = allSessions.find((s) => s.id === id)?.parentSessionId;
+    let parentSessionId: string | undefined;
+    const parentSessionPath = (header as { parentSession?: string } | null)?.parentSession;
+    if (parentSessionPath) {
+      try { parentSessionId = SessionManager.open(parentSessionPath).getSessionId(); } catch { /* parent may be archived or deleted */ }
+    }
     const archived = filePath.includes("/sessions-archive/");
+    const projectLink = getSessionProjectLink(header as never);
     const info = header ? {
       path: filePath,
       id: header.id,
       cwd: header.cwd ?? "",
       name: sm.getSessionName(),
+      projectId: projectLink.projectId,
+      spaceId: projectLink.spaceId,
+      legacyUnassigned: projectLink.legacyUnassigned,
       created: header.timestamp,
       modified,
       messageCount: context.messages.length,

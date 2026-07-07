@@ -12,6 +12,8 @@ export async function POST(req: Request) {
       modelId?: string;
       toolNames?: string[];
       thinkingLevel?: string;
+      projectId?: string;
+      spaceId?: string;
     };
 
     const { sessionId } = await createConfiguredEmptyAgentSession({
@@ -21,6 +23,8 @@ export async function POST(req: Request) {
       toolNames: body.toolNames,
       thinkingLevel: body.thinkingLevel,
       applyAutoThinkingLevel: false,
+      projectId: body.projectId,
+      spaceId: body.spaceId,
     });
 
     return NextResponse.json({ success: true, sessionId });

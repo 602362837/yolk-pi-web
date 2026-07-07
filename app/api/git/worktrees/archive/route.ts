@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { archiveGitWorktree, getWorktreeStatus, MainWorktreeDirtyError, WorktreeUserError } from "@/lib/git-worktree";
 import { destroyRpcSessionsForCwd } from "@/lib/rpc-manager";
 import { deleteSessionsForCwd } from "@/lib/session-reader";
+import { markWorktreeSpaceArchivedByPath } from "@/lib/project-registry";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +23,9 @@ export async function POST(req: Request) {
         ...cleanupAliases.flatMap((alias) => destroyRpcSessionsForCwd(alias)),
       ])],
     });
+    const archivedSpaces = await markWorktreeSpaceArchivedByPath(cwd);
     const deletedSessions = await deleteSessionsForCwd(cwd, cleanupAliases);
-    return NextResponse.json({ ...result, deletedSessionIds: deletedSessions.map((session) => session.id) });
+    return NextResponse.json({ ...result, archivedSpaces, deletedSessionIds: deletedSessions.map((session) => session.id) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof MainWorktreeDirtyError) {

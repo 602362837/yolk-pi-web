@@ -1,0 +1,1516 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-090031-设计并改造项目注册表与项目空间层级",
+  "title": "设计并改造项目注册表与项目空间层级",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260707-085431",
+  "createdAt": "2026-07-07T01:00:31.448Z",
+  "updatedAt": "2026-07-07T02:59:48.549Z",
+  "completedAt": "2026-07-07T01:54:36.950Z",
+  "contextIds": [
+    "pi_019f3a13-c521-7b56-96b0-a8b44f4da838",
+    "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-41e4e13e86cd1024b464a13e",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:00:58.418Z",
+      "finishedAt": "2026-07-07T01:07:35.644Z",
+      "prompt": "请基于 brief.md 和用户补充约束，完成项目注册表与项目空间层级改造的架构设计。重点：不做历史 session 反推项目迁移；旧 session 兼容不报错；兼容原有 worktree 配置；以 Project 为顶层，main/worktree spaces 为子项目空间，sessions 归属 project/space；设计 Project Registry schema、API、lib 模块、前端左侧导航数据流、新建/打开 session 流程、分阶段实施计划…",
+      "summary": "已完成架构设计并写入：\n\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/design.md`\n\n产出内容覆盖：\n\n- Project Registry 存储位置与 schema\n- Project Space main/worktree schema\n- session `projectId/spaceId` 写入与旧 session 兼容\n- session index 缓存设计\n- WorkTree 配置/API 兼容与映射策略\n- API / lib 模块边界\n- 左侧导航、新建 session、打开旧 session 数据流\n- 分阶段 Implementation Plan（含 `json ypi-implementation-plan`）\n- 验证清单、风险与回滚/缓解\n- UI 设计员补充建议\n\n验证：\n\n- 未运行 `npm run lint` / `tsc`，本次仅修改规划文档。\n- 已读取写入后的 `design.md` 开头确认落盘成功。\n\n剩余风险 / 需主会话决策：\n\n1. legacy exact-cwd 旧会话是否默认折叠显示在 space 下，还是仅允许 URL 打开。\n2. Project/space 删除是否第一版只 archive。\n3. WorkTree 删除/归档是否继续沿用当前“删除相关 sessions”行为。\n4. 是否允许未来手动把旧 session 关联到当前 space；本设计暂不做自动/批量迁移。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:00:58.418Z",
+        "updatedAt": "2026-07-07T01:07:35.644Z",
+        "eventCount": 11904,
+        "lastTextPreview": "已完成架构设计并写入：\n\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/design.md`\n\n产出内容覆盖：\n\n- Project Registry 存储位置与 schema\n- Project Space main/worktree schema\n- session `projectId/spaceId` 写入与旧 session 兼容\n- session index 缓存设计\n- WorkTree 配置/API 兼容与映射策略\n- API / lib 模块边界\n- 左侧导航、新建 session、打开旧 session 数据流\n- 分阶段 Implementation Plan（含 `json ypi-implementation-plan`）\n- 验证清单、风险与回滚/缓解\n- UI 设计员补充建议\n\n验证：\n\n- 未运行 `npm run lint` / `tsc`，本次仅修改规划文档。\n- 已读取写入后的 `design.md` 开头确认落盘成功。\n\n剩余风险 / 需主会话决策：\n\n1. legacy exact-cwd 旧会话是否默认折叠显示在 space 下，还是仅允许 URL 打开。\n2. Project/space 删除是否第一版只 archive。\n3. WorkTree 删除/归档是否继续沿用当前“删除相关 sessions”行为。\n4. 是否允许未来手动把旧 session 关联到当前 space；本设计暂不做自动/批量迁移。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:07:18.292Z",
+            "toolCallId": "call_kdMOslcb5x0U7ZNeWvFJwtkq|fc_065f701da583c2ce016a4c50ae98a0819980e1f4e96ab4d2ce",
+            "toolName": "write",
+            "text": "Successfully wrote 23737 bytes to .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/design.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:07:24.544Z",
+            "toolCallId": "call_Rnu8wIMCNdQmaFRie2HgOmiQ|fc_065f701da583c2ce016a4c514c41cc81999c9d9505f1f7340f",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/design.md\",\n  \"limit\": 40\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:07:24.551Z",
+            "toolCallId": "call_Rnu8wIMCNdQmaFRie2HgOmiQ|fc_065f701da583c2ce016a4c514c41cc81999c9d9505f1f7340f",
+            "toolName": "read",
+            "text": "# design\n\n## 方案摘要\n\n引入独立的 **Project Registry** 作为左侧项目树的唯一顶层数据源，Session 不再参与项目列表聚合。Project 下固定包含一个 `main` space，并可包含多个 Git worktree space；Session 作为 space 下的历史记录，新增会话写入 `projectId + spaceId`，旧会话缺失这两个字段时继续可读可打开。\n\n核心设计：\n\n1. 新增 `~/.pi/agent/pi-web-projects.json` 保存项目/空间元数据；不从历史 session 反推创建项目。\n2. 新增轻量 `~/.pi/agent/pi-web-session-index.json` 作为新 session 的 project/space 链接索引；session JSONL header 中同时写入可选 `projectId`、`spaceId` 作为持久真源，索引只是性能缓存。\n3. 左侧导航改为 `Project -> Space(main/worktree) -> Sessions(lazy)`：项目和 space 从 registry 读取，只有展开/选中 space 时才读取该 space 的 session。\n4. 旧 session 缺少 projectId/spaceId 时不报错；可通过 URL/legacy fallback 打开。可在已注册 space 下以“未归属旧会话”显示 exact-cwd 匹配结果，但不自动回写、不迁移。\n5. 兼容现有 WorkTree：继续使用 `pi-web.json.worktree` 的创建模板；注册/刷新项目时通过 `git worktree list --porcelain` 发现已有 worktree，并作为项目子 space 物化/更新。\n6. 文件、Git、Trellis、Studio、Terminal 等下游仍消费 cwd/path；Project/Space 是导航与 session 归属层，不替代 workspace cwd。\n\n## 当前代码证据\n\n已阅读并基于以下现状设计：\n\n- `components/SessionSidebar.tsx` 当前通过 `/api/sessions` -> `getRecentCwds()` -> `buildCwdPickerRows()` 从 session cwd 聚合项目/WorkTree 列表。\n- `lib/session-reader.ts` 当前 `listAllSessions()` 扫描 session，并通过 `getGitMetadataForCwd()` 给 session 附带 `worktree/git`。\n- `app/api/agent/new/route.ts`、`app/api/agent/draft/route.ts` 和 `lib/agent-session-bootstrap.ts` 当前只接收 `cwd`，创建 session 后未写项目归属。\n- `lib/rpc-manager.ts` 的 fork 分支会创建新 JSONL 文件，需要继承/写入 project/space 上下文。\n- `lib/git-worktree.ts` 已有 worktree create/status/remove/archive 能力，但缺少“列出某项目全部 worktree space”的 registry 层。\n- `lib/allowed-roots.ts` 当前主要从 session cwd 构造允许根；改造后必须纳入 Project Registry paths，否则无 session 的新项目无法打开文件/Studio/Trellis。\n\n## 目标与非目标\n\n### 范围内\n\n- 新增 Project Registry 持久化 schema、读写 lib、API。\n- 新增 Project Space schema：`main` 和 `worktree`。\n- 新 session / draft session / fork session 关联 `projectId + spaceId`。\n- 旧 session 缺字段兼容，不因缺 project/space 报错。\n- 左侧导航改为 registry 驱动，space 下按需加载 sessions。\n- 兼容现有 WorkTree 创建配置和已有 Git worktree 列表。\n- 支持项目/空间 displayName、tags、metadata、pinned、archived、lastOpenedAt。\n\n### 范围外\n\n\n[596 more lines in file. Use offset=41 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:07:33.434Z",
+            "text": "已完成架构设计并写入：\n\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/design.md`\n\n产出内容覆盖：\n\n- Project Registry 存储位置与 schema\n- Project Space main/worktree schema\n- session `projectId/spaceId` 写入与旧 session 兼容\n- session index 缓存设计\n- WorkTree 配置/API 兼容与映射策略\n- API / lib 模块边界\n- 左侧导航、新建 session、打开旧 session 数据流\n- 分阶段 Implementation Plan（含 `json ypi-implementation-plan`）\n- 验证清单、风险与回滚/缓解\n- UI 设计员补充建议\n\n验证：\n\n- 未运行 `npm run lint` / `tsc`，本次仅修改规划文档。\n- 已读取写入后的 `design.md` 开头确认落盘成功。\n\n剩余风险 / 需主会话决策：\n\n1. legacy exact-cwd 旧会话是否默认折叠显示在 space 下，还是仅允许 URL 打开。\n2. Project/space 删除是否第一版只 archive。\n3. WorkTree 删除/归档是否继续沿用当前“删除相关 sessions”行为。\n4. 是否允许未来手动把旧 session 关联到当前 space；本设计暂不做自动/批量迁移。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:07:33.456Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1322,
+        "tokens": 397,
+        "tokenSource": "usage",
+        "tps": 74.88,
+        "firstTokenAt": "2026-07-07T01:07:28.126Z",
+        "lastTokenAt": "2026-07-07T01:07:33.428Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-41e4e13e86cd1024b464a13e",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/architect-41e4e13e86cd1024b464a13e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:00:58.418Z",
+        "finishedAt": "2026-07-07T01:07:35.637Z",
+        "updatedAt": "2026-07-07T01:07:35.637Z",
+        "itemCount": 101,
+        "messageCount": 1,
+        "toolCallCount": 48,
+        "stderrBytes": 0,
+        "bytes": 410433,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-71f7e546b07224cd7ee0d929",
+      "subtaskId": "registry-lib-api",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:16:32.850Z",
+      "finishedAt": "2026-07-07T01:21:30.492Z",
+      "prompt": "请实现已认领子任务 registry-lib-api：新增 Project Registry 类型、lib 与基础 API。遵循任务 artifacts 中的 design.md、implement.md、checks.md；只处理该子任务范围，完成后总结修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added Project Registry/project-space schema and input types.\n- `lib/project-registry.ts` — added registry persistence, canonical realpath path keys, project registration, main-space creation, duplicate detection, and metadata patch helpers.\n- `app/api/projects/**/route.ts` — added project and project-space GET/POST/PATCH APIs.\n- `docs/modules/api.md` — documented new Project Registry API routes.\n- `docs/modules/library.md` — documented new registry lib modules.\n- `.ypi/tasks/.../handoff.md` — produced required handoff artifact.\n\n#### Verification\n\n- `npm install --include=dev` — installed missing dev dependencies; npm reported existing peer/vulnerability warnings.\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Limited to selected `registry-lib-api` subtask only.\n- Session link, WorkTree sync, allowed roots, sidebar UI, and legacy UX remain for later subtasks.\n- No decisions needed from main session.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:16:32.850Z",
+        "updatedAt": "2026-07-07T01:21:30.492Z",
+        "eventCount": 7717,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added Project Registry/project-space schema and input types.\n- `lib/project-registry.ts` — added registry persistence, canonical realpath path keys, project registration, main-space creation, duplicate detection, and metadata patch helpers.\n- `app/api/projects/**/route.ts` — added project and project-space GET/POST/PATCH APIs.\n- `docs/modules/api.md` — documented new Project Registry API routes.\n- `docs/modules/library.md` — documented new registry lib modules.\n- `.ypi/tasks/.../handoff.md` — produced required handoff artifact.\n\n#### Verification\n\n- `npm install --include=dev` — installed missing dev dependencies; npm reported existing peer/vulnerability warnings.\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Limited to selected `registry-lib-api` subtask only.\n- Session link, WorkTree sync, allowed roots, sidebar UI, and legacy UX remain for later subtasks.\n- No decisions needed from main session.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:21:00.280Z",
+            "toolCallId": "call_gghodPwkhNDTsiT9IOaU5mDB|fc_0e62535f73544d44016a4c547c04188199a87b9ecaa8ae177a",
+            "toolName": "bash",
+            "text": "M docs/modules/api.md\n M docs/modules/library.md\n?? \".ypi/tasks/20260707-090031-\\350\\256\\276\\350\\256\\241\\345\\271\\266\\346\\224\\271\\351\\200\\240\\351\\241\\271\\347\\233\\256\\346\\263\\250\\345\\206\\214\\350\\241\\250\\344\\270\\216\\351\\241\\271\\347\\233\\256\\347\\251\\272\\351\\227\\264\\345\\261\\202\\347\\272\\247/\"\n?? app/api/projects/\n?? lib/project-registry-types.ts\n?? lib/project-registry.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:21:16.947Z",
+            "toolCallId": "call_n4ybr2Vp12UmDoBBHNQzvYIh|fc_0e62535f73544d44016a4c548702dc8199a8f1e3181c45823b",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md\",\n  \"content\": \"# handoff\\n\\n## registry-lib-api implementation\\n\\n### Files changed\\n\\n- `lib/project-registry-types.ts` — added Project Registry/project-space schema and API input types.\\n- `lib/project-registry.ts` — added registry persistence at `getAgentDir()/pi-web-projects.json`, canonical realpath-backed path keys, project registration with main-space creation, duplicate active-project detection, and project/space metadata patch helpers.\\n- `app/api/projects/route.ts` — added `GET /api/projects` and `POST /api/projects`.\\n- `app/api/projects/[projectId]/route.ts` — added project read/update API.\\n- `app/api/projects/[projectId]/spaces/route.ts` — added project-space listing API.\\n- `app/api/projects/[projectId]/spaces/[spaceId]/route.ts` — added project-space read/update API.\\n- `docs/modules/api.md` — documented Project Registry routes and route ownership.\\n- `docs/modules/library.md` — documented Project Registry library modules and canonical path reuse rule.\\n\\n### Validation\\n\\n- `npm install --include=dev` — installed missing dev dependencies required by validation; npm reported existing peer/vulnerability warnings.\\n- `npm run lint` — passed.\\n- `node_modules/.bin/tsc --noEmit` — passed.\\n\\n### Notes / risks\\n\\n- Scope intentionally limited to Registry lib/API; session linking, WorkTree sync, allowed-roots integration, sidebar UI, and legacy-session UX remain for later subtasks.\\n- `POST /api/projects` returns an existing active project when canonical `pathKey` already exists; archived projects with the same path do not block a new active record.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:21:16.950Z",
+            "toolCallId": "call_n4ybr2Vp12UmDoBBHNQzvYIh|fc_0e62535f73544d44016a4c548702dc8199a8f1e3181c45823b",
+            "toolName": "write",
+            "text": "Successfully wrote 1547 bytes to .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:21:28.283Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added Project Registry/project-space schema and input types.\n- `lib/project-registry.ts` — added registry persistence, canonical realpath path keys, project registration, main-space creation, duplicate detection, and metadata patch helpers.\n- `app/api/projects/**/route.ts` — added project and project-space GET/POST/PATCH APIs.\n- `docs/modules/api.md` — documented new Project Registry API routes.\n- `docs/modules/library.md` — documented new registry lib modules.\n- `.ypi/tasks/.../handoff.md` — produced required handoff artifact.\n\n#### Verification\n\n- `npm install --include=dev` — installed missing dev dependencies; npm reported existing peer/vulnerability warnings.\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Limited to selected `registry-lib-api` subtask only.\n- Session link, WorkTree sync, allowed roots, sidebar UI, and legacy UX remain for later subtasks.\n- No decisions needed from main session.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:21:28.292Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2090,
+        "tokens": 276,
+        "tokenSource": "usage",
+        "tps": 90.34,
+        "firstTokenAt": "2026-07-07T01:21:25.221Z",
+        "lastTokenAt": "2026-07-07T01:21:28.276Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-71f7e546b07224cd7ee0d929",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/implementer-71f7e546b07224cd7ee0d929.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:16:32.850Z",
+        "finishedAt": "2026-07-07T01:21:30.487Z",
+        "updatedAt": "2026-07-07T01:21:30.487Z",
+        "itemCount": 89,
+        "messageCount": 1,
+        "toolCallCount": 42,
+        "stderrBytes": 0,
+        "bytes": 116148,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-935d401ca6e22aaa5a8d5235",
+      "subtaskId": "worktree-registry-sync",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:22:04.846Z",
+      "finishedAt": "2026-07-07T01:26:35.206Z",
+      "prompt": "请实现已认领子任务 worktree-registry-sync：兼容现有 WorkTree 配置并同步为 space。遵循任务 artifacts 中的 design.md、implement.md、checks.md；只处理该子任务范围，注意与已完成 registry-lib-api 的产物集成。完成后总结修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/project-registry.ts` — added WorkTree space sync/upsert/archive helpers.\n- `lib/git-worktree.ts` — exported `WorktreeRecord`.\n- `lib/allowed-roots.ts` — includes active Project Registry roots/spaces for file API access without sessions.\n- `app/api/projects/route.ts` — refreshes WorkTree spaces after project registration.\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts` — new refresh API.\n- `app/api/git/worktrees/route.ts` — WorkTree create/remove now syncs registry spaces.\n- `app/api/git/worktrees/archive/route.ts` — archive removal marks registry spaces archived/missing.\n- `docs/modules/api.md` / `docs/modules/library.md` — documented changes.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended handoff section.\n\n#### Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree removal/archive still deletes related sessions per existing behavior; registry space is additionally marked `archived=true` and `missing=true`.\n- Decisions needed from main session: None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:22:04.846Z",
+        "updatedAt": "2026-07-07T01:26:35.205Z",
+        "eventCount": 6477,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/project-registry.ts` — added WorkTree space sync/upsert/archive helpers.\n- `lib/git-worktree.ts` — exported `WorktreeRecord`.\n- `lib/allowed-roots.ts` — includes active Project Registry roots/spaces for file API access without sessions.\n- `app/api/projects/route.ts` — refreshes WorkTree spaces after project registration.\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts` — new refresh API.\n- `app/api/git/worktrees/route.ts` — WorkTree create/remove now syncs registry spaces.\n- `app/api/git/worktrees/archive/route.ts` — archive removal marks registry spaces archived/missing.\n- `docs/modules/api.md` / `docs/modules/library.md` — documented changes.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended handoff section.\n\n#### Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree removal/archive still deletes related sessions per existing behavior; registry space is additionally marked `archived=true` and `missing=true`.\n- Decisions needed from main session: None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:26:20.286Z",
+            "toolCallId": "call_FHE7wqh4bd5ewxKVNxZis9he|fc_01d8fcbd0f1ac13d016a4c55b38a6c8198bb5018f35fbcc0fd",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:26:25.847Z",
+            "toolCallId": "call_ygIZfpTruDMh9FgjHroWxbPZ|fc_01d8fcbd0f1ac13d016a4c55c192008198a73eec68059c2e10",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:26:25.930Z",
+            "toolCallId": "call_ygIZfpTruDMh9FgjHroWxbPZ|fc_01d8fcbd0f1ac13d016a4c55c192008198a73eec68059c2e10",
+            "toolName": "bash",
+            "text": "M app/api/git/worktrees/archive/route.ts\n M app/api/git/worktrees/route.ts\n M docs/modules/api.md\n M docs/modules/library.md\n M lib/allowed-roots.ts\n M lib/git-worktree.ts\n?? \".ypi/tasks/20260707-090031-\\350\\256\\276\\350\\256\\241\\345\\271\\266\\346\\224\\271\\351\\200\\240\\351\\241\\271\\347\\233\\256\\346\\263\\250\\345\\206\\214\\350\\241\\250\\344\\270\\216\\351\\241\\271\\347\\233\\256\\347\\251\\272\\351\\227\\264\\345\\261\\202\\347\\272\\247/\"\n?? app/api/projects/\n?? lib/project-registry-types.ts\n?? lib/project-registry.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:26:34.551Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/project-registry.ts` — added WorkTree space sync/upsert/archive helpers.\n- `lib/git-worktree.ts` — exported `WorktreeRecord`.\n- `lib/allowed-roots.ts` — includes active Project Registry roots/spaces for file API access without sessions.\n- `app/api/projects/route.ts` — refreshes WorkTree spaces after project registration.\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts` — new refresh API.\n- `app/api/git/worktrees/route.ts` — WorkTree create/remove now syncs registry spaces.\n- `app/api/git/worktrees/archive/route.ts` — archive removal marks registry spaces archived/missing.\n- `docs/modules/api.md` / `docs/modules/library.md` — documented changes.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended handoff section.\n\n#### Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree removal/archive still deletes related sessions per existing behavior; registry space is additionally marked `archived=true` and `missing=true`.\n- Decisions needed from main session: None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:26:34.566Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2342,
+        "tokens": 330,
+        "tokenSource": "usage",
+        "tps": 88.54,
+        "firstTokenAt": "2026-07-07T01:26:30.803Z",
+        "lastTokenAt": "2026-07-07T01:26:34.530Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-935d401ca6e22aaa5a8d5235",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/implementer-935d401ca6e22aaa5a8d5235.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:22:04.846Z",
+        "finishedAt": "2026-07-07T01:26:35.194Z",
+        "updatedAt": "2026-07-07T01:26:35.194Z",
+        "itemCount": 79,
+        "messageCount": 1,
+        "toolCallCount": 37,
+        "stderrBytes": 0,
+        "bytes": 163905,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e8a46b0a3fa6448fafd3de30",
+      "subtaskId": "session-project-link",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:22:04.801Z",
+      "finishedAt": "2026-07-07T01:34:00.183Z",
+      "prompt": "请实现已认领子任务 session-project-link：新增 session project/space 链接与旧 session 兼容。遵循任务 artifacts 中的 design.md、implement.md、checks.md；只处理该子任务范围，注意与已完成 registry-lib-api 的产物集成。完成后总结修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-project-link.ts` — added session header link helpers and legacy-unassigned detection.\n- `lib/project-session-index.ts` — added best-effort `pi-web-session-index.json` maintenance.\n- `lib/types.ts` — added optional `projectId`, `spaceId`, `legacyUnassigned`.\n- `lib/session-reader.ts` — returns project link metadata for active/archived sessions.\n- `lib/agent-session-bootstrap.ts` — validates project/space context, writes linked headers/index.\n- `app/api/agent/new/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `app/api/agent/draft/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `lib/rpc-manager.ts` — linked forks inherit project/space; legacy forks remain unassigned.\n- `app/api/sessions/[id]/route.ts` — includes link metadata while tolerating old sessions.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — added space sessions API with optional legacy exact-cwd results.\n- Docs updated: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md`.\n- Artifact updated: `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md`.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `git diff --check` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification was run.\n- Session index is maintained for new/forked linked sessions, but project-space session API still filters headers as source of truth.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:22:04.801Z",
+        "updatedAt": "2026-07-07T01:34:00.183Z",
+        "eventCount": 9347,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-project-link.ts` — added session header link helpers and legacy-unassigned detection.\n- `lib/project-session-index.ts` — added best-effort `pi-web-session-index.json` maintenance.\n- `lib/types.ts` — added optional `projectId`, `spaceId`, `legacyUnassigned`.\n- `lib/session-reader.ts` — returns project link metadata for active/archived sessions.\n- `lib/agent-session-bootstrap.ts` — validates project/space context, writes linked headers/index.\n- `app/api/agent/new/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `app/api/agent/draft/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `lib/rpc-manager.ts` — linked forks inherit project/space; legacy forks remain unassigned.\n- `app/api/sessions/[id]/route.ts` — includes link metadata while tolerating old sessions.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — added space sessions API with optional legacy exact-cwd results.\n- Docs updated: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md`.\n- Artifact updated: `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md`.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `git diff --check` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification was run.\n- Session index is maintained for new/forked linked sessions, but project-space session API still filters headers as source of truth.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:33:39.381Z",
+            "toolCallId": "call_xEBGS1iqflWA4STy2YILvIwc|fc_01242c64a51e9f07016a4c5772e624819a8a0790f9184aa175",
+            "toolName": "bash",
+            "text": "app/api/agent/draft/route.ts           |  4 ++++\n app/api/agent/new/route.ts             |  4 +++-\n app/api/git/worktrees/archive/route.ts |  4 +++-\n app/api/git/worktrees/route.ts         | 10 ++++++++--\n app/api/sessions/[id]/route.ts         |  5 +++++\n docs/architecture/overview.md          |  5 ++++-\n docs/modules/api.md                    | 11 +++++++++--\n docs/modules/library.md                | 10 ++++++++--\n lib/agent-session-bootstrap.ts         | 30 ++++++++++++++++++++++++++++++\n lib/allowed-roots.ts                   | 19 ++++++++++++++++++-\n lib/git-worktree.ts                    |  2 +-\n lib/rpc-manager.ts                     | 13 +++++++++++++\n lib/session-reader.ts                  | 14 ++++++++++++++\n lib/types.ts                           |  5 +++++\n 14 files changed, 125 insertions(+), 11 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:33:44.591Z",
+            "toolCallId": "call_sKYaU0DmuSgufCM8c2TFECQw|fc_01242c64a51e9f07016a4c57785cd0819aa1d193edf7631714",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:33:44.665Z",
+            "toolCallId": "call_sKYaU0DmuSgufCM8c2TFECQw|fc_01242c64a51e9f07016a4c57785cd0819aa1d193edf7631714",
+            "toolName": "bash",
+            "text": "M app/api/agent/draft/route.ts\n M app/api/agent/new/route.ts\n M app/api/git/worktrees/archive/route.ts\n M app/api/git/worktrees/route.ts\n M app/api/sessions/[id]/route.ts\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/library.md\n M lib/agent-session-bootstrap.ts\n M lib/allowed-roots.ts\n M lib/git-worktree.ts\n M lib/rpc-manager.ts\n M lib/session-reader.ts\n M lib/types.ts\n?? \".ypi/tasks/20260707-090031-\\350\\256\\276\\350\\256\\241\\345\\271\\266\\346\\224\\271\\351\\200\\240\\351\\241\\271\\347\\233\\256\\346\\263\\250\\345\\206\\214\\350\\241\\250\\344\\270\\216\\351\\241\\271\\347\\233\\256\\347\\251\\272\\351\\227\\264\\345\\261\\202\\347\\272\\247/\"\n?? app/api/projects/\n?? lib/project-registry-types.ts\n?? lib/project-registry.ts\n?? lib/project-session-index.ts\n?? lib/session-project-link.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:33:59.627Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-project-link.ts` — added session header link helpers and legacy-unassigned detection.\n- `lib/project-session-index.ts` — added best-effort `pi-web-session-index.json` maintenance.\n- `lib/types.ts` — added optional `projectId`, `spaceId`, `legacyUnassigned`.\n- `lib/session-reader.ts` — returns project link metadata for active/archived sessions.\n- `lib/agent-session-bootstrap.ts` — validates project/space context, writes linked headers/index.\n- `app/api/agent/new/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `app/api/agent/draft/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `lib/rpc-manager.ts` — linked forks inherit project/space; legacy forks remain unassigned.\n- `app/api/sessions/[id]/route.ts` — includes link metadata while tolerating old sessions.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — added space sessions API with optional legacy exact-cwd results.\n- Docs updated: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md`.\n- Artifact updated: `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md`.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `git diff --check` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification was run.\n- Session index is maintained for new/forked linked sessions, but project-space session API still filters headers as source of truth.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:33:59.637Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2962,
+        "tokens": 530,
+        "tokenSource": "usage",
+        "tps": 191.96,
+        "firstTokenAt": "2026-07-07T01:33:56.841Z",
+        "lastTokenAt": "2026-07-07T01:33:59.602Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e8a46b0a3fa6448fafd3de30",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/implementer-e8a46b0a3fa6448fafd3de30.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:22:04.801Z",
+        "finishedAt": "2026-07-07T01:34:00.176Z",
+        "updatedAt": "2026-07-07T01:34:00.176Z",
+        "itemCount": 115,
+        "messageCount": 1,
+        "toolCallCount": 51,
+        "stderrBytes": 0,
+        "bytes": 227951,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3be7b41ae502af46acd15f29",
+      "subtaskId": "sidebar-project-tree",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:34:18.053Z",
+      "finishedAt": "2026-07-07T01:43:20.754Z",
+      "prompt": "请实现已认领子任务 sidebar-project-tree：改造 AppShell/SessionSidebar 为 Project/Space 导航。遵循任务 artifacts 中的 design.md、implement.md、checks.md；只处理该子任务范围，注意与已完成 registry-lib-api、session-project-link、worktree-registry-sync 的产物集成。完成后总结修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — Project Registry-driven Project → Space sidebar, lazy project-space session loading, add project path flow, legacy unassigned session section, project/space context forwarding.\n- `components/AppShell.tsx` — tracks active/new project-space context and passes it into chat creation.\n- `components/ChatWindow.tsx` — accepts new-session project-space context.\n- `hooks/useAgentSession.ts` — sends optional `projectId`/`spaceId` to new/draft session APIs.\n- `docs/modules/frontend.md` — documented new frontend data flow.\n- `.ypi/.../handoff.md` — appended sidebar-project-tree handoff notes.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree creation refreshes registry data and relies on path matching after refresh; checker should verify newly created WorkTree space selection/linking in UI.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:34:18.053Z",
+        "updatedAt": "2026-07-07T01:43:20.754Z",
+        "eventCount": 17356,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — Project Registry-driven Project → Space sidebar, lazy project-space session loading, add project path flow, legacy unassigned session section, project/space context forwarding.\n- `components/AppShell.tsx` — tracks active/new project-space context and passes it into chat creation.\n- `components/ChatWindow.tsx` — accepts new-session project-space context.\n- `hooks/useAgentSession.ts` — sends optional `projectId`/`spaceId` to new/draft session APIs.\n- `docs/modules/frontend.md` — documented new frontend data flow.\n- `.ypi/.../handoff.md` — appended sidebar-project-tree handoff notes.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree creation refreshes registry data and relies on path matching after refresh; checker should verify newly created WorkTree space selection/linking in UI.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:43:06.500Z",
+            "toolCallId": "call_u7WXrqHHSYA8kA8Oovtr8C1r|fc_079a09e8d9e9e593016a4c59a4306081988fc5cb39e6d4f984",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:43:12.095Z",
+            "toolCallId": "call_hg4BPByBa2mxyGRjAMo4oY8b|fc_079a09e8d9e9e593016a4c59af86dc8198bf0ebcb303628dd1",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat -- components/AppShell.tsx components/ChatWindow.tsx components/SessionSidebar.tsx hooks/useAgentSession.ts docs/modules/frontend.md .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:43:12.162Z",
+            "toolCallId": "call_hg4BPByBa2mxyGRjAMo4oY8b|fc_079a09e8d9e9e593016a4c59af86dc8198bf0ebcb303628dd1",
+            "toolName": "bash",
+            "text": "components/AppShell.tsx       |  14 +-\n components/ChatWindow.tsx     |   5 +-\n components/SessionSidebar.tsx | 537 ++++++++++++++++++++++++------------------\n docs/modules/frontend.md      |   8 +-\n hooks/useAgentSession.ts      |  11 +-\n 5 files changed, 340 insertions(+), 235 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:43:20.212Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — Project Registry-driven Project → Space sidebar, lazy project-space session loading, add project path flow, legacy unassigned session section, project/space context forwarding.\n- `components/AppShell.tsx` — tracks active/new project-space context and passes it into chat creation.\n- `components/ChatWindow.tsx` — accepts new-session project-space context.\n- `hooks/useAgentSession.ts` — sends optional `projectId`/`spaceId` to new/draft session APIs.\n- `docs/modules/frontend.md` — documented new frontend data flow.\n- `.ypi/.../handoff.md` — appended sidebar-project-tree handoff notes.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree creation refreshes registry data and relies on path matching after refresh; checker should verify newly created WorkTree space selection/linking in UI.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:43:20.222Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1980,
+        "tokens": 254,
+        "tokenSource": "usage",
+        "tps": 93.14,
+        "firstTokenAt": "2026-07-07T01:43:17.466Z",
+        "lastTokenAt": "2026-07-07T01:43:20.193Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3be7b41ae502af46acd15f29",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/implementer-3be7b41ae502af46acd15f29.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:34:18.053Z",
+        "finishedAt": "2026-07-07T01:43:20.747Z",
+        "updatedAt": "2026-07-07T01:43:20.747Z",
+        "itemCount": 163,
+        "messageCount": 1,
+        "toolCallCount": 78,
+        "stderrBytes": 0,
+        "bytes": 411732,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-6fca1042fa5fc01dc984ebd9",
+      "subtaskId": "metadata-legacy-ux",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:43:38.687Z",
+      "finishedAt": "2026-07-07T01:48:55.149Z",
+      "prompt": "请实现已认领子任务 metadata-legacy-ux：补齐项目/空间元数据编辑与 legacy 展示。遵循任务 artifacts 中的 design.md、implement.md、checks.md；只处理该子任务范围，注意与前序产物集成。完成后总结修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — added project/space metadata edit modal for display name, tags, pinned, archived; added workspace menu actions; pinned/archived now update sidebar sorting/visibility; missing spaces remain metadata-editable while new session stays disabled; legacy sessions show inline “未关联”.\n- `docs/modules/frontend.md` — documented sidebar metadata editing.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended subtask handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser verification run.\n- Archived projects/spaces are hidden from active selector; no separate archived-project management view added in this subtask.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:43:38.687Z",
+        "updatedAt": "2026-07-07T01:48:55.149Z",
+        "eventCount": 9737,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — added project/space metadata edit modal for display name, tags, pinned, archived; added workspace menu actions; pinned/archived now update sidebar sorting/visibility; missing spaces remain metadata-editable while new session stays disabled; legacy sessions show inline “未关联”.\n- `docs/modules/frontend.md` — documented sidebar metadata editing.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended subtask handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser verification run.\n- Archived projects/spaces are hidden from active selector; no separate archived-project management view added in this subtask.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:48:40.494Z",
+            "toolCallId": "call_rG9MH5NYBz4tmFz4xzbHMwzv|fc_0489827ee43748af016a4c5af7a4408198b6a71fd712e4685e",
+            "toolName": "bash",
+            "text": "M app/api/agent/draft/route.ts\n M app/api/agent/new/route.ts\n M app/api/git/worktrees/archive/route.ts\n M app/api/git/worktrees/route.ts\n M app/api/sessions/[id]/route.ts\n M components/AppShell.tsx\n M components/ChatWindow.tsx\n M components/SessionSidebar.tsx\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M hooks/useAgentSession.ts\n M lib/agent-session-bootstrap.ts\n M lib/allowed-roots.ts\n M lib/git-worktree.ts\n M lib/rpc-manager.ts\n M lib/session-reader.ts\n M lib/types.ts\n?? \".ypi/tasks/20260707-090031-\\350\\256\\276\\350\\256\\241\\345\\271\\266\\346\\224\\271\\351\\200\\240\\351\\241\\271\\347\\233\\256\\346\\263\\250\\345\\206\\214\\350\\241\\250\\344\\270\\216\\351\\241\\271\\347\\233\\256\\347\\251\\272\\351\\227\\264\\345\\261\\202\\347\\272\\247/\"\n?? app/api/projects/\n?? lib/project-registry-types.ts\n?? lib/project-registry.ts\n?? lib/project-session-index.ts\n?? lib/session-project-link.ts\n\n- No manual browser/API verification was run in this delegated pass.\n- The session index is maintained for new/forked linked sessions but not yet used as the primary query path; project-space session API filters headers to preserve header-as-source-of-truth semantics.\n\n## sidebar-project-tree implementation\n\n### Files changed\n\n- `components/SessionSidebar.tsx` — switched the sidebar project selector to `/api/projects`, renders Project → Space entries from the registry, registers added paths through `POST /api/projects`, lazy-loads linked sessions through the project-space sessions API, shows exact-cwd legacy sessions in a separate “未关联旧会话” section, and forwards selected project/space context for new chats.\n- `components/AppShell.tsx` — tracks active and new-session project/space context from the sidebar and passes it into chat creation while preserving legacy URL session restore behavior.\n- `components/ChatWindow.tsx` — accepts optional new-session project/space context and forwards it to the agent hook.\n- `hooks/useAgentSession.ts` — includes optional `projectId`/`spaceId` in new and draft session requests and local session-created projections.\n- `docs/modules/frontend.md` — documented the Project Registry-driven sidebar and project/space context plumbing.\n\n### Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n### Notes / risks\n\n- No manual browser verification was run in this delegated pass.\n- WorkTree creation refreshes registry data and relies on the registry space match by path after refresh; checker should verify the newly created worktree is selected/linked in the browser flow.\n\n## metadata-legacy-ux implementation\n\n### Files changed\n\n- `components/SessionSidebar.tsx` — added a workspace metadata action menu and modal for editing project/space display name, tags, pinned, and archived state via the existing Project Registry PATCH APIs; pinned/archived updates immediately affect active sidebar sorting/visibility; missing spaces keep metadata editable while new-session creation remains disabled; legacy rows now show an inline “未关联” marker.\n- `docs/modules/frontend.md` — documented Project Registry metadata editing in the sidebar module map.\n\n### Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n### Notes / risks\n\n- No manual browser verification was run in this delegated pass.\n- Archived projects/spaces are hidden from the active selector; this subtask did not add a separate archived-project management view.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:48:46.168Z",
+            "toolCallId": "call_HauxvPuw6FfkZiC3ilT1EiIQ|fc_0489827ee43748af016a4c5afdea348198b97e5860cea84d7f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- components/SessionSidebar.tsx | grep -n \\\"metadata\\\\|ProjectMetadata\\\\|未关联\\\\|WorkspaceMenu\\\" | head -80\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:48:46.209Z",
+            "toolCallId": "call_HauxvPuw6FfkZiC3ilT1EiIQ|fc_0489827ee43748af016a4c5afdea348198b97e5860cea84d7f",
+            "toolName": "bash",
+            "text": "174:+function WorkspaceMenuButton({ children, danger = false, onClick }: { children: React.ReactNode; danger?: boolean; onClick: () => void }) {\n228:+  const [metadataEditTarget, setMetadataEditTarget] = useState<MetadataEditTarget | null>(null);\n229:+  const [metadataBusy, setMetadataBusy] = useState(false);\n230:+  const [metadataError, setMetadataError] = useState<string | null>(null);\n492:+  const patchProjectMetadata = useCallback(async (projectId: string, patch: Record<string, unknown>) => {\n683:-                          setWorkspaceMenuOpen(false);\n707:+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setMetadataError(null); setMetadataEditTarget({ kind: \"project\", project: selectedProjectSpace.project }); }}>\n709:+                          </WorkspaceMenuButton>\n710:+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setMetadataError(null); setMetadataEditTarget({ kind: \"space\", project: selectedProjectSpace.project, space: selectedProjectSpace.space }); }}>\n712:+                          </WorkspaceMenuButton>\n713:+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchProjectMetadata(selectedProjectSpace.project.id, { pinned: !selectedProjectSpace.project.pinned }); }}>\n715:+                          </WorkspaceMenuButton>\n716:+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { pinned: !selectedProjectSpace.space.pinned }); }}>\n718:+                          </WorkspaceMenuButton>\n721:+                      <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setArchiveAllConfirming(true); }}>\n724:+                      </WorkspaceMenuButton>\n727:+                          <WorkspaceMenuButton danger onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { archived: true }); }}>\n729:+                          </WorkspaceMenuButton>\n730:+                          <WorkspaceMenuButton danger onClick={() => {\n732:+                            setWorkspaceMenuOpen(false);\n733:+                            void patchProjectMetadata(selectedProjectSpace.project.id, { archived: true });\n736:+                          </WorkspaceMenuButton>\n923:+      {metadataEditTarget && (\n924:+        <ProjectMetadataDialog\n925:+          target={metadataEditTarget}\n926:+          busy={metadataBusy}\n927:+          error={metadataError}\n929:+            if (metadataBusy) return;\n934:+            if (metadataEditTarget.kind === \"project\") {\n935:+              void patchProjectMetadata(metadataEditTarget.project.id, patch);\n936:+            } else if (metadataEditTarget.space) {\n937:+              void patchSpaceMetadata(metadataEditTarget.project.id, metadataEditTarget.space.id, patch);\n970:+              未关联旧会话 ({legacySessions.length})\n1007:+function ProjectMetadataDialog({\n1095:+              {session.legacyUnassigned && <span title=\"缺少 projectId/spaceId，按 cwd 匹配显示，不会自动回写\">未关联</span>}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:48:52.926Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — added project/space metadata edit modal for display name, tags, pinned, archived; added workspace menu actions; pinned/archived now update sidebar sorting/visibility; missing spaces remain metadata-editable while new session stays disabled; legacy sessions show inline “未关联”.\n- `docs/modules/frontend.md` — documented sidebar metadata editing.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended subtask handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser verification run.\n- Archived projects/spaces are hidden from active selector; no separate archived-project management view added in this subtask.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:48:52.937Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1590,
+        "tokens": 293,
+        "tokenSource": "usage",
+        "tps": 489.97,
+        "firstTokenAt": "2026-07-07T01:48:52.320Z",
+        "lastTokenAt": "2026-07-07T01:48:52.918Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-6fca1042fa5fc01dc984ebd9",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/implementer-6fca1042fa5fc01dc984ebd9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:43:38.687Z",
+        "finishedAt": "2026-07-07T01:48:55.135Z",
+        "updatedAt": "2026-07-07T01:48:55.135Z",
+        "itemCount": 73,
+        "messageCount": 1,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 232796,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-21c1519bd306a4eda79b6585",
+      "subtaskId": "docs-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:49:13.172Z",
+      "finishedAt": "2026-07-07T01:50:37.198Z",
+      "prompt": "请实现已认领子任务 docs-validation：更新文档并完成验证。遵循任务 artifacts 中的 design.md、implement.md、checks.md；只处理该子任务范围，运行必要验证（至少 lint 与 tsc，如遇环境问题说明）。完成后总结修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `docs/architecture/overview.md` — added Project Registry boundary, storage, canonical path, session-link source-of-truth notes.\n- `docs/modules/api.md` — verified/kept Project Registry and project-space API documentation.\n- `docs/modules/frontend.md` — verified registry-driven sidebar/project-space context documentation.\n- `docs/modules/library.md` — verified registry/session-link/index/canonical path reuse guidance.\n- `AGENTS.md` — added Project Registry navigation, invariants, and data-file locations.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended docs-validation handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Browser/API manual checklist from `checks.md` was not executed in this non-interactive delegated pass; checker/main session should run it against a dev server.\n- No decisions needed from main session.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:49:13.172Z",
+        "updatedAt": "2026-07-07T01:50:37.198Z",
+        "eventCount": 3018,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `docs/architecture/overview.md` — added Project Registry boundary, storage, canonical path, session-link source-of-truth notes.\n- `docs/modules/api.md` — verified/kept Project Registry and project-space API documentation.\n- `docs/modules/frontend.md` — verified registry-driven sidebar/project-space context documentation.\n- `docs/modules/library.md` — verified registry/session-link/index/canonical path reuse guidance.\n- `AGENTS.md` — added Project Registry navigation, invariants, and data-file locations.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended docs-validation handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Browser/API manual checklist from `checks.md` was not executed in this non-interactive delegated pass; checker/main session should run it against a dev server.\n- No decisions needed from main session.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:50:25.921Z",
+            "toolCallId": "call_xk2JzSvmGgVdL7EWmi8YnVgN|fc_0a33d94c257f8fd7016a4c5b5c01dc81999afe0a3e4fab0fc4",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:50:29.249Z",
+            "toolCallId": "call_KSYH0OY3fPZGvpTIcKEhACtz|fc_0a33d94c257f8fd7016a4c5b6506b88199becc0e665bfff228",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short docs/architecture/overview.md docs/modules/api.md docs/modules/frontend.md docs/modules/library.md AGENTS.md .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:50:29.297Z",
+            "toolCallId": "call_KSYH0OY3fPZGvpTIcKEhACtz|fc_0a33d94c257f8fd7016a4c5b6506b88199becc0e665bfff228",
+            "toolName": "bash",
+            "text": "M AGENTS.md\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n?? \".ypi/tasks/20260707-090031-\\350\\256\\276\\350\\256\\241\\345\\271\\266\\346\\224\\271\\351\\200\\240\\351\\241\\271\\347\\233\\256\\346\\263\\250\\345\\206\\214\\350\\241\\250\\344\\270\\216\\351\\241\\271\\347\\233\\256\\347\\251\\272\\351\\227\\264\\345\\261\\202\\347\\272\\247/handoff.md\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:50:34.982Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `docs/architecture/overview.md` — added Project Registry boundary, storage, canonical path, session-link source-of-truth notes.\n- `docs/modules/api.md` — verified/kept Project Registry and project-space API documentation.\n- `docs/modules/frontend.md` — verified registry-driven sidebar/project-space context documentation.\n- `docs/modules/library.md` — verified registry/session-link/index/canonical path reuse guidance.\n- `AGENTS.md` — added Project Registry navigation, invariants, and data-file locations.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended docs-validation handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Browser/API manual checklist from `checks.md` was not executed in this non-interactive delegated pass; checker/main session should run it against a dev server.\n- No decisions needed from main session.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:50:34.989Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1966,
+        "tokens": 254,
+        "tokenSource": "usage",
+        "tps": 118.19,
+        "firstTokenAt": "2026-07-07T01:50:32.832Z",
+        "lastTokenAt": "2026-07-07T01:50:34.981Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-21c1519bd306a4eda79b6585",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/implementer-21c1519bd306a4eda79b6585.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:49:13.172Z",
+        "finishedAt": "2026-07-07T01:50:37.183Z",
+        "updatedAt": "2026-07-07T01:50:37.183Z",
+        "itemCount": 33,
+        "messageCount": 1,
+        "toolCallCount": 14,
+        "stderrBytes": 0,
+        "bytes": 133814,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-7fdd2e5b251d3efed7a1e71e",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T01:50:48.708Z",
+      "finishedAt": "2026-07-07T01:53:22.585Z",
+      "prompt": "请对任务“设计并改造项目注册表与项目空间层级”进行检查。重点核对 design.md、implement.md、checks.md 的验收项是否满足，审查代码质量、兼容性、文档与验证结果。请运行/复核必要验证（至少 lint 与 tsc，如果已经运行请确认结果），并将检查结论写入 review.md。",
+      "summary": "已完成检查并写入：\n\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/review.md`\n\n本次检查员补修文件：\n\n- `components/SessionSidebar.tsx`\n- `lib/agent-session-bootstrap.ts`\n\n验证：\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n补修内容：\n\n- 修复 WorkTree 创建后立即新建聊天未带 `spaceId`，导致首个 worktree 会话可能落成未关联旧会话的问题。\n- 修复新建/draft 会话只校验 `projectId/spaceId` 存在、未校验 `cwd` 与所选 project space 一致的问题。\n\n剩余风险：\n\n- 未执行浏览器手工验收；建议主会话按 `checks.md` 再过一遍空 registry、legacy 未关联展示、worktree 创建/归档侧栏流。\n\n需要主会话决策：\n\n- None.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T01:50:48.708Z",
+        "updatedAt": "2026-07-07T01:53:22.585Z",
+        "eventCount": 3840,
+        "lastTextPreview": "已完成检查并写入：\n\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/review.md`\n\n本次检查员补修文件：\n\n- `components/SessionSidebar.tsx`\n- `lib/agent-session-bootstrap.ts`\n\n验证：\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n补修内容：\n\n- 修复 WorkTree 创建后立即新建聊天未带 `spaceId`，导致首个 worktree 会话可能落成未关联旧会话的问题。\n- 修复新建/draft 会话只校验 `projectId/spaceId` 存在、未校验 `cwd` 与所选 project space 一致的问题。\n\n剩余风险：\n\n- 未执行浏览器手工验收；建议主会话按 `checks.md` 再过一遍空 registry、legacy 未关联展示、worktree 创建/归档侧栏流。\n\n需要主会话决策：\n\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:53:03.913Z",
+            "toolCallId": "call_HwH1EoHbaB8Viy6wRNU3gWz5|fc_0c2d8b42bdad43d2016a4c5bff9830819bbdfce8c0ef645d50",
+            "toolName": "bash",
+            "text": "diff --git a/components/SessionSidebar.tsx b/components/SessionSidebar.tsx\nindex 9fdff83..5ce5b9c 100644\n--- a/components/SessionSidebar.tsx\n+++ b/components/SessionSidebar.tsx\n@@ -3,6 +3,7 @@\n import { useEffect, useState, useCallback, useRef } from \"react\";\n import type { TrellisSetupStatus } from \"@/lib/trellis-setup-types\";\n import type { GitInfo, SessionInfo, WorktreeInfo } from \"@/lib/types\";\n+import type { PiWebProjectRecord, PiWebProjectSpaceRecord } from \"@/lib/project-registry-types\";\n import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from \"@/lib/workspace-title\";\n import { displayTitleForSession } from \"@/lib/session-title\";\n import { Checkbox } from \"./Checkbox\";\n@@ -11,7 +12,8 @@ import { FileExplorer } from \"./FileExplorer\";\n interface Props {\n   selectedSessionId: string | null;\n   onSelectSession: (session: SessionInfo, isRestore?: boolean) => void;\n-  onNewSession?: (sessionId: string, cwd: string) => void;\n+  onNewSession?: (sessionId: string, cwd: string, projectId?: string, spaceId?: string) => void;\n+  onProjectSpaceChange?: (context: { projectId: string; spaceId: string; cwd: string } | null) => void;\n   initialSessionId?: string | null;\n   onInitialRestoreDone?: () => void;\n   refreshKey?: number;\n@@ -40,22 +42,6 @@ function formatRelativeTime(dateStr: string): string {\n   return date.toLocaleDateString();\n }\n \n-/** Return the 5 most recently active cwds across all sessions */\n-function getRecentCwds(sessions: SessionInfo[], extraCwds: string[] = []): string[] {\n-  const latestByCwd = new Map<string, string>(); // cwd -> most recent modified\n-  for (const s of sessions) {\n-    if (!s.cwd) continue;\n-    const prev = latestByCwd.get(s.cwd);\n-    if (!prev || s.modified > prev) {\n-      latestByCwd.set(s.cwd, s.modified);\n-    }\n-  }\n-  const recent = [...latestByCwd.entries()]\n-    .sort((a, b) => b[1].localeCompare(a[1]))\n-    .map(([cwd]) => cwd);\n-  return [...extraCwds, ...recent.filter((cwd) => !extraCwds.includes(cwd))].slice(0, 5);\n-}\n-\n function shortenCwd(cwd: string, homeDir?: string): string {\n   const path = (homeDir && cwd.startsWith(homeDir)) ? \"~\" + cwd.slice(homeDir.length) : cwd;\n   const sep = path.includes(\"/\") ? \"/\" : \"\\\\\";\n@@ -132,6 +118,11 @@ interface WorktreeCreateResponse {\n   branchName?: string;\n   mainWorktreePath?: string;\n   mainWorktreeBranch?: string;\n+  registryLink?: {\n+    project?: PiWebProjectRecord;\n+    space?: PiWebProjectSpaceRecord;\n+    created?: boolean;\n+  } | null;\n }\n \n interface WorktreeActionResponse {\n@@ -159,6 +150,12 @@ interface SessionContextMenuState {\n   session: SessionInfo;\n }\n \n+interface MetadataEditTarget {\n+  kind: \"project\" | \"space\";\n+  project: PiWebProjectRecord;\n+  space?: PiWebProjectSpaceRecord;\n+}\n+\n interface WorktreeActionState {\n   kind: \"delete\" | \"archive\";\n   cwd: string;\n@@ -169,59 +166,6 @@ interface WorktreeActionState {\n   dirtySummary?: string[];\n }\n \n-interface CwdPickerRow {\n-  kind: \"project\" | \"worktree\";\n-  cwd: string;\n-  worktree?: WorktreeInfo;\n-  syntheticParent?: boolean;\n-}\n-\n-function buildCwdPickerRows(recentCwds: string[], worktreeByCwd: Map<string, WorktreeInfo>): CwdPickerRow[] {\n-  const projectOrder: string[] = [];\n-  const syntheticParents = new Set<string>();\n-  const worktreesByParent = new Map<string, Array<{ cwd: string; worktree: WorktreeInfo }>>();\n-  const seenProjects = new Set<string>();\n-  const seenWorktrees = new Set<string>();\n-  const recentCwdSet = new Set(recentCwds);\n-\n-  const pushProject = (cwd: string, syntheticParent = false) => {\n-    if (seenProjects.has(cwd)) {\n-      if (syntheticParent) syntheticParents.add(cwd);\n-      return;\n-    }\n-    seenProjects.add(cwd);\n-    projectOrder.push(cwd);\n-    if (syntheticParent) syntheticParents.add(cwd);\n-  };\n-\n-  const pushWorktree = (parentCwd: string, cwd: string, worktree: WorktreeInfo) => {\n-    if (seenWorktrees.has(cwd)) return;\n-    seenWorktrees.add(cwd);\n-    const group = worktreesByParent.get(parentCwd) ?? [];\n-    group.push({ cwd, worktree });\n-    worktreesByParent.set(parentCwd, group)…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T01:53:13.974Z",
+            "toolCallId": "call_c0jPN7OhDmCrJIxfdcfXljvV|fc_0c2d8b42bdad43d2016a4c5c064698819bab767a9445328598",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/review.md\",\n  \"content\": \"# review\\n\\n## Check Complete\\n\\n### Findings Fixed\\n\\n- 修复了 WorkTree 创建后立即新建聊天未携带 `spaceId` 的问题：现在优先使用 `POST /api/git/worktrees` 返回的 `registryLink` 选中新 worktree space，并把 `projectId + spaceId` 传给新会话，避免新 worktree 首聊落成未关联旧会话。\\n- 修复了新建/draft 会话仅校验 `projectId/spaceId` 存在、未校验 `cwd` 与所选 space 是否一致的问题：现在按 canonical `pathKey` 比较，不允许把任意 cwd 伪装关联到别的项目空间。\\n\\n### Remaining Findings\\n\\n- None.\\n\\n### Verification\\n\\n- `npm run lint` — passed\\n- `node_modules/.bin/tsc --noEmit` — passed\\n- 手工验收 — 未在本次非交互检查中执行；建议主会话再走一遍 `checks.md` 中的浏览器/API 流程，重点看空 registry、legacy 未关联折叠、worktree 创建/归档后的侧栏行为。\\n\\n### Verdict\\n\\n- Pass — 设计约束、兼容策略、文档更新与最小自动验证已满足；本次检查中发现的两个实现缺口已修复。\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T01:53:13.980Z",
+            "toolCallId": "call_c0jPN7OhDmCrJIxfdcfXljvV|fc_0c2d8b42bdad43d2016a4c5c064698819bab767a9445328598",
+            "toolName": "write",
+            "text": "Successfully wrote 634 bytes to .ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T01:53:20.356Z",
+            "text": "已完成检查并写入：\n\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/review.md`\n\n本次检查员补修文件：\n\n- `components/SessionSidebar.tsx`\n- `lib/agent-session-bootstrap.ts`\n\n验证：\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n补修内容：\n\n- 修复 WorkTree 创建后立即新建聊天未带 `spaceId`，导致首个 worktree 会话可能落成未关联旧会话的问题。\n- 修复新建/draft 会话只校验 `projectId/spaceId` 存在、未校验 `cwd` 与所选 project space 一致的问题。\n\n剩余风险：\n\n- 未执行浏览器手工验收；建议主会话按 `checks.md` 再过一遍空 registry、legacy 未关联展示、worktree 创建/归档侧栏流。\n\n需要主会话决策：\n\n- None.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T01:53:20.364Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 970,
+        "tokens": 265,
+        "tokenSource": "usage",
+        "tps": 112.29,
+        "firstTokenAt": "2026-07-07T01:53:17.994Z",
+        "lastTokenAt": "2026-07-07T01:53:20.354Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-7fdd2e5b251d3efed7a1e71e",
+        "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-090031-/checker-7fdd2e5b251d3efed7a1e71e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T01:50:48.708Z",
+        "finishedAt": "2026-07-07T01:53:22.572Z",
+        "updatedAt": "2026-07-07T01:53:22.572Z",
+        "itemCount": 91,
+        "messageCount": 1,
+        "toolCallCount": 43,
+        "stderrBytes": 0,
+        "bytes": 245323,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T01:09:41.069Z",
+      "contextId": "pi_019f3a13-c521-7b56-96b0-a8b44f4da838",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-07T01:16:25.015Z",
+      "contextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+      "inputHash": "7d4e0e029995443927c75f0b",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-07T02:59:48.549Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260707-105948-设计并改造项目注册表与项目空间层级",
+    "knowledgePath": ".ypi/knowledge/20260707-105948-设计并改造项目注册表与项目空间层级.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T01:09:37.724Z",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "registry-lib-api",
+          "title": "backend",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "registry-lib-api"
+          ]
+        },
+        {
+          "id": "session-project-link",
+          "title": "backend",
+          "relation": "serial",
+          "dependencies": [
+            "registry-lib-api"
+          ],
+          "subtaskIds": [
+            "session-project-link"
+          ]
+        },
+        {
+          "id": "worktree-registry-sync",
+          "title": "backend",
+          "relation": "parallel",
+          "dependencies": [
+            "registry-lib-api"
+          ],
+          "subtaskIds": [
+            "worktree-registry-sync"
+          ]
+        },
+        {
+          "id": "sidebar-project-tree",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [
+            "registry-lib-api",
+            "session-project-link",
+            "worktree-registry-sync"
+          ],
+          "subtaskIds": [
+            "sidebar-project-tree"
+          ]
+        },
+        {
+          "id": "metadata-legacy-ux",
+          "title": "frontend",
+          "relation": "parallel",
+          "dependencies": [
+            "sidebar-project-tree"
+          ],
+          "subtaskIds": [
+            "metadata-legacy-ux"
+          ]
+        },
+        {
+          "id": "docs-validation",
+          "title": "checks",
+          "relation": "serial",
+          "dependencies": [
+            "metadata-legacy-ux"
+          ],
+          "subtaskIds": [
+            "docs-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "registry-lib-api",
+        "title": "新增 Project Registry 类型、lib 与基础 API",
+        "phase": "backend",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/project-registry-types.ts",
+          "lib/project-registry.ts",
+          "app/api/projects/route.ts",
+          "app/api/projects/[projectId]/route.ts",
+          "app/api/projects/[projectId]/spaces/route.ts",
+          "app/api/projects/[projectId]/spaces/[spaceId]/route.ts",
+          "docs/modules/api.md",
+          "docs/modules/library.md"
+        ],
+        "acceptance": [
+          "registry 文件不存在时 GET /api/projects 返回空列表而非报错",
+          "POST /api/projects 可注册普通项目 path，并创建 main space",
+          "PATCH 可更新 displayName/tags/pinned/archived/metadata/lastOpenedAt"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "session-project-link",
+        "title": "新增 session project/space 链接与旧 session 兼容",
+        "phase": "backend",
+        "order": 2,
+        "dependsOn": [
+          "registry-lib-api"
+        ],
+        "dependencies": [
+          "registry-lib-api"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/session-project-link.ts",
+          "lib/project-session-index.ts",
+          "lib/types.ts",
+          "lib/session-reader.ts",
+          "lib/agent-session-bootstrap.ts",
+          "lib/rpc-manager.ts",
+          "app/api/agent/new/route.ts",
+          "app/api/agent/draft/route.ts",
+          "app/api/sessions/[id]/route.ts",
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts"
+        ],
+        "acceptance": [
+          "新建 session 的 header 含 projectId/spaceId",
+          "旧 session 缺 projectId/spaceId 时 GET /api/sessions/:id 成功",
+          "fork linked session 后新 session 继承 project/space",
+          "space sessions API 不通过 sessions 聚合创建项目"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "worktree-registry-sync",
+        "title": "兼容现有 WorkTree 配置并同步为 space",
+        "phase": "backend",
+        "order": 3,
+        "dependsOn": [
+          "registry-lib-api"
+        ],
+        "dependencies": [
+          "registry-lib-api"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/git-worktree.ts",
+          "lib/project-registry.ts",
+          "lib/allowed-roots.ts",
+          "app/api/git/worktrees/route.ts",
+          "app/api/git/worktrees/archive/route.ts",
+          "app/api/projects/[projectId]/worktrees/refresh/route.ts",
+          "docs/modules/api.md",
+          "docs/modules/library.md"
+        ],
+        "acceptance": [
+          "注册 main project 后可发现已有 git worktree space",
+          "从 UI/API 创建 WorkTree 后 registry 出现 worktree space",
+          "无 session 的已注册 project 也可通过文件 API 访问",
+          "删除 WorkTree 后 active sidebar 不再显示该 space"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "sidebar-project-tree",
+        "title": "改造 AppShell/SessionSidebar 为 Project/Space 导航",
+        "phase": "frontend",
+        "order": 4,
+        "dependsOn": [
+          "registry-lib-api",
+          "session-project-link",
+          "worktree-registry-sync"
+        ],
+        "dependencies": [
+          "registry-lib-api",
+          "session-project-link",
+          "worktree-registry-sync"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/AppShell.tsx",
+          "components/SessionSidebar.tsx",
+          "components/ChatWindow.tsx",
+          "components/ChatInput.tsx",
+          "hooks/useAgentSession.ts",
+          "lib/types.ts",
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "空 registry 显示添加项目引导，不扫描 sessions 生成项目",
+          "选择 project main/worktree space 后才加载 sessions",
+          "新聊天从 selected space 创建并正确显示在该 space 下",
+          "旧 session URL 可打开且不因缺 project/space 崩溃"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "metadata-legacy-ux",
+        "title": "补齐项目/空间元数据编辑与 legacy 展示",
+        "phase": "frontend",
+        "order": 5,
+        "dependsOn": [
+          "sidebar-project-tree"
+        ],
+        "dependencies": [
+          "sidebar-project-tree"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/SessionSidebar.tsx",
+          "components/AppShell.tsx",
+          "app/api/projects/[projectId]/route.ts",
+          "app/api/projects/[projectId]/spaces/[spaceId]/route.ts",
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "项目和 space 可改昵称/标签并持久化",
+          "pinned/archived 影响排序和可见性",
+          "legacy sessions 有明确未关联标记",
+          "missing space 不允许新建 session 但不丢 metadata"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "docs-validation",
+        "title": "更新文档并完成验证",
+        "phase": "checks",
+        "order": 6,
+        "dependsOn": [
+          "metadata-legacy-ux"
+        ],
+        "dependencies": [
+          "metadata-legacy-ux"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "AGENTS.md"
+        ],
+        "acceptance": [
+          "文档说明 session 不再是项目列表数据源",
+          "自动验证通过",
+          "手工验收清单完成并记录结果"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T02:59:48.549Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 6,
+      "skipped": 0
+    },
+    "subtasks": {
+      "registry-lib-api": {
+        "id": "registry-lib-api",
+        "status": "done",
+        "updatedAt": "2026-07-07T01:21:30.495Z",
+        "startedAt": "2026-07-07T01:16:29.473Z",
+        "finishedAt": "2026-07-07T01:21:30.492Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-71f7e546b07224cd7ee0d929"
+        ],
+        "lastRunId": "implementer-71f7e546b07224cd7ee0d929",
+        "claimedAt": "2026-07-07T01:16:29.473Z",
+        "claimedByContextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added Project Registry/project-space schema and input types.\n- `lib/project-registry.ts` — added registry persistence, canonical realpath path keys, project registration, main-space creation, duplicate detection, and metadata patch helpers.\n- `app/api/projects/**/route.ts` — added project and project-space GET/POST/PATCH APIs.\n- `docs/modules/api.md` — documented new Project Registry API routes.\n- `docs/modules/library.md` — documented new registry lib modules.\n- `.ypi/tasks/.../handoff.md` — produced required handoff artifact.\n\n#### Verification\n\n- `npm install --include=dev` — installed missing dev dependencies; npm reported existing peer/vulnerability warnings.\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Limited to selected `registry-lib-api` subtask only.\n- Session link, WorkTree sync, allowed roots, sidebar UI, and legacy UX remain for later subtasks.\n- No decisions needed from main session."
+      },
+      "session-project-link": {
+        "id": "session-project-link",
+        "status": "done",
+        "updatedAt": "2026-07-07T01:34:00.187Z",
+        "startedAt": "2026-07-07T01:21:56.241Z",
+        "finishedAt": "2026-07-07T01:34:00.183Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-e8a46b0a3fa6448fafd3de30"
+        ],
+        "lastRunId": "implementer-e8a46b0a3fa6448fafd3de30",
+        "claimedAt": "2026-07-07T01:21:56.241Z",
+        "claimedByContextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-project-link.ts` — added session header link helpers and legacy-unassigned detection.\n- `lib/project-session-index.ts` — added best-effort `pi-web-session-index.json` maintenance.\n- `lib/types.ts` — added optional `projectId`, `spaceId`, `legacyUnassigned`.\n- `lib/session-reader.ts` — returns project link metadata for active/archived sessions.\n- `lib/agent-session-bootstrap.ts` — validates project/space context, writes linked headers/index.\n- `app/api/agent/new/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `app/api/agent/draft/route.ts` — accepts/forwards `projectId` + `spaceId`.\n- `lib/rpc-manager.ts` — linked forks inherit project/space; legacy forks remain unassigned.\n- `app/api/sessions/[id]/route.ts` — includes link metadata while tolerating old sessions.\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — added space sessions API with optional legacy exact-cwd results.\n- Docs updated: `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md`.\n- Artifact updated: `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md`.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `git diff --check` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification was run.\n- Session index is maintained for new/forked linked sessions, but project-space session API still filters headers as source of truth."
+      },
+      "worktree-registry-sync": {
+        "id": "worktree-registry-sync",
+        "status": "done",
+        "updatedAt": "2026-07-07T01:26:35.209Z",
+        "startedAt": "2026-07-07T01:21:56.241Z",
+        "finishedAt": "2026-07-07T01:26:35.206Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-935d401ca6e22aaa5a8d5235"
+        ],
+        "lastRunId": "implementer-935d401ca6e22aaa5a8d5235",
+        "claimedAt": "2026-07-07T01:21:56.241Z",
+        "claimedByContextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/project-registry.ts` — added WorkTree space sync/upsert/archive helpers.\n- `lib/git-worktree.ts` — exported `WorktreeRecord`.\n- `lib/allowed-roots.ts` — includes active Project Registry roots/spaces for file API access without sessions.\n- `app/api/projects/route.ts` — refreshes WorkTree spaces after project registration.\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts` — new refresh API.\n- `app/api/git/worktrees/route.ts` — WorkTree create/remove now syncs registry spaces.\n- `app/api/git/worktrees/archive/route.ts` — archive removal marks registry spaces archived/missing.\n- `docs/modules/api.md` / `docs/modules/library.md` — documented changes.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended handoff section.\n\n#### Validation\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree removal/archive still deletes related sessions per existing behavior; registry space is additionally marked `archived=true` and `missing=true`.\n- Decisions needed from main session: None."
+      },
+      "sidebar-project-tree": {
+        "id": "sidebar-project-tree",
+        "status": "done",
+        "updatedAt": "2026-07-07T01:43:20.758Z",
+        "startedAt": "2026-07-07T01:34:14.081Z",
+        "finishedAt": "2026-07-07T01:43:20.754Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-3be7b41ae502af46acd15f29"
+        ],
+        "lastRunId": "implementer-3be7b41ae502af46acd15f29",
+        "claimedAt": "2026-07-07T01:34:14.081Z",
+        "claimedByContextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — Project Registry-driven Project → Space sidebar, lazy project-space session loading, add project path flow, legacy unassigned session section, project/space context forwarding.\n- `components/AppShell.tsx` — tracks active/new project-space context and passes it into chat creation.\n- `components/ChatWindow.tsx` — accepts new-session project-space context.\n- `hooks/useAgentSession.ts` — sends optional `projectId`/`spaceId` to new/draft session APIs.\n- `docs/modules/frontend.md` — documented new frontend data flow.\n- `.ypi/.../handoff.md` — appended sidebar-project-tree handoff notes.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser/API verification run.\n- WorkTree creation refreshes registry data and relies on path matching after refresh; checker should verify newly created WorkTree space selection/linking in UI."
+      },
+      "metadata-legacy-ux": {
+        "id": "metadata-legacy-ux",
+        "status": "done",
+        "updatedAt": "2026-07-07T01:48:55.155Z",
+        "startedAt": "2026-07-07T01:43:34.409Z",
+        "finishedAt": "2026-07-07T01:48:55.149Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-6fca1042fa5fc01dc984ebd9"
+        ],
+        "lastRunId": "implementer-6fca1042fa5fc01dc984ebd9",
+        "claimedAt": "2026-07-07T01:43:34.409Z",
+        "claimedByContextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — added project/space metadata edit modal for display name, tags, pinned, archived; added workspace menu actions; pinned/archived now update sidebar sorting/visibility; missing spaces remain metadata-editable while new session stays disabled; legacy sessions show inline “未关联”.\n- `docs/modules/frontend.md` — documented sidebar metadata editing.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended subtask handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- No manual browser verification run.\n- Archived projects/spaces are hidden from active selector; no separate archived-project management view added in this subtask."
+      },
+      "docs-validation": {
+        "id": "docs-validation",
+        "status": "done",
+        "updatedAt": "2026-07-07T01:50:37.203Z",
+        "startedAt": "2026-07-07T01:49:07.847Z",
+        "finishedAt": "2026-07-07T01:50:37.198Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-21c1519bd306a4eda79b6585"
+        ],
+        "lastRunId": "implementer-21c1519bd306a4eda79b6585",
+        "claimedAt": "2026-07-07T01:49:07.847Z",
+        "claimedByContextId": "pi_019f3a25-2cc2-72ba-9a1a-1321491a89b1",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `docs/architecture/overview.md` — added Project Registry boundary, storage, canonical path, session-link source-of-truth notes.\n- `docs/modules/api.md` — verified/kept Project Registry and project-space API documentation.\n- `docs/modules/frontend.md` — verified registry-driven sidebar/project-space context documentation.\n- `docs/modules/library.md` — verified registry/session-link/index/canonical path reuse guidance.\n- `AGENTS.md` — added Project Registry navigation, invariants, and data-file locations.\n- `.ypi/tasks/20260707-090031-设计并改造项目注册表与项目空间层级/handoff.md` — appended docs-validation handoff.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Browser/API manual checklist from `checks.md` was not executed in this non-interactive delegated pass; checker/main session should run it against a dev server.\n- No decisions needed from main session."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-07T01:16:29.473Z",
+        "subtaskId": "registry-lib-api",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T01:21:56.241Z",
+        "subtaskId": "session-project-link",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T01:21:56.241Z",
+        "subtaskId": "worktree-registry-sync",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T01:34:14.081Z",
+        "subtaskId": "sidebar-project-tree",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T01:43:34.409Z",
+        "subtaskId": "metadata-legacy-ux",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T01:49:07.847Z",
+        "subtaskId": "docs-validation",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}
