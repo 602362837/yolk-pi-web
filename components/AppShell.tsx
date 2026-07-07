@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, type CSSProperties } from "re
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
+import type { SessionUsageTopbarStats } from "@/hooks/useAgentSession";
 import { FileViewer } from "./FileViewer";
 import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
@@ -156,8 +157,8 @@ export function AppShell() {
   }, []);
 
   // Session stats (tokens + cost) — populated by ChatWindow, displayed in top bar
-  const [sessionStats, setSessionStats] = useState<{ tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null>(null);
-  const handleSessionStatsChange = useCallback((stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => {
+  const [sessionStats, setSessionStats] = useState<SessionUsageTopbarStats | null>(null);
+  const handleSessionStatsChange = useCallback((stats: SessionUsageTopbarStats | null) => {
     setSessionStats(stats);
   }, []);
 
@@ -1064,13 +1065,23 @@ export function AppShell() {
               ctxStr = pct !== null ? `${pct.toFixed(0)}% / ${fmt(contextUsage.contextWindow)}` : `? / ${fmt(contextUsage.contextWindow)}`;
             }
 
+            const childCount = sessionStats?.studioChildSessionCount ?? 0;
+            const ownCost = sessionStats?.own?.cost ?? 0;
+            const childCost = sessionStats?.studioChild?.cost ?? 0;
+            const hasChildUsage = childCount > 0 || childCost > 0;
             const tooltipParts: string[] = [];
             if (t) {
+              tooltipParts.push(`scope: ${hasChildUsage ? `current chat + ${childCount} Studio child session${childCount === 1 ? "" : "s"}` : "current chat"}`);
+              tooltipParts.push(`source: ${sessionStats?.source === "rollup" ? "usage rollup" : "local messages"}`);
               tooltipParts.push(`in: ${t.input.toLocaleString()}`);
               tooltipParts.push(`out: ${t.output.toLocaleString()}`);
               tooltipParts.push(`cache read: ${t.cacheRead.toLocaleString()}`);
               tooltipParts.push(`cache write: ${t.cacheWrite.toLocaleString()}`);
               if (c > 0) tooltipParts.push(`cost: $${c.toFixed(4)}`);
+              if (hasChildUsage) {
+                tooltipParts.push(`own cost: $${ownCost.toFixed(4)}`);
+                tooltipParts.push(`Studio children cost: $${childCost.toFixed(4)}`);
+              }
             }
             if (contextUsage?.contextWindow) {
               const pct = contextUsage.percent;
@@ -1118,8 +1129,9 @@ export function AppShell() {
                   </span>
                 )}
                 {costStr && (
-                  <span style={{ display: "flex", alignItems: "center", color: "var(--text)", fontWeight: 500 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", fontWeight: 500 }}>
                     {costStr}
+                    {hasChildUsage && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>+child</span>}
                   </span>
                 )}
                 {ctxStr && (

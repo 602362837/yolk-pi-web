@@ -1,0 +1,1855 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+  "title": "完善 Usage 统计以纳入 Studio 子代理消耗并轻量增强顶部计费",
+  "workflowId": "feature-dev",
+  "status": "completed",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-07T07:10:26.834Z",
+  "updatedAt": "2026-07-07T07:46:11.988Z",
+  "completedAt": "2026-07-07T07:46:11.988Z",
+  "contextIds": [
+    "pi_019f3b66-2990-764d-9309-764931bd3f09",
+    "pi_019f3b73-a001-7c10-bfee-d92422d26e9f"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-bc2edac178773ed26cbb76fd",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:10:32.681Z",
+      "finishedAt": "2026-07-07T07:18:29.982Z",
+      "runner": "cli",
+      "prompt": "请为本任务做架构设计与实施方案，不要修改代码。目标：方案 A + A+：1) /api/usage 与 lib/usage-stats.ts 统计纳入 YPI Studio child sessions，并能按 parent session 归并；2) UsageStatsModal 展示/说明包含子代理；3) Chat 顶部当前 session cost 轻量增强，通过后台 API 查询父会话+关联 child sessions usage 汇总，避免把 child tr…",
+      "summary": "规划完成，未修改生产代码、未派发子代理。\n\n## Artifacts produced\n\n已写入：\n\n- `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n`implement.md` 内含机器可读 `json ypi-implementation-plan`，共 6 个子任务。\n\n## Validation run\n\n- 已阅读相关 docs/source。\n- 已用 Python 校验 implementation plan JSON 可解析。\n- 未运行 `npm run lint` / `tsc`：本轮仅规划与 artifact 写入，未改生产代码。\n\n## Key recommendations\n\n- 复用 `GET /api/usage?sessionId=<id>` 做 Chat 顶部 parent + Studio child usage rollup。\n- `/api/usage` 普通聚合新增 `byParentSession`，保留旧 `bySession` 兼容。\n- 只统计带 `studioChild` header 的 SDK child session JSONL；不解析 CLI `--no-session` transcript sidecar 估算费用。\n- 顶部 stats API 失败时回退当前父 session `messages` 本地统计，确保不污染父聊天上下文。\n\n## Main-session decision needed\n\n请确认是否接受 API 形态：`/api/usage?sessionId=<id>`。若确认，建议保存 implementationPlan 并进入 awaiting_approval 后派实现员。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:10:32.681Z",
+        "updatedAt": "2026-07-07T07:18:29.982Z",
+        "eventCount": 14095,
+        "lastTextPreview": "规划完成，未修改生产代码、未派发子代理。\n\n## Artifacts produced\n\n已写入：\n\n- `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n`implement.md` 内含机器可读 `json ypi-implementation-plan`，共 6 个子任务。\n\n## Validation run\n\n- 已阅读相关 docs/source。\n- 已用 Python 校验 implementation plan JSON 可解析。\n- 未运行 `npm run lint` / `tsc`：本轮仅规划与 artifact 写入，未改生产代码。\n\n## Key recommendations\n\n- 复用 `GET /api/usage?sessionId=<id>` 做 Chat 顶部 parent + Studio child usage rollup。\n- `/api/usage` 普通聚合新增 `byParentSession`，保留旧 `bySession` 兼容。\n- 只统计带 `studioChild` header 的 SDK child session JSONL；不解析 CLI `--no-session` transcript sidecar 估算费用。\n- 顶部 stats API 失败时回退当前父 session `messages` 本地统计，确保不污染父聊天上下文。\n\n## Main-session decision needed\n\n请确认是否接受 API 形态：`/api/usage?sessionId=<id>`。若确认，建议保存 implementationPlan 并进入 awaiting_approval 后派实现员。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:18:07.422Z",
+            "toolCallId": "call_26sr90gyHAK8xGRNwa2xvksF|fc_09dc3585d927624e016a4ca82ec3dc8199abb32d6acb133f23",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260707-151026-\\345\\256\\214\\345\\226\\204-usage-\\347\\273\\237\\350\\256\\241\\344\\273\\245\\347\\272\\263\\345\\205\\245-studio-\\345\\255\\220\\344\\273\\243\\347\\220\\206\\346\\266\\210\\350\\200\\227\\345\\271\\266\\350\\275\\273\\351\\207\\217\\345\\242\\236\\345\\274\\272\\351\\241\\266\\351\\203\\250\\350\\256\\241\\350\\264\\271/\"\n    3891 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/brief.md\n    4229 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/prd.md\n    3141 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/ui.md\n    7823 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/design.md\n   13750 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/implement.md\n    3157 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/checks.md\n    2130 .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/handoff.md\n   38121 total",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:18:13.295Z",
+            "toolCallId": "call_WPB1WvnM07L4DCsCetAC4yBn|fc_09dc3585d927624e016a4ca833cfc48199ac5da6a2abfbdb3c",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport re,json\\np=Path('.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/implement.md')\\ns=p.read_text()\\nm=re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```',s,re.S)\\nassert m, 'missing block'\\nobj=json.loads(m.group(1))\\nprint(obj['taskId'], len(obj['subtasks']))\\nPY\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:18:13.352Z",
+            "toolCallId": "call_WPB1WvnM07L4DCsCetAC4yBn|fc_09dc3585d927624e016a4ca833cfc48199ac5da6a2abfbdb3c",
+            "toolName": "bash",
+            "text": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费 6",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:18:27.725Z",
+            "text": "规划完成，未修改生产代码、未派发子代理。\n\n## Artifacts produced\n\n已写入：\n\n- `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n`implement.md` 内含机器可读 `json ypi-implementation-plan`，共 6 个子任务。\n\n## Validation run\n\n- 已阅读相关 docs/source。\n- 已用 Python 校验 implementation plan JSON 可解析。\n- 未运行 `npm run lint` / `tsc`：本轮仅规划与 artifact 写入，未改生产代码。\n\n## Key recommendations\n\n- 复用 `GET /api/usage?sessionId=<id>` 做 Chat 顶部 parent + Studio child usage rollup。\n- `/api/usage` 普通聚合新增 `byParentSession`，保留旧 `bySession` 兼容。\n- 只统计带 `studioChild` header 的 SDK child session JSONL；不解析 CLI `--no-session` transcript sidecar 估算费用。\n- 顶部 stats API 失败时回退当前父 session `messages` 本地统计，确保不污染父聊天上下文。\n\n## Main-session decision needed\n\n请确认是否接受 API 形态：`/api/usage?sessionId=<id>`。若确认，建议保存 implementationPlan 并进入 awaiting_approval 后派实现员。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:18:27.740Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1758,
+        "tokens": 703,
+        "tokenSource": "usage",
+        "tps": 161.65,
+        "firstTokenAt": "2026-07-07T07:18:23.370Z",
+        "lastTokenAt": "2026-07-07T07:18:27.719Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-bc2edac178773ed26cbb76fd",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/architect-bc2edac178773ed26cbb76fd.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:10:32.681Z",
+        "finishedAt": "2026-07-07T07:18:29.971Z",
+        "updatedAt": "2026-07-07T07:18:29.971Z",
+        "itemCount": 133,
+        "messageCount": 1,
+        "toolCallCount": 64,
+        "stderrBytes": 0,
+        "bytes": 392987,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-c2e2e5a39e5e704229c884f1",
+      "subtaskId": "session-metadata-child-archive",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:21:35.506Z",
+      "finishedAt": "2026-07-07T07:23:21.274Z",
+      "runner": "cli",
+      "prompt": "按已批准的设计与实现计划执行子任务：扩展 session reader 的 Studio child metadata 读取能力。请先阅读任务 artifacts（prd/design/implement/checks）和相关 docs/source，严格遵循项目规范。完成后更新子任务状态，说明修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added archived session listing opt-in `includeStudioChildren`, parses archived headers via `parseSessionHeaderMetadata`, preserves `studioChild` metadata, and keeps default archived lists hiding Studio child audit sessions.\n- `.ypi/tasks/.../task.json` — Updated selected subtask `session-metadata-child-archive` to `done`; next subtask marked ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Active `listAllSessions({ includeStudioChildren: true })` already parsed `studioChild`; no change needed there.\n- No docs updated in this subtask; docs are assigned to later `docs-validation`.\n- No blockers / decisions needed from main session.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:21:35.506Z",
+        "updatedAt": "2026-07-07T07:23:21.274Z",
+        "eventCount": 2588,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added archived session listing opt-in `includeStudioChildren`, parses archived headers via `parseSessionHeaderMetadata`, preserves `studioChild` metadata, and keeps default archived lists hiding Studio child audit sessions.\n- `.ypi/tasks/.../task.json` — Updated selected subtask `session-metadata-child-archive` to `done`; next subtask marked ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Active `listAllSessions({ includeStudioChildren: true })` already parsed `studioChild`; no change needed there.\n- No docs updated in this subtask; docs are assigned to later `docs-validation`.\n- No blockers / decisions needed from main session.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:23:06.454Z",
+            "toolCallId": "call_vwAqyVkFTvik3vDC9aOZ4yIx|fc_0a0791b33892ad16016a4ca9595a9481999ed47e45b0e1ef9e",
+            "toolName": "bash",
+            "text": "diff --git a/lib/session-reader.ts b/lib/session-reader.ts\nindex e82e688..fc5420e 100644\n--- a/lib/session-reader.ts\n+++ b/lib/session-reader.ts\n@@ -6,7 +6,6 @@ import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } fro\n import { normalizeToolCalls } from \"./normalize\";\n import { getGitMetadataForCwd } from \"./git-worktree\";\n import { canonicalizeCwd, expandCwd } from \"./cwd\";\n-import { getSessionProjectLink } from \"./session-project-link\";\n import { parseSessionHeaderMetadata } from \"./session-header-metadata\";\n \n export { getAgentDir };\n@@ -443,7 +442,12 @@ export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, num\n  * Parses JSONL files in the archive directory matching the given cwd.\n  * Uses SessionManager.open() for efficient metadata extraction.\n  */\n-async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {\n+export interface ListArchivedSessionsOptions {\n+  /** Include YPI Studio child audit sessions as archived list roots. Defaults to false so archived history stays focused on user chats. */\n+  includeStudioChildren?: boolean;\n+}\n+\n+async function listArchivedSessions(cwd?: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {\n   const archiveDir = getSessionsArchiveDir();\n   if (!existsSync(archiveDir)) return [];\n \n@@ -467,6 +471,9 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {\n         if (!header?.id) continue;\n         if (targets && !cwdMatchesAny(header.cwd, targets)) continue;\n \n+        const metadata = parseSessionHeaderMetadata(readFirstLineSync(filePath));\n+        if (metadata.studioChild && !options.includeStudioChildren) continue;\n+\n         const sessionCwd = header.cwd ? canonicalizeCwd(header.cwd) : cwd ?? \"\";\n         // Cache the path so resolveSessionPath can find it\n         cache.set(header.id, filePath);\n@@ -498,15 +505,15 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {\n           // use header timestamp\n         }\n \n-        const projectLink = getSessionProjectLink(header as never);\n         sessions.push({\n           path: filePath,\n           id: header.id,\n           cwd: sessionCwd,\n           name: sm.getSessionName(),\n-          projectId: projectLink.projectId,\n-          spaceId: projectLink.spaceId,\n-          legacyUnassigned: projectLink.legacyUnassigned,\n+          projectId: metadata.projectLink.projectId,\n+          spaceId: metadata.projectLink.spaceId,\n+          legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,\n+          studioChild: metadata.studioChild,\n           created: header.timestamp ?? modified,\n           modified,\n           messageCount,\n@@ -522,12 +529,12 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {\n   return sessions.sort((a, b) => b.modified.localeCompare(a.modified));\n }\n \n-export async function listAllArchivedSessions(): Promise<SessionInfo[]> {\n-  return listArchivedSessions();\n+export async function listAllArchivedSessions(options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {\n+  return listArchivedSessions(undefined, options);\n }\n \n-export async function listArchivedSessionsForCwd(cwd: string): Promise<SessionInfo[]> {\n-  return listArchivedSessions(cwd);\n+export async function listArchivedSessionsForCwd(cwd: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {\n+  return listArchivedSessions(cwd, options);\n }\n \n /**",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:23:11.083Z",
+            "toolCallId": "call_QJy2VjgkFk87qIEKcCycqiAI|fc_0a0791b33892ad16016a4ca95ee44c819982a72c5f9e302379",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:23:11.121Z",
+            "toolCallId": "call_QJy2VjgkFk87qIEKcCycqiAI|fc_0a0791b33892ad16016a4ca95ee44c819982a72c5f9e302379",
+            "toolName": "bash",
+            "text": "M lib/session-reader.ts\n?? \".ypi/tasks/20260707-151026-\\345\\256\\214\\345\\226\\204-usage-\\347\\273\\237\\350\\256\\241\\344\\273\\245\\347\\272\\263\\345\\205\\245-studio-\\345\\255\\220\\344\\273\\243\\347\\220\\206\\346\\266\\210\\350\\200\\227\\345\\271\\266\\350\\275\\273\\351\\207\\217\\345\\242\\236\\345\\274\\272\\351\\241\\266\\351\\203\\250\\350\\256\\241\\350\\264\\271/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:23:19.050Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added archived session listing opt-in `includeStudioChildren`, parses archived headers via `parseSessionHeaderMetadata`, preserves `studioChild` metadata, and keeps default archived lists hiding Studio child audit sessions.\n- `.ypi/tasks/.../task.json` — Updated selected subtask `session-metadata-child-archive` to `done`; next subtask marked ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Active `listAllSessions({ includeStudioChildren: true })` already parsed `studioChild`; no change needed there.\n- No docs updated in this subtask; docs are assigned to later `docs-validation`.\n- No blockers / decisions needed from main session.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:23:19.061Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1518,
+        "tokens": 230,
+        "tokenSource": "usage",
+        "tps": 329.04,
+        "firstTokenAt": "2026-07-07T07:23:18.350Z",
+        "lastTokenAt": "2026-07-07T07:23:19.049Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-c2e2e5a39e5e704229c884f1",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-c2e2e5a39e5e704229c884f1.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:21:35.506Z",
+        "finishedAt": "2026-07-07T07:23:21.260Z",
+        "updatedAt": "2026-07-07T07:23:21.260Z",
+        "itemCount": 41,
+        "messageCount": 1,
+        "toolCallCount": 18,
+        "stderrBytes": 0,
+        "bytes": 120523,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-b8e7153e8c2f85de102599ac",
+      "subtaskId": "usage-stats-parent-rollup",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:23:34.302Z",
+      "finishedAt": "2026-07-07T07:27:03.210Z",
+      "runner": "cli",
+      "prompt": "按已批准的设计与实现计划执行子任务：扩展 usage 聚合与 parent session rollup。请基于前一子任务已完成的 session reader metadata 能力，阅读相关 artifacts/source，保持兼容与测试覆盖。完成后更新子任务状态，说明修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added Studio child-aware usage aggregation:\n  - `UsageSessionKind`, `UsageParentSessionSummary`, `UsageSessionRollupResult`\n  - `byParentSession` rollups with own vs Studio child totals\n  - `scannedStudioChildSessions` / `matchedStudioChildSessions`\n  - `getUsageStatsForSessionRollup()` for lightweight parent+child session usage totals\n  - Uses `listAllSessions({ includeStudioChildren: true })` and archived equivalent\n- `.ypi/tasks/.../task.json` — Marked `usage-stats-parent-rollup` done and next subtask ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- `getUsageStatsForSessionRollup()` returns `null` for missing session ids; next API subtask should map this to 404.\n- Parent rollup rows are emitted when there is at least one usage-bearing assistant message in range.\n- Docs intentionally not updated in this subtask; covered by later `docs-validation`.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:23:34.302Z",
+        "updatedAt": "2026-07-07T07:27:03.210Z",
+        "eventCount": 6990,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added Studio child-aware usage aggregation:\n  - `UsageSessionKind`, `UsageParentSessionSummary`, `UsageSessionRollupResult`\n  - `byParentSession` rollups with own vs Studio child totals\n  - `scannedStudioChildSessions` / `matchedStudioChildSessions`\n  - `getUsageStatsForSessionRollup()` for lightweight parent+child session usage totals\n  - Uses `listAllSessions({ includeStudioChildren: true })` and archived equivalent\n- `.ypi/tasks/.../task.json` — Marked `usage-stats-parent-rollup` done and next subtask ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- `getUsageStatsForSessionRollup()` returns `null` for missing session ids; next API subtask should map this to 404.\n- Parent rollup rows are emitted when there is at least one usage-bearing assistant message in range.\n- Docs intentionally not updated in this subtask; covered by later `docs-validation`.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:26:44.632Z",
+            "toolCallId": "call_pA9bOtGYPfknG5FWHn9dL5p6|fc_017864586690e203016a4caa271d5081988a0e751970510ad8",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:26:52.402Z",
+            "toolCallId": "call_WskEVIAm6kfxJK8I9AbhU3kY|fc_017864586690e203016a4caa3c36f88198bef4fecfe4bcdc11",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:26:52.442Z",
+            "toolCallId": "call_WskEVIAm6kfxJK8I9AbhU3kY|fc_017864586690e203016a4caa3c36f88198bef4fecfe4bcdc11",
+            "toolName": "bash",
+            "text": "M lib/session-reader.ts\n M lib/usage-stats.ts\n?? \".ypi/tasks/20260707-151026-\\345\\256\\214\\345\\226\\204-usage-\\347\\273\\237\\350\\256\\241\\344\\273\\245\\347\\272\\263\\345\\205\\245-studio-\\345\\255\\220\\344\\273\\243\\347\\220\\206\\346\\266\\210\\350\\200\\227\\345\\271\\266\\350\\275\\273\\351\\207\\217\\345\\242\\236\\345\\274\\272\\351\\241\\266\\351\\203\\250\\350\\256\\241\\350\\264\\271/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:27:00.945Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added Studio child-aware usage aggregation:\n  - `UsageSessionKind`, `UsageParentSessionSummary`, `UsageSessionRollupResult`\n  - `byParentSession` rollups with own vs Studio child totals\n  - `scannedStudioChildSessions` / `matchedStudioChildSessions`\n  - `getUsageStatsForSessionRollup()` for lightweight parent+child session usage totals\n  - Uses `listAllSessions({ includeStudioChildren: true })` and archived equivalent\n- `.ypi/tasks/.../task.json` — Marked `usage-stats-parent-rollup` done and next subtask ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- `getUsageStatsForSessionRollup()` returns `null` for missing session ids; next API subtask should map this to 404.\n- Parent rollup rows are emitted when there is at least one usage-bearing assistant message in range.\n- Docs intentionally not updated in this subtask; covered by later `docs-validation`.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:27:00.963Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2012,
+        "tokens": 345,
+        "tokenSource": "usage",
+        "tps": 82.26,
+        "firstTokenAt": "2026-07-07T07:26:56.744Z",
+        "lastTokenAt": "2026-07-07T07:27:00.938Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-b8e7153e8c2f85de102599ac",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-b8e7153e8c2f85de102599ac.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:23:34.302Z",
+        "finishedAt": "2026-07-07T07:27:03.198Z",
+        "updatedAt": "2026-07-07T07:27:03.198Z",
+        "itemCount": 37,
+        "messageCount": 1,
+        "toolCallCount": 16,
+        "stderrBytes": 0,
+        "bytes": 137561,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-17b06753e7e9bfa0d97c50b7",
+      "subtaskId": "usage-api-session-mode",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:27:20.496Z",
+      "finishedAt": "2026-07-07T07:28:34.286Z",
+      "runner": "cli",
+      "prompt": "按已批准的设计与实现计划执行子任务：扩展 /api/usage 聚合响应并接入 sessionId rollup 分支。请基于前序子任务的 session reader 与 usage 聚合修改，阅读 artifacts/source，保持 API 兼容。完成后更新子任务状态，说明修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/usage/route.ts` — Added `sessionId` query branch for lightweight usage rollup:\n  - Parses optional `from` / `to` in session mode without applying default 7-day range.\n  - Calls `getUsageStatsForSessionRollup()`.\n  - Returns `404` when session is not found.\n  - Keeps existing aggregate `/api/usage` behavior and default date range unchanged.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual API curl verification run; dev server was not started.\n- Existing modified files from prior subtasks remain untouched: `lib/session-reader.ts`, `lib/usage-stats.ts`.\n- Decisions needed from main session: None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:27:20.496Z",
+        "updatedAt": "2026-07-07T07:28:34.286Z",
+        "eventCount": 1804,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/usage/route.ts` — Added `sessionId` query branch for lightweight usage rollup:\n  - Parses optional `from` / `to` in session mode without applying default 7-day range.\n  - Calls `getUsageStatsForSessionRollup()`.\n  - Returns `404` when session is not found.\n  - Keeps existing aggregate `/api/usage` behavior and default date range unchanged.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual API curl verification run; dev server was not started.\n- Existing modified files from prior subtasks remain untouched: `lib/session-reader.ts`, `lib/usage-stats.ts`.\n- Decisions needed from main session: None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:28:18.922Z",
+            "toolCallId": "call_mqiRZZMVndLKh1q3U3D3pUl0|fc_0561330b486f3377016a4caa92adb8819ba5c54b1cf3b3e374",
+            "toolName": "bash",
+            "text": "diff --git a/app/api/usage/route.ts b/app/api/usage/route.ts\nindex 7a2f5bb..2512dd7 100644\n--- a/app/api/usage/route.ts\n+++ b/app/api/usage/route.ts\n@@ -1,6 +1,6 @@\n import { NextResponse, type NextRequest } from \"next/server\";\n import { readPiWebConfig } from \"@/lib/pi-web-config\";\n-import { formatLocalDate, getUsageStats, parseLocalDateParam } from \"@/lib/usage-stats\";\n+import { formatLocalDate, getUsageStats, getUsageStatsForSessionRollup, parseLocalDateParam } from \"@/lib/usage-stats\";\n \n export const dynamic = \"force-dynamic\";\n \n@@ -27,25 +27,40 @@ function getDefaultRange(): { from: Date; to: Date } {\n export async function GET(request: NextRequest) {\n   try {\n     const defaults = getDefaultRange();\n-    const fromParam = request.nextUrl.searchParams.get(\"from\");\n-    const toParam = request.nextUrl.searchParams.get(\"to\");\n-    const cwd = request.nextUrl.searchParams.get(\"cwd\") || undefined;\n-    const from = fromParam ? parseLocalDateParam(fromParam, false) : defaults.from;\n-    const to = toParam ? parseLocalDateParam(toParam, true) : defaults.to;\n+    const searchParams = request.nextUrl.searchParams;\n+    const fromParam = searchParams.get(\"from\");\n+    const toParam = searchParams.get(\"to\");\n+    const sessionId = searchParams.get(\"sessionId\") || undefined;\n+    const cwd = searchParams.get(\"cwd\") || undefined;\n+    const from = fromParam ? parseLocalDateParam(fromParam, false) : sessionId ? undefined : defaults.from;\n+    const to = toParam ? parseLocalDateParam(toParam, true) : sessionId ? undefined : defaults.to;\n \n-    if (!from || !to) {\n+    if ((fromParam && !from) || (toParam && !to) || (!sessionId && (!from || !to))) {\n       return NextResponse.json({ error: \"from and to must use YYYY-MM-DD\" }, { status: 400 });\n     }\n-    if (from.getTime() > to.getTime()) {\n+    if (from && to && from.getTime() > to.getTime()) {\n       return NextResponse.json({ error: \"from must be earlier than or equal to to\" }, { status: 400 });\n     }\n \n     const config = readPiWebConfig();\n-    const stats = await getUsageStats({ from, to, cwd, includeArchived: config.usage.includeArchived });\n+    if (sessionId) {\n+      const rollup = await getUsageStatsForSessionRollup({\n+        sessionId,\n+        from: from ?? undefined,\n+        to: to ?? undefined,\n+        includeArchived: config.usage.includeArchived,\n+      });\n+      if (!rollup) {\n+        return NextResponse.json({ error: \"session not found\" }, { status: 404 });\n+      }\n+      return NextResponse.json(rollup);\n+    }\n+\n+    const stats = await getUsageStats({ from: from!, to: to!, cwd, includeArchived: config.usage.includeArchived });\n     return NextResponse.json({\n       ...stats,\n-      from: fromParam ?? formatLocalDate(from),\n-      to: toParam ?? formatLocalDate(to),\n+      from: fromParam ?? formatLocalDate(from!),\n+      to: toParam ?? formatLocalDate(to!),\n     });\n   } catch (error) {\n     return NextResponse.json({ error: String(error) }, { status: 500 });\n M app/api/usage/route.ts\n M lib/session-reader.ts\n M lib/usage-stats.ts\n?? \".ypi/tasks/20260707-151026-\\345\\256\\214\\345\\226\\204-usage-\\347\\273\\237\\350\\256\\241\\344\\273\\245\\347\\272\\263\\345\\205\\245-studio-\\345\\255\\220\\344\\273\\243\\347\\220\\206\\346\\266\\210\\350\\200\\227\\345\\271\\266\\350\\275\\273\\351\\207\\217\\345\\242\\236\\345\\274\\272\\351\\241\\266\\351\\203\\250\\350\\256\\241\\350\\264\\271/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:28:23.602Z",
+            "toolCallId": "call_o66xt0iXCjhXxR43Qe0GTj6T|fc_0561330b486f3377016a4caa9770a0819ba464226c8e08383c",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"app/api/usage/route.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:28:23.605Z",
+            "toolCallId": "call_o66xt0iXCjhXxR43Qe0GTj6T|fc_0561330b486f3377016a4caa9770a0819ba464226c8e08383c",
+            "toolName": "read",
+            "text": "import { NextResponse, type NextRequest } from \"next/server\";\nimport { readPiWebConfig } from \"@/lib/pi-web-config\";\nimport { formatLocalDate, getUsageStats, getUsageStatsForSessionRollup, parseLocalDateParam } from \"@/lib/usage-stats\";\n\nexport const dynamic = \"force-dynamic\";\n\n/**\n * 计算默认的本地日期范围。\n *\n * @returns 默认近 7 天的开始和结束日期。\n */\nfunction getDefaultRange(): { from: Date; to: Date } {\n  const to = new Date();\n  to.setHours(23, 59, 59, 999);\n  const from = new Date(to);\n  from.setDate(from.getDate() - 6);\n  from.setHours(0, 0, 0, 0);\n  return { from, to };\n}\n\n/**\n * 查询指定日期范围内的 Pi assistant usage 费用统计。\n *\n * @param request 包含 from、to、cwd 查询参数的 Next.js 请求对象。\n * @returns 聚合后的费用统计 JSON。\n */\nexport async function GET(request: NextRequest) {\n  try {\n    const defaults = getDefaultRange();\n    const searchParams = request.nextUrl.searchParams;\n    const fromParam = searchParams.get(\"from\");\n    const toParam = searchParams.get(\"to\");\n    const sessionId = searchParams.get(\"sessionId\") || undefined;\n    const cwd = searchParams.get(\"cwd\") || undefined;\n    const from = fromParam ? parseLocalDateParam(fromParam, false) : sessionId ? undefined : defaults.from;\n    const to = toParam ? parseLocalDateParam(toParam, true) : sessionId ? undefined : defaults.to;\n\n    if ((fromParam && !from) || (toParam && !to) || (!sessionId && (!from || !to))) {\n      return NextResponse.json({ error: \"from and to must use YYYY-MM-DD\" }, { status: 400 });\n    }\n    if (from && to && from.getTime() > to.getTime()) {\n      return NextResponse.json({ error: \"from must be earlier than or equal to to\" }, { status: 400 });\n    }\n\n    const config = readPiWebConfig();\n    if (sessionId) {\n      const rollup = await getUsageStatsForSessionRollup({\n        sessionId,\n        from: from ?? undefined,\n        to: to ?? undefined,\n        includeArchived: config.usage.includeArchived,\n      });\n      if (!rollup) {\n        return NextResponse.json({ error: \"session not found\" }, { status: 404 });\n      }\n      return NextResponse.json(rollup);\n    }\n\n    const stats = await getUsageStats({ from: from!, to: to!, cwd, includeArchived: config.usage.includeArchived });\n    return NextResponse.json({\n      ...stats,\n      from: fromParam ?? formatLocalDate(from!),\n      to: toParam ?? formatLocalDate(to!),\n    });\n  } catch (error) {\n    return NextResponse.json({ error: String(error) }, { status: 500 });\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:28:32.016Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/usage/route.ts` — Added `sessionId` query branch for lightweight usage rollup:\n  - Parses optional `from` / `to` in session mode without applying default 7-day range.\n  - Calls `getUsageStatsForSessionRollup()`.\n  - Returns `404` when session is not found.\n  - Keeps existing aggregate `/api/usage` behavior and default date range unchanged.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual API curl verification run; dev server was not started.\n- Existing modified files from prior subtasks remain untouched: `lib/session-reader.ts`, `lib/usage-stats.ts`.\n- Decisions needed from main session: None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:28:32.022Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1468,
+        "tokens": 397,
+        "tokenSource": "usage",
+        "tps": 144.1,
+        "firstTokenAt": "2026-07-07T07:28:29.252Z",
+        "lastTokenAt": "2026-07-07T07:28:32.007Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-17b06753e7e9bfa0d97c50b7",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-17b06753e7e9bfa0d97c50b7.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:27:20.496Z",
+        "finishedAt": "2026-07-07T07:28:34.272Z",
+        "updatedAt": "2026-07-07T07:28:34.272Z",
+        "itemCount": 31,
+        "messageCount": 1,
+        "toolCallCount": 13,
+        "stderrBytes": 0,
+        "bytes": 56886,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-834c4955e0c898cadb2efc59",
+      "subtaskId": "chat-topbar-rollup",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:28:46.529Z",
+      "finishedAt": "2026-07-07T07:32:07.763Z",
+      "runner": "cli",
+      "prompt": "按已批准的设计与实现计划执行子任务：Chat 顶部通过 usage API 展示 parent+child 汇总。请阅读 artifacts/source 与前序实现，更新相关组件/类型，保持 UI 轻量且兼容无 Studio 子会话场景。完成后更新子任务状态，说明修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `hooks/useAgentSession.ts` — Added `/api/usage?sessionId=...` rollup fetch with AbortController/race protection, idle refresh, 30s current-session refresh, and local message-usage fallback. Added `SessionUsageTopbarStats`.\n- `components/ChatWindow.tsx` — Propagates expanded top-bar stats shape including rollup/source/child split fields.\n- `components/AppShell.tsx` — Top-bar tooltip now shows scope/source and own vs Studio child cost; compact `+child` marker appears only when child usage is included.\n- `.ypi/tasks/.../task.json` — Marked `chat-topbar-rollup` as done.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/messages are fetched or injected; only usage rollup JSON is read.\n- API failures silently fall back to local parent-session message stats.\n- Not manually browser-tested in UI.\n- Decisions needed: None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:28:46.529Z",
+        "updatedAt": "2026-07-07T07:32:07.763Z",
+        "eventCount": 5899,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `hooks/useAgentSession.ts` — Added `/api/usage?sessionId=...` rollup fetch with AbortController/race protection, idle refresh, 30s current-session refresh, and local message-usage fallback. Added `SessionUsageTopbarStats`.\n- `components/ChatWindow.tsx` — Propagates expanded top-bar stats shape including rollup/source/child split fields.\n- `components/AppShell.tsx` — Top-bar tooltip now shows scope/source and own vs Studio child cost; compact `+child` marker appears only when child usage is included.\n- `.ypi/tasks/.../task.json` — Marked `chat-topbar-rollup` as done.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/messages are fetched or injected; only usage rollup JSON is read.\n- API failures silently fall back to local parent-session message stats.\n- Not manually browser-tested in UI.\n- Decisions needed: None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:31:55.234Z",
+            "toolCallId": "call_xJVTSpY8KBHtQ875HNpdOUAC|fc_0b73ab3b9235a668016a4cab6a77ec819986450e5aa2f7d55b",
+            "toolName": "bash",
+            "text": "M app/api/usage/route.ts\n M components/AppShell.tsx\n M components/ChatWindow.tsx\n M hooks/useAgentSession.ts\n M lib/session-reader.ts\n M lib/usage-stats.ts\n?? \".ypi/tasks/20260707-151026-\\345\\256\\214\\345\\226\\204-usage-\\347\\273\\237\\350\\256\\241\\344\\273\\245\\347\\272\\263\\345\\205\\245-studio-\\345\\255\\220\\344\\273\\243\\347\\220\\206\\346\\266\\210\\350\\200\\227\\345\\271\\266\\350\\275\\273\\351\\207\\217\\345\\242\\236\\345\\274\\272\\351\\241\\266\\351\\203\\250\\350\\256\\241\\350\\264\\271/\"\n app/api/usage/route.ts    |  37 ++++--\n components/AppShell.tsx   |  18 ++-\n components/ChatWindow.tsx |  17 ++-\n hooks/useAgentSession.ts  |  95 +++++++++++++-\n lib/session-reader.ts     |  27 ++--\n lib/usage-stats.ts        | 308 ++++++++++++++++++++++++++++++++++++++++------\n 6 files changed, 433 insertions(+), 69 deletions(-)\ndiff --git a/components/AppShell.tsx b/components/AppShell.tsx\nindex 674b0fc..fd2314e 100644\n--- a/components/AppShell.tsx\n+++ b/components/AppShell.tsx\n@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, type CSSProperties } from \"re\n import { useRouter, useSearchParams } from \"next/navigation\";\n import { SessionSidebar, type ProjectSpaceSelectionContext } from \"./SessionSidebar\";\n import { ChatWindow } from \"./ChatWindow\";\n+import type { SessionUsageTopbarStats } from \"@/hooks/useAgentSession\";\n import { FileViewer } from \"./FileViewer\";\n import { TabBar, type Tab } from \"./TabBar\";\n import { ModelsConfig } from \"./ModelsConfig\";\n@@ -156,8 +157,8 @@ export function AppShell() {\n   }, []);\n \n   // Session stats (tokens + cost) — populated by ChatWindow, displayed in top bar\n-  const [sessionStats, setSessionStats] = useState<{ tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null>(null);\n-  const handleSessionStatsChange = useCallback((stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => {\n+  const [sessionStats, setSessionStats] = useState<SessionUsageTopbarStats | null>(null);\n+  const handleSessionStatsChange = useCallback((stats: SessionUsageTopbarStats | null) => {\n     setSessionStats(stats);\n   }, []);\n \n@@ -1064,13 +1065,23 @@ export function AppShell() {\n               ctxStr = pct !== null ? `${pct.toFixed(0)}% / ${fmt(contextUsage.contextWindow)}` : `? / ${fmt(contextUsage.contextWindow)}`;\n             }\n \n+            const childCount = sessionStats?.studioChildSessionCount ?? 0;\n+            const ownCost = sessionStats?.own?.cost ?? 0;\n+            const childCost = sessionStats?.studioChild?.cost ?? 0;\n+            const hasChildUsage = childCount > 0 || childCost > 0;\n             const tooltipParts: string[] = [];\n             if (t) {\n+              tooltipParts.push(`scope: ${hasChildUsage ? `current chat + ${childCount} Studio child session${childCount === 1 ? \"\" : \"s\"}` : \"current chat\"}`);\n+              tooltipParts.push(`source: ${sessionStats?.source === \"rollup\" ? \"usage rollup\" : \"local messages\"}`);\n               tooltipParts.push(`in: ${t.input.toLocaleString()}`);\n               tooltipParts.push(`out: ${t.output.toLocaleString()}`);\n               tooltipParts.push(`cache read: ${t.cacheRead.toLocaleString()}`);\n               tooltipParts.push(`cache write: ${t.cacheWrite.toLocaleString()}`);\n               if (c > 0) tooltipParts.push(`cost: $${c.toFixed(4)}`);\n+              if (hasChildUsage) {\n+                tooltipParts.push(`own cost: $${ownCost.toFixed(4)}`);\n+                tooltipParts.push(`Studio children cost: $${childCost.toFixed(4)}`);\n+              }\n             }\n             if (contextUsage?.contextWindow) {\n               const pct = contextUsage.percent;\n@@ -1118,8 +1129,9 @@ export function AppShell() {\n                   </span>\n                 )}\n                 {costStr && (\n-                  <span style={{ display: \"flex\", alignItems: \"center\", color: \"var(--text)\", fontWeight: 500 }}>\n+                  <span style={{ display: \"flex\", alignItems: \"center\", gap: 4, color: \"var(--text)\", fontWeight: 500 }}>\n                     {costStr}\n+          …",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:31:57.638Z",
+            "toolCallId": "call_9mRzIuiNN6p3xHE1WSoyzNc6|fc_0b73ab3b9235a668016a4cab6d63c48199a09b4a08f4ce17a8",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- hooks/useAgentSession.ts | sed -n '90,180p'\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:31:57.668Z",
+            "toolCallId": "call_9mRzIuiNN6p3xHE1WSoyzNc6|fc_0b73ab3b9235a668016a4cab6d63c48199a09b4a08f4ce17a8",
+            "toolName": "bash",
+            "text": "+      const base = statsFromTotals(sessionUsageRollup.rollup.totals);\n+      const tokenTotal = base.tokens.input + base.tokens.output + base.tokens.cacheRead + base.tokens.cacheWrite;\n+      return tokenTotal > 0 || base.cost > 0 || sessionUsageRollup.rollup.studioChildSessionCount > 0\n+        ? {\n+          ...base,\n+          source: \"rollup\" as const,\n+          parentSessionId: sessionUsageRollup.rollup.parentSessionId,\n+          selectedSessionKind: sessionUsageRollup.rollup.selectedSessionKind,\n+          parentFound: sessionUsageRollup.rollup.parentFound,\n+          own: statsFromTotals(sessionUsageRollup.rollup.ownTotals),\n+          studioChild: statsFromTotals(sessionUsageRollup.rollup.studioChildTotals),\n+          studioChildSessionCount: sessionUsageRollup.rollup.studioChildSessionCount,\n+        }\n+        : null;\n+    })()\n+    : null;\n+\n+  const sessionStats: SessionUsageTopbarStats | null = rollupSessionStats ?? localSessionStats;\n+\n+  const fetchSessionUsageRollup = useCallback(async (sid: string) => {\n+    usageRollupAbortRef.current?.abort();\n+    const controller = new AbortController();\n+    usageRollupAbortRef.current = controller;\n+    try {\n+      const res = await fetch(`/api/usage?sessionId=${encodeURIComponent(sid)}`, { signal: controller.signal });\n+      if (!res.ok) throw new Error(`HTTP ${res.status}`);\n+      const rollup = await res.json() as UsageSessionRollupResult;\n+      if (!controller.signal.aborted && effectiveSessionIdRef.current === sid) {\n+        setSessionUsageRollup({ sessionId: sid, rollup });\n+      }\n+    } catch (error) {\n+      if ((error as { name?: string }).name === \"AbortError\") return;\n+      if (effectiveSessionIdRef.current === sid) setSessionUsageRollup(null);\n+    } finally {\n+      if (usageRollupAbortRef.current === controller) usageRollupAbortRef.current = null;\n+    }\n+  }, []);\n+\n+  useEffect(() => {\n+    setSessionUsageRollup(null);\n+    if (!effectiveSessionId) usageRollupAbortRef.current?.abort();\n+  }, [effectiveSessionId]);\n+\n+  useEffect(() => {\n+    if (!effectiveSessionId || agentRunning) return;\n+    void fetchSessionUsageRollup(effectiveSessionId);\n+  }, [agentRunning, effectiveSessionId, fetchSessionUsageRollup]);\n+\n+  useEffect(() => {\n+    if (!effectiveSessionId) return;\n+    const timer = window.setInterval(() => {\n+      void fetchSessionUsageRollup(effectiveSessionId);\n+    }, 30_000);\n+    return () => window.clearInterval(timer);\n+  }, [effectiveSessionId, fetchSessionUsageRollup]);\n+\n+  useEffect(() => () => usageRollupAbortRef.current?.abort(), []);\n+\n   const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false) => {\n     try {\n       if (showLoading) setLoading(true);",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:32:05.646Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `hooks/useAgentSession.ts` — Added `/api/usage?sessionId=...` rollup fetch with AbortController/race protection, idle refresh, 30s current-session refresh, and local message-usage fallback. Added `SessionUsageTopbarStats`.\n- `components/ChatWindow.tsx` — Propagates expanded top-bar stats shape including rollup/source/child split fields.\n- `components/AppShell.tsx` — Top-bar tooltip now shows scope/source and own vs Studio child cost; compact `+child` marker appears only when child usage is included.\n- `.ypi/tasks/.../task.json` — Marked `chat-topbar-rollup` as done.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/messages are fetched or injected; only usage rollup JSON is read.\n- API failures silently fall back to local parent-session message stats.\n- Not manually browser-tested in UI.\n- Decisions needed: None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:32:05.647Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1916,
+        "tokens": 370,
+        "tokenSource": "usage",
+        "tps": 91.47,
+        "firstTokenAt": "2026-07-07T07:32:01.601Z",
+        "lastTokenAt": "2026-07-07T07:32:05.646Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-834c4955e0c898cadb2efc59",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-834c4955e0c898cadb2efc59.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:28:46.529Z",
+        "finishedAt": "2026-07-07T07:32:07.754Z",
+        "updatedAt": "2026-07-07T07:32:07.754Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 166805,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-39dc21258936ba718630f49c",
+      "subtaskId": "usage-modal-rollup-ui",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:32:20.469Z",
+      "finishedAt": "2026-07-07T07:33:58.594Z",
+      "runner": "cli",
+      "prompt": "按已批准的设计与实现计划执行子任务：UsageStatsModal 展示包含子代理说明与 parent rollup。请阅读 artifacts/source 与前序实现，保持 UI 轻量、文案清晰、兼容无 Studio 子会话场景。完成后更新子任务状态，说明修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/UsageStatsModal.tsx` — Added Studio child usage explanation, Studio child / parent rollup metrics, and parent-rollup-first Sessions rendering with child count and own/child cost breakdown. Preserves fallback to legacy `bySession`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/details are displayed; only usage rollup totals.\n- Subtask status update was not performed directly because no Studio state-update tool is available in this delegated context.\n- Pre-existing modifications in other files were left untouched.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:32:20.469Z",
+        "updatedAt": "2026-07-07T07:33:58.594Z",
+        "eventCount": 2978,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/UsageStatsModal.tsx` — Added Studio child usage explanation, Studio child / parent rollup metrics, and parent-rollup-first Sessions rendering with child count and own/child cost breakdown. Preserves fallback to legacy `bySession`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/details are displayed; only usage rollup totals.\n- Subtask status update was not performed directly because no Studio state-update tool is available in this delegated context.\n- Pre-existing modifications in other files were left untouched.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:33:45.457Z",
+            "toolCallId": "call_LT74RaKPufOxkoI3cmfgqbh4|fc_0f71b1f36bf27040016a4cabd050a8819b897241c5232f5817",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.8 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:33:48.762Z",
+            "toolCallId": "call_AJDSjusrRlhiAEfyuk0nWOSg|fc_0f71b1f36bf27040016a4cabdc8198819b8ccea22956dcc448",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- components/UsageStatsModal.tsx\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:33:48.817Z",
+            "toolCallId": "call_AJDSjusrRlhiAEfyuk0nWOSg|fc_0f71b1f36bf27040016a4cabdc8198819b8ccea22956dcc448",
+            "toolName": "bash",
+            "text": "diff --git a/components/UsageStatsModal.tsx b/components/UsageStatsModal.tsx\nindex 2632223..691e831 100644\n--- a/components/UsageStatsModal.tsx\n+++ b/components/UsageStatsModal.tsx\n@@ -88,6 +88,12 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {\n \n   const activeCwd = scope === \"cwd\" ? cwd : null;\n   const largestDailyCost = Math.max(0, ...(stats?.byDay.map((day) => day.totals.cost) ?? []));\n+  const parentSessionRows = stats?.byParentSession?.length ? stats.byParentSession : null;\n+  const sessionRows = parentSessionRows ?? stats?.bySession ?? [];\n+  const sessionSectionTitle = parentSessionRows ? \"Parent sessions\" : \"Sessions\";\n+  const sessionSectionRight = parentSessionRows\n+    ? `${stats?.skippedEntries ?? 0} skipped · rolled up`\n+    : `${stats?.skippedEntries ?? 0} skipped`;\n \n   const loadStats = useCallback(async (signal?: AbortSignal) => {\n     setLoading(true);\n@@ -158,7 +164,12 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {\n               <line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"23\" />\n               <path d=\"M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6\" />\n             </svg>\n-            <div style={{ fontSize: 13, fontWeight: 600, color: \"var(--text)\", whiteSpace: \"nowrap\" }}>Usage</div>\n+            <div style={{ minWidth: 0 }}>\n+              <div style={{ fontSize: 13, fontWeight: 600, color: \"var(--text)\", whiteSpace: \"nowrap\" }}>Usage</div>\n+              <div style={{ marginTop: 1, fontSize: 10, color: \"var(--text-dim)\", whiteSpace: \"nowrap\", overflow: \"hidden\", textOverflow: \"ellipsis\" }}>\n+                Includes YPI Studio child sessions when present; children are rolled up to their parent chat.\n+              </div>\n+            </div>\n           </div>\n \n           <div style={{ display: \"flex\", alignItems: \"center\", gap: 8, marginLeft: \"auto\", flexWrap: \"wrap\", justifyContent: \"flex-end\" }}>\n@@ -233,6 +244,8 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {\n                 <Metric label=\"Tokens\" value={`${formatTokens(totalTokens(stats?.totals ?? zeroTotals))} (${formatTokensM(totalTokens(stats?.totals ?? zeroTotals))})`} />\n                 <Metric label=\"Calls\" value={formatTokens(stats?.totals.calls ?? 0)} />\n                 <Metric label=\"Sessions\" value={`${stats?.bySession.length ?? 0}/${stats?.matchedSessions ?? 0}`} />\n+                <Metric label=\"Studio children\" value={`${stats?.matchedStudioChildSessions ?? 0}/${stats?.scannedStudioChildSessions ?? 0}`} />\n+                <Metric label=\"Parent rollups\" value={formatTokens(stats?.byParentSession?.length ?? 0)} />\n                 <Metric label=\"Scanned active/archive\" value={`${stats?.scannedActiveSessions ?? 0}/${stats?.scannedArchivedSessions ?? 0}`} />\n                 <Metric label=\"Matched active/archive\" value={`${stats?.matchedActiveSessions ?? 0}/${stats?.matchedArchivedSessions ?? 0}`} />\n               </div>\n@@ -270,24 +283,48 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {\n               </div>\n \n               <section style={{ ...panelStyle, marginTop: 12 }}>\n-                <SectionTitle title=\"Sessions\" right={`${stats?.skippedEntries ?? 0} skipped`} />\n+                <SectionTitle title={sessionSectionTitle} right={sessionSectionRight} />\n+                {parentSessionRows && (\n+                  <div style={{ marginBottom: 6, fontSize: 10, color: \"var(--text-dim)\" }}>\n+                    Totals combine each parent chat with its YPI Studio child sessions; the legacy per-session list remains available in the API response.\n+                  </div>\n+                )}\n                 <div style={{ display: \"flex\", flexDirection: \"column\" }}>\n-                  {(stats?.bySession ?? []).length === 0 ? (\n+                  {sessionRows.length === 0 ? (\n                     <EmptyState />\n-                  ) : stats!.bySession.slice(0, 12).map((session) => (\n-                    <div key={session.sessionId} style={{ display: \"grid\", gridTemplateColumns: \"minmax(0, 1fr) 90px 90px\", gap: 10, paddin…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:33:56.373Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/UsageStatsModal.tsx` — Added Studio child usage explanation, Studio child / parent rollup metrics, and parent-rollup-first Sessions rendering with child count and own/child cost breakdown. Preserves fallback to legacy `bySession`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/details are displayed; only usage rollup totals.\n- Subtask status update was not performed directly because no Studio state-update tool is available in this delegated context.\n- Pre-existing modifications in other files were left untouched.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:33:56.392Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1334,
+        "tokens": 337,
+        "tokenSource": "usage",
+        "tps": 140.07,
+        "firstTokenAt": "2026-07-07T07:33:53.963Z",
+        "lastTokenAt": "2026-07-07T07:33:56.369Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-39dc21258936ba718630f49c",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-39dc21258936ba718630f49c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:32:20.469Z",
+        "finishedAt": "2026-07-07T07:33:58.580Z",
+        "updatedAt": "2026-07-07T07:33:58.580Z",
+        "itemCount": 23,
+        "messageCount": 1,
+        "toolCallCount": 9,
+        "stderrBytes": 0,
+        "bytes": 75924,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e5fc08b65b267388cf8d3724",
+      "subtaskId": "docs-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:34:09.341Z",
+      "finishedAt": "2026-07-07T07:36:48.993Z",
+      "runner": "cli",
+      "prompt": "按已批准的设计与实现计划执行子任务：更新文档并执行验证。请检查本任务所有实现变更，按项目要求更新相关 docs/modules 或其它文档，运行最低验证 npm run lint 与 node_modules/.bin/tsc --noEmit（如无法完成需记录原因）。完成后更新子任务状态，说明修改文件与验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/api.md` — documented `/api/usage` Studio child inclusion, `byParentSession`, and `sessionId` rollup mode.\n- `docs/modules/frontend.md` — documented Usage modal parent rollup and Chat/AppShell top-bar rollup/fallback behavior.\n- `docs/modules/library.md` — documented `session-reader` Studio child opt-in and `usage-stats` rollup rules.\n- `docs/architecture/overview.md` — added usage accounting boundaries: JSONL assistant `usage` only, no parent message/context pollution.\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact with completion/validation summary.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- Reviewed docs diff for scope; no unrelated docs changes.\n\n#### Notes / Risks\n\n- Manual API/UI acceptance with real Studio child sessions was not run in this delegated docs-validation step.\n- Decisions needed from main session: None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:34:09.341Z",
+        "updatedAt": "2026-07-07T07:36:48.993Z",
+        "eventCount": 4339,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/api.md` — documented `/api/usage` Studio child inclusion, `byParentSession`, and `sessionId` rollup mode.\n- `docs/modules/frontend.md` — documented Usage modal parent rollup and Chat/AppShell top-bar rollup/fallback behavior.\n- `docs/modules/library.md` — documented `session-reader` Studio child opt-in and `usage-stats` rollup rules.\n- `docs/architecture/overview.md` — added usage accounting boundaries: JSONL assistant `usage` only, no parent message/context pollution.\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact with completion/validation summary.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- Reviewed docs diff for scope; no unrelated docs changes.\n\n#### Notes / Risks\n\n- Manual API/UI acceptance with real Studio child sessions was not run in this delegated docs-validation step.\n- Decisions needed from main session: None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:36:28.472Z",
+            "toolCallId": "call_UFethGQylAqnqjpWE9YcttL0|fc_05b9e3c1ed07fcbb016a4cac7c3358819bb769ca86d5877813",
+            "toolName": "bash",
+            "text": "app/api/usage/route.ts         |  37 +++--\n components/AppShell.tsx        |  18 ++-\n components/ChatWindow.tsx      |  17 ++-\n components/UsageStatsModal.tsx |  67 +++++++--\n docs/architecture/overview.md  |  10 +-\n docs/modules/api.md            |   3 +-\n docs/modules/frontend.md       |   8 +-\n docs/modules/library.md        |   5 +-\n hooks/useAgentSession.ts       |  95 ++++++++++++-\n lib/session-reader.ts          |  27 ++--\n lib/usage-stats.ts             | 308 ++++++++++++++++++++++++++++++++++++-----\n 11 files changed, 503 insertions(+), 92 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:36:36.842Z",
+            "toolCallId": "call_AphyWQMp471Weh9BAA0gQuh0|fc_05b9e3c1ed07fcbb016a4cac803fb0819ba089304868a6d96c",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/handoff.md\",\n  \"content\": \"# Handoff — docs-validation complete\\n\\n## Files Changed\\n\\n- `docs/modules/api.md` — Documented `/api/usage` Studio child inclusion, `byParentSession`, `sessionId` rollup mode, archive setting behavior, 404 semantics, and no-transcript boundary.\\n- `docs/modules/frontend.md` — Documented Usage modal parent rollup UI, Chat/AppShell top-bar rollup tooltip, and `useAgentSession` fetch/fallback behavior.\\n- `docs/modules/library.md` — Documented `session-reader` archived/active Studio child metadata opt-in and `usage-stats` parent rollup/session rollup rules.\\n- `docs/architecture/overview.md` — Added Usage accounting boundary: standard JSONL assistant `usage` only, child rollup to parent, no parent message/context pollution, no sidecar/CLI cost estimation.\\n\\n## Validation\\n\\n- `npm run lint` — passed.\\n- `node_modules/.bin/tsc --noEmit` — passed.\\n\\n## Notes / Risks\\n\\n- Manual API/UI acceptance with real Studio child session data was not run in this delegated docs-validation step.\\n- Existing implementation changes outside docs were already present; this subtask only updated documentation and ran validation.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:36:36.848Z",
+            "toolCallId": "call_AphyWQMp471Weh9BAA0gQuh0|fc_05b9e3c1ed07fcbb016a4cac803fb0819ba089304868a6d96c",
+            "toolName": "write",
+            "text": "Successfully wrote 1109 bytes to .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:36:46.774Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/api.md` — documented `/api/usage` Studio child inclusion, `byParentSession`, and `sessionId` rollup mode.\n- `docs/modules/frontend.md` — documented Usage modal parent rollup and Chat/AppShell top-bar rollup/fallback behavior.\n- `docs/modules/library.md` — documented `session-reader` Studio child opt-in and `usage-stats` rollup rules.\n- `docs/architecture/overview.md` — added usage accounting boundaries: JSONL assistant `usage` only, no parent message/context pollution.\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact with completion/validation summary.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- Reviewed docs diff for scope; no unrelated docs changes.\n\n#### Notes / Risks\n\n- Manual API/UI acceptance with real Studio child sessions was not run in this delegated docs-validation step.\n- Decisions needed from main session: None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:36:46.787Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1916,
+        "tokens": 383,
+        "tokenSource": "usage",
+        "tps": 97.65,
+        "firstTokenAt": "2026-07-07T07:36:42.848Z",
+        "lastTokenAt": "2026-07-07T07:36:46.770Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e5fc08b65b267388cf8d3724",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-e5fc08b65b267388cf8d3724.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:34:09.341Z",
+        "finishedAt": "2026-07-07T07:36:48.981Z",
+        "updatedAt": "2026-07-07T07:36:48.981Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 276394,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-45127a11db168c005634c9d5",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:37:00.741Z",
+      "finishedAt": "2026-07-07T07:38:35.893Z",
+      "runner": "cli",
+      "prompt": "请对本任务实现进行最终检查。重点核对：Studio 子代理 usage 是否纳入 parent session 汇总；/api/usage sessionId rollup 兼容性；Chat 顶部与 UsageStatsModal 展示是否轻量清晰；文档是否更新；lint 与 tsc 验证结果是否可靠。请如实报告阻塞问题、建议修复项与是否可完成。",
+      "summary": "Handoff:\n\n- Artifact produced: `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md`\n- Reviewed changed files:\n  - `lib/usage-stats.ts`\n  - `lib/session-reader.ts`\n  - `app/api/usage/route.ts`\n  - `hooks/useAgentSession.ts`\n  - `components/AppShell.tsx`\n  - `components/ChatWindow.tsx`\n  - `components/UsageStatsModal.tsx`\n  - docs under `docs/architecture/` and `docs/modules/`\n\nValidation run:\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\nResult:\n- Usage aggregation now includes Studio child sessions.\n- Parent rollup fields and top-bar/UI/doc updates are present.\n- Abort/fallback behavior for Chat top-bar rollup looks correct.\n\nRemaining blocker:\n- `GET /api/usage?sessionId=...` is not fully lightweight for archived sessions.\n- `getUsageStatsForSessionRollup()` calls `listAllArchivedSessions({ includeStudioChildren: true })`, and that reader currently opens every archived JSONL and iterates entries to compute summary fields before narrowing to the selected parent/children.\n- This conflicts with the intended performance boundary for session rollup.\n\nVerdict:\n- Needs work\n\nDecision needed from main session:\n- Whether to accept this performance issue temporarily, or require a follow-up fix so archived session rollup scans headers first and opens only related parent/child session entries.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:37:00.741Z",
+        "updatedAt": "2026-07-07T07:38:35.893Z",
+        "eventCount": 1966,
+        "lastTextPreview": "Handoff:\n\n- Artifact produced: `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md`\n- Reviewed changed files:\n  - `lib/usage-stats.ts`\n  - `lib/session-reader.ts`\n  - `app/api/usage/route.ts`\n  - `hooks/useAgentSession.ts`\n  - `components/AppShell.tsx`\n  - `components/ChatWindow.tsx`\n  - `components/UsageStatsModal.tsx`\n  - docs under `docs/architecture/` and `docs/modules/`\n\nValidation run:\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\nResult:\n- Usage aggregation now includes Studio child sessions.\n- Parent rollup fields and top-bar/UI/doc updates are present.\n- Abort/fallback behavior for Chat top-bar rollup looks correct.\n\nRemaining blocker:\n- `GET /api/usage?sessionId=...` is not fully lightweight for archived sessions.\n- `getUsageStatsForSessionRollup()` calls `listAllArchivedSessions({ includeStudioChildren: true })`, and that reader currently opens every archived JSONL and iterates entries to compute summary fields before narrowing to the selected parent/children.\n- This conflicts with the intended performance boundary for session rollup.\n\nVerdict:\n- Needs work\n\nDecision needed from main session:\n- Whether to accept this performance issue temporarily, or require a follow-up fix so archived session rollup scans headers first and opens only related parent/child session entries.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:38:01.798Z",
+            "toolCallId": "call_YwauaSsTpyOeKT1zRGdR5EPn|fc_05e847dc543ec586016a4cacd0b1a8819ab448a0f7fde792c0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.8 lint\n> eslint .\n\n__EXIT:0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:38:25.381Z",
+            "toolCallId": "call_tjV2uKD9OdTJ6oudSdZ0A3wQ|fc_05e847dc543ec586016a4cacf01ae0819aa4539ac867b4f4a9",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md\",\n  \"content\": \"# Check Complete\\n\\n## Findings Fixed\\n\\n- None.\\n\\n## Remaining Findings\\n\\n- **Blocker — archived session rollup still opens every archived session entry set.** `getUsageStatsForSessionRollup()` calls `listAllArchivedSessions({ includeStudioChildren: true })`, and `listAllArchivedSessions()` currently opens each archived JSONL and iterates all entries to compute `messageCount` / `firstMessage` before the rollup narrows to the selected parent+children. This violates the task’s performance boundary for `/api/usage?sessionId=...` (should scan headers, then open only related parent/child session entries) and can make the top-bar rollup expensive on large archives. Relevant paths: `lib/usage-stats.ts`, `lib/session-reader.ts`.\\n\\n## Verification\\n\\n- `npm run lint` — passed (`__EXIT:0`)\\n- `node_modules/.bin/tsc --noEmit` — passed (`__EXIT:0`)\\n- Static review — confirmed global usage aggregation includes `includeStudioChildren: true`, `byParentSession` rollup is additive, top-bar rollup fetch is abort-protected with local fallback, Usage modal copy/UI is updated, and docs were updated.\\n\\n## Verdict\\n\\n- **Needs work** — behavior and docs are largely aligned, but the `sessionId` rollup path still does not meet the intended lightweight scan/open boundary for archived sessions.\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:38:25.390Z",
+            "toolCallId": "call_tjV2uKD9OdTJ6oudSdZ0A3wQ|fc_05e847dc543ec586016a4cacf01ae0819aa4539ac867b4f4a9",
+            "toolName": "write",
+            "text": "Successfully wrote 1276 bytes to .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:38:33.671Z",
+            "text": "Handoff:\n\n- Artifact produced: `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md`\n- Reviewed changed files:\n  - `lib/usage-stats.ts`\n  - `lib/session-reader.ts`\n  - `app/api/usage/route.ts`\n  - `hooks/useAgentSession.ts`\n  - `components/AppShell.tsx`\n  - `components/ChatWindow.tsx`\n  - `components/UsageStatsModal.tsx`\n  - docs under `docs/architecture/` and `docs/modules/`\n\nValidation run:\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\nResult:\n- Usage aggregation now includes Studio child sessions.\n- Parent rollup fields and top-bar/UI/doc updates are present.\n- Abort/fallback behavior for Chat top-bar rollup looks correct.\n\nRemaining blocker:\n- `GET /api/usage?sessionId=...` is not fully lightweight for archived sessions.\n- `getUsageStatsForSessionRollup()` calls `listAllArchivedSessions({ includeStudioChildren: true })`, and that reader currently opens every archived JSONL and iterates entries to compute summary fields before narrowing to the selected parent/children.\n- This conflicts with the intended performance boundary for session rollup.\n\nVerdict:\n- Needs work\n\nDecision needed from main session:\n- Whether to accept this performance issue temporarily, or require a follow-up fix so archived session rollup scans headers first and opens only related parent/child session entries.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:38:33.693Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2702,
+        "tokens": 363,
+        "tokenSource": "usage",
+        "tps": 72.04,
+        "firstTokenAt": "2026-07-07T07:38:28.631Z",
+        "lastTokenAt": "2026-07-07T07:38:33.670Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-45127a11db168c005634c9d5",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/checker-45127a11db168c005634c9d5.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:37:00.741Z",
+        "finishedAt": "2026-07-07T07:38:35.879Z",
+        "updatedAt": "2026-07-07T07:38:35.879Z",
+        "itemCount": 45,
+        "messageCount": 1,
+        "toolCallCount": 20,
+        "stderrBytes": 0,
+        "bytes": 151242,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-859224c6bbdf82abda43539e",
+      "subtaskId": "usage-stats-parent-rollup",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:39:48.291Z",
+      "finishedAt": "2026-07-07T07:42:55.305Z",
+      "runner": "cli",
+      "prompt": "返工修复检查员 blocker：`getUsageStatsForSessionRollup()` 目前调用 `listAllArchivedSessions({ includeStudioChildren: true })`，导致 archived 列表打开每个 JSONL 并遍历 entries。请修改为 sessionId rollup 路径先只扫描 headers/metadata 找到目标 parent 与 child sessions，再只打开相关 parent…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added lightweight `listAllArchivedSessionMetadata()` that scans archived JSONL headers/metadata only, preserving `studioChild` opt-in behavior.\n- `lib/usage-stats.ts` — Updated `getUsageStatsForSessionRollup()` to use archived metadata scan first, then open only related parent/child session files for usage.\n- `.ypi/tasks/.../handoff.md` / `task.json` — Updated blocker-fix handoff and subtask status.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Global `getUsageStats()` behavior is unchanged.\n- Session rollup archived metadata uses `firstMessage: \"(metadata only)\"`; usage totals still come from related session entries only.\n- Manual API/UI validation with real archived Studio child data was not run.\n\n#### Decisions Needed\n\n- None.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:39:48.291Z",
+        "updatedAt": "2026-07-07T07:42:55.305Z",
+        "eventCount": 4470,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added lightweight `listAllArchivedSessionMetadata()` that scans archived JSONL headers/metadata only, preserving `studioChild` opt-in behavior.\n- `lib/usage-stats.ts` — Updated `getUsageStatsForSessionRollup()` to use archived metadata scan first, then open only related parent/child session files for usage.\n- `.ypi/tasks/.../handoff.md` / `task.json` — Updated blocker-fix handoff and subtask status.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Global `getUsageStats()` behavior is unchanged.\n- Session rollup archived metadata uses `firstMessage: \"(metadata only)\"`; usage totals still come from related session entries only.\n- Manual API/UI validation with real archived Studio child data was not run.\n\n#### Decisions Needed\n\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:42:25.203Z",
+            "toolCallId": "call_C0YCQld26hfIzMF16D91pwIX|fc_0a8e949b5fdc178d016a4caddd25ac8199bb4475d89d09d4d5",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:42:36.466Z",
+            "toolCallId": "call_Gh7NafBTXQ8o6I3mavizy626|fc_0a8e949b5fdc178d016a4cadebf2b0819989f87290a60dfab4",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat && git diff -- lib/usage-stats.ts lib/session-reader.ts .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/handoff.md | tail -120\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:42:36.550Z",
+            "toolCallId": "call_Gh7NafBTXQ8o6I3mavizy626|fc_0a8e949b5fdc178d016a4cadebf2b0819989f87290a60dfab4",
+            "toolName": "bash",
+            "text": "app/api/usage/route.ts         |  37 +++--\n components/AppShell.tsx        |  18 ++-\n components/ChatWindow.tsx      |  17 ++-\n components/UsageStatsModal.tsx |  67 +++++++--\n docs/architecture/overview.md  |  10 +-\n docs/modules/api.md            |   3 +-\n docs/modules/frontend.md       |   8 +-\n docs/modules/library.md        |   5 +-\n hooks/useAgentSession.ts       |  95 ++++++++++++-\n lib/session-reader.ts          |  89 ++++++++++--\n lib/usage-stats.ts             | 310 +++++++++++++++++++++++++++++++++++------\n 11 files changed, 566 insertions(+), 93 deletions(-)\n-    try {\n-      entries = SessionManager.open(session.path).getEntries() as unknown as SessionEntry[];\n-    } catch {\n-      skippedEntries += 1;\n-      continue;\n-    }\n-\n-    for (const entry of entries) {\n-      if (!isUsageMessageEntry(entry)) continue;\n-      const at = new Date(entry.timestamp).getTime();\n-      if (!Number.isFinite(at)) {\n-        skippedEntries += 1;\n-        continue;\n-      }\n-      if (at < options.from.getTime() || at > options.to.getTime()) continue;\n-      records.push({ entry, message: entry.message, session });\n-    }\n-  }\n+  const scannedStudioChildSessions = sessions.filter((session) => Boolean(session.studioChild)).length;\n+  const matchedStudioChildSessions = matchedSessions.filter((session) => Boolean(session.studioChild)).length;\n+  const { records, skippedEntries } = await collectUsageRecords(matchedSessions, options.from, options.to);\n \n   const totals = createTotals();\n   const byDay = new Map<string, UsageTotals>();\n@@ -217,18 +404,7 @@ export async function getUsageStats(options: UsageStatsOptions): Promise<UsageSt\n     if (!byProvider.has(provider)) byProvider.set(provider, { provider, model: \"all\", totals: createTotals() });\n     addUsage(byProvider.get(provider)!.totals, usage);\n \n-    if (!bySession.has(record.session.id)) {\n-      bySession.set(record.session.id, {\n-        sessionId: record.session.id,\n-        cwd: record.session.cwd,\n-        name: record.session.name,\n-        firstMessage: record.session.firstMessage,\n-        created: record.session.created,\n-        modified: record.session.modified,\n-        totals: createTotals(),\n-      });\n-    }\n-    addUsage(bySession.get(record.session.id)!.totals, usage);\n+    addRecordToSessionMap(bySession, record);\n   }\n \n   return {\n@@ -238,6 +414,7 @@ export async function getUsageStats(options: UsageStatsOptions): Promise<UsageSt\n       cwd: options.cwd,\n       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || \"local\",\n       includeArchived: options.includeArchived !== false,\n+      includeStudioChildren: true,\n     },\n     totals,\n     byDay: [...byDay.entries()]\n@@ -246,12 +423,67 @@ export async function getUsageStats(options: UsageStatsOptions): Promise<UsageSt\n     byModel: [...byModel.values()].sort((a, b) => b.totals.cost - a.totals.cost),\n     byProvider: [...byProvider.values()].sort((a, b) => b.totals.cost - a.totals.cost),\n     bySession: [...bySession.values()].sort((a, b) => b.totals.cost - a.totals.cost),\n+    byParentSession: buildParentRollups(matchedSessions, bySession),\n     scannedSessions: sessions.length,\n     matchedSessions: matchedSessions.length,\n     scannedActiveSessions: activeSessions.length,\n     scannedArchivedSessions: archivedSessions.length,\n     matchedActiveSessions: matchedActiveSessions.length,\n     matchedArchivedSessions: matchedArchivedSessions.length,\n+    scannedStudioChildSessions,\n+    matchedStudioChildSessions,\n+    skippedEntries,\n+  };\n+}\n+\n+export async function getUsageStatsForSessionRollup(options: UsageSessionRollupOptions): Promise<UsageSessionRollupResult | null> {\n+  const activeSessions = await listAllSessions({ includeStudioChildren: true });\n+  const archivedSessions = options.includeArchived === false ? [] : await listAllArchivedSessionMetadata({ includeStudioChildren: true });\n+  const sessions = [...activeSessions, ...archivedSessions];\n+  const sessionById = new Map(sessions.map((session) => [session.id, session]));\n+  const selectedSession = sessionById.get(options.sessionId)…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:42:53.081Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added lightweight `listAllArchivedSessionMetadata()` that scans archived JSONL headers/metadata only, preserving `studioChild` opt-in behavior.\n- `lib/usage-stats.ts` — Updated `getUsageStatsForSessionRollup()` to use archived metadata scan first, then open only related parent/child session files for usage.\n- `.ypi/tasks/.../handoff.md` / `task.json` — Updated blocker-fix handoff and subtask status.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Global `getUsageStats()` behavior is unchanged.\n- Session rollup archived metadata uses `firstMessage: \"(metadata only)\"`; usage totals still come from related session entries only.\n- Manual API/UI validation with real archived Studio child data was not run.\n\n#### Decisions Needed\n\n- None.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:42:53.090Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1766,
+        "tokens": 578,
+        "tokenSource": "usage",
+        "tps": 73.99,
+        "firstTokenAt": "2026-07-07T07:42:45.262Z",
+        "lastTokenAt": "2026-07-07T07:42:53.074Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-859224c6bbdf82abda43539e",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/implementer-859224c6bbdf82abda43539e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:39:48.291Z",
+        "finishedAt": "2026-07-07T07:42:55.295Z",
+        "updatedAt": "2026-07-07T07:42:55.295Z",
+        "itemCount": 53,
+        "messageCount": 1,
+        "toolCallCount": 24,
+        "stderrBytes": 0,
+        "bytes": 137974,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-ef6d9c3617acdfdbcdfa0f98",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T07:43:14.847Z",
+      "finishedAt": "2026-07-07T07:45:13.132Z",
+      "runner": "cli",
+      "prompt": "请复查返工后的实现，重点确认之前 blocker 已解决：`/api/usage?sessionId=...` 的 archived session rollup 是否先轻量扫描 headers/metadata，再只打开相关 parent/child session entries；全局 usage 统计兼容性是否保持；lint/tsc 是否通过。若无 blocker/needs-work，请给出可完成 verdict。",
+      "summary": "## Handoff\n\n### Artifacts produced\n- Updated `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md` with final check result.\n\n### Files reviewed\n- `lib/session-reader.ts`\n- `lib/usage-stats.ts`\n- `app/api/usage/route.ts`\n\n### Validation run\n- `npm run lint` — passed (`__EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — passed\n\n### Review result\n- Previous blocker is fixed.\n- `/api/usage?sessionId=...` now does a lightweight archived metadata scan first (`listAllArchivedSessionMetadata(...)`), then opens only the selected parent and related Studio child session files for usage accumulation.\n- Global usage aggregation compatibility is preserved: full aggregate path still includes Studio child sessions and keeps additive `byParentSession` behavior.\n\n### Remaining risks\n- No blocker found.\n- Manual API/UI verification against real archived Studio child session data was not rerun in this check pass.\n\n### Decisions needed\n- None.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T07:43:14.847Z",
+        "updatedAt": "2026-07-07T07:45:13.132Z",
+        "eventCount": 2084,
+        "lastTextPreview": "## Handoff\n\n### Artifacts produced\n- Updated `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md` with final check result.\n\n### Files reviewed\n- `lib/session-reader.ts`\n- `lib/usage-stats.ts`\n- `app/api/usage/route.ts`\n\n### Validation run\n- `npm run lint` — passed (`__EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — passed\n\n### Review result\n- Previous blocker is fixed.\n- `/api/usage?sessionId=...` now does a lightweight archived metadata scan first (`listAllArchivedSessionMetadata(...)`), then opens only the selected parent and related Studio child session files for usage accumulation.\n- Global usage aggregation compatibility is preserved: full aggregate path still includes Studio child sessions and keeps additive `byParentSession` behavior.\n\n### Remaining risks\n- No blocker found.\n- Manual API/UI verification against real archived Studio child session data was not rerun in this check pass.\n\n### Decisions needed\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:44:52.819Z",
+            "toolCallId": "call_UrCXOK8teYHMIzLyVgw75FHt|fc_0b5eabca2cd15f95016a4cae6c7178819b839077a1b1d6b3c6",
+            "toolName": "edit",
+            "text": "Could not find the exact text in .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md. The old text must match exactly including all whitespace and newlines.",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T07:45:02.212Z",
+            "toolCallId": "call_ydhQ2dm8ii2UXhot1XWuCZ5G|fc_0b5eabca2cd15f95016a4cae7ad95c819bbb5a0f9af04f9c46",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md\",\n  \"content\": \"# Check Complete\\n\\n## Findings Fixed\\n\\n- Previously reported blocker is resolved: `/api/usage?sessionId=...` now uses archived header/metadata scanning via `listAllArchivedSessionMetadata({ includeStudioChildren: true })` and only opens the selected parent plus related Studio child session files when collecting usage.\\n\\n## Remaining Findings\\n\\n- None.\\n\\n## Verification\\n\\n- `npm run lint` — passed (`__EXIT:0`)\\n- `node_modules/.bin/tsc --noEmit` — passed (`__EXIT:0`)\\n- Static review — confirmed global `getUsageStats()` still uses the full aggregate path with `includeStudioChildren: true`, `byParentSession` remains additive, and the session rollup path keeps the lightweight archived scan/open boundary.\\n\\n## Verdict\\n\\n- **Pass** — the archived-session rollup blocker is fixed, aggregate compatibility is preserved, and required validation passes.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T07:45:02.217Z",
+            "toolCallId": "call_ydhQ2dm8ii2UXhot1XWuCZ5G|fc_0b5eabca2cd15f95016a4cae7ad95c819bbb5a0f9af04f9c46",
+            "toolName": "write",
+            "text": "Successfully wrote 845 bytes to .ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T07:45:10.907Z",
+            "text": "## Handoff\n\n### Artifacts produced\n- Updated `.ypi/tasks/20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费/review.md` with final check result.\n\n### Files reviewed\n- `lib/session-reader.ts`\n- `lib/usage-stats.ts`\n- `app/api/usage/route.ts`\n\n### Validation run\n- `npm run lint` — passed (`__EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — passed\n\n### Review result\n- Previous blocker is fixed.\n- `/api/usage?sessionId=...` now does a lightweight archived metadata scan first (`listAllArchivedSessionMetadata(...)`), then opens only the selected parent and related Studio child session files for usage accumulation.\n- Global usage aggregation compatibility is preserved: full aggregate path still includes Studio child sessions and keeps additive `byParentSession` behavior.\n\n### Remaining risks\n- No blocker found.\n- Manual API/UI verification against real archived Studio child session data was not rerun in this check pass.\n\n### Decisions needed\n- None.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T07:45:10.925Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1908,
+        "tokens": 285,
+        "tokenSource": "usage",
+        "tps": 82.7,
+        "firstTokenAt": "2026-07-07T07:45:07.321Z",
+        "lastTokenAt": "2026-07-07T07:45:10.767Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-ef6d9c3617acdfdbcdfa0f98",
+        "taskId": "20260707-151026-完善-usage-统计以纳入-studio-子代理消耗并轻量增强顶部计费",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-151026-_-usage-_-studio-/checker-ef6d9c3617acdfdbcdfa0f98.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T07:43:14.847Z",
+        "finishedAt": "2026-07-07T07:45:13.121Z",
+        "updatedAt": "2026-07-07T07:45:13.121Z",
+        "itemCount": 33,
+        "messageCount": 1,
+        "toolCallCount": 14,
+        "stderrBytes": 0,
+        "bytes": 65220,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T07:20:10.846Z",
+      "contextId": "pi_019f3b66-2990-764d-9309-764931bd3f09",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-07T07:21:23.211Z",
+      "contextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+      "inputHash": "07f280490fd47bb01b13f0c1",
+      "source": "user-input"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T07:20:06.992Z",
+    "summary": "让 Usage 统计纳入带 studioChild header 的 YPI Studio child sessions，新增 parent session rollup，并让 Chat 顶部通过后台 API 显示 parent + child 汇总费用，保持父聊天上下文不被 child transcript/usage 明细污染。",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "session-metadata-child-archive",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "session-metadata-child-archive"
+          ]
+        },
+        {
+          "id": "usage-stats-parent-rollup",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [
+            "session-metadata-child-archive"
+          ],
+          "subtaskIds": [
+            "usage-stats-parent-rollup"
+          ]
+        },
+        {
+          "id": "usage-api-session-mode",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [
+            "usage-stats-parent-rollup"
+          ],
+          "subtaskIds": [
+            "usage-api-session-mode"
+          ]
+        },
+        {
+          "id": "chat-topbar-rollup",
+          "title": "implementation",
+          "relation": "parallel",
+          "dependencies": [
+            "usage-api-session-mode"
+          ],
+          "subtaskIds": [
+            "chat-topbar-rollup"
+          ]
+        },
+        {
+          "id": "usage-modal-rollup-ui",
+          "title": "implementation",
+          "relation": "parallel",
+          "dependencies": [
+            "usage-api-session-mode"
+          ],
+          "subtaskIds": [
+            "usage-modal-rollup-ui"
+          ]
+        },
+        {
+          "id": "docs-validation",
+          "title": "checks",
+          "relation": "serial",
+          "dependencies": [
+            "chat-topbar-rollup",
+            "usage-modal-rollup-ui"
+          ],
+          "subtaskIds": [
+            "docs-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "session-metadata-child-archive",
+        "title": "扩展 session reader 的 Studio child metadata 读取能力",
+        "phase": "implementation",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/session-reader.ts",
+          "lib/session-header-metadata.ts",
+          "lib/types.ts"
+        ],
+        "instructions": [
+          "确认 active listAllSessions({ includeStudioChildren: true }) 已解析 studioChild；保持默认 includeStudioChildren=false。",
+          "为 archived session listing 增加可选 includeStudioChildren 参数，并用 parseSessionHeaderMetadata 或等价逻辑解析 studioChild。",
+          "listAllArchivedSessions / listArchivedSessionsForCwd 保持旧调用默认不返回 child；usage 场景显式传 includeStudioChildren=true。",
+          "归档 SessionInfo 也填充 projectId/spaceId/legacyUnassigned/studioChild，studioChild 存在时 legacyUnassigned=false。",
+          "不要改变普通 sessions/sidebar API 的默认隐藏 child 行为。"
+        ],
+        "acceptance": [
+          "active 和 archived usage 扫描均能拿到 session.studioChild。",
+          "不传 includeStudioChildren 的现有 session 列表行为不变。",
+          "Studio child SessionInfo 包含 studioChild.parentSessionId/taskId/runId/member。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "usage-stats-parent-rollup",
+        "title": "扩展 usage 聚合与 parent session rollup",
+        "phase": "implementation",
+        "order": 2,
+        "dependsOn": [
+          "session-metadata-child-archive"
+        ],
+        "dependencies": [
+          "session-metadata-child-archive"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/usage-stats.ts",
+          "lib/types.ts"
+        ],
+        "instructions": [
+          "新增 UsageSessionKind、UsageParentSessionSummary、UsageSessionRollupResult 等导出类型。",
+          "新增 totals clone/add helpers，避免 ownTotals/studioChildTotals/byDay/byModel 共享引用。",
+          "getUsageStats 使用 listAllSessions({ includeStudioChildren: true }) 和 listAllArchivedSessions({ includeStudioChildren: true })。",
+          "保留 bySession 单 session 维度，但为 child row 填 kind=studio_child、parentSessionId、studioChild 摘要。",
+          "新增 buildParentRollups：普通 session 归入自身 id，child session 归入 studioChild.parentSessionId；parent 缺失时输出 parentFound=false row。",
+          "新增 getUsageStatsForSessionRollup({ sessionId, from?, to?, includeArchived })：先扫描 headers 找 parent/children，再只打开相关 session entries 累加。",
+          "session rollup 默认 lifetime；若传 from/to 则复用日期过滤。",
+          "增加 scannedStudioChildSessions、matchedStudioChildSessions 计数。"
+        ],
+        "acceptance": [
+          "全局 totals 包含 Studio child usage。",
+          "byParentSession totals = ownTotals + studioChildTotals。",
+          "session rollup 不返回 child messages/transcripts，只返回 usage totals 和 child session summaries。",
+          "旧 UsageStatsResult 字段仍存在。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "usage-api-session-mode",
+        "title": "扩展 /api/usage 聚合响应并接入 sessionId rollup 分支",
+        "phase": "implementation",
+        "order": 3,
+        "dependsOn": [
+          "usage-stats-parent-rollup"
+        ],
+        "dependencies": [
+          "usage-stats-parent-rollup"
+        ],
+        "relation": "serial",
+        "files": [
+          "app/api/usage/route.ts"
+        ],
+        "instructions": [
+          "解析 searchParams.sessionId；存在时进入 session rollup mode。",
+          "sessionId mode：from/to 可选；不传时使用 lifetime range；读取 readPiWebConfig().usage.includeArchived；调用 getUsageStatsForSessionRollup。",
+          "sessionId 不存在返回 404；日期格式沿用现有 400。",
+          "非 sessionId mode 保持默认近 7 天逻辑，调用扩展后的 getUsageStats。",
+          "响应不要包含 transcript、message content 或 task artifact bodies。"
+        ],
+        "acceptance": [
+          "GET /api/usage 原查询兼容，新增字段可见。",
+          "GET /api/usage?sessionId=<parent> 返回 parent + children totals。",
+          "GET /api/usage?sessionId=<child> 能归一到 parent rollup 或在 parent 缺失时返回 child self rollup。",
+          "错误状态码明确。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "chat-topbar-rollup",
+        "title": "Chat 顶部通过 usage API 展示 parent+child 汇总",
+        "phase": "implementation",
+        "order": 4,
+        "dependsOn": [
+          "usage-api-session-mode"
+        ],
+        "dependencies": [
+          "usage-api-session-mode"
+        ],
+        "relation": "parallel",
+        "files": [
+          "hooks/useAgentSession.ts",
+          "components/ChatWindow.tsx",
+          "components/AppShell.tsx"
+        ],
+        "instructions": [
+          "抽出/复用本地 messages usage 累加作为 fallback。",
+          "在 useAgentSession 中基于 effectiveSessionId 请求 /api/usage?sessionId=...，使用 AbortController 清理过期请求。",
+          "请求触发：session 切换、首次加载、agent 从 running 变为 idle 后；可加低频 interval（例如 30s）仅当前会话刷新以覆盖后台 Studio child 完成。",
+          "扩展 onSessionStatsChange 类型，包含 totals/ownTotals/studioChildTotals/studioChildSessionCount/source。",
+          "AppShell 顶部显示仍保持紧凑；tooltip 增加 scope、own cost、Studio child cost/child count。",
+          "API 失败时静默使用本地 stats，不弹错误、不影响聊天。"
+        ],
+        "acceptance": [
+          "父会话顶部 cost 包含 child sessions cost。",
+          "无 child 的普通会话视觉基本不变。",
+          "父 session messages 数组未被 child 内容污染。",
+          "快速切换 session 不会显示上一个 session 的 rollup。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "usage-modal-rollup-ui",
+        "title": "UsageStatsModal 展示包含子代理说明与 parent rollup",
+        "phase": "implementation",
+        "order": 5,
+        "dependsOn": [
+          "usage-api-session-mode"
+        ],
+        "dependencies": [
+          "usage-api-session-mode"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/UsageStatsModal.tsx"
+        ],
+        "instructions": [
+          "在标题/说明区增加包含 YPI Studio child sessions 且 roll up to parent 的说明。",
+          "Metrics 增加 Studio child sessions 与 Parent rollups 信息，保持布局自适应。",
+          "Sessions section 优先渲染 stats.byParentSession；旧响应 fallback 到 bySession。",
+          "parent row 展示 child count，tooltip 或副标题显示 child cost/own cost。",
+          "不新增 transcript 明细入口，不显示 child prompt/output。"
+        ],
+        "acceptance": [
+          "Modal 中能看见 child sessions 已纳入统计。",
+          "Parent sessions 列表按 rollup cost 排序。",
+          "旧字段缺失时仍可展示 bySession。",
+          "小屏布局不明显溢出。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "docs-validation",
+        "title": "更新文档并执行验证",
+        "phase": "checks",
+        "order": 6,
+        "dependsOn": [
+          "chat-topbar-rollup",
+          "usage-modal-rollup-ui"
+        ],
+        "dependencies": [
+          "chat-topbar-rollup",
+          "usage-modal-rollup-ui"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md"
+        ],
+        "instructions": [
+          "更新 /api/usage 文档：包含 Studio child sessions、byParentSession、sessionId rollup。",
+          "更新 frontend 文档：UsageStatsModal parent rollup；Chat 顶部 usage API rollup 与 fallback。",
+          "更新 library 文档：usage-stats 归并规则；session-reader archived child metadata opt-in。",
+          "在 architecture overview 中记录 usage 只读取 child session JSONL usage，不污染父 messages。",
+          "运行 lint 与 TypeScript 检查。",
+          "人工检查 diff，确认无生产代码外无关改动。"
+        ],
+        "acceptance": [
+          "docs 与 API/类型/UI 契约一致。",
+          "npm run lint 通过。",
+          "node_modules/.bin/tsc --noEmit 通过。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T07:46:11.986Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 6,
+      "skipped": 0
+    },
+    "subtasks": {
+      "session-metadata-child-archive": {
+        "id": "session-metadata-child-archive",
+        "status": "done",
+        "updatedAt": "2026-07-07T07:23:21.278Z",
+        "startedAt": "2026-07-07T07:21:30.494Z",
+        "finishedAt": "2026-07-07T07:23:21.274Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-c2e2e5a39e5e704229c884f1"
+        ],
+        "lastRunId": "implementer-c2e2e5a39e5e704229c884f1",
+        "claimedAt": "2026-07-07T07:21:30.494Z",
+        "claimedByContextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added archived session listing opt-in `includeStudioChildren`, parses archived headers via `parseSessionHeaderMetadata`, preserves `studioChild` metadata, and keeps default archived lists hiding Studio child audit sessions.\n- `.ypi/tasks/.../task.json` — Updated selected subtask `session-metadata-child-archive` to `done`; next subtask marked ready.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Active `listAllSessions({ includeStudioChildren: true })` already parsed `studioChild`; no change needed there.\n- No docs updated in this subtask; docs are assigned to later `docs-validation`.\n- No blockers / decisions needed from main session."
+      },
+      "usage-stats-parent-rollup": {
+        "id": "usage-stats-parent-rollup",
+        "status": "done",
+        "updatedAt": "2026-07-07T07:42:55.310Z",
+        "startedAt": "2026-07-07T07:39:42.727Z",
+        "finishedAt": "2026-07-07T07:42:55.305Z",
+        "attempts": 2,
+        "runIds": [
+          "implementer-b8e7153e8c2f85de102599ac",
+          "implementer-859224c6bbdf82abda43539e"
+        ],
+        "lastRunId": "implementer-859224c6bbdf82abda43539e",
+        "claimedAt": "2026-07-07T07:39:42.727Z",
+        "claimedByContextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-reader.ts` — Added lightweight `listAllArchivedSessionMetadata()` that scans archived JSONL headers/metadata only, preserving `studioChild` opt-in behavior.\n- `lib/usage-stats.ts` — Updated `getUsageStatsForSessionRollup()` to use archived metadata scan first, then open only related parent/child session files for usage.\n- `.ypi/tasks/.../handoff.md` / `task.json` — Updated blocker-fix handoff and subtask status.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Global `getUsageStats()` behavior is unchanged.\n- Session rollup archived metadata uses `firstMessage: \"(metadata only)\"`; usage totals still come from related session entries only.\n- Manual API/UI validation with real archived Studio child data was not run.\n\n#### Decisions Needed\n\n- None."
+      },
+      "usage-api-session-mode": {
+        "id": "usage-api-session-mode",
+        "status": "done",
+        "updatedAt": "2026-07-07T07:28:34.293Z",
+        "startedAt": "2026-07-07T07:27:13.914Z",
+        "finishedAt": "2026-07-07T07:28:34.286Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-17b06753e7e9bfa0d97c50b7"
+        ],
+        "lastRunId": "implementer-17b06753e7e9bfa0d97c50b7",
+        "claimedAt": "2026-07-07T07:27:13.914Z",
+        "claimedByContextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/usage/route.ts` — Added `sessionId` query branch for lightweight usage rollup:\n  - Parses optional `from` / `to` in session mode without applying default 7-day range.\n  - Calls `getUsageStatsForSessionRollup()`.\n  - Returns `404` when session is not found.\n  - Keeps existing aggregate `/api/usage` behavior and default date range unchanged.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual API curl verification run; dev server was not started.\n- Existing modified files from prior subtasks remain untouched: `lib/session-reader.ts`, `lib/usage-stats.ts`.\n- Decisions needed from main session: None."
+      },
+      "chat-topbar-rollup": {
+        "id": "chat-topbar-rollup",
+        "status": "done",
+        "updatedAt": "2026-07-07T07:32:07.767Z",
+        "startedAt": "2026-07-07T07:28:42.675Z",
+        "finishedAt": "2026-07-07T07:32:07.763Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-834c4955e0c898cadb2efc59"
+        ],
+        "lastRunId": "implementer-834c4955e0c898cadb2efc59",
+        "claimedAt": "2026-07-07T07:28:42.675Z",
+        "claimedByContextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `hooks/useAgentSession.ts` — Added `/api/usage?sessionId=...` rollup fetch with AbortController/race protection, idle refresh, 30s current-session refresh, and local message-usage fallback. Added `SessionUsageTopbarStats`.\n- `components/ChatWindow.tsx` — Propagates expanded top-bar stats shape including rollup/source/child split fields.\n- `components/AppShell.tsx` — Top-bar tooltip now shows scope/source and own vs Studio child cost; compact `+child` marker appears only when child usage is included.\n- `.ypi/tasks/.../task.json` — Marked `chat-topbar-rollup` as done.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/messages are fetched or injected; only usage rollup JSON is read.\n- API failures silently fall back to local parent-session message stats.\n- Not manually browser-tested in UI.\n- Decisions needed: None."
+      },
+      "usage-modal-rollup-ui": {
+        "id": "usage-modal-rollup-ui",
+        "status": "done",
+        "updatedAt": "2026-07-07T07:33:58.601Z",
+        "startedAt": "2026-07-07T07:32:16.072Z",
+        "finishedAt": "2026-07-07T07:33:58.594Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-39dc21258936ba718630f49c"
+        ],
+        "lastRunId": "implementer-39dc21258936ba718630f49c",
+        "claimedAt": "2026-07-07T07:32:16.072Z",
+        "claimedByContextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/UsageStatsModal.tsx` — Added Studio child usage explanation, Studio child / parent rollup metrics, and parent-rollup-first Sessions rendering with child count and own/child cost breakdown. Preserves fallback to legacy `bySession`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- No child transcript/details are displayed; only usage rollup totals.\n- Subtask status update was not performed directly because no Studio state-update tool is available in this delegated context.\n- Pre-existing modifications in other files were left untouched."
+      },
+      "docs-validation": {
+        "id": "docs-validation",
+        "status": "done",
+        "updatedAt": "2026-07-07T07:36:48.996Z",
+        "startedAt": "2026-07-07T07:34:04.974Z",
+        "finishedAt": "2026-07-07T07:36:48.993Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-e5fc08b65b267388cf8d3724"
+        ],
+        "lastRunId": "implementer-e5fc08b65b267388cf8d3724",
+        "claimedAt": "2026-07-07T07:34:04.974Z",
+        "claimedByContextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/api.md` — documented `/api/usage` Studio child inclusion, `byParentSession`, and `sessionId` rollup mode.\n- `docs/modules/frontend.md` — documented Usage modal parent rollup and Chat/AppShell top-bar rollup/fallback behavior.\n- `docs/modules/library.md` — documented `session-reader` Studio child opt-in and `usage-stats` rollup rules.\n- `docs/architecture/overview.md` — added usage accounting boundaries: JSONL assistant `usage` only, no parent message/context pollution.\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact with completion/validation summary.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- Reviewed docs diff for scope; no unrelated docs changes.\n\n#### Notes / Risks\n\n- Manual API/UI acceptance with real Studio child sessions was not run in this delegated docs-validation step.\n- Decisions needed from main session: None."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-07T07:21:30.494Z",
+        "subtaskId": "session-metadata-child-archive",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:23:02.855Z",
+        "subtaskId": "session-metadata-child-archive",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T07:23:02.855Z",
+        "subtaskId": "usage-stats-parent-rollup",
+        "from": "pending",
+        "to": "ready"
+      },
+      {
+        "at": "2026-07-07T07:23:30.283Z",
+        "subtaskId": "usage-stats-parent-rollup",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:26:44.628Z",
+        "subtaskId": "usage-stats-parent-rollup",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T07:26:44.628Z",
+        "subtaskId": "usage-api-session-mode",
+        "from": "pending",
+        "to": "ready"
+      },
+      {
+        "at": "2026-07-07T07:27:13.914Z",
+        "subtaskId": "usage-api-session-mode",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:28:42.675Z",
+        "subtaskId": "chat-topbar-rollup",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:31:52.209Z",
+        "subtaskId": "chat-topbar-rollup",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-07T07:32:16.072Z",
+        "subtaskId": "usage-modal-rollup-ui",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:34:04.974Z",
+        "subtaskId": "docs-validation",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:39:27.620Z",
+        "subtaskId": "usage-stats-parent-rollup",
+        "from": "done",
+        "to": "ready"
+      },
+      {
+        "at": "2026-07-07T07:39:42.727Z",
+        "subtaskId": "usage-stats-parent-rollup",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T07:42:25.198Z",
+        "subtaskId": "usage-stats-parent-rollup",
+        "to": "pending"
+      }
+    ]
+  }
+}

@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-07T06:27:08.809Z",
+  "updatedAt": "2026-07-07T08:29:33.030Z",
   "entries": [
+    {
+      "id": "20260707-162933-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+      "title": "修复 YPI Studio SDK runner preflight 回退 CLI 问题",
+      "taskId": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+      "taskKey": "archived:2026-07:20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：修复 YPI Studio SDK runner preflight 回退 CLI 问题。关键可复用结论：SessionManager.create() 可能只分配 child session id/file path 而不立即落盘 JSONL，SDK runner 在 prompt 前写 header 不能假设文件已存在；应使用 ensure helper 在缺失时创建兼容 session header，并保留 parentSession、projectId、spaceId、studioChild 元数据。auto runner 模式中 SDK preflight 失败只应在 prompt 发送前回退 CLI，且 preflight/fallback 诊断必须持久化到 run warnings/summary/transcript，避免被 CLI final snapshot 覆盖。强制 runner=sdk 的 async preflight 失败应落成真实 failed run 与 failed transcript，而不是在 poll/collect 中退化为 runtime_lost。新增低成本验证脚本 test:studio-sdk-runner 覆盖 header 创建、fallback 诊断和 forced sdk 失败持久化；常规验证为 lint 与 tsc。后续可关注 SDK preflight 短窗口取消 async run 的窄竞态。",
+      "tags": [
+        "ypi-studio",
+        "sdk-runner",
+        "child-session",
+        "fallback",
+        "diagnostics",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+      "knowledgePath": ".ypi/knowledge/20260707-162933-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题.md",
+      "createdAt": "2026-07-07T08:29:33.030Z",
+      "archivedAt": "2026-07-07T08:29:33.030Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260707-142708-优化项目空间命名与空间信息展示",
       "title": "优化项目空间命名与空间信息展示",

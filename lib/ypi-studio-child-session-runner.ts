@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import type { ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import { readSessionHeaderFromFile } from "./session-project-link";
+import { writeSessionHeader } from "./ypi-studio-child-session-header";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
 import {
   appendYpiStudioSubagentTranscriptItem,
@@ -150,16 +150,16 @@ function usageOutputTokens(event: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-function writeSessionHeader(filePath: string, patch: Partial<SessionHeader>): SessionHeader | null {
-  const content = readFileSync(filePath, "utf8");
-  const newlineIndex = content.indexOf("\n");
-  const firstLine = newlineIndex >= 0 ? content.slice(0, newlineIndex) : content;
-  const rest = newlineIndex >= 0 ? content.slice(newlineIndex) : "\n";
-  const header = JSON.parse(firstLine) as SessionHeader;
-  if (header.type !== "session") return null;
-  const next = { ...header, ...patch } as SessionHeader;
-  writeFileSync(filePath, `${JSON.stringify(next)}${rest}`, "utf8");
-  return next;
+type WritableSessionManagerInternals = {
+  flushed?: boolean;
+  fileEntries?: unknown[];
+};
+
+function markSessionManagerHeaderFlushed(sessionManager: unknown, header: SessionHeader): void {
+  const internals = sessionManager as WritableSessionManagerInternals;
+  const firstEntry = Array.isArray(internals.fileEntries) ? internals.fileEntries[0] : undefined;
+  if (isObj(firstEntry) && firstEntry.type === "session") Object.assign(firstEntry, header);
+  internals.flushed = true;
 }
 
 function updateStudioChildHeader(filePath: string | undefined, patch: Partial<StudioChildSessionInfo>): void {
@@ -460,7 +460,16 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
       createdAt: meta.startedAt,
     };
     if (childSessionFile) {
-      writeSessionHeader(childSessionFile, { projectId: parentHeader?.projectId, spaceId: parentHeader?.spaceId, studioChild });
+      const baseHeader = typeof sessionManager.getHeader === "function" ? sessionManager.getHeader() as SessionHeader | null : null;
+      const header = writeSessionHeader(childSessionFile, { projectId: parentHeader?.projectId, spaceId: parentHeader?.spaceId, studioChild }, baseHeader ?? {
+        type: "session",
+        version: 3,
+        id: childSessionId,
+        timestamp: meta.startedAt,
+        cwd: root,
+        parentSession: meta.parentSessionFile,
+      });
+      if (header) markSessionManagerHeaderFlushed(sessionManager, header);
     }
     try { sessionManager.appendSessionInfo(`YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`); } catch {}
     if (writer) {

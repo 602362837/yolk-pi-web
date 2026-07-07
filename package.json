@@ -39,6 +39,7 @@
     "lint": "eslint .",
     "test:studio-policy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-policy.mjs",
     "test:studio-dag": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-dag.mjs",
+    "test:studio-sdk-runner": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-sdk-runner.mjs",
     "test:terminal-ssh": "node scripts/test-terminal-ssh-config.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
     "release:patch": "npm version patch && npm publish --access public",

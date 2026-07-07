@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect, useReducer } from "react";
 import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
-import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { AgentMessage, AssistantMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { UsageSessionRollupResult, UsageTotals } from "@/lib/usage-stats";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ToolEntry } from "@/components/ToolPanel";
@@ -147,6 +148,18 @@ export interface ToolExecutionProgress {
   };
   updatedAt: number;
   running: boolean;
+}
+
+export interface SessionUsageTopbarStats {
+  tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  cost?: number;
+  source: "local" | "rollup";
+  parentSessionId?: string;
+  selectedSessionKind?: UsageSessionRollupResult["selectedSessionKind"];
+  parentFound?: boolean;
+  own?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
+  studioChild?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
+  studioChildSessionCount: number;
 }
 
 export type OnSubagentChange = (runs: SubagentRun[]) => void;
@@ -294,9 +307,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [subagentRuns, setSubagentRuns] = useState<SubagentRun[]>([]);
   const [toolProgressById, setToolProgressById] = useState<Record<string, ToolExecutionProgress>>({});
   const [precreatedSessionId, setPrecreatedSessionId] = useState<string | null>(null);
+  const [sessionUsageRollup, setSessionUsageRollup] = useState<{ sessionId: string; rollup: UsageSessionRollupResult } | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
+  const effectiveSessionIdRef = useRef<string | null>(null);
+  const usageRollupAbortRef = useRef<AbortController | null>(null);
   const precreatedSessionIdRef = useRef<string | null>(null);
   const ensureBrowserShareSessionPromiseRef = useRef<Promise<string | null> | null>(null);
   const agentRunningRef = useRef(false);
@@ -317,6 +333,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const currentModel = currentModelOverride ?? data?.context.model ?? pendingModel ?? null;
   const effectiveSessionId = session?.id ?? precreatedSessionId;
   const displayModel = isNew ? newSessionModel : currentModel;
+  effectiveSessionIdRef.current = effectiveSessionId;
 
   useEffect(() => {
     if (!isNew || toolPresetTouchedRef.current || messages.length > 0 || agentRunning) return;
@@ -328,12 +345,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setThinkingLevel(defaultThinkingLevel);
   }, [agentRunning, defaultThinkingLevel, isNew, messages.length]);
 
-  const sessionStats = (() => {
+  const localSessionStats = (() => {
     const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
     let cost = 0;
     for (const msg of messages) {
       if (msg.role !== "assistant") continue;
-      const u = (msg as import("@/lib/types").AssistantMessage).usage;
+      const u = (msg as AssistantMessage).usage;
       if (!u) continue;
       tokens.input += u.input ?? 0;
       tokens.output += u.output ?? 0;
@@ -342,8 +359,78 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       cost += u.cost?.total ?? 0;
     }
     const total = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite;
-    return total > 0 ? { tokens, cost } : null;
+    return total > 0 ? { tokens, cost, source: "local" as const, studioChildSessionCount: 0 } : null;
   })();
+
+  const statsFromTotals = (totals: UsageTotals) => ({
+    tokens: {
+      input: totals.input,
+      output: totals.output,
+      cacheRead: totals.cacheRead,
+      cacheWrite: totals.cacheWrite,
+    },
+    cost: totals.cost,
+  });
+
+  const rollupSessionStats = sessionUsageRollup?.sessionId === effectiveSessionId
+    ? (() => {
+      const base = statsFromTotals(sessionUsageRollup.rollup.totals);
+      const tokenTotal = base.tokens.input + base.tokens.output + base.tokens.cacheRead + base.tokens.cacheWrite;
+      return tokenTotal > 0 || base.cost > 0 || sessionUsageRollup.rollup.studioChildSessionCount > 0
+        ? {
+          ...base,
+          source: "rollup" as const,
+          parentSessionId: sessionUsageRollup.rollup.parentSessionId,
+          selectedSessionKind: sessionUsageRollup.rollup.selectedSessionKind,
+          parentFound: sessionUsageRollup.rollup.parentFound,
+          own: statsFromTotals(sessionUsageRollup.rollup.ownTotals),
+          studioChild: statsFromTotals(sessionUsageRollup.rollup.studioChildTotals),
+          studioChildSessionCount: sessionUsageRollup.rollup.studioChildSessionCount,
+        }
+        : null;
+    })()
+    : null;
+
+  const sessionStats: SessionUsageTopbarStats | null = rollupSessionStats ?? localSessionStats;
+
+  const fetchSessionUsageRollup = useCallback(async (sid: string) => {
+    usageRollupAbortRef.current?.abort();
+    const controller = new AbortController();
+    usageRollupAbortRef.current = controller;
+    try {
+      const res = await fetch(`/api/usage?sessionId=${encodeURIComponent(sid)}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rollup = await res.json() as UsageSessionRollupResult;
+      if (!controller.signal.aborted && effectiveSessionIdRef.current === sid) {
+        setSessionUsageRollup({ sessionId: sid, rollup });
+      }
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return;
+      if (effectiveSessionIdRef.current === sid) setSessionUsageRollup(null);
+    } finally {
+      if (usageRollupAbortRef.current === controller) usageRollupAbortRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    setSessionUsageRollup(null);
+    if (!effectiveSessionId) usageRollupAbortRef.current?.abort();
+  }, [effectiveSessionId]);
+
+  useEffect(() => {
+    if (!effectiveSessionId || agentRunning) return;
+    void fetchSessionUsageRollup(effectiveSessionId);
+  }, [agentRunning, effectiveSessionId, fetchSessionUsageRollup]);
+
+  useEffect(() => {
+    if (!effectiveSessionId) return;
+    const timer = window.setInterval(() => {
+      void fetchSessionUsageRollup(effectiveSessionId);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [effectiveSessionId, fetchSessionUsageRollup]);
+
+  useEffect(() => () => usageRollupAbortRef.current?.abort(), []);
 
   const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false) => {
     try {

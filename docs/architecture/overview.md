@@ -62,7 +62,7 @@ Path matching uses `canonicalizeProjectPath()` from `lib/project-registry.ts`: e
 
 - `parentSession` is display metadata only and does not affect chat content.
 - `projectId`/`spaceId` are optional project-space linkage fields. New web-created linked sessions write both fields and update `pi-web-session-index.json`; old sessions without either field remain readable/openable and are reported as legacy unassigned.
-- YPI Studio child sessions are persistent audit sessions marked by a header `studioChild` object. The standard `parentSession` field still points to the parent chat JSONL file for Pi/fork display compatibility, while `studioChild.parentSessionId` stores the parent chat session id used by Studio runtime correlation. `.ypi/tasks/<task>/task.json` remains the workflow/run status source of truth; the child JSONL is only an audit, replay, and provider-affinity carrier.
+- YPI Studio child sessions are persistent audit sessions marked by a header `studioChild` object. The standard `parentSession` field still points to the parent chat JSONL file for Pi/fork display compatibility, while `studioChild.parentSessionId` stores the parent chat session id used by Studio runtime correlation. `.ypi/tasks/<task>/task.json` remains the workflow/run status source of truth; the child JSONL is only an audit, replay, provider-affinity, and usage-accounting carrier. Usage accounting may roll up assistant `usage` from child JSONL files to the parent session, but parent chat `messages`, SSE payloads, and model context must not receive child transcripts, child messages, or child usage detail entries.
 - Session files are fully rewritable when updating display metadata such as cascade reparenting on delete.
 - Deleting or archiving a linked Git WorkTree also deletes session JSONL files whose `cwd` points at that WorkTree; session listing also prunes stale missing `*.worktrees/*` cwd sessions left by older versions.
 - Orphaned sessions whose first line cannot be parsed as a valid header are marked `orphaned: true` and displayed as incomplete, not clickable.
@@ -92,6 +92,14 @@ The archive directory is scanned separately from `SessionManager.listAll()` (whi
 - `lib/rpc-manager.ts` forwards live edit/write tool events to `lib/session-file-changes.ts`, which captures bounded before/after text snapshots and persists `~/.pi/agent/session-changes/<session-id>.json`.
 - Session JSONL files are not modified for this UI-only projection.
 - MVP tracks built-in `edit` and `write` tools only; arbitrary `bash` file mutations are not shown unless a future scanner/sandbox design adds explicit support.
+
+### Usage accounting
+
+- `GET /api/usage` is a read-only reporting path. It scans active sessions and, when `pi-web.json` `usage.includeArchived` is enabled, archived sessions; usage scans explicitly opt in to YPI Studio child audit sessions so Studio SDK child JSONL costs are visible in totals.
+- Global usage responses keep the legacy `bySession` dimension as individual JSONL files and add `byParentSession` for parent-chat rollups. Ordinary sessions roll up to themselves; Studio child sessions roll up by `studioChild.parentSessionId`; unresolved/deleted parents still produce `parentFound=false` rows so child usage is not dropped.
+- `GET /api/usage?sessionId=<id>` returns a lightweight lifetime `session_rollup` for the selected session: parent own totals, Studio child totals, combined totals, child count, and child session summaries. If the selected session is itself a Studio child, the rollup resolves back to its parent id when possible.
+- Usage totals come only from standard assistant message `usage` fields persisted in session JSONL. The reporting path does not parse `.ypi/.runtime/studio-subagents/*.jsonl` sidecars, does not estimate CLI `--no-session` runner cost, and does not return transcript, prompt/output, or artifact bodies.
+- Chat top-bar usage prefers the `session_rollup` API result and falls back to local parent-session `messages` usage while loading or after API failure. This is a display-only enhancement and must not mutate the parent session file or append child content to the React message list.
 
 ### Models and tools
 

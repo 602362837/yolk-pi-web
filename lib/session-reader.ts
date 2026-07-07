@@ -6,7 +6,6 @@ import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } fro
 import { normalizeToolCalls } from "./normalize";
 import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd, expandCwd } from "./cwd";
-import { getSessionProjectLink } from "./session-project-link";
 import { parseSessionHeaderMetadata } from "./session-header-metadata";
 
 export { getAgentDir };
@@ -443,7 +442,70 @@ export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, num
  * Parses JSONL files in the archive directory matching the given cwd.
  * Uses SessionManager.open() for efficient metadata extraction.
  */
-async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {
+export interface ListArchivedSessionsOptions {
+  /** Include YPI Studio child audit sessions as archived list roots. Defaults to false so archived history stays focused on user chats. */
+  includeStudioChildren?: boolean;
+}
+
+async function listArchivedSessionMetadata(cwd?: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
+  const archiveDir = getSessionsArchiveDir();
+  if (!existsSync(archiveDir)) return [];
+
+  const targets = cwd ? cwdKeys(cwd) : null;
+  const cache = getPathCache();
+  const sessions: SessionInfo[] = [];
+
+  const dirs = readdirSync(archiveDir, { withFileTypes: true });
+  for (const dir of dirs) {
+    if (!dir.isDirectory()) continue;
+    const dirPath = join(archiveDir, dir.name);
+    const jsonlFiles = readdirSync(dirPath).filter((f) => f.endsWith(".jsonl"));
+
+    for (const file of jsonlFiles) {
+      const filePath = join(dirPath, file);
+      try {
+        const firstLine = readFirstLineSync(filePath);
+        const header = JSON.parse(firstLine) as { type?: string; id?: string; cwd?: string; timestamp?: string; parentSession?: string };
+        if (header.type !== "session" || !header.id) continue;
+        if (targets && !cwdMatchesAny(header.cwd, targets)) continue;
+
+        const metadata = parseSessionHeaderMetadata(firstLine);
+        if (metadata.studioChild && !options.includeStudioChildren) continue;
+
+        const sessionCwd = header.cwd ? canonicalizeCwd(header.cwd) : cwd ?? "";
+        cache.set(header.id, filePath);
+
+        let modified = header.timestamp ?? new Date().toISOString();
+        try {
+          modified = statSync(filePath).mtime.toISOString();
+        } catch {
+          // use header timestamp
+        }
+
+        sessions.push({
+          path: filePath,
+          id: header.id,
+          cwd: sessionCwd,
+          projectId: metadata.projectLink.projectId,
+          spaceId: metadata.projectLink.spaceId,
+          legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,
+          studioChild: metadata.studioChild,
+          created: header.timestamp ?? modified,
+          modified,
+          messageCount: 0,
+          firstMessage: "(metadata only)",
+          archived: true,
+        });
+      } catch {
+        // skip malformed files
+      }
+    }
+  }
+
+  return sessions.sort((a, b) => b.modified.localeCompare(a.modified));
+}
+
+async function listArchivedSessions(cwd?: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
   const archiveDir = getSessionsArchiveDir();
   if (!existsSync(archiveDir)) return [];
 
@@ -466,6 +528,9 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {
         const header = sm.getHeader();
         if (!header?.id) continue;
         if (targets && !cwdMatchesAny(header.cwd, targets)) continue;
+
+        const metadata = parseSessionHeaderMetadata(readFirstLineSync(filePath));
+        if (metadata.studioChild && !options.includeStudioChildren) continue;
 
         const sessionCwd = header.cwd ? canonicalizeCwd(header.cwd) : cwd ?? "";
         // Cache the path so resolveSessionPath can find it
@@ -498,15 +563,15 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {
           // use header timestamp
         }
 
-        const projectLink = getSessionProjectLink(header as never);
         sessions.push({
           path: filePath,
           id: header.id,
           cwd: sessionCwd,
           name: sm.getSessionName(),
-          projectId: projectLink.projectId,
-          spaceId: projectLink.spaceId,
-          legacyUnassigned: projectLink.legacyUnassigned,
+          projectId: metadata.projectLink.projectId,
+          spaceId: metadata.projectLink.spaceId,
+          legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,
+          studioChild: metadata.studioChild,
           created: header.timestamp ?? modified,
           modified,
           messageCount,
@@ -522,12 +587,16 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {
   return sessions.sort((a, b) => b.modified.localeCompare(a.modified));
 }
 
-export async function listAllArchivedSessions(): Promise<SessionInfo[]> {
-  return listArchivedSessions();
+export async function listAllArchivedSessions(options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
+  return listArchivedSessions(undefined, options);
 }
 
-export async function listArchivedSessionsForCwd(cwd: string): Promise<SessionInfo[]> {
-  return listArchivedSessions(cwd);
+export async function listAllArchivedSessionMetadata(options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
+  return listArchivedSessionMetadata(undefined, options);
+}
+
+export async function listArchivedSessionsForCwd(cwd: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
+  return listArchivedSessions(cwd, options);
 }
 
 /**

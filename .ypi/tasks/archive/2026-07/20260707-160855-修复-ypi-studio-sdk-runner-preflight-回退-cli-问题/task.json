@@ -1,0 +1,926 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+  "title": "修复 YPI Studio SDK runner preflight 回退 CLI 问题",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-07T08:08:55.667Z",
+  "updatedAt": "2026-07-07T08:29:33.030Z",
+  "completedAt": "2026-07-07T08:25:27.395Z",
+  "contextIds": [
+    "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+    "pi_019f3ba2-8eaf-771c-9e1e-d7c604fba61c"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-18a159bcdc766f30b5c569a3",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:09:05.640Z",
+      "finishedAt": "2026-07-07T08:09:27.962Z",
+      "runner": "cli",
+      "prompt": "请为本任务做架构/修复方案设计，暂不修改代码。背景：刚排查发现 YPI Studio subagent 在 `studio.subagents.runner=auto` 下全部回退 CLI。强制 sdk 同步暴露真实错误：`SDK child runner preflight failed before prompt execution: ENOENT: no such file or directory, open '<child session jsonl>'`。原因疑…",
+      "summary": "Child Pi run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:09:05.640Z",
+        "updatedAt": "2026-07-07T08:09:27.962Z",
+        "eventCount": 68,
+        "lastTextPreview": "Child Pi run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T08:09:25.199Z",
+            "toolCallId": "call_riosjnLs2MoslDJyMBdjYN2L|fc_07739ed17a313178016a4cb43521b4819aa57279cebd0070cf",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"runYpiStudioSdkChildSession|writeSessionHeader|SessionManager\\\\.create|runner=auto|runtime_lost|preflight|studioChild|childSessionFile|childSessionId|fallback|runner\\\" lib/ypi-studio-extension.ts lib/ypi-studio-child-session-runner.ts lib/rpc-manager.ts lib/session-project-link.ts lib/session-reader.ts lib/pi-web-config.ts lib/ypi-studio-tasks.ts lib/usage-stats.ts lib/types.ts lib/ypi-studio-types.ts\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:09:25.215Z",
+            "toolCallId": "call_fEt7XECnGkHGaEwNTHqVG4bx|fc_07739ed17a313178016a4cb435219c819ab5e3041d3df36d58",
+            "toolName": "bash",
+            "text": "2382 lib/ypi-studio-extension.ts\n     549 lib/ypi-studio-child-session-runner.ts\n     686 lib/rpc-manager.ts\n      51 lib/session-project-link.ts\n     648 lib/session-reader.ts\n    1366 lib/pi-web-config.ts\n    2187 lib/ypi-studio-tasks.ts\n     489 lib/usage-stats.ts\n     495 lib/types.ts\n     946 lib/ypi-studio-types.ts\n    9799 total",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:09:25.219Z",
+            "toolCallId": "call_riosjnLs2MoslDJyMBdjYN2L|fc_07739ed17a313178016a4cb43521b4819aa57279cebd0070cf",
+            "toolName": "bash",
+            "text": "lib/session-reader.ts:170:    let studioChild: StudioChildSessionInfo | undefined;\nlib/session-reader.ts:174:      studioChild = metadata.studioChild;\nlib/session-reader.ts:185:      legacyUnassigned: studioChild ? false : projectLink.legacyUnassigned,\nlib/session-reader.ts:186:      studioChild,\nlib/session-reader.ts:195:  }).filter((session) => options.includeStudioChildren || !session.studioChild);\nlib/session-reader.ts:473:        if (metadata.studioChild && !options.includeStudioChildren) continue;\nlib/session-reader.ts:491:          legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,\nlib/session-reader.ts:492:          studioChild: metadata.studioChild,\nlib/session-reader.ts:533:        if (metadata.studioChild && !options.includeStudioChildren) continue;\nlib/session-reader.ts:573:          legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,\nlib/session-reader.ts:574:          studioChild: metadata.studioChild,\nlib/ypi-studio-child-session-runner.ts:44:  runner: \"sdk\";\nlib/ypi-studio-child-session-runner.ts:45:  childSessionId?: string;\nlib/ypi-studio-child-session-runner.ts:46:  childSessionFile?: string;\nlib/ypi-studio-child-session-runner.ts:153:function writeSessionHeader(filePath: string, patch: Partial<SessionHeader>): SessionHeader | null {\nlib/ypi-studio-child-session-runner.ts:169:    if (!header?.studioChild) return;\nlib/ypi-studio-child-session-runner.ts:170:    writeSessionHeader(filePath, { studioChild: { ...header.studioChild, ...patch } });\nlib/ypi-studio-child-session-runner.ts:188:export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOptions): Promise<StudioSdkChildRunResult> {\nlib/ypi-studio-child-session-runner.ts:207:  let childSessionId: string | undefined;\nlib/ypi-studio-child-session-runner.ts:208:  let childSessionFile: string | undefined;\nlib/ypi-studio-child-session-runner.ts:219:  const requestAffinity = (): YpiStudioTaskSubagentRun[\"requestAffinity\"] | undefined => childSessionId ? {\nlib/ypi-studio-child-session-runner.ts:221:    providerSessionIdSource: \"childSessionId\",\nlib/ypi-studio-child-session-runner.ts:223:    childSessionId,\nlib/ypi-studio-child-session-runner.ts:291:    runner: \"sdk\",\nlib/ypi-studio-child-session-runner.ts:292:    childSessionId,\nlib/ypi-studio-child-session-runner.ts:293:    childSessionFile,\nlib/ypi-studio-child-session-runner.ts:305:    transcript: writer ? { ...writer.ref, runner: \"sdk\" as const, childSessionId, childSessionFile, status: transcriptStatus(runStatus) } : undefined,\nlib/ypi-studio-child-session-runner.ts:311:    updateYpiStudioChildRun(meta.runId, { status, progress, childSessionId, childSessionFile });\nlib/ypi-studio-child-session-runner.ts:317:        details: { run: { id: meta.runId, member: meta.member, status, taskId: meta.taskId, runner: \"sdk\", childSessionId, childSessionFile, requestAffinity: requestAffinity(), model: policy.modelLabel, thinking: policy.thinkingLabel, modelSource: policy.modelSource, thinkingSource: policy.thinkingSource, policy: policy.diagnostics, transcript: writer ? { ...writer.ref } : undefined, progress, terminationReason } },\nlib/ypi-studio-child-session-runner.ts:416:    let transcript = writer ? { ...writer.ref, runner: \"sdk\" as const, childSessionId, childSessionFile, status: transcriptStatus(status) } : undefined;\nlib/ypi-studio-child-session-runner.ts:418:      try { transcript = { ...finalizeYpiStudioSubagentTranscript(writer, transcriptStatus(status)), runner: \"sdk\" as const, childSessionId, childSessionFile }; }\nlib/ypi-studio-child-session-runner.ts:423:    updateStudioChildHeader(childSessionFile, { status, finishedAt: new Date().toISOString(), terminationReason });\nlib/ypi-studio-child-session-runner.ts:424:    const result: StudioSdkChildRunResult = { output, status, transcript, warnings, progress: progressSnapshot(), terminationReason, runner: \"sdk\", childSessionId, childSessionFile, requestAffinity: requestAffinity() };\nlib/ypi-studio-child-session-runner.ts:429:    updateYpiStudioChildRun(meta.runId, { s…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T08:09:25.743Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T08:09:27.953Z",
+            "text": "Child Pi run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 65,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-18a159bcdc766f30b5c569a3",
+        "taskId": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-160855-_-ypi-studio-sdk-runner-preflight-_-cli-/architect-18a159bcdc766f30b5c569a3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:09:05.640Z",
+        "finishedAt": "2026-07-07T08:09:27.954Z",
+        "updatedAt": "2026-07-07T08:09:27.954Z",
+        "itemCount": 17,
+        "messageCount": 1,
+        "toolCallCount": 6,
+        "stderrBytes": 0,
+        "bytes": 74329,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-fabd4b9d1502f5d537a4cb56",
+      "subtaskId": "sdk-child-header-ensure",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:13:37.955Z",
+      "finishedAt": "2026-07-07T08:15:11.850Z",
+      "runner": "cli",
+      "prompt": "实现子任务 sdk-child-header-ensure：修复 SDK child session header 创建与写入时机。请先阅读任务 artifacts（prd/design/implement/checks）和相关代码，按实现计划修改代码，并记录验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — fixed SDK child session header writing so it can create the JSONL header when `SessionManager.create()` has not flushed the file yet; preserves `parentSession`, `projectId`, `spaceId`, and `studioChild` metadata.\n- `lib/types.ts` — no changes needed.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- The fix marks the SDK `SessionManager` as flushed after manually creating the header, preventing later SDK persistence from using exclusive create (`wx`) against an already-created file.\n- Remaining subtasks for fallback diagnostics and validation/docs were not implemented, per assigned boundary.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:13:37.955Z",
+        "updatedAt": "2026-07-07T08:15:11.850Z",
+        "eventCount": 1474,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — fixed SDK child session header writing so it can create the JSONL header when `SessionManager.create()` has not flushed the file yet; preserves `parentSession`, `projectId`, `spaceId`, and `studioChild` metadata.\n- `lib/types.ts` — no changes needed.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- The fix marks the SDK `SessionManager` as flushed after manually creating the header, preventing later SDK persistence from using exclusive create (`wx`) against an already-created file.\n- Remaining subtasks for fallback diagnostics and validation/docs were not implemented, per assigned boundary.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:14:52.970Z",
+            "toolCallId": "call_82U6iw9wAbjk2IkEpTitjDdy|fc_0fcd3db2c43d71d2016a4cb57ae93081999c33689f465ac30f",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T08:14:56.006Z",
+            "toolCallId": "call_79qNicVJBKUA52UVouOtkjxg|fc_0fcd3db2c43d71d2016a4cb57fcdc48199aa786dafdc10577e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/ypi-studio-child-session-runner.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:14:56.079Z",
+            "toolCallId": "call_79qNicVJBKUA52UVouOtkjxg|fc_0fcd3db2c43d71d2016a4cb57fcdc48199aa786dafdc10577e",
+            "toolName": "bash",
+            "text": "diff --git a/lib/ypi-studio-child-session-runner.ts b/lib/ypi-studio-child-session-runner.ts\nindex 7c243d3..e5acb31 100644\n--- a/lib/ypi-studio-child-session-runner.ts\n+++ b/lib/ypi-studio-child-session-runner.ts\n@@ -1,5 +1,5 @@\n-import { readFileSync, writeFileSync } from \"node:fs\";\n-import { basename } from \"node:path\";\n+import { existsSync, mkdirSync, readFileSync, writeFileSync } from \"node:fs\";\n+import { basename, dirname } from \"node:path\";\n import type { ResolvedYpiStudioMemberPolicy } from \"./ypi-studio-policy\";\n import { readSessionHeaderFromFile } from \"./session-project-link\";\n import { createYpiStudioChildGuardExtension } from \"./ypi-studio-child-guard\";\n@@ -150,18 +150,32 @@ function usageOutputTokens(event: unknown): number | undefined {\n   return typeof value === \"number\" && Number.isFinite(value) && value >= 0 ? value : undefined;\n }\n \n-function writeSessionHeader(filePath: string, patch: Partial<SessionHeader>): SessionHeader | null {\n-  const content = readFileSync(filePath, \"utf8\");\n+function writeSessionHeader(filePath: string, patch: Partial<SessionHeader>, baseHeader?: SessionHeader): SessionHeader | null {\n+  const fileExists = existsSync(filePath);\n+  const content = fileExists ? readFileSync(filePath, \"utf8\") : \"\";\n   const newlineIndex = content.indexOf(\"\\n\");\n   const firstLine = newlineIndex >= 0 ? content.slice(0, newlineIndex) : content;\n-  const rest = newlineIndex >= 0 ? content.slice(newlineIndex) : \"\\n\";\n-  const header = JSON.parse(firstLine) as SessionHeader;\n-  if (header.type !== \"session\") return null;\n+  const rest = fileExists ? (newlineIndex >= 0 ? content.slice(newlineIndex) : \"\\n\") : \"\\n\";\n+  const header = firstLine.trim() ? JSON.parse(firstLine) as SessionHeader : baseHeader;\n+  if (header?.type !== \"session\") return null;\n   const next = { ...header, ...patch } as SessionHeader;\n+  mkdirSync(dirname(filePath), { recursive: true });\n   writeFileSync(filePath, `${JSON.stringify(next)}${rest}`, \"utf8\");\n   return next;\n }\n \n+type WritableSessionManagerInternals = {\n+  flushed?: boolean;\n+  fileEntries?: unknown[];\n+};\n+\n+function markSessionManagerHeaderFlushed(sessionManager: unknown, header: SessionHeader): void {\n+  const internals = sessionManager as WritableSessionManagerInternals;\n+  const firstEntry = Array.isArray(internals.fileEntries) ? internals.fileEntries[0] : undefined;\n+  if (isObj(firstEntry) && firstEntry.type === \"session\") Object.assign(firstEntry, header);\n+  internals.flushed = true;\n+}\n+\n function updateStudioChildHeader(filePath: string | undefined, patch: Partial<StudioChildSessionInfo>): void {\n   if (!filePath) return;\n   try {\n@@ -460,7 +474,16 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti\n       createdAt: meta.startedAt,\n     };\n     if (childSessionFile) {\n-      writeSessionHeader(childSessionFile, { projectId: parentHeader?.projectId, spaceId: parentHeader?.spaceId, studioChild });\n+      const baseHeader = typeof sessionManager.getHeader === \"function\" ? sessionManager.getHeader() as SessionHeader | null : null;\n+      const header = writeSessionHeader(childSessionFile, { projectId: parentHeader?.projectId, spaceId: parentHeader?.spaceId, studioChild }, baseHeader ?? {\n+        type: \"session\",\n+        version: 3,\n+        id: childSessionId,\n+        timestamp: meta.startedAt,\n+        cwd: root,\n+        parentSession: meta.parentSessionFile,\n+      });\n+      if (header) markSessionManagerHeaderFlushed(sessionManager, header);\n     }\n     try { sessionManager.appendSessionInfo(`YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`); } catch {}\n     if (writer) {",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T08:15:09.632Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — fixed SDK child session header writing so it can create the JSONL header when `SessionManager.create()` has not flushed the file yet; preserves `parentSession`, `projectId`, `spaceId`, and `studioChild` metadata.\n- `lib/types.ts` — no changes needed.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- The fix marks the SDK `SessionManager` as flushed after manually creating the header, preventing later SDK persistence from using exclusive create (`wx`) against an already-created file.\n- Remaining subtasks for fallback diagnostics and validation/docs were not implemented, per assigned boundary.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T08:15:09.642Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1460,
+        "tokens": 478,
+        "tokenSource": "usage",
+        "tps": 206.21,
+        "firstTokenAt": "2026-07-07T08:15:07.309Z",
+        "lastTokenAt": "2026-07-07T08:15:09.627Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-fabd4b9d1502f5d537a4cb56",
+        "taskId": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-160855-_-ypi-studio-sdk-runner-preflight-_-cli-/implementer-fabd4b9d1502f5d537a4cb56.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:13:37.955Z",
+        "finishedAt": "2026-07-07T08:15:11.843Z",
+        "updatedAt": "2026-07-07T08:15:11.843Z",
+        "itemCount": 41,
+        "messageCount": 1,
+        "toolCallCount": 18,
+        "stderrBytes": 0,
+        "bytes": 153226,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d970017957c2722f163a3488",
+      "subtaskId": "runner-error-persistence",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:15:21.778Z",
+      "finishedAt": "2026-07-07T08:18:52.458Z",
+      "runner": "cli",
+      "prompt": "实现子任务 runner-error-persistence：持久化 auto fallback 与强制 sdk async 失败诊断。请基于任务 artifacts 和上一子任务结果继续实现，确保 run/transcript/API 能暴露必要诊断信息并符合设计。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — implemented runner-error-persistence:\n  - Preserves SDK preflight/fallback warnings across CLI fallback progress/final snapshots.\n  - Writes fallback diagnostic status into transcript sidecar when available.\n  - Persists forced `runner=sdk` preflight/runner failures as failed runs with `error`, `terminationReason`, failed transcript metadata, and progress warnings.\n  - Registers an early SDK placeholder runtime handle to avoid async poll/collect racing into `runtime_lost`.\n  - Exposes progress warnings in lifecycle/wait compact projections.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify unrelated files already present in the working tree.\n- No manual Studio smoke run performed in this delegated subtask.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:15:21.778Z",
+        "updatedAt": "2026-07-07T08:18:52.458Z",
+        "eventCount": 3714,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — implemented runner-error-persistence:\n  - Preserves SDK preflight/fallback warnings across CLI fallback progress/final snapshots.\n  - Writes fallback diagnostic status into transcript sidecar when available.\n  - Persists forced `runner=sdk` preflight/runner failures as failed runs with `error`, `terminationReason`, failed transcript metadata, and progress warnings.\n  - Registers an early SDK placeholder runtime handle to avoid async poll/collect racing into `runtime_lost`.\n  - Exposes progress warnings in lifecycle/wait compact projections.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify unrelated files already present in the working tree.\n- No manual Studio smoke run performed in this delegated subtask.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:18:21.443Z",
+            "toolCallId": "call_HlPopBJsmMozt2X4scMoMhNj|fc_00c1f55fac12c721016a4cb64cd5ac8198b9d0f44bfd2ac8e4",
+            "toolName": "bash",
+            "text": "app/api/usage/route.ts                 |  37 ++--\n components/AppShell.tsx                |  18 +-\n components/ChatWindow.tsx              |  17 +-\n components/UsageStatsModal.tsx         |  67 +++++--\n docs/architecture/overview.md          |  10 +-\n docs/modules/api.md                    |   3 +-\n docs/modules/frontend.md               |   8 +-\n docs/modules/library.md                |   5 +-\n hooks/useAgentSession.ts               |  95 +++++++++-\n lib/session-reader.ts                  |  89 ++++++++--\n lib/usage-stats.ts                     | 310 ++++++++++++++++++++++++++++-----\n lib/ypi-studio-child-session-runner.ts |  39 ++++-\n lib/ypi-studio-extension.ts            |  79 ++++++++-\n 13 files changed, 671 insertions(+), 106 deletions(-)\ndiff --git a/lib/ypi-studio-extension.ts b/lib/ypi-studio-extension.ts\nindex 16702f6..296cad7 100644\n--- a/lib/ypi-studio-extension.ts\n+++ b/lib/ypi-studio-extension.ts\n@@ -1479,6 +1479,7 @@ function compactProgressForLifecycle(progress: YpiStudioSubagentRunProgress | un\n     updatedAt: progress.updatedAt,\n     eventCount: progress.eventCount,\n     lastTextPreview: progress.lastTextPreview ? oneLine(progress.lastTextPreview, lastTextMax) : undefined,\n+    warnings: progress.warnings?.slice(-5),\n     tokens: progress.tokens,\n     tps: progress.tps,\n     currentTool: progress.currentTool,\n@@ -1637,6 +1638,7 @@ function compactSubagentRunForWait(run: StudioSubagentRunProjection): Record<str\n   const progress = run.progress ? {\n     phase: run.progress.phase,\n     updatedAt: run.progress.updatedAt,\n+    warnings: run.progress.warnings?.slice(-5),\n     tokens: run.progress.tokens,\n     tps: run.progress.tps,\n     currentTool: run.progress.currentTool,\n@@ -2089,12 +2091,18 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:\n         const childPrompt = buildMemberPrompt(root, taskId, member, prompt, subtaskId);\n         let writer: YpiStudioSubagentTranscriptWriter | null = null;\n         const warnings: string[] = [...runnerSelection.warnings];\n+        const persistentRunWarnings = new Set<string>([...policy.warnings, ...warnings]);\n+        const rememberRunWarning = (warning: string): void => {\n+          if (!warning.trim()) return;\n+          warnings.push(warning);\n+          persistentRunWarnings.add(warning);\n+        };\n         try {\n           writer = createYpiStudioSubagentTranscript(root, taskId, { runId, member, startedAt });\n           writer.ref.runner = runnerSelection.runner;\n           appendYpiStudioSubagentTranscriptItem(writer, { kind: \"prompt\", at: startedAt, text: prompt });\n         } catch (error) {\n-          warnings.push(`Transcript capture unavailable: ${error instanceof Error ? error.message : String(error)}`);\n+          rememberRunWarning(`Transcript capture unavailable: ${error instanceof Error ? error.message : String(error)}`);\n         }\n         const promptPreview = previewYpiStudioTranscriptText(prompt, MAX_CHILD_LIVE_PREVIEW_BYTES);\n         const initialItemsPreview: YpiStudioSubagentTranscriptItem[] = writer ? [{ kind: \"prompt\", at: startedAt, text: promptPreview.text, truncated: promptPreview.truncated }] : [];\n@@ -2135,14 +2143,52 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:\n         const persistRunSnapshot = (run: YpiStudioTaskSubagentRun): void => {\n           const latestTask = getYpiStudioTaskDetail(root, taskId);\n           const existing = latestTask?.subagents.find((item) => item.id === run.id);\n+          const mergedWarnings = Array.from(new Set([\n+            ...(existing?.progress?.warnings ?? []),\n+            ...persistentRunWarnings,\n+            ...(run.progress?.warnings ?? []),\n+          ])).slice(-12);\n           recordYpiStudioSubagentRun(root, taskId, {\n             ...existing,\n             ...run,\n             prompt: run.prompt ?? existing?.prompt ?? runningRun.prompt,\n             summary: run.summary ?? existing?.summary ?? runningRun.summary,\n             transcript: run.transcript ?? existing?.transcript ?? runningRun.transcript,\n+          …",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T08:18:34.359Z",
+            "toolCallId": "call_kApZGj4SSZiepeUkk6S8YOO3|fc_00c1f55fac12c721016a4cb65a27888198a26324f2e26d095f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run lint\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:18:42.995Z",
+            "toolCallId": "call_kApZGj4SSZiepeUkk6S8YOO3|fc_00c1f55fac12c721016a4cb65a27888198a26324f2e26d095f",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.8 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T08:18:50.229Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — implemented runner-error-persistence:\n  - Preserves SDK preflight/fallback warnings across CLI fallback progress/final snapshots.\n  - Writes fallback diagnostic status into transcript sidecar when available.\n  - Persists forced `runner=sdk` preflight/runner failures as failed runs with `error`, `terminationReason`, failed transcript metadata, and progress warnings.\n  - Registers an early SDK placeholder runtime handle to avoid async poll/collect racing into `runtime_lost`.\n  - Exposes progress warnings in lifecycle/wait compact projections.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify unrelated files already present in the working tree.\n- No manual Studio smoke run performed in this delegated subtask.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T08:18:50.247Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1752,
+        "tokens": 266,
+        "tokenSource": "usage",
+        "tps": 89.29,
+        "firstTokenAt": "2026-07-07T08:18:47.242Z",
+        "lastTokenAt": "2026-07-07T08:18:50.221Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d970017957c2722f163a3488",
+        "taskId": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-160855-_-ypi-studio-sdk-runner-preflight-_-cli-/implementer-d970017957c2722f163a3488.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:15:21.778Z",
+        "finishedAt": "2026-07-07T08:18:52.447Z",
+        "updatedAt": "2026-07-07T08:18:52.447Z",
+        "itemCount": 65,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 212778,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-c5b2f05dac673b7b3c41083a",
+      "subtaskId": "sdk-runner-validation-docs",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:19:01.522Z",
+      "finishedAt": "2026-07-07T08:22:18.272Z",
+      "runner": "cli",
+      "prompt": "实现子任务 sdk-runner-validation-docs：补充验证脚本/文档并运行验证。请检查前两个子任务变更，补齐必要测试/文档/验证说明，运行项目要求的验证命令并记录结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/ypi-studio-child-session-header.ts` — 新增可测试 header helper，支持 child JSONL 不存在时创建 `studioChild` session header。\n- `lib/ypi-studio-child-session-runner.ts` — SDK runner 复用 header helper。\n- `scripts/test-ypi-studio-sdk-runner.mjs` — 新增低成本验证脚本。\n- `package.json` — 新增 `test:studio-sdk-runner` script。\n- `docs/modules/library.md` — 补充 SDK runner/CLI fallback/diagn断与 usage 边界说明。\n- `docs/modules/api.md` — 补充 subagent run projection 与 usage rollup 文档。\n- `.ypi/tasks/.../handoff.md` — 更新本任务 handoff artifact。\n\n#### Verification\n\n- `npm run test:studio-sdk-runner` — passed（仅 Node experimental loader warning）。\n- `npm run lint` — passed。\n- `node_modules/.bin/tsc --noEmit` — passed。\n\n#### Notes / Risks\n\n- 未执行真实模型手工 smoke；建议主会话按 `checks.md` 验证 `runner=sdk` 的真实 run、child JSONL header 和 usage rollup。\n- 未 commit/push。\n- 工作区已有前两个子任务及其他任务的未提交改动，我未回滚或覆盖。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:19:01.522Z",
+        "updatedAt": "2026-07-07T08:22:18.272Z",
+        "eventCount": 5027,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/ypi-studio-child-session-header.ts` — 新增可测试 header helper，支持 child JSONL 不存在时创建 `studioChild` session header。\n- `lib/ypi-studio-child-session-runner.ts` — SDK runner 复用 header helper。\n- `scripts/test-ypi-studio-sdk-runner.mjs` — 新增低成本验证脚本。\n- `package.json` — 新增 `test:studio-sdk-runner` script。\n- `docs/modules/library.md` — 补充 SDK runner/CLI fallback/diagn断与 usage 边界说明。\n- `docs/modules/api.md` — 补充 subagent run projection 与 usage rollup 文档。\n- `.ypi/tasks/.../handoff.md` — 更新本任务 handoff artifact。\n\n#### Verification\n\n- `npm run test:studio-sdk-runner` — passed（仅 Node experimental loader warning）。\n- `npm run lint` — passed。\n- `node_modules/.bin/tsc --noEmit` — passed。\n\n#### Notes / Risks\n\n- 未执行真实模型手工 smoke；建议主会话按 `checks.md` 验证 `runner=sdk` 的真实 run、child JSONL header 和 usage rollup。\n- 未 commit/push。\n- 工作区已有前两个子任务及其他任务的未提交改动，我未回滚或覆盖。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:22:01.744Z",
+            "toolCallId": "call_ucTaazcPnPRCdCzhJcLElCfv|fc_02878f3bcefddd4d016a4cb7222f04819a9c0d979208e35f01",
+            "toolName": "write",
+            "text": "Successfully wrote 1024 bytes to .ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T08:22:08.003Z",
+            "toolCallId": "call_6RPCyaoiGAdqXJdzjO0RzsdS|fc_02878f3bcefddd4d016a4cb72e94fc819a91cb0a0f20cc4950",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short -- lib/ypi-studio-child-session-header.ts scripts/test-ypi-studio-sdk-runner.mjs package.json docs/modules/library.md docs/modules/api.md lib/ypi-studio-child-session-runner.ts .ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/handoff.md\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:22:08.027Z",
+            "toolCallId": "call_6RPCyaoiGAdqXJdzjO0RzsdS|fc_02878f3bcefddd4d016a4cb72e94fc819a91cb0a0f20cc4950",
+            "toolName": "bash",
+            "text": "M docs/modules/api.md\n M docs/modules/library.md\n M lib/ypi-studio-child-session-runner.ts\n M package.json\n?? \".ypi/tasks/20260707-160855-\\344\\277\\256\\345\\244\\215-ypi-studio-sdk-runner-preflight-\\345\\233\\236\\351\\200\\200-cli-\\351\\227\\256\\351\\242\\230/handoff.md\"\n?? lib/ypi-studio-child-session-header.ts\n?? scripts/test-ypi-studio-sdk-runner.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T08:22:16.048Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/ypi-studio-child-session-header.ts` — 新增可测试 header helper，支持 child JSONL 不存在时创建 `studioChild` session header。\n- `lib/ypi-studio-child-session-runner.ts` — SDK runner 复用 header helper。\n- `scripts/test-ypi-studio-sdk-runner.mjs` — 新增低成本验证脚本。\n- `package.json` — 新增 `test:studio-sdk-runner` script。\n- `docs/modules/library.md` — 补充 SDK runner/CLI fallback/diagn断与 usage 边界说明。\n- `docs/modules/api.md` — 补充 subagent run projection 与 usage rollup 文档。\n- `.ypi/tasks/.../handoff.md` — 更新本任务 handoff artifact。\n\n#### Verification\n\n- `npm run test:studio-sdk-runner` — passed（仅 Node experimental loader warning）。\n- `npm run lint` — passed。\n- `node_modules/.bin/tsc --noEmit` — passed。\n\n#### Notes / Risks\n\n- 未执行真实模型手工 smoke；建议主会话按 `checks.md` 验证 `runner=sdk` 的真实 run、child JSONL header 和 usage rollup。\n- 未 commit/push。\n- 工作区已有前两个子任务及其他任务的未提交改动，我未回滚或覆盖。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T08:22:16.059Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1816,
+        "tokens": 344,
+        "tokenSource": "usage",
+        "tps": 65.6,
+        "firstTokenAt": "2026-07-07T08:22:10.803Z",
+        "lastTokenAt": "2026-07-07T08:22:16.047Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-c5b2f05dac673b7b3c41083a",
+        "taskId": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-160855-_-ypi-studio-sdk-runner-preflight-_-cli-/implementer-c5b2f05dac673b7b3c41083a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:19:01.522Z",
+        "finishedAt": "2026-07-07T08:22:18.257Z",
+        "updatedAt": "2026-07-07T08:22:18.257Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 182046,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-24d350d83a28be226720a040",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T08:22:29.355Z",
+      "finishedAt": "2026-07-07T08:24:35.359Z",
+      "runner": "cli",
+      "prompt": "请对任务“修复 YPI Studio SDK runner preflight 回退 CLI 问题”的实现进行代码审查和验证。重点检查：SDK child session header 写入时机、auto fallback/forced sdk 诊断持久化、API/transcript 投影、文档/验证脚本，以及是否有回归风险。请运行或核对必要验证并给出结论。",
+      "summary": "已完成检查，产物已写入：\n\n- `.ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/review.md`\n\n检查范围：\n\n- `lib/ypi-studio-child-session-header.ts`\n- `lib/ypi-studio-child-session-runner.ts`\n- `lib/ypi-studio-extension.ts`\n- `scripts/test-ypi-studio-sdk-runner.mjs`\n- `package.json`\n- `docs/modules/library.md`\n- `docs/modules/api.md`\n\n验证结果：\n\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n结论：\n\n- Pass\n- 代码已覆盖本任务核心验收：  \n  - SDK child session header 在 JSONL 未落盘时可安全创建\n  - `auto` fallback 保留 SDK preflight 诊断到 run progress/warnings\n  - 强制 `sdk` 的 async preflight/runner 失败会持久化为真实 failed，而不是只剩 `runtime_lost`\n  - 文档与验证脚本已补齐\n\n剩余风险：\n\n- 非阻塞：`lib/ypi-studio-extension.ts` 新增的 SDK 预注册占位 handle 修复了 `runtime_lost`，但若用户恰好在 SDK preflight 极短窗口内取消 async run，占位 `abort` 目前是 no-op，后续真实 handle 可能覆盖已取消状态。当前不影响本任务验收，但建议主会话决定是否补一个后续小修。\n\n主会话需要决策：\n\n- 是否接受上述“SDK preflight 期间 async cancel 窄窗口竞态”为后续优化，而不是本任务阻塞项。",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T08:22:29.355Z",
+        "updatedAt": "2026-07-07T08:24:35.359Z",
+        "eventCount": 1109,
+        "lastTextPreview": "已完成检查，产物已写入：\n\n- `.ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/review.md`\n\n检查范围：\n\n- `lib/ypi-studio-child-session-header.ts`\n- `lib/ypi-studio-child-session-runner.ts`\n- `lib/ypi-studio-extension.ts`\n- `scripts/test-ypi-studio-sdk-runner.mjs`\n- `package.json`\n- `docs/modules/library.md`\n- `docs/modules/api.md`\n\n验证结果：\n\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n结论：\n\n- Pass\n- 代码已覆盖本任务核心验收：  \n  - SDK child session header 在 JSONL 未落盘时可安全创建\n  - `auto` fallback 保留 SDK preflight 诊断到 run progress/warnings\n  - 强制 `sdk` 的 async preflight/runner 失败会持久化为真实 failed，而不是只剩 `runtime_lost`\n  - 文档与验证脚本已补齐\n\n剩余风险：\n\n- 非阻塞：`lib/ypi-studio-extension.ts` 新增的 SDK 预注册占位 handle 修复了 `runtime_lost`，但若用户恰好在 SDK preflight 极短窗口内取消 async run，占位 `abort` 目前是 no-op，后续真实 handle 可能覆盖已取消状态。当前不影响本任务验收，但建议主会话决定是否补一个后续小修。\n\n主会话需要决策：\n\n- 是否接受上述“SDK preflight 期间 async cancel 窄窗口竞态”为后续优化，而不是本任务阻塞项。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:23:38.538Z",
+            "toolCallId": "call_qrpqWiqVCVKPE7tvolSWNIT5|fc_044f20fbec93f33a016a4cb78a1b188199b33cc1b0beccab63",
+            "toolName": "read",
+            "text": "timestamp,\n            cwd: this.cwd,\n            parentSession: options?.parentSession,\n        };\n        this.fileEntries = [header];\n        this.byId.clear();\n        this.labelsById.clear();\n        this.leafId = null;\n        this.flushed = false;\n        if (this.persist) {\n            const fileTimestamp = timestamp.replace(/[:.]/g, \"-\");\n            this.sessionFile = join(this.getSessionDir(), `${fileTimestamp}_${this.sessionId}.jsonl`);\n        }\n        return this.sessionFile;\n    }\n    _buildIndex() {\n        this.byId.clear();\n        this.labelsById.clear();\n        this.labelTimestampsById.clear();\n        this.leafId = null;\n        for (const entry of this.fileEntries) {\n            if (entry.type === \"session\")\n                continue;\n            this.byId.set(entry.id, entry);\n            this.leafId = entry.id;\n            if (entry.type === \"label\") {\n                if (entry.label) {\n                    this.labelsById.set(entry.targetId, entry.label);\n                    this.labelTimestampsById.set(entry.targetId, entry.timestamp);\n                }\n                else {\n                    this.labelsById.delete(entry.targetId);\n                    this.labelTimestampsById.delete(entry.targetId);\n                }\n            }\n        }\n    }\n    _rewriteFile() {\n        if (!this.persist || !this.sessionFile)\n            return;\n        const fd = openSync(this.sessionFile, \"w\");\n        try {\n            for (const entry of this.fileEntries) {\n                writeFileSync(fd, `${JSON.stringify(entry)}\\n`);\n            }\n        }\n        finally {\n            closeSync(fd);\n        }\n    }\n    isPersisted() {\n        return this.persist;\n    }\n    getCwd() {\n        return this.cwd;\n    }\n    getSessionDir() {\n        return this.sessionDir;\n    }\n    usesDefaultSessionDir() {\n        return this.sessionDir === getDefaultSessionDirPath(this.cwd);\n    }\n    getSessionId() {\n        return this.sessionId;\n    }\n    getSessionFile() {\n        return this.sessionFile;\n    }\n    _persist(entry) {\n        if (!this.persist || !this.sessionFile)\n            return;\n        const hasAssistant = this.fileEntries.some((e) => e.type === \"message\" && e.message.role === \"assistant\");\n        if (!hasAssistant) {\n            if (this.flushed) {\n                appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\\n`);\n            }\n            else {\n                // Mark as not flushed so when assistant arrives, all entries get written\n                this.flushed = false;\n            }\n            return;\n        }\n        if (!this.flushed) {\n            const fd = openSync(this.sessionFile, \"wx\");\n            try {\n                for (const e of this.fileEntries) {\n                    writeFileSync(fd, `${JSON.stringify(e)}\\n`);\n                }\n            }\n            finally {\n                closeSync(fd);\n            }\n            this.flushed = true;\n        }\n        else {\n            appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\\n`);\n        }\n    }\n    _appendEntry(entry) {\n        this.fileEntries.push(entry);\n\n[561 more lines in file. Use offset=670 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T08:24:23.852Z",
+            "toolCallId": "call_Pu7v1rqfZ9fKDtJYn964nTOT|fc_044f20fbec93f33a016a4cb7b42a548199b9b29aa4442a2cc4",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/review.md\",\n  \"content\": \"# review\\n\\n## Check Complete\\n\\n### Findings Fixed\\n\\n- None.\\n\\n### Remaining Findings\\n\\n- Non-blocking: `lib/ypi-studio-extension.ts` now registers a temporary SDK runtime handle before the real SDK runner handle exists. This fixes `runtime_lost`, but if a user cancels an async run during that short preflight window, the placeholder `abort` is a no-op and the later real handle can overwrite the cancelled state. I did not see evidence this breaks the task acceptance, but it is a narrow cancellation race worth follow-up if async cancel during SDK preflight matters.\\n\\n### Verification\\n\\n- `npm run test:studio-sdk-runner` — passed\\n- `npm run lint` — passed\\n- `node_modules/.bin/tsc --noEmit` — passed\\n\\n### Verdict\\n\\n- Pass — core acceptance is covered: missing SDK child JSONL now gets a compatible header, auto fallback preserves SDK preflight diagnostics in run progress/warnings, forced-SDK async failures are persisted as real failed runs instead of only `runtime_lost`, and docs/script updates are present.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T08:24:23.856Z",
+            "toolCallId": "call_Pu7v1rqfZ9fKDtJYn964nTOT|fc_044f20fbec93f33a016a4cb7b42a548199b9b29aa4442a2cc4",
+            "toolName": "write",
+            "text": "Successfully wrote 1007 bytes to .ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T08:24:33.102Z",
+            "text": "已完成检查，产物已写入：\n\n- `.ypi/tasks/20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题/review.md`\n\n检查范围：\n\n- `lib/ypi-studio-child-session-header.ts`\n- `lib/ypi-studio-child-session-runner.ts`\n- `lib/ypi-studio-extension.ts`\n- `scripts/test-ypi-studio-sdk-runner.mjs`\n- `package.json`\n- `docs/modules/library.md`\n- `docs/modules/api.md`\n\n验证结果：\n\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n结论：\n\n- Pass\n- 代码已覆盖本任务核心验收：  \n  - SDK child session header 在 JSONL 未落盘时可安全创建\n  - `auto` fallback 保留 SDK preflight 诊断到 run progress/warnings\n  - 强制 `sdk` 的 async preflight/runner 失败会持久化为真实 failed，而不是只剩 `runtime_lost`\n  - 文档与验证脚本已补齐\n\n剩余风险：\n\n- 非阻塞：`lib/ypi-studio-extension.ts` 新增的 SDK 预注册占位 handle 修复了 `runtime_lost`，但若用户恰好在 SDK preflight 极短窗口内取消 async run，占位 `abort` 目前是 no-op，后续真实 handle 可能覆盖已取消状态。当前不影响本任务验收，但建议主会话决定是否补一个后续小修。\n\n主会话需要决策：\n\n- 是否接受上述“SDK preflight 期间 async cancel 窄窗口竞态”为后续优化，而不是本任务阻塞项。",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T08:24:33.107Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1922,
+        "tokens": 426,
+        "tokenSource": "usage",
+        "tps": 61.45,
+        "firstTokenAt": "2026-07-07T08:24:26.169Z",
+        "lastTokenAt": "2026-07-07T08:24:33.102Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-24d350d83a28be226720a040",
+        "taskId": "20260707-160855-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-160855-_-ypi-studio-sdk-runner-preflight-_-cli-/checker-24d350d83a28be226720a040.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T08:22:29.355Z",
+        "finishedAt": "2026-07-07T08:24:35.347Z",
+        "updatedAt": "2026-07-07T08:24:35.347Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 204164,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T08:11:56.565Z",
+      "contextId": "pi_019f3b73-a001-7c10-bfee-d92422d26e9f",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-07T08:13:23.601Z",
+      "contextId": "pi_019f3ba2-8eaf-771c-9e1e-d7c604fba61c",
+      "inputHash": "1ddaada91af4ccc692548da3",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-07T08:29:33.030Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260707-162933-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
+    "knowledgePath": ".ypi/knowledge/20260707-162933-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T08:11:48.472Z",
+    "summary": "修复 YPI Studio SDK child runner 在 session JSONL 尚未落盘时写 header 导致 ENOENT 并回退 CLI 的问题，同时增强 fallback/failed 诊断持久化。",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "serial",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "sdk-child-header-ensure",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "sdk-child-header-ensure"
+          ]
+        },
+        {
+          "id": "runner-error-persistence",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [
+            "sdk-child-header-ensure"
+          ],
+          "subtaskIds": [
+            "runner-error-persistence"
+          ]
+        },
+        {
+          "id": "sdk-runner-validation-docs",
+          "title": "implementation",
+          "relation": "serial",
+          "dependencies": [
+            "runner-error-persistence"
+          ],
+          "subtaskIds": [
+            "sdk-runner-validation-docs"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "sdk-child-header-ensure",
+        "title": "修复 SDK child session header 创建与写入时机",
+        "phase": "implementation",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-child-session-runner.ts",
+          "lib/types.ts"
+        ],
+        "instructions": [
+          "在 childSessionFile 不存在时创建兼容 session header，而不是 readFileSync 失败。",
+          "保留 parentSession/projectId/spaceId/studioChild 字段。",
+          "确认 SDK child run 开始后 task run/transcript 含 childSessionId/childSessionFile。"
+        ],
+        "acceptance": [
+          "强制 sdk 不再因 ENOENT preflight 失败",
+          "生成的 child JSONL header 可被 session-reader 识别为 studioChild"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "runner-error-persistence",
+        "title": "持久化 auto fallback 与强制 sdk async 失败诊断",
+        "phase": "implementation",
+        "order": 2,
+        "dependsOn": [
+          "sdk-child-header-ensure"
+        ],
+        "dependencies": [
+          "sdk-child-header-ensure"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-extension.ts",
+          "lib/ypi-studio-tasks.ts",
+          "lib/ypi-studio-transcripts.ts"
+        ],
+        "instructions": [
+          "auto fallback 时将 SDK preflight error 保留到 run warnings/summary，避免被 CLI final snapshot 覆盖。",
+          "runner=sdk 且 async preflight/prompt 前失败时，立刻持久化 failed run 与 failed transcript，包含真实 error/terminationReason。",
+          "避免 poll/collect 将真实错误覆盖成 runtime_lost。"
+        ],
+        "acceptance": [
+          "auto fallback 可在 task run 中看到 SDK preflight 错误",
+          "强制 sdk async 失败不再只显示 runtime_lost"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "sdk-runner-validation-docs",
+        "title": "补充验证脚本/文档并运行验证",
+        "phase": "implementation",
+        "order": 3,
+        "dependsOn": [
+          "runner-error-persistence"
+        ],
+        "dependencies": [
+          "runner-error-persistence"
+        ],
+        "relation": "serial",
+        "files": [
+          "scripts/test-ypi-studio-sdk-runner.mjs",
+          "package.json",
+          "docs/modules/library.md",
+          "docs/modules/api.md"
+        ],
+        "instructions": [
+          "增加低成本测试或脚本验证 header helper 能在文件不存在时创建 studioChild header。",
+          "必要时增加 npm script。",
+          "更新 docs，说明 SDK runner 不依赖外部 CLI，CLI 仅为显式回滚/fallback。",
+          "运行 npm run lint 与 node_modules/.bin/tsc --noEmit；如增加测试脚本也运行。"
+        ],
+        "acceptance": [
+          "验证命令通过",
+          "文档反映 runner 行为与诊断边界"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-07T08:29:33.030Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 3,
+      "skipped": 0
+    },
+    "subtasks": {
+      "sdk-child-header-ensure": {
+        "id": "sdk-child-header-ensure",
+        "status": "done",
+        "updatedAt": "2026-07-07T08:15:11.852Z",
+        "startedAt": "2026-07-07T08:13:32.190Z",
+        "finishedAt": "2026-07-07T08:15:11.850Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-fabd4b9d1502f5d537a4cb56"
+        ],
+        "lastRunId": "implementer-fabd4b9d1502f5d537a4cb56",
+        "claimedAt": "2026-07-07T08:13:32.190Z",
+        "claimedByContextId": "pi_019f3ba2-8eaf-771c-9e1e-d7c604fba61c",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — fixed SDK child session header writing so it can create the JSONL header when `SessionManager.create()` has not flushed the file yet; preserves `parentSession`, `projectId`, `spaceId`, and `studioChild` metadata.\n- `lib/types.ts` — no changes needed.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- The fix marks the SDK `SessionManager` as flushed after manually creating the header, preventing later SDK persistence from using exclusive create (`wx`) against an already-created file.\n- Remaining subtasks for fallback diagnostics and validation/docs were not implemented, per assigned boundary."
+      },
+      "runner-error-persistence": {
+        "id": "runner-error-persistence",
+        "status": "done",
+        "updatedAt": "2026-07-07T08:18:52.464Z",
+        "startedAt": "2026-07-07T08:15:18.107Z",
+        "finishedAt": "2026-07-07T08:18:52.458Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-d970017957c2722f163a3488"
+        ],
+        "lastRunId": "implementer-d970017957c2722f163a3488",
+        "claimedAt": "2026-07-07T08:15:18.107Z",
+        "claimedByContextId": "pi_019f3ba2-8eaf-771c-9e1e-d7c604fba61c",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — implemented runner-error-persistence:\n  - Preserves SDK preflight/fallback warnings across CLI fallback progress/final snapshots.\n  - Writes fallback diagnostic status into transcript sidecar when available.\n  - Persists forced `runner=sdk` preflight/runner failures as failed runs with `error`, `terminationReason`, failed transcript metadata, and progress warnings.\n  - Registers an early SDK placeholder runtime handle to avoid async poll/collect racing into `runtime_lost`.\n  - Exposes progress warnings in lifecycle/wait compact projections.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify unrelated files already present in the working tree.\n- No manual Studio smoke run performed in this delegated subtask."
+      },
+      "sdk-runner-validation-docs": {
+        "id": "sdk-runner-validation-docs",
+        "status": "done",
+        "updatedAt": "2026-07-07T08:22:18.277Z",
+        "startedAt": "2026-07-07T08:18:57.874Z",
+        "finishedAt": "2026-07-07T08:22:18.272Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-c5b2f05dac673b7b3c41083a"
+        ],
+        "lastRunId": "implementer-c5b2f05dac673b7b3c41083a",
+        "claimedAt": "2026-07-07T08:18:57.874Z",
+        "claimedByContextId": "pi_019f3ba2-8eaf-771c-9e1e-d7c604fba61c",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/ypi-studio-child-session-header.ts` — 新增可测试 header helper，支持 child JSONL 不存在时创建 `studioChild` session header。\n- `lib/ypi-studio-child-session-runner.ts` — SDK runner 复用 header helper。\n- `scripts/test-ypi-studio-sdk-runner.mjs` — 新增低成本验证脚本。\n- `package.json` — 新增 `test:studio-sdk-runner` script。\n- `docs/modules/library.md` — 补充 SDK runner/CLI fallback/diagn断与 usage 边界说明。\n- `docs/modules/api.md` — 补充 subagent run projection 与 usage rollup 文档。\n- `.ypi/tasks/.../handoff.md` — 更新本任务 handoff artifact。\n\n#### Verification\n\n- `npm run test:studio-sdk-runner` — passed（仅 Node experimental loader warning）。\n- `npm run lint` — passed。\n- `node_modules/.bin/tsc --noEmit` — passed。\n\n#### Notes / Risks\n\n- 未执行真实模型手工 smoke；建议主会话按 `checks.md` 验证 `runner=sdk` 的真实 run、child JSONL header 和 usage rollup。\n- 未 commit/push。\n- 工作区已有前两个子任务及其他任务的未提交改动，我未回滚或覆盖。"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-07T08:13:32.190Z",
+        "subtaskId": "sdk-child-header-ensure",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T08:15:18.107Z",
+        "subtaskId": "runner-error-persistence",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-07T08:18:57.874Z",
+        "subtaskId": "sdk-runner-validation-docs",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

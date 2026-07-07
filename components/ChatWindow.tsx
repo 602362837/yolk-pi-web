@@ -8,7 +8,7 @@ import type { YpiStudioLiveRunOverlay } from "@/lib/ypi-studio-types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
-import { useAgentSession, type AgentPhase } from "@/hooks/useAgentSession";
+import { useAgentSession, type AgentPhase, type SessionUsageTopbarStats } from "@/hooks/useAgentSession";
 import { useAudio } from "@/hooks/useAudio";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useDragDrop } from "@/hooks/useDragDrop";
@@ -26,7 +26,7 @@ interface Props {
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSubagentChange?: (runs: import("@/hooks/useAgentSession").SubagentRun[]) => void;
-  onSessionStatsChange?: (stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => void;
+  onSessionStatsChange?: (stats: SessionUsageTopbarStats | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;
   defaultToolPreset?: PiWebToolPreset;
@@ -169,7 +169,18 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
   // Push session stats up to AppShell for the top bar.
   // Compare scalar fields to avoid loops from new object identity each render.
   const statsKey = sessionStats
-    ? `${sessionStats.tokens.input}|${sessionStats.tokens.output}|${sessionStats.tokens.cacheRead}|${sessionStats.tokens.cacheWrite}|${sessionStats.cost ?? 0}`
+    ? [
+      sessionStats.tokens.input,
+      sessionStats.tokens.output,
+      sessionStats.tokens.cacheRead,
+      sessionStats.tokens.cacheWrite,
+      sessionStats.cost ?? 0,
+      sessionStats.source,
+      sessionStats.parentSessionId ?? "",
+      sessionStats.studioChildSessionCount,
+      sessionStats.own?.cost ?? 0,
+      sessionStats.studioChild?.cost ?? 0,
+    ].join("|")
     : null;
   const sessionStatsRef = useRef(sessionStats);
   sessionStatsRef.current = sessionStats;

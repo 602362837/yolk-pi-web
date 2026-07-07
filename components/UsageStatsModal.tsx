@@ -88,6 +88,12 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
 
   const activeCwd = scope === "cwd" ? cwd : null;
   const largestDailyCost = Math.max(0, ...(stats?.byDay.map((day) => day.totals.cost) ?? []));
+  const parentSessionRows = stats?.byParentSession?.length ? stats.byParentSession : null;
+  const sessionRows = parentSessionRows ?? stats?.bySession ?? [];
+  const sessionSectionTitle = parentSessionRows ? "Parent sessions" : "Sessions";
+  const sessionSectionRight = parentSessionRows
+    ? `${stats?.skippedEntries ?? 0} skipped · rolled up`
+    : `${stats?.skippedEntries ?? 0} skipped`;
 
   const loadStats = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -158,7 +164,12 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
               <line x1="12" y1="1" x2="12" y2="23" />
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6" />
             </svg>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>Usage</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>Usage</div>
+              <div style={{ marginTop: 1, fontSize: 10, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                Includes YPI Studio child sessions when present; children are rolled up to their parent chat.
+              </div>
+            </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -233,6 +244,8 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
                 <Metric label="Tokens" value={`${formatTokens(totalTokens(stats?.totals ?? zeroTotals))} (${formatTokensM(totalTokens(stats?.totals ?? zeroTotals))})`} />
                 <Metric label="Calls" value={formatTokens(stats?.totals.calls ?? 0)} />
                 <Metric label="Sessions" value={`${stats?.bySession.length ?? 0}/${stats?.matchedSessions ?? 0}`} />
+                <Metric label="Studio children" value={`${stats?.matchedStudioChildSessions ?? 0}/${stats?.scannedStudioChildSessions ?? 0}`} />
+                <Metric label="Parent rollups" value={formatTokens(stats?.byParentSession?.length ?? 0)} />
                 <Metric label="Scanned active/archive" value={`${stats?.scannedActiveSessions ?? 0}/${stats?.scannedArchivedSessions ?? 0}`} />
                 <Metric label="Matched active/archive" value={`${stats?.matchedActiveSessions ?? 0}/${stats?.matchedArchivedSessions ?? 0}`} />
               </div>
@@ -270,24 +283,48 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
               </div>
 
               <section style={{ ...panelStyle, marginTop: 12 }}>
-                <SectionTitle title="Sessions" right={`${stats?.skippedEntries ?? 0} skipped`} />
+                <SectionTitle title={sessionSectionTitle} right={sessionSectionRight} />
+                {parentSessionRows && (
+                  <div style={{ marginBottom: 6, fontSize: 10, color: "var(--text-dim)" }}>
+                    Totals combine each parent chat with its YPI Studio child sessions; the legacy per-session list remains available in the API response.
+                  </div>
+                )}
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {(stats?.bySession ?? []).length === 0 ? (
+                  {sessionRows.length === 0 ? (
                     <EmptyState />
-                  ) : stats!.bySession.slice(0, 12).map((session) => (
-                    <div key={session.sessionId} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 90px 90px", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", alignItems: "center" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {session.name || session.firstMessage || session.sessionId}
+                  ) : sessionRows.slice(0, 12).map((session) => {
+                    const isParentRollup = "parentSessionId" in session && "ownTotals" in session;
+                    const title = session.name || session.firstMessage || (isParentRollup ? session.parentSessionId : session.sessionId);
+                    const childCount = isParentRollup ? session.studioChildSessionCount : 0;
+                    const childCost = isParentRollup ? session.studioChildTotals.cost : 0;
+                    const ownCost = isParentRollup ? session.ownTotals.cost : session.totals.cost;
+                    const rowTitle = isParentRollup
+                      ? `own ${formatCost(ownCost)} · children ${formatCost(childCost)}${session.parentFound ? "" : " · parent not found"}`
+                      : undefined;
+                    return (
+                      <div key={isParentRollup ? session.parentSessionId : session.sessionId} title={rowTitle} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 90px 90px", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", alignItems: "center" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                            <span style={{ fontSize: 12, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {title}
+                            </span>
+                            {childCount > 0 && (
+                              <span style={{ flexShrink: 0, fontSize: 10, color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 45%, transparent)", borderRadius: 999, padding: "1px 5px" }}>
+                                +{childCount} child
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
+                            {session.cwd}
+                            {isParentRollup && childCount > 0 ? ` · children ${formatCost(childCost)} · own ${formatCost(ownCost)}` : ""}
+                            {isParentRollup && !session.parentFound ? " · parent not found" : ""}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 10, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
-                          {session.cwd}
-                        </div>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatTokens(totalTokens(session.totals))}</span>
+                        <span style={{ fontSize: 12, color: "var(--text)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatCost(session.totals.cost)}</span>
                       </div>
-                      <span style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatTokens(totalTokens(session.totals))}</span>
-                      <span style={{ fontSize: 12, color: "var(--text)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatCost(session.totals.cost)}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             </>
