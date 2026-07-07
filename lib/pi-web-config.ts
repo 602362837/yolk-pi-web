@@ -1,6 +1,24 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import type {
+  PiWebTerminalSshConfig,
+  TerminalSshEndpoint,
+  TerminalSshKnownHostsPolicy,
+  TerminalSshProfile,
+  TerminalSshProfileOptions,
+  TerminalSshProxyConfig,
+} from "./terminal-ssh-types";
+
+export type {
+  PiWebTerminalSshConfig,
+  TerminalCredentialSummary,
+  TerminalSshEndpoint,
+  TerminalSshKnownHostsPolicy,
+  TerminalSshProfile,
+  TerminalSshProfileOptions,
+  TerminalSshProxyConfig,
+} from "./terminal-ssh-types";
 
 export type PiWebToolPreset = "none" | "default" | "full" | "subagent";
 export type PiWebThinkingLevel = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -104,6 +122,7 @@ export interface PiWebTerminalConfig {
   env: Record<string, string>;
   envAssistant: PiWebSubagentRunPolicy;
   envAssistantFallback: PiWebSubagentRunPolicy;
+  ssh: PiWebTerminalSshConfig;
 }
 
 export interface PiWebChatGptConfig {
@@ -206,6 +225,13 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     envAssistantFallback: {
       model: { mode: "piDefault" },
       thinking: "minimal",
+    },
+    ssh: {
+      enabled: false,
+      allowCustomProxyCommand: false,
+      defaultKnownHostsPolicy: "ask",
+      applyTerminalEnvToSsh: false,
+      profiles: [],
     },
   },
   chatgpt: {
@@ -365,8 +391,116 @@ function readTerminalShell(value: unknown, fallback: PiWebTerminalShell): PiWebT
   return value === "zsh" || value === "bash" || value === "sh" || value === "cmd" || value === "powershell" || value === "pwsh" || value === "custom" ? value : fallback;
 }
 
+function readSshKnownHostsPolicy(value: unknown, fallback: TerminalSshKnownHostsPolicy): TerminalSshKnownHostsPolicy {
+  return value === "ask" || value === "strict" || value === "accept-new" ? value : fallback;
+}
+
+function readOptionalSshKnownHostsPolicy(value: unknown): TerminalSshKnownHostsPolicy | undefined {
+  return value === "ask" || value === "strict" || value === "accept-new" ? value : undefined;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readOptionalIntegerInRange(value: unknown, min: number, max: number): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : undefined;
+}
+
+function readTerminalSshEndpoint(value: unknown, fallback?: TerminalSshEndpoint): TerminalSshEndpoint | null {
+  const root = isRecord(value) ? value : {};
+  const host = readOptionalString(root.host) ?? fallback?.host;
+  const port = readOptionalIntegerInRange(root.port, 1, 65535) ?? fallback?.port ?? 22;
+  if (!host) return null;
+  return {
+    id: readOptionalString(root.id) ?? fallback?.id,
+    label: readOptionalString(root.label) ?? fallback?.label,
+    host,
+    port,
+    username: readOptionalString(root.username) ?? fallback?.username,
+    credentialId: readOptionalString(root.credentialId) ?? fallback?.credentialId,
+  };
+}
+
+function readTerminalSshProfileOptions(value: unknown): TerminalSshProfileOptions | undefined {
+  if (!isRecord(value)) return undefined;
+  const options: TerminalSshProfileOptions = {};
+  const connectTimeoutSeconds = readOptionalIntegerInRange(value.connectTimeoutSeconds, 1, 3600);
+  const serverAliveIntervalSeconds = readOptionalIntegerInRange(value.serverAliveIntervalSeconds, 1, 3600);
+  if (connectTimeoutSeconds !== undefined) options.connectTimeoutSeconds = connectTimeoutSeconds;
+  if (serverAliveIntervalSeconds !== undefined) options.serverAliveIntervalSeconds = serverAliveIntervalSeconds;
+  if (typeof value.forwardAgent === "boolean") options.forwardAgent = value.forwardAgent;
+  if (typeof value.requestTty === "boolean") options.requestTty = value.requestTty;
+  const knownHostsPolicy = readOptionalSshKnownHostsPolicy(value.knownHostsPolicy);
+  if (knownHostsPolicy) options.knownHostsPolicy = knownHostsPolicy;
+  return Object.keys(options).length > 0 ? options : undefined;
+}
+
+function readTerminalSshProxyConfig(value: unknown): TerminalSshProxyConfig | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.type === "none") return { type: "none" };
+  if (value.type === "socks5" || value.type === "http") {
+    const host = readOptionalString(value.host);
+    const port = readOptionalIntegerInRange(value.port, 1, 65535);
+    if (!host || port === undefined) return undefined;
+    return { type: value.type, host, port, credentialId: readOptionalString(value.credentialId) };
+  }
+  if (value.type === "custom") {
+    const commandTemplate = typeof value.commandTemplate === "string" ? value.commandTemplate.trim() : "";
+    return { type: "custom", commandTemplate, acknowledgedRisk: readBoolean(value.acknowledgedRisk, false) };
+  }
+  return undefined;
+}
+
+function readTerminalSshProfiles(value: unknown): TerminalSshProfile[] {
+  if (!Array.isArray(value)) return [];
+  const profiles: TerminalSshProfile[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const id = readOptionalString(item.id);
+    const label = readOptionalString(item.label);
+    const target = readTerminalSshEndpoint(item.target);
+    const createdAt = readOptionalString(item.createdAt);
+    const updatedAt = readOptionalString(item.updatedAt);
+    if (!id || !label || !target || !createdAt || !updatedAt || seen.has(id)) continue;
+    seen.add(id);
+    const jumpHosts = Array.isArray(item.jumpHosts)
+      ? item.jumpHosts.flatMap((jumpHost) => {
+        const endpoint = readTerminalSshEndpoint(jumpHost);
+        return endpoint ? [endpoint] : [];
+      })
+      : [];
+    const proxy = readTerminalSshProxyConfig(item.proxy);
+    const options = readTerminalSshProfileOptions(item.options);
+    profiles.push({
+      id,
+      label,
+      enabled: readBoolean(item.enabled, true),
+      target,
+      jumpHosts,
+      proxy,
+      options,
+      createdAt,
+      updatedAt,
+    });
+  }
+  return profiles;
+}
+
+function readTerminalSshConfig(value: unknown, fallback: PiWebTerminalSshConfig): PiWebTerminalSshConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    allowCustomProxyCommand: readBoolean(root.allowCustomProxyCommand, fallback.allowCustomProxyCommand),
+    defaultKnownHostsPolicy: readSshKnownHostsPolicy(root.defaultKnownHostsPolicy, fallback.defaultKnownHostsPolicy),
+    applyTerminalEnvToSsh: readBoolean(root.applyTerminalEnvToSsh, fallback.applyTerminalEnvToSsh),
+    profiles: readTerminalSshProfiles(root.profiles),
+  };
 }
 
 function readSubagentModelRef(value: unknown, fallback: PiWebSubagentModelRef): PiWebSubagentModelRef {
@@ -541,6 +675,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       env: terminalEnv,
       envAssistant: readSubagentPolicy(terminal.envAssistant, defaults.terminal.envAssistant),
       envAssistantFallback: readSubagentPolicy(terminal.envAssistantFallback, defaults.terminal.envAssistantFallback),
+      ssh: readTerminalSshConfig(terminal.ssh, defaults.terminal.ssh),
     },
     chatgpt: {
       usagePanelEnabled: readBoolean(chatgpt.usagePanelEnabled, defaults.chatgpt.usagePanelEnabled),
@@ -837,6 +972,124 @@ function validateTerminalEnv(value: unknown): Record<string, string> {
   return env;
 }
 
+const TERMINAL_SSH_FORBIDDEN_SECRET_FIELDS = new Set(["privateKey", "privateKeyPem", "password", "passphrase", "proxyPassword"]);
+
+function rejectTerminalSshSecretFields(value: unknown, field: string): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => rejectTerminalSshSecretFields(item, `${field}[${index}]`));
+    return;
+  }
+  if (!isRecord(value)) return;
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (TERMINAL_SSH_FORBIDDEN_SECRET_FIELDS.has(key)) {
+      throw new PiWebConfigValidationError(`${field}.${key} must be stored in the SSH credential vault, not pi-web.json`);
+    }
+    rejectTerminalSshSecretFields(nestedValue, `${field}.${key}`);
+  }
+}
+
+function validateSshKnownHostsPolicy(value: unknown, field: string): TerminalSshKnownHostsPolicy {
+  if (value === "ask" || value === "strict" || value === "accept-new") return value;
+  throw new PiWebConfigValidationError(`${field} must be ask, strict, or accept-new`);
+}
+
+function validateOptionalPlainString(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new PiWebConfigValidationError(`${field} must be a string`);
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function validateSshEndpoint(value: unknown, field: string): TerminalSshEndpoint {
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field} must be an object`);
+  return {
+    id: validateOptionalPlainString(value.id, `${field}.id`),
+    label: validateOptionalPlainString(value.label, `${field}.label`),
+    host: requireNonEmptyString(value.host, `${field}.host`),
+    port: requireIntegerInRange(value.port, `${field}.port`, 1, 65535),
+    username: validateOptionalPlainString(value.username, `${field}.username`),
+    credentialId: validateOptionalPlainString(value.credentialId, `${field}.credentialId`),
+  };
+}
+
+function validateSshProfileOptions(value: unknown, field: string): TerminalSshProfileOptions | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field} must be an object`);
+  return {
+    connectTimeoutSeconds: value.connectTimeoutSeconds === undefined ? undefined : requireIntegerInRange(value.connectTimeoutSeconds, `${field}.connectTimeoutSeconds`, 1, 3600),
+    serverAliveIntervalSeconds: value.serverAliveIntervalSeconds === undefined ? undefined : requireIntegerInRange(value.serverAliveIntervalSeconds, `${field}.serverAliveIntervalSeconds`, 1, 3600),
+    forwardAgent: value.forwardAgent === undefined ? undefined : requireBoolean(value.forwardAgent, `${field}.forwardAgent`),
+    knownHostsPolicy: value.knownHostsPolicy === undefined ? undefined : validateSshKnownHostsPolicy(value.knownHostsPolicy, `${field}.knownHostsPolicy`),
+    requestTty: value.requestTty === undefined ? undefined : requireBoolean(value.requestTty, `${field}.requestTty`),
+  };
+}
+
+function validateSshProxyConfig(value: unknown, field: string): TerminalSshProxyConfig | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field} must be an object`);
+  if (value.type === "none") return { type: "none" };
+  if (value.type === "socks5" || value.type === "http") {
+    return {
+      type: value.type,
+      host: requireNonEmptyString(value.host, `${field}.host`),
+      port: requireIntegerInRange(value.port, `${field}.port`, 1, 65535),
+      credentialId: validateOptionalPlainString(value.credentialId, `${field}.credentialId`),
+    };
+  }
+  if (value.type === "custom") {
+    const commandTemplate = requireNonEmptyString(value.commandTemplate, `${field}.commandTemplate`);
+    if (/[\u0000-\u001f\u007f]/.test(commandTemplate)) {
+      throw new PiWebConfigValidationError(`${field}.commandTemplate must not contain control characters`);
+    }
+    if (/\{\{\s*secret\s*:/i.test(commandTemplate)) {
+      throw new PiWebConfigValidationError(`${field}.commandTemplate must not reference secret placeholders`);
+    }
+    return {
+      type: "custom",
+      commandTemplate,
+      acknowledgedRisk: requireBoolean(value.acknowledgedRisk, `${field}.acknowledgedRisk`),
+    };
+  }
+  throw new PiWebConfigValidationError(`${field}.type must be none, socks5, http, or custom`);
+}
+
+function validateSshProfile(value: unknown, field: string): TerminalSshProfile {
+  rejectTerminalSshSecretFields(value, field);
+  if (!isRecord(value)) throw new PiWebConfigValidationError(`${field} must be an object`);
+  if (!Array.isArray(value.jumpHosts)) throw new PiWebConfigValidationError(`${field}.jumpHosts must be an array`);
+  return {
+    id: requireNonEmptyString(value.id, `${field}.id`),
+    label: requireNonEmptyString(value.label, `${field}.label`),
+    enabled: requireBoolean(value.enabled, `${field}.enabled`),
+    target: validateSshEndpoint(value.target, `${field}.target`),
+    jumpHosts: value.jumpHosts.map((jumpHost, index) => validateSshEndpoint(jumpHost, `${field}.jumpHosts[${index}]`)),
+    proxy: validateSshProxyConfig(value.proxy, `${field}.proxy`),
+    options: validateSshProfileOptions(value.options, `${field}.options`),
+    createdAt: requireNonEmptyString(value.createdAt, `${field}.createdAt`),
+    updatedAt: requireNonEmptyString(value.updatedAt, `${field}.updatedAt`),
+  };
+}
+
+function validateTerminalSshConfig(value: unknown): PiWebTerminalSshConfig {
+  if (value === undefined) return DEFAULT_PI_WEB_CONFIG.terminal.ssh;
+  if (!isRecord(value)) throw new PiWebConfigValidationError("terminal.ssh must be an object");
+  if (!Array.isArray(value.profiles)) throw new PiWebConfigValidationError("terminal.ssh.profiles must be an array");
+  const seen = new Set<string>();
+  const profiles = value.profiles.map((profile, index) => {
+    const normalized = validateSshProfile(profile, `terminal.ssh.profiles[${index}]`);
+    if (seen.has(normalized.id)) throw new PiWebConfigValidationError(`terminal.ssh.profiles[${index}].id must be unique`);
+    seen.add(normalized.id);
+    return normalized;
+  });
+  return {
+    enabled: requireBoolean(value.enabled, "terminal.ssh.enabled"),
+    allowCustomProxyCommand: requireBoolean(value.allowCustomProxyCommand, "terminal.ssh.allowCustomProxyCommand"),
+    defaultKnownHostsPolicy: validateSshKnownHostsPolicy(value.defaultKnownHostsPolicy, "terminal.ssh.defaultKnownHostsPolicy"),
+    applyTerminalEnvToSsh: requireBoolean(value.applyTerminalEnvToSsh, "terminal.ssh.applyTerminalEnvToSsh"),
+    profiles,
+  };
+}
+
 export function validatePiWebTerminalConfig(value: unknown): PiWebTerminalConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("terminal config must be an object");
@@ -852,6 +1105,7 @@ export function validatePiWebTerminalConfig(value: unknown): PiWebTerminalConfig
     envAssistantFallback: value.envAssistantFallback === undefined
       ? DEFAULT_PI_WEB_CONFIG.terminal.envAssistantFallback
       : validateSubagentPolicy(value.envAssistantFallback, "terminal.envAssistantFallback"),
+    ssh: validateTerminalSshConfig(value.ssh),
   };
 }
 
