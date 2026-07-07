@@ -313,6 +313,7 @@ export interface GitInfo {
   repoRoot?: string;
   mainWorktreePath?: string;
   mainWorktreeBranch?: string;
+  baseRef?: string;
   isWorktree?: boolean;
 }
 
@@ -322,6 +323,7 @@ export interface WorktreeInfo {
   repoRoot?: string;
   mainWorktreePath?: string;
   mainWorktreeBranch?: string;
+  baseRef?: string;
 }
 
 export interface SessionInfo {

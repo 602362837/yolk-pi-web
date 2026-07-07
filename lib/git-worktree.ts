@@ -12,6 +12,7 @@ export interface GitMetadata {
   repoRoot?: string;
   mainWorktreePath?: string;
   mainWorktreeBranch?: string;
+  baseRef?: string;
 }
 
 export interface WorktreeMetadata extends GitMetadata {
@@ -85,6 +86,7 @@ export interface WorktreeRecord {
   head?: string;
   bare?: boolean;
   detached?: boolean;
+  baseRef?: string;
 }
 
 async function git(args: string[], cwd?: string): Promise<string> {
@@ -352,6 +354,7 @@ export async function createGitWorktree(options: CreateWorktreeOptions): Promise
     repoRoot: targetPath,
     mainWorktreePath,
     mainWorktreeBranch: mainWorktree?.branch,
+    baseRef,
   };
 
   return {

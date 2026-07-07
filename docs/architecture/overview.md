@@ -36,7 +36,9 @@ Project records are stored at:
 ~/.pi/agent/pi-web-projects.json
 ```
 
-Each project has a stable `id`, display `rootPath`, canonical `pathKey`, metadata fields (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`), and a `spaces` map. The `main` space represents the project root; `worktree` spaces represent Git worktrees discovered from `git worktree list --porcelain` or created through the WorkTree API.
+Each project has a stable `id`, display `rootPath`, canonical `pathKey`, metadata fields (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`), and a `spaces` map. The `main` space represents the project root; its identifier remains `spaceId: "main"` even though the UI fallback label is `主空间` when no custom display name is set. `worktree` spaces represent Git worktrees discovered from `git worktree list --porcelain` or created through the WorkTree API.
+
+WorkTree space metadata is best-effort. Registry records may store the worktree branch, repo/worktree path, main-worktree path/branch, `discoveredAt`, and optional creation-time `baseRef` when a worktree is created through `POST /api/git/worktrees`. Git discovery cannot reconstruct creation-time base refs for old or external worktrees, so missing `baseRef` must be displayed as unknown or clearly treated as a fallback rather than guessed as `main`. Refreshing discovered worktrees should preserve an existing stored `baseRef` instead of dropping it.
 
 Path matching uses `canonicalizeProjectPath()` from `lib/project-registry.ts`: expand and normalize the display path, prefer `fs.realpath` for `realRootPath`/`realPath`, and compare the resulting de-trailed `pathKey`. Project and space dedupe, WorkTree matching, legacy exact-cwd matching, and allowed-root checks should compare `pathKey` rather than display paths so symlinks do not create duplicate projects.
 

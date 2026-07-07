@@ -15,6 +15,7 @@ export interface PiWebProjectSpaceWorktreeInfo {
   repoRoot?: string;
   mainWorktreePath?: string;
   mainWorktreeBranch?: string;
+  baseRef?: string;
   discoveredAt?: string;
 }
 

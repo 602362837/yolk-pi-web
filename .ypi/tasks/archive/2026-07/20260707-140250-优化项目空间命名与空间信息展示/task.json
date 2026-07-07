@@ -1,0 +1,1332 @@
+{
+  "schemaVersion": 1,
+  "id": "20260707-140250-优化项目空间命名与空间信息展示",
+  "title": "优化项目空间命名与空间信息展示",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-07T06:02:50.224Z",
+  "updatedAt": "2026-07-07T06:27:08.809Z",
+  "completedAt": "2026-07-07T06:23:58.455Z",
+  "contextIds": [
+    "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-4cd2e4a18acf4da5c6c90c52",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:02:56.446Z",
+      "finishedAt": "2026-07-07T06:08:28.190Z",
+      "runner": "cli",
+      "prompt": "请为以下需求做实现设计，不要直接改代码： 用户反馈：左侧项目区域现在区分“项目”和“项目空间”；主空间当前命名为 Main，容易与分支 main 混淆，希望直接改为中文“主空间”。另外左上角显示项目空间的位置目前只显示空间名称，信息需要丰富：显示空间名称，以及分支名/工作树信息；若是工作树，需要能描述出来源分支/基准分支。 请阅读相关文档和代码，给出： 1. 涉及文件与现有数据结构/API/组件梳理。 2. 推荐的 UI 文案与展示规则（主空间、普通分支/工作树、来源分支缺…",
+      "summary": "## Handoff\n\n### Artifacts produced\nPlanning only; no production code changed.\n\nUpdated:\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/brief.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/prd.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/ui.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/design.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/implement.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md`\n\n### Key design conclusions\n- `Main` comes from `components/SessionSidebar.tsx` `displaySpaceName()` fallback; minimal fix: change main-space fallback to `主空间`, without changing `spaceId: \"main\"`.\n- Top-left/sidebar space info should be formatted in `SessionSidebar.tsx`:\n  - Main/normal Git: `空间：主空间 · 分支：<branch>`\n  - No branch: `空间：主空间 · 未检测到 Git 分支`\n  - WorkTree: `空间：<spaceName> · WorkTree：<branch|未知分支> · 基准：<base|未知>`\n- Existing data has `branch/mainWorktreeBranch` but not creation-time `baseRef`. Recommended optional enhancement: persist `baseRef` on new WorkTree creation and preserve it on refresh.\n\n### Main files for implementer\n- `components/SessionSidebar.tsx`\n- Optional data enhancement:\n  - `lib/project-registry-types.ts`\n  - `lib/project-registry.ts`\n  - `lib/git-worktree.ts`\n  - `lib/types.ts`\n  - `app/api/git/worktrees/route.ts`\n- Docs if fields/UI change:\n  - `docs/modules/frontend.md`\n  - `docs/modules/library.md`\n  - `docs/modules/api.md`\n  - `docs/architecture/overview.md`\n\n### Validation run\nNot run; planning/design only.\n\nRecommended after implementation:\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\n```\n\n### Decisions needed\n1. Should historical/manual `displayName: \"Main\"` also be forced to show `主空间`? Recommended: no migration; only change fallback.\n2. Should WorkTree source/base be exact creation `baseRef`? Recommended: persist `baseRef` for newly created WorkTrees; old/external WorkTrees show `mainWorktreeBranch` or `未知`.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:02:56.446Z",
+        "updatedAt": "2026-07-07T06:08:28.190Z",
+        "eventCount": 7959,
+        "lastTextPreview": "## Handoff\n\n### Artifacts produced\nPlanning only; no production code changed.\n\nUpdated:\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/brief.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/prd.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/ui.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/design.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/implement.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md`\n\n### Key design conclusions\n- `Main` comes from `components/SessionSidebar.tsx` `displaySpaceName()` fallback; minimal fix: change main-space fallback to `主空间`, without changing `spaceId: \"main\"`.\n- Top-left/sidebar space info should be formatted in `SessionSidebar.tsx`:\n  - Main/normal Git: `空间：主空间 · 分支：<branch>`\n  - No branch: `空间：主空间 · 未检测到 Git 分支`\n  - WorkTree: `空间：<spaceName> · WorkTree：<branch|未知分支> · 基准：<base|未知>`\n- Existing data has `branch/mainWorktreeBranch` but not creation-time `baseRef`. Recommended optional enhancement: persist `baseRef` on new WorkTree creation and preserve it on refresh.\n\n### Main files for implementer\n- `components/SessionSidebar.tsx`\n- Optional data enhancement:\n  - `lib/project-registry-types.ts`\n  - `lib/project-registry.ts`\n  - `lib/git-worktree.ts`\n  - `lib/types.ts`\n  - `app/api/git/worktrees/route.ts`\n- Docs if fields/UI change:\n  - `docs/modules/frontend.md`\n  - `docs/modules/library.md`\n  - `docs/modules/api.md`\n  - `docs/architecture/overview.md`\n\n### Validation run\nNot run; planning/design only.\n\nRecommended after implementation:\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\n```\n\n### Decisions needed\n1. Should historical/manual `displayName: \"Main\"` also be forced to show `主空间`? Recommended: no migration; only change fallback.\n2. Should WorkTree source/base be exact creation `baseRef`? Recommended: persist `baseRef` for newly created WorkTrees; old/external WorkTrees show `mainWorktreeBranch` or `未知`.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:07:56.641Z",
+            "toolCallId": "call_O80pSJvEhEyVmWki5PHxMQvO|fc_09a07b6b6aca1f92016a4c97b45394819a8337fa5205539b00",
+            "toolName": "write",
+            "text": "Successfully wrote 792 bytes to .ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:08:09.847Z",
+            "toolCallId": "call_9d1xvaPzON3xzfzMOktD7QQt|fc_09a07b6b6aca1f92016a4c97bfc978819abb370fdabb4cc89f",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md\",\n  \"content\": \"# handoff\\n\\n## 产出\\n\\n- 已完成实现设计，未修改生产代码。\\n- 更新规划 artifacts：`brief.md`、`prd.md`、`ui.md`、`design.md`、`implement.md`、`checks.md`、`handoff.md`。\\n\\n## 关键结论\\n\\n- `Main` 主要来自 `components/SessionSidebar.tsx` 的 `displaySpaceName()` fallback；最小改动是将 `space.kind === \\\"main\\\"` 的默认展示改为 `主空间`。\\n- 顶部空间信息应在 `SessionSidebar.tsx` 内新增格式化 helper：`空间：<spaceName> · 分支：<branch>` 或 `空间：<spaceName> · WorkTree：<branch> · 基准：<base|未知>`。\\n- 现有 registry worktree metadata 有 `branch/mainWorktreeBranch`，但没有创建时 `baseRef`；若要准确描述来源/基准，建议新增可选 `baseRef` 并在 `/api/git/worktrees` 创建后写入 registry，刷新时保留旧值。\\n\\n## 建议先改文件\\n\\n- `components/SessionSidebar.tsx`\\n- 可选：`lib/project-registry-types.ts`、`lib/project-registry.ts`、`lib/git-worktree.ts`、`lib/types.ts`、`app/api/git/worktrees/route.ts`\\n- 文档：`docs/modules/frontend.md`，若新增字段再更新 `docs/modules/library.md`、`docs/modules/api.md`、`docs/architecture/overview.md`\\n\\n## 验证\\n\\n未运行自动验证（本轮仅规划/设计）。建议实现后运行：\\n\\n```bash\\nnpm run lint\\nnode_modules/.bin/tsc --noEmit\\n```\\n\\n## 待主会话确认\\n\\n1. 是否强制把历史/手动 `displayName: \\\"Main\\\"` 的 main space 也显示为 `主空间`？建议不迁移，只改默认 fallback。\\n2. WorkTree “来源/基准”是否要求保存创建时 `baseRef`？建议保存新建 WorkTree 的 `baseRef`，旧/外部 WorkTree 用 `mainWorktreeBranch` 或 `未知` 兜底。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:08:09.857Z",
+            "toolCallId": "call_9d1xvaPzON3xzfzMOktD7QQt|fc_09a07b6b6aca1f92016a4c97bfc978819abb370fdabb4cc89f",
+            "toolName": "write",
+            "text": "Successfully wrote 1157 bytes to .ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:08:27.664Z",
+            "text": "## Handoff\n\n### Artifacts produced\nPlanning only; no production code changed.\n\nUpdated:\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/brief.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/prd.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/ui.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/design.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/implement.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md`\n\n### Key design conclusions\n- `Main` comes from `components/SessionSidebar.tsx` `displaySpaceName()` fallback; minimal fix: change main-space fallback to `主空间`, without changing `spaceId: \"main\"`.\n- Top-left/sidebar space info should be formatted in `SessionSidebar.tsx`:\n  - Main/normal Git: `空间：主空间 · 分支：<branch>`\n  - No branch: `空间：主空间 · 未检测到 Git 分支`\n  - WorkTree: `空间：<spaceName> · WorkTree：<branch|未知分支> · 基准：<base|未知>`\n- Existing data has `branch/mainWorktreeBranch` but not creation-time `baseRef`. Recommended optional enhancement: persist `baseRef` on new WorkTree creation and preserve it on refresh.\n\n### Main files for implementer\n- `components/SessionSidebar.tsx`\n- Optional data enhancement:\n  - `lib/project-registry-types.ts`\n  - `lib/project-registry.ts`\n  - `lib/git-worktree.ts`\n  - `lib/types.ts`\n  - `app/api/git/worktrees/route.ts`\n- Docs if fields/UI change:\n  - `docs/modules/frontend.md`\n  - `docs/modules/library.md`\n  - `docs/modules/api.md`\n  - `docs/architecture/overview.md`\n\n### Validation run\nNot run; planning/design only.\n\nRecommended after implementation:\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\n```\n\n### Decisions needed\n1. Should historical/manual `displayName: \"Main\"` also be forced to show `主空间`? Recommended: no migration; only change fallback.\n2. Should WorkTree source/base be exact creation `baseRef`? Recommended: persist `baseRef` for newly created WorkTrees; old/external WorkTrees show `mainWorktreeBranch` or `未知`.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:08:27.686Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3918,
+        "tokens": 779,
+        "tokenSource": "usage",
+        "tps": 71.08,
+        "firstTokenAt": "2026-07-07T06:08:16.686Z",
+        "lastTokenAt": "2026-07-07T06:08:27.646Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-4cd2e4a18acf4da5c6c90c52",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/architect-4cd2e4a18acf4da5c6c90c52.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:02:56.446Z",
+        "finishedAt": "2026-07-07T06:08:28.184Z",
+        "updatedAt": "2026-07-07T06:08:28.184Z",
+        "itemCount": 105,
+        "messageCount": 1,
+        "toolCallCount": 50,
+        "stderrBytes": 0,
+        "bytes": 327585,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-770c876bb7e27eacd282c4a1",
+      "subtaskId": "PS-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:10:23.808Z",
+      "finishedAt": "2026-07-07T06:12:32.427Z",
+      "runner": "cli",
+      "prompt": "实现已认领子任务 PS-01。请严格按任务 artifact 中的 implement.md/design.md/ui.md 执行，只处理 PS-01 范围：修改 components/SessionSidebar.tsx，将 main space 默认显示从 Main 改为 主空间，并让左上角当前空间摘要更丰富，显示空间名称以及分支/WorkTree/基准信息，做好缺失状态兜底。暂不要处理 baseRef 持久化（PS-03）和文档（PS-04），除非为通过类型必须做最小…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - 将 main space 默认 fallback 从 `Main` 改为 `主空间`。\n  - 顶部空间摘要改为：\n    - 普通空间：`空间：<name> · 分支：<branch>` / `未检测到 Git 分支`\n    - WorkTree：`空间：<name> · WorkTree：<branch|未知分支> · 基准：<base|基准未知>`\n    - missing path 追加 `路径缺失`\n  - Tooltip/detail 增加多行完整信息：空间、路径、分支、WorkTree、基准；支持换行展示。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未处理 PS-03：没有新增/持久化 `baseRef`，WorkTree 基准仅使用现有 `mainWorktreeBranch`，缺失时显示未知。\n- 未处理 PS-02/PS-04：未增强 dropdown badge tooltip，未改文档。\n- 子任务状态需由主会话/Studio 工作流侧更新；本执行环境未直接写状态。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:10:23.808Z",
+        "updatedAt": "2026-07-07T06:12:32.427Z",
+        "eventCount": 3542,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - 将 main space 默认 fallback 从 `Main` 改为 `主空间`。\n  - 顶部空间摘要改为：\n    - 普通空间：`空间：<name> · 分支：<branch>` / `未检测到 Git 分支`\n    - WorkTree：`空间：<name> · WorkTree：<branch|未知分支> · 基准：<base|基准未知>`\n    - missing path 追加 `路径缺失`\n  - Tooltip/detail 增加多行完整信息：空间、路径、分支、WorkTree、基准；支持换行展示。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未处理 PS-03：没有新增/持久化 `baseRef`，WorkTree 基准仅使用现有 `mainWorktreeBranch`，缺失时显示未知。\n- 未处理 PS-02/PS-04：未增强 dropdown badge tooltip，未改文档。\n- 子任务状态需由主会话/Studio 工作流侧更新；本执行环境未直接写状态。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:12:14.597Z",
+            "toolCallId": "call_ezVFwzYF7xH2q8cflHDPoMZ8|fc_0a8256c05d968115016a4c98b59e20819b85e750814b85a38b",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.8 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:12:18.943Z",
+            "toolCallId": "call_fODUaBWiLPRAM1bqlyUR5r8Z|fc_0a8256c05d968115016a4c98c2c5ac819bb66eac05dec7a223",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- components/SessionSidebar.tsx\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:12:19.013Z",
+            "toolCallId": "call_fODUaBWiLPRAM1bqlyUR5r8Z|fc_0a8256c05d968115016a4c98c2c5ac819bb66eac05dec7a223",
+            "toolName": "bash",
+            "text": "diff --git a/components/SessionSidebar.tsx b/components/SessionSidebar.tsx\nindex 5b08225..84c6463 100644\n--- a/components/SessionSidebar.tsx\n+++ b/components/SessionSidebar.tsx\n@@ -232,6 +232,7 @@ function WorkspaceHeaderLine({\n             fontSize: 11,\n             lineHeight: 1.35,\n             overflowWrap: \"anywhere\",\n+            whiteSpace: \"pre-line\",\n             pointerEvents: \"none\",\n           }}\n         >\n@@ -248,10 +249,54 @@ function displayProjectName(project: PiWebProjectRecord): string {\n \n function displaySpaceName(space: PiWebProjectSpaceRecord): string {\n   if (space.displayName?.trim()) return space.displayName.trim();\n-  if (space.kind === \"main\") return \"Main\";\n+  if (space.kind === \"main\") return \"主空间\";\n   return space.worktree?.branch || space.path.split(/[\\\\/]+/).filter(Boolean).pop() || space.path;\n }\n \n+function formatUnknownGitBranch(): string {\n+  return \"未检测到 Git 分支\";\n+}\n+\n+function formatWorktreeBranch(worktree?: WorktreeInfo, git?: GitInfo): string {\n+  return worktree?.branch || git?.branch || \"未知分支\";\n+}\n+\n+function resolveWorktreeBase(worktree?: WorktreeInfo, git?: GitInfo): string | undefined {\n+  return worktree?.mainWorktreeBranch || git?.mainWorktreeBranch;\n+}\n+\n+function formatProjectSpaceSubtitle(space: PiWebProjectSpaceRecord, git: GitInfo | undefined): string {\n+  const spaceName = displaySpaceName(space);\n+  const pathMissingSuffix = space.missing ? \" · 路径缺失\" : \"\";\n+  if (space.kind === \"worktree\") {\n+    const worktree = worktreeInfoFromSpace(space);\n+    const base = resolveWorktreeBase(worktree, git);\n+    const baseText = base ? `基准：${base}` : \"基准未知\";\n+    return `空间：${spaceName} · WorkTree：${formatWorktreeBranch(worktree, git)} · ${baseText}${pathMissingSuffix}`;\n+  }\n+  const branchText = git?.branch ? `分支：${git.branch}` : formatUnknownGitBranch();\n+  return `空间：${spaceName} · ${branchText}${pathMissingSuffix}`;\n+}\n+\n+function formatProjectSpaceDetail(space: PiWebProjectSpaceRecord, git: GitInfo | undefined, homeDir?: string): string {\n+  const worktree = worktreeInfoFromSpace(space);\n+  const lines = [\n+    `空间：${displaySpaceName(space)}`,\n+    `路径：${space.path}${space.missing ? \"（路径缺失）\" : \"\"}`,\n+  ];\n+  if (space.kind === \"worktree\") {\n+    lines.push(`分支：${formatWorktreeBranch(worktree, git)}`);\n+    lines.push(\"WorkTree：是\");\n+    lines.push(`基准：${resolveWorktreeBase(worktree, git) || \"未知\"}`);\n+  } else {\n+    lines.push(`分支：${git?.branch || \"未检测到\"}`);\n+    lines.push(\"WorkTree：否\");\n+  }\n+  const shortPath = shortenCwd(space.path, homeDir);\n+  if (shortPath !== space.path) lines.push(`短路径：${shortPath}`);\n+  return lines.join(\"\\n\");\n+}\n+\n function activeProjectSpaces(project: PiWebProjectRecord): PiWebProjectSpaceRecord[] {\n   return Object.values(project.spaces)\n     .filter((space) => !space.archived)\n@@ -1017,7 +1062,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio\n   } : undefined);\n   const workspaceTitle = selectedProjectSpace ? displayProjectName(selectedProjectSpace.project) : formatWorkspaceHeaderTitle(selectedCwd, currentGit);\n   const workspaceTitleDetail = selectedProjectSpace ? selectedProjectSpace.project.rootPath : formatWorkspaceTitle(selectedCwd, currentGit);\n-  const workspaceSubtitle = selectedSpace ? `${displaySpaceName(selectedSpace)} · ${shortenCwd(selectedSpace.path, homeDir)}${selectedSpace.missing ? \" · missing\" : \"\"}` : formatWorkspaceSubtitle(selectedCwd, currentGit);\n+  const workspaceSubtitle = selectedSpace ? formatProjectSpaceSubtitle(selectedSpace, currentGit) : formatWorkspaceSubtitle(selectedCwd, currentGit);\n+  const workspaceSubtitleDetail = selectedSpace ? formatProjectSpaceDetail(selectedSpace, currentGit, homeDir) : workspaceSubtitle;\n   const filteredSessions = allSessions.filter((session) => !removedWorktreeCwds.includes(session.cwd));\n   const sessionTree = buildSessionTree(filteredSessions);\n   const showTrellisInitializePrompt = trellisEnabled &&…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:12:30.201Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - 将 main space 默认 fallback 从 `Main` 改为 `主空间`。\n  - 顶部空间摘要改为：\n    - 普通空间：`空间：<name> · 分支：<branch>` / `未检测到 Git 分支`\n    - WorkTree：`空间：<name> · WorkTree：<branch|未知分支> · 基准：<base|基准未知>`\n    - missing path 追加 `路径缺失`\n  - Tooltip/detail 增加多行完整信息：空间、路径、分支、WorkTree、基准；支持换行展示。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未处理 PS-03：没有新增/持久化 `baseRef`，WorkTree 基准仅使用现有 `mainWorktreeBranch`，缺失时显示未知。\n- 未处理 PS-02/PS-04：未增强 dropdown badge tooltip，未改文档。\n- 子任务状态需由主会话/Studio 工作流侧更新；本执行环境未直接写状态。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:12:30.206Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1264,
+        "tokens": 542,
+        "tokenSource": "usage",
+        "tps": 217.85,
+        "firstTokenAt": "2026-07-07T06:12:27.687Z",
+        "lastTokenAt": "2026-07-07T06:12:30.175Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-770c876bb7e27eacd282c4a1",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/implementer-770c876bb7e27eacd282c4a1.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:10:23.808Z",
+        "finishedAt": "2026-07-07T06:12:32.416Z",
+        "updatedAt": "2026-07-07T06:12:32.416Z",
+        "itemCount": 39,
+        "messageCount": 1,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 67981,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e345120e7cb3e6f93527511f",
+      "subtaskId": "PS-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:12:55.439Z",
+      "finishedAt": "2026-07-07T06:14:03.979Z",
+      "runner": "cli",
+      "prompt": "实现已认领子任务 PS-02。请基于当前代码与 PS-01 已完成改动，严格只处理 WorkTree badge/dropdown tooltip 补充分支与基准：增强 components/SessionSidebar.tsx 中 WorkTree badge/title/tooltip 的文案，显示 WorkTree 分支与基准/来源（缺失为未知），保持列表行布局不明显增高。不要做 baseRef 持久化或文档。完成后更新子任务状态并说明验证。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - Added WorkTree tooltip helpers.\n  - Enhanced `WorktreeBadge` `title` to show `WorkTree：<branch|未知分支> / 基准：<base|未知>`.\n  - Enhanced selected path and dropdown space row tooltip to include WorkTree branch/base info plus right-click hint.\n  - Kept dropdown row layout unchanged; only tooltip/title text changed.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Base currently uses existing `mainWorktreeBranch` metadata via `resolveWorktreeBase`; no `baseRef` persistence was added per PS-02 boundary.\n- Manual hover verification in a real WorkTree dropdown still needs parent/session UI check if required.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:12:55.439Z",
+        "updatedAt": "2026-07-07T06:14:03.979Z",
+        "eventCount": 1370,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - Added WorkTree tooltip helpers.\n  - Enhanced `WorktreeBadge` `title` to show `WorkTree：<branch|未知分支> / 基准：<base|未知>`.\n  - Enhanced selected path and dropdown space row tooltip to include WorkTree branch/base info plus right-click hint.\n  - Kept dropdown row layout unchanged; only tooltip/title text changed.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Base currently uses existing `mainWorktreeBranch` metadata via `resolveWorktreeBase`; no `baseRef` persistence was added per PS-02 boundary.\n- Manual hover verification in a real WorkTree dropdown still needs parent/session UI check if required.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:13:46.007Z",
+            "toolCallId": "call_7kftxfOYN8geHzcGRDDgiyNi|fc_0694b6123f8b4ffb016a4c9910a764819b9a1d92668a920b11",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.8 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:13:51.445Z",
+            "toolCallId": "call_3DV8BxHJzzuGmqly19Ud6Zwa|fc_0694b6123f8b4ffb016a4c991f4668819b91de2efd594a23d3",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:13:53.535Z",
+            "toolCallId": "call_3DV8BxHJzzuGmqly19Ud6Zwa|fc_0694b6123f8b4ffb016a4c991f4668819b91de2efd594a23d3",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:14:01.775Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - Added WorkTree tooltip helpers.\n  - Enhanced `WorktreeBadge` `title` to show `WorkTree：<branch|未知分支> / 基准：<base|未知>`.\n  - Enhanced selected path and dropdown space row tooltip to include WorkTree branch/base info plus right-click hint.\n  - Kept dropdown row layout unchanged; only tooltip/title text changed.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Base currently uses existing `mainWorktreeBranch` metadata via `resolveWorktreeBase`; no `baseRef` persistence was added per PS-02 boundary.\n- Manual hover verification in a real WorkTree dropdown still needs parent/session UI check if required.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:14:01.781Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1508,
+        "tokens": 371,
+        "tokenSource": "usage",
+        "tps": 120.22,
+        "firstTokenAt": "2026-07-07T06:13:58.683Z",
+        "lastTokenAt": "2026-07-07T06:14:01.769Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e345120e7cb3e6f93527511f",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/implementer-e345120e7cb3e6f93527511f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:12:55.439Z",
+        "finishedAt": "2026-07-07T06:14:03.967Z",
+        "updatedAt": "2026-07-07T06:14:03.967Z",
+        "itemCount": 27,
+        "messageCount": 1,
+        "toolCallCount": 11,
+        "stderrBytes": 0,
+        "bytes": 52325,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-76d1008e113fafaa150a884f",
+      "subtaskId": "PS-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:14:22.913Z",
+      "finishedAt": "2026-07-07T06:16:19.481Z",
+      "runner": "cli",
+      "prompt": "实现已认领子任务 PS-03。请根据 implement.md/design.md 做可选持久化 WorkTree 创建 baseRef：在 worktree metadata 中新增可选 baseRef；创建 WorkTree 后将 result.baseRef 写入 registry；刷新/同步 worktree 时保留已有 baseRef，旧/外部 worktree 无 baseRef 时 UI 可继续用 mainWorktreeBranch/未知兜底。请阅读相关文件…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added optional `worktree.baseRef`.\n- `lib/git-worktree.ts` — added optional `baseRef` to Git/WorkTree metadata and WorktreeRecord; created WorkTrees now include `baseRef` in returned metadata.\n- `lib/project-registry.ts` — persists `baseRef` when syncing newly created WorkTree spaces; preserves existing `baseRef` during refresh/discovery when Git cannot provide it.\n- `lib/types.ts` — added optional `baseRef` to shared `GitInfo` / `WorktreeInfo`.\n- `app/api/git/worktrees/route.ts` — passes `result.baseRef` into Project Registry sync after WorkTree creation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual `/api/projects` WorkTree creation check was run; requires dev server and creating a real WorkTree.\n- Docs updates are left for PS-04 per plan.\n- Existing/externally discovered WorkTrees without saved `baseRef` remain compatible; refresh preserves saved `baseRef` but cannot reconstruct missing historical creation source.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:14:22.913Z",
+        "updatedAt": "2026-07-07T06:16:19.481Z",
+        "eventCount": 2337,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added optional `worktree.baseRef`.\n- `lib/git-worktree.ts` — added optional `baseRef` to Git/WorkTree metadata and WorktreeRecord; created WorkTrees now include `baseRef` in returned metadata.\n- `lib/project-registry.ts` — persists `baseRef` when syncing newly created WorkTree spaces; preserves existing `baseRef` during refresh/discovery when Git cannot provide it.\n- `lib/types.ts` — added optional `baseRef` to shared `GitInfo` / `WorktreeInfo`.\n- `app/api/git/worktrees/route.ts` — passes `result.baseRef` into Project Registry sync after WorkTree creation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual `/api/projects` WorkTree creation check was run; requires dev server and creating a real WorkTree.\n- Docs updates are left for PS-04 per plan.\n- Existing/externally discovered WorkTrees without saved `baseRef` remain compatible; refresh preserves saved `baseRef` but cannot reconstruct missing historical creation source.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:16:05.144Z",
+            "toolCallId": "call_Dudjpq4lWVeYIzdGNN1TbxL6|fc_06301813313dd283016a4c999f6258819a819af56416f41445",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:16:09.562Z",
+            "toolCallId": "call_y4r8DXlSmzHN9kbgEGVzMYs3|fc_06301813313dd283016a4c99a955c0819aba8a683bd0017b37",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/project-registry-types.ts lib/project-registry.ts lib/git-worktree.ts lib/types.ts app/api/git/worktrees/route.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:16:09.631Z",
+            "toolCallId": "call_y4r8DXlSmzHN9kbgEGVzMYs3|fc_06301813313dd283016a4c99a955c0819aba8a683bd0017b37",
+            "toolName": "bash",
+            "text": "diff --git a/app/api/git/worktrees/route.ts b/app/api/git/worktrees/route.ts\nindex 6a342cd..9fa9f75 100644\n--- a/app/api/git/worktrees/route.ts\n+++ b/app/api/git/worktrees/route.ts\n@@ -46,7 +46,7 @@ export async function POST(req: Request) {\n     });\n \n     const registryLink = result.mainWorktreePath\n-      ? await syncRegisteredProjectWorktreeSpace(result.mainWorktreePath, result.cwd, result.branchName)\n+      ? await syncRegisteredProjectWorktreeSpace(result.mainWorktreePath, result.cwd, result.branchName, result.baseRef)\n       : null;\n \n     registerAllowedRoot(result.cwd);\ndiff --git a/lib/git-worktree.ts b/lib/git-worktree.ts\nindex 07daa7b..1ce10e6 100644\n--- a/lib/git-worktree.ts\n+++ b/lib/git-worktree.ts\n@@ -12,6 +12,7 @@ export interface GitMetadata {\n   repoRoot?: string;\n   mainWorktreePath?: string;\n   mainWorktreeBranch?: string;\n+  baseRef?: string;\n }\n \n export interface WorktreeMetadata extends GitMetadata {\n@@ -85,6 +86,7 @@ export interface WorktreeRecord {\n   head?: string;\n   bare?: boolean;\n   detached?: boolean;\n+  baseRef?: string;\n }\n \n async function git(args: string[], cwd?: string): Promise<string> {\n@@ -352,6 +354,7 @@ export async function createGitWorktree(options: CreateWorktreeOptions): Promise\n     repoRoot: targetPath,\n     mainWorktreePath,\n     mainWorktreeBranch: mainWorktree?.branch,\n+    baseRef,\n   };\n \n   return {\ndiff --git a/lib/project-registry-types.ts b/lib/project-registry-types.ts\nindex f4670fa..851467d 100644\n--- a/lib/project-registry-types.ts\n+++ b/lib/project-registry-types.ts\n@@ -15,6 +15,7 @@ export interface PiWebProjectSpaceWorktreeInfo {\n   repoRoot?: string;\n   mainWorktreePath?: string;\n   mainWorktreeBranch?: string;\n+  baseRef?: string;\n   discoveredAt?: string;\n }\n \ndiff --git a/lib/project-registry.ts b/lib/project-registry.ts\nindex 58eac92..31711a8 100644\n--- a/lib/project-registry.ts\n+++ b/lib/project-registry.ts\n@@ -8,6 +8,7 @@ import type {\n   PiWebProjectRecord,\n   PiWebProjectRegistryFile,\n   PiWebProjectSpaceRecord,\n+  PiWebProjectSpaceWorktreeInfo,\n   ProjectId,\n   ProjectPatchInput,\n   ProjectPathInfo,\n@@ -177,12 +178,17 @@ function createWorktreeSpaceId(pathKey: string): ProjectSpaceId {\n   return `wt_${createHash(\"sha256\").update(pathKey).digest(\"hex\").slice(0, 16)}`;\n }\n \n-function worktreeInfoFromRecord(record: WorktreeRecord, mainWorktree?: WorktreeRecord): PiWebProjectSpaceRecord[\"worktree\"] {\n+function worktreeInfoFromRecord(\n+  record: WorktreeRecord,\n+  mainWorktree?: WorktreeRecord,\n+  existing?: PiWebProjectSpaceWorktreeInfo,\n+): PiWebProjectSpaceRecord[\"worktree\"] {\n   return {\n     branch: record.branch,\n     repoRoot: record.path,\n     mainWorktreePath: mainWorktree?.path,\n     mainWorktreeBranch: mainWorktree?.branch,\n+    baseRef: record.baseRef || existing?.baseRef,\n     discoveredAt: nowIso(),\n   };\n }\n@@ -204,7 +210,7 @@ async function upsertWorktreeSpace(\n       pathKey: pathInfo.pathKey,\n       archived: false,\n       missing: pathInfo.missing || undefined,\n-      worktree: worktreeInfoFromRecord(record, mainWorktree),\n+      worktree: worktreeInfoFromRecord(record, mainWorktree, existing.worktree),\n       updatedAt: timestamp,\n     };\n     project.spaces[spaceId as ProjectSpaceId] = space;\n@@ -330,7 +336,7 @@ export async function syncProjectWorktreeSpaces(projectId: string): Promise<{\n   return { project, spaces: Object.values(project.spaces).filter((space) => space.kind === \"worktree\"), created, archivedMissing };\n }\n \n-export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: string, worktreePath: string, branch?: string): Promise<{\n+export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: string, worktreePath: string, branch?: string, baseRef?: string): Promise<{\n   project: PiWebProjectRecord;\n   space: PiWebProjectSpaceRecord;\n   created: boolean;\n@@ -341,7 +347,7 @@ export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: strin\n   if (projectIndex < 0) return null;\n \n   const project = registry.projects[projectIndex];\n-  const result = await upsertWorktreeSpace(projec…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:16:18.950Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added optional `worktree.baseRef`.\n- `lib/git-worktree.ts` — added optional `baseRef` to Git/WorkTree metadata and WorktreeRecord; created WorkTrees now include `baseRef` in returned metadata.\n- `lib/project-registry.ts` — persists `baseRef` when syncing newly created WorkTree spaces; preserves existing `baseRef` during refresh/discovery when Git cannot provide it.\n- `lib/types.ts` — added optional `baseRef` to shared `GitInfo` / `WorktreeInfo`.\n- `app/api/git/worktrees/route.ts` — passes `result.baseRef` into Project Registry sync after WorkTree creation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual `/api/projects` WorkTree creation check was run; requires dev server and creating a real WorkTree.\n- Docs updates are left for PS-04 per plan.\n- Existing/externally discovered WorkTrees without saved `baseRef` remain compatible; refresh preserves saved `baseRef` but cannot reconstruct missing historical creation source.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:16:18.961Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2184,
+        "tokens": 389,
+        "tokenSource": "usage",
+        "tps": 87.46,
+        "firstTokenAt": "2026-07-07T06:16:14.482Z",
+        "lastTokenAt": "2026-07-07T06:16:18.930Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-76d1008e113fafaa150a884f",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/implementer-76d1008e113fafaa150a884f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:14:22.913Z",
+        "finishedAt": "2026-07-07T06:16:19.469Z",
+        "updatedAt": "2026-07-07T06:16:19.469Z",
+        "itemCount": 43,
+        "messageCount": 1,
+        "toolCallCount": 19,
+        "stderrBytes": 0,
+        "bytes": 137116,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3760e8263222b480edc07fd2",
+      "subtaskId": "PS-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:16:36.572Z",
+      "finishedAt": "2026-07-07T06:19:07.410Z",
+      "runner": "cli",
+      "prompt": "实现已认领子任务 PS-04。请根据实际已完成代码改动同步文档：docs/modules/frontend.md、docs/modules/library.md、docs/modules/api.md、docs/architecture/overview.md 中与 Project Registry、SessionSidebar、Project/Space、WorkTree metadata/baseRef 相关描述。只做必要文档更新，不改业务代码。完成后更新子任务状态并说…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented `SessionSidebar` `主空间` fallback, enriched space subtitle/detail tooltip, WorkTree badge tooltip.\n- `docs/modules/library.md` — documented WorkTree metadata, optional `baseRef`, preservation behavior, shared Git/WorkTree types.\n- `docs/modules/api.md` — documented `/api/projects`, `/api/git/worktrees`, `/api/git/info` baseRef/main-space behavior.\n- `docs/architecture/overview.md` — documented Project Registry main-space invariant and best-effort WorkTree metadata/baseRef semantics.\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/task.json` — marked PS-04 done and PS-05 ready.\n\n#### Verification\n\n- `git diff -- docs/modules/frontend.md docs/modules/library.md docs/modules/api.md docs/architecture/overview.md` — reviewed docs diff.\n- Not run: `npm run lint` / `tsc` (docs-only subtask).\n\n#### Notes / Risks\n\n- Current code stores `baseRef`, but `SessionSidebar` appears to display WorkTree base from `mainWorktreeBranch`/Git metadata rather than stored `baseRef`; checker/main session should verify if this is intended.\n- No product decision needed from PS-04 beyond existing questions about historical `displayName: \"Main\"` behavior.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:16:36.572Z",
+        "updatedAt": "2026-07-07T06:19:07.410Z",
+        "eventCount": 3896,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented `SessionSidebar` `主空间` fallback, enriched space subtitle/detail tooltip, WorkTree badge tooltip.\n- `docs/modules/library.md` — documented WorkTree metadata, optional `baseRef`, preservation behavior, shared Git/WorkTree types.\n- `docs/modules/api.md` — documented `/api/projects`, `/api/git/worktrees`, `/api/git/info` baseRef/main-space behavior.\n- `docs/architecture/overview.md` — documented Project Registry main-space invariant and best-effort WorkTree metadata/baseRef semantics.\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/task.json` — marked PS-04 done and PS-05 ready.\n\n#### Verification\n\n- `git diff -- docs/modules/frontend.md docs/modules/library.md docs/modules/api.md docs/architecture/overview.md` — reviewed docs diff.\n- Not run: `npm run lint` / `tsc` (docs-only subtask).\n\n#### Notes / Risks\n\n- Current code stores `baseRef`, but `SessionSidebar` appears to display WorkTree base from `mainWorktreeBranch`/Git metadata rather than stored `baseRef`; checker/main session should verify if this is intended.\n- No product decision needed from PS-04 beyond existing questions about historical `displayName: \"Main\"` behavior.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:18:29.999Z",
+            "toolCallId": "call_FIYBpgBYkd9aO6evgQOFF3wO|fc_047d1e4f0800e65b016a4c9a34eb90819aafe17e2fab1c5374",
+            "toolName": "bash",
+            "text": "{\n  \"id\": \"PS-04\",\n  \"status\": \"running\",\n  \"updatedAt\": \"2026-07-07T06:18:29.599Z\",\n  \"startedAt\": \"2026-07-07T06:16:31.684Z\",\n  \"attempts\": 1,\n  \"runIds\": [\n    \"implementer-ps04\",\n    \"implementer-3760e8263222b480edc07fd2\"\n  ],\n  \"lastRunId\": \"implementer-3760e8263222b480edc07fd2\",\n  \"currentRunId\": \"implementer-3760e8263222b480edc07fd2\",\n  \"claimedAt\": \"2026-07-07T06:16:31.684Z\",\n  \"claimedByContextId\": \"pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635\"\n}\ncounts {'pending': 1, 'waiting': 0, 'ready': 0, 'queued': 0, 'running': 1, 'blocked': 0, 'failed': 0, 'done': 3, 'skipped': 0}\nactive ['PS-04'] next None",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:18:54.645Z",
+            "toolCallId": "call_624DcAlPzMVyug81DYP1neR2|fc_047d1e4f0800e65b016a4c9a408c8c819a81e4967ad071a3cf",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nimport json\\nfrom datetime import datetime, timezone\\np='.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/task.json'\\nwith open(p, encoding='utf-8') as f:\\n    d=json.load(f)\\nnow=datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00','Z')\\nsummary='''### Implementation Complete\\\\n\\\\n#### Files Changed\\\\n\\\\n- `docs/modules/frontend.md` — documented `SessionSidebar` main-space `主空间` fallback, enriched space subtitle/detail tooltip, and compact WorkTree badge tooltip behavior.\\\\n- `docs/modules/library.md` — documented Project Registry WorkTree metadata, optional `baseRef`, preservation behavior, and shared Git/WorkTree type updates.\\\\n- `docs/modules/api.md` — documented `/api/projects`, `/api/git/worktrees`, and `/api/git/info` behavior for main-space identity and WorkTree `baseRef` availability.\\\\n- `docs/architecture/overview.md` — documented Project Registry main-space display invariant and best-effort WorkTree metadata/baseRef semantics.\\\\n\\\\n#### Verification\\\\n\\\\n- `git diff -- docs/modules/frontend.md docs/modules/library.md docs/modules/api.md docs/architecture/overview.md` — reviewed documentation diff.\\\\n\\\\n#### Notes / Risks\\\\n\\\\n- No lint/type-check run for this docs-only subtask.\\\\n- Existing code stores `baseRef`, but current Sidebar projection appears to display WorkTree base from `mainWorktreeBranch`/Git metadata rather than stored `baseRef`; flagged for main session/checker attention.'''\\nprog=d.setdefault('implementationProgress', {})\\nsub=prog.setdefault('subtasks', {}).setdefault('PS-04', {'id':'PS-04'})\\nsub.update({\\n    'status':'done',\\n    'updatedAt':now,\\n    'finishedAt':now,\\n    'summary':summary,\\n})\\nsub.pop('currentRunId', None)\\nprog['updatedAt']=now\\nprog['activeSubtaskId']=None\\nprog['activeSubtaskIds']=[]\\n# PS-05 remains not executed by this delegated subtask; mark as ready only if still pending and dependencies are done.\\nps05=prog.get('subtasks',{}).get('PS-05')\\nif ps05 and ps05.get('status') in (None,'pending','waiting'):\\n    ps05['status']='ready'\\n    ps05['updatedAt']=now\\n    prog['nextSubtaskId']='PS-05'\\n    prog['nextSubtaskIds']=['PS-05']\\nelse:\\n    prog.setdefault('nextSubtaskIds', [])\\ncounts={'pending':0,'waiting':0,'ready':0,'queued':0,'running':0,'blocked':0,'failed':0,'done':0,'skipped':0}\\nfor s in prog.get('subtasks',{}).values():\\n    st=s.get('status','pending')\\n    counts[st if st in counts else 'pending']+=1\\nprog['counts']=counts\\n# Keep task-level updatedAt in sync; status remains implementing because PS-05/checks is not done.\\nd['updatedAt']=now\\nwith open(p,'w',encoding='utf-8') as f:\\n    json.dump(d,f,ensure_ascii=False,indent=2)\\n    f.write('\\\\n')\\nPY\\npython3 - <<'PY'\\nimport json\\np='.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/task.json'\\nd=json.load(open(p))\\nprint(json.dumps(d['implementationProgress']['subtasks']['PS-04'], ensure_ascii=False, indent=2)[:1200])\\nprint(d['implementationProgress']['counts'])\\nprint('next', d['implementationProgress'].get('nextSubtaskIds'))\\nPY\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:18:54.752Z",
+            "toolCallId": "call_624DcAlPzMVyug81DYP1neR2|fc_047d1e4f0800e65b016a4c9a408c8c819a81e4967ad071a3cf",
+            "toolName": "bash",
+            "text": "{\n  \"id\": \"PS-04\",\n  \"status\": \"done\",\n  \"updatedAt\": \"2026-07-07T06:18:54.720Z\",\n  \"startedAt\": \"2026-07-07T06:16:31.684Z\",\n  \"attempts\": 1,\n  \"runIds\": [\n    \"implementer-ps04\",\n    \"implementer-3760e8263222b480edc07fd2\"\n  ],\n  \"lastRunId\": \"implementer-3760e8263222b480edc07fd2\",\n  \"claimedAt\": \"2026-07-07T06:16:31.684Z\",\n  \"claimedByContextId\": \"pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635\",\n  \"finishedAt\": \"2026-07-07T06:18:54.720Z\",\n  \"summary\": \"### Implementation Complete\\n\\n#### Files Changed\\n\\n- `docs/modules/frontend.md` — documented `SessionSidebar` main-space `主空间` fallback, enriched space subtitle/detail tooltip, and compact WorkTree badge tooltip behavior.\\n- `docs/modules/library.md` — documented Project Registry WorkTree metadata, optional `baseRef`, preservation behavior, and shared Git/WorkTree type updates.\\n- `docs/modules/api.md` — documented `/api/projects`, `/api/git/worktrees`, and `/api/git/info` behavior for main-space identity and WorkTree `baseRef` availability.\\n- `docs/architecture/overview.md` — documented Project Registry main-space display invariant and best-effort WorkTree metadata/baseRef semantics.\\n\\n#### Verification\\n\\n- `git diff -- docs/modules/\n{'pending': 0, 'waiting': 0, 'ready': 1, 'queued': 0, 'running': 0, 'blocked': 0, 'failed': 0, 'done': 4, 'skipped': 0}\nnext ['PS-05']",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:19:05.195Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented `SessionSidebar` `主空间` fallback, enriched space subtitle/detail tooltip, WorkTree badge tooltip.\n- `docs/modules/library.md` — documented WorkTree metadata, optional `baseRef`, preservation behavior, shared Git/WorkTree types.\n- `docs/modules/api.md` — documented `/api/projects`, `/api/git/worktrees`, `/api/git/info` baseRef/main-space behavior.\n- `docs/architecture/overview.md` — documented Project Registry main-space invariant and best-effort WorkTree metadata/baseRef semantics.\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/task.json` — marked PS-04 done and PS-05 ready.\n\n#### Verification\n\n- `git diff -- docs/modules/frontend.md docs/modules/library.md docs/modules/api.md docs/architecture/overview.md` — reviewed docs diff.\n- Not run: `npm run lint` / `tsc` (docs-only subtask).\n\n#### Notes / Risks\n\n- Current code stores `baseRef`, but `SessionSidebar` appears to display WorkTree base from `mainWorktreeBranch`/Git metadata rather than stored `baseRef`; checker/main session should verify if this is intended.\n- No product decision needed from PS-04 beyond existing questions about historical `displayName: \"Main\"` behavior.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:19:05.207Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2460,
+        "tokens": 494,
+        "tokenSource": "usage",
+        "tps": 98.68,
+        "firstTokenAt": "2026-07-07T06:19:00.185Z",
+        "lastTokenAt": "2026-07-07T06:19:05.191Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3760e8263222b480edc07fd2",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/implementer-3760e8263222b480edc07fd2.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:16:36.572Z",
+        "finishedAt": "2026-07-07T06:19:07.396Z",
+        "updatedAt": "2026-07-07T06:19:07.396Z",
+        "itemCount": 55,
+        "messageCount": 1,
+        "toolCallCount": 25,
+        "stderrBytes": 0,
+        "bytes": 186106,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-bc4c45acb3c4ad72dfcfd615",
+      "subtaskId": "PS-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:19:30.649Z",
+      "finishedAt": "2026-07-07T06:21:10.236Z",
+      "runner": "cli",
+      "prompt": "实现已认领子任务 PS-05。请执行验证与回归检查：运行 npm run lint 和 node_modules/.bin/tsc --noEmit；检查相关 diff 是否符合需求（主空间、顶部空间信息、WorkTree 分支/基准、baseRef、文档）。如发现小问题可修复；若发现大问题请标记 blocked/failed 并说明。完成后更新子任务状态、checks.md 或 handoff/summary 中的验证结果。",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `components/SessionSidebar.tsx` — PS-05 检查中修复小问题：WorkTree 基准现在优先使用 `baseRef`，再 fallback 到 `mainWorktreeBranch`；`worktreeInfoFromSpace()` 传递 `baseRef`。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md` — 更新验证结果与需求覆盖检查。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md` — 更新最终交接说明。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 未启动 dev server 做浏览器手工验收；建议检查员抽查主空间、WorkTree、missing path、长分支 tooltip。\n- 历史/手动 `displayName: \"Main\"` 仍按自定义名显示为 `Main`；未做迁移或强制覆盖，符合当前设计建议。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:19:30.649Z",
+        "updatedAt": "2026-07-07T06:21:10.236Z",
+        "eventCount": 2889,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `components/SessionSidebar.tsx` — PS-05 检查中修复小问题：WorkTree 基准现在优先使用 `baseRef`，再 fallback 到 `mainWorktreeBranch`；`worktreeInfoFromSpace()` 传递 `baseRef`。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md` — 更新验证结果与需求覆盖检查。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md` — 更新最终交接说明。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 未启动 dev server 做浏览器手工验收；建议检查员抽查主空间、WorkTree、missing path、长分支 tooltip。\n- 历史/手动 `displayName: \"Main\"` 仍按自定义名显示为 `Main`；未做迁移或强制覆盖，符合当前设计建议。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:20:53.737Z",
+            "toolCallId": "call_3PDuXHyJQhl4kNTWQSlrKLof|fc_09aebdd88edbbb42016a4c9abac94081988c6c3b8cda90892a",
+            "toolName": "write",
+            "text": "Successfully wrote 1265 bytes to .ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:20:58.518Z",
+            "toolCallId": "call_UhBfjZb1xF2VL8Om1wMT7HYd|fc_09aebdd88edbbb42016a4c9aca54fc8198b5e8444acca7e57b",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat && git diff --check\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:20:58.601Z",
+            "toolCallId": "call_UhBfjZb1xF2VL8Om1wMT7HYd|fc_09aebdd88edbbb42016a4c9aca54fc8198b5e8444acca7e57b",
+            "toolName": "bash",
+            "text": "app/api/git/worktrees/route.ts |  2 +-\n components/SessionSidebar.tsx  | 73 ++++++++++++++++++++++++++++++++++++++----\n docs/architecture/overview.md  |  4 ++-\n docs/modules/api.md            |  6 ++--\n docs/modules/frontend.md       |  2 +-\n docs/modules/library.md        |  8 ++---\n lib/git-worktree.ts            |  3 ++\n lib/project-registry-types.ts  |  1 +\n lib/project-registry.ts        | 14 +++++---\n lib/types.ts                   |  2 ++\n 10 files changed, 95 insertions(+), 20 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:21:07.941Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `components/SessionSidebar.tsx` — PS-05 检查中修复小问题：WorkTree 基准现在优先使用 `baseRef`，再 fallback 到 `mainWorktreeBranch`；`worktreeInfoFromSpace()` 传递 `baseRef`。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md` — 更新验证结果与需求覆盖检查。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md` — 更新最终交接说明。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 未启动 dev server 做浏览器手工验收；建议检查员抽查主空间、WorkTree、missing path、长分支 tooltip。\n- 历史/手动 `displayName: \"Main\"` 仍按自定义名显示为 `Main`；未做迁移或强制覆盖，符合当前设计建议。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:21:07.946Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1274,
+        "tokens": 283,
+        "tokenSource": "usage",
+        "tps": 70.15,
+        "firstTokenAt": "2026-07-07T06:21:03.902Z",
+        "lastTokenAt": "2026-07-07T06:21:07.936Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-bc4c45acb3c4ad72dfcfd615",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/implementer-bc4c45acb3c4ad72dfcfd615.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:19:30.649Z",
+        "finishedAt": "2026-07-07T06:21:10.221Z",
+        "updatedAt": "2026-07-07T06:21:10.221Z",
+        "itemCount": 39,
+        "messageCount": 1,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 66466,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-9875b13c0659e246b099a12b",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-07T06:21:23.424Z",
+      "finishedAt": "2026-07-07T06:23:25.462Z",
+      "runner": "cli",
+      "prompt": "请对任务“优化项目空间命名与空间信息展示”进行最终检查。重点 review： 1. 主空间默认是否显示为“主空间”，且不误改 spaceId。 2. 左上角当前空间信息是否包含空间名、分支/WorkTree、基准/来源兜底。 3. WorkTree baseRef 持久化是否兼容旧数据，刷新是否保留。 4. 文档是否同步。 5. lint 和 tsc 结果。 请阅读相关 diff 和 artifacts，必要时运行验证。通过则更新 review/checks/summary…",
+      "summary": "检查完成，结论：**Pass**。\n\n**Artifacts updated**\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/review.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/summary.md`\n\n**Review result**\n- 主空间 fallback 已改为 `主空间`，未见对 `spaceId: \"main\"`、session header、registry id 的误改。\n- 顶部空间信息已覆盖：\n  - 空间名\n  - 普通 Git 分支\n  - WorkTree 分支\n  - 基准/baseRef 或未知兜底\n  - 路径缺失提示\n- WorkTree `baseRef` 已贯通：\n  - 类型新增可选 `baseRef`\n  - `POST /api/git/worktrees` 创建后传入 registry 同步\n  - registry 刷新同步时保留已有 `baseRef`\n  - 旧/外部 worktree 缺失时不会猜测为 `main`\n- 文档已同步到：\n  - `docs/architecture/overview.md`\n  - `docs/modules/api.md`\n  - `docs/modules/frontend.md`\n  - `docs/modules/library.md`\n\n**Validation run**\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n**Remaining risks**\n- 未启动 dev server 做浏览器手工抽查；建议主会话补验主空间、WorkTree、路径缺失、长分支 tooltip 场景。\n\n**Decisions needed from main session**\n- None.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-07T06:21:23.424Z",
+        "updatedAt": "2026-07-07T06:23:25.462Z",
+        "eventCount": 2314,
+        "lastTextPreview": "检查完成，结论：**Pass**。\n\n**Artifacts updated**\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/review.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/summary.md`\n\n**Review result**\n- 主空间 fallback 已改为 `主空间`，未见对 `spaceId: \"main\"`、session header、registry id 的误改。\n- 顶部空间信息已覆盖：\n  - 空间名\n  - 普通 Git 分支\n  - WorkTree 分支\n  - 基准/baseRef 或未知兜底\n  - 路径缺失提示\n- WorkTree `baseRef` 已贯通：\n  - 类型新增可选 `baseRef`\n  - `POST /api/git/worktrees` 创建后传入 registry 同步\n  - registry 刷新同步时保留已有 `baseRef`\n  - 旧/外部 worktree 缺失时不会猜测为 `main`\n- 文档已同步到：\n  - `docs/architecture/overview.md`\n  - `docs/modules/api.md`\n  - `docs/modules/frontend.md`\n  - `docs/modules/library.md`\n\n**Validation run**\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n**Remaining risks**\n- 未启动 dev server 做浏览器手工抽查；建议主会话补验主空间、WorkTree、路径缺失、长分支 tooltip 场景。\n\n**Decisions needed from main session**\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:23:10.575Z",
+            "toolCallId": "call_FopTKJFqdaf9orSBqW44Si8Q|fc_0fea66f429921440016a4c9b48e3408198998dd443de52dd11",
+            "toolName": "write",
+            "text": "Successfully wrote 541 bytes to .ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/summary.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-07T06:23:14.423Z",
+            "toolCallId": "call_1TgB2OdajBSkNWS8xpbZRN9P|fc_0fea66f429921440016a4c9b520c4081989dd29a4d68215afc",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"结果：\\n\\n- `npm run lint` — passed\\n- `node_modules/.bin/tsc --noEmit` — passed\\n\",\n      \"newText\": \"结果：\\n\\n- `npm run lint` — passed\\n- `node_modules/.bin/tsc --noEmit` — passed\\n\\n检查员复核：已重新执行上述命令并通过。\\n\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-07T06:23:14.429Z",
+            "toolCallId": "call_1TgB2OdajBSkNWS8xpbZRN9P|fc_0fea66f429921440016a4c9b520c4081989dd29a4d68215afc",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-07T06:23:23.170Z",
+            "text": "检查完成，结论：**Pass**。\n\n**Artifacts updated**\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/review.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md`\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/summary.md`\n\n**Review result**\n- 主空间 fallback 已改为 `主空间`，未见对 `spaceId: \"main\"`、session header、registry id 的误改。\n- 顶部空间信息已覆盖：\n  - 空间名\n  - 普通 Git 分支\n  - WorkTree 分支\n  - 基准/baseRef 或未知兜底\n  - 路径缺失提示\n- WorkTree `baseRef` 已贯通：\n  - 类型新增可选 `baseRef`\n  - `POST /api/git/worktrees` 创建后传入 registry 同步\n  - registry 刷新同步时保留已有 `baseRef`\n  - 旧/外部 worktree 缺失时不会猜测为 `main`\n- 文档已同步到：\n  - `docs/architecture/overview.md`\n  - `docs/modules/api.md`\n  - `docs/modules/frontend.md`\n  - `docs/modules/library.md`\n\n**Validation run**\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n**Remaining risks**\n- 未启动 dev server 做浏览器手工抽查；建议主会话补验主空间、WorkTree、路径缺失、长分支 tooltip 场景。\n\n**Decisions needed from main session**\n- None.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-07T06:23:23.182Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1828,
+        "tokens": 419,
+        "tokenSource": "usage",
+        "tps": 199.14,
+        "firstTokenAt": "2026-07-07T06:23:21.060Z",
+        "lastTokenAt": "2026-07-07T06:23:23.164Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-9875b13c0659e246b099a12b",
+        "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260707-140250-/checker-9875b13c0659e246b099a12b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-07T06:21:23.424Z",
+        "finishedAt": "2026-07-07T06:23:25.455Z",
+        "updatedAt": "2026-07-07T06:23:25.455Z",
+        "itemCount": 63,
+        "messageCount": 1,
+        "toolCallCount": 29,
+        "stderrBytes": 0,
+        "bytes": 180230,
+        "truncated": true,
+        "runner": "cli",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-07T06:10:06.141Z",
+      "contextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+      "from": "awaiting_approval",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-07T06:10:09.014Z",
+      "contextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+      "inputHash": "0cd4f285380e89c45897d41e",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-07T06:27:08.809Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260707-142708-优化项目空间命名与空间信息展示",
+    "knowledgePath": ".ypi/knowledge/20260707-142708-优化项目空间命名与空间信息展示.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T06:10:06.141Z",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "PS-01",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "PS-01"
+          ]
+        },
+        {
+          "id": "PS-02",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [
+            "PS-01"
+          ],
+          "subtaskIds": [
+            "PS-02"
+          ]
+        },
+        {
+          "id": "PS-03",
+          "title": "data",
+          "relation": "serial",
+          "dependencies": [
+            "PS-01"
+          ],
+          "subtaskIds": [
+            "PS-03"
+          ]
+        },
+        {
+          "id": "PS-04",
+          "title": "docs",
+          "relation": "parallel",
+          "dependencies": [
+            "PS-01",
+            "PS-03"
+          ],
+          "subtaskIds": [
+            "PS-04"
+          ]
+        },
+        {
+          "id": "PS-05",
+          "title": "checks",
+          "relation": "serial",
+          "dependencies": [
+            "PS-01",
+            "PS-02",
+            "PS-03",
+            "PS-04"
+          ],
+          "subtaskIds": [
+            "PS-05"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "PS-01",
+        "title": "主空间中文 fallback 与顶部空间信息格式化",
+        "phase": "frontend",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx"
+        ],
+        "acceptance": [
+          "main space 默认显示为 主空间",
+          "顶部信息包含空间名和 Git/WorkTree 状态",
+          "非 Git/缺失状态有明确兜底文案"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工选择 main 空间、非 Git 空间验证文案"
+        ],
+        "risks": [
+          "旧 displayName=Main 是否需要覆盖需产品确认",
+          "顶部一行信息过密需用省略和 tooltip 控制"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "PS-02",
+        "title": "WorkTree badge/dropdown tooltip 补充分支与基准",
+        "phase": "frontend",
+        "order": 2,
+        "dependsOn": [
+          "PS-01"
+        ],
+        "dependencies": [
+          "PS-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx"
+        ],
+        "acceptance": [
+          "WorkTree badge tooltip 可看到 branch 与 base/unknown",
+          "列表行不明显增高或撑破布局"
+        ],
+        "validation": [
+          "手工打开空间下拉并 hover WorkTree badge"
+        ],
+        "risks": [
+          "过长分支名需省略显示"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "PS-03",
+        "title": "可选持久化 WorkTree 创建 baseRef",
+        "phase": "data",
+        "order": 3,
+        "dependsOn": [
+          "PS-01"
+        ],
+        "dependencies": [
+          "PS-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/project-registry-types.ts",
+          "lib/project-registry.ts",
+          "lib/git-worktree.ts",
+          "lib/types.ts",
+          "app/api/git/worktrees/route.ts"
+        ],
+        "acceptance": [
+          "新建 WorkTree registry space 含 baseRef",
+          "刷新项目 worktree 不丢 baseRef",
+          "旧 registry 无 baseRef 仍能显示"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "创建 WorkTree 后检查 /api/projects 返回的 space.worktree.baseRef"
+        ],
+        "risks": [
+          "Git 无法恢复旧 WorkTree 创建来源",
+          "字段新增需同步所有类型消费者"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "PS-04",
+        "title": "同步文档",
+        "phase": "docs",
+        "order": 4,
+        "dependsOn": [
+          "PS-01",
+          "PS-03"
+        ],
+        "dependencies": [
+          "PS-01",
+          "PS-03"
+        ],
+        "relation": "parallel",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "docs/modules/api.md",
+          "docs/architecture/overview.md"
+        ],
+        "acceptance": [
+          "文档描述与最终实现一致"
+        ],
+        "validation": [
+          "人工 review docs diff"
+        ],
+        "risks": [
+          "文档过度承诺 baseRef 对旧 WorkTree 的准确性"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "PS-05",
+        "title": "验证与回归检查",
+        "phase": "checks",
+        "order": 5,
+        "dependsOn": [
+          "PS-01",
+          "PS-02",
+          "PS-03",
+          "PS-04"
+        ],
+        "dependencies": [
+          "PS-01",
+          "PS-02",
+          "PS-03",
+          "PS-04"
+        ],
+        "relation": "serial",
+        "acceptance": [
+          "lint/type-check 通过",
+          "所有目标场景文案符合 ui.md"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "需要本地 Git WorkTree 场景才能完整手工验证"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T06:27:08.809Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "PS-01": {
+        "id": "PS-01",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:12:32.432Z",
+        "startedAt": "2026-07-07T06:10:16.444Z",
+        "finishedAt": "2026-07-07T06:12:32.427Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ps01",
+          "implementer-770c876bb7e27eacd282c4a1"
+        ],
+        "lastRunId": "implementer-770c876bb7e27eacd282c4a1",
+        "claimedAt": "2026-07-07T06:10:16.444Z",
+        "claimedByContextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - 将 main space 默认 fallback 从 `Main` 改为 `主空间`。\n  - 顶部空间摘要改为：\n    - 普通空间：`空间：<name> · 分支：<branch>` / `未检测到 Git 分支`\n    - WorkTree：`空间：<name> · WorkTree：<branch|未知分支> · 基准：<base|基准未知>`\n    - missing path 追加 `路径缺失`\n  - Tooltip/detail 增加多行完整信息：空间、路径、分支、WorkTree、基准；支持换行展示。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- 未处理 PS-03：没有新增/持久化 `baseRef`，WorkTree 基准仅使用现有 `mainWorktreeBranch`，缺失时显示未知。\n- 未处理 PS-02/PS-04：未增强 dropdown badge tooltip，未改文档。\n- 子任务状态需由主会话/Studio 工作流侧更新；本执行环境未直接写状态。"
+      },
+      "PS-02": {
+        "id": "PS-02",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:14:03.983Z",
+        "startedAt": "2026-07-07T06:12:50.540Z",
+        "finishedAt": "2026-07-07T06:14:03.979Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ps02",
+          "implementer-e345120e7cb3e6f93527511f"
+        ],
+        "lastRunId": "implementer-e345120e7cb3e6f93527511f",
+        "claimedAt": "2026-07-07T06:12:50.540Z",
+        "claimedByContextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - Added WorkTree tooltip helpers.\n  - Enhanced `WorktreeBadge` `title` to show `WorkTree：<branch|未知分支> / 基准：<base|未知>`.\n  - Enhanced selected path and dropdown space row tooltip to include WorkTree branch/base info plus right-click hint.\n  - Kept dropdown row layout unchanged; only tooltip/title text changed.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Base currently uses existing `mainWorktreeBranch` metadata via `resolveWorktreeBase`; no `baseRef` persistence was added per PS-02 boundary.\n- Manual hover verification in a real WorkTree dropdown still needs parent/session UI check if required."
+      },
+      "PS-03": {
+        "id": "PS-03",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:16:19.485Z",
+        "startedAt": "2026-07-07T06:14:17.916Z",
+        "finishedAt": "2026-07-07T06:16:19.481Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ps03",
+          "implementer-76d1008e113fafaa150a884f"
+        ],
+        "lastRunId": "implementer-76d1008e113fafaa150a884f",
+        "claimedAt": "2026-07-07T06:14:17.916Z",
+        "claimedByContextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/project-registry-types.ts` — added optional `worktree.baseRef`.\n- `lib/git-worktree.ts` — added optional `baseRef` to Git/WorkTree metadata and WorktreeRecord; created WorkTrees now include `baseRef` in returned metadata.\n- `lib/project-registry.ts` — persists `baseRef` when syncing newly created WorkTree spaces; preserves existing `baseRef` during refresh/discovery when Git cannot provide it.\n- `lib/types.ts` — added optional `baseRef` to shared `GitInfo` / `WorktreeInfo`.\n- `app/api/git/worktrees/route.ts` — passes `result.baseRef` into Project Registry sync after WorkTree creation.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- No manual `/api/projects` WorkTree creation check was run; requires dev server and creating a real WorkTree.\n- Docs updates are left for PS-04 per plan.\n- Existing/externally discovered WorkTrees without saved `baseRef` remain compatible; refresh preserves saved `baseRef` but cannot reconstruct missing historical creation source."
+      },
+      "PS-04": {
+        "id": "PS-04",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:19:07.416Z",
+        "startedAt": "2026-07-07T06:16:31.684Z",
+        "finishedAt": "2026-07-07T06:19:07.410Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ps04",
+          "implementer-3760e8263222b480edc07fd2"
+        ],
+        "lastRunId": "implementer-3760e8263222b480edc07fd2",
+        "claimedAt": "2026-07-07T06:16:31.684Z",
+        "claimedByContextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented `SessionSidebar` `主空间` fallback, enriched space subtitle/detail tooltip, WorkTree badge tooltip.\n- `docs/modules/library.md` — documented WorkTree metadata, optional `baseRef`, preservation behavior, shared Git/WorkTree types.\n- `docs/modules/api.md` — documented `/api/projects`, `/api/git/worktrees`, `/api/git/info` baseRef/main-space behavior.\n- `docs/architecture/overview.md` — documented Project Registry main-space invariant and best-effort WorkTree metadata/baseRef semantics.\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/task.json` — marked PS-04 done and PS-05 ready.\n\n#### Verification\n\n- `git diff -- docs/modules/frontend.md docs/modules/library.md docs/modules/api.md docs/architecture/overview.md` — reviewed docs diff.\n- Not run: `npm run lint` / `tsc` (docs-only subtask).\n\n#### Notes / Risks\n\n- Current code stores `baseRef`, but `SessionSidebar` appears to display WorkTree base from `mainWorktreeBranch`/Git metadata rather than stored `baseRef`; checker/main session should verify if this is intended.\n- No product decision needed from PS-04 beyond existing questions about historical `displayName: \"Main\"` behavior."
+      },
+      "PS-05": {
+        "id": "PS-05",
+        "status": "done",
+        "updatedAt": "2026-07-07T06:21:10.243Z",
+        "startedAt": "2026-07-07T06:19:23.771Z",
+        "finishedAt": "2026-07-07T06:21:10.236Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ps05",
+          "implementer-bc4c45acb3c4ad72dfcfd615"
+        ],
+        "lastRunId": "implementer-bc4c45acb3c4ad72dfcfd615",
+        "claimedAt": "2026-07-07T06:19:23.771Z",
+        "claimedByContextId": "pi_019f3b2b-65a7-78ce-bb5f-5efd19a41635",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `components/SessionSidebar.tsx` — PS-05 检查中修复小问题：WorkTree 基准现在优先使用 `baseRef`，再 fallback 到 `mainWorktreeBranch`；`worktreeInfoFromSpace()` 传递 `baseRef`。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/checks.md` — 更新验证结果与需求覆盖检查。\n- `.ypi/tasks/20260707-140250-优化项目空间命名与空间信息展示/handoff.md` — 更新最终交接说明。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 未启动 dev server 做浏览器手工验收；建议检查员抽查主空间、WorkTree、missing path、长分支 tooltip。\n- 历史/手动 `displayName: \"Main\"` 仍按自定义名显示为 `Main`；未做迁移或强制覆盖，符合当前设计建议。"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-07T06:10:16.444Z",
+        "subtaskId": "PS-01",
+        "from": "ready",
+        "to": "running",
+        "runId": "implementer-ps01"
+      },
+      {
+        "at": "2026-07-07T06:12:50.540Z",
+        "subtaskId": "PS-02",
+        "from": "ready",
+        "to": "running",
+        "runId": "implementer-ps02"
+      },
+      {
+        "at": "2026-07-07T06:14:17.916Z",
+        "subtaskId": "PS-03",
+        "from": "ready",
+        "to": "running",
+        "runId": "implementer-ps03"
+      },
+      {
+        "at": "2026-07-07T06:16:31.684Z",
+        "subtaskId": "PS-04",
+        "from": "ready",
+        "to": "running",
+        "runId": "implementer-ps04"
+      },
+      {
+        "at": "2026-07-07T06:19:23.771Z",
+        "subtaskId": "PS-05",
+        "from": "ready",
+        "to": "running",
+        "runId": "implementer-ps05"
+      }
+    ]
+  }
+}

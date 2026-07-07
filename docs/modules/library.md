@@ -4,8 +4,8 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 
 | File | Purpose |
 | --- | --- |
-| `lib/project-registry-types.ts` | Shared Project Registry schema and wire types for projects, spaces, worktree metadata, and metadata patch payloads. |
-| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, Git worktree space sync from `git worktree list --porcelain`, and archived/missing marking for removed worktrees. |
+| `lib/project-registry-types.ts` | Shared Project Registry schema and wire types for projects, spaces, worktree metadata, and metadata patch payloads. WorkTree space metadata may include `branch`, `repoRoot`, `mainWorktreePath`, `mainWorktreeBranch`, optional creation-time `baseRef`, and `discoveredAt`. |
+| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, Git worktree space sync from `git worktree list --porcelain`, creation-time WorkTree `baseRef` preservation when available, and archived/missing marking for removed worktrees. |
 | `lib/project-session-index.ts` | Best-effort `~/.pi/agent/pi-web-session-index.json` maintenance for new/forked sessions linked to project spaces; session headers remain the source of truth. |
 | `lib/session-project-link.ts` | Helpers for reading/writing optional `projectId`/`spaceId` on session headers, deriving `legacyUnassigned`, and canonical path matching for legacy exact-cwd display. |
 | `lib/rpc-manager.ts` | `AgentSessionWrapper`, global registry, `startRpcSession()`, cwd-scoped session cleanup, lifecycle handling, built-in YPI Studio extension factory injection for web-created AgentSessions, Studio child terminal continuation prompts, idle-timeout extension while Studio children are active, and ChatGPT account failover retry hook wiring. |
@@ -13,7 +13,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/session-reader.ts` | Parse `.jsonl` session files, resolve session paths, return lightweight active session summaries (Git/worktree metadata is opt-in), hide YPI Studio child audit sessions by default unless explicitly requested, prune/delete sessions for removed WorkTree cwd paths, read model/default config. Archive helpers: `getSessionsArchiveDir()`, `archiveSessionFile()`, `unarchiveSessionFile()`, `scanArchivedCwds()`, `listArchivedSessionsForCwd()`, `resolveArchivedSessionPath()`. |
 | `lib/session-header-metadata.ts` | Pure parser for session header metadata shared by session listing/tests, including optional Project Registry linkage and YPI Studio `studioChild` audit metadata extraction. |
 | `lib/session-title.ts` | Pure helpers for deriving display titles from sessions and first user messages, including the pending empty-session label used by Browser Share precreated sessions. |
-| `lib/types.ts` | Shared TypeScript types for messages, sessions, Studio child-session header metadata, Git status/graph/commit/diff wire payloads, and API payloads. |
+| `lib/types.ts` | Shared TypeScript types for messages, sessions, Studio child-session header metadata, Git/worktree metadata including optional `baseRef`, Git status/graph/commit/diff wire payloads, and API payloads. |
 | `lib/pi-types.ts` | `AgentSessionLike` wrapper interface expected by hooks/components. |
 | `lib/normalize.ts` | Normalize pi tool-call fields to web UI shape. |
 | `lib/session-file-changes.ts` | Non-Git session file-change tracker: observes edit/write tool events, persists sidecar summaries, and serves browser-safe changed-file projections. |
@@ -24,7 +24,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/agent-client.ts` | Client-side helper for `POST /api/agent/[id]`. |
 | `lib/file-paths.ts` | Path normalization utilities for file viewer APIs. |
 | `lib/cwd.ts` | Cwd validation and normalization helpers. |
-| `lib/git-worktree.ts` | Git worktree creation, status, archive, removal helpers, and exported porcelain worktree records consumed by Project Registry sync. |
+| `lib/git-worktree.ts` | Git worktree creation, status, archive, removal helpers, and exported porcelain worktree records consumed by Project Registry sync. WorkTree creation returns the requested/effective `baseRef`; Git discovery cannot recover creation-time base refs for old or externally-created worktrees, so callers must treat missing `baseRef` as unknown. |
 | `lib/deepseek-balance.ts` | Query DeepSeek account balance. |
 | `lib/quota-display.ts` | Shared ChatGPT/Codex quota display helpers: tier labels, utilization colors, quota/reset-credit countdowns, earliest reset-credit expiration, relative refresh time, and known-tier filtering. |
 | `lib/oauth-accounts.ts` | Persist, import raw/converted credential JSON, sanitize, sync, label, activate, quota/reset-credit cache metadata, and soft-delete saved `openai-codex` OAuth accounts without exposing tokens. |

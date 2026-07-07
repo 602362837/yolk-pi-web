@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-07T05:47:17.739Z",
+  "updatedAt": "2026-07-07T06:27:08.809Z",
   "entries": [
+    {
+      "id": "20260707-142708-优化项目空间命名与空间信息展示",
+      "title": "优化项目空间命名与空间信息展示",
+      "taskId": "20260707-140250-优化项目空间命名与空间信息展示",
+      "taskKey": "archived:2026-07:20260707-140250-优化项目空间命名与空间信息展示",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：优化项目空间命名与空间信息展示。关键可复用结论：主空间显示应仅改 UI fallback 为“主空间”，不能修改 `spaceId: \"main\"`、session JSONL 或 Project Registry 标识；自定义 `displayName` 仍优先。SessionSidebar 顶部空间摘要可统一由 helper 格式化：普通 Git 空间显示 `空间：<name> · 分支：<branch>`，WorkTree 显示 `空间：<name> · WorkTree：<branch> · 基准：<base>`，缺失分支/基准时明确显示未知且不要猜测为 main。WorkTree badge/dropdown tooltip 可补充完整分支、基准、路径和 missing 状态。为准确描述 WorkTree 来源，应在 Project Registry/Git metadata 中增加可选 `baseRef`，新建 WorkTree 时持久化，刷新/发现 WorkTree 时保留已有值；旧/外部 WorkTree 无 `baseRef` 时 fallback 到 `mainWorktreeBranch` 或未知。验证通过 `npm run lint` 与 `node_modules/.bin/tsc --noEmit`，未做浏览器手工验收。",
+      "tags": [
+        "frontend",
+        "project-space",
+        "worktree",
+        "project-registry",
+        "session-sidebar",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260707-140250-优化项目空间命名与空间信息展示",
+      "knowledgePath": ".ypi/knowledge/20260707-142708-优化项目空间命名与空间信息展示.md",
+      "createdAt": "2026-07-07T06:27:08.809Z",
+      "archivedAt": "2026-07-07T06:27:08.809Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260707-134717-设计-ypi-studio-subagent-in-process-sdk-子会话一致性改造",
       "title": "设计 YPI Studio subagent in-process SDK 子会话一致性改造",

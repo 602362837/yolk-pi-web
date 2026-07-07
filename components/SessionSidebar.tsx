@@ -88,11 +88,25 @@ function getInitialExplorerHeight(): number | null {
   return Math.max(MIN_EXPLORER_HEIGHT, stored);
 }
 
+function formatWorktreeTooltip(worktree: WorktreeInfo): string {
+  const branch = worktree.branch || "未知分支";
+  const base = resolveWorktreeBase(worktree) || "未知";
+  return `WorkTree：${branch} / 基准：${base}`;
+}
+
+function formatWorktreeDetailTooltip(worktree: WorktreeInfo, path?: string): string {
+  return [
+    path,
+    formatWorktreeTooltip(worktree),
+    "右键点击查看更多 WorkTree 操作",
+  ].filter(Boolean).join("\n");
+}
+
 function WorktreeBadge({ worktree }: { worktree?: WorktreeInfo }) {
   if (!worktree) return null;
   return (
     <span
-      title={worktree.branch ? `Git 工作树: ${worktree.branch}` : "Git 工作树"}
+      title={formatWorktreeTooltip(worktree)}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -232,6 +246,7 @@ function WorkspaceHeaderLine({
             fontSize: 11,
             lineHeight: 1.35,
             overflowWrap: "anywhere",
+            whiteSpace: "pre-line",
             pointerEvents: "none",
           }}
         >
@@ -248,8 +263,52 @@ function displayProjectName(project: PiWebProjectRecord): string {
 
 function displaySpaceName(space: PiWebProjectSpaceRecord): string {
   if (space.displayName?.trim()) return space.displayName.trim();
-  if (space.kind === "main") return "Main";
+  if (space.kind === "main") return "主空间";
   return space.worktree?.branch || space.path.split(/[\\/]+/).filter(Boolean).pop() || space.path;
+}
+
+function formatUnknownGitBranch(): string {
+  return "未检测到 Git 分支";
+}
+
+function formatWorktreeBranch(worktree?: WorktreeInfo, git?: GitInfo): string {
+  return worktree?.branch || git?.branch || "未知分支";
+}
+
+function resolveWorktreeBase(worktree?: WorktreeInfo, git?: GitInfo): string | undefined {
+  return worktree?.baseRef || git?.baseRef || worktree?.mainWorktreeBranch || git?.mainWorktreeBranch;
+}
+
+function formatProjectSpaceSubtitle(space: PiWebProjectSpaceRecord, git: GitInfo | undefined): string {
+  const spaceName = displaySpaceName(space);
+  const pathMissingSuffix = space.missing ? " · 路径缺失" : "";
+  if (space.kind === "worktree") {
+    const worktree = worktreeInfoFromSpace(space);
+    const base = resolveWorktreeBase(worktree, git);
+    const baseText = base ? `基准：${base}` : "基准未知";
+    return `空间：${spaceName} · WorkTree：${formatWorktreeBranch(worktree, git)} · ${baseText}${pathMissingSuffix}`;
+  }
+  const branchText = git?.branch ? `分支：${git.branch}` : formatUnknownGitBranch();
+  return `空间：${spaceName} · ${branchText}${pathMissingSuffix}`;
+}
+
+function formatProjectSpaceDetail(space: PiWebProjectSpaceRecord, git: GitInfo | undefined, homeDir?: string): string {
+  const worktree = worktreeInfoFromSpace(space);
+  const lines = [
+    `空间：${displaySpaceName(space)}`,
+    `路径：${space.path}${space.missing ? "（路径缺失）" : ""}`,
+  ];
+  if (space.kind === "worktree") {
+    lines.push(`分支：${formatWorktreeBranch(worktree, git)}`);
+    lines.push("WorkTree：是");
+    lines.push(`基准：${resolveWorktreeBase(worktree, git) || "未知"}`);
+  } else {
+    lines.push(`分支：${git?.branch || "未检测到"}`);
+    lines.push("WorkTree：否");
+  }
+  const shortPath = shortenCwd(space.path, homeDir);
+  if (shortPath !== space.path) lines.push(`短路径：${shortPath}`);
+  return lines.join("\n");
 }
 
 function activeProjectSpaces(project: PiWebProjectRecord): PiWebProjectSpaceRecord[] {
@@ -283,6 +342,7 @@ function worktreeInfoFromSpace(space: PiWebProjectSpaceRecord): WorktreeInfo | u
     repoRoot: space.worktree?.repoRoot,
     mainWorktreePath: space.worktree?.mainWorktreePath,
     mainWorktreeBranch: space.worktree?.mainWorktreeBranch,
+    baseRef: space.worktree?.baseRef,
   };
 }
 
@@ -1017,7 +1077,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   } : undefined);
   const workspaceTitle = selectedProjectSpace ? displayProjectName(selectedProjectSpace.project) : formatWorkspaceHeaderTitle(selectedCwd, currentGit);
   const workspaceTitleDetail = selectedProjectSpace ? selectedProjectSpace.project.rootPath : formatWorkspaceTitle(selectedCwd, currentGit);
-  const workspaceSubtitle = selectedSpace ? `${displaySpaceName(selectedSpace)} · ${shortenCwd(selectedSpace.path, homeDir)}${selectedSpace.missing ? " · missing" : ""}` : formatWorkspaceSubtitle(selectedCwd, currentGit);
+  const workspaceSubtitle = selectedSpace ? formatProjectSpaceSubtitle(selectedSpace, currentGit) : formatWorkspaceSubtitle(selectedCwd, currentGit);
+  const workspaceSubtitleDetail = selectedSpace ? formatProjectSpaceDetail(selectedSpace, currentGit, homeDir) : workspaceSubtitle;
   const filteredSessions = allSessions.filter((session) => !removedWorktreeCwds.includes(session.cwd));
   const sessionTree = buildSessionTree(filteredSessions);
   const showTrellisInitializePrompt = trellisEnabled && !!selectedCwd && !!trellisSetupStatus?.canInitialize && !trellisSetupStatus.project.hasTrellisDir;
@@ -1045,7 +1106,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         <div style={{ marginBottom: 10, minWidth: 0 }}>
           <WorkspaceHeaderLine text={workspaceTitle} detail={workspaceTitleDetail} strong />
           <div style={{ marginTop: 2 }}>
-            <WorkspaceHeaderLine text={workspaceSubtitle} detail={workspaceSubtitle} />
+            <WorkspaceHeaderLine text={workspaceSubtitle} detail={workspaceSubtitleDetail} />
           </div>
         </div>
         <div className="session-sidebar-actions" style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -1302,7 +1363,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 fontSize: 11,
                 color: selectedCwd ? "var(--text)" : "var(--text-dim)",
               }}
-              title={selectedWorktree ? `${selectedCwd ?? ""}\n右键点击查看更多 WorkTree 操作` : selectedCwd ?? ""}
+              title={selectedWorktree ? formatWorktreeDetailTooltip(selectedWorktree, selectedCwd ?? undefined) : selectedCwd ?? ""}
             >
               {selectedCwd ? shortenCwd(selectedCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : "Select project…")}
             </span>
@@ -1376,7 +1437,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                         }}
-                        title={`${space.path}${worktree ? "\n右键点击查看更多 WorkTree 操作" : ""}`}
+                        title={worktree ? formatWorktreeDetailTooltip(worktree, space.path) : space.path}
                       >
                         {selected ? (
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>

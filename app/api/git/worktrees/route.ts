@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     });
 
     const registryLink = result.mainWorktreePath
-      ? await syncRegisteredProjectWorktreeSpace(result.mainWorktreePath, result.cwd, result.branchName)
+      ? await syncRegisteredProjectWorktreeSpace(result.mainWorktreePath, result.cwd, result.branchName, result.baseRef)
       : null;
 
     registerAllowedRoot(result.cwd);

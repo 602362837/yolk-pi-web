@@ -8,6 +8,7 @@ import type {
   PiWebProjectRecord,
   PiWebProjectRegistryFile,
   PiWebProjectSpaceRecord,
+  PiWebProjectSpaceWorktreeInfo,
   ProjectId,
   ProjectPatchInput,
   ProjectPathInfo,
@@ -177,12 +178,17 @@ function createWorktreeSpaceId(pathKey: string): ProjectSpaceId {
   return `wt_${createHash("sha256").update(pathKey).digest("hex").slice(0, 16)}`;
 }
 
-function worktreeInfoFromRecord(record: WorktreeRecord, mainWorktree?: WorktreeRecord): PiWebProjectSpaceRecord["worktree"] {
+function worktreeInfoFromRecord(
+  record: WorktreeRecord,
+  mainWorktree?: WorktreeRecord,
+  existing?: PiWebProjectSpaceWorktreeInfo,
+): PiWebProjectSpaceRecord["worktree"] {
   return {
     branch: record.branch,
     repoRoot: record.path,
     mainWorktreePath: mainWorktree?.path,
     mainWorktreeBranch: mainWorktree?.branch,
+    baseRef: record.baseRef || existing?.baseRef,
     discoveredAt: nowIso(),
   };
 }
@@ -204,7 +210,7 @@ async function upsertWorktreeSpace(
       pathKey: pathInfo.pathKey,
       archived: false,
       missing: pathInfo.missing || undefined,
-      worktree: worktreeInfoFromRecord(record, mainWorktree),
+      worktree: worktreeInfoFromRecord(record, mainWorktree, existing.worktree),
       updatedAt: timestamp,
     };
     project.spaces[spaceId as ProjectSpaceId] = space;
@@ -330,7 +336,7 @@ export async function syncProjectWorktreeSpaces(projectId: string): Promise<{
   return { project, spaces: Object.values(project.spaces).filter((space) => space.kind === "worktree"), created, archivedMissing };
 }
 
-export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: string, worktreePath: string, branch?: string): Promise<{
+export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: string, worktreePath: string, branch?: string, baseRef?: string): Promise<{
   project: PiWebProjectRecord;
   space: PiWebProjectSpaceRecord;
   created: boolean;
@@ -341,7 +347,7 @@ export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: strin
   if (projectIndex < 0) return null;
 
   const project = registry.projects[projectIndex];
-  const result = await upsertWorktreeSpace(project, { path: worktreePath, branch }, { path: mainWorktreePath });
+  const result = await upsertWorktreeSpace(project, { path: worktreePath, branch, baseRef }, { path: mainWorktreePath });
   project.updatedAt = nowIso();
   registry.projects[projectIndex] = project;
   await writeRegistry(registry);

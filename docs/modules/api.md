@@ -4,7 +4,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 
 | Route | Methods | Purpose |
 | --- | --- | --- |
-| `projects/` | GET/POST | List Project Registry records from `~/.pi/agent/pi-web-projects.json`, or register a project path and create its main space without scanning sessions. |
+| `projects/` | GET/POST | List Project Registry records from `~/.pi/agent/pi-web-projects.json`, or register a project path and create its main space without scanning sessions. Space records keep `id: "main"` for the main space; UI display text is a presentation concern. WorkTree space records may include optional `worktree.baseRef` when the worktree was created through the web WorkTree API. |
 | `projects/select-directory/` | POST | Open a local OS directory picker from the server process and return the selected project path; manual path entry remains the fallback when a picker is unavailable. |
 | `projects/[projectId]/` | GET/PATCH | Read or update project metadata (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`). |
 | `projects/[projectId]/spaces/` | GET | List spaces for one registered project. |
@@ -49,13 +49,13 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `skills/install/` | POST | Install a skill via `npx skills add`. |
 | `commands/` | GET | List slash commands from built-in YPI Studio extension commands plus skills and prompt templates for a cwd. |
 | `cwd/validate/` | POST | Validate a candidate workspace path. |
-| `git/worktrees/` | GET/POST/DELETE | Inspect, create, and remove Git worktrees from the selected cwd; creation upserts a registered project worktree space when the main worktree is registered, and removal marks matching spaces archived/missing while still deleting sessions for that worktree cwd. |
+| `git/worktrees/` | GET/POST/DELETE | Inspect, create, and remove Git worktrees from the selected cwd; creation returns the effective `baseRef` and upserts a registered project worktree space with that optional `baseRef` when the main worktree is registered, while removal marks matching spaces archived/missing and still deletes sessions for that worktree cwd. |
 | `sessions/archive/` | POST | Archive one or more sessions (moves to `sessions-archive/`). |
 | `sessions/unarchive/` | POST | Unarchive one or more sessions (moves back to `sessions/`). |
 | `sessions/archive-all/` | POST | Archive all sessions for a cwd. |
 | `sessions/archived/` | GET | List archived sessions for a cwd. |
 | `git/worktrees/archive/` | POST | Squash, push, merge, and remove a Git worktree after user risk confirmation; archive marks matching spaces archived/missing and deletes sessions for that worktree cwd. |
-| `git/info/` | GET | Return best-effort Git branch/worktree metadata for a cwd. |
+| `git/info/` | GET | Return best-effort Git branch/worktree metadata for a cwd, including current branch and WorkTree/main-worktree details when detectable. Creation-time `baseRef` is only available from registry/API creation paths, not from generic Git discovery for old or external worktrees. |
 | `git/status/` | GET | Return detailed Git status (branch, commits, staged/unstaged changes, untracked files, stash) for a cwd. |
 | `git/graph/` | GET | Return decorated commit graph data (commits, parents, refs, local branches) for the Git panel branch visualization; optional `branch` previews one validated local branch. |
 | `git/commit/` | GET | Return read-only metadata and first-parent/root changed-file stats for a selected commit in the Git panel. |
