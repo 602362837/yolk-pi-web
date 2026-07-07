@@ -176,7 +176,7 @@ function addDetailsEvidence(details: unknown, output: CandidateEvidence[], order
   ].filter((item): item is string => !!item);
   const detailCwd = optionalString(task?.cwd);
   for (const candidate of candidates) output.push({ candidate, source: "session-transcript", order, structured: true, cwd: detailCwd ?? cwd });
-  if (toolName === "ypi_studio_task" || toolName === "ypi_studio_subagent") return;
+  if (toolName === "ypi_studio_task" || toolName === "ypi_studio_subagent" || toolName === "ypi_studio_wait") return;
 }
 
 function collectTranscriptEvidence(entries: SessionEntry[], cwd: string): CandidateEvidence[] {
@@ -185,7 +185,7 @@ function collectTranscriptEvidence(entries: SessionEntry[], cwd: string): Candid
     if (entry.type !== "message") return;
     const message = entry.message;
     if (message.role === "toolResult") {
-      if (message.toolName === "ypi_studio_task" || message.toolName === "ypi_studio_subagent") {
+      if (message.toolName === "ypi_studio_task" || message.toolName === "ypi_studio_subagent" || message.toolName === "ypi_studio_wait") {
         addDetailsEvidence((message as ToolResultMessage).details, evidence, order, message.toolName, cwd);
       }
       for (const text of messageTexts(message)) {

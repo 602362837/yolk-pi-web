@@ -260,7 +260,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   useEffect(() => () => { onContextUsageChange?.(null); }, [onContextUsageChange]);
 
   const studioProgressSignature = Object.values(toolProgressById)
-    .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent")
+    .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent" || progress.toolName === "ypi_studio_wait")
     .map((progress) => {
       const details = (isRecord(progress.result?.details) ? progress.result.details : isRecord(progress.partialResult?.details) ? progress.partialResult.details : {}) as Record<string, unknown>;
       const run = isRecord(details.run) ? details.run : null;
@@ -294,7 +294,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   useEffect(() => {
     if (!onStudioToolProgressChange) return;
     const overlays: YpiStudioLiveRunOverlay[] = Object.values(toolProgressById)
-      .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent")
+      .filter((progress) => progress.toolName === "ypi_studio_task" || progress.toolName === "ypi_studio_subagent" || progress.toolName === "ypi_studio_wait")
       .map((progress) => {
         const details = (isRecord(progress.result?.details) ? progress.result.details : isRecord(progress.partialResult?.details) ? progress.partialResult.details : {}) as Record<string, unknown>;
         const run = isRecord(details.run) ? details.run : null;
@@ -307,7 +307,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         const safeStatus = status === "queued" || status === "succeeded" || status === "failed" || status === "cancelled" || status === "running" || status === "waiting_for_user" ? status : undefined;
         return {
           toolCallId: progress.toolCallId,
-          toolName: progress.toolName as "ypi_studio_task" | "ypi_studio_subagent",
+          toolName: progress.toolName as "ypi_studio_task" | "ypi_studio_subagent" | "ypi_studio_wait",
           taskId: optionalString(task?.id) ?? optionalString(run?.taskId) ?? optionalString(progress.args?.taskId),
           taskKey: optionalString(task?.key) ?? optionalString(run?.taskKey),
           runId: optionalString(run?.id) ?? optionalString(progress.args?.runId),

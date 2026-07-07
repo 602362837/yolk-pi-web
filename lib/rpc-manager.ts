@@ -29,7 +29,8 @@ type EventListener = (event: AgentEvent) => void;
 
 const ABORT_WAIT_TIMEOUT_MS = 3_000;
 const STUDIO_CONTINUATION_RETRY_MS = 2_000;
-const STUDIO_CONTINUATION_MAX_RETRIES = 30;
+const STUDIO_FOLLOW_UP_RETRY_MS = 2_000;
+const STUDIO_FOLLOW_UP_MAX_RETRIES = 10;
 
 function sanitizeYpiStudioContextId(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180) || "session";
@@ -47,16 +48,34 @@ function ypiStudioContinuationKeys(sessionId: string, sessionFile?: string): str
   ].filter(Boolean);
 }
 
-function buildYpiStudioReadyContinuationPrompt(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; reason?: string }): string {
+function buildYpiStudioReadyContinuationPrompt(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; completionReady?: boolean; checkingReady?: boolean; checkerRunId?: string; checkerStatus?: string; checkerSummary?: string; reason?: string }): string {
+  if (input.checkingReady) {
+    return [
+      "YPI Studio checker 子代理已结束，请继续自动收口，不要等待用户输入。",
+      "",
+      `- taskId: ${input.taskId}`,
+      input.checkerRunId ? `- checkerRunId: ${input.checkerRunId}` : undefined,
+      input.checkerStatus ? `- checkerStatus: ${input.checkerStatus}` : undefined,
+      input.checkerSummary ? `- checkerSummary: ${input.checkerSummary}` : undefined,
+      input.reason ? `- reason: ${input.reason}` : undefined,
+      "",
+      "请按现有 Studio 状态机继续：先调用 ypi_studio_subagent(action=collect, runId=<checkerRunId>) 幂等收集 checker 结果，再读取 ypi_studio_task(action=current) 的默认 compact 摘要。若 checker 通过且无 remaining/needs-work 项，transition 到 completed 并总结；若 checker 指出 needs work / blocker / remaining findings，不要假装完成，说明需要处理的问题并按工作流回到 implementing 或请求用户决策。不要为了收口读取 full detail。",
+    ].filter(Boolean).join("\n");
+  }
   return [
-    "YPI Studio implementationPlan 仍有 ready 子任务且存在空闲并发槽，请继续自动推进，不要等待用户输入。",
+    input.completionReady
+      ? "YPI Studio implementationPlan 子任务已全部完成且没有活跃 run，请继续自动收口，不要等待用户输入。"
+      : "YPI Studio implementationPlan 仍有 ready 子任务且存在空闲并发槽，请继续自动推进，不要等待用户输入。",
     "",
     `- taskId: ${input.taskId}`,
     typeof input.readySubtaskCount === "number" ? `- readySubtaskCount: ${input.readySubtaskCount}` : undefined,
     typeof input.availableSlots === "number" ? `- availableSlots: ${input.availableSlots}` : undefined,
+    input.completionReady ? "- completionReady: true" : undefined,
     input.reason ? `- reason: ${input.reason}` : undefined,
     "",
-    "请按现有 Studio 状态机继续：先调用 ypi_studio_task(action=current) 或 ypi_studio_task(action=get, taskId=<上面的 taskId>) 确认状态；若 task 仍是 implementing，调用 implementation_next(limit=<available slots>)，claim ready 子任务，并为每个 claimed subtaskId 启动一个 async implementer，直到 maxConcurrency 填满或无 ready。每个 implementer run 只处理一个 subtaskId。",
+    input.completionReady
+      ? "请按现有 Studio 状态机继续：优先使用注入摘要和 ypi_studio_task(action=current) 的默认 compact 摘要确认状态；若 task 仍是 implementing 且全部 implementation subtasks 都 done/skipped、无 active run，自动 transition 到 checking，并派发 checker；检查完成后按工作流完成或说明需要用户处理。不要为了收口读取 full detail。"
+      : "请按现有 Studio 状态机继续：先调用 ypi_studio_task(action=current) 或 ypi_studio_task(action=get, taskId=<上面的 taskId>) 获取默认 compact 摘要；若 task 仍是 implementing，调用 implementation_next(limit=<available slots>)，claim ready 子任务，并为每个 claimed subtaskId 启动一个 async implementer，直到 maxConcurrency 填满或无 ready。每个 implementer run 只处理一个 subtaskId。只有 compact 摘要不足时才请求 full detail。",
   ].filter(Boolean).join("\n");
 }
 
@@ -73,7 +92,7 @@ function buildYpiStudioChildContinuationPrompt(payload: YpiStudioChildRunContinu
     "",
     "请按现有 Studio 状态机继续，不要停下来等用户输入：",
     "1. 先调用 ypi_studio_subagent(action=collect, runId=<上面的 runId>) 刷新/确认结果；如当前 task 还有其他 terminal async run，也一并 collect。",
-    "2. 重新读取当前 task / implementationProgress。若出现 failed、cancelled、waiting_for_user、blocked 或需要产品/人工决策的结果，停止派发新子任务并用人话说明需要用户处理。",
+    "2. 重新读取当前 task / implementationProgress 的默认 compact 摘要。若出现 failed、cancelled、waiting_for_user、blocked 或需要产品/人工决策的结果，停止派发新子任务并用人话说明需要用户处理；只有 compact 摘要不足时才请求 full detail。",
     "3. 若 task 仍是 implementing，必须按 maxConcurrency 补足所有空闲并发槽：计算 availableSlots=maxConcurrency-(running+queued)，调用 ypi_studio_task(action=implementation_next, limit=availableSlots) 查看 ready batch；若返回多个 ready，使用 ypi_studio_task(action=claim_implementation_subtask, limit=availableSlots, status=running) 或对这些 ready id 连续 claim，随后为每个 claimed subtaskId 各启动一个 ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<该子任务id>)，直到槽位满或无 ready。每个 implementer run 只处理一个 subtaskId，但同一轮必须派发多个 run 来填满并发槽。不要重复 claim/dispatch already queued/running/done 的子任务。",
     "4. 若全部 implementation subtasks 都 done/skipped 且无 active run，自动将任务 transition 到 checking，并派发 checker；检查完成后按现有工作流完成/请求用户处理。",
     "5. 严格遵守 awaiting_approval -> implementing 的服务器 approval gate；如果 task 未处于 implementing，不要 claim 或派发 implementer。",
@@ -226,27 +245,48 @@ export class AgentSessionWrapper {
     this.destroy();
   }
 
-  private scheduleStudioChildContinuation(payload: YpiStudioChildRunContinuationPayload, attempt = 0): void {
-    if (!this._alive || !ypiStudioContinuationKeys(this.sessionId, this.sessionFile).includes(payload.parentSessionId)) return;
+  private async scheduleStudioFollowUp(prompt: string, attempt = 0): Promise<boolean> {
+    if (!this._alive) return false;
     this.resetIdleTimer();
     if (this.inner.isStreaming) {
-      if (attempt >= STUDIO_CONTINUATION_MAX_RETRIES) return;
-      setTimeout(() => this.scheduleStudioChildContinuation(payload, attempt + 1), STUDIO_CONTINUATION_RETRY_MS);
-      return;
+      if (attempt >= STUDIO_FOLLOW_UP_MAX_RETRIES) {
+        this.emitEvent({ type: "studio_continuation_failed", sessionId: this.sessionId });
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, STUDIO_CONTINUATION_RETRY_MS));
+      return this.scheduleStudioFollowUp(prompt, attempt + 1);
     }
-    this.inner.followUp(buildYpiStudioChildContinuationPrompt(payload)).catch(() => {});
+    try {
+      // Use a normal prompt for Studio auto-continuation. Some pi followUp()
+      // paths can report acceptance without appending a new turn when the
+      // wrapper was restored outside the original run; prompt() gives us the
+      // same durable user-message path as explicit user input.
+      await this.inner.prompt(prompt);
+      return true;
+    } catch {
+      if (attempt >= STUDIO_FOLLOW_UP_MAX_RETRIES) {
+        this.emitEvent({ type: "studio_continuation_failed", sessionId: this.sessionId });
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, STUDIO_FOLLOW_UP_RETRY_MS));
+      return this.scheduleStudioFollowUp(prompt, attempt + 1);
+    }
   }
 
-  private scheduleStudioReadyContinuation(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; stateKey?: string; reason?: string }): { queued: boolean; skippedReason?: string } {
+  private scheduleStudioChildContinuation(payload: YpiStudioChildRunContinuationPayload): Promise<boolean> | boolean {
+    if (!this._alive || !ypiStudioContinuationKeys(this.sessionId, this.sessionFile).includes(payload.parentSessionId)) return false;
+    return this.scheduleStudioFollowUp(buildYpiStudioChildContinuationPrompt(payload));
+  }
+
+  private scheduleStudioReadyContinuation(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; completionReady?: boolean; checkingReady?: boolean; checkerRunId?: string; checkerStatus?: string; checkerSummary?: string; stateKey?: string; reason?: string }): { queued: boolean; skippedReason?: string } {
     if (!this._alive) return { queued: false, skippedReason: "session_not_alive" };
     this.resetIdleTimer();
-    if (this.inner.isStreaming) return { queued: false, skippedReason: "session_streaming" };
     const key = `${input.taskId}:${input.stateKey ?? "ready"}`;
     const now = Date.now();
     const last = this.studioAutoContinueKeys.get(key) ?? 0;
     if (now - last < 30_000) return { queued: false, skippedReason: "recently_queued" };
     this.studioAutoContinueKeys.set(key, now);
-    this.inner.followUp(buildYpiStudioReadyContinuationPrompt(input)).catch(() => {});
+    this.scheduleStudioFollowUp(buildYpiStudioReadyContinuationPrompt(input));
     return { queued: true };
   }
 
@@ -291,6 +331,11 @@ export class AgentSessionWrapper {
           taskId,
           readySubtaskCount: typeof command.readySubtaskCount === "number" ? command.readySubtaskCount : undefined,
           availableSlots: typeof command.availableSlots === "number" ? command.availableSlots : undefined,
+          completionReady: command.completionReady === true,
+          checkingReady: command.checkingReady === true,
+          checkerRunId: typeof command.checkerRunId === "string" ? command.checkerRunId : undefined,
+          checkerStatus: typeof command.checkerStatus === "string" ? command.checkerStatus : undefined,
+          checkerSummary: typeof command.checkerSummary === "string" ? command.checkerSummary : undefined,
           stateKey: typeof command.stateKey === "string" ? command.stateKey : undefined,
           reason: typeof command.reason === "string" ? command.reason : undefined,
         });

@@ -46,12 +46,21 @@ export interface YpiStudioChildRunContinuationPayload {
   continuationKey: string;
 }
 
-export type YpiStudioSessionContinuationCallback = (payload: YpiStudioChildRunContinuationPayload) => void | Promise<void>;
+export type YpiStudioSessionContinuationCallback = (payload: YpiStudioChildRunContinuationPayload) => boolean | void | Promise<boolean | void>;
+
+interface PendingYpiStudioContinuation {
+  payload: YpiStudioChildRunContinuationPayload;
+  attempts: number;
+}
+
+const CONTINUATION_DELIVERY_RETRY_MS = 5_000;
+const CONTINUATION_DELIVERY_MAX_RETRIES = 30;
 
 declare global {
   var __ypiStudioSubagentChildRuns: Map<string, YpiStudioChildRunHandle> | undefined;
   var __ypiStudioSessionContinuations: Map<string, YpiStudioSessionContinuationCallback> | undefined;
   var __ypiStudioTerminalContinuationKeys: Set<string> | undefined;
+  var __ypiStudioPendingContinuations: Map<string, PendingYpiStudioContinuation> | undefined;
 }
 
 function registry(): Map<string, YpiStudioChildRunHandle> {
@@ -73,6 +82,59 @@ function terminalContinuationKeys(): Set<string> {
     globalThis.__ypiStudioTerminalContinuationKeys = new Set();
   }
   return globalThis.__ypiStudioTerminalContinuationKeys;
+}
+
+function pendingContinuations(): Map<string, PendingYpiStudioContinuation> {
+  if (!globalThis.__ypiStudioPendingContinuations) {
+    globalThis.__ypiStudioPendingContinuations = new Map();
+  }
+  return globalThis.__ypiStudioPendingContinuations;
+}
+
+function continuationKeyFor(payload: Pick<YpiStudioChildRunContinuationPayload, "parentSessionId" | "taskId" | "runId">): string {
+  return `${payload.parentSessionId}:${payload.taskId}:${payload.runId}`;
+}
+
+function persistPendingContinuation(payload: YpiStudioChildRunContinuationPayload, attempts = 0): void {
+  pendingContinuations().set(payload.continuationKey, { payload, attempts });
+}
+
+function retryPendingContinuation(payload: YpiStudioChildRunContinuationPayload, attempts: number): void {
+  persistPendingContinuation(payload, attempts);
+  if (attempts >= CONTINUATION_DELIVERY_MAX_RETRIES) return;
+  setTimeout(() => {
+    const pending = pendingContinuations().get(payload.continuationKey);
+    if (!pending || terminalContinuationKeys().has(payload.continuationKey)) return;
+    tryDeliverYpiStudioContinuation(pending.payload, pending.attempts);
+  }, CONTINUATION_DELIVERY_RETRY_MS);
+}
+
+function tryDeliverYpiStudioContinuation(payload: YpiStudioChildRunContinuationPayload, attempts = 0): boolean {
+  const delivered = terminalContinuationKeys();
+  if (delivered.has(payload.continuationKey)) return false;
+  const callback = continuationRegistry().get(payload.parentSessionId);
+  if (!callback) {
+    persistPendingContinuation(payload, attempts);
+    return false;
+  }
+  persistPendingContinuation(payload, attempts);
+  setTimeout(() => {
+    try {
+      Promise.resolve(callback(payload)).then((accepted) => {
+        if (accepted === false) {
+          retryPendingContinuation(payload, attempts + 1);
+          return;
+        }
+        pendingContinuations().delete(payload.continuationKey);
+        delivered.add(payload.continuationKey);
+      }).catch(() => {
+        retryPendingContinuation(payload, attempts + 1);
+      });
+    } catch {
+      retryPendingContinuation(payload, attempts + 1);
+    }
+  }, 0);
+  return true;
 }
 
 export function registerYpiStudioChildRun(handle: YpiStudioChildRunHandle): void {
@@ -102,6 +164,11 @@ export function registerYpiStudioSessionContinuation(
   callback: YpiStudioSessionContinuationCallback,
 ): void {
   continuationRegistry().set(parentSessionId, callback);
+  for (const pending of pendingContinuations().values()) {
+    if (pending.payload.parentSessionId === parentSessionId) {
+      tryDeliverYpiStudioContinuation(pending.payload, pending.attempts);
+    }
+  }
 }
 
 export function unregisterYpiStudioSessionContinuation(parentSessionId: string): void {
@@ -109,24 +176,10 @@ export function unregisterYpiStudioSessionContinuation(parentSessionId: string):
 }
 
 export function scheduleYpiStudioChildRunContinuation(payload: Omit<YpiStudioChildRunContinuationPayload, "continuationKey">): boolean {
-  const continuationKey = `${payload.parentSessionId}:${payload.taskId}:${payload.runId}`;
-  const delivered = terminalContinuationKeys();
-  if (delivered.has(continuationKey)) return false;
-  const callback = continuationRegistry().get(payload.parentSessionId);
-  if (!callback) return false;
-  delivered.add(continuationKey);
-  setTimeout(() => {
-    try {
-      Promise.resolve(callback({ ...payload, continuationKey })).catch(() => {
-        // Continuation is best-effort. The terminal run is already persisted and can
-        // still be collected manually if the parent session is busy or unavailable.
-      });
-    } catch {
-      // Continuation is best-effort. The terminal run is already persisted and can
-      // still be collected manually if the parent session is busy or unavailable.
-    }
-  }, 0);
-  return true;
+  const continuation = { ...payload, continuationKey: continuationKeyFor(payload) };
+  if (terminalContinuationKeys().has(continuation.continuationKey)) return false;
+  if (pendingContinuations().has(continuation.continuationKey)) return false;
+  return tryDeliverYpiStudioContinuation(continuation);
 }
 
 export function abortYpiStudioChildRun(runId: string, reason = "abort"): boolean {

@@ -15,7 +15,7 @@ const BROWSER_SHARE_ACTION_TOOLS = ["browser_share_click", "browser_share_type",
 
 export const PRESET_DEFAULT: string[] = ["read", "bash", "edit", "write", "ypi_studio_task", ...BROWSER_SHARE_READONLY_TOOLS];
 export const PRESET_FULL: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "ypi_studio_task", ...BROWSER_SHARE_READONLY_TOOLS, ...BROWSER_SHARE_ACTION_TOOLS];
-export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent", "ypi_studio_task", "ypi_studio_subagent", ...BROWSER_SHARE_READONLY_TOOLS, ...BROWSER_SHARE_ACTION_TOOLS];
+export const PRESET_SUBAGENT: string[] = ["bash", "read", "edit", "write", "grep", "find", "ls", "subagent", "ypi_studio_task", "ypi_studio_subagent", "ypi_studio_wait", ...BROWSER_SHARE_READONLY_TOOLS, ...BROWSER_SHARE_ACTION_TOOLS];
 const BUILTIN_TOOL_NAMES = new Set(PRESET_SUBAGENT);
 
 export function getPresetFromTools(tools: ToolEntry[]): ToolPreset {

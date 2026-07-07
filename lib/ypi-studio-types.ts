@@ -763,7 +763,7 @@ export type YpiStudioSessionTaskLinkResult =
 
 export interface YpiStudioLiveRunOverlay {
   toolCallId: string;
-  toolName: "ypi_studio_task" | "ypi_studio_subagent";
+  toolName: "ypi_studio_task" | "ypi_studio_subagent" | "ypi_studio_wait";
   taskId?: string;
   taskKey?: string;
   runId?: string;

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
@@ -35,7 +35,7 @@ import {
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
 import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
-import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskDetail, YpiStudioTaskEvent, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -83,6 +83,8 @@ interface StudioTaskToolInput {
   skippedReason?: string;
   terminationReason?: string;
   localReview?: { status?: YpiStudioImplementationLocalReviewStatus; runId?: string; summary?: string };
+  detail?: "compact" | "full";
+  includeFullDetail?: boolean;
 }
 interface StudioSubagentInput {
   /** Omitted action/mode preserves the existing synchronous delegation behavior. */
@@ -97,6 +99,15 @@ interface StudioSubagentInput {
   runId?: string;
   runIds?: string[];
   cancelReason?: string;
+}
+
+interface StudioWaitInput {
+  taskId?: string;
+  runId?: string;
+  runIds?: string[];
+  until?: "child_terminal" | "next_orchestration_step";
+  timeoutMs?: number;
+  pollIntervalMs?: number;
 }
 
 export interface YpiStudioSlashCommandDefinition {
@@ -274,7 +285,7 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     state?.requiresSubagent ? "The next owner must be dispatched through ypi_studio_subagent." : "The main session may handle orchestration for this state.",
     current.implementationPlan ? `Implementation subtasks: ${current.implementation?.done ?? 0}/${current.implementation?.total ?? current.implementationPlan.subtasks.length} done; active=${current.implementation?.activeTitle ?? current.implementation?.activeSubtaskId ?? "none"}; next=${current.implementation?.nextTitle ?? current.implementation?.nextSubtaskId ?? "none"}; blocked=${current.implementation?.blocked ?? 0}.` : "Implementation plan: not saved yet.",
     current.status === "planning" ? "When planning/design artifacts are complete, save implementationPlan with ypi_studio_task(action=update_implementation_plan), transition only to awaiting_approval, and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
-    current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: fill available concurrency slots, not just one. First inspect ready work with ypi_studio_task(action=implementation_next, limit=<available slots>). Then claim ready subtask(s) up to maxConcurrency with ypi_studio_task(action=claim_implementation_subtask, limit=<available slots>, status=running) or explicit subtaskIds, and start one ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<claimed id>) per claimed subtask. Each implementer run handles exactly one subtaskId, but a single orchestration turn should launch multiple async runs when multiple ready subtasks and free slots exist. Do not delegate the whole implementation at once." : "",
+    current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: fill available concurrency slots, not just one. First inspect ready work with ypi_studio_task(action=implementation_next, limit=<available slots>). Then claim ready subtask(s) up to maxConcurrency with ypi_studio_task(action=claim_implementation_subtask, limit=<available slots>, status=running) or explicit subtaskIds, and start one ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<claimed id>) per claimed subtask. Each implementer run handles exactly one subtaskId, but a single orchestration turn should launch multiple async runs when multiple ready subtasks and free slots exist. After launching async run(s), call ypi_studio_wait(runIds=<started run ids>) so this main chat waits for terminal results and continues from the tool result. Do not delegate the whole implementation at once." : "",
     current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
     current.status === "awaiting_approval" && !approvalGranted ? "Current task is awaiting approval: summarize the plan/artifacts and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
     state?.requiresUserApproval && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
@@ -289,7 +300,7 @@ function startupContext(root: string): string {
   return [
     "<ypi-studio-context>",
     "YPI Studio workflow context is available. Studio tasks are structured under .ypi/tasks and workflows under .ypi/workflows.",
-    "The main session is the orchestrator. Use ypi_studio_task for task lifecycle and ypi_studio_subagent for role delegation.",
+    "The main session is the orchestrator. Use ypi_studio_task for task lifecycle, ypi_studio_subagent for role delegation, and ypi_studio_wait after async delegation so the main chat waits for child results as a real tool call.",
     "Design/planning must stop at awaiting_approval for user confirmation; implementation may start only after a later explicit user approval.",
     "</ypi-studio-context>",
     knowledge,
@@ -303,6 +314,266 @@ function currentTaskIdOrThrow(root: string, key: string | null, requested?: stri
   const current = key ? getCurrentYpiStudioTaskDetail(root, key) : null;
   if (!current) throw new Error("No active YPI Studio task is bound to this session. Create or bind one first.");
   return current.id;
+}
+
+function shouldReturnFullTaskDetail(input: StudioTaskToolInput): boolean {
+  return input.detail === "full" || input.includeFullDetail === true;
+}
+
+function isTaskEvent(value: unknown): value is YpiStudioTaskEvent {
+  if (!isObj(value)) return false;
+  const type = value.type;
+  return (type === "created" || type === "transition" || type === "artifact" || type === "subagent" || type === "note" || type === "archive") && typeof value.at === "string" && typeof value.taskId === "string";
+}
+
+function countNonEmptyJsonlLines(filePath: string): number {
+  if (!existsSync(filePath)) return 0;
+  const stat = statSync(filePath);
+  if (stat.size <= 0) return 0;
+  const fd = openSync(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(64 * 1024);
+    let position = 0;
+    let count = 0;
+    let sawNonWhitespace = false;
+    let currentLineHasText = false;
+    while (position < stat.size) {
+      const bytesRead = readSync(fd, buffer, 0, Math.min(buffer.length, stat.size - position), position);
+      if (bytesRead <= 0) break;
+      for (let i = 0; i < bytesRead; i += 1) {
+        const byte = buffer[i];
+        if (byte === 10) {
+          if (currentLineHasText) count += 1;
+          currentLineHasText = false;
+        } else if (byte !== 13 && byte !== 32 && byte !== 9) {
+          sawNonWhitespace = true;
+          currentLineHasText = true;
+        }
+      }
+      position += bytesRead;
+    }
+    if (currentLineHasText) count += 1;
+    return sawNonWhitespace ? count : 0;
+  } catch {
+    return 0;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function readRecentTaskEvents(root: string, task: YpiStudioTaskDetail, limit = 10): { totalCount: number; recentLimit: number; recent: YpiStudioTaskEvent[]; path: string; tailTruncated: boolean } {
+  const eventPath = join(root, task.pathLabel, "events.jsonl");
+  if (!existsSync(eventPath)) return { totalCount: 0, recentLimit: limit, recent: [], path: `${task.pathLabel}/events.jsonl`, tailTruncated: false };
+  let totalCount = 0;
+  try {
+    totalCount = countNonEmptyJsonlLines(eventPath);
+    const stat = statSync(eventPath);
+    const fd = openSync(eventPath, "r");
+    try {
+      const maxTailBytes = Math.min(stat.size, 1024 * 1024);
+      let tailBytes = Math.min(stat.size, 64 * 1024);
+      let recent: YpiStudioTaskEvent[] = [];
+      while (tailBytes <= maxTailBytes) {
+        const buffer = Buffer.alloc(tailBytes);
+        readSync(fd, buffer, 0, tailBytes, stat.size - tailBytes);
+        recent = buffer.toString("utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-limit).flatMap((line) => {
+          try {
+            const parsed = JSON.parse(line) as unknown;
+            return isTaskEvent(parsed) ? [parsed] : [];
+          } catch {
+            return [];
+          }
+        });
+        if (recent.length >= Math.min(limit, totalCount) || tailBytes === maxTailBytes) break;
+        tailBytes = Math.min(maxTailBytes, tailBytes * 2);
+      }
+      return { totalCount, recentLimit: limit, recent, path: `${task.pathLabel}/events.jsonl`, tailTruncated: stat.size > maxTailBytes };
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return { totalCount, recentLimit: limit, recent: task.events.slice(-limit), path: `${task.pathLabel}/events.jsonl`, tailTruncated: false };
+  }
+}
+
+function summarizeStudioEvent(event: YpiStudioTaskEvent): Record<string, unknown> {
+  return {
+    type: event.type,
+    at: event.at,
+    taskId: event.taskId,
+    message: event.message ? oneLine(event.message, 300) : undefined,
+    from: event.from,
+    to: event.to,
+    member: event.member,
+    artifact: event.artifact,
+  };
+}
+
+function summarizeStudioTimelineItem(item: { id: string; title: string; status: string; displayStatus?: string; member?: string; runId?: string; runStatus?: string; reason?: string; summary?: string; updatedAt: string }): Record<string, unknown> {
+  return {
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    displayStatus: item.displayStatus,
+    member: item.member,
+    runId: item.runId,
+    runStatus: item.runStatus,
+    reason: item.reason ? oneLine(item.reason, 240) : undefined,
+    summary: item.summary ? oneLine(item.summary, 240) : undefined,
+    updatedAt: item.updatedAt,
+  };
+}
+
+function summarizeStudioSubagentRun(run: YpiStudioTaskSubagentRun): Record<string, unknown> {
+  const currentTool = run.progress?.currentTool ? { toolName: run.progress.currentTool.toolName, startedAt: run.progress.currentTool.startedAt } : undefined;
+  return {
+    id: run.id,
+    member: run.member,
+    subtaskId: run.subtaskId,
+    status: run.status,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    summary: run.summary ? oneLine(run.summary, 300) : undefined,
+    error: run.error ? oneLine(run.error, 300) : undefined,
+    terminationReason: run.terminationReason,
+    model: run.model,
+    thinking: run.thinking,
+    phase: run.progress?.phase,
+    tokens: run.progress?.tokens,
+    tps: run.progress?.tps,
+    currentTool,
+  };
+}
+
+function buildNextStudioTaskAction(task: YpiStudioTaskDetail): string {
+  const summary = task.implementation;
+  if (task.status === "awaiting_approval") return "Summarize the saved plan/artifacts and ask the user for explicit approval; do not transition to implementing without a server-recorded approval grant.";
+  if (task.status === "planning") return "Finish design/planning artifacts, save implementationPlan if applicable, then transition only to awaiting_approval and stop for user confirmation.";
+  if (task.status === "implementing" && summary) {
+    const active = summary.running + summary.queued;
+    const unfinished = summary.ready + summary.waiting + summary.pending + summary.blocked + summary.failed + active;
+    if (summary.failed > 0 || summary.blocked > 0) return "Inspect failed/blocked implementation subtasks and report the blocker before dispatching more work.";
+    if (unfinished === 0 && summary.total > 0) return "Implementation subtasks are complete and no active run remains: transition the task to checking and dispatch the checker.";
+    if (summary.ready > 0) return "Call ypi_studio_task(action=implementation_next, limit=<available slots>), claim ready subtasks, then start one async implementer per claimed subtaskId.";
+    if (active > 0) return "Poll or collect active Studio subagent runs with ypi_studio_subagent before claiming more work.";
+  }
+  if (task.status === "checking") {
+    const activeChecker = task.subagents.find((run) => run.member === "checker" && (run.status === "queued" || run.status === "running"));
+    if (activeChecker) return `Checker is still ${activeChecker.status}: poll or collect run ${activeChecker.id} instead of dispatching another checker.`;
+    const terminalChecker = task.subagents.filter((run) => run.member === "checker" && run.finishedAt).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt))[0];
+    if (terminalChecker) return `Checker finished with status ${terminalChecker.status}: collect run ${terminalChecker.id}, then complete the task only if the checker verdict has no needs-work/blocker findings; otherwise report the remaining work or return to implementing.`;
+    return "Dispatch checker work via ypi_studio_subagent, then transition according to the workflow result.";
+  }
+  if (task.status === "completed") return "Task is completed; archive only when the user asks or the workflow calls for durable knowledge capture.";
+  return "Use the task status/progress summary to choose the next workflow transition; request full detail only if the compact summary is insufficient.";
+}
+
+function compactYpiStudioTaskForTool(root: string, task: YpiStudioTaskDetail): Record<string, unknown> {
+  const recentEvents = readRecentTaskEvents(root, task, 10);
+  const documentIndex = Object.fromEntries(Object.entries(task.artifacts).map(([artifact, fileName]) => {
+    const document = task.documents[artifact];
+    return [artifact, {
+      fileName,
+      path: `${task.pathLabel}/${fileName}`,
+      available: !!document,
+      truncated: document?.truncated ?? false,
+      chars: document?.content.length ?? 0,
+    }];
+  }));
+  const subagentStatusCounts = task.subagents.reduce<Record<string, number>>((counts, run) => {
+    counts[run.status] = (counts[run.status] ?? 0) + 1;
+    return counts;
+  }, {});
+  const activeSubagents = task.subagents.filter((run) => run.status === "queued" || run.status === "running" || run.status === "waiting_for_user").map(summarizeStudioSubagentRun);
+  const recentSubagents = task.subagents.slice(-5).map(summarizeStudioSubagentRun);
+  const projection = task.implementationProjection;
+  const compactProjection = projection ? {
+    maxConcurrency: projection.maxConcurrency,
+    statusCounts: projection.statusCounts,
+    activeSubtaskIds: projection.activeSubtaskIds,
+    queuedSubtaskIds: projection.queuedSubtaskIds,
+    nextSubtaskIds: projection.nextSubtaskIds,
+    nonTerminalSubtasks: projection.nonTerminalSubtasks.map((subtask) => ({
+      id: subtask.id,
+      title: subtask.title,
+      status: subtask.status,
+      displayStatus: subtask.displayStatus,
+      waitingOn: subtask.waitingOn,
+      blockedBy: subtask.blockedBy,
+      blockedReason: subtask.blockedReason,
+      summary: subtask.summary ? oneLine(subtask.summary, 240) : undefined,
+    })),
+    compactTimeline: projection.compactTimeline.slice(-10).map(summarizeStudioTimelineItem),
+    sessionRuntime: projection.sessionRuntime ? {
+      status: projection.sessionRuntime.status,
+      message: projection.sessionRuntime.message,
+      activeRunCount: projection.sessionRuntime.activeRunCount,
+      queuedRunCount: projection.sessionRuntime.queuedRunCount,
+      readySubtaskCount: projection.sessionRuntime.readySubtaskCount,
+      blockedSubtaskCount: projection.sessionRuntime.blockedSubtaskCount,
+      failedSubtaskCount: projection.sessionRuntime.failedSubtaskCount,
+      updatedAt: projection.sessionRuntime.updatedAt,
+    } : undefined,
+  } : undefined;
+  return {
+    key: task.key,
+    id: task.id,
+    title: task.title,
+    workflowId: task.workflowId,
+    workflowName: task.workflowName,
+    status: task.status,
+    cwd: task.cwd,
+    pathLabel: task.pathLabel,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    completedAt: task.completedAt,
+    currentMember: task.currentMember,
+    contextIds: task.contextIds,
+    progress: task.progress,
+    archived: task.archived,
+    archiveMonth: task.archiveMonth,
+    archivedAt: task.archivedAt,
+    artifacts: {
+      required: task.progress.requiredArtifacts,
+      optional: task.progress.optionalArtifacts,
+      completed: task.progress.completedArtifacts,
+      missing: task.progress.missingArtifacts,
+      files: documentIndex,
+    },
+    implementation: task.implementation,
+    implementationPlan: task.implementationPlan ? {
+      summary: task.implementationPlan.summary,
+      strategy: task.implementationPlan.strategy,
+      maxConcurrency: task.implementationPlan.maxConcurrency,
+      subtaskCount: task.implementationPlan.subtasks.length,
+    } : undefined,
+    implementationProgress: task.implementationProgress ? {
+      updatedAt: task.implementationProgress.updatedAt,
+      counts: task.implementationProgress.counts,
+      activeSubtaskIds: task.implementationProgress.activeSubtaskIds ?? [],
+      queuedSubtaskIds: task.implementationProgress.queuedSubtaskIds ?? [],
+      nextSubtaskIds: task.implementationProgress.nextSubtaskIds ?? [],
+    } : undefined,
+    implementationProjection: compactProjection,
+    subagents: {
+      totalCount: task.subagents.length,
+      statusCounts: subagentStatusCounts,
+      active: activeSubagents,
+      recentLimit: 5,
+      recent: recentSubagents,
+    },
+    events: { ...recentEvents, recent: recentEvents.recent.map(summarizeStudioEvent) },
+    nextRecommendedAction: buildNextStudioTaskAction(task),
+    readHints: [
+      `Artifacts live under ${task.pathLabel}; read specific files from the artifacts.files map when their content is needed.`,
+      `Events are omitted except the recent ${recentEvents.recentLimit}; totalCount=${recentEvents.totalCount}. Read ${recentEvents.path} manually only if old event history is needed.`,
+      "Default ypi_studio_task current/get output is compact. Use detail='full' or includeFullDetail=true only when full JSON is truly necessary.",
+    ],
+  };
+}
+
+function taskToolPayload(root: string, task: YpiStudioTaskDetail, input: StudioTaskToolInput): YpiStudioTaskDetail | Record<string, unknown> {
+  return shouldReturnFullTaskDetail(input) ? task : compactYpiStudioTaskForTool(root, task);
 }
 
 function isLocalReviewStatus(value: unknown): value is YpiStudioImplementationLocalReviewStatus {
@@ -341,6 +612,8 @@ function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
     skippedReason: str(raw.skippedReason) ?? undefined,
     terminationReason: str(raw.terminationReason) ?? undefined,
     localReview: isObj(raw.localReview) ? { status: isLocalReviewStatus(raw.localReview.status) ? raw.localReview.status : undefined, runId: str(raw.localReview.runId) ?? undefined, summary: str(raw.localReview.summary) ?? undefined } : undefined,
+    detail: raw.detail === "full" ? "full" : raw.detail === "compact" ? "compact" : undefined,
+    includeFullDetail: raw.includeFullDetail === true,
   };
 }
 
@@ -358,6 +631,24 @@ function normalizeSubagentInput(value: unknown): StudioSubagentInput {
     runId: str(raw.runId) ?? undefined,
     runIds: Array.isArray(raw.runIds) ? raw.runIds.filter((item): item is string => typeof item === "string") : undefined,
     cancelReason: str(raw.cancelReason) ?? undefined,
+  };
+}
+
+function normalizeWaitInput(value: unknown): StudioWaitInput {
+  const raw = isObj(value) ? value : {};
+  const timeoutMs = typeof raw.timeoutMs === "number" && Number.isFinite(raw.timeoutMs)
+    ? Math.min(60 * 60_000, Math.max(1_000, Math.floor(raw.timeoutMs)))
+    : undefined;
+  const pollIntervalMs = typeof raw.pollIntervalMs === "number" && Number.isFinite(raw.pollIntervalMs)
+    ? Math.min(15_000, Math.max(500, Math.floor(raw.pollIntervalMs)))
+    : undefined;
+  return {
+    taskId: str(raw.taskId) ?? undefined,
+    runId: str(raw.runId) ?? undefined,
+    runIds: Array.isArray(raw.runIds) ? raw.runIds.filter((item): item is string => typeof item === "string") : undefined,
+    until: raw.until === "next_orchestration_step" ? "next_orchestration_step" : raw.until === "child_terminal" ? "child_terminal" : undefined,
+    timeoutMs,
+    pollIntervalMs,
   };
 }
 
@@ -1240,6 +1531,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
       "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit=<available concurrency slots> to inspect the ready batch, then claim all ready subtask(s) that fit the free slots before dispatching one async implementer per claimed subtaskId.",
+      "current/get return compact summaries by default, with artifact paths, recent 10 events, event totalCount, and nextRecommendedAction. Request detail='full' only when the compact summary is insufficient.",
     ],
     parameters: {
       type: "object",
@@ -1271,6 +1563,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         skippedReason: { type: "string" },
         terminationReason: { type: "string" },
         localReview: { type: "object" },
+        detail: { type: "string", enum: ["compact", "full"], description: "current/get default to compact task summaries. Use full only when the complete task JSON is truly needed." },
+        includeFullDetail: { type: "boolean", description: "Compatibility alias for detail='full'. Defaults to false." },
       },
     },
     execute: async (_id: string, inputValue: unknown, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: PiExtensionContext): Promise<PiToolResult> => {
@@ -1286,33 +1580,34 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const title = str(input.title);
           if (!title) throw new Error("title is required for create");
           const task = createYpiStudioTask({ cwd: root, title, workflowId: str(input.workflowId) ?? undefined, contextId: key });
-          return { content: [{ type: "text", text: `Created YPI Studio task ${task.id} (${task.status}).` }], details: { task } };
+          return { content: [{ type: "text", text: `Created YPI Studio task ${task.id} (${task.status}).` }], details: { task: taskToolPayload(root, task, input) } };
         }
         if (action === "get") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const task = getYpiStudioTaskDetail(root, taskId);
           if (!task) throw new Error("Task not found");
-          return { content: [{ type: "text", text: JSON.stringify(task, null, 2) }], details: { task } };
+          const payload = taskToolPayload(root, task, input);
+          return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], details: { task: payload } };
         }
         if (action === "transition") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const to = str(input.to);
           if (!to) throw new Error("to is required for transition");
           const task = transitionYpiStudioTask(taskId, { cwd: root, to, reason: str(input.reason) ?? undefined, contextId: key, override: input.override === true });
-          return { content: [{ type: "text", text: `Transitioned YPI Studio task ${task.id} to ${task.status}.` }], details: { task } };
+          return { content: [{ type: "text", text: `Transitioned YPI Studio task ${task.id} to ${task.status}.` }], details: { task: taskToolPayload(root, task, input) } };
         }
         if (action === "update_artifact") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const artifact = str(input.artifact);
           if (!artifact) throw new Error("artifact is required for update_artifact");
           const task = updateYpiStudioTaskArtifact(taskId, { cwd: root, artifact, content: input.content ?? "", contextId: key });
-          return { content: [{ type: "text", text: `Updated YPI Studio artifact ${artifact} for ${task.id}.` }], details: { task } };
+          return { content: [{ type: "text", text: `Updated YPI Studio artifact ${artifact} for ${task.id}.` }], details: { task: taskToolPayload(root, task, input) } };
         }
         if (action === "update_implementation_plan") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           if (!input.implementationPlan) throw new Error("implementationPlan is required for update_implementation_plan");
           const task = updateYpiStudioImplementationPlan(taskId, { cwd: root, action: "update_implementation_plan", implementationPlan: input.implementationPlan, contextId: key });
-          return { content: [{ type: "text", text: `Updated implementation plan for ${task.id}: ${task.implementation?.total ?? 0} subtasks.` }], details: { task } };
+          return { content: [{ type: "text", text: `Updated implementation plan for ${task.id}: ${task.implementation?.total ?? 0} subtasks.` }], details: { task: taskToolPayload(root, task, input) } };
         }
         if (action === "implementation_next") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
@@ -1321,7 +1616,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const text = result.subtasks.length > 1
             ? `Ready implementation subtasks: ${result.subtasks.map((subtask) => `${subtask.id} · ${subtask.title}`).join("; ")}`
             : result.subtask ? `Next implementation subtask: ${result.subtask.id} · ${result.subtask.title}` : "No ready implementation subtask is available.";
-          return { content: [{ type: "text", text }], details: { ...result, waiting } };
+          return { content: [{ type: "text", text }], details: { ...result, task: taskToolPayload(root, result.task, input), waiting } };
         }
         if (action === "claim_implementation_subtask") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
@@ -1340,7 +1635,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const claimedIds = newlyClaimedSubtaskIds.length ? newlyClaimedSubtaskIds : fallbackClaimedIds;
           return {
             content: [{ type: "text", text: `Claimed implementation subtask(s) ${claimedIds.join(", ") || "unknown"} for ${task.id}. Active=${activeSubtaskIds.join(", ") || "none"}; queued=${queuedSubtaskIds.join(", ") || "none"}. Dispatch one async implementer per newly claimed subtask until maxConcurrency is full.` }],
-            details: { task, newlyClaimedSubtaskIds, subtaskIds: claimedIds, activeSubtaskIds, queuedSubtaskIds, subtaskId: claimedIds[0] ?? task.implementationProgress?.activeSubtaskId },
+            details: { task: taskToolPayload(root, task, input), newlyClaimedSubtaskIds, subtaskIds: claimedIds, activeSubtaskIds, queuedSubtaskIds, subtaskId: claimedIds[0] ?? task.implementationProgress?.activeSubtaskId },
           };
         }
         if (action === "update_implementation_subtask") {
@@ -1348,7 +1643,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const subtaskId = str(input.subtaskId);
           if (!subtaskId || !input.status) throw new Error("subtaskId and status are required for update_implementation_subtask");
           const task = updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedBy: input.blockedBy, blockedReason: input.blockedReason, skippedReason: input.skippedReason, terminationReason: input.terminationReason, localReview: input.localReview, contextId: key });
-          return { content: [{ type: "text", text: `Implementation subtask ${subtaskId} -> ${input.status}.` }], details: { task, subtaskId } };
+          return { content: [{ type: "text", text: `Implementation subtask ${subtaskId} -> ${input.status}.` }], details: { task: taskToolPayload(root, task, input), subtaskId } };
         }
         if (action === "archive") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
@@ -1362,10 +1657,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             allowFallbackKnowledge: !input.knowledgeSummary || !input.knowledgeMarkdown,
           });
           const warningText = result.warnings?.length ? ` Warnings: ${result.warnings.join("; ")}` : "";
-          return { content: [{ type: "text", text: `Archived YPI Studio task ${result.task.id}. Knowledge: ${result.knowledge.knowledgePath}.${warningText}` }], details: result };
+          return { content: [{ type: "text", text: `Archived YPI Studio task ${result.task.id}. Knowledge: ${result.knowledge.knowledgePath}.${warningText}` }], details: { ...result, task: taskToolPayload(root, result.task, input) } };
         }
         const current = getCurrentYpiStudioTaskDetail(root, key);
-        const payload = current ? { task: current } : { task: null, tasks: listYpiStudioTasks(root, { scope: input.scope ?? "active" }).tasks.slice(0, 8) };
+        const payload = current ? { task: taskToolPayload(root, current, input) } : { task: null, tasks: listYpiStudioTasks(root, { scope: input.scope ?? "active" }).tasks.slice(0, 8) };
         return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], details: payload };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1383,7 +1678,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
       "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
       "When dispatching implementer for a task with implementationPlan, each ypi_studio_subagent run must pass exactly one claimed subtaskId; to use parallelism, launch multiple async implementer runs in the same orchestration turn until maxConcurrency is full.",
-      "Omitting action/mode preserves the current synchronous behavior. Async orchestration uses action=start with mode=async; when an async child reaches a terminal state, the same parent session is automatically nudged to collect the run and continue the implementation plan. poll/collect/cancel by runId remain available and must be idempotent.",
+      "Omitting action/mode preserves the current synchronous behavior. Async orchestration uses action=start with mode=async; immediately call ypi_studio_wait with the returned runId(s) so the main chat waits on a real tool result. Background terminal continuations remain as a fallback. poll/collect/cancel by runId remain available and must be idempotent.",
     ],
     parameters: {
       type: "object",
@@ -1424,7 +1719,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const unfinished = projected.filter((run) => run.status === "queued" || run.status === "running").length;
           return {
             content: [{ type: "text", text: action === "collect" && unfinished === 0 ? `Collected ${projected.length} Studio subagent run(s).` : `${projected.length} Studio subagent run(s): ${projected.map((run) => `${run.runId}=${run.status}`).join(", ")}` }],
-            details: { action, mode, task: refreshed, runs: projected, run: projected[0] },
+            details: { action, mode, task: compactYpiStudioTaskForTool(root, refreshed), runs: projected, run: projected[0] },
           };
         }
 
@@ -1453,7 +1748,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           });
           const refreshed = getYpiStudioTaskDetail(root, taskId) ?? taskDetail;
           const projected = cancelledRuns.map((run) => projectSubagentRun(root, taskId, refreshed.subagents.find((item) => item.id === run.id) ?? run));
-          return { content: [{ type: "text", text: `Cancelled Studio subagent run(s): ${requestedRunIds.join(", ")}.` }], details: { action, mode, task: refreshed, runs: projected, run: projected[0] } };
+          return { content: [{ type: "text", text: `Cancelled Studio subagent run(s): ${requestedRunIds.join(", ")}.` }], details: { action, mode, task: compactYpiStudioTaskForTool(root, refreshed), runs: projected, run: projected[0] } };
         }
 
         const requestedMember = str(input.member);
@@ -1548,7 +1843,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           root,
           childPrompt,
           policy,
-          { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), subtaskId, continuationOnFinal: mode === "async" },
+          { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), subtaskId, continuationOnFinal: false },
           writer,
           signal,
           onUpdate,
@@ -1560,8 +1855,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         if (mode === "async") {
           childPromise.catch(() => {});
           return {
-            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. The parent session will be nudged automatically when it finishes; action=poll or action=collect with runId remains available.` }],
-            details: { action: "start", mode: "async", task: taskAfterInitialRun, run: projectSubagentRun(root, taskId, runningRun), warnings: [...policy.warnings, ...warnings].length ? [...policy.warnings, ...warnings] : undefined },
+            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. Next call ypi_studio_wait(runId=${runId}) so the main chat waits for the child result and continues from the tool result; action=poll or action=collect with runId remains available.` }],
+            details: { action: "start", mode: "async", task: compactYpiStudioTaskForTool(root, taskAfterInitialRun), run: projectSubagentRun(root, taskId, runningRun), wait: { tool: "ypi_studio_wait", taskId, runIds: [runId], until: "child_terminal" }, warnings: [...policy.warnings, ...warnings].length ? [...policy.warnings, ...warnings] : undefined },
           };
         }
         const result = await childPromise;
@@ -1587,10 +1882,96 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           transcript: result.transcript,
         };
         const task = recordYpiStudioSubagentRun(root, taskId, run);
-        return { content: [{ type: "text", text: result.output }], details: { action: "start", mode: "sync", task, run, warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
+        return { content: [{ type: "text", text: result.output }], details: { action: "start", mode: "sync", task: compactYpiStudioTaskForTool(root, task), run: projectSubagentRun(root, taskId, run), warnings: allWarnings.length ? allWarnings : undefined }, isError: result.status === "failed" || result.status === "cancelled" };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { content: [{ type: "text", text: message }], details: { error: message }, isError: true };
+      }
+    },
+  });
+
+  pi.registerTool?.({
+    name: "ypi_studio_wait",
+    label: "YPI Studio Wait",
+    description: "Wait for YPI Studio child runs to reach a terminal state and return a compact result to the main chat.",
+    promptSnippet: "Use ypi_studio_wait after starting async YPI Studio subagents so the main chat waits for their results instead of relying on background continuation.",
+    promptGuidelines: [
+      "After ypi_studio_subagent(action=start, mode=async), call ypi_studio_wait with the returned runId(s) unless you are explicitly only reporting that background work has started.",
+      "ypi_studio_wait streams compact progress via onUpdate and returns terminal run summaries; continue orchestration from its result.",
+      "If wait returns still_running due to timeout, tell the user Studio is still working or call ypi_studio_wait again with an appropriate timeout.",
+    ],
+    parameters: {
+      type: "object",
+      properties: {
+        taskId: { type: "string" },
+        runId: { type: "string" },
+        runIds: { type: "array", items: { type: "string" } },
+        until: { type: "string", enum: ["child_terminal", "next_orchestration_step"], description: "Defaults to child_terminal; next_orchestration_step currently waits for child terminal and returns orchestration hints." },
+        timeoutMs: { type: "number", description: "Maximum wait time. Defaults to 30 minutes, capped at 60 minutes." },
+        pollIntervalMs: { type: "number", description: "Polling interval. Defaults to 2000ms." },
+      },
+    },
+    execute: async (_id: string, inputValue: unknown, signal?: AbortSignal, onUpdate?: ToolUpdateCallback, ctx?: PiExtensionContext): Promise<PiToolResult> => {
+      const input = normalizeWaitInput(inputValue);
+      const key = getKey(input, ctx);
+      const taskId = currentTaskIdOrThrow(root, key, input.taskId);
+      const requestedRunIds = input.runIds?.length ? input.runIds : input.runId ? [input.runId] : [];
+      const timeoutMs = input.timeoutMs ?? 30 * 60_000;
+      const pollIntervalMs = input.pollIntervalMs ?? 2_000;
+      const startedAt = Date.now();
+      const terminalStatuses = new Set<YpiStudioTaskSubagentRun["status"]>(["succeeded", "failed", "cancelled", "waiting_for_user"]);
+      const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+      const resolveRuns = () => {
+        const detail = getYpiStudioTaskDetail(root, taskId);
+        if (!detail) throw new Error("Task not found");
+        const sourceRuns = requestedRunIds.length
+          ? requestedRunIds.map((id) => {
+            const run = detail.subagents.find((item) => item.id === id);
+            if (!run) throw new Error(`Studio subagent run not found: ${id}`);
+            return run;
+          })
+          : detail.subagents.filter((run) => run.status === "queued" || run.status === "running");
+        return { detail, runs: sourceRuns };
+      };
+
+      while (true) {
+        if (signal?.aborted) {
+          return { content: [{ type: "text", text: "YPI Studio wait cancelled by parent session." }], details: { taskId, runIds: requestedRunIds, status: "cancelled" }, isError: true };
+        }
+        const { detail, runs } = resolveRuns();
+        const projected = runs.map((run) => projectSubagentRun(root, taskId, run));
+        const terminal = projected.filter((run) => terminalStatuses.has(run.status));
+        const running = projected.filter((run) => !terminalStatuses.has(run.status));
+        const firstRun = projected[0];
+        const statusText = projected.length
+          ? projected.map((run) => `${run.runId}=${run.status}`).join(", ")
+          : "no active Studio subagent run";
+        onUpdate?.({
+          content: [{ type: "text", text: `Waiting for YPI Studio run(s): ${statusText}` }],
+          details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: projected, run: firstRun, status: running.length ? "waiting" : "terminal" },
+        });
+        if (!requestedRunIds.length && projected.length === 0) {
+          return {
+            content: [{ type: "text", text: "No active YPI Studio subagent run is currently waiting." }],
+            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: [], status: "no_active_runs", nextRecommendedAction: buildNextStudioTaskAction(detail) },
+          };
+        }
+        if (projected.length > 0 && running.length === 0) {
+          const failed = terminal.filter((run) => run.status === "failed" || run.status === "cancelled" || run.status === "waiting_for_user");
+          const text = `YPI Studio wait complete: ${statusText}. Next: ${buildNextStudioTaskAction(detail)}`;
+          return {
+            content: [{ type: "text", text }],
+            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: projected, run: firstRun, status: "terminal", nextRecommendedAction: buildNextStudioTaskAction(detail) },
+            isError: failed.length > 0,
+          };
+        }
+        if (Date.now() - startedAt >= timeoutMs) {
+          return {
+            content: [{ type: "text", text: `YPI Studio wait timed out; still running: ${statusText}` }],
+            details: { action: "wait", task: compactYpiStudioTaskForTool(root, detail), runs: projected, run: firstRun, status: "still_running", timeoutMs },
+          };
+        }
+        await sleep(pollIntervalMs);
       }
     },
   });

@@ -300,6 +300,75 @@ function progressFor(implementationPlan, statuses = {}) {
 }
 
 {
+  const parentSessionId = "pi_terminal_continuation_late_register";
+  const payload = {
+    runId: "run-terminal-continuation-late",
+    taskId: "task-terminal-continuation-late",
+    subtaskId: "A",
+    member: "implementer",
+    cwd: process.cwd(),
+    parentSessionId,
+    status: "succeeded",
+    summary: "done",
+    finishedAt: now,
+  };
+  assert.equal(scheduleYpiStudioChildRunContinuation(payload), false);
+  assert.equal(scheduleYpiStudioChildRunContinuation(payload), false);
+  let calls = 0;
+  const received = new Promise((resolve) => {
+    registerYpiStudioSessionContinuation(parentSessionId, (actual) => {
+      calls += 1;
+      resolve(actual);
+    });
+  });
+  try {
+    const actual = await received;
+    assert.equal(actual.continuationKey, `${parentSessionId}:${payload.taskId}:${payload.runId}`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(calls, 1);
+  } finally {
+    unregisterYpiStudioSessionContinuation(parentSessionId);
+  }
+}
+
+{
+  const parentSessionId = "pi_terminal_continuation_retry_rejected";
+  const payload = {
+    runId: "run-terminal-continuation-retry",
+    taskId: "task-terminal-continuation-retry",
+    subtaskId: "A",
+    member: "implementer",
+    cwd: process.cwd(),
+    parentSessionId,
+    status: "succeeded",
+    summary: "done",
+    finishedAt: now,
+  };
+  let calls = 0;
+  registerYpiStudioSessionContinuation(parentSessionId, () => {
+    calls += 1;
+    return false;
+  });
+  try {
+    assert.equal(scheduleYpiStudioChildRunContinuation(payload), true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(calls, 1);
+    unregisterYpiStudioSessionContinuation(parentSessionId);
+    const received = new Promise((resolve) => {
+      registerYpiStudioSessionContinuation(parentSessionId, (actual) => {
+        calls += 1;
+        resolve(actual);
+      });
+    });
+    const actual = await received;
+    assert.equal(actual.continuationKey, `${parentSessionId}:${payload.taskId}:${payload.runId}`);
+    assert.equal(calls, 2);
+  } finally {
+    unregisterYpiStudioSessionContinuation(parentSessionId);
+  }
+}
+
+{
   const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-inline-approval-"));
   try {
     const contextId = "pi_inline_approval";
