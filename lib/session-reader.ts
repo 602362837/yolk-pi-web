@@ -1,11 +1,12 @@
 import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
 import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd, expandCwd } from "./cwd";
+import { getSessionProjectLink } from "./session-project-link";
 
 export { getAgentDir };
 
@@ -33,6 +34,27 @@ function cwdMatchesAny(cwd: string | undefined, targets: Set<string>): boolean {
     if (targets.has(key)) return true;
   }
   return false;
+}
+
+function readFirstLineSync(filePath: string): string {
+  const fd = openSync(filePath, "r");
+  try {
+    const chunks: Buffer[] = [];
+    const buffer = Buffer.allocUnsafe(4096);
+    while (true) {
+      const bytesRead = readSync(fd, buffer, 0, buffer.length, null);
+      if (bytesRead <= 0) break;
+      const newlineIndex = buffer.subarray(0, bytesRead).indexOf(10);
+      if (newlineIndex !== -1) {
+        chunks.push(Buffer.from(buffer.subarray(0, newlineIndex)));
+        break;
+      }
+      chunks.push(Buffer.from(buffer.subarray(0, bytesRead)));
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
 }
 
 function isDeletedWorktreeCwd(cwd: string | undefined): boolean {
@@ -93,7 +115,11 @@ export async function listSessionCwdsForAllowedRoots(): Promise<string[]> {
   return [...new Set(piSessions.map((session) => session.cwd).filter((cwd): cwd is string => Boolean(cwd)))];
 }
 
-export async function listAllSessions(): Promise<SessionInfo[]> {
+export interface ListAllSessionsOptions {
+  includeGit?: boolean;
+}
+
+export async function listAllSessions(options: ListAllSessionsOptions = {}): Promise<SessionInfo[]> {
   let piSessions: PiSessionInfo[] = await SessionManager.listAll();
   const prunedSessionIds = pruneDeletedWorktreeSessions(piSessions);
   if (prunedSessionIds.size > 0) {
@@ -109,43 +135,55 @@ export async function listAllSessions(): Promise<SessionInfo[]> {
 
   const gitByCwd = new Map<string, SessionInfo["git"]>();
   const worktreeByCwd = new Map<string, SessionInfo["worktree"]>();
-  await Promise.all([...new Set(canonicalCwdBySessionId.values())].map(async (cwd) => {
-    try {
-      const metadata = await getGitMetadataForCwd(cwd);
-      if (metadata) {
-        gitByCwd.set(cwd, metadata);
-        if (metadata.isWorktree) {
-          worktreeByCwd.set(cwd, {
-            isWorktree: true,
-            branch: metadata.branch,
-            repoRoot: metadata.repoRoot,
-            mainWorktreePath: metadata.mainWorktreePath,
-            mainWorktreeBranch: metadata.mainWorktreeBranch,
-          });
+  if (options.includeGit) {
+    await Promise.all([...new Set(canonicalCwdBySessionId.values())].map(async (cwd) => {
+      try {
+        const metadata = await getGitMetadataForCwd(cwd);
+        if (metadata) {
+          gitByCwd.set(cwd, metadata);
+          if (metadata.isWorktree) {
+            worktreeByCwd.set(cwd, {
+              isWorktree: true,
+              branch: metadata.branch,
+              repoRoot: metadata.repoRoot,
+              mainWorktreePath: metadata.mainWorktreePath,
+              mainWorktreeBranch: metadata.mainWorktreeBranch,
+            });
+          }
         }
+      } catch {
+        // Git metadata is best-effort; normal session listing must still work.
       }
-    } catch {
-      // Git metadata is best-effort; normal session listing must still work.
-    }
-  }));
+    }));
+  }
 
   const cache = getPathCache();
   return piSessions.map((s) => {
     const cwd = canonicalCwdBySessionId.get(s.id) ?? s.cwd;
     // Populate path cache so resolveSessionPath works without a full scan
     cache.set(s.id, s.path);
+    let projectLink: { legacyUnassigned: boolean; projectId?: string; spaceId?: string } = { legacyUnassigned: true };
+    try {
+      const headerLine = readFirstLineSync(s.path);
+      projectLink = getSessionProjectLink(JSON.parse(headerLine) as never);
+    } catch {
+      // Keep session listing tolerant of malformed/missing headers; orphan handling lives in detail routes.
+    }
     return {
       path: s.path,
       id: s.id,
       cwd,
       name: s.name,
+      projectId: projectLink.projectId,
+      spaceId: projectLink.spaceId,
+      legacyUnassigned: projectLink.legacyUnassigned,
       created: s.created instanceof Date ? s.created.toISOString() : String(s.created),
       modified: s.modified instanceof Date ? s.modified.toISOString() : String(s.modified),
       messageCount: s.messageCount,
       firstMessage: s.firstMessage || "(no messages)",
       parentSessionId: s.parentSessionPath ? pathToId.get(s.parentSessionPath) : undefined,
-      worktree: cwd ? worktreeByCwd.get(cwd) : undefined,
-      git: cwd ? gitByCwd.get(cwd) : undefined,
+      worktree: options.includeGit && cwd ? worktreeByCwd.get(cwd) : undefined,
+      git: options.includeGit && cwd ? gitByCwd.get(cwd) : undefined,
     };
   });
 }
@@ -452,11 +490,15 @@ async function listArchivedSessions(cwd?: string): Promise<SessionInfo[]> {
           // use header timestamp
         }
 
+        const projectLink = getSessionProjectLink(header as never);
         sessions.push({
           path: filePath,
           id: header.id,
           cwd: sessionCwd,
           name: sm.getSessionName(),
+          projectId: projectLink.projectId,
+          spaceId: projectLink.spaceId,
+          legacyUnassigned: projectLink.legacyUnassigned,
           created: header.timestamp ?? modified,
           modified,
           messageCount,

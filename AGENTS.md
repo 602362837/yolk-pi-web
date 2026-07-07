@@ -54,6 +54,7 @@ npm run dev     # http://localhost:30141
 | --- | --- | --- |
 | Session browsing/parsing | `lib/session-reader.ts`, `app/api/sessions/**` | `docs/architecture/overview.md`, `docs/modules/api.md` |
 | Session changed-file overlay | `lib/session-file-changes.ts`, `components/SessionChangesFloatingPanel.tsx`, `app/api/sessions/[id]/changes/**` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
+| Project registry and project spaces | `lib/project-registry.ts`, `app/api/projects/**`, `components/SessionSidebar.tsx` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
 | Agent command lifecycle | `lib/rpc-manager.ts`, `app/api/agent/**` | `docs/architecture/overview.md` |
 | Chat/session UI state | `hooks/useAgentSession.ts`, `components/ChatWindow.tsx`, `components/ChatInput.tsx` | `docs/modules/frontend.md` |
 | Tool-call normalization | `lib/normalize.ts` | `docs/architecture/overview.md`, `docs/modules/library.md` |
@@ -71,6 +72,8 @@ Keep this section short and operational; detailed rationale belongs in `docs/arc
 - Normalize pi tool calls through `lib/normalize.ts`; do not hand-roll tool-call field mapping in components/routes.
 - Track session changed-file UI through non-Git sidecars in `lib/session-file-changes.ts`; do not derive it from Git status.
 - Treat session header `parentSession` as display metadata only; content comes from JSONL entries.
+- Treat Project Registry as the project list source; sessions are space history and must not be scanned to synthesize top-level projects.
+- Keep project/space path comparisons on canonical `pathKey` values so symlink/display paths do not duplicate projects.
 - When changing event kinds, JSONL records, RPC payloads, config fields, or shared constants, search for all consumers first and update docs/tests/validation notes.
 - Do not reset or overwrite unrelated user changes.
 
@@ -108,6 +111,8 @@ node_modules/.bin/tsc --noEmit
 | Default data dir | `~/.pi/agent/` |
 | Data dir override | `PI_CODING_AGENT_DIR` |
 | Session files | `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl` |
+| Project registry | `~/.pi/agent/pi-web-projects.json` |
+| Project-session index sidecar | `~/.pi/agent/pi-web-session-index.json` |
 | Model config | `~/.pi/agent/models.json` |
 | Settings/default model | `~/.pi/agent/settings.json` |
 | Web UI settings (Yolk Pi chat defaults, WorkTree, Usage, Web Terminal, ChatGPT panel, Editor) | `~/.pi/agent/pi-web.json` |

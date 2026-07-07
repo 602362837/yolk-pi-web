@@ -21,10 +21,26 @@ Browser                Next.js Server              AgentSession (in-process)
 
 ## Key Boundaries
 
+- Project Registry is the only top-level project list data source: `/api/projects` reads `~/.pi/agent/pi-web-projects.json` and never scans sessions to synthesize projects.
+- Sessions are project-space history records, not project records. Space session lists may filter session headers by `projectId`/`spaceId` and may show exact-cwd legacy sessions separately, but they must not backfill legacy headers automatically.
 - Session browsing does not create an AgentSession: API routes read `.jsonl` files through `lib/session-reader.ts`; the only write side effect is pruning stale sessions whose cwd points at a deleted WorkTree.
 - Sending commands creates or reuses an in-process AgentSession through `lib/rpc-manager.ts`.
 - Client state and SSE streaming behavior are centralized in `hooks/useAgentSession.ts`.
 - File viewing and workspace metadata use explicit API routes under `app/api/files/`, `app/api/cwd/`, and `app/api/git/`.
+
+## Project Registry
+
+Project records are stored at:
+
+```text
+~/.pi/agent/pi-web-projects.json
+```
+
+Each project has a stable `id`, display `rootPath`, canonical `pathKey`, metadata fields (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`), and a `spaces` map. The `main` space represents the project root; `worktree` spaces represent Git worktrees discovered from `git worktree list --porcelain` or created through the WorkTree API.
+
+Path matching uses `canonicalizeProjectPath()` from `lib/project-registry.ts`: expand and normalize the display path, prefer `fs.realpath` for `realRootPath`/`realPath`, and compare the resulting de-trailed `pathKey`. Project and space dedupe, WorkTree matching, legacy exact-cwd matching, and allowed-root checks should compare `pathKey` rather than display paths so symlinks do not create duplicate projects.
+
+`pi-web-session-index.json` is a best-effort performance sidecar for newly linked/forked sessions. Session JSONL headers remain the source of truth for project-space linkage.
 
 ## Project Invariants
 
@@ -43,6 +59,7 @@ Browser                Next.js Server              AgentSession (in-process)
 ### Session files
 
 - `parentSession` is display metadata only and does not affect chat content.
+- `projectId`/`spaceId` are optional project-space linkage fields. New web-created linked sessions write both fields and update `pi-web-session-index.json`; old sessions without either field remain readable/openable and are reported as legacy unassigned.
 - Session files are fully rewritable when updating display metadata such as cascade reparenting on delete.
 - Deleting or archiving a linked Git WorkTree also deletes session JSONL files whose `cwd` points at that WorkTree; session listing also prunes stale missing `*.worktrees/*` cwd sessions left by older versions.
 - Orphaned sessions whose first line cannot be parsed as a valid header are marked `orphaned: true` and displayed as incomplete, not clickable.
@@ -97,7 +114,7 @@ Default location:
 Typical records:
 
 ```jsonl
-{"type":"session","version":3,"id":"<uuid>","timestamp":"...","cwd":"/path","parentSession":"/abs/path/to/parent.jsonl"}
+{"type":"session","version":3,"id":"<uuid>","timestamp":"...","cwd":"/path","parentSession":"/abs/path/to/parent.jsonl","projectId":"prj_...","spaceId":"main"}
 {"type":"model_change","id":"<8hex>","parentId":null,"provider":"zenmux","modelId":"claude-sonnet-4-6","timestamp":"..."}
 {"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"user","content":"..."}}
 {"type":"message","id":"<8hex>","parentId":"<8hex>","message":{"role":"assistant","content":[...]}}
@@ -105,5 +122,7 @@ Typical records:
 {"type":"compaction","id":"<8hex>","parentId":"<8hex>","summary":"...","firstKeptEntryId":"<8hex>","tokensBefore":0}
 {"type":"session_info","id":"...","parentId":"...","name":"user-defined name"}
 ```
+
+`projectId` and `spaceId` are optional. They are written for new project-space sessions and inherited on fork; legacy files that omit them are not migrated or backfilled automatically.
 
 `entryIds[]` in `SessionContext` is parallel to `messages[]` and maps displayed messages back to `.jsonl` entry ids for fork and `navigate_tree` commands.

@@ -4,6 +4,7 @@ import { readPiWebConfig } from "@/lib/pi-web-config";
 import { destroyRpcSessionsForCwd } from "@/lib/rpc-manager";
 import { deleteSessionsForCwd } from "@/lib/session-reader";
 import { registerAllowedRoot } from "@/lib/allowed-roots";
+import { markWorktreeSpaceArchivedByPath, syncRegisteredProjectWorktreeSpace } from "@/lib/project-registry";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,12 @@ export async function POST(req: Request) {
       targetPath: typeof body.targetPath === "string" ? body.targetPath : undefined,
     });
 
+    const registryLink = result.mainWorktreePath
+      ? await syncRegisteredProjectWorktreeSpace(result.mainWorktreePath, result.cwd, result.branchName)
+      : null;
+
     registerAllowedRoot(result.cwd);
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, registryLink });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = error instanceof WorktreeUserError ? 400 : 500;
@@ -70,8 +75,9 @@ export async function DELETE(req: NextRequest) {
       ...cleanupAliases.flatMap((alias) => destroyRpcSessionsForCwd(alias)),
     ])];
     const result = await removeGitWorktree(cwd, { force, destroyedSessionIds });
+    const archivedSpaces = await markWorktreeSpaceArchivedByPath(cwd);
     const deletedSessions = await deleteSessionsForCwd(cwd, cleanupAliases);
-    return NextResponse.json({ ...result, deletedSessionIds: deletedSessions.map((session) => session.id) });
+    return NextResponse.json({ ...result, archivedSpaces, deletedSessionIds: deletedSessions.map((session) => session.id) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = error instanceof WorktreeUserError ? 400 : 500;

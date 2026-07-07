@@ -2,6 +2,8 @@ import { createHash } from "crypto";
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath } from "./session-reader";
+import { readSessionHeaderFromFile, writeSessionProjectLink } from "./session-project-link";
+import { upsertProjectSessionIndexEntry } from "./project-session-index";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
@@ -308,9 +310,31 @@ export class AgentSessionWrapper {
 
     switch (type) {
       case "prompt": {
-        // Fire and forget — events come via subscribe
+        // Start the turn asynchronously, but wait for pi's preflight so
+        // synchronous failures (missing auth/model, extension input failures,
+        // already-running errors) are returned to the caller instead of leaving
+        // the UI stuck in "waiting for model".
         const promptImages = command.images as Array<{ type: "image"; data: string; mimeType: string }> | undefined;
-        this.inner.prompt(command.message as string, promptImages?.length ? { images: promptImages } : undefined).catch(() => {});
+        let resolvePreflight: (success: boolean) => void = () => {};
+        const preflight = new Promise<boolean>((resolve) => {
+          resolvePreflight = resolve;
+        });
+        const promptPromise = this.inner.prompt(command.message as string, {
+          ...(promptImages?.length ? { images: promptImages } : {}),
+          source: "rpc",
+          preflightResult: resolvePreflight,
+        }).catch((error: unknown) => {
+          console.error("Agent prompt failed:", error);
+          this.emitEvent({ type: "agent_error", errorMessage: error instanceof Error ? error.message : String(error) });
+          this.emitEvent({ type: "agent_end", studioChildRunCount: countActiveYpiStudioChildRunsForSession(this.sessionId) });
+          throw error;
+        });
+        const preflightSuccess = await Promise.race([
+          preflight,
+          promptPromise.then(() => true),
+          promptPromise.catch((error: unknown) => { throw error; }),
+        ]);
+        if (!preflightSuccess) throw new Error("Agent prompt preflight failed");
         return null;
       }
 
@@ -400,6 +424,17 @@ export class AgentSessionWrapper {
         }
 
         const newSessionId = SessionManager.open(newSessionFile, sessionDir).getSessionId();
+        const sourceHeader = readSessionHeaderFromFile(currentSessionFile);
+        if (sourceHeader?.projectId && sourceHeader.spaceId) {
+          writeSessionProjectLink(newSessionFile, { projectId: sourceHeader.projectId, spaceId: sourceHeader.spaceId });
+          await upsertProjectSessionIndexEntry({
+            sessionId: newSessionId,
+            sessionFile: newSessionFile,
+            cwd: sessionManager.getCwd(),
+            projectId: sourceHeader.projectId,
+            spaceId: sourceHeader.spaceId,
+          });
+        }
         cacheSessionPath(newSessionId, newSessionFile);
         this.destroy();
         return { cancelled: false, newSessionId };

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { TrellisSetupStatus } from "@/lib/trellis-setup-types";
 import type { GitInfo, SessionInfo, WorktreeInfo } from "@/lib/types";
+import type { PiWebProjectRecord, PiWebProjectSpaceRecord } from "@/lib/project-registry-types";
 import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
 import { displayTitleForSession } from "@/lib/session-title";
 import { Checkbox } from "./Checkbox";
@@ -11,7 +12,8 @@ import { FileExplorer } from "./FileExplorer";
 interface Props {
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean) => void;
-  onNewSession?: (sessionId: string, cwd: string) => void;
+  onNewSession?: (sessionId: string, cwd: string, projectId?: string, spaceId?: string) => void;
+  onProjectSpaceChange?: (context: { projectId: string; spaceId: string; cwd: string } | null) => void;
   initialSessionId?: string | null;
   onInitialRestoreDone?: () => void;
   refreshKey?: number;
@@ -38,22 +40,6 @@ function formatRelativeTime(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
   return date.toLocaleDateString();
-}
-
-/** Return the 5 most recently active cwds across all sessions */
-function getRecentCwds(sessions: SessionInfo[], extraCwds: string[] = []): string[] {
-  const latestByCwd = new Map<string, string>(); // cwd -> most recent modified
-  for (const s of sessions) {
-    if (!s.cwd) continue;
-    const prev = latestByCwd.get(s.cwd);
-    if (!prev || s.modified > prev) {
-      latestByCwd.set(s.cwd, s.modified);
-    }
-  }
-  const recent = [...latestByCwd.entries()]
-    .sort((a, b) => b[1].localeCompare(a[1]))
-    .map(([cwd]) => cwd);
-  return [...extraCwds, ...recent.filter((cwd) => !extraCwds.includes(cwd))].slice(0, 5);
 }
 
 function shortenCwd(cwd: string, homeDir?: string): string {
@@ -132,6 +118,11 @@ interface WorktreeCreateResponse {
   branchName?: string;
   mainWorktreePath?: string;
   mainWorktreeBranch?: string;
+  registryLink?: {
+    project?: PiWebProjectRecord;
+    space?: PiWebProjectSpaceRecord;
+    created?: boolean;
+  } | null;
 }
 
 interface WorktreeActionResponse {
@@ -159,6 +150,12 @@ interface SessionContextMenuState {
   session: SessionInfo;
 }
 
+interface MetadataEditTarget {
+  kind: "project" | "space";
+  project: PiWebProjectRecord;
+  space?: PiWebProjectSpaceRecord;
+}
+
 interface WorktreeActionState {
   kind: "delete" | "archive";
   cwd: string;
@@ -167,59 +164,6 @@ interface WorktreeActionState {
   busy: boolean;
   error: string | null;
   dirtySummary?: string[];
-}
-
-interface CwdPickerRow {
-  kind: "project" | "worktree";
-  cwd: string;
-  worktree?: WorktreeInfo;
-  syntheticParent?: boolean;
-}
-
-function buildCwdPickerRows(recentCwds: string[], worktreeByCwd: Map<string, WorktreeInfo>): CwdPickerRow[] {
-  const projectOrder: string[] = [];
-  const syntheticParents = new Set<string>();
-  const worktreesByParent = new Map<string, Array<{ cwd: string; worktree: WorktreeInfo }>>();
-  const seenProjects = new Set<string>();
-  const seenWorktrees = new Set<string>();
-  const recentCwdSet = new Set(recentCwds);
-
-  const pushProject = (cwd: string, syntheticParent = false) => {
-    if (seenProjects.has(cwd)) {
-      if (syntheticParent) syntheticParents.add(cwd);
-      return;
-    }
-    seenProjects.add(cwd);
-    projectOrder.push(cwd);
-    if (syntheticParent) syntheticParents.add(cwd);
-  };
-
-  const pushWorktree = (parentCwd: string, cwd: string, worktree: WorktreeInfo) => {
-    if (seenWorktrees.has(cwd)) return;
-    seenWorktrees.add(cwd);
-    const group = worktreesByParent.get(parentCwd) ?? [];
-    group.push({ cwd, worktree });
-    worktreesByParent.set(parentCwd, group);
-  };
-
-  for (const cwd of recentCwds) {
-    const worktree = worktreeByCwd.get(cwd);
-    const parentCwd = worktree?.mainWorktreePath && worktree.mainWorktreePath !== cwd
-      ? worktree.mainWorktreePath
-      : null;
-
-    if (worktree && parentCwd) {
-      pushProject(parentCwd, !recentCwdSet.has(parentCwd));
-      pushWorktree(parentCwd, cwd, worktree);
-    } else {
-      pushProject(cwd);
-    }
-  }
-
-  return projectOrder.flatMap((cwd) => [
-    { kind: "project" as const, cwd, syntheticParent: syntheticParents.has(cwd) },
-    ...(worktreesByParent.get(cwd) ?? []).map((entry) => ({ kind: "worktree" as const, ...entry })),
-  ]);
 }
 
 interface SessionTreeNode {
@@ -290,6 +234,82 @@ function WorkspaceHeaderLine({
   );
 }
 
+function displayProjectName(project: PiWebProjectRecord): string {
+  return project.displayName?.trim() || project.rootPath.split(/[\\/]+/).filter(Boolean).pop() || project.rootPath;
+}
+
+function displaySpaceName(space: PiWebProjectSpaceRecord): string {
+  if (space.displayName?.trim()) return space.displayName.trim();
+  if (space.kind === "main") return "Main";
+  return space.worktree?.branch || space.path.split(/[\\/]+/).filter(Boolean).pop() || space.path;
+}
+
+function activeProjectSpaces(project: PiWebProjectRecord): PiWebProjectSpaceRecord[] {
+  return Object.values(project.spaces)
+    .filter((space) => !space.archived)
+    .sort((a, b) => {
+      if (a.id === "main") return -1;
+      if (b.id === "main") return 1;
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return displaySpaceName(a).localeCompare(displaySpaceName(b));
+    });
+}
+
+function sortProjectsForSidebar(projects: PiWebProjectRecord[]): PiWebProjectRecord[] {
+  return projects
+    .filter((project) => !project.archived)
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      const aTime = a.lastOpenedAt ?? a.updatedAt;
+      const bTime = b.lastOpenedAt ?? b.updatedAt;
+      const timeCompare = bTime.localeCompare(aTime);
+      return timeCompare || displayProjectName(a).localeCompare(displayProjectName(b));
+    });
+}
+
+function worktreeInfoFromSpace(space: PiWebProjectSpaceRecord): WorktreeInfo | undefined {
+  if (space.kind !== "worktree") return undefined;
+  return {
+    isWorktree: true,
+    branch: space.worktree?.branch,
+    repoRoot: space.worktree?.repoRoot,
+    mainWorktreePath: space.worktree?.mainWorktreePath,
+    mainWorktreeBranch: space.worktree?.mainWorktreeBranch,
+  };
+}
+
+function findProjectSpace(projects: PiWebProjectRecord[], projectId: string | null, spaceId: string | null): { project: PiWebProjectRecord; space: PiWebProjectSpaceRecord } | null {
+  if (!projectId || !spaceId) return null;
+  const project = projects.find((item) => item.id === projectId);
+  const space = project?.spaces[spaceId];
+  return project && space ? { project, space } : null;
+}
+
+function WorkspaceMenuButton({ children, danger = false, onClick }: { children: React.ReactNode; danger?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+        padding: "9px 14px",
+        background: "none",
+        border: "none",
+        color: danger ? "#dc2626" : "var(--text)",
+        cursor: "pointer",
+        fontSize: 12,
+        textAlign: "left",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = danger ? "rgba(239,68,68,0.08)" : "var(--bg-hover)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
   const byId = new Map<string, SessionTreeNode>();
   for (const s of sessions) {
@@ -334,7 +354,10 @@ function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
   return roots;
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention, trellisEnabled = false, terminalEnabled = false, onOpenTerminalCommand }: Props) {
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onProjectSpaceChange, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention, trellisEnabled = false, terminalEnabled = false, onOpenTerminalCommand }: Props) {
+  const [projects, setProjects] = useState<PiWebProjectRecord[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -356,18 +379,22 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [explorerKey, setExplorerKey] = useState(0);
   const [explorerHeight, setExplorerHeight] = useState<number | null>(getInitialExplorerHeight);
   const [explorerResizing, setExplorerResizing] = useState(false);
+  const [projectsRefreshDone, setProjectsRefreshDone] = useState(false);
   const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const [creatingWorktree, setCreatingWorktree] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
-  const [ephemeralWorktrees, setEphemeralWorktrees] = useState<Record<string, WorktreeInfo>>({});
+  const [, setEphemeralWorktrees] = useState<Record<string, WorktreeInfo>>({});
   const [worktreeContextMenu, setWorktreeContextMenu] = useState<WorktreeContextMenuState | null>(null);
   const [sessionContextMenu, setSessionContextMenu] = useState<SessionContextMenuState | null>(null);
+  const [metadataEditTarget, setMetadataEditTarget] = useState<MetadataEditTarget | null>(null);
+  const [metadataBusy, setMetadataBusy] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [worktreeAction, setWorktreeAction] = useState<WorktreeActionState | null>(null);
   const [removedWorktreeCwds, setRemovedWorktreeCwds] = useState<string[]>([]);
   const [selectedCwdGit, setSelectedCwdGit] = useState<GitInfo | undefined>(undefined);
   const [archivedCounts, setArchivedCounts] = useState<Record<string, number>>({});
-  const [archivedCwds, setArchivedCwds] = useState<string[]>([]);
+  const [, setArchivedCwds] = useState<string[]>([]);
   const [archivedSessions, setArchivedSessions] = useState<SessionInfo[]>([]);
   const [archivedExpanded, setArchivedExpanded] = useState(false);
   const [trellisSetupStatus, setTrellisSetupStatus] = useState<TrellisSetupStatus | null>(null);
@@ -419,15 +446,42 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     window.addEventListener("pointercancel", finishResize);
   }, [explorerOpen]);
 
-  const loadSessions = useCallback(async (showLoading = false) => {
+  const loadProjects = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) setLoading(true);
-      const res = await fetch("/api/sessions");
+      const res = await fetch("/api/projects");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { sessions: SessionInfo[]; archivedCwds?: string[]; archivedCounts?: Record<string, number> };
-      setAllSessions(data.sessions);
-      if (data.archivedCwds) setArchivedCwds(data.archivedCwds);
-      if (data.archivedCounts) setArchivedCounts(data.archivedCounts);
+      const data = await res.json() as { projects?: PiWebProjectRecord[]; error?: string };
+      if (data.error) throw new Error(data.error);
+      setProjects(data.projects ?? []);
+      setError(null);
+      if (!showLoading) {
+        setProjectsRefreshDone(true);
+        if (sessionRefreshTimerRef.current) clearTimeout(sessionRefreshTimerRef.current);
+        sessionRefreshTimerRef.current = setTimeout(() => setProjectsRefreshDone(false), 2000);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, []);
+
+  const loadSessions = useCallback(async (showLoading = false) => {
+    const selected = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
+    if (!selected) {
+      setAllSessions([]);
+      return;
+    }
+    try {
+      if (showLoading) setLoading(true);
+      const res = await fetch(`/api/projects/${encodeURIComponent(selected.project.id)}/spaces/${encodeURIComponent(selected.space.id)}/sessions`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as { sessions?: SessionInfo[]; archivedCounts?: Record<string, number>; error?: string };
+      if (data.error) throw new Error(data.error);
+      setAllSessions(data.sessions ?? []);
+      setArchivedCwds([]);
+      setArchivedCounts(data.archivedCounts ?? {});
       setError(null);
       if (!showLoading) {
         setSessionRefreshDone(true);
@@ -439,7 +493,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [projects, selectedProjectId, selectedSpaceId]);
 
   const loadArchivedSessions = useCallback(async (cwd: string) => {
     try {
@@ -552,8 +606,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   useEffect(() => {
     const isFirst = !initialLoadDone.current;
     initialLoadDone.current = true;
-    loadSessions(isFirst);
-  }, [loadSessions, refreshKey]);
+    void loadProjects(isFirst);
+  }, [loadProjects, refreshKey]);
+
+  useEffect(() => {
+    void loadSessions(false);
+  }, [loadSessions]);
 
   useEffect(() => {
     if (!archivedExpanded || !selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) return;
@@ -571,10 +629,19 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, []);
 
   const restoredRef = useRef(false);
+  const lastNotifiedCwdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    onCwdChange?.(selectedCwd);
-  }, [selectedCwd, onCwdChange]);
+    const cwdForApp = selectedCwdProp ?? selectedCwd;
+    if (lastNotifiedCwdRef.current === cwdForApp) return;
+    lastNotifiedCwdRef.current = cwdForApp;
+    onCwdChange?.(cwdForApp ?? null);
+  }, [selectedCwd, selectedCwdProp, onCwdChange]);
+
+  useEffect(() => {
+    const selected = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
+    onProjectSpaceChange?.(selected ? { projectId: selected.project.id, spaceId: selected.space.id, cwd: selected.space.path } : null);
+  }, [onProjectSpaceChange, projects, selectedProjectId, selectedSpaceId]);
 
   useEffect(() => {
     if (!selectedCwd) {
@@ -615,27 +682,55 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     return () => controller.abort();
   }, [selectedCwd, trellisEnabled, trellisStatusRefreshKey]);
 
-  // Auto-select cwd and restore session from URL on first load
+  // Restore session from URL without using sessions as the project list source.
   useEffect(() => {
-    if (allSessions.length === 0) return;
-
-    if (selectedCwd === null) {
-      // If restoring a session, set cwd to match that session
-      if (initialSessionId && !restoredRef.current) {
-        restoredRef.current = true;
-        const target = allSessions.find((s) => s.id === initialSessionId);
-        if (target) {
+    if (!initialSessionId || restoredRef.current) return;
+    restoredRef.current = true;
+    fetch(`/api/sessions/${encodeURIComponent(initialSessionId)}`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return await res.json() as SessionInfo & { session?: SessionInfo; info?: SessionInfo };
+      })
+      .then((data) => {
+        const target = data && ("info" in data && data.info ? data.info : "session" in data && data.session ? data.session : data);
+        if (target?.id) {
           setSelectedCwd(target.cwd);
+          if (target.projectId && target.spaceId) {
+            setSelectedProjectId(target.projectId);
+            setSelectedSpaceId(target.spaceId);
+          }
           onSelectSession(target, true);
-          return;
+        } else {
+          onInitialRestoreDone?.();
         }
-        // Session not found — notify parent so it can show the placeholder
-        onInitialRestoreDone?.();
-      }
-      const cwds = getRecentCwds(allSessions);
-      if (cwds.length > 0) setSelectedCwd(cwds[0]);
+      })
+      .catch(() => onInitialRestoreDone?.());
+  }, [initialSessionId, onInitialRestoreDone, onSelectSession]);
+
+  useEffect(() => {
+    if (selectedCwd !== null || selectedProjectId || selectedSpaceId) return;
+    const firstProject = sortProjectsForSidebar(projects)[0];
+    const firstSpace = firstProject ? activeProjectSpaces(firstProject)[0] : undefined;
+    if (firstProject && firstSpace) {
+      setSelectedProjectId(firstProject.id);
+      setSelectedSpaceId(firstSpace.id);
+      setSelectedCwd(firstSpace.path);
     }
-  }, [allSessions, selectedCwd, initialSessionId, onSelectSession, onInitialRestoreDone]);
+  }, [projects, selectedCwd, selectedProjectId, selectedSpaceId]);
+
+  useEffect(() => {
+    if (!selectedCwd) return;
+    const current = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
+    if (current?.space.path === selectedCwd) return;
+    for (const project of projects) {
+      const match = activeProjectSpaces(project).find((space) => space.path === selectedCwd);
+      if (match) {
+        setSelectedProjectId(project.id);
+        setSelectedSpaceId(match.id);
+        return;
+      }
+    }
+  }, [projects, selectedCwd, selectedProjectId, selectedSpaceId]);
 
   const commitCustomPath = useCallback(async () => {
     const path = customPathValue.trim();
@@ -644,17 +739,21 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     setCustomPathValidating(true);
     setCustomPathError(null);
     try {
-      const res = await fetch("/api/cwd/validate", {
+      const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cwd: path }),
+        body: JSON.stringify({ path }),
       });
-      const data = await res.json().catch(() => ({})) as { cwd?: string; error?: string };
-      if (!res.ok || data.error) {
+      const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; error?: string };
+      if (!res.ok || data.error || !data.project) {
         setCustomPathError(data.error ?? `HTTP ${res.status}`);
         return;
       }
-      setSelectedCwd(data.cwd ?? path);
+      const mainSpace = data.project.spaces.main;
+      setProjects((prev) => [data.project!, ...prev.filter((project) => project.id !== data.project!.id)]);
+      setSelectedProjectId(data.project.id);
+      setSelectedSpaceId(mainSpace.id);
+      setSelectedCwd(mainSpace.path);
       setCustomPathOpen(false);
       setCustomPathValue("");
       setDropdownOpen(false);
@@ -670,7 +769,21 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       const res = await fetch("/api/default-cwd", { method: "POST" });
       const data = await res.json() as { cwd?: string; error?: string };
       if (data.cwd) {
-        setSelectedCwd(data.cwd);
+        const projectRes = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: data.cwd }),
+        });
+        const projectData = await projectRes.json().catch(() => ({})) as { project?: PiWebProjectRecord };
+        if (projectData.project?.spaces.main) {
+          const mainSpace = projectData.project.spaces.main;
+          setProjects((prev) => [projectData.project!, ...prev.filter((project) => project.id !== projectData.project!.id)]);
+          setSelectedProjectId(projectData.project.id);
+          setSelectedSpaceId(mainSpace.id);
+          setSelectedCwd(mainSpace.path);
+        } else {
+          setSelectedCwd(data.cwd);
+        }
         setCustomPathOpen(false);
         setCustomPathValue("");
         setCustomPathError(null);
@@ -686,6 +799,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     const handler = (e: MouseEvent) => {
       setWorktreeContextMenu(null);
       setSessionContextMenu(null);
+      if (workspaceMenuRef.current && workspaceMenuRef.current.contains(e.target as Node)) return;
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
         setCustomPathOpen(false);
@@ -701,8 +815,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     if (!selectedCwd) return;
     // Generate a temporary UUID client-side — no backend call needed.
     // Pi will be spawned lazily when the user sends the first message.
-    onNewSession?.(makeTempSessionId(), selectedCwd);
-  }, [selectedCwd, onNewSession]);
+    onNewSession?.(makeTempSessionId(), selectedCwd, selectedProjectId ?? undefined, selectedSpaceId ?? undefined);
+  }, [selectedCwd, selectedProjectId, selectedSpaceId, onNewSession]);
 
   const handleNewWorktree = useCallback(async () => {
     if (!selectedCwd || creatingWorktree) return;
@@ -728,25 +842,83 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       };
       setEphemeralWorktrees((prev) => ({ ...prev, [data.cwd!]: worktree }));
       setRemovedWorktreeCwds((prev) => prev.filter((cwd) => cwd !== data.cwd));
+      await loadProjects(false);
+      const linkedProjectId = data.registryLink?.project?.id ?? selectedProjectId ?? undefined;
+      const linkedSpaceId = data.registryLink?.space?.id;
+      if (linkedProjectId && linkedSpaceId) {
+        setSelectedProjectId(linkedProjectId);
+        setSelectedSpaceId(linkedSpaceId);
+      }
       setSelectedCwd(data.cwd);
       setDropdownOpen(false);
       setCustomPathOpen(false);
       setCustomPathValue("");
       setCustomPathError(null);
-      onNewSession?.(makeTempSessionId(), data.cwd);
+      onNewSession?.(makeTempSessionId(), data.cwd, linkedProjectId, linkedSpaceId);
       setExplorerKey((k) => k + 1);
     } catch (e) {
       setWorktreeError(e instanceof Error ? e.message : String(e));
     } finally {
       setCreatingWorktree(false);
     }
-  }, [selectedCwd, creatingWorktree, onNewSession]);
+  }, [selectedCwd, creatingWorktree, onNewSession, selectedProjectId, loadProjects]);
 
   const openWorktreeAction = useCallback((kind: "delete" | "archive", cwd: string, worktree: WorktreeInfo) => {
     setWorktreeContextMenu(null);
     setDropdownOpen(false);
     setWorktreeAction({ kind, cwd, worktree, force: false, busy: false, error: null });
   }, []);
+
+  const patchProjectMetadata = useCallback(async (projectId: string, patch: Record<string, unknown>) => {
+    setMetadataBusy(true);
+    setMetadataError(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; error?: string };
+      if (!res.ok || data.error || !data.project) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setProjects((prev) => prev.map((project) => project.id === data.project!.id ? data.project! : project));
+      setMetadataEditTarget(null);
+      if (data.project.archived && selectedProjectId === data.project.id) {
+        setSelectedProjectId(null);
+        setSelectedSpaceId(null);
+        setSelectedCwd(null);
+      }
+    } catch (error) {
+      setMetadataError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMetadataBusy(false);
+    }
+  }, [selectedProjectId]);
+
+  const patchSpaceMetadata = useCallback(async (projectId: string, spaceId: string, patch: Record<string, unknown>) => {
+    setMetadataBusy(true);
+    setMetadataError(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/spaces/${encodeURIComponent(spaceId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({})) as { space?: PiWebProjectSpaceRecord; error?: string };
+      if (!res.ok || data.error || !data.space) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setProjects((prev) => prev.map((project) => project.id === projectId ? { ...project, spaces: { ...project.spaces, [spaceId]: data.space! } } : project));
+      setMetadataEditTarget(null);
+      if (data.space.archived && selectedProjectId === projectId && selectedSpaceId === spaceId) {
+        const project = projects.find((item) => item.id === projectId);
+        const fallback = project ? activeProjectSpaces({ ...project, spaces: { ...project.spaces, [spaceId]: data.space } }).find((space) => space.id !== spaceId && !space.missing) : undefined;
+        setSelectedSpaceId(fallback?.id ?? null);
+        setSelectedCwd(fallback?.path ?? null);
+      }
+    } catch (error) {
+      setMetadataError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMetadataBusy(false);
+    }
+  }, [projects, selectedProjectId, selectedSpaceId]);
 
   const applyWorktreeFallback = useCallback((removedCwd: string, fallbackCwd?: string) => {
     setEphemeralWorktrees((prev) => {
@@ -797,34 +969,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }, [applyWorktreeFallback, onSessionDeleted, worktreeAction]);
 
-  const visibleSessions = allSessions.filter((session) => !removedWorktreeCwds.includes(session.cwd));
-  const worktreeByCwd = new Map<string, WorktreeInfo>();
-  for (const session of visibleSessions) {
-    if (session.cwd && session.worktree && !worktreeByCwd.has(session.cwd)) {
-      worktreeByCwd.set(session.cwd, session.worktree);
-    }
-  }
-  for (const [cwd, worktree] of Object.entries(ephemeralWorktrees)) {
-    if (!removedWorktreeCwds.includes(cwd)) worktreeByCwd.set(cwd, worktree);
-  }
-  const extraCwds: string[] = [];
-  const pinCwd = (cwd: string | null | undefined) => {
-    if (!cwd || removedWorktreeCwds.includes(cwd) || extraCwds.includes(cwd)) return;
-    extraCwds.push(cwd);
-  };
-  pinCwd(selectedCwd);
-  for (const worktree of worktreeByCwd.values()) pinCwd(worktree.mainWorktreePath);
-  for (const cwd of Object.keys(ephemeralWorktrees)) pinCwd(cwd);
-  // Add archived-only cwds (no active sessions) so projects remain visible
-  for (const acwd of archivedCwds) {
-    if (!acwd || extraCwds.includes(acwd)) continue;
-    if (!visibleSessions.some((s) => s.cwd === acwd)) {
-      extraCwds.push(acwd);
-    }
-  }
-  const recentCwds = getRecentCwds(visibleSessions, extraCwds);
-  const selectedWorktree = selectedCwd ? worktreeByCwd.get(selectedCwd) : undefined;
-  const sessionGit = selectedCwd ? visibleSessions.find((s) => s.cwd === selectedCwd)?.git : undefined;
+  const activeProjects = sortProjectsForSidebar(projects);
+  const selectedProjectSpace = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
+  const selectedSpace = selectedProjectSpace?.space ?? null;
+  const selectedWorktree = selectedSpace ? worktreeInfoFromSpace(selectedSpace) : undefined;
+  const sessionGit = selectedCwd ? allSessions.find((s) => s.cwd === selectedCwd)?.git : undefined;
   const currentGit: GitInfo | undefined = sessionGit ?? selectedCwdGit ?? (selectedWorktree ? {
     isWorktree: true,
     branch: selectedWorktree.branch,
@@ -832,16 +981,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     mainWorktreePath: selectedWorktree.mainWorktreePath,
     mainWorktreeBranch: selectedWorktree.mainWorktreeBranch,
   } : undefined);
-  const workspaceTitle = formatWorkspaceHeaderTitle(selectedCwd, currentGit);
-  const workspaceTitleDetail = formatWorkspaceTitle(selectedCwd, currentGit);
-  const workspaceSubtitle = formatWorkspaceSubtitle(selectedCwd, currentGit);
-  const archivedOnlyCwds = new Set(archivedCwds.filter((acwd) => !visibleSessions.some((s) => s.cwd === acwd)));
-  const cwdRows = buildCwdPickerRows(recentCwds, worktreeByCwd);
-  const filteredSessions = selectedCwd
-    ? visibleSessions.filter((s) => s.cwd === selectedCwd)
-    : visibleSessions;
-
-  // Build parent-child tree within the filtered set
+  const workspaceTitle = selectedProjectSpace ? displayProjectName(selectedProjectSpace.project) : formatWorkspaceHeaderTitle(selectedCwd, currentGit);
+  const workspaceTitleDetail = selectedProjectSpace ? selectedProjectSpace.project.rootPath : formatWorkspaceTitle(selectedCwd, currentGit);
+  const workspaceSubtitle = selectedSpace ? `${displaySpaceName(selectedSpace)} · ${shortenCwd(selectedSpace.path, homeDir)}${selectedSpace.missing ? " · missing" : ""}` : formatWorkspaceSubtitle(selectedCwd, currentGit);
+  const filteredSessions = allSessions.filter((session) => !removedWorktreeCwds.includes(session.cwd));
   const sessionTree = buildSessionTree(filteredSessions);
   const showTrellisInitializePrompt = trellisEnabled && !!selectedCwd && !!trellisSetupStatus?.canInitialize && !trellisSetupStatus.project.hasTrellisDir;
   const trellisInitCommand = buildTrellisInitCommand(trellisSetupStatus);
@@ -874,13 +1017,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         <div className="session-sidebar-actions" style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             <button
               onClick={handleNewSession}
-              disabled={!selectedCwd}
+              disabled={!selectedCwd || !!selectedSpace?.missing}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 background: "var(--bg-hover)",
                 border: "1px solid var(--border)",
-                color: selectedCwd ? "var(--text-muted)" : "var(--text-dim)",
-                cursor: selectedCwd ? "pointer" : "not-allowed",
+                color: selectedCwd && !selectedSpace?.missing ? "var(--text-muted)" : "var(--text-dim)",
+                cursor: selectedCwd && !selectedSpace?.missing ? "pointer" : "not-allowed",
                 height: 32,
                 paddingLeft: 10,
                 paddingRight: 12,
@@ -891,16 +1034,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 flexShrink: 0,
                 transition: "background 0.12s, color 0.12s, border-color 0.12s",
               }}
-              title={selectedCwd ? `在 ${selectedCwd} 新建会话` : "请先选择一个项目"}
+              title={selectedSpace?.missing ? "该项目空间缺失，不能新建会话" : selectedCwd ? `在 ${selectedCwd} 新建会话` : "请先选择一个项目"}
               onMouseEnter={(e) => {
-                if (!selectedCwd) return;
+                if (!selectedCwd || selectedSpace?.missing) return;
                 e.currentTarget.style.background = "var(--bg-selected)";
                 e.currentTarget.style.color = "var(--accent)";
                 e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = selectedCwd ? "var(--text-muted)" : "var(--text-dim)";
+                e.currentTarget.style.color = selectedCwd && !selectedSpace?.missing ? "var(--text-muted)" : "var(--text-dim)";
                 e.currentTarget.style.borderColor = "var(--border)";
               }}
             >
@@ -951,12 +1094,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               {creatingWorktree ? "创建中…" : "WorkTree"}
             </button>
             <button
-              onClick={() => loadSessions(false)}
+              onClick={() => { void loadProjects(false); void loadSessions(false); }}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: sessionRefreshDone ? "rgba(74,222,128,0.18)" : "var(--bg-hover)",
-                border: `1px solid ${sessionRefreshDone ? "rgba(74,222,128,0.4)" : "var(--border)"}`,
-                color: sessionRefreshDone ? "#4ade80" : "var(--text-muted)",
+                background: (sessionRefreshDone || projectsRefreshDone) ? "rgba(74,222,128,0.18)" : "var(--bg-hover)",
+                border: `1px solid ${(sessionRefreshDone || projectsRefreshDone) ? "rgba(74,222,128,0.4)" : "var(--border)"}`,
+                color: (sessionRefreshDone || projectsRefreshDone) ? "#4ade80" : "var(--text-muted)",
                 cursor: "pointer",
                 width: 32, height: 32,
                 borderRadius: 7,
@@ -978,7 +1121,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               }}
               title="刷新"
             >
-              {sessionRefreshDone ? (
+              {(sessionRefreshDone || projectsRefreshDone) ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
@@ -1029,36 +1172,43 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                       borderRadius: 8,
                       boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
                       zIndex: 1000,
-                      minWidth: 180,
+                      minWidth: 190,
                       padding: "4px 0",
                       overflow: "hidden",
                     }}>
-                      <button
-                        onClick={() => {
-                          setWorkspaceMenuOpen(false);
-                          setArchiveAllConfirming(true);
-                        }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 8,
-                          width: "100%",
-                          padding: "9px 14px",
-                          background: "none",
-                          border: "none",
-                          color: "var(--text)",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          textAlign: "left",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="7 10 12 15 17 10" />
-                          <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
+                      {selectedProjectSpace && (
+                        <>
+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setMetadataError(null); setMetadataEditTarget({ kind: "project", project: selectedProjectSpace.project }); }}>
+                            编辑项目元数据…
+                          </WorkspaceMenuButton>
+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setMetadataError(null); setMetadataEditTarget({ kind: "space", project: selectedProjectSpace.project, space: selectedProjectSpace.space }); }}>
+                            编辑空间元数据…
+                          </WorkspaceMenuButton>
+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchProjectMetadata(selectedProjectSpace.project.id, { pinned: !selectedProjectSpace.project.pinned }); }}>
+                            {selectedProjectSpace.project.pinned ? "取消置顶项目" : "置顶项目"}
+                          </WorkspaceMenuButton>
+                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { pinned: !selectedProjectSpace.space.pinned }); }}>
+                            {selectedProjectSpace.space.pinned ? "取消置顶空间" : "置顶空间"}
+                          </WorkspaceMenuButton>
+                        </>
+                      )}
+                      <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setArchiveAllConfirming(true); }}>
                         归档所有会话
-                      </button>
+                      </WorkspaceMenuButton>
+                      {selectedProjectSpace && (
+                        <>
+                          <WorkspaceMenuButton danger onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { archived: true }); }}>
+                            归档当前空间
+                          </WorkspaceMenuButton>
+                          <WorkspaceMenuButton danger onClick={() => {
+                            if (!window.confirm(`归档项目 “${displayProjectName(selectedProjectSpace.project)}”？项目会从侧边栏隐藏，sessions 不会被删除。`)) return;
+                            setWorkspaceMenuOpen(false);
+                            void patchProjectMetadata(selectedProjectSpace.project.id, { archived: true });
+                          }}>
+                            归档项目
+                          </WorkspaceMenuButton>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -1087,7 +1237,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           <button
             onClick={() => setDropdownOpen((v) => !v)}
             onContextMenu={(e) => {
-              const worktree = selectedCwd ? worktreeByCwd.get(selectedCwd) : undefined;
+              const worktree = selectedWorktree;
               if (!selectedCwd || !worktree) return;
               e.preventDefault();
               e.stopPropagation();
@@ -1122,7 +1272,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             >
               {selectedCwd ? shortenCwd(selectedCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : "Select project…")}
             </span>
-            <WorktreeBadge worktree={selectedCwd ? worktreeByCwd.get(selectedCwd) : undefined} />
+            <WorktreeBadge worktree={selectedWorktree} />
           </button>
 
           {dropdownOpen && (
@@ -1141,66 +1291,76 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 overflow: "hidden",
               }}
             >
-              {cwdRows.map((row) => {
-                const selected = row.cwd === selectedCwd;
-                const isWorktree = row.kind === "worktree";
-                return (
-                  <button
-                    key={`${row.kind}:${row.cwd}`}
-                    onClick={() => {
-                      setSelectedCwd(row.cwd);
-                      setWorktreeError(null);
-                      setCustomPathOpen(false);
-                      setCustomPathValue("");
-                      setCustomPathError(null);
-                      setDropdownOpen(false);
-                    }}
-                    onContextMenu={(e) => {
-                      if (!row.worktree) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setWorktreeContextMenu({ x: e.clientX, y: e.clientY, cwd: row.cwd, worktree: row.worktree });
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 7,
-                      width: "100%",
-                      padding: isWorktree ? "7px 10px 7px 28px" : "8px 10px",
-                      background: selected ? "var(--bg-selected)" : isWorktree ? "var(--bg-subtle)" : "none",
-                      border: "none",
-                      borderBottom: "1px solid var(--border)",
-                      color: selected ? "var(--text)" : "var(--text-muted)",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontSize: 11,
-                      fontFamily: "var(--font-mono)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                    title={row.worktree ? `${row.cwd}\n右键点击查看更多 WorkTree 操作` : row.cwd}
-                  >
-                    {selected && (
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                        <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                      </svg>
-                    )}
-                    {!selected && isWorktree && (
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                        <path d="M2 1.5v4A2.5 2.5 0 0 0 4.5 8H8" />
-                      </svg>
-                    )}
-                    {!selected && !isWorktree && <span style={{ width: 10, flexShrink: 0 }} />}
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {shortenCwd(row.cwd, homeDir)}
-                      {row.syntheticParent && <span style={{ color: "var(--text-dim)", marginLeft: 5 }}>(main)</span>}
-                      {archivedOnlyCwds.has(row.cwd) && <span style={{ color: "var(--text-dim)", fontStyle: "italic", marginLeft: 5 }}>(archived)</span>}
-                    </span>
-                    <WorktreeBadge worktree={row.worktree} />
-                  </button>
-                );
-              })}
+              {activeProjects.length === 0 && !customPathOpen && (
+                <div style={{ padding: "10px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>
+                  尚未注册项目。请用下方 “Add project path…” 添加项目；历史 sessions 不会被扫描生成项目。
+                </div>
+              )}
+              {activeProjects.map((project) => (
+                <div key={project.id}>
+                  <div style={{ padding: "8px 10px 5px", color: "var(--text)", fontSize: 11, fontWeight: 800, borderTop: "1px solid var(--border)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.rootPath}>
+                    {project.pinned ? "★ " : ""}{displayProjectName(project)}
+                  </div>
+                  {activeProjectSpaces(project).map((space) => {
+                    const selected = project.id === selectedProjectId && space.id === selectedSpaceId;
+                    const worktree = worktreeInfoFromSpace(space);
+                    return (
+                      <button
+                        key={`${project.id}:${space.id}`}
+                        onClick={() => {
+                          if (space.missing) return;
+                          setSelectedProjectId(project.id);
+                          setSelectedSpaceId(space.id);
+                          setSelectedCwd(space.path);
+                          setWorktreeError(null);
+                          setCustomPathOpen(false);
+                          setCustomPathValue("");
+                          setCustomPathError(null);
+                          setDropdownOpen(false);
+                        }}
+                        onContextMenu={(e) => {
+                          if (!worktree) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setWorktreeContextMenu({ x: e.clientX, y: e.clientY, cwd: space.path, worktree });
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 7,
+                          width: "100%",
+                          padding: space.kind === "worktree" ? "7px 10px 7px 28px" : "7px 10px 7px 18px",
+                          background: selected ? "var(--bg-selected)" : space.kind === "worktree" ? "var(--bg-subtle)" : "none",
+                          border: "none",
+                          color: selected ? "var(--text)" : "var(--text-muted)",
+                          cursor: space.missing ? "not-allowed" : "pointer",
+                          opacity: space.missing ? 0.55 : 1,
+                          textAlign: "left",
+                          fontSize: 11,
+                          fontFamily: "var(--font-mono)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={`${space.path}${worktree ? "\n右键点击查看更多 WorkTree 操作" : ""}`}
+                      >
+                        {selected ? (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <polyline points="1.5 5 4 7.5 8.5 2.5" />
+                          </svg>
+                        ) : (
+                          <span style={{ width: 10, flexShrink: 0 }} />
+                        )}
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {displaySpaceName(space)}
+                          {space.missing && <span style={{ color: "var(--text-dim)", marginLeft: 5 }}>(missing)</span>}
+                        </span>
+                        <WorktreeBadge worktree={worktree} />
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
 
               {/* Default cwd shortcut */}
               {!customPathOpen && (
@@ -1214,7 +1374,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     padding: "8px 10px",
                     background: "none",
                     border: "none",
-                    borderTop: cwdRows.length > 0 ? "1px solid var(--border)" : "none",
+                    borderTop: activeProjects.length > 0 ? "1px solid var(--border)" : "none",
                     color: "var(--text-muted)",
                     cursor: "pointer",
                     textAlign: "left",
@@ -1255,10 +1415,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     <line x1="5" y1="1" x2="5" y2="9" />
                     <line x1="1" y1="5" x2="9" y2="5" />
                   </svg>
-                  <span>Custom path…</span>
+                  <span>Add project path…</span>
                 </button>
               ) : (
-                <div style={{ padding: "6px 8px", borderTop: cwdRows.length > 0 ? "none" : undefined }}>
+                <div style={{ padding: "6px 8px", borderTop: activeProjects.length > 0 ? "none" : undefined }}>
                   <input
                     ref={customPathInputRef}
                     value={customPathValue}
@@ -1343,6 +1503,26 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           )}
         </div>
       </div>
+
+      {metadataEditTarget && (
+        <ProjectMetadataDialog
+          target={metadataEditTarget}
+          busy={metadataBusy}
+          error={metadataError}
+          onClose={() => {
+            if (metadataBusy) return;
+            setMetadataEditTarget(null);
+            setMetadataError(null);
+          }}
+          onSave={(patch) => {
+            if (metadataEditTarget.kind === "project") {
+              void patchProjectMetadata(metadataEditTarget.project.id, patch);
+            } else if (metadataEditTarget.space) {
+              void patchSpaceMetadata(metadataEditTarget.project.id, metadataEditTarget.space.id, patch);
+            }
+          }}
+        />
+      )}
 
       {worktreeContextMenu && (
         <div
@@ -1548,9 +1728,14 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             {error}
           </div>
         )}
-        {!loading && !error && filteredSessions.length === 0 && (
+        {!loading && !error && activeProjects.length === 0 && (
+          <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+            No registered projects yet. Add a project path from the selector above to start.
+          </div>
+        )}
+        {!loading && !error && activeProjects.length > 0 && filteredSessions.length === 0 && (!selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
-            No sessions found
+            No sessions found in this space
           </div>
         )}
         {sessionTree.map((node) => (
@@ -1784,6 +1969,87 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ProjectMetadataDialog({
+  target,
+  busy,
+  error,
+  onClose,
+  onSave,
+}: {
+  target: MetadataEditTarget;
+  busy: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (patch: { displayName?: string; tags: string[]; pinned: boolean; archived: boolean }) => void;
+}) {
+  const record = target.kind === "project" ? target.project : target.space!;
+  const title = target.kind === "project" ? "编辑项目元数据" : "编辑空间元数据";
+  const [displayName, setDisplayName] = useState(record.displayName ?? "");
+  const [tagsText, setTagsText] = useState(record.tags.join(", "));
+  const [pinned, setPinned] = useState(record.pinned);
+  const [archived, setArchived] = useState(record.archived);
+
+  const tags = tagsText.split(",").map((tag) => tag.trim()).filter(Boolean);
+
+  return (
+    <div
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.28)", padding: 16 }}
+    >
+      <div style={{ width: "min(460px, 100%)", borderRadius: 12, background: "var(--bg)", border: "1px solid var(--border)", boxShadow: "0 18px 50px rgba(0,0,0,0.25)", padding: 16 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 12, overflowWrap: "anywhere" }}>
+          {target.kind === "project" ? target.project.rootPath : target.space?.path}
+        </div>
+        <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+          昵称/显示名
+          <input
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder={target.kind === "project" ? displayProjectName(target.project) : target.space ? displaySpaceName(target.space) : ""}
+            style={{ marginTop: 5, width: "100%", boxSizing: "border-box", padding: "7px 9px", border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none" }}
+          />
+        </label>
+        <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+          Tags（逗号分隔）
+          <input
+            value={tagsText}
+            onChange={(event) => setTagsText(event.target.value)}
+            placeholder="frontend, pinned, client-a"
+            style={{ marginTop: 5, width: "100%", boxSizing: "border-box", padding: "7px 9px", border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none" }}
+          />
+        </label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          <Checkbox checked={pinned} label="置顶（影响侧边栏排序）" onChange={(event) => setPinned(event.currentTarget.checked)} rootStyle={{ fontSize: 12 }} />
+          <Checkbox checked={archived} label="归档（从活动侧边栏隐藏，不删除 sessions）" onChange={(event) => setArchived(event.currentTarget.checked)} rootStyle={{ fontSize: 12 }} />
+        </div>
+        {target.kind === "space" && target.space?.missing && (
+          <div style={{ padding: "8px 10px", borderRadius: 7, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.25)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
+            该空间路径缺失，不能新建会话；元数据仍可保存。
+          </div>
+        )}
+        {error && (
+          <div style={{ padding: "8px 10px", borderRadius: 7, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.22)", color: "#dc2626", fontSize: 12, lineHeight: 1.4, overflowWrap: "anywhere", marginBottom: 10 }}>
+            {error}
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} disabled={busy} style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: busy ? "not-allowed" : "pointer", fontSize: 12 }}>
+            取消
+          </button>
+          <button
+            onClick={() => onSave({ displayName: displayName.trim(), tags, pinned, archived })}
+            disabled={busy}
+            style={{ padding: "7px 12px", borderRadius: 7, border: "none", background: "var(--accent)", color: "#fff", cursor: busy ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 800, opacity: busy ? 0.65 : 1 }}
+          >
+            {busy ? "保存中…" : "保存"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2101,6 +2367,7 @@ function SessionItem({
             <div style={{ marginTop: 2, display: "flex", gap: 8, color: "var(--text-dim)", fontSize: 11 }}>
               <span title={session.modified}>{formatRelativeTime(session.modified)}</span>
               <span>{session.messageCount} msgs</span>
+              {session.legacyUnassigned && <span title="缺少 projectId/spaceId，按 cwd 匹配显示，不会自动回写">未关联</span>}
             </div>
           </div>
 

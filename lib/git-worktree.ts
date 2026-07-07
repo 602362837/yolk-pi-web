@@ -79,7 +79,7 @@ export class MainWorktreeDirtyError extends Error {
   }
 }
 
-interface WorktreeRecord {
+export interface WorktreeRecord {
   path: string;
   branch?: string;
   head?: string;

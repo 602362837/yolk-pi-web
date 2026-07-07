@@ -1,7 +1,37 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-07T00:46:38.422Z",
+  "updatedAt": "2026-07-07T02:59:48.549Z",
   "entries": [
+    {
+      "id": "20260707-105948-设计并改造项目注册表与项目空间层级",
+      "title": "设计并改造项目注册表与项目空间层级",
+      "taskId": "20260707-090031-设计并改造项目注册表与项目空间层级",
+      "taskKey": "archived:2026-07:20260707-090031-设计并改造项目注册表与项目空间层级",
+      "workflowId": "feature-dev",
+      "summary": "完成 Project Registry 与 Project/Space 层级改造：以 pi-web-projects.json 作为项目树唯一顶层来源，Project 下含 main/worktree spaces，Session 只作为 space 历史记录并通过 header projectId/spaceId 关联；旧 session 缺字段保持可读但不自动回写。关键实现包括 registry 类型/lib/API、session-project-link 与 session index、WorkTree space 同步、allowed roots 兼容、Sidebar Project→Space 导航、项目/空间元数据编辑与文档更新。后续调试还补充了 project-scoped 新会话首 prompt 持久化、prompt preflight 错误收敛、单 session detail 避免全量 listAllSessions、session list 默认轻量化并将 Git 元数据 opt-in、归档计数在 project space 下展示、隐藏未关联旧会话。验证通过 npm run lint 与 tsc --noEmit。",
+      "tags": [
+        "feature-dev",
+        "project-registry",
+        "project-space",
+        "session-performance",
+        "worktree",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260707-090031-设计并改造项目注册表与项目空间层级",
+      "knowledgePath": ".ypi/knowledge/20260707-105948-设计并改造项目注册表与项目空间层级.md",
+      "createdAt": "2026-07-07T02:59:48.549Z",
+      "archivedAt": "2026-07-07T02:59:48.549Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md"
+      ]
+    },
     {
       "id": "20260707-084638-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
       "title": "设计 Web Terminal SSH 凭证管理、多级跳板机与代理连接",

@@ -4,9 +4,13 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 
 | File | Purpose |
 | --- | --- |
+| `lib/project-registry-types.ts` | Shared Project Registry schema and wire types for projects, spaces, worktree metadata, and metadata patch payloads. |
+| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, Git worktree space sync from `git worktree list --porcelain`, and archived/missing marking for removed worktrees. |
+| `lib/project-session-index.ts` | Best-effort `~/.pi/agent/pi-web-session-index.json` maintenance for new/forked sessions linked to project spaces; session headers remain the source of truth. |
+| `lib/session-project-link.ts` | Helpers for reading/writing optional `projectId`/`spaceId` on session headers, deriving `legacyUnassigned`, and canonical path matching for legacy exact-cwd display. |
 | `lib/rpc-manager.ts` | `AgentSessionWrapper`, global registry, `startRpcSession()`, cwd-scoped session cleanup, lifecycle handling, built-in YPI Studio extension factory injection for web-created AgentSessions, Studio child terminal continuation prompts, idle-timeout extension while Studio children are active, and ChatGPT account failover retry hook wiring. |
 | `lib/agent-session-bootstrap.ts` | Shared API helper for validating/canonicalizing cwd, creating configured empty AgentSessions, registering allowed roots, and applying initial tool/model/thinking selections before a prompt is sent. |
-| `lib/session-reader.ts` | Parse `.jsonl` session files, resolve session paths, prune/delete sessions for removed WorkTree cwd paths, read model/default config. Archive helpers: `getSessionsArchiveDir()`, `archiveSessionFile()`, `unarchiveSessionFile()`, `scanArchivedCwds()`, `listArchivedSessionsForCwd()`, `resolveArchivedSessionPath()`. |
+| `lib/session-reader.ts` | Parse `.jsonl` session files, resolve session paths, return lightweight active session summaries (Git/worktree metadata is opt-in), prune/delete sessions for removed WorkTree cwd paths, read model/default config. Archive helpers: `getSessionsArchiveDir()`, `archiveSessionFile()`, `unarchiveSessionFile()`, `scanArchivedCwds()`, `listArchivedSessionsForCwd()`, `resolveArchivedSessionPath()`. |
 | `lib/session-title.ts` | Pure helpers for deriving display titles from sessions and first user messages, including the pending empty-session label used by Browser Share precreated sessions. |
 | `lib/types.ts` | Shared TypeScript types for messages, sessions, Git status/graph/commit/diff wire payloads, and API payloads. |
 | `lib/pi-types.ts` | `AgentSessionLike` wrapper interface expected by hooks/components. |
@@ -19,7 +23,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/agent-client.ts` | Client-side helper for `POST /api/agent/[id]`. |
 | `lib/file-paths.ts` | Path normalization utilities for file viewer APIs. |
 | `lib/cwd.ts` | Cwd validation and normalization helpers. |
-| `lib/git-worktree.ts` | Git worktree creation, status, archive, and removal helpers. |
+| `lib/git-worktree.ts` | Git worktree creation, status, archive, removal helpers, and exported porcelain worktree records consumed by Project Registry sync. |
 | `lib/deepseek-balance.ts` | Query DeepSeek account balance. |
 | `lib/quota-display.ts` | Shared ChatGPT/Codex quota display helpers: tier labels, utilization colors, quota/reset-credit countdowns, earliest reset-credit expiration, relative refresh time, and known-tier filtering. |
 | `lib/oauth-accounts.ts` | Persist, import raw/converted credential JSON, sanitize, sync, label, activate, quota/reset-credit cache metadata, and soft-delete saved `openai-codex` OAuth accounts without exposing tokens. |
@@ -37,7 +41,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/terminal-ssh-profiles.ts` | Dedicated Web Terminal SSH profile CRUD helper: validates non-secret profile payloads, rejects secret fields at the profile API boundary, writes `terminal.ssh.profiles` through `pi-web.json`, and leaves credential material in the vault. |
 | `lib/terminal-ssh-runner.ts` | OpenSSH launch-plan builder for SSH terminal sessions. It detects `ssh`/`ssh.exe`, creates session-scoped temp dirs/config/key/askpass/proxy context files with best-effort 0700/0600 permissions, generates target/jump `Host` aliases with ProxyJump/proxy/known_hosts options, returns redacted plans, and exposes cleanup/startup-sweep helpers while leaving process spawning to `lib/terminal-manager.ts`. |
 | `lib/terminal-known-hosts.ts` | Dedicated Web Terminal SSH known-hosts manager. It keeps `~/.pi/agent/terminal/known_hosts` separate from `pi-web.json`, enforces best-effort 0700/0600 permissions, lists/removes/trusts host-key summaries, runs advisory `ssh-keyscan`, and provides stable `host:port` `HostKeyAlias` plus `UserKnownHostsFile` helpers for the SSH launcher. |
-| `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs. |
+| `lib/allowed-roots.ts` | Shared authorized-workspace root discovery and path checks for file and Trellis APIs, including registered Project Registry roots/spaces so projects without sessions can use file APIs. |
 | `lib/terminal-manager.ts` | Web Terminal PTY manager: setting-gated local/SSH session creation, cwd authorization, platform-aware Unix/Windows shell and custom path resolution, OpenSSH launch-plan integration, env injection, SSH temp cleanup callbacks, SSE subscription fan-out, input/resize handling, and process cleanup. |
 | `lib/trellis-manager.ts` | Trellis setup/status/update helper: prerequisite checks, CLI/version inspection, proxy-scoped child-process environment, and fixed Trellis/npm command execution. |
 | `lib/trellis-reader.ts` | Read-only Trellis task discovery, artifact loading, manifest counting, hierarchy, optional `meta.lastCheck` quality-check state, and phase/progress derivation. |
@@ -63,4 +67,6 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 
 - Do not duplicate JSONL parsing or tool-call normalization in UI code.
 - If a route and a component need the same derived value, put it in `lib/` and import it from both sides.
+- Use `canonicalizeProjectPath()` for Project Registry path comparisons so display paths, symlinks, and realpath-backed `pathKey` values stay distinct.
+- Treat session header `projectId`/`spaceId` as optional; legacy sessions without both fields must continue to open and should be surfaced as unassigned rather than rewritten.
 - Keep wire types in `lib/types.ts` synchronized with route responses and hook consumers.

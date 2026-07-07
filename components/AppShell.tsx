@@ -56,8 +56,10 @@ export function AppShell() {
   const searchParams = useSearchParams();
   const { isDark, toggleTheme } = useTheme();
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
-  // When user clicks +, we only store the cwd — no fake session id
+  // When user clicks +, we only store the cwd/project context — no fake session id
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
+  const [activeProjectContext, setActiveProjectContext] = useState<{ projectId: string; spaceId: string; cwd: string } | null>(null);
+  const [newSessionProjectContext, setNewSessionProjectContext] = useState<{ projectId: string; spaceId: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
@@ -263,6 +265,7 @@ export function AppShell() {
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
     setNewSessionCwd(null);
+    setNewSessionProjectContext(null);
     setSelectedSession(session);
     setSessionKey((k) => k + 1);
     setSystemPrompt(null);
@@ -280,20 +283,22 @@ export function AppShell() {
     }
   }, [router]);
 
-  const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
+  const handleNewSession = useCallback((_sessionId: string, cwd: string, projectId?: string, spaceId?: string) => {
     setSelectedSession(null);
     setNewSessionCwd(cwd);
+    setNewSessionProjectContext(projectId && spaceId ? { projectId, spaceId } : activeProjectContext?.cwd === cwd ? { projectId: activeProjectContext.projectId, spaceId: activeProjectContext.spaceId } : null);
     setSessionKey((k) => k + 1);
     setBranchTree([]);
     setBranchActiveLeafId(null);
     setSystemPrompt(null);
     setActiveTopPanel(null);
     router.replace("/", { scroll: false });
-  }, [router]);
+  }, [activeProjectContext, router]);
 
   // Called by ChatWindow when a new session gets its real id from pi
   const handleSessionCreated = useCallback((session: SessionInfo) => {
     setNewSessionCwd(null);
+    setNewSessionProjectContext(null);
     setSelectedSession((prev) => {
       if (prev?.id !== session.id) return session;
       return {
@@ -321,6 +326,7 @@ export function AppShell() {
     setRefreshKey((k) => k + 1);
     setSessionKey((k) => k + 1);
     setNewSessionCwd(null);
+    setNewSessionProjectContext(null);
     setSelectedSession((prev) => ({
       ...(prev ?? { path: "", cwd: "", created: "", modified: "", messageCount: 0, firstMessage: "" }),
       id: newSessionId,
@@ -636,6 +642,7 @@ export function AppShell() {
         selectedSessionId={selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        onProjectSpaceChange={setActiveProjectContext}
         initialSessionId={initialSessionId}
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
@@ -1195,6 +1202,7 @@ export function AppShell() {
               key={sessionKey}
               session={selectedSession}
               newSessionCwd={effectiveNewSessionCwd}
+              newSessionProjectContext={newSessionProjectContext ?? (effectiveNewSessionCwd && activeProjectContext?.cwd === effectiveNewSessionCwd ? { projectId: activeProjectContext.projectId, spaceId: activeProjectContext.spaceId } : null)}
               onAgentEnd={handleAgentEnd}
               onSessionCreated={handleSessionCreated}
               onSessionForked={handleSessionForked}

@@ -34,12 +34,29 @@ export function registerAllowedRoot(cwd: string): void {
 }
 
 async function buildAllowedRoots(): Promise<Set<string>> {
-  const { listSessionCwdsForAllowedRoots } = await import("@/lib/session-reader");
+  const [{ listSessionCwdsForAllowedRoots }, { listProjects }] = await Promise.all([
+    import("@/lib/session-reader"),
+    import("@/lib/project-registry"),
+  ]);
   const sessionCwds = await listSessionCwdsForAllowedRoots();
   const roots = new Set<string>();
 
   for (const cwd of sessionCwds) {
     for (const root of createRootVariants(cwd)) roots.add(root);
+  }
+
+  try {
+    const projects = await listProjects();
+    for (const project of projects) {
+      if (project.archived) continue;
+      for (const root of createRootVariants(project.rootPath)) roots.add(root);
+      for (const space of Object.values(project.spaces)) {
+        if (space.archived || space.missing) continue;
+        for (const root of createRootVariants(space.path)) roots.add(root);
+      }
+    }
+  } catch {
+    // Registry roots are an optimization for project-first workspaces; legacy session roots remain authoritative.
   }
 
   const home = homedir();
