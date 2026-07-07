@@ -1,0 +1,2598 @@
+{
+  "schemaVersion": 1,
+  "id": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+  "title": "设计 Web Terminal SSH 凭证管理、多级跳板机与代理连接",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260706-160533",
+  "createdAt": "2026-07-06T08:12:57.990Z",
+  "updatedAt": "2026-07-07T00:46:38.422Z",
+  "completedAt": "2026-07-06T11:43:44.612Z",
+  "contextIds": [
+    "pi_process_acdc90acabea4c5a74a3e46d",
+    "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+    "pi_019f36df-6bde-7339-9bc5-686dcc7381fd",
+    "pi_019f3722-5ddf-7cb8-bf9f-1043c6f33879"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-c98b794ec05fe456e130e89f",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:13:08.720Z",
+      "finishedAt": "2026-07-06T08:22:08.578Z",
+      "prompt": "请基于当前项目已有 Web Terminal 多 tab 能力，设计“SSH 凭证管理 + 多级跳板机 + 指定代理连接”功能。要求： 1. 先阅读 AGENTS.md、docs/modules/frontend.md、docs/modules/api.md、docs/modules/library.md，以及现有 components/TerminalPanel.tsx、lib/terminal-manager.ts、lib/pi-web-config.ts、app/ap…",
+      "summary": "已完成规划产物，未修改生产代码、未提交。 ## 产物/文件 更新 Studio artifacts： - `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/brief.md` - `prd.md` - `ui.md` - `design.md` - `implement.md`（含 `json ypi-implementation-plan`） - `checks.md` - `handoff.md` ## 验证 - 已解析校验 `implement.md` 中 implementation plan JSON：通过，9 个子任务。 - 未运行 `npm run lint` / `tsc`，因为本轮只写规划文档，未改生产代码。 ## 核心方案 - 推荐首版采用 **OpenSSH + node-pty**，复用现有 Web Terminal session 进程模型。 - `pi-web.json` 只保存非 secret：profile、host/port/user、credentialId、jump/proxy 拓扑、known_hosts 策略。 - 私钥、password、passphrase、proxy password 必须进入独立 vault：`~/.pi/agent/terminal-secrets/`，0700/0600，API 只返回脱敏 summary。 - 支持 local/ssh 混合多 tab、多级 ProxyJump、SOCKS5/HTTP proxy、受控 custom ProxyCommand。 ## 剩余风险 - Password/passphrase askpass 依赖 OpenSSH/平台能力，需要手输 fallback。 - 本地 vault 不是 OS keychain/encrypted vault，只是隔离+权限+脱敏。 - custom ProxyCommand 是本机命令执行能力，必须强风险提示。 - known_hosts 默认策略影响安全/易用性，需要确认。 ## 需要主会话决策 1. 是否接受 OpenSSH-native 方案，而非引入 `ssh2` 自实现协议？ 2. 是否允许保存 SSH password/passphra…",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:13:08.720Z",
+        "updatedAt": "2026-07-06T08:22:08.572Z",
+        "eventCount": 2772,
+        "lastTextPreview": "已完成规划产物，未修改生产代码、未提交。\n\n## 产物/文件\n\n更新 Studio artifacts：\n\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 `json ypi-implementation-plan`）\n- `checks.md`\n- `handoff.md`\n\n## 验证\n\n- 已解析校验 `implement.md` 中 implementation plan JSON：通过，9 个子任务。\n- 未运行 `npm run lint` / `tsc`，因为本轮只写规划文档，未改生产代码。\n\n## 核心方案\n\n- 推荐首版采用 **OpenSSH + node-pty**，复用现有 Web Terminal session 进程模型。\n- `pi-web.json` 只保存非 secret：profile、host/port/user、credentialId、jump/proxy 拓扑、known_hosts 策略。\n- 私钥、password、passphrase、proxy password 必须进入独立 vault：`~/.pi/agent/terminal-secrets/`，0700/0600，API 只返回脱敏 summary。\n- 支持 local/ssh 混合多 tab、多级 ProxyJump、SOCKS5/HTTP proxy、受控 custom ProxyCommand。\n\n## 剩余风险\n\n- Password/passphrase askpass 依赖 OpenSSH/平台能力，需要手输 fallback。\n- 本地 vault 不是 OS keychain/encrypted vault，只是隔离+权限+脱敏。\n- custom ProxyCommand 是本机命令执行能力，必须强风险提示。\n- known_hosts 默认策略影响安全/易用性，需要确认。\n\n## 需要主会话决策\n\n1. 是否接受 OpenSSH-native 方案，而非引入 `ssh2` 自实现协议？\n2. 是否允许保存 SSH password/passphrase 并通过 askpass 自动使用？\n3. known_hosts 默认策略是否采用推荐的 `ask/manual trust`？\n4. custom ProxyCommand 是否首版开放？\n5. 是否将 `implement.md` 的 implementation plan 保存到任务并推进到 `awaiting_approval`。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:21:48.862Z",
+            "toolCallId": "call_dkidy7GlG3l8BsOeDuo9L6J6|fc_0851f083ceb1b5ec016a4b659c5f1c819883a135e85b2292d5",
+            "toolName": "bash",
+            "text": "implementation plan JSON ok: 9 subtasks",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T08:21:54.272Z",
+            "toolCallId": "call_blmCQOoGCZ2vaqCbxOV24sPG|fc_0851f083ceb1b5ec016a4b65a200548198b58e84281cc252a2",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接 && git diff -- .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接 --stat\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:21:54.408Z",
+            "toolCallId": "call_blmCQOoGCZ2vaqCbxOV24sPG|fc_0851f083ceb1b5ec016a4b65a200548198b58e84281cc252a2",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T08:22:06.274Z",
+            "text": "已完成规划产物，未修改生产代码、未提交。\n\n## 产物/文件\n\n更新 Studio artifacts：\n\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 `json ypi-implementation-plan`）\n- `checks.md`\n- `handoff.md`\n\n## 验证\n\n- 已解析校验 `implement.md` 中 implementation plan JSON：通过，9 个子任务。\n- 未运行 `npm run lint` / `tsc`，因为本轮只写规划文档，未改生产代码。\n\n## 核心方案\n\n- 推荐首版采用 **OpenSSH + node-pty**，复用现有 Web Terminal session 进程模型。\n- `pi-web.json` 只保存非 secret：profile、host/port/user、credentialId、jump/proxy 拓扑、known_hosts 策略。\n- 私钥、password、passphrase、proxy password 必须进入独立 vault：`~/.pi/agent/terminal-secrets/`，0700/0600，API 只返回脱敏 summary。\n- 支持 local/ssh 混合多 tab、多级 ProxyJump、SOCKS5/HTTP proxy、受控 custom ProxyCommand。\n\n## 剩余风险\n\n- Password/passphrase askpass 依赖 OpenSSH/平台能力，需要手输 fallback。\n- 本地 vault 不是 OS keychain/encrypted vault，只是隔离+权限+脱敏。\n- custom ProxyCommand 是本机命令执行能力，必须强风险提示。\n- known_hosts 默认策略影响安全/易用性，需要确认。\n\n## 需要主会话决策\n\n1. 是否接受 OpenSSH-native 方案，而非引入 `ssh2` 自实现协议？\n2. 是否允许保存 SSH password/passphrase 并通过 askpass 自动使用？\n3. known_hosts 默认策略是否采用推荐的 `ask/manual trust`？\n4. custom ProxyCommand 是否首版开放？\n5. 是否将 `implement.md` 的 implementation plan 保存到任务并推进到 `awaiting_approval`。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T08:22:06.295Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2366,
+        "tokens": 576,
+        "tokenSource": "usage",
+        "tps": 140.32,
+        "firstTokenAt": "2026-07-06T08:22:02.164Z",
+        "lastTokenAt": "2026-07-06T08:22:06.269Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-c98b794ec05fe456e130e89f",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/architect-c98b794ec05fe456e130e89f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:13:08.720Z",
+        "finishedAt": "2026-07-06T08:22:08.572Z",
+        "updatedAt": "2026-07-06T08:22:08.572Z",
+        "itemCount": 93,
+        "messageCount": 1,
+        "toolCallCount": 44,
+        "stderrBytes": 0,
+        "bytes": 287753,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a731ff5099509ccbe5c3eb34",
+      "subtaskId": "ssh-contracts-config",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:24:33.446Z",
+      "finishedAt": "2026-07-06T08:32:39.879Z",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-types.ts` — added shared SSH config/profile/endpoint/proxy/credential summary types.\n- `lib/pi-web-config.ts` — added `terminal.ssh` defaults, normalization, validation, and secret-field rejection for SSH profiles.\n- `docs/modules/api.md` — documented reserved SSH terminal config/API direction.\n- `docs/modules/library.md` — documented new SSH types module and config boundary.\n- `docs/modules/frontend.md` — documented future SSH UI contract usage.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — failed: `node_modules/.bin/tsc` not found.\n- `npm run lint` — failed before linting: missing `eslint-config-next` package in `node_modules`.\n\n#### Notes / Risks\n\n- Did not implement vault/API/runner/UI per subtask boundary.\n- Validation now rejects `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` anywhere inside SSH profile objects.\n- Remaining validation could not be completed until dependencies are installed.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:24:33.446Z",
+        "updatedAt": "2026-07-06T08:32:39.879Z",
+        "eventCount": 8894,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-types.ts` — added shared SSH config/profile/endpoint/proxy/credential summary types.\n- `lib/pi-web-config.ts` — added `terminal.ssh` defaults, normalization, validation, and secret-field rejection for SSH profiles.\n- `docs/modules/api.md` — documented reserved SSH terminal config/API direction.\n- `docs/modules/library.md` — documented new SSH types module and config boundary.\n- `docs/modules/frontend.md` — documented future SSH UI contract usage.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — failed: `node_modules/.bin/tsc` not found.\n- `npm run lint` — failed before linting: missing `eslint-config-next` package in `node_modules`.\n\n#### Notes / Risks\n\n- Did not implement vault/API/runner/UI per subtask boundary.\n- Validation now rejects `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` anywhere inside SSH profile objects.\n- Remaining validation could not be completed until dependencies are installed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:32:07.938Z",
+            "toolCallId": "call_Nl2z2QIkMmtYwohmQDvs0H9n|fc_0830b946473509be016a4b6807b5d8819bb69562342869a3e4",
+            "toolName": "read",
+            "text": "if (!isRecord(value)) return undefined;\n  const options: TerminalSshProfileOptions = {};\n  const connectTimeoutSeconds = readOptionalIntegerInRange(value.connectTimeoutSeconds, 1, 3600);\n  const serverAliveIntervalSeconds = readOptionalIntegerInRange(value.serverAliveIntervalSeconds, 1, 3600);\n  if (connectTimeoutSeconds !== undefined) options.connectTimeoutSeconds = connectTimeoutSeconds;\n  if (serverAliveIntervalSeconds !== undefined) options.serverAliveIntervalSeconds = serverAliveIntervalSeconds;\n  if (typeof value.forwardAgent === \"boolean\") options.forwardAgent = value.forwardAgent;\n  if (typeof value.requestTty === \"boolean\") options.requestTty = value.requestTty;\n  const knownHostsPolicy = readOptionalSshKnownHostsPolicy(value.knownHostsPolicy);\n  if (knownHostsPolicy) options.knownHostsPolicy = knownHostsPolicy;\n  return Object.keys(options).length > 0 ? options : undefined;\n}\n\nfunction readTerminalSshProxyConfig(value: unknown): TerminalSshProxyConfig | undefined {\n  if (!isRecord(value)) return undefined;\n  if (value.type === \"none\") return { type: \"none\" };\n  if (value.type === \"socks5\" || value.type === \"http\") {\n    const host = readOptionalString(value.host);\n    const port = readOptionalIntegerInRange(value.port, 1, 65535);\n    if (!host || port === undefined) return undefined;\n    return { type: value.type, host, port, credentialId: readOptionalString(value.credentialId) };\n  }\n  if (value.type === \"custom\") {\n    const commandTemplate = typeof value.commandTemplate === \"string\" ? value.commandTemplate.trim() : \"\";\n    return { type: \"custom\", commandTemplate, acknowledgedRisk: readBoolean(value.acknowledgedRisk, false) };\n  }\n  return undefined;\n}\n\nfunction readTerminalSshProfiles(value: unknown): TerminalSshProfile[] {\n  if (!Array.isArray(value)) return [];\n  const profiles: TerminalSshProfile[] = [];\n  const seen = new Set<string>();\n  for (const item of value) {\n    if (!isRecord(item)) continue;\n    const id = readOptionalString(item.id);\n    const label = readOptionalString(item.label);\n    const target = readTerminalSshEndpoint(item.target);\n    const createdAt = readOptionalString(item.createdAt);\n    const updatedAt = readOptionalString(item.updatedAt);\n    if (!id || !label || !target || !createdAt || !updatedAt || seen.has(id)) continue;\n    seen.add(id);\n    const jumpHosts = Array.isArray(item.jumpHosts)\n      ? item.jumpHosts.flatMap((jumpHost) => {\n        const endpoint = readTerminalSshEndpoint(jumpHost);\n        return endpoint ? [endpoint] : [];\n      })\n      : [];\n    const proxy = readTerminalSshProxyConfig(item.proxy);\n    const options = readTerminalSshProfileOptions(item.options);\n    profiles.push({\n      id,\n      label,\n      enabled: readBoolean(item.enabled, true),\n      target,\n      jumpHosts,\n      proxy,\n      options,\n      createdAt,\n      updatedAt,\n    });\n  }\n  return profiles;\n}\n\nfunction readTerminalSshConfig(value: unknown, fallback: PiWebTerminalSshConfig): PiWebTerminalSshConfig {\n  const root = isRecord(value) ? value : {};\n  return {\n    enabled: readBoolean(root.enabled, fallback.enabled),\n    allowCustomProxyCommand: readBoolean(root.allowCustomProxyCommand, fallback.allowCustomProxyCommand),\n\n[836 more lines in file. Use offset=500 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T08:32:17.233Z",
+            "toolCallId": "call_ZwOapwdYKyIo8aWhS0yQdsSE|fc_0830b946473509be016a4b68110038819b86a53fdd4b70b55d",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"ls node_modules/.bin 2>/dev/null | head || true && ls node_modules/eslint-config-next 2>/dev/null || true\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:32:17.252Z",
+            "toolCallId": "call_ZwOapwdYKyIo8aWhS0yQdsSE|fc_0830b946473509be016a4b68110038819b86a53fdd4b70b55d",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T08:32:39.227Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-types.ts` — added shared SSH config/profile/endpoint/proxy/credential summary types.\n- `lib/pi-web-config.ts` — added `terminal.ssh` defaults, normalization, validation, and secret-field rejection for SSH profiles.\n- `docs/modules/api.md` — documented reserved SSH terminal config/API direction.\n- `docs/modules/library.md` — documented new SSH types module and config boundary.\n- `docs/modules/frontend.md` — documented future SSH UI contract usage.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — failed: `node_modules/.bin/tsc` not found.\n- `npm run lint` — failed before linting: missing `eslint-config-next` package in `node_modules`.\n\n#### Notes / Risks\n\n- Did not implement vault/API/runner/UI per subtask boundary.\n- Validation now rejects `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` anywhere inside SSH profile objects.\n- Remaining validation could not be completed until dependencies are installed.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T08:32:39.243Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2038,
+        "tokens": 505,
+        "tokenSource": "usage",
+        "tps": 119.95,
+        "firstTokenAt": "2026-07-06T08:32:35.004Z",
+        "lastTokenAt": "2026-07-06T08:32:39.214Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a731ff5099509ccbe5c3eb34",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-a731ff5099509ccbe5c3eb34.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:24:33.446Z",
+        "finishedAt": "2026-07-06T08:32:39.878Z",
+        "updatedAt": "2026-07-06T08:32:39.878Z",
+        "itemCount": 77,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 150584,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a19f9a57313c472f52f9ed40",
+      "subtaskId": "profile-api-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:34:30.210Z",
+      "finishedAt": "2026-07-06T08:34:49.972Z",
+      "summary": "Child Pi run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:34:30.210Z",
+        "updatedAt": "2026-07-06T08:34:49.972Z",
+        "eventCount": 202,
+        "lastTextPreview": "Child Pi run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:34:47.379Z",
+            "toolCallId": "call_9lyxYBM6VOVTstdf6XTIBREA|fc_0b886a641d194b36016a4b68a5a1a8819aa924bcef13bd84f3",
+            "toolName": "read",
+            "text": "import { NextResponse } from \"next/server\";\nimport { createTerminalSession, TerminalError } from \"@/lib/terminal-manager\";\n\nexport const dynamic = \"force-dynamic\";\nexport const runtime = \"nodejs\";\n\nexport async function POST(req: Request) {\n  try {\n    const body = await req.json().catch(() => ({})) as { cwd?: unknown; cols?: unknown; rows?: unknown };\n    const session = await createTerminalSession(body);\n    return NextResponse.json({ session });\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    const status = error instanceof TerminalError ? error.status : 500;\n    return NextResponse.json({ error: message }, { status });\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:34:47.385Z",
+            "toolCallId": "call_5BoA6sArHOPQTdmlr2PuTkyl|fc_0b886a641d194b36016a4b68a5a1d0819aa96f0277c87c93ff",
+            "toolName": "bash",
+            "text": "app/api/terminal/env/assist/route.ts\napp/api/terminal/sessions/[id]/events/route.ts\napp/api/terminal/sessions/[id]/input/route.ts\napp/api/terminal/sessions/[id]/resize/route.ts\napp/api/terminal/sessions/[id]/route.ts\napp/api/terminal/sessions/route.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:34:47.390Z",
+            "toolCallId": "call_yU6VOTkJFuALTDL1268WOsax|fc_0b886a641d194b36016a4b68a5a1d8819a9807c3b2a5157e5c",
+            "toolName": "bash",
+            "text": "app/api/terminal/sessions/[id]/input/route.ts\napp/api/terminal/sessions/[id]/route.ts\napp/api/terminal/sessions/[id]/events/route.ts\napp/api/terminal/sessions/[id]/resize/route.ts\napp/api/agent/[id]/route.ts\napp/api/agent/[id]/events/route.ts\napp/api/sessions/[id]/context/route.ts\napp/api/sessions/[id]/changes/file/route.ts\napp/api/sessions/[id]/changes/route.ts\napp/api/sessions/[id]/studio-task/route.ts\napp/api/sessions/[id]/trellis-task/route.ts\napp/api/sessions/[id]/route.ts\napp/api/sessions/[id]/export/route.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T08:34:48.001Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T08:34:49.965Z",
+            "text": "Child Pi run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 65,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a19f9a57313c472f52f9ed40",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-a19f9a57313c472f52f9ed40.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:34:30.210Z",
+        "finishedAt": "2026-07-06T08:34:49.965Z",
+        "updatedAt": "2026-07-06T08:34:49.965Z",
+        "itemCount": 27,
+        "messageCount": 1,
+        "toolCallCount": 11,
+        "stderrBytes": 0,
+        "bytes": 80396,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-7892546b6ffb453c91dfc1ab",
+      "subtaskId": "credential-vault-api",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:33:41.831Z",
+      "finishedAt": "2026-07-06T08:35:10.830Z",
+      "summary": "Child Pi run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:33:41.831Z",
+        "updatedAt": "2026-07-06T08:35:10.830Z",
+        "eventCount": 3833,
+        "lastTextPreview": "Child Pi run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:33:53.190Z",
+            "toolCallId": "call_JjLdOZzB5ZoSDE29OJha8cQy|fc_0d57f11b4e1576d0016a4b6871218c819ab833a0a971ce19e1",
+            "toolName": "bash",
+            "text": "app/api/auth/accounts/[provider]/route.ts\napp/api/auth/accounts/[provider]/activate/route.ts\napp/api/terminal/env/assist/route.ts\napp/api/terminal/sessions/route.ts\napp/api/terminal/sessions/[id]/input/route.ts\napp/api/terminal/sessions/[id]/route.ts\napp/api/terminal/sessions/[id]/events/route.ts\napp/api/terminal/sessions/[id]/resize/route.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T08:35:08.194Z",
+            "toolCallId": "call_7J2dLE95gL7ufkOXp9gZXkYn|fc_0d57f11b4e1576d0016a4b687bde08819a8396760ea83daab9",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"lib/terminal-ssh-vault.ts\",\n  \"content\": \"import { createHash, randomUUID } from \\\"node:crypto\\\";\\nimport { access, chmod, mkdir, readFile, rename, writeFile } from \\\"node:fs/promises\\\";\\nimport { join } from \\\"node:path\\\";\\nimport { getAgentDir } from \\\"@earendil-works/pi-coding-agent\\\";\\nimport { readPiWebConfig } from \\\"@/lib/pi-web-config\\\";\\nimport type { TerminalCredentialSummary, TerminalCredentialType, TerminalSshProfile } from \\\"@/lib/terminal-ssh-types\\\";\\n\\nconst VAULT_DIR_NAME = \\\"terminal-secrets\\\";\\nconst CREDENTIALS_FILE = \\\"credentials.json\\\";\\nconst DELETED_DIR_NAME = \\\"deleted\\\";\\nconst VAULT_DIR_MODE = 0o700;\\nconst CREDENTIALS_FILE_MODE = 0o600;\\n\\ninterface TerminalCredentialVaultFile {\\n  version: 1;\\n  credentials: TerminalCredentialRecord[];\\n}\\n\\nexport interface TerminalCredentialRecord {\\n  id: string;\\n  label: string;\\n  type: TerminalCredentialType;\\n  username?: string;\\n  identityFilePath?: string;\\n  privateKeyPem?: string;\\n  passphrase?: string;\\n  password?: string;\\n  proxyUsername?: string;\\n  proxyPassword?: string;\\n  fingerprint?: string;\\n  createdAt: string;\\n  updatedAt: string;\\n}\\n\\ninterface CredentialSecretInput {\\n  privateKeyPem?: unknown;\\n  passphrase?: unknown;\\n  password?: unknown;\\n  proxyPassword?: unknown;\\n}\\n\\ninterface CredentialMetadataInput extends CredentialSecretInput {\\n  id?: unknown;\\n  label?: unknown;\\n  type?: unknown;\\n  username?: unknown;\\n  identityFilePath?: unknown;\\n  proxyUsername?: unknown;\\n  fingerprint?: unknown;\\n}\\n\\nexport class TerminalSshVaultError extends Error {\\n  constructor(message: string, public readonly status = 400, public readonly references?: string[]) {\\n    super(message);\\n    this.name = \\\"TerminalSshVaultError\\\";\\n  }\\n}\\n\\nfunction isRecord(value: unknown): value is Record<string, unknown> {\\n  return typeof value === \\\"object\\\" && value !== null && !Array.isArray(value);\\n}\\n\\nfunction isNodeError(error: unknown): error is NodeJS.ErrnoException {\\n  return error instanceof Error && \\\"code\\\" in error;\\n}\\n\\nfunction vaultDir(): string {\\n  return join(getAgentDir(), VAULT_DIR_NAME);\\n}\\n\\nfunction vaultPath(): string {\\n  return join(vaultDir(), CREDENTIALS_FILE);\\n}\\n\\nfunction deletedVaultDir(): string {\\n  return join(vaultDir(), DELETED_DIR_NAME);\\n}\\n\\nfunction deletedCredentialPath(id: string): string {\\n  const timestamp = new Date().toISOString().replace(/[:.]/g, \\\"-\\\");\\n  return join(deletedVaultDir(), `${timestamp}_${encodeURIComponent(id)}.json`);\\n}\\n\\nasync function pathExists(path: string): Promise<boolean> {\\n  try {\\n    await access(path);\\n    return true;\\n  } catch (error) {\\n    if (isNodeError(error) && error.code === \\\"ENOENT\\\") return false;\\n    throw error;\\n  }\\n}\\n\\nasync function ensureVaultDir(): Promise<void> {\\n  const dir = vaultDir();\\n  await mkdir(dir, { recursive: true, mode: VAULT_DIR_MODE });\\n  await chmod(dir, VAULT_DIR_MODE).catch(() => {});\\n}\\n\\nasync function ensureDeletedVaultDir(): Promise<void> {\\n  const dir = deletedVaultDir();\\n  await mkdir(dir, { recursive: true, mode: VAULT_DIR_MODE });\\n  await chmod(dir, VAULT_DIR_MODE).catch(() => {});\\n}\\n\\nfunction normalizeString(value: unknown): string | undefined {\\n  return typeof value === \\\"string\\\" && value.trim() ? value.trim() : undefined;\\n}\\n\\nfunction normalizeSecretString(value: unknown): string | undefined {\\n  return typeof value === \\\"string\\\" && value.length > 0 ? value : undefined;\\n}\\n\\nfunction normalizeCredentialType(value: unknown): TerminalCredentialType | null {\\n  return value === \\\"agent\\\" || value === \\\"identityFile\\\" || value === \\\"privateKey\\\" || value === \\\"password\\\" || value === \\\"proxyAuth\\\" ? value : null;\\n}\\n\\nfunction normalizeRecord(value: unknown): TerminalCredentialRecord | null {\\n  if (!isRecord(value)) return null;\\n  const type = normalizeCredentialType(value.type);\\n  if (!type) return null;\\n  const id = normalizeString(value.id);\\n  const label = normalizeString(value.label);\\n  const createdAt = normalizeString(value.createdAt);\\n  const updatedAt = normalizeString…",
+            "truncated": true
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:35:08.195Z",
+            "toolCallId": "call_7J2dLE95gL7ufkOXp9gZXkYn|fc_0d57f11b4e1576d0016a4b687bde08819a8396760ea83daab9",
+            "toolName": "write",
+            "text": "Successfully wrote 14121 bytes to lib/terminal-ssh-vault.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T08:35:08.608Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T08:35:10.829Z",
+            "text": "Child Pi run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 65,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-7892546b6ffb453c91dfc1ab",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-7892546b6ffb453c91dfc1ab.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:33:41.831Z",
+        "finishedAt": "2026-07-06T08:35:10.830Z",
+        "updatedAt": "2026-07-06T08:35:10.830Z",
+        "itemCount": 25,
+        "messageCount": 1,
+        "toolCallCount": 10,
+        "stderrBytes": 0,
+        "bytes": 95526,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-24d5421c1c6e548dd6813c83",
+      "subtaskId": "known-hosts-manager",
+      "member": "implementer",
+      "status": "failed",
+      "startedAt": "2026-07-06T08:34:54.499Z",
+      "finishedAt": "2026-07-06T08:40:38.992Z",
+      "prompt": "实现子任务 known-hosts-manager：实现 dedicated known_hosts 管理与 scan/trust API。 请严格只做该子任务，不实现 credential vault、profile CRUD、SSH runner 或前端 UI。当前 credential-vault-api/profile-api-validation 可能正在并行实现，避免修改其范围内文件；如需类型，只依赖 lib/terminal-ssh-types.ts 和已有配…",
+      "summary": "Async child Pi process starting.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:34:54.499Z",
+        "updatedAt": "2026-07-06T08:40:38.992Z",
+        "eventCount": 0,
+        "lastTextPreview": "Child Pi process starting.",
+        "itemsPreview": [
+          {
+            "kind": "prompt",
+            "at": "2026-07-06T08:34:54.499Z",
+            "text": "实现子任务 known-hosts-manager：实现 dedicated known_hosts 管理与 scan/trust API。\n\n请严格只做该子任务，不实现 credential vault、profile CRUD、SSH runner 或前端 UI。当前 credential-vault-api/profile-api-validation 可能正在并行实现，避免修改其范围内文件；如需类型，只依赖 lib/terminal-ssh-types.ts 和已有配置契约。\n\n范围：\n- 先阅读 AGENTS.md、docs/modules/api.md、docs/modules/library.md、docs/standards/code-style.md、lib/terminal-ssh-types.ts。\n- 新增 lib/terminal-known-hosts.ts：使用 ~/.pi/agent/terminal/known_hosts，目录 chmod 0700、文件 chmod 0600（Windows best-effort）。\n- 实现 known_hosts list/remove/trust 与 ssh-keyscan best-effort scan。\n- 返回 key type、SHA256 fingerprint、host/port summary，不返回不必要原始文件内容。\n- 为后续 SSH launch config 提供 UserKnownHostsFile 与 HostKeyAlias helper。\n- 新增 app/api/terminal/ssh/known-hosts/route.ts 与 app/api/terminal/ssh/known-hosts/scan/route.ts。\n- 更新 docs/modules/api.md 和 docs/modules/library.md。\n\n验收：\n- known_hosts 文件独立于 pi-web.json。\n- scan 失败不破坏 profile 保存，只返回可展示错误。\n- HostKeyAlias 使用稳定 host:port，避免 session alias 污染 known_hosts。\n- 运行 npm run lint 与 node_modules/.bin/tsc --noEmit；如失败，记录是否为本子任务引入。\n\n注意：ssh-keyscan 只能辅助展示，不能证明可信；文档/错误文案要表达这个边界。保护已有 local terminal 行为。",
+            "truncated": false
+          }
+        ],
+        "warnings": [],
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        },
+        "terminationReason": "runtime_lost"
+      },
+      "terminationReason": "runtime_lost",
+      "error": "Studio subagent runtime handle was lost before completion. Retry or handle manually.",
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-24d5421c1c6e548dd6813c83",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-24d5421c1c6e548dd6813c83.jsonl",
+        "status": "failed",
+        "startedAt": "2026-07-06T08:34:54.499Z",
+        "finishedAt": "2026-07-06T08:40:38.992Z",
+        "updatedAt": "2026-07-06T08:40:38.992Z",
+        "itemCount": 1,
+        "messageCount": 0,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1653,
+        "truncated": false,
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-7ce8564e1b12da76be24bd69",
+      "subtaskId": "known-hosts-manager",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:41:11.762Z",
+      "finishedAt": "2026-07-06T08:44:08.685Z",
+      "prompt": "重试实现子任务 known-hosts-manager：实现 dedicated known_hosts 管理与 scan/trust API。 上一次失败原因是 runtime_lost，几乎没有实际执行内容。请重新执行该子任务。 严格只做该子任务，不实现 credential vault、profile CRUD、SSH runner 或前端 UI。当前 credential-vault-api/profile-api-validation 已完成，避免改动它们的范围；…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-known-hosts.ts` — added dedicated known_hosts manager with 0700/0600 best-effort permissions, list/trust/remove, advisory `ssh-keyscan`, SHA256 fingerprints, stable `host:port` alias helper, and `UserKnownHostsFile` helper.\n- `app/api/terminal/ssh/known-hosts/route.ts` — added GET/POST/DELETE known_hosts API.\n- `app/api/terminal/ssh/known-hosts/scan/route.ts` — added best-effort scan API that returns displayable errors without mutating config/profile state.\n- `docs/modules/api.md` — documented known_hosts routes and advisory scan boundary.\n- `docs/modules/library.md` — documented `lib/terminal-known-hosts.ts`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed with one warning in unrelated `lib/terminal-ssh-vault.ts` (`rename` unused), not introduced by this subtask.\n\n#### Notes / Risks\n\n- `ssh-keyscan` results explicitly include a warning that fingerprints must be verified through a trusted channel before trust.\n- No credential vault, profile CRUD, SSH runner, or frontend UI was implemented in this subtask.\n- Host key storage is separate from `pi-web.json` at `~/.pi/agent/terminal/known_hosts`.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:41:11.762Z",
+        "updatedAt": "2026-07-06T08:44:08.685Z",
+        "eventCount": 3545,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-known-hosts.ts` — added dedicated known_hosts manager with 0700/0600 best-effort permissions, list/trust/remove, advisory `ssh-keyscan`, SHA256 fingerprints, stable `host:port` alias helper, and `UserKnownHostsFile` helper.\n- `app/api/terminal/ssh/known-hosts/route.ts` — added GET/POST/DELETE known_hosts API.\n- `app/api/terminal/ssh/known-hosts/scan/route.ts` — added best-effort scan API that returns displayable errors without mutating config/profile state.\n- `docs/modules/api.md` — documented known_hosts routes and advisory scan boundary.\n- `docs/modules/library.md` — documented `lib/terminal-known-hosts.ts`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed with one warning in unrelated `lib/terminal-ssh-vault.ts` (`rename` unused), not introduced by this subtask.\n\n#### Notes / Risks\n\n- `ssh-keyscan` results explicitly include a warning that fingerprints must be verified through a trusted channel before trust.\n- No credential vault, profile CRUD, SSH runner, or frontend UI was implemented in this subtask.\n- Host key storage is separate from `pi-web.json` at `~/.pi/agent/terminal/known_hosts`.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:43:40.080Z",
+            "toolCallId": "call_YVxEVb1gztwIAmtHqqE9P9zY|fc_0637245256887876016a4b6abbdd18819884dec5742eb6a81a",
+            "toolName": "bash",
+            "text": "diff --git a/docs/modules/api.md b/docs/modules/api.md\nindex ae4a02a..5c6970f 100644\n--- a/docs/modules/api.md\n+++ b/docs/modules/api.md\n@@ -56,7 +56,9 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd\n | `git/switch/` | POST | Switch the current workspace to a local branch. Validates cwd, branch existence, and working tree cleanliness before executing `git switch`. Returns `switchedTo` on success or an error message. |\n | `web-config/` | GET/PUT | Read/write `~/.pi/agent/pi-web.json` for Yolk Pi chat defaults such as `yolk.defaultToolPreset`, WorkTree defaults, YPI Studio default/member model and thinking policies, Usage scan scope, Web Terminal settings, ChatGPT usage panel/warmup schedule/default-off auto-failover settings, Editor implementation/shortcut settings, optional Trellis panel settings, setup proxy, and Trellis subagent model policy; also lazily ensures the local ChatGPT warmup scheduler. |\n | `terminal/env/assist/` | POST | Use the configured Terminal env assistant model to parse complex raw env text into normalized key-value env entries. |\n-| `terminal/sessions/` | POST | Create a local Web Terminal session for an authorized workspace cwd when the Terminal setting is enabled. |\n+| `terminal/ssh/known-hosts/` | GET/POST/DELETE | Manage the dedicated Web Terminal SSH `known_hosts` file under `~/.pi/agent/terminal/known_hosts`: list redacted host-key summaries, trust a caller-provided public host key, or remove entries by host/fingerprint/index. Responses expose key type and SHA256 fingerprint, not unnecessary raw file contents. |\n+| `terminal/ssh/known-hosts/scan/` | POST | Best-effort `ssh-keyscan` for `{ host, port }`, returning displayable key type/SHA256 fingerprint/public key candidates plus a warning that scans do not prove trust. Scan failures are returned as normal result data and do not modify profiles or config. |\n+| `terminal/sessions/` | POST | Create a local Web Terminal session for an authorized workspace cwd when the Terminal setting is enabled; the config contract now reserves `terminal.ssh` for future SSH profile session creation while preserving old local requests. |\n | `terminal/sessions/[id]/` | DELETE | Close a Web Terminal session and terminate its process. |\n | `terminal/sessions/[id]/events/` | GET | Stream Web Terminal output through SSE. |\n | `terminal/sessions/[id]/input/` | POST | Write user input to a Web Terminal session. |\n@@ -99,3 +101,5 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd\n - Session-file routes should use `lib/session-reader.ts` and shared types in `lib/types.ts`.\n - Client-side command calls should use `lib/agent-client.ts`.\n - Normalize streamed/file-loaded tool calls through `lib/normalize.ts`.\n+- Future Web Terminal SSH routes should use `lib/terminal-ssh-types.ts` and keep profiles in `terminal.ssh` as non-secret config only; credential secrets must not be accepted through profile/config routes or written to `pi-web.json`.\n+- Web Terminal SSH known-hosts routes use `lib/terminal-known-hosts.ts`, which stores trust data in the dedicated `~/.pi/agent/terminal/known_hosts` file. `ssh-keyscan` results are advisory only; users must verify fingerprints through a trusted channel before trusting them.\ndiff --git a/docs/modules/library.md b/docs/modules/library.md\nindex 9d5550a..6253b84 100644\n--- a/docs/modules/library.md\n+++ b/docs/modules/library.md\n@@ -31,7 +31,9 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by\n | `lib/openai-codex-warmup-scheduler.ts` | Local in-process ChatGPT warmup scheduler guarded by `globalThis`, reading `pi-web.json` each tick and running due saved schedules once per local date/time key. |\n | `lib/npx.ts` | Cross-platform `npx` wrapper that avoids shell quoting issues. |\n | `lib/usage-stats.ts` | Aggregate token/cost across configured active-only or active-plus-archived sessions by day, model, provider, and session. |\n-| `lib/pi-web-config.ts` | Read/write/validate `~/.pi/agent/pi-web.json` for Yolk Pi chat defaults (`yolk.defaultToolPr…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T08:43:44.339Z",
+            "toolCallId": "call_pkldLGfgPhX4jFGBC1eOEszn|fc_0637245256887876016a4b6ac02bf88198b90294ce1d3416c3",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short package-lock.json package.json node_modules 2>/dev/null | head -20 && git status --short lib/terminal-known-hosts.ts app/api/terminal/ssh/known-hosts docs/modules/api.md docs/modules/library.md\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T08:43:44.376Z",
+            "toolCallId": "call_pkldLGfgPhX4jFGBC1eOEszn|fc_0637245256887876016a4b6ac02bf88198b90294ce1d3416c3",
+            "toolName": "bash",
+            "text": "M docs/modules/api.md\n M docs/modules/library.md\n?? app/api/terminal/ssh/known-hosts/\n?? lib/terminal-known-hosts.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T08:44:06.454Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-known-hosts.ts` — added dedicated known_hosts manager with 0700/0600 best-effort permissions, list/trust/remove, advisory `ssh-keyscan`, SHA256 fingerprints, stable `host:port` alias helper, and `UserKnownHostsFile` helper.\n- `app/api/terminal/ssh/known-hosts/route.ts` — added GET/POST/DELETE known_hosts API.\n- `app/api/terminal/ssh/known-hosts/scan/route.ts` — added best-effort scan API that returns displayable errors without mutating config/profile state.\n- `docs/modules/api.md` — documented known_hosts routes and advisory scan boundary.\n- `docs/modules/library.md` — documented `lib/terminal-known-hosts.ts`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed with one warning in unrelated `lib/terminal-ssh-vault.ts` (`rename` unused), not introduced by this subtask.\n\n#### Notes / Risks\n\n- `ssh-keyscan` results explicitly include a warning that fingerprints must be verified through a trusted channel before trust.\n- No credential vault, profile CRUD, SSH runner, or frontend UI was implemented in this subtask.\n- Host key storage is separate from `pi-web.json` at `~/.pi/agent/terminal/known_hosts`.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T08:44:06.468Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2434,
+        "tokens": 1163,
+        "tokenSource": "usage",
+        "tps": 252.39,
+        "firstTokenAt": "2026-07-06T08:44:01.838Z",
+        "lastTokenAt": "2026-07-06T08:44:06.446Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-7ce8564e1b12da76be24bd69",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-7ce8564e1b12da76be24bd69.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:41:11.762Z",
+        "finishedAt": "2026-07-06T08:44:08.675Z",
+        "updatedAt": "2026-07-06T08:44:08.675Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 126722,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-69e415c29eb3d1ff507960d9",
+      "subtaskId": "ssh-launch-runner",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:56:43.597Z",
+      "finishedAt": "2026-07-06T09:01:47.381Z",
+      "prompt": "实现子任务 ssh-launch-runner：实现 OpenSSH launch plan、临时文件、ProxyJump、askpass、proxy helper。 请严格只做该子任务，不集成 terminal session API、不做 Settings/TerminalPanel UI。 范围： - 先阅读 AGENTS.md、docs/modules/library.md、docs/modules/api.md、docs/standards/code-style.…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-runner.ts` — added OpenSSH launch-plan builder, temp dir/config/key/askpass/proxy context handling, ProxyJump generation, redacted plan, cleanup, and startup sweep helpers.\n- `scripts/terminal-proxy-helper.js` — added Node-based SOCKS5 / HTTP CONNECT proxy helper, including auth via context file (not command line).\n- `docs/modules/library.md` — documented SSH vault/runner/known-hosts library responsibilities.\n- `docs/modules/api.md` — noted future SSH session routes should use the runner and return only redacted data.\n- `lib/terminal-ssh-vault.ts` — removed unused `rename` import to keep lint clean.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Runner only builds launch plans; it does **not** integrate with `terminal-manager` or session API, per task boundary.\n- Password/passphrase askpass is implemented as best-effort and may still fall back to interactive prompts depending on OpenSSH/platform behavior.\n- Proxy helper path resolves from `process.cwd()/scripts/terminal-proxy-helper.js`, which matches current dev/published server cwd behavior.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:56:43.597Z",
+        "updatedAt": "2026-07-06T09:01:47.381Z",
+        "eventCount": 10100,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-runner.ts` — added OpenSSH launch-plan builder, temp dir/config/key/askpass/proxy context handling, ProxyJump generation, redacted plan, cleanup, and startup sweep helpers.\n- `scripts/terminal-proxy-helper.js` — added Node-based SOCKS5 / HTTP CONNECT proxy helper, including auth via context file (not command line).\n- `docs/modules/library.md` — documented SSH vault/runner/known-hosts library responsibilities.\n- `docs/modules/api.md` — noted future SSH session routes should use the runner and return only redacted data.\n- `lib/terminal-ssh-vault.ts` — removed unused `rename` import to keep lint clean.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Runner only builds launch plans; it does **not** integrate with `terminal-manager` or session API, per task boundary.\n- Password/passphrase askpass is implemented as best-effort and may still fall back to interactive prompts depending on OpenSSH/platform behavior.\n- Proxy helper path resolves from `process.cwd()/scripts/terminal-proxy-helper.js`, which matches current dev/published server cwd behavior.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:01:15.884Z",
+            "toolCallId": "call_K8umVmhCO8FOplCuaXBRVPkk|fc_031d06b3871445b1016a4b6edbb4488198bf82b9e6c6d215cd",
+            "toolName": "bash",
+            "text": "M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/pi-web-config.ts\n?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/\"\n?? app/api/terminal/ssh/\n?? components/TerminalSshCredentialEditor.tsx\n?? components/TerminalSshProfileEditor.tsx\n?? lib/terminal-known-hosts.ts\n?? lib/terminal-ssh-runner.ts\n?? lib/terminal-ssh-types.ts\n?? lib/terminal-ssh-vault.ts\n?? scripts/terminal-proxy-helper.js\n docs/modules/api.md      |   7 +-\n docs/modules/frontend.md |   4 +-\n docs/modules/library.md  |   6 +-\n lib/pi-web-config.ts     | 254 +++++++++++++++++++++++++++++++++++++++++++++++\n 4 files changed, 267 insertions(+), 4 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T09:01:25.536Z",
+            "toolCallId": "call_7JQrwXjsCNQmR8qtIADCGU18|fc_031d06b3871445b1016a4b6ee57a3881988ab4f70ac43c4985",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"bin/pi-web.js\",\n  \"limit\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:01:25.538Z",
+            "toolCallId": "call_7JQrwXjsCNQmR8qtIADCGU18|fc_031d06b3871445b1016a4b6ee57a3881988ab4f70ac43c4985",
+            "toolName": "read",
+            "text": "#!/usr/bin/env node\n\"use strict\";\n\n// eslint-disable-next-line @typescript-eslint/no-require-imports\nconst { spawn } = require(\"child_process\");\n// eslint-disable-next-line @typescript-eslint/no-require-imports\nconst path = require(\"path\");\n// eslint-disable-next-line @typescript-eslint/no-require-imports\nconst fs = require(\"fs\");\n// eslint-disable-next-line @typescript-eslint/no-require-imports\nconst { parseArgs } = require(\"util\");\n\nconst pkgDir = path.join(__dirname, \"..\");\nconst nextDir = path.join(pkgDir, \".next\");\n\n// Resolve next's CLI entry directly to avoid relying on .bin symlinks (which\n// may not exist when installed via npx).\nlet nextBin;\ntry {\n  nextBin = require.resolve(\"next/dist/bin/next\", { paths: [pkgDir] });\n} catch {\n  // Fallback: locate next package root and derive the bin path manually.\n  try {\n    const nextPkg = require.resolve(\"next/package.json\", { paths: [pkgDir] });\n    nextBin = path.join(path.dirname(nextPkg), \"dist\", \"bin\", \"next\");\n  } catch {\n    nextBin = path.join(pkgDir, \"node_modules\", \"next\", \"dist\", \"bin\", \"next\");\n  }\n}\n\nconst { values: cliArgs } = parseArgs({\n  options: {\n    port:         { type: \"string\", short: \"p\" },\n    hostname:     { type: \"string\", short: \"H\" },\n    proxy:        { type: \"string\" },\n    \"socks-proxy\": { type: \"string\" },\n    \"no-proxy\":  { type: \"string\" },\n  },\n  strict: false,\n});\n\nconst port       = cliArgs.port     ?? process.env.PORT     ?? \"30141\";\nconst hostname   = cliArgs.hostname ?? process.env.HOSTNAME ?? null;\nconst httpProxy  = cliArgs.proxy ?? process.env.PROXY_URL ?? process.env.HTTP_PROXY ?? process.env.http_proxy ?? null;\nconst socksProxy = cliArgs[\"socks-proxy\"] ?? process.env.SOCKS_PROXY_URL ?? process.env.ALL_PROXY ?? process.env.all_proxy ?? null;\nconst noProxy    = cliArgs[\"no-proxy\"] ?? process.env.NO_PROXY ?? process.env.no_proxy ?? null;\n\nif (!fs.existsSync(nextDir)) {\n  console.error(\"Build artifacts not found. Please report this issue.\");\n  process.exit(1);\n}\n\nconst nextArgs = [\"start\", \"-p\", port];\nif (hostname) nextArgs.push(\"-H\", hostname);\n\nfunction appendNodeOption(current, option) {\n  const parts = (current ?? \"\").split(/\\s+/).filter(Boolean);\n  return parts.includes(option) ? current ?? \"\" : [...parts, option].join(\" \");\n}\n\nfunction createRuntimeEnv(baseEnv) {\n  const env = { ...baseEnv };\n  if (httpProxy) {\n    env.HTTP_PROXY = httpProxy;\n    env.HTTPS_PROXY = httpProxy;\n    env.http_proxy = httpProxy;\n    env.https_proxy = httpProxy;\n  }\n  if (socksProxy) {\n    env.ALL_PROXY = socksProxy;\n    env.all_proxy = socksProxy;\n  }\n  if (noProxy) {\n    env.NO_PROXY = noProxy;\n    env.no_proxy = noProxy;\n  }\n  if (httpProxy || socksProxy || noProxy) {\n    env.NODE_OPTIONS = appendNodeOption(env.NODE_OPTIONS, \"--use-env-proxy\");\n  }\n  return env;\n}\n\n// Always run next's JS entry with node directly — avoids .bin symlink issues\n// and path-with-spaces problems on Windows when shell: true is used.\nconst child = spawn(process.execPath, [nextBin, ...nextArgs], {\n  cwd: pkgDir,\n  stdio: [\"inherit\", \"pipe\", \"inherit\"],\n  env: createRuntimeEnv(process.env),\n});\n\nlet browserOpened = false;\nconst url = `http://${hostname ?? \"localhost\"}:${port}`;\n\nchild.stdout.on(\"data\", (chunk) => {\n  const text = chunk.toString();\n  process.stdout.write(text);\n  if (!browserOpened && text.includes(\"Ready\")) {\n    browserOpened = true;\n    const isWindows = process.platform === \"win32\";\n    const isMac = process.platform === \"darwin\";\n    const openCmd = isWindows ? \"start\" : isMac ? \"open\" : \"xdg-open\";\n    spawn(openCmd, [url], { shell: isWindows, stdio: \"ignore\", detached: true }).unref();\n  }\n});\n\nchild.on(\"exit\", (code) => process.exit(code ?? 0));",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T09:01:45.156Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-runner.ts` — added OpenSSH launch-plan builder, temp dir/config/key/askpass/proxy context handling, ProxyJump generation, redacted plan, cleanup, and startup sweep helpers.\n- `scripts/terminal-proxy-helper.js` — added Node-based SOCKS5 / HTTP CONNECT proxy helper, including auth via context file (not command line).\n- `docs/modules/library.md` — documented SSH vault/runner/known-hosts library responsibilities.\n- `docs/modules/api.md` — noted future SSH session routes should use the runner and return only redacted data.\n- `lib/terminal-ssh-vault.ts` — removed unused `rename` import to keep lint clean.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Runner only builds launch plans; it does **not** integrate with `terminal-manager` or session API, per task boundary.\n- Password/passphrase askpass is implemented as best-effort and may still fall back to interactive prompts depending on OpenSSH/platform behavior.\n- Proxy helper path resolves from `process.cwd()/scripts/terminal-proxy-helper.js`, which matches current dev/published server cwd behavior.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T09:01:45.170Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2392,
+        "tokens": 756,
+        "tokenSource": "usage",
+        "tps": 301.08,
+        "firstTokenAt": "2026-07-06T09:01:42.631Z",
+        "lastTokenAt": "2026-07-06T09:01:45.142Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-69e415c29eb3d1ff507960d9",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-69e415c29eb3d1ff507960d9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:56:43.597Z",
+        "finishedAt": "2026-07-06T09:01:47.373Z",
+        "updatedAt": "2026-07-06T09:01:47.373Z",
+        "itemCount": 63,
+        "messageCount": 1,
+        "toolCallCount": 29,
+        "stderrBytes": 0,
+        "bytes": 165656,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-91e142281feb0aad4deba87d",
+      "subtaskId": "settings-ssh-ui",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T08:57:00.498Z",
+      "finishedAt": "2026-07-06T09:03:51.098Z",
+      "prompt": "实现子任务 settings-ssh-ui：Settings Terminal 增加 profiles/credentials/known_hosts 管理 UI。 请严格只做该子任务，不修改 TerminalPanel 混合 tab，不实现 SSH runner，不改 terminal-manager session 集成。 范围： - 先阅读 AGENTS.md、docs/modules/frontend.md、docs/modules/api.md、docs/stan…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SettingsConfig.tsx` — Added Terminal → SSH settings section with SSH enablement, custom ProxyCommand/env risk toggles, default known_hosts policy, and embedded SSH profile/credential/known_hosts panels.\n- `components/TerminalSshCredentialEditor.tsx` — New credential vault UI with redacted summaries, write-only secret fields, explicit Replace secret flow, and referenced-credential delete blocking display.\n- `components/TerminalSshProfileEditor.tsx` — New SSH profile editor for target, jump chain, credentials, proxy config, known_hosts policy, timeout/agent-forwarding toggles, warnings, and validate/resolve test hooks.\n- `components/TerminalKnownHostsPanel.tsx` — New known_hosts UI for listing, scanning, trusting, and deleting dedicated SSH host keys.\n- `docs/modules/frontend.md` — Documented the new SSH settings components.\n- `docs/modules/api.md` — Documented Settings UI usage of SSH credential/profile-test/known-hosts APIs and secret boundary.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel`, `terminal-manager`, SSH runner, or session integration.\n- Credential/profile API routes are expected from prerequisite subtasks; if absent at runtime, the new UI will surface API errors instead of silently failing.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T08:57:00.498Z",
+        "updatedAt": "2026-07-06T09:03:51.098Z",
+        "eventCount": 18236,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SettingsConfig.tsx` — Added Terminal → SSH settings section with SSH enablement, custom ProxyCommand/env risk toggles, default known_hosts policy, and embedded SSH profile/credential/known_hosts panels.\n- `components/TerminalSshCredentialEditor.tsx` — New credential vault UI with redacted summaries, write-only secret fields, explicit Replace secret flow, and referenced-credential delete blocking display.\n- `components/TerminalSshProfileEditor.tsx` — New SSH profile editor for target, jump chain, credentials, proxy config, known_hosts policy, timeout/agent-forwarding toggles, warnings, and validate/resolve test hooks.\n- `components/TerminalKnownHostsPanel.tsx` — New known_hosts UI for listing, scanning, trusting, and deleting dedicated SSH host keys.\n- `docs/modules/frontend.md` — Documented the new SSH settings components.\n- `docs/modules/api.md` — Documented Settings UI usage of SSH credential/profile-test/known-hosts APIs and secret boundary.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel`, `terminal-manager`, SSH runner, or session integration.\n- Credential/profile API routes are expected from prerequisite subtasks; if absent at runtime, the new UI will surface API errors instead of silently failing.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:03:25.239Z",
+            "toolCallId": "call_p7ou6NDdwwaZJBqZB8FV7aBs|fc_049c522bc6174118016a4b6f539c8c8198865d8ff1444732b4",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.7 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T09:03:30.897Z",
+            "toolCallId": "call_jPtdZXp4N9E1La42iW3XOsYt|fc_049c522bc6174118016a4b6f62c49c8198b195062f35e5aa53",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- components/SettingsConfig.tsx components/TerminalSshCredentialEditor.tsx components/TerminalSshProfileEditor.tsx components/TerminalKnownHostsPanel.tsx docs/modules/frontend.md docs/modules/api.md | diffstat && git status --short\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:03:30.973Z",
+            "toolCallId": "call_jPtdZXp4N9E1La42iW3XOsYt|fc_049c522bc6174118016a4b6f62c49c8198b195062f35e5aa53",
+            "toolName": "bash",
+            "text": "components/SettingsConfig.tsx |   55 ++++++++++++++++++++++++++++++++++++++++++\n docs/modules/api.md           |   11 +++++++-\n docs/modules/frontend.md      |    7 +++--\n 3 files changed, 70 insertions(+), 3 deletions(-)\n M components/SettingsConfig.tsx\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/pi-web-config.ts\n?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/\"\n?? app/api/terminal/ssh/\n?? components/TerminalKnownHostsPanel.tsx\n?? components/TerminalSshCredentialEditor.tsx\n?? components/TerminalSshProfileEditor.tsx\n?? lib/terminal-known-hosts.ts\n?? lib/terminal-ssh-runner.ts\n?? lib/terminal-ssh-types.ts\n?? lib/terminal-ssh-vault.ts\n?? scripts/terminal-proxy-helper.js",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T09:03:48.878Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SettingsConfig.tsx` — Added Terminal → SSH settings section with SSH enablement, custom ProxyCommand/env risk toggles, default known_hosts policy, and embedded SSH profile/credential/known_hosts panels.\n- `components/TerminalSshCredentialEditor.tsx` — New credential vault UI with redacted summaries, write-only secret fields, explicit Replace secret flow, and referenced-credential delete blocking display.\n- `components/TerminalSshProfileEditor.tsx` — New SSH profile editor for target, jump chain, credentials, proxy config, known_hosts policy, timeout/agent-forwarding toggles, warnings, and validate/resolve test hooks.\n- `components/TerminalKnownHostsPanel.tsx` — New known_hosts UI for listing, scanning, trusting, and deleting dedicated SSH host keys.\n- `docs/modules/frontend.md` — Documented the new SSH settings components.\n- `docs/modules/api.md` — Documented Settings UI usage of SSH credential/profile-test/known-hosts APIs and secret boundary.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel`, `terminal-manager`, SSH runner, or session integration.\n- Credential/profile API routes are expected from prerequisite subtasks; if absent at runtime, the new UI will surface API errors instead of silently failing.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T09:03:48.895Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2762,
+        "tokens": 818,
+        "tokenSource": "usage",
+        "tps": 1744.14,
+        "firstTokenAt": "2026-07-06T09:03:48.401Z",
+        "lastTokenAt": "2026-07-06T09:03:48.870Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-91e142281feb0aad4deba87d",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-91e142281feb0aad4deba87d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T08:57:00.498Z",
+        "finishedAt": "2026-07-06T09:03:51.089Z",
+        "updatedAt": "2026-07-06T09:03:51.089Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 184193,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-eaeb14b474f87a6e87839a2c",
+      "subtaskId": "terminal-session-integration",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T09:12:05.976Z",
+      "finishedAt": "2026-07-06T09:15:33.024Z",
+      "prompt": "实现子任务 terminal-session-integration：扩展 terminal-manager 与 sessions API，支持 kind=local/ssh。 请严格只做该子任务，不做 TerminalPanel UI、不做 Settings UI、不做最终测试文档总收口。 范围： - 先阅读 AGENTS.md、docs/modules/api.md、docs/modules/library.md、docs/standards/code-style.md…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-manager.ts` — added `CreateTerminalSessionInput`, `kind: \"local\" | \"ssh\"` session metadata, SSH profile lookup/gating, OpenSSH launch-plan integration, cleanup callbacks, and startup temp-dir sweep.\n- `app/api/terminal/sessions/route.ts` — updated request body typing to accept local/SSH session creation input without breaking old local bodies.\n- `docs/modules/api.md` — documented SSH-capable `terminal/sessions` behavior and secret-safe session metadata.\n- `docs/modules/library.md` — updated terminal manager / SSH runner module descriptions.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel` or Settings UI per subtask boundary.\n- `events/input/resize/delete` routes remain unified by session id and unchanged.\n- Real SSH connection behavior depends on existing profile/vault/runner data and system OpenSSH availability; not manually exercised here.\n- Worktree has pre-existing unrelated changes from other subtasks; I only touched the files listed above.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T09:12:05.976Z",
+        "updatedAt": "2026-07-06T09:15:33.023Z",
+        "eventCount": 5539,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-manager.ts` — added `CreateTerminalSessionInput`, `kind: \"local\" | \"ssh\"` session metadata, SSH profile lookup/gating, OpenSSH launch-plan integration, cleanup callbacks, and startup temp-dir sweep.\n- `app/api/terminal/sessions/route.ts` — updated request body typing to accept local/SSH session creation input without breaking old local bodies.\n- `docs/modules/api.md` — documented SSH-capable `terminal/sessions` behavior and secret-safe session metadata.\n- `docs/modules/library.md` — updated terminal manager / SSH runner module descriptions.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel` or Settings UI per subtask boundary.\n- `events/input/resize/delete` routes remain unified by session id and unchanged.\n- Real SSH connection behavior depends on existing profile/vault/runner data and system OpenSSH availability; not manually exercised here.\n- Worktree has pre-existing unrelated changes from other subtasks; I only touched the files listed above.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:15:19.809Z",
+            "toolCallId": "call_zfYUBlUQypJjOSFsxOOtvMkb|fc_08d2e64db54e7e4a016a4b72203b2c819abc85e0e5389ae03f",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.7 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T09:15:21.969Z",
+            "toolCallId": "call_z0YAv6Hspm4mHRM22IUFG6oB|fc_08d2e64db54e7e4a016a4b7229a320819a95dd57cfb9545961",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"lib/terminal-manager.ts\",\n  \"offset\": 256,\n  \"limit\": 160\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:15:21.970Z",
+            "toolCallId": "call_z0YAv6Hspm4mHRM22IUFG6oB|fc_08d2e64db54e7e4a016a4b7229a320819a95dd57cfb9545961",
+            "toolName": "read",
+            "text": "}\n}\n\nfunction targetLabelFor(profileLabel: string, launchPlan: TerminalSshLaunchPlan): string {\n  const target = launchPlan.redacted.target;\n  const userPrefix = target.username ? `${target.username}@` : \"\";\n  return `${profileLabel} (${userPrefix}${target.host}:${target.port})`;\n}\n\nexport async function createTerminalSession(input: CreateTerminalSessionInput): Promise<TerminalSessionInfo> {\n  const config = readPiWebConfig().terminal;\n  if (!config.enabled) throw new TerminalError(\"Web terminal is disabled\", 403);\n  if (typeof input.cwd !== \"string\" || !input.cwd.trim()) throw new TerminalError(\"cwd is required\");\n\n  const cwd = existingCanonicalCwd(input.cwd);\n  if (!cwd) throw new TerminalError(\"cwd does not exist\");\n  const roots = await getAllowedRoots();\n  if (!isPathAllowed(cwd, roots)) throw new TerminalError(\"cwd is outside allowed workspaces\", 403);\n\n  const rawKind = \"kind\" in input ? input.kind : undefined;\n  if (rawKind !== undefined && rawKind !== \"local\" && rawKind !== \"ssh\") throw new TerminalError(\"kind must be local or ssh\");\n  const kind = rawKind === \"ssh\" ? \"ssh\" : \"local\";\n  const cols = typeof input.cols === \"number\" && Number.isInteger(input.cols) && input.cols > 0 ? input.cols : 80;\n  const rows = typeof input.rows === \"number\" && Number.isInteger(input.rows) && input.rows > 0 ? input.rows : 24;\n  const id = randomUUID();\n\n  let shell: ResolvedShell;\n  let env: Record<string, string>;\n  let cleanupCallbacks: TerminalSession[\"cleanupCallbacks\"] = [];\n  let profileId: string | undefined;\n  let profileLabel: string | undefined;\n  let targetLabel: string | undefined;\n\n  if (kind === \"ssh\") {\n    if (!config.ssh.enabled) throw new TerminalError(\"Web terminal SSH is disabled\", 403);\n    const profileIdValue = \"profileId\" in input ? input.profileId : undefined;\n    if (typeof profileIdValue !== \"string\" || !profileIdValue.trim()) throw new TerminalError(\"profileId is required for SSH terminal sessions\");\n    const profile = config.ssh.profiles.find((candidate) => candidate.id === profileIdValue.trim());\n    if (!profile) throw new TerminalError(\"SSH profile not found\", 404);\n    let launchPlan: TerminalSshLaunchPlan;\n    try {\n      launchPlan = await createTerminalSshLaunchPlan({\n        sessionId: id,\n        profile,\n        sshConfig: config.ssh,\n        baseEnv: process.env,\n        terminalEnv: validateEnv(config.env),\n      });\n    } catch (error) {\n      if (error instanceof TerminalSshRunnerError) throw new TerminalError(error.message, error.status);\n      throw new TerminalError(`Failed to prepare SSH session: ${error instanceof Error ? error.message : String(error)}`, 500);\n    }\n    cleanupCallbacks = [launchPlan.cleanup];\n    profileId = profile.id;\n    profileLabel = profile.label;\n    targetLabel = targetLabelFor(profile.label, launchPlan);\n    shell = { command: launchPlan.command, args: launchPlan.args, label: `ssh: ${profile.label}` };\n    env = launchPlan.env as Record<string, string>;\n  } else {\n    shell = resolveShell(config);\n    env = { ...process.env, ...validateEnv(config.env) } as Record<string, string>;\n  }\n\n  let terminalProcess: { process: TerminalProcess; backend: \"pty\" | \"script\" | \"pipe\" };\n  try {\n    terminalProcess = spawnTerminalProcess(shell, cwd, env, cols, rows);\n  } catch (error) {\n    for (const cleanup of cleanupCallbacks) await Promise.resolve(cleanup()).catch(() => {});\n    const label = kind === \"ssh\" ? \"SSH session\" : \"shell\";\n    throw new TerminalError(`Failed to start ${label}: ${error instanceof Error ? error.message : String(error)}`, 500);\n  }\n\n  const session: TerminalSession = {\n    id,\n    kind,\n    cwd,\n    shell: shell.label,\n    process: terminalProcess.process,\n    backend: terminalProcess.backend,\n    subscribers: new Set(),\n    buffer: [],\n    cleanupTimer: null,\n    closed: false,\n    cleanupCallbacks,\n    profileId,\n    profileLabel,\n    targetLabel,\n  };\n  getTerminalSessions().set(id, session);\n  scheduleIdleKill(session);\n\n  if (session.backend === \"script\") appendBuffer(session, \"[node-pty unavailable; using script PTY fallback.]\\r\\n\")…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T09:15:30.956Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-manager.ts` — added `CreateTerminalSessionInput`, `kind: \"local\" | \"ssh\"` session metadata, SSH profile lookup/gating, OpenSSH launch-plan integration, cleanup callbacks, and startup temp-dir sweep.\n- `app/api/terminal/sessions/route.ts` — updated request body typing to accept local/SSH session creation input without breaking old local bodies.\n- `docs/modules/api.md` — documented SSH-capable `terminal/sessions` behavior and secret-safe session metadata.\n- `docs/modules/library.md` — updated terminal manager / SSH runner module descriptions.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel` or Settings UI per subtask boundary.\n- `events/input/resize/delete` routes remain unified by session id and unchanged.\n- Real SSH connection behavior depends on existing profile/vault/runner data and system OpenSSH availability; not manually exercised here.\n- Worktree has pre-existing unrelated changes from other subtasks; I only touched the files listed above.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T09:15:30.971Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2238,
+        "tokens": 401,
+        "tokenSource": "usage",
+        "tps": 90.77,
+        "firstTokenAt": "2026-07-06T09:15:26.537Z",
+        "lastTokenAt": "2026-07-06T09:15:30.955Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-eaeb14b474f87a6e87839a2c",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-eaeb14b474f87a6e87839a2c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T09:12:05.976Z",
+        "finishedAt": "2026-07-06T09:15:33.011Z",
+        "updatedAt": "2026-07-06T09:15:33.011Z",
+        "itemCount": 77,
+        "messageCount": 1,
+        "toolCallCount": 36,
+        "stderrBytes": 0,
+        "bytes": 160180,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-50ae3f0a78a4015a072342da",
+      "subtaskId": "terminal-panel-ui",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T09:20:42.650Z",
+      "finishedAt": "2026-07-06T09:25:44.679Z",
+      "prompt": "实现子任务 terminal-panel-ui：TerminalPanel 支持 local/ssh 混合 tab 与 profile picker。 请严格只做该子任务，不做 Settings SSH UI、不做 runner/API 逻辑重构、不做最终验证总收口。 范围： - 先阅读 AGENTS.md、docs/modules/frontend.md、docs/modules/api.md、docs/standards/code-style.md。 - 阅读 comp…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/TerminalPanel.tsx` — added `kind: \"local\" | \"ssh\"` tab state, mixed local/SSH tab creation, SSH session request body, SSH-safe titles/tooltips/status labels, and header Local/SSH open controls.\n- `components/TerminalSshProfilePicker.tsx` — new picker loading non-secret SSH profiles from `/api/web-config`, filtering profiles, showing disabled/custom ProxyCommand warnings, and opening SSH tabs.\n- `docs/modules/frontend.md` — documented mixed TerminalPanel behavior and the new SSH profile picker.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- The picker reads profiles from current `terminal.ssh.profiles` config via `/api/web-config`; credential existence is still ultimately enforced by backend SSH session creation/preflight because no dedicated profile list/validation route is present in this worktree.\n- No Settings UI or backend runner/API logic was changed.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T09:20:42.650Z",
+        "updatedAt": "2026-07-06T09:25:44.679Z",
+        "eventCount": 9079,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/TerminalPanel.tsx` — added `kind: \"local\" | \"ssh\"` tab state, mixed local/SSH tab creation, SSH session request body, SSH-safe titles/tooltips/status labels, and header Local/SSH open controls.\n- `components/TerminalSshProfilePicker.tsx` — new picker loading non-secret SSH profiles from `/api/web-config`, filtering profiles, showing disabled/custom ProxyCommand warnings, and opening SSH tabs.\n- `docs/modules/frontend.md` — documented mixed TerminalPanel behavior and the new SSH profile picker.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- The picker reads profiles from current `terminal.ssh.profiles` config via `/api/web-config`; credential existence is still ultimately enforced by backend SSH session creation/preflight because no dedicated profile list/validation route is present in this worktree.\n- No Settings UI or backend runner/API logic was changed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T09:25:26.799Z",
+            "toolCallId": "call_AXi2LeIYm6yTLSQoil663EO3|fc_0920e0f3744fcae2016a4b7486c724819aae5c084d0211d4cb",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:25:28.812Z",
+            "toolCallId": "call_AXi2LeIYm6yTLSQoil663EO3|fc_0920e0f3744fcae2016a4b7486c724819aae5c084d0211d4cb",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:25:34.710Z",
+            "toolCallId": "call_T67VpEJ0pqpNWN7D84HbdVT0|fc_0920e0f3744fcae2016a4b7486c6e4819ab22a250ac61cae56",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.7 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T09:25:42.439Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/TerminalPanel.tsx` — added `kind: \"local\" | \"ssh\"` tab state, mixed local/SSH tab creation, SSH session request body, SSH-safe titles/tooltips/status labels, and header Local/SSH open controls.\n- `components/TerminalSshProfilePicker.tsx` — new picker loading non-secret SSH profiles from `/api/web-config`, filtering profiles, showing disabled/custom ProxyCommand warnings, and opening SSH tabs.\n- `docs/modules/frontend.md` — documented mixed TerminalPanel behavior and the new SSH profile picker.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- The picker reads profiles from current `terminal.ssh.profiles` config via `/api/web-config`; credential existence is still ultimately enforced by backend SSH session creation/preflight because no dedicated profile list/validation route is present in this worktree.\n- No Settings UI or backend runner/API logic was changed.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T09:25:42.452Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1994,
+        "tokens": 337,
+        "tokenSource": "usage",
+        "tps": 89.87,
+        "firstTokenAt": "2026-07-06T09:25:38.678Z",
+        "lastTokenAt": "2026-07-06T09:25:42.428Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-50ae3f0a78a4015a072342da",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-50ae3f0a78a4015a072342da.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T09:20:42.650Z",
+        "finishedAt": "2026-07-06T09:25:44.666Z",
+        "updatedAt": "2026-07-06T09:25:44.666Z",
+        "itemCount": 83,
+        "messageCount": 1,
+        "toolCallCount": 39,
+        "stderrBytes": 0,
+        "bytes": 196250,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e8ff73fa38b2b930d6cedb33",
+      "subtaskId": "tests-docs-security-review",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T09:47:34.147Z",
+      "finishedAt": "2026-07-06T09:51:52.706Z",
+      "prompt": "实现最后子任务 tests-docs-security-review：自动验证、文档更新、安全 review 与手工验收。 请严格只做该子任务：收口验证、补充文档、增加轻量测试脚本/必要 package script、修复由验证发现的小问题。不要重构已完成的大模块，除非是让 lint/tsc/test 通过的必要小修。 范围： - 先阅读 AGENTS.md、docs/modules/api.md、docs/modules/frontend.md、docs/modules/…",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Produced\n\n- `scripts/test-terminal-ssh-config.mjs` — added dry-run SSH terminal security/config checks.\n- `package.json` — added `test:terminal-ssh`.\n- `app/api/terminal/ssh/credentials/route.ts` — added credential list/create summary API.\n- `app/api/terminal/ssh/credentials/[id]/route.ts` — added credential get/update/delete summary API.\n- `app/api/terminal/ssh/profiles/[id]/test/route.ts` — added profile validate/resolve preflight returning redacted plan only.\n- `docs/architecture/overview.md` — documented SSH terminal architecture and secret boundaries.\n- `docs/operations/troubleshooting.md` — added SSH terminal troubleshooting.\n- `docs/standards/code-style.md` — documented terminal SSH test script.\n- `.ypi/tasks/.../handoff.md`, `summary.md`, `review.md` — updated task handoff artifacts.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `node scripts/test-terminal-ssh-config.mjs` — passed.\n\n#### Notes / Risks\n\n- Real SSH / jump host / SOCKS5 / HTTP proxy end-to-end manual matrix was not run; current validation is dry-run/source-boundary focused.\n- Vault is local file permission isolation, not encrypted OS keychain.\n- Password/passphrase askpass remains platform/OpenSSH dependent; fallback manual input should remain expected.\n- Main session still needs final product decisions on custom ProxyCommand exposure and host key default policy.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T09:47:34.147Z",
+        "updatedAt": "2026-07-06T09:51:52.706Z",
+        "eventCount": 8586,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Produced\n\n- `scripts/test-terminal-ssh-config.mjs` — added dry-run SSH terminal security/config checks.\n- `package.json` — added `test:terminal-ssh`.\n- `app/api/terminal/ssh/credentials/route.ts` — added credential list/create summary API.\n- `app/api/terminal/ssh/credentials/[id]/route.ts` — added credential get/update/delete summary API.\n- `app/api/terminal/ssh/profiles/[id]/test/route.ts` — added profile validate/resolve preflight returning redacted plan only.\n- `docs/architecture/overview.md` — documented SSH terminal architecture and secret boundaries.\n- `docs/operations/troubleshooting.md` — added SSH terminal troubleshooting.\n- `docs/standards/code-style.md` — documented terminal SSH test script.\n- `.ypi/tasks/.../handoff.md`, `summary.md`, `review.md` — updated task handoff artifacts.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `node scripts/test-terminal-ssh-config.mjs` — passed.\n\n#### Notes / Risks\n\n- Real SSH / jump host / SOCKS5 / HTTP proxy end-to-end manual matrix was not run; current validation is dry-run/source-boundary focused.\n- Vault is local file permission isolation, not encrypted OS keychain.\n- Password/passphrase askpass remains platform/OpenSSH dependent; fallback manual input should remain expected.\n- Main session still needs final product decisions on custom ProxyCommand exposure and host key default policy.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:51:34.147Z",
+            "toolCallId": "call_OWyIRjwKXKnRK413A66kIwsq|fc_028390f2becd1ba9016a4b7aa09c84819a81bddaa3ff244236",
+            "toolName": "write",
+            "text": "Successfully wrote 1165 bytes to .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T09:51:39.277Z",
+            "toolCallId": "call_WvW6dE0Ot7LCxgKmkSJmsOob|fc_028390f2becd1ba9016a4b7aab1498819a8ab12965f9860633",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short && git diff --stat\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T09:51:39.385Z",
+            "toolCallId": "call_WvW6dE0Ot7LCxgKmkSJmsOob|fc_028390f2becd1ba9016a4b7aab1498819a8ab12965f9860633",
+            "toolName": "bash",
+            "text": "M app/api/terminal/sessions/route.ts\n M components/SettingsConfig.tsx\n M components/TerminalPanel.tsx\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M docs/operations/troubleshooting.md\n M docs/standards/code-style.md\n M lib/pi-web-config.ts\n M lib/terminal-manager.ts\n M package.json\n?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/\"\n?? app/api/terminal/ssh/\n?? components/TerminalKnownHostsPanel.tsx\n?? components/TerminalSshCredentialEditor.tsx\n?? components/TerminalSshProfileEditor.tsx\n?? components/TerminalSshProfilePicker.tsx\n?? lib/terminal-known-hosts.ts\n?? lib/terminal-ssh-runner.ts\n?? lib/terminal-ssh-types.ts\n?? lib/terminal-ssh-vault.ts\n?? scripts/terminal-proxy-helper.js\n?? scripts/test-terminal-ssh-config.mjs\n app/api/terminal/sessions/route.ts |   4 +-\n components/SettingsConfig.tsx      |  55 ++++++++\n components/TerminalPanel.tsx       | 126 ++++++++++++++----\n docs/architecture/overview.md      |  14 ++\n docs/modules/api.md                |  11 +-\n docs/modules/frontend.md           |   8 +-\n docs/modules/library.md            |   8 +-\n docs/operations/troubleshooting.md |  10 ++\n docs/standards/code-style.md       |   3 +-\n lib/pi-web-config.ts               | 254 +++++++++++++++++++++++++++++++++++++\n lib/terminal-manager.ts            | 103 ++++++++++++++-\n package.json                       |   1 +\n 12 files changed, 562 insertions(+), 35 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T09:51:50.499Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Produced\n\n- `scripts/test-terminal-ssh-config.mjs` — added dry-run SSH terminal security/config checks.\n- `package.json` — added `test:terminal-ssh`.\n- `app/api/terminal/ssh/credentials/route.ts` — added credential list/create summary API.\n- `app/api/terminal/ssh/credentials/[id]/route.ts` — added credential get/update/delete summary API.\n- `app/api/terminal/ssh/profiles/[id]/test/route.ts` — added profile validate/resolve preflight returning redacted plan only.\n- `docs/architecture/overview.md` — documented SSH terminal architecture and secret boundaries.\n- `docs/operations/troubleshooting.md` — added SSH terminal troubleshooting.\n- `docs/standards/code-style.md` — documented terminal SSH test script.\n- `.ypi/tasks/.../handoff.md`, `summary.md`, `review.md` — updated task handoff artifacts.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `node scripts/test-terminal-ssh-config.mjs` — passed.\n\n#### Notes / Risks\n\n- Real SSH / jump host / SOCKS5 / HTTP proxy end-to-end manual matrix was not run; current validation is dry-run/source-boundary focused.\n- Vault is local file permission isolation, not encrypted OS keychain.\n- Password/passphrase askpass remains platform/OpenSSH dependent; fallback manual input should remain expected.\n- Main session still needs final product decisions on custom ProxyCommand exposure and host key default policy.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T09:51:50.514Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2908,
+        "tokens": 517,
+        "tokenSource": "usage",
+        "tps": 105.88,
+        "firstTokenAt": "2026-07-06T09:51:45.610Z",
+        "lastTokenAt": "2026-07-06T09:51:50.493Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e8ff73fa38b2b930d6cedb33",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-e8ff73fa38b2b930d6cedb33.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T09:47:34.147Z",
+        "finishedAt": "2026-07-06T09:51:52.698Z",
+        "updatedAt": "2026-07-06T09:51:52.698Z",
+        "itemCount": 99,
+        "messageCount": 1,
+        "toolCallCount": 47,
+        "stderrBytes": 0,
+        "bytes": 286016,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-2c568144e77caeed5795b78e",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T11:14:11.540Z",
+      "finishedAt": "2026-07-06T11:17:45.170Z",
+      "prompt": "请对当前任务“设计 Web Terminal SSH 凭证管理、多级跳板机与代理连接”进行检查验收。重点审查：实现是否符合 prd/design/implement/handoff；SSH credential/secret 不泄露边界；profile CRUD 与 schema 校验；known_hosts 管理；OpenSSH runner/ProxyJump/proxy helper/临时文件清理；TerminalPanel 与 Settings UI 兼容 loca…",
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- `lib/terminal-ssh-types.ts`\n- `lib/terminal-ssh-vault.ts`\n- `components/TerminalSshCredentialEditor.tsx`\n  - 补了 `proxyUsername` summary，修复 proxy-auth credential 编辑时用户名被清空、可能导致保存失败的问题。\n- `lib/terminal-ssh-runner.ts`\n  - `plan.redacted.tempDir` 改为占位符，避免 resolve/test API 暴露真实 session temp dir。\n\n#### Remaining Findings\n- **Needs work:** 设计/implement 里规划的 SSH profile dedicated CRUD routes 还没落地；当前 profile 主要靠 `/api/web-config` 整体保存，仅有 `/api/terminal/ssh/profiles/[id]/test`。这与既定 API 契约不完全一致，也让 profile schema 边界更多依赖全局 config 保存路径。\n\n#### Artifacts Updated\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/checks.md`\n\n#### Verification\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:terminal-ssh` — pass\n\n#### Remaining Risks\n- 还没做真实 SSH / 多级 jump / SOCKS5 / HTTP proxy / mixed local+SSH tabs 的端到端手工矩阵。\n- host key 默认策略、password/passphrase auto-fill、custom ProxyCommand 首版开放策略仍需主会话确认。\n\n#### Verdict\n- **Needs work** — secret/vault/known_hosts/runner 边界静态审查通过，但 profile CRUD/API 覆盖仍未完全满足 design/implement。",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T11:14:11.540Z",
+        "updatedAt": "2026-07-06T11:17:45.170Z",
+        "eventCount": 5546,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- `lib/terminal-ssh-types.ts`\n- `lib/terminal-ssh-vault.ts`\n- `components/TerminalSshCredentialEditor.tsx`\n  - 补了 `proxyUsername` summary，修复 proxy-auth credential 编辑时用户名被清空、可能导致保存失败的问题。\n- `lib/terminal-ssh-runner.ts`\n  - `plan.redacted.tempDir` 改为占位符，避免 resolve/test API 暴露真实 session temp dir。\n\n#### Remaining Findings\n- **Needs work:** 设计/implement 里规划的 SSH profile dedicated CRUD routes 还没落地；当前 profile 主要靠 `/api/web-config` 整体保存，仅有 `/api/terminal/ssh/profiles/[id]/test`。这与既定 API 契约不完全一致，也让 profile schema 边界更多依赖全局 config 保存路径。\n\n#### Artifacts Updated\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/checks.md`\n\n#### Verification\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:terminal-ssh` — pass\n\n#### Remaining Risks\n- 还没做真实 SSH / 多级 jump / SOCKS5 / HTTP proxy / mixed local+SSH tabs 的端到端手工矩阵。\n- host key 默认策略、password/passphrase auto-fill、custom ProxyCommand 首版开放策略仍需主会话确认。\n\n#### Verdict\n- **Needs work** — secret/vault/known_hosts/runner 边界静态审查通过，但 profile CRUD/API 覆盖仍未完全满足 design/implement。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:17:26.778Z",
+            "toolCallId": "call_9gU4D5zjraJhwYCvGlfOasNV|fc_0954889503c83a4e016a4b8ec55dd8819b85336f5b0714392f",
+            "toolName": "bash",
+            "text": "app/api/terminal/sessions/route.ts |   4 +-\n components/SettingsConfig.tsx      |  55 ++++++++\n components/TerminalPanel.tsx       | 126 ++++++++++++++----\n docs/architecture/overview.md      |  14 ++\n docs/modules/api.md                |  11 +-\n docs/modules/frontend.md           |   8 +-\n docs/modules/library.md            |   8 +-\n docs/operations/troubleshooting.md |  10 ++\n docs/standards/code-style.md       |   3 +-\n lib/pi-web-config.ts               | 254 +++++++++++++++++++++++++++++++++++++\n lib/terminal-manager.ts            | 103 ++++++++++++++-\n package.json                       |   1 +\n 12 files changed, 562 insertions(+), 35 deletions(-)\n---",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T11:17:33.307Z",
+            "toolCallId": "call_LImctf8ewMCEFQEUzveextbI|fc_0954889503c83a4e016a4b8eccadd8819ba58a3d37d82bb9e8",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short -- .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/checks.md lib/terminal-ssh-types.ts lib/terminal-ssh-vault.ts lib/terminal-ssh-runner.ts components/TerminalSshCredentialEditor.tsx app/api/terminal/ssh app/api/terminal/sessions/route.ts components/SettingsConfig.tsx components/TerminalPanel.tsx components/TerminalSshProfilePicker.tsx components/TerminalSshProfileEditor.tsx components/TerminalKnownHostsPanel.tsx lib/terminal-known-hosts.ts lib/pi-web-config.ts lib/terminal-manager.ts scripts/terminal-proxy-helper.js scripts/test-terminal-ssh-config.mjs package.json docs/architecture/overview.md docs/modules/api.md docs/modules/frontend.md docs/modules/library.md docs/operations/troubleshooting.md docs/standards/code-style.md\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:17:33.351Z",
+            "toolCallId": "call_LImctf8ewMCEFQEUzveextbI|fc_0954889503c83a4e016a4b8eccadd8819ba58a3d37d82bb9e8",
+            "toolName": "bash",
+            "text": "M app/api/terminal/sessions/route.ts\n M components/SettingsConfig.tsx\n M components/TerminalPanel.tsx\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M docs/operations/troubleshooting.md\n M docs/standards/code-style.md\n M lib/pi-web-config.ts\n M lib/terminal-manager.ts\n M package.json\n?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/checks.md\"\n?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/review.md\"\n?? app/api/terminal/ssh/\n?? components/TerminalKnownHostsPanel.tsx\n?? components/TerminalSshCredentialEditor.tsx\n?? components/TerminalSshProfileEditor.tsx\n?? components/TerminalSshProfilePicker.tsx\n?? lib/terminal-known-hosts.ts\n?? lib/terminal-ssh-runner.ts\n?? lib/terminal-ssh-types.ts\n?? lib/terminal-ssh-vault.ts\n?? scripts/terminal-proxy-helper.js\n?? scripts/test-terminal-ssh-config.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T11:17:42.936Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- `lib/terminal-ssh-types.ts`\n- `lib/terminal-ssh-vault.ts`\n- `components/TerminalSshCredentialEditor.tsx`\n  - 补了 `proxyUsername` summary，修复 proxy-auth credential 编辑时用户名被清空、可能导致保存失败的问题。\n- `lib/terminal-ssh-runner.ts`\n  - `plan.redacted.tempDir` 改为占位符，避免 resolve/test API 暴露真实 session temp dir。\n\n#### Remaining Findings\n- **Needs work:** 设计/implement 里规划的 SSH profile dedicated CRUD routes 还没落地；当前 profile 主要靠 `/api/web-config` 整体保存，仅有 `/api/terminal/ssh/profiles/[id]/test`。这与既定 API 契约不完全一致，也让 profile schema 边界更多依赖全局 config 保存路径。\n\n#### Artifacts Updated\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`\n- `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/checks.md`\n\n#### Verification\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:terminal-ssh` — pass\n\n#### Remaining Risks\n- 还没做真实 SSH / 多级 jump / SOCKS5 / HTTP proxy / mixed local+SSH tabs 的端到端手工矩阵。\n- host key 默认策略、password/passphrase auto-fill、custom ProxyCommand 首版开放策略仍需主会话确认。\n\n#### Verdict\n- **Needs work** — secret/vault/known_hosts/runner 边界静态审查通过，但 profile CRUD/API 覆盖仍未完全满足 design/implement。",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T11:17:42.950Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2340,
+        "tokens": 453,
+        "tokenSource": "usage",
+        "tps": 77.24,
+        "firstTokenAt": "2026-07-06T11:17:37.069Z",
+        "lastTokenAt": "2026-07-06T11:17:42.934Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-2c568144e77caeed5795b78e",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/checker-2c568144e77caeed5795b78e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T11:14:11.540Z",
+        "finishedAt": "2026-07-06T11:17:45.153Z",
+        "updatedAt": "2026-07-06T11:17:45.153Z",
+        "itemCount": 103,
+        "messageCount": 1,
+        "toolCallCount": 49,
+        "stderrBytes": 0,
+        "bytes": 244856,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-9bfd1c7fe0f15b8e3fd0ddd3",
+      "subtaskId": "profile-api-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T11:27:03.263Z",
+      "finishedAt": "2026-07-06T11:31:04.008Z",
+      "prompt": "Checker review verdict is Needs work: dedicated SSH profile CRUD routes from the plan are incomplete. Please fix the reopened subtask `profile-api-validation` only. Implement/verify dedicated `/api/terminal/ssh/profiles` list/create and `/…",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/terminal-ssh-profiles.ts` — added dedicated SSH profile CRUD helper with validation and recursive secret-field rejection.\n- `app/api/terminal/ssh/profiles/route.ts` — added profile list/create API.\n- `app/api/terminal/ssh/profiles/[id]/route.ts` — added profile read/update/delete API.\n- `scripts/test-terminal-ssh-config.mjs` — extended dry-run checks for profile CRUD route/helper coverage.\n- `docs/modules/api.md` — documented dedicated profile CRUD routes.\n- `docs/modules/library.md` — documented profile helper module.\n- `.ypi/tasks/.../handoff.md` — updated task handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:terminal-ssh` — passed\n\n#### Notes / Risks\n\n- Existing `/api/terminal/ssh/profiles/[id]/test` behavior preserved.\n- Profile create/update reject `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` at API/helper boundary.\n- Remaining product decisions unchanged: real SSH/proxy E2E matrix, OS keychain vs file vault, askpass policy, custom ProxyCommand exposure, and host-key default confirmation.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T11:27:03.263Z",
+        "updatedAt": "2026-07-06T11:31:04.008Z",
+        "eventCount": 7774,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/terminal-ssh-profiles.ts` — added dedicated SSH profile CRUD helper with validation and recursive secret-field rejection.\n- `app/api/terminal/ssh/profiles/route.ts` — added profile list/create API.\n- `app/api/terminal/ssh/profiles/[id]/route.ts` — added profile read/update/delete API.\n- `scripts/test-terminal-ssh-config.mjs` — extended dry-run checks for profile CRUD route/helper coverage.\n- `docs/modules/api.md` — documented dedicated profile CRUD routes.\n- `docs/modules/library.md` — documented profile helper module.\n- `.ypi/tasks/.../handoff.md` — updated task handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:terminal-ssh` — passed\n\n#### Notes / Risks\n\n- Existing `/api/terminal/ssh/profiles/[id]/test` behavior preserved.\n- Profile create/update reject `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` at API/helper boundary.\n- Remaining product decisions unchanged: real SSH/proxy E2E matrix, OS keychain vs file vault, askpass policy, custom ProxyCommand exposure, and host-key default confirmation.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:30:47.796Z",
+            "toolCallId": "call_gVwIeCrAQa2FPaoa8VRw3GV6|fc_0f995243a71ab491016a4b91dbbdc08198b2c0c094fbd7d514",
+            "toolName": "edit",
+            "text": "Successfully replaced 5 block(s) in .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T11:30:54.555Z",
+            "toolCallId": "call_ljhwvYWv2vHrN3vQdRemPWvh|fc_0f995243a71ab491016a4b91ee3980819894fb1fe32a7a2220",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short lib/terminal-ssh-profiles.ts app/api/terminal/ssh/profiles/route.ts app/api/terminal/ssh/profiles/[id]/route.ts docs/modules/api.md docs/modules/library.md scripts/test-terminal-ssh-config.mjs .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/handoff.md\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:30:54.656Z",
+            "toolCallId": "call_ljhwvYWv2vHrN3vQdRemPWvh|fc_0f995243a71ab491016a4b91ee3980819894fb1fe32a7a2220",
+            "toolName": "bash",
+            "text": "M docs/modules/api.md\n M docs/modules/library.md\n?? \".ypi/tasks/20260706-161257-\\350\\256\\276\\350\\256\\241-web-terminal-ssh-\\345\\207\\255\\350\\257\\201\\347\\256\\241\\347\\220\\206-\\345\\244\\232\\347\\272\\247\\350\\267\\263\\346\\235\\277\\346\\234\\272\\344\\270\\216\\344\\273\\243\\347\\220\\206\\350\\277\\236\\346\\216\\245/handoff.md\"\n?? app/api/terminal/ssh/profiles/[id]/route.ts\n?? app/api/terminal/ssh/profiles/route.ts\n?? lib/terminal-ssh-profiles.ts\n?? scripts/test-terminal-ssh-config.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T11:31:01.775Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/terminal-ssh-profiles.ts` — added dedicated SSH profile CRUD helper with validation and recursive secret-field rejection.\n- `app/api/terminal/ssh/profiles/route.ts` — added profile list/create API.\n- `app/api/terminal/ssh/profiles/[id]/route.ts` — added profile read/update/delete API.\n- `scripts/test-terminal-ssh-config.mjs` — extended dry-run checks for profile CRUD route/helper coverage.\n- `docs/modules/api.md` — documented dedicated profile CRUD routes.\n- `docs/modules/library.md` — documented profile helper module.\n- `.ypi/tasks/.../handoff.md` — updated task handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:terminal-ssh` — passed\n\n#### Notes / Risks\n\n- Existing `/api/terminal/ssh/profiles/[id]/test` behavior preserved.\n- Profile create/update reject `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` at API/helper boundary.\n- Remaining product decisions unchanged: real SSH/proxy E2E matrix, OS keychain vs file vault, askpass policy, custom ProxyCommand exposure, and host-key default confirmation.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T11:31:01.787Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2366,
+        "tokens": 323,
+        "tokenSource": "usage",
+        "tps": 143.36,
+        "firstTokenAt": "2026-07-06T11:30:59.512Z",
+        "lastTokenAt": "2026-07-06T11:31:01.765Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-9bfd1c7fe0f15b8e3fd0ddd3",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/implementer-9bfd1c7fe0f15b8e3fd0ddd3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T11:27:03.263Z",
+        "finishedAt": "2026-07-06T11:31:03.999Z",
+        "updatedAt": "2026-07-06T11:31:03.999Z",
+        "itemCount": 73,
+        "messageCount": 1,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 173291,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-1032550bd445fb90e2ea21f9",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T11:41:03.746Z",
+      "finishedAt": "2026-07-06T11:41:18.211Z",
+      "prompt": "请对 checker-requested fix 后的任务进行复查验收。重点确认：dedicated `/api/terminal/ssh/profiles` list/create 与 `/api/terminal/ssh/profiles/[id]` read/update/delete API 已实现；create/update 在 API 边界拒绝 secret 字段；现有 `/api/terminal/ssh/profiles/[id]/test`、Setting…",
+      "summary": "Child Pi run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T11:41:03.746Z",
+        "updatedAt": "2026-07-06T11:41:18.210Z",
+        "eventCount": 149,
+        "lastTextPreview": "Child Pi run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:41:15.453Z",
+            "toolCallId": "call_npyLOK2gqBd0cmb1PpjnDmF3|fc_01ab47a6a11d60a2016a4b945b6760819bae480dbe11deac0f",
+            "toolName": "read",
+            "text": "import { randomUUID } from \"node:crypto\";\nimport {\n  PiWebConfigValidationError,\n  readPiWebConfig,\n  writePiWebConfigPatch,\n} from \"./pi-web-config\";\nimport type {\n  PiWebTerminalConfig,\n  PiWebTerminalSshConfig,\n  TerminalSshEndpoint,\n  TerminalSshKnownHostsPolicy,\n  TerminalSshProfile,\n  TerminalSshProfileOptions,\n  TerminalSshProxyConfig,\n} from \"./pi-web-config\";\n\nconst FORBIDDEN_SECRET_FIELDS = new Set([\"privateKey\", \"privateKeyPem\", \"password\", \"passphrase\", \"proxyPassword\"]);\nconst ID_PREFIX = \"ssh-profile-\";\n\nexport class TerminalSshProfileError extends Error {\n  constructor(message: string, public status = 400) {\n    super(message);\n    this.name = \"TerminalSshProfileError\";\n  }\n}\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {\n  return typeof value === \"object\" && value !== null && !Array.isArray(value);\n}\n\nfunction rejectSecretFields(value: unknown, field: string): void {\n  if (Array.isArray(value)) {\n    value.forEach((item, index) => rejectSecretFields(item, `${field}[${index}]`));\n    return;\n  }\n  if (!isRecord(value)) return;\n  for (const [key, nestedValue] of Object.entries(value)) {\n    if (FORBIDDEN_SECRET_FIELDS.has(key)) {\n      throw new TerminalSshProfileError(`${field}.${key} must be stored in the SSH credential vault, not SSH profiles`);\n    }\n    rejectSecretFields(nestedValue, `${field}.${key}`);\n  }\n}\n\nfunction requireString(value: unknown, field: string): string {\n  if (typeof value !== \"string\") throw new TerminalSshProfileError(`${field} must be a string`);\n  const trimmed = value.trim();\n  if (!trimmed) throw new TerminalSshProfileError(`${field} must be a non-empty string`);\n  if (/[\\u0000-\\u001f\\u007f]/.test(trimmed)) throw new TerminalSshProfileError(`${field} must not contain control characters`);\n  return trimmed;\n}\n\nfunction optionalString(value: unknown, field: string): string | undefined {\n  if (value === undefined || value === null) return undefined;\n  if (typeof value !== \"string\") throw new TerminalSshProfileError(`${field} must be a string`);\n  const trimmed = value.trim();\n  if (!trimmed) return undefined;\n  if (/[\\u0000-\\u001f\\u007f]/.test(trimmed)) throw new TerminalSshProfileError(`${field} must not contain control characters`);\n  return trimmed;\n}\n\nfunction optionalBoolean(value: unknown, fallback: boolean, field: string): boolean {\n  if (value === undefined) return fallback;\n  if (typeof value !== \"boolean\") throw new TerminalSshProfileError(`${field} must be a boolean`);\n  return value;\n}\n\nfunction requirePort(value: unknown, field: string): number {\n  if (typeof value !== \"number\" || !Number.isInteger(value) || value < 1 || value > 65535) {\n    throw new TerminalSshProfileError(`${field} must be an integer between 1 and 65535`);\n  }\n  return value;\n}\n\nfunction optionalInteger(value: unknown, field: string, min: number, max: number): number | undefined {\n  if (value === undefined) return undefined;\n  if (typeof value !== \"number\" || !Number.isInteger(value) || value < min || value > max) {\n    throw new TerminalSshProfileError(`${field} must be an integer between ${min} and ${max}`);\n  }\n  return value;\n}\n\nfunction knownHostsPolicy(value: unknown, field: string): TerminalSshKnownHostsPolicy | undefined {\n  if (value === undefined) return undefined;\n  if (value === \"ask\" || value === \"strict\" || value === \"accept-new\") return value;\n  throw new TerminalSshProfileError(`${field} must be ask, strict, or accept-new`);\n}\n\nfunction parseEndpoint(value: unknown, field: string): TerminalSshEndpoint {\n  if (!isRecord(value)) throw new TerminalSshProfileError(`${field} must be an object`);\n  return {\n    id: optionalString(value.id, `${field}.id`),\n    label: optionalString(value.label, `${field}.label`),\n    host: requireString(value.host, `${field}.host`),\n    port: requirePort(value.port, `${field}.port`),\n    username: optionalString(value.username, `${field}.username`),\n    credentialId: optionalString(value.credentialId, `${field}.credentialId`),\n  };\n}\n\nfunction parseOptions(value: unknown, field: string): TerminalSshProfileOptions | undefined {\n  i…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:41:15.454Z",
+            "toolCallId": "call_FDdKZRKHJ8nDJRM9NC3RHdw6|fc_01ab47a6a11d60a2016a4b945b6750819baa2dc0e2f9471477",
+            "toolName": "read",
+            "text": "import { NextResponse } from \"next/server\";\nimport { deleteTerminalSshProfile, getTerminalSshProfile, TerminalSshProfileError, updateTerminalSshProfile } from \"@/lib/terminal-ssh-profiles\";\n\nexport const dynamic = \"force-dynamic\";\nexport const runtime = \"nodejs\";\n\ninterface RouteContext {\n  params: Promise<{ id: string }>;\n}\n\nfunction errorResponse(error: unknown) {\n  const message = error instanceof Error ? error.message : String(error);\n  const status = error instanceof TerminalSshProfileError ? error.status : 500;\n  return NextResponse.json({ error: message }, { status });\n}\n\nexport async function GET(_request: Request, context: RouteContext) {\n  try {\n    const { id } = await context.params;\n    const profile = getTerminalSshProfile(decodeURIComponent(id));\n    return NextResponse.json({ profile });\n  } catch (error) {\n    return errorResponse(error);\n  }\n}\n\nexport async function PATCH(request: Request, context: RouteContext) {\n  try {\n    const { id } = await context.params;\n    const body = await request.json().catch(() => ({})) as unknown;\n    const profile = updateTerminalSshProfile(decodeURIComponent(id), body);\n    return NextResponse.json({ profile });\n  } catch (error) {\n    return errorResponse(error);\n  }\n}\n\nexport async function DELETE(_request: Request, context: RouteContext) {\n  try {\n    const { id } = await context.params;\n    const profiles = deleteTerminalSshProfile(decodeURIComponent(id));\n    return NextResponse.json({ profiles });\n  } catch (error) {\n    return errorResponse(error);\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:41:15.454Z",
+            "toolCallId": "call_oYq6LkCyv3W2I5dJ0VTHjb3C|fc_01ab47a6a11d60a2016a4b945b6758819b9242e5614c6d9a55",
+            "toolName": "read",
+            "text": "import { NextResponse } from \"next/server\";\nimport { readPiWebConfig } from \"@/lib/pi-web-config\";\nimport { createTerminalSshLaunchPlan, detectSshExecutable, TerminalSshRunnerError } from \"@/lib/terminal-ssh-runner\";\nimport { readTerminalCredentialSecret, TerminalSshVaultError } from \"@/lib/terminal-ssh-vault\";\nimport type { TerminalSshEndpoint, TerminalSshProfile, TerminalSshProxyConfig } from \"@/lib/terminal-ssh-types\";\n\nexport const dynamic = \"force-dynamic\";\nexport const runtime = \"nodejs\";\n\ninterface RouteContext {\n  params: Promise<{ id: string }>;\n}\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {\n  return typeof value === \"object\" && value !== null && !Array.isArray(value);\n}\n\nfunction credentialReferences(profile: TerminalSshProfile): string[] {\n  const ids = new Set<string>();\n  const addEndpoint = (endpoint: TerminalSshEndpoint) => {\n    if (endpoint.credentialId) ids.add(endpoint.credentialId);\n  };\n  addEndpoint(profile.target);\n  profile.jumpHosts.forEach(addEndpoint);\n  const proxy: TerminalSshProxyConfig | undefined = profile.proxy;\n  if ((proxy?.type === \"socks5\" || proxy?.type === \"http\") && proxy.credentialId) ids.add(proxy.credentialId);\n  return [...ids];\n}\n\nasync function missingCredentialIds(profile: TerminalSshProfile): Promise<string[]> {\n  const missing: string[] = [];\n  for (const id of credentialReferences(profile)) {\n    try {\n      await readTerminalCredentialSecret(id);\n    } catch (error) {\n      if (error instanceof TerminalSshVaultError && error.status === 404) missing.push(id);\n      else throw error;\n    }\n  }\n  return missing;\n}\n\nfunction errorResponse(error: unknown) {\n  const message = error instanceof Error ? error.message : String(error);\n  const status = error instanceof TerminalSshRunnerError || error instanceof TerminalSshVaultError ? error.status : 500;\n  return NextResponse.json({ ok: false, error: message }, { status });\n}\n\nexport async function POST(request: Request, context: RouteContext) {\n  try {\n    const { id } = await context.params;\n    const body = await request.json().catch(() => ({})) as unknown;\n    const mode = isRecord(body) && body.mode === \"resolve\" ? \"resolve\" : \"validate\";\n    const config = readPiWebConfig().terminal.ssh;\n    const profile = config.profiles.find((candidate) => candidate.id === decodeURIComponent(id));\n    if (!profile) return NextResponse.json({ ok: false, error: \"SSH profile not found\" }, { status: 404 });\n\n    const missingCredentials = await missingCredentialIds(profile);\n    const warnings: string[] = [];\n    if (!config.enabled) warnings.push(\"Terminal SSH is disabled; sessions cannot start until it is enabled.\");\n    if (profile.proxy?.type === \"custom\") {\n      if (!config.allowCustomProxyCommand) warnings.push(\"Custom ProxyCommand is disabled globally.\");\n      if (!profile.proxy.acknowledgedRisk) warnings.push(\"Custom ProxyCommand risk is not acknowledged on this profile.\");\n    }\n    if (profile.options?.knownHostsPolicy === \"accept-new\" || (!profile.options?.knownHostsPolicy && config.defaultKnownHostsPolicy === \"accept-new\")) {\n      warnings.push(\"accept-new trusts the first observed host key; verify fingerprints to reduce MITM risk.\");\n    }\n\n    let sshExecutable: string | null = null;\n    try {\n      sshExecutable = await detectSshExecutable(process.env);\n    } catch (error) {\n      warnings.push(error instanceof Error ? error.message : String(error));\n    }\n\n    if (mode === \"validate\") {\n      return NextResponse.json({ ok: missingCredentials.length === 0, mode, profileId: profile.id, missingCredentials, warnings, sshExecutable });\n    }\n\n    const plan = await createTerminalSshLaunchPlan({ profile, sshConfig: config, baseEnv: process.env, terminalEnv: {} });\n    await plan.cleanup();\n    return NextResponse.json({ ok: missingCredentials.length === 0, mode, profileId: profile.id, missingCredentials, warnings, sshExecutable, plan: plan.redacted });\n  } catch (error) {\n    return errorResponse(error);\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T11:41:16.018Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T11:41:18.201Z",
+            "text": "Child Pi run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 65,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-1032550bd445fb90e2ea21f9",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/checker-1032550bd445fb90e2ea21f9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T11:41:03.746Z",
+        "finishedAt": "2026-07-06T11:41:18.201Z",
+        "updatedAt": "2026-07-06T11:41:18.201Z",
+        "itemCount": 17,
+        "messageCount": 1,
+        "toolCallCount": 6,
+        "stderrBytes": 0,
+        "bytes": 23760,
+        "truncated": false,
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-65d9005c34c8e33fc8cda221",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-06T11:41:53.567Z",
+      "finishedAt": "2026-07-06T11:43:06.097Z",
+      "prompt": "上一次 checker run 没有捕获最终消息且未更新 review.md。请重新复查 checker-requested fix 后的当前代码并务必更新 `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`，追加一个新的“Checker re-review after profile CRUD fix”章节，明确 Verdict。重点确认：dedicated `/api/te…",
+      "summary": "Handoff:\n\n- Updated artifact:\n  - `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`\n    - appended `Checker re-review after profile CRUD fix`\n    - Verdict: **Pass**\n\nValidation run:\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:terminal-ssh` — pass\n\nReview conclusion:\n- Confirmed dedicated profile CRUD APIs exist:\n  - `app/api/terminal/ssh/profiles/route.ts`\n  - `app/api/terminal/ssh/profiles/[id]/route.ts`\n- Confirmed create/update reject secret fields via `lib/terminal-ssh-profiles.ts`\n- Confirmed `/api/terminal/ssh/profiles/[id]/test` still returns redacted plan\n- Confirmed TerminalPanel local default / SSH opt-in behavior remains intact\n- Confirmed secret/vault/known_hosts/redacted-plan boundaries still hold\n\nRemaining risks:\n- No blocking findings from this re-review.\n- End-to-end real SSH / multi-jump / proxy manual matrix is still outside this dry-run check scope.\n\nDecisions needed from main session:\n- None for this checker re-review.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-06T11:41:53.567Z",
+        "updatedAt": "2026-07-06T11:43:06.097Z",
+        "eventCount": 1544,
+        "lastTextPreview": "Handoff:\n\n- Updated artifact:\n  - `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`\n    - appended `Checker re-review after profile CRUD fix`\n    - Verdict: **Pass**\n\nValidation run:\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:terminal-ssh` — pass\n\nReview conclusion:\n- Confirmed dedicated profile CRUD APIs exist:\n  - `app/api/terminal/ssh/profiles/route.ts`\n  - `app/api/terminal/ssh/profiles/[id]/route.ts`\n- Confirmed create/update reject secret fields via `lib/terminal-ssh-profiles.ts`\n- Confirmed `/api/terminal/ssh/profiles/[id]/test` still returns redacted plan\n- Confirmed TerminalPanel local default / SSH opt-in behavior remains intact\n- Confirmed secret/vault/known_hosts/redacted-plan boundaries still hold\n\nRemaining risks:\n- No blocking findings from this re-review.\n- End-to-end real SSH / multi-jump / proxy manual matrix is still outside this dry-run check scope.\n\nDecisions needed from main session:\n- None for this checker re-review.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:42:42.510Z",
+            "toolCallId": "call_lSTVoboVc896ZuUzU4vfPniD|fc_0ff1d4ead5d586b6016a4b94b2711c8199b1a9abd0be5555ed",
+            "toolName": "bash",
+            "text": "components/TerminalPanel.tsx:92:  | { kind: \"ssh\"; cwd: string; profileId: string; profileLabel: string; targetLabel: string };\ncomponents/TerminalPanel.tsx:228:      const label = action.tab.kind === \"ssh\" ? `SSH: ${action.tab.profileLabel}` : `Terminal ${state.nextTabNumber}`;\ncomponents/TerminalPanel.tsx:234:        profileId: action.tab.kind === \"ssh\" ? action.tab.profileId : undefined,\ncomponents/TerminalPanel.tsx:235:        profileLabel: action.tab.kind === \"ssh\" ? action.tab.profileLabel : undefined,\ncomponents/TerminalPanel.tsx:236:        targetLabel: action.tab.kind === \"ssh\" ? action.tab.targetLabel : undefined,\ncomponents/TerminalPanel.tsx:248:        nextTabNumber: action.tab.kind === \"ssh\" ? state.nextTabNumber : state.nextTabNumber + 1,\ncomponents/TerminalPanel.tsx:350:  if (tab.kind === \"ssh\") {\ncomponents/TerminalPanel.tsx:361:  return tab.kind === \"ssh\" ? (tab.targetLabel ?? tab.profileLabel ?? \"SSH\") : tab.cwd;\ncomponents/TerminalPanel.tsx:478:          term.writeln(tab.kind === \"ssh\" ? `Reconnecting SSH terminal ${tabContextLabelRef.current} ...` : `Reconnecting terminal in ${tab.cwd} ...`);\ncomponents/TerminalPanel.tsx:485:        term.writeln(tab.kind === \"ssh\" ? `Starting SSH terminal ${tabContextLabelRef.current} ...` : `Starting terminal in ${tab.cwd} ...`);\ncomponents/TerminalPanel.tsx:486:        const createBody = tab.kind === \"ssh\"\ncomponents/TerminalPanel.tsx:487:          ? { kind: \"ssh\", cwd: tab.cwd, profileId: tab.profileId, cols: term.cols, rows: term.rows }\ncomponents/TerminalPanel.tsx:633:        kind: \"ssh\",\ncomponents/TerminalPanel.tsx:956:          + Local\ncomponents/TerminalPanel.tsx:962:          title=\"Open SSH profile\"\ndocs/modules/frontend.md:42:| `components/TerminalSshProfilePicker.tsx` | Terminal dock SSH profile picker. Reads non-secret profile data from `/api/web-config`, filters by label/host/user, blocks disabled profiles or custom ProxyCommand profiles missing the required risk gates, and opens selected profiles as SSH terminal tabs without displaying secrets. |",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-06T11:42:57.298Z",
+            "toolCallId": "call_N9TQH28yfGcgKmYtc3uuEDcY|fc_0ff1d4ead5d586b6016a4b94bbf4908199818099987f2904fb",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"### Verdict\\n\\n- **Needs work** — core secret/vault/known_hosts/runner boundaries look sound in static review and dry-run validation, but profile CRUD/API coverage still falls short of the stated design/implementation contract.\\n\",\n      \"newText\": \"### Verdict\\n\\n- **Needs work** — core secret/vault/known_hosts/runner boundaries look sound in static review and dry-run validation, but profile CRUD/API coverage still falls short of the stated design/implementation contract.\\n\\n## Checker re-review after profile CRUD fix\\n\\n### Findings Fixed\\n\\n- Dedicated SSH profile CRUD routes now exist at `app/api/terminal/ssh/profiles/route.ts` and `app/api/terminal/ssh/profiles/[id]/route.ts`, wired through `lib/terminal-ssh-profiles.ts` for list/create/read/update/delete.\\n- Create/update now reject secret-bearing profile payloads at the API boundary via `rejectSecretFields()` in `lib/terminal-ssh-profiles.ts` before writing `terminal.ssh.profiles` back to `pi-web.json`.\\n- `/api/terminal/ssh/profiles/[id]/test` still resolves profiles through the non-secret config path and returns `plan.redacted`, with session temp dir/path redacted.\\n\\n### Remaining Findings\\n\\n- None.\\n\\n### Verification\\n\\n- `npm run lint` — pass\\n- `node_modules/.bin/tsc --noEmit` — pass\\n- `npm run test:terminal-ssh` — pass\\n\\n### Verdict\\n\\n- **Pass** — dedicated profile CRUD API is implemented, profile create/update reject secret fields at the route/helper boundary, TerminalPanel still defaults local and only opts into SSH with `{ kind: \\\"ssh\\\", profileId }`, Settings/Picker paths remain non-secret, and vault/redacted-plan boundaries remain intact in current code and dry-run validation.\\n\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-06T11:42:57.327Z",
+            "toolCallId": "call_N9TQH28yfGcgKmYtc3uuEDcY|fc_0ff1d4ead5d586b6016a4b94bbf4908199818099987f2904fb",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-06T11:43:03.889Z",
+            "text": "Handoff:\n\n- Updated artifact:\n  - `.ypi/tasks/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接/review.md`\n    - appended `Checker re-review after profile CRUD fix`\n    - Verdict: **Pass**\n\nValidation run:\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:terminal-ssh` — pass\n\nReview conclusion:\n- Confirmed dedicated profile CRUD APIs exist:\n  - `app/api/terminal/ssh/profiles/route.ts`\n  - `app/api/terminal/ssh/profiles/[id]/route.ts`\n- Confirmed create/update reject secret fields via `lib/terminal-ssh-profiles.ts`\n- Confirmed `/api/terminal/ssh/profiles/[id]/test` still returns redacted plan\n- Confirmed TerminalPanel local default / SSH opt-in behavior remains intact\n- Confirmed secret/vault/known_hosts/redacted-plan boundaries still hold\n\nRemaining risks:\n- No blocking findings from this re-review.\n- End-to-end real SSH / multi-jump / proxy manual matrix is still outside this dry-run check scope.\n\nDecisions needed from main session:\n- None for this checker re-review.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-06T11:43:03.892Z",
+            "text": "Child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2034,
+        "tokens": 294,
+        "tokenSource": "usage",
+        "tps": 79.4,
+        "firstTokenAt": "2026-07-06T11:43:00.183Z",
+        "lastTokenAt": "2026-07-06T11:43:03.886Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-65d9005c34c8e33fc8cda221",
+        "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260706-161257-_-web-terminal-ssh-_-/checker-65d9005c34c8e33fc8cda221.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-06T11:41:53.567Z",
+        "finishedAt": "2026-07-06T11:43:06.085Z",
+        "updatedAt": "2026-07-06T11:43:06.085Z",
+        "itemCount": 59,
+        "messageCount": 1,
+        "toolCallCount": 27,
+        "stderrBytes": 0,
+        "bytes": 183815,
+        "truncated": true,
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-06T08:23:53.291Z",
+      "contextId": "pi_process_acdc90acabea4c5a74a3e46d",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-06T08:24:16.098Z",
+      "contextId": "pi_process_acdc90acabea4c5a74a3e46d",
+      "inputHash": "7dd3a9868c800a79232bcb3d",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-07T00:46:38.422Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260707-084638-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+    "knowledgePath": ".ypi/knowledge/20260707-084638-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-06T08:23:49.396Z",
+    "sourceArtifact": "implement.md",
+    "summary": "为 Web Terminal 增加 SSH profiles、credential vault、多级 ProxyJump、SOCKS5/HTTP/custom proxy 与 local/ssh 混合 tab，保持 local terminal 兼容并强化 secret 边界。",
+    "strategy": "先定义兼容配置和 secret storage，再实现 OpenSSH runner 与 API，最后接入 Settings/TerminalPanel UI；每阶段以 local terminal 不回归和 secret 不泄露为门禁。",
+    "maxConcurrency": 3,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 3,
+      "groups": [
+        {
+          "id": "contracts",
+          "title": "类型与配置契约",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "ssh-contracts-config"
+          ]
+        },
+        {
+          "id": "storage-config-parallel",
+          "title": "Credential/Profile/Known hosts 基础设施",
+          "relation": "parallel",
+          "dependencies": [
+            "ssh-contracts-config"
+          ],
+          "subtaskIds": [
+            "credential-vault-api",
+            "profile-api-validation",
+            "known-hosts-manager"
+          ]
+        },
+        {
+          "id": "runner",
+          "title": "OpenSSH 启动器",
+          "relation": "serial",
+          "dependencies": [
+            "credential-vault-api",
+            "profile-api-validation",
+            "known-hosts-manager"
+          ],
+          "subtaskIds": [
+            "ssh-launch-runner"
+          ]
+        },
+        {
+          "id": "terminal-api",
+          "title": "Terminal session API 集成",
+          "relation": "serial",
+          "dependencies": [
+            "ssh-launch-runner"
+          ],
+          "subtaskIds": [
+            "terminal-session-integration"
+          ]
+        },
+        {
+          "id": "frontend-parallel",
+          "title": "Settings 与 TerminalPanel UI",
+          "relation": "parallel",
+          "dependencies": [
+            "terminal-session-integration"
+          ],
+          "subtaskIds": [
+            "settings-ssh-ui",
+            "terminal-panel-ui"
+          ]
+        },
+        {
+          "id": "validation",
+          "title": "测试、文档、安全验收",
+          "relation": "serial",
+          "dependencies": [
+            "settings-ssh-ui",
+            "terminal-panel-ui"
+          ],
+          "subtaskIds": [
+            "tests-docs-security-review"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "ssh-contracts-config",
+        "title": "定义 SSH profile/config/credential 类型与 pi-web 兼容扩展",
+        "phase": "contracts",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/pi-web-config.ts",
+          "lib/terminal-ssh-types.ts",
+          "docs/modules/api.md",
+          "docs/modules/library.md",
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "旧 terminal config 能被 normalize 为带 ssh 默认值的新 config。",
+          "validatePiWebTerminalConfig 拒绝 profile 中出现 privateKey/password/passphrase/proxyPassword 等 secret 字段。",
+          "docs/modules 中记录新增模块和 API 入口。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "credential-vault-api",
+        "title": "实现 credential vault、脱敏 summary、credential API",
+        "phase": "security-storage",
+        "order": 20,
+        "dependsOn": [
+          "ssh-contracts-config"
+        ],
+        "dependencies": [
+          "ssh-contracts-config"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/terminal-ssh-vault.ts",
+          "app/api/terminal/ssh/credentials/route.ts",
+          "app/api/terminal/ssh/credentials/[id]/route.ts"
+        ],
+        "acceptance": [
+          "GET credentials 不返回 secret。",
+          "secret 文件不写入 pi-web.json。",
+          "删除被引用 credential 返回 409 和引用 profile ids。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelGroup": "storage-config-parallel",
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "profile-api-validation",
+        "title": "实现 profile CRUD、schema 校验、secret 字段拒绝",
+        "phase": "config-api",
+        "order": 30,
+        "dependsOn": [
+          "ssh-contracts-config"
+        ],
+        "dependencies": [
+          "ssh-contracts-config"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/terminal-ssh-profiles.ts",
+          "app/api/terminal/ssh/profiles/route.ts",
+          "app/api/terminal/ssh/profiles/[id]/route.ts",
+          "app/api/terminal/ssh/profiles/[id]/test/route.ts"
+        ],
+        "acceptance": [
+          "profile 可包含 target credential 与多级 jumpHosts credential。",
+          "profile API 不接受 secret 字段。",
+          "test resolve 返回 redacted plan 与分类错误。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelGroup": "storage-config-parallel",
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "known-hosts-manager",
+        "title": "实现 dedicated known_hosts 管理与 scan/trust API",
+        "phase": "security-storage",
+        "order": 40,
+        "dependsOn": [
+          "ssh-contracts-config"
+        ],
+        "dependencies": [
+          "ssh-contracts-config"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/terminal-known-hosts.ts",
+          "app/api/terminal/ssh/known-hosts/route.ts",
+          "app/api/terminal/ssh/known-hosts/scan/route.ts"
+        ],
+        "acceptance": [
+          "known_hosts 文件独立于 pi-web.json。",
+          "scan 失败不破坏 profile 保存。",
+          "HostKeyAlias 使用稳定 host:port。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelGroup": "storage-config-parallel",
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "ssh-launch-runner",
+        "title": "实现 OpenSSH launch plan、临时文件、ProxyJump、askpass、proxy helper",
+        "phase": "runner",
+        "order": 50,
+        "dependsOn": [
+          "credential-vault-api",
+          "profile-api-validation",
+          "known-hosts-manager"
+        ],
+        "dependencies": [
+          "credential-vault-api",
+          "profile-api-validation",
+          "known-hosts-manager"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/terminal-ssh-runner.ts",
+          "scripts/terminal-proxy-helper.js"
+        ],
+        "acceptance": [
+          "redacted launch plan 不含 secret。",
+          "临时文件权限符合要求并在 session 结束清理。",
+          "多级 jump host 使用不同 credential 时生成独立 Host alias 配置。",
+          "SOCKS5/HTTP proxy 不依赖外部 nc。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "terminal-session-integration",
+        "title": "扩展 terminal-manager 与 sessions API，支持 kind=local/ssh",
+        "phase": "terminal-api",
+        "order": 60,
+        "dependsOn": [
+          "ssh-launch-runner"
+        ],
+        "dependencies": [
+          "ssh-launch-runner"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/terminal-manager.ts",
+          "app/api/terminal/sessions/route.ts"
+        ],
+        "acceptance": [
+          "旧 local session API 请求和 UI 仍能工作。",
+          "kind=ssh + profileId 可创建 SSH terminal session。",
+          "terminal disabled 或 cwd 未授权时 local/SSH 均被拒绝。",
+          "关闭 tab/dock 后 SSH 进程和 temp files 被清理。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "settings-ssh-ui",
+        "title": "Settings Terminal 增加 profiles/credentials/known_hosts 管理 UI",
+        "phase": "frontend",
+        "order": 70,
+        "dependsOn": [
+          "credential-vault-api",
+          "profile-api-validation",
+          "known-hosts-manager"
+        ],
+        "dependencies": [
+          "credential-vault-api",
+          "profile-api-validation",
+          "known-hosts-manager"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/SettingsConfig.tsx",
+          "components/TerminalSshProfileEditor.tsx",
+          "components/TerminalSshCredentialEditor.tsx",
+          "components/TerminalKnownHostsPanel.tsx"
+        ],
+        "acceptance": [
+          "用户可创建 credential 和 profile。",
+          "secret 输入保存后 UI 不回显 secret。",
+          "删除被引用 credential 时显示引用并阻止默认删除。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelGroup": "frontend-parallel",
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "terminal-panel-ui",
+        "title": "TerminalPanel 支持 local/ssh 混合 tab 与 profile picker",
+        "phase": "frontend",
+        "order": 80,
+        "dependsOn": [
+          "terminal-session-integration",
+          "profile-api-validation"
+        ],
+        "dependencies": [
+          "terminal-session-integration",
+          "profile-api-validation"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/TerminalPanel.tsx",
+          "components/TerminalSshProfilePicker.tsx"
+        ],
+        "acceptance": [
+          "一个 dock 内可同时打开 local tab 和多个 SSH profile tab。",
+          "split pane 拖拽、rename、close、fullscreen/collapse 在 mixed tabs 下正常。",
+          "active SSH tab 显示 profile/target 状态，错误 banner 可读。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "parallelGroup": "frontend-parallel",
+        "parallelizable": true,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "tests-docs-security-review",
+        "title": "自动验证、文档更新、安全 review 与手工验收",
+        "phase": "validation",
+        "order": 90,
+        "dependsOn": [
+          "terminal-session-integration",
+          "settings-ssh-ui",
+          "terminal-panel-ui"
+        ],
+        "dependencies": [
+          "terminal-session-integration",
+          "settings-ssh-ui",
+          "terminal-panel-ui"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md",
+          "docs/operations/troubleshooting.md",
+          "scripts/test-terminal-ssh-config.mjs"
+        ],
+        "acceptance": [
+          "npm run lint 通过。",
+          "node_modules/.bin/tsc --noEmit 通过。",
+          "新增 terminal SSH 测试脚本通过。",
+          "文档明确 pi-web.json 与 vault/secret storage 边界。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "node scripts/test-terminal-ssh-config.mjs"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-07T00:46:38.422Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 9,
+      "skipped": 0
+    },
+    "subtasks": {
+      "ssh-contracts-config": {
+        "id": "ssh-contracts-config",
+        "status": "done",
+        "updatedAt": "2026-07-06T08:32:39.880Z",
+        "startedAt": "2026-07-06T08:24:23.065Z",
+        "finishedAt": "2026-07-06T08:32:39.879Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-a731ff5099509ccbe5c3eb34"
+        ],
+        "lastRunId": "implementer-a731ff5099509ccbe5c3eb34",
+        "claimedAt": "2026-07-06T08:24:23.065Z",
+        "claimedByContextId": "pi_process_acdc90acabea4c5a74a3e46d",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-types.ts` — added shared SSH config/profile/endpoint/proxy/credential summary types.\n- `lib/pi-web-config.ts` — added `terminal.ssh` defaults, normalization, validation, and secret-field rejection for SSH profiles.\n- `docs/modules/api.md` — documented reserved SSH terminal config/API direction.\n- `docs/modules/library.md` — documented new SSH types module and config boundary.\n- `docs/modules/frontend.md` — documented future SSH UI contract usage.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — failed: `node_modules/.bin/tsc` not found.\n- `npm run lint` — failed before linting: missing `eslint-config-next` package in `node_modules`.\n\n#### Notes / Risks\n\n- Did not implement vault/API/runner/UI per subtask boundary.\n- Validation now rejects `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` anywhere inside SSH profile objects.\n- Remaining validation could not be completed until dependencies are installed."
+      },
+      "credential-vault-api": {
+        "id": "credential-vault-api",
+        "status": "done",
+        "updatedAt": "2026-07-06T08:35:10.830Z",
+        "startedAt": "2026-07-06T08:33:32.344Z",
+        "finishedAt": "2026-07-06T08:35:10.830Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-7892546b6ffb453c91dfc1ab"
+        ],
+        "lastRunId": "implementer-7892546b6ffb453c91dfc1ab",
+        "claimedAt": "2026-07-06T08:33:32.344Z",
+        "claimedByContextId": "pi_process_acdc90acabea4c5a74a3e46d",
+        "summary": "Child Pi run finished without a captured final assistant message."
+      },
+      "profile-api-validation": {
+        "id": "profile-api-validation",
+        "status": "done",
+        "updatedAt": "2026-07-06T11:31:04.011Z",
+        "startedAt": "2026-07-06T11:26:58.456Z",
+        "finishedAt": "2026-07-06T11:31:04.008Z",
+        "attempts": 2,
+        "runIds": [
+          "implementer-a19f9a57313c472f52f9ed40",
+          "implementer-9bfd1c7fe0f15b8e3fd0ddd3"
+        ],
+        "lastRunId": "implementer-9bfd1c7fe0f15b8e3fd0ddd3",
+        "claimedAt": "2026-07-06T11:26:58.456Z",
+        "claimedByContextId": "pi_019f3722-5ddf-7cb8-bf9f-1043c6f33879",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `lib/terminal-ssh-profiles.ts` — added dedicated SSH profile CRUD helper with validation and recursive secret-field rejection.\n- `app/api/terminal/ssh/profiles/route.ts` — added profile list/create API.\n- `app/api/terminal/ssh/profiles/[id]/route.ts` — added profile read/update/delete API.\n- `scripts/test-terminal-ssh-config.mjs` — extended dry-run checks for profile CRUD route/helper coverage.\n- `docs/modules/api.md` — documented dedicated profile CRUD routes.\n- `docs/modules/library.md` — documented profile helper module.\n- `.ypi/tasks/.../handoff.md` — updated task handoff artifact.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:terminal-ssh` — passed\n\n#### Notes / Risks\n\n- Existing `/api/terminal/ssh/profiles/[id]/test` behavior preserved.\n- Profile create/update reject `privateKey`, `privateKeyPem`, `password`, `passphrase`, and `proxyPassword` at API/helper boundary.\n- Remaining product decisions unchanged: real SSH/proxy E2E matrix, OS keychain vs file vault, askpass policy, custom ProxyCommand exposure, and host-key default confirmation.",
+        "validation": [
+          "Checker review found dedicated SSH profile CRUD routes are incomplete; implement /api/terminal/ssh/profiles list/create and /api/terminal/ssh/profiles/[id] read/update/delete APIs, enforce secret-field rejection at API boundary, update docs/tests, and preserve existing profile test route/UI behavior."
+        ]
+      },
+      "known-hosts-manager": {
+        "id": "known-hosts-manager",
+        "status": "done",
+        "updatedAt": "2026-07-06T08:49:16.507Z",
+        "startedAt": "2026-07-06T08:41:01.169Z",
+        "finishedAt": "2026-07-06T08:44:08.685Z",
+        "attempts": 2,
+        "runIds": [
+          "implementer-24d5421c1c6e548dd6813c83",
+          "implementer-7ce8564e1b12da76be24bd69"
+        ],
+        "lastRunId": "implementer-7ce8564e1b12da76be24bd69",
+        "claimedAt": "2026-07-06T08:41:01.169Z",
+        "claimedByContextId": "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-known-hosts.ts` — added dedicated known_hosts manager with 0700/0600 best-effort permissions, list/trust/remove, advisory `ssh-keyscan`, SHA256 fingerprints, stable `host:port` alias helper, and `UserKnownHostsFile` helper.\n- `app/api/terminal/ssh/known-hosts/route.ts` — added GET/POST/DELETE known_hosts API.\n- `app/api/terminal/ssh/known-hosts/scan/route.ts` — added best-effort scan API that returns displayable errors without mutating config/profile state.\n- `docs/modules/api.md` — documented known_hosts routes and advisory scan boundary.\n- `docs/modules/library.md` — documented `lib/terminal-known-hosts.ts`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `npm run lint` — passed with one warning in unrelated `lib/terminal-ssh-vault.ts` (`rename` unused), not introduced by this subtask.\n\n#### Notes / Risks\n\n- `ssh-keyscan` results explicitly include a warning that fingerprints must be verified through a trusted channel before trust.\n- No credential vault, profile CRUD, SSH runner, or frontend UI was implemented in this subtask.\n- Host key storage is separate from `pi-web.json` at `~/.pi/agent/terminal/known_hosts`."
+      },
+      "ssh-launch-runner": {
+        "id": "ssh-launch-runner",
+        "status": "done",
+        "updatedAt": "2026-07-06T09:01:47.384Z",
+        "startedAt": "2026-07-06T08:56:30.033Z",
+        "finishedAt": "2026-07-06T09:01:47.381Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-69e415c29eb3d1ff507960d9"
+        ],
+        "lastRunId": "implementer-69e415c29eb3d1ff507960d9",
+        "claimedAt": "2026-07-06T08:56:30.033Z",
+        "claimedByContextId": "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-ssh-runner.ts` — added OpenSSH launch-plan builder, temp dir/config/key/askpass/proxy context handling, ProxyJump generation, redacted plan, cleanup, and startup sweep helpers.\n- `scripts/terminal-proxy-helper.js` — added Node-based SOCKS5 / HTTP CONNECT proxy helper, including auth via context file (not command line).\n- `docs/modules/library.md` — documented SSH vault/runner/known-hosts library responsibilities.\n- `docs/modules/api.md` — noted future SSH session routes should use the runner and return only redacted data.\n- `lib/terminal-ssh-vault.ts` — removed unused `rename` import to keep lint clean.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Runner only builds launch plans; it does **not** integrate with `terminal-manager` or session API, per task boundary.\n- Password/passphrase askpass is implemented as best-effort and may still fall back to interactive prompts depending on OpenSSH/platform behavior.\n- Proxy helper path resolves from `process.cwd()/scripts/terminal-proxy-helper.js`, which matches current dev/published server cwd behavior."
+      },
+      "terminal-session-integration": {
+        "id": "terminal-session-integration",
+        "status": "done",
+        "updatedAt": "2026-07-06T09:15:33.028Z",
+        "startedAt": "2026-07-06T09:11:52.439Z",
+        "finishedAt": "2026-07-06T09:15:33.024Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-eaeb14b474f87a6e87839a2c"
+        ],
+        "lastRunId": "implementer-eaeb14b474f87a6e87839a2c",
+        "claimedAt": "2026-07-06T09:11:52.439Z",
+        "claimedByContextId": "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/terminal-manager.ts` — added `CreateTerminalSessionInput`, `kind: \"local\" | \"ssh\"` session metadata, SSH profile lookup/gating, OpenSSH launch-plan integration, cleanup callbacks, and startup temp-dir sweep.\n- `app/api/terminal/sessions/route.ts` — updated request body typing to accept local/SSH session creation input without breaking old local bodies.\n- `docs/modules/api.md` — documented SSH-capable `terminal/sessions` behavior and secret-safe session metadata.\n- `docs/modules/library.md` — updated terminal manager / SSH runner module descriptions.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel` or Settings UI per subtask boundary.\n- `events/input/resize/delete` routes remain unified by session id and unchanged.\n- Real SSH connection behavior depends on existing profile/vault/runner data and system OpenSSH availability; not manually exercised here.\n- Worktree has pre-existing unrelated changes from other subtasks; I only touched the files listed above."
+      },
+      "settings-ssh-ui": {
+        "id": "settings-ssh-ui",
+        "status": "done",
+        "updatedAt": "2026-07-06T09:03:51.102Z",
+        "startedAt": "2026-07-06T08:56:49.884Z",
+        "finishedAt": "2026-07-06T09:03:51.098Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-91e142281feb0aad4deba87d"
+        ],
+        "lastRunId": "implementer-91e142281feb0aad4deba87d",
+        "claimedAt": "2026-07-06T08:56:49.884Z",
+        "claimedByContextId": "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SettingsConfig.tsx` — Added Terminal → SSH settings section with SSH enablement, custom ProxyCommand/env risk toggles, default known_hosts policy, and embedded SSH profile/credential/known_hosts panels.\n- `components/TerminalSshCredentialEditor.tsx` — New credential vault UI with redacted summaries, write-only secret fields, explicit Replace secret flow, and referenced-credential delete blocking display.\n- `components/TerminalSshProfileEditor.tsx` — New SSH profile editor for target, jump chain, credentials, proxy config, known_hosts policy, timeout/agent-forwarding toggles, warnings, and validate/resolve test hooks.\n- `components/TerminalKnownHostsPanel.tsx` — New known_hosts UI for listing, scanning, trusting, and deleting dedicated SSH host keys.\n- `docs/modules/frontend.md` — Documented the new SSH settings components.\n- `docs/modules/api.md` — Documented Settings UI usage of SSH credential/profile-test/known-hosts APIs and secret boundary.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed\n\n#### Notes / Risks\n\n- Did not modify `TerminalPanel`, `terminal-manager`, SSH runner, or session integration.\n- Credential/profile API routes are expected from prerequisite subtasks; if absent at runtime, the new UI will surface API errors instead of silently failing."
+      },
+      "terminal-panel-ui": {
+        "id": "terminal-panel-ui",
+        "status": "done",
+        "updatedAt": "2026-07-06T09:25:44.684Z",
+        "startedAt": "2026-07-06T09:20:29.962Z",
+        "finishedAt": "2026-07-06T09:25:44.679Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-50ae3f0a78a4015a072342da"
+        ],
+        "lastRunId": "implementer-50ae3f0a78a4015a072342da",
+        "claimedAt": "2026-07-06T09:20:29.962Z",
+        "claimedByContextId": "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/TerminalPanel.tsx` — added `kind: \"local\" | \"ssh\"` tab state, mixed local/SSH tab creation, SSH session request body, SSH-safe titles/tooltips/status labels, and header Local/SSH open controls.\n- `components/TerminalSshProfilePicker.tsx` — new picker loading non-secret SSH profiles from `/api/web-config`, filtering profiles, showing disabled/custom ProxyCommand warnings, and opening SSH tabs.\n- `docs/modules/frontend.md` — documented mixed TerminalPanel behavior and the new SSH profile picker.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- The picker reads profiles from current `terminal.ssh.profiles` config via `/api/web-config`; credential existence is still ultimately enforced by backend SSH session creation/preflight because no dedicated profile list/validation route is present in this worktree.\n- No Settings UI or backend runner/API logic was changed."
+      },
+      "tests-docs-security-review": {
+        "id": "tests-docs-security-review",
+        "status": "done",
+        "updatedAt": "2026-07-06T09:51:52.709Z",
+        "startedAt": "2026-07-06T09:47:17.637Z",
+        "finishedAt": "2026-07-06T09:51:52.706Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-e8ff73fa38b2b930d6cedb33"
+        ],
+        "lastRunId": "implementer-e8ff73fa38b2b930d6cedb33",
+        "claimedAt": "2026-07-06T09:47:17.637Z",
+        "claimedByContextId": "pi_019f367a-db55-76ab-8b3f-558b7b2c1887",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Produced\n\n- `scripts/test-terminal-ssh-config.mjs` — added dry-run SSH terminal security/config checks.\n- `package.json` — added `test:terminal-ssh`.\n- `app/api/terminal/ssh/credentials/route.ts` — added credential list/create summary API.\n- `app/api/terminal/ssh/credentials/[id]/route.ts` — added credential get/update/delete summary API.\n- `app/api/terminal/ssh/profiles/[id]/test/route.ts` — added profile validate/resolve preflight returning redacted plan only.\n- `docs/architecture/overview.md` — documented SSH terminal architecture and secret boundaries.\n- `docs/operations/troubleshooting.md` — added SSH terminal troubleshooting.\n- `docs/standards/code-style.md` — documented terminal SSH test script.\n- `.ypi/tasks/.../handoff.md`, `summary.md`, `review.md` — updated task handoff artifacts.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n- `node scripts/test-terminal-ssh-config.mjs` — passed.\n\n#### Notes / Risks\n\n- Real SSH / jump host / SOCKS5 / HTTP proxy end-to-end manual matrix was not run; current validation is dry-run/source-boundary focused.\n- Vault is local file permission isolation, not encrypted OS keychain.\n- Password/passphrase askpass remains platform/OpenSSH dependent; fallback manual input should remain expected.\n- Main session still needs final product decisions on custom ProxyCommand exposure and host key default policy."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-06T08:24:23.065Z",
+        "subtaskId": "ssh-contracts-config",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T08:33:32.344Z",
+        "subtaskId": "credential-vault-api",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T08:34:18.323Z",
+        "subtaskId": "profile-api-validation",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T08:34:33.590Z",
+        "subtaskId": "known-hosts-manager",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T08:40:56.690Z",
+        "subtaskId": "known-hosts-manager",
+        "from": "failed",
+        "to": "ready"
+      },
+      {
+        "at": "2026-07-06T08:41:01.169Z",
+        "subtaskId": "known-hosts-manager",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T08:56:30.033Z",
+        "subtaskId": "ssh-launch-runner",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T08:56:49.884Z",
+        "subtaskId": "settings-ssh-ui",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T09:11:52.439Z",
+        "subtaskId": "terminal-session-integration",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T09:20:29.962Z",
+        "subtaskId": "terminal-panel-ui",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T09:47:17.637Z",
+        "subtaskId": "tests-docs-security-review",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-06T11:26:54.260Z",
+        "subtaskId": "profile-api-validation",
+        "from": "done",
+        "to": "ready"
+      },
+      {
+        "at": "2026-07-06T11:26:58.456Z",
+        "subtaskId": "profile-api-validation",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

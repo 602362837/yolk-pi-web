@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { TerminalSshProfilePicker } from "./TerminalSshProfilePicker";
+import type { TerminalSshProfile } from "@/lib/terminal-ssh-types";
 
 interface Props {
   cwd: string;
@@ -14,6 +16,7 @@ interface Props {
 
 type TerminalBackend = "pty" | "script" | "pipe";
 type TerminalStatus = "starting" | "connected" | "error";
+type TerminalKind = "local" | "ssh";
 type SplitDirection = "horizontal" | "vertical";
 type DropZone = "center" | "left" | "right" | "top" | "bottom";
 
@@ -25,7 +28,16 @@ interface DropTargetState {
 }
 
 interface CreateTerminalResponse {
-  session?: { id: string; cwd: string; shell: string; backend: TerminalBackend };
+  session?: {
+    id: string;
+    kind: TerminalKind;
+    cwd: string;
+    shell: string;
+    backend: TerminalBackend;
+    profileId?: string;
+    profileLabel?: string;
+    targetLabel?: string;
+  };
   error?: string;
 }
 
@@ -37,8 +49,12 @@ interface TerminalEvent {
 
 interface TerminalTabState {
   id: string;
+  kind: TerminalKind;
   label: string;
   cwd: string;
+  profileId?: string;
+  profileLabel?: string;
+  targetLabel?: string;
   sessionId: string | null;
   shell: string | null;
   backend: TerminalBackend | null;
@@ -71,9 +87,15 @@ interface TerminalState {
   nextTabNumber: number;
 }
 
+type AddTerminalTabPayload =
+  | { kind: "local"; cwd: string }
+  | { kind: "ssh"; cwd: string; profileId: string; profileLabel: string; targetLabel: string };
+
+type TerminalTabUpdates = Partial<Pick<TerminalTabState, "sessionId" | "shell" | "backend" | "status" | "error" | "profileId" | "profileLabel" | "targetLabel">>;
+
 type TerminalAction =
-  | { type: "add_tab"; cwd: string }
-  | { type: "update_tab"; tabId: string; updates: Partial<Pick<TerminalTabState, "sessionId" | "shell" | "backend" | "status" | "error">> }
+  | { type: "add_tab"; tab: AddTerminalTabPayload }
+  | { type: "update_tab"; tabId: string; updates: TerminalTabUpdates }
   | { type: "select_tab"; paneId: string; tabId: string }
   | { type: "rename_tab"; tabId: string; label: string }
   | { type: "close_tab"; tabId: string }
@@ -84,7 +106,7 @@ interface TerminalSessionViewProps {
   tab: TerminalTabState;
   visible: boolean;
   layoutVersion: number;
-  onTabUpdate: (tabId: string, updates: Partial<Pick<TerminalTabState, "sessionId" | "shell" | "backend" | "status" | "error">>) => void;
+  onTabUpdate: (tabId: string, updates: TerminalTabUpdates) => void;
   initialInput?: { id: string; text: string } | null;
 }
 
@@ -121,6 +143,7 @@ function createInitialState(cwd: string): TerminalState {
     tabs: {
       [tabId]: {
         id: tabId,
+        kind: "local",
         label: "Terminal 1",
         cwd,
         sessionId: null,
@@ -202,11 +225,15 @@ function terminalReducer(state: TerminalState, action: TerminalAction): Terminal
     case "add_tab": {
       const pane = findPane(state.layout, state.activePaneId) ?? findFirstPane(state.layout);
       const tabId = makeId("term-tab");
-      const label = `Terminal ${state.nextTabNumber}`;
+      const label = action.tab.kind === "ssh" ? `SSH: ${action.tab.profileLabel}` : `Terminal ${state.nextTabNumber}`;
       const tab: TerminalTabState = {
         id: tabId,
+        kind: action.tab.kind,
         label,
-        cwd: action.cwd,
+        cwd: action.tab.cwd,
+        profileId: action.tab.kind === "ssh" ? action.tab.profileId : undefined,
+        profileLabel: action.tab.kind === "ssh" ? action.tab.profileLabel : undefined,
+        targetLabel: action.tab.kind === "ssh" ? action.tab.targetLabel : undefined,
         sessionId: null,
         shell: null,
         backend: null,
@@ -218,7 +245,7 @@ function terminalReducer(state: TerminalState, action: TerminalAction): Terminal
         tabs: { ...state.tabs, [tabId]: tab },
         layout: updatePane(state.layout, pane.id, (node) => ({ ...node, tabIds: [...node.tabIds, tabId], activeTabId: tabId })),
         activePaneId: pane.id,
-        nextTabNumber: state.nextTabNumber + 1,
+        nextTabNumber: action.tab.kind === "ssh" ? state.nextTabNumber : state.nextTabNumber + 1,
       };
     }
     case "update_tab": {
@@ -314,6 +341,26 @@ function deleteTerminalSession(sessionId: string | null): void {
   void fetch(`/api/terminal/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }
 
+function endpointLabel(profile: TerminalSshProfile): string {
+  const user = profile.target.username ? `${profile.target.username}@` : "";
+  return `${user}${profile.target.host}:${profile.target.port}`;
+}
+
+function getTabTooltip(tab: TerminalTabState): string {
+  if (tab.kind === "ssh") {
+    return [
+      tab.label,
+      tab.targetLabel ?? tab.profileLabel ?? tab.profileId,
+      `workspace: ${tab.cwd}`,
+    ].filter(Boolean).join(" · ");
+  }
+  return `${tab.label} · ${tab.cwd}`;
+}
+
+function getTabContextLabel(tab: TerminalTabState): string {
+  return tab.kind === "ssh" ? (tab.targetLabel ?? tab.profileLabel ?? "SSH") : tab.cwd;
+}
+
 function TerminalSessionView({ tab, visible, layoutVersion, onTabUpdate, initialInput }: TerminalSessionViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -323,6 +370,7 @@ function TerminalSessionView({ tab, visible, layoutVersion, onTabUpdate, initial
   const localInputLengthRef = useRef(0);
   const injectedInputIdRef = useRef<string | null>(null);
   const backendRef = useRef<TerminalBackend | null>(tab.backend);
+  const tabContextLabelRef = useRef(getTabContextLabel(tab));
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
 
@@ -427,18 +475,21 @@ function TerminalSessionView({ tab, visible, layoutVersion, onTabUpdate, initial
         onTabUpdate(tab.id, { status: "starting", error: null });
         const existingSessionId = sessionIdRef.current;
         if (existingSessionId) {
-          term.writeln(`Reconnecting terminal in ${tab.cwd} ...`);
+          term.writeln(tab.kind === "ssh" ? `Reconnecting SSH terminal ${tabContextLabelRef.current} ...` : `Reconnecting terminal in ${tab.cwd} ...`);
           localEchoRef.current = backendRef.current === "pipe";
           connectEvents(existingSessionId);
           onTabUpdate(tab.id, { status: "connected", error: null });
           return;
         }
 
-        term.writeln(`Starting terminal in ${tab.cwd} ...`);
+        term.writeln(tab.kind === "ssh" ? `Starting SSH terminal ${tabContextLabelRef.current} ...` : `Starting terminal in ${tab.cwd} ...`);
+        const createBody = tab.kind === "ssh"
+          ? { kind: "ssh", cwd: tab.cwd, profileId: tab.profileId, cols: term.cols, rows: term.rows }
+          : { cwd: tab.cwd, cols: term.cols, rows: term.rows };
         const res = await fetch("/api/terminal/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cwd: tab.cwd, cols: term.cols, rows: term.rows }),
+          body: JSON.stringify(createBody),
         });
         const data = await res.json() as CreateTerminalResponse;
         if (!res.ok || data.error || !data.session) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -452,6 +503,9 @@ function TerminalSessionView({ tab, visible, layoutVersion, onTabUpdate, initial
           sessionId: data.session.id,
           shell: data.session.shell,
           backend: data.session.backend,
+          profileId: data.session.profileId,
+          profileLabel: data.session.profileLabel,
+          targetLabel: data.session.targetLabel,
           status: "connected",
           error: null,
         });
@@ -481,7 +535,7 @@ function TerminalSessionView({ tab, visible, layoutVersion, onTabUpdate, initial
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [fitTerminal, onTabUpdate, postResize, tab.cwd, tab.id]);
+  }, [fitTerminal, onTabUpdate, postResize, tab.cwd, tab.id, tab.kind, tab.profileId]);
 
   useEffect(() => {
     if (!visible) return;
@@ -526,6 +580,7 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
   const [dockHeight, setDockHeight] = useState(NORMAL_DOCK_HEIGHT);
   const [fullscreen, setFullscreen] = useState(false);
   const [layoutVersion, setLayoutVersion] = useState(0);
+  const [sshPickerOpen, setSshPickerOpen] = useState(false);
   const sessionIdsRef = useRef<string[]>([]);
   const closedExplicitlyRef = useRef(false);
 
@@ -546,7 +601,7 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
     };
   }, []);
 
-  const updateTab = useCallback((tabId: string, updates: Partial<Pick<TerminalTabState, "sessionId" | "shell" | "backend" | "status" | "error">>) => {
+  const updateTab = useCallback((tabId: string, updates: TerminalTabUpdates) => {
     dispatch({ type: "update_tab", tabId, updates });
   }, []);
 
@@ -564,6 +619,26 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
     closeAllSessions();
     onClose();
   }, [closeAllSessions, onClose]);
+
+  const addLocalTab = useCallback(() => {
+    dispatch({ type: "add_tab", tab: { kind: "local", cwd } });
+    setSshPickerOpen(false);
+    requestLayoutFit();
+  }, [cwd, requestLayoutFit]);
+
+  const addSshTab = useCallback((profile: TerminalSshProfile) => {
+    dispatch({
+      type: "add_tab",
+      tab: {
+        kind: "ssh",
+        cwd,
+        profileId: profile.id,
+        profileLabel: profile.label,
+        targetLabel: endpointLabel(profile),
+      },
+    });
+    requestLayoutFit();
+  }, [cwd, requestLayoutFit]);
 
   const handleCloseTab = useCallback((tabId: string) => {
     const tab = state.tabs[tabId];
@@ -640,7 +715,7 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
           cursor: editingTabId === tabId ? "text" : "grab",
           flexShrink: 0,
         }}
-        title={`${tab.label} · ${tab.cwd}`}
+        title={getTabTooltip(tab)}
         onClick={() => {
           dispatch({ type: "select_tab", paneId: pane.id, tabId });
           requestLayoutFit();
@@ -844,12 +919,13 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
   };
 
   const shellLabel = activeTab?.shell ? `${activeTab.shell}${activeTab.backend && activeTab.backend !== "pty" ? ` · ${activeTab.backend}` : ""}` : null;
+  const activeContextLabel = activeTab ? getTabContextLabel(activeTab) : cwd;
   const rootStyle: React.CSSProperties = fullscreen
     ? { position: "fixed", inset: 0, zIndex: 650, height: "100dvh" }
     : { height: collapsed ? HEADER_HEIGHT : dockHeight, minHeight: collapsed ? HEADER_HEIGHT : MIN_DOCK_HEIGHT };
 
   return (
-    <div className={`terminal-panel-root${fullscreen ? " terminal-panel-fullscreen" : ""}${collapsed ? " terminal-panel-collapsed" : ""}`} style={{ ...rootStyle, borderTop: "1px solid var(--border)", background: "var(--bg)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <div className={`terminal-panel-root${fullscreen ? " terminal-panel-fullscreen" : ""}${collapsed ? " terminal-panel-collapsed" : ""}`} style={{ ...rootStyle, position: "relative", borderTop: "1px solid var(--border)", background: "var(--bg)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
       {!collapsed && !fullscreen && (
         <div
           onPointerDown={handleDockResizePointerDown}
@@ -870,17 +946,22 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
           {collapsed ? "▴" : "▾"}
         </button>
         <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 700 }}>Terminal</span>
-        <span title={cwd} style={{ minWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>{cwd}</span>
+        <span title={activeContextLabel} style={{ minWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>{activeContextLabel}</span>
         <button
           type="button"
-          onClick={() => {
-            dispatch({ type: "add_tab", cwd });
-            requestLayoutFit();
-          }}
-          style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", borderRadius: 6, fontSize: 13, lineHeight: 1, padding: "4px 8px" }}
-          title="New terminal tab"
+          onClick={addLocalTab}
+          style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", borderRadius: 6, fontSize: 12, lineHeight: 1, padding: "5px 8px" }}
+          title="New local terminal tab"
         >
-          +
+          + Local
+        </button>
+        <button
+          type="button"
+          onClick={() => setSshPickerOpen((value) => !value)}
+          style={{ background: sshPickerOpen ? "var(--bg-selected)" : "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", borderRadius: 6, fontSize: 12, lineHeight: 1, padding: "5px 8px" }}
+          title="Open SSH profile"
+        >
+          SSH ▾
         </button>
         {shellLabel && <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{shellLabel}</span>}
         <span style={{ fontSize: 11, color: activeTab?.status === "error" ? "#f87171" : activeTab?.status === "connected" ? "#22c55e" : "var(--text-dim)", marginLeft: shellLabel ? 0 : "auto" }}>{activeTab?.status ?? "starting"}</span>
@@ -905,6 +986,7 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
           ×
         </button>
       </div>
+      <TerminalSshProfilePicker open={!collapsed && sshPickerOpen} onClose={() => setSshPickerOpen(false)} onOpenProfile={addSshTab} />
       {!collapsed && activeTab?.error && <div style={{ padding: "6px 10px", background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, borderBottom: "1px solid var(--border)", overflowWrap: "anywhere" }}>{activeTab.error}</div>}
       {!collapsed && (
         <div style={{ flex: 1, minHeight: 0, padding: 8, display: "flex", overflow: "hidden", background: "var(--bg-subtle)" }}>

@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModelSelect, type ModelSelectOption } from "./ModelSelect";
 import { SelectDropdown, type SelectDropdownOption } from "./SelectDropdown";
+import { TerminalKnownHostsPanel } from "./TerminalKnownHostsPanel";
+import { TerminalSshCredentialEditor } from "./TerminalSshCredentialEditor";
+import { TerminalSshProfileEditor } from "./TerminalSshProfileEditor";
 import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
 import type {
   PiWebChatGptConfig,
@@ -15,6 +18,7 @@ import type {
   PiWebSubagentModality,
   PiWebSubagentRunPolicy,
   PiWebTerminalConfig,
+  PiWebTerminalSshConfig,
   PiWebThinkingLevel,
   PiWebToolPreset,
   PiWebTrellisConfig,
@@ -22,6 +26,7 @@ import type {
   PiWebWorktreeConfig,
   PiWebYolkConfig,
 } from "@/lib/pi-web-config";
+import type { TerminalCredentialSummary } from "@/lib/terminal-ssh-types";
 import type { TrellisCommandResponse, TrellisSetupStatus } from "@/lib/trellis-setup-types";
 
 interface WebConfigResponse {
@@ -487,6 +492,7 @@ export function SettingsConfig({
   const [savedUsage, setSavedUsage] = useState<PiWebUsageConfig | null>(null);
   const [terminal, setTerminal] = useState<PiWebTerminalConfig | null>(null);
   const [savedTerminal, setSavedTerminal] = useState<PiWebTerminalConfig | null>(null);
+  const [terminalCredentials, setTerminalCredentials] = useState<TerminalCredentialSummary[]>([]);
   const [rawEnvImport, setRawEnvImport] = useState("");
   const [terminalEnvAssistLoading, setTerminalEnvAssistLoading] = useState(false);
   const [chatgpt, setChatgpt] = useState<PiWebChatGptConfig | null>(null);
@@ -681,6 +687,11 @@ export function SettingsConfig({
 
   const updateTerminal = useCallback((patch: Partial<PiWebTerminalConfig>) => {
     setTerminal((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateTerminalSsh = useCallback((ssh: PiWebTerminalSshConfig) => {
+    setTerminal((prev) => prev ? { ...prev, ssh } : prev);
     setNotice(null);
   }, []);
 
@@ -1343,6 +1354,50 @@ export function SettingsConfig({
                         </Field>
                       </div>
                     </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+                      <div>
+                        <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>SSH Profiles 总开关</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 3, lineHeight: 1.45 }}>
+                          这里仅保存非 secret profile 配置；密码、私钥、passphrase 和代理密码由独立 credential vault 管理，不写入 pi-web.json。
+                        </div>
+                      </div>
+                      <ToggleField
+                        label="启用 Web Terminal SSH"
+                        description="开启后后续 Terminal UI 可按 SSH profile 创建远端 tab；关闭时只保留本地终端。"
+                        checked={terminal.ssh.enabled}
+                        onChange={(enabled) => updateTerminalSsh({ ...terminal.ssh, enabled })}
+                      />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <ToggleField
+                          label="允许 Custom ProxyCommand"
+                          description="高风险：custom ProxyCommand 会在运行 ypi 的本机执行命令。仍需 profile 级风险确认。"
+                          checked={terminal.ssh.allowCustomProxyCommand}
+                          onChange={(allowCustomProxyCommand) => updateTerminalSsh({ ...terminal.ssh, allowCustomProxyCommand })}
+                        />
+                        <ToggleField
+                          label="SSH 继承 terminal.env"
+                          description="默认关闭，避免把本地 env/代理/密钥类变量暴露给 SSH 或 ProxyCommand。"
+                          checked={terminal.ssh.applyTerminalEnvToSsh}
+                          onChange={(applyTerminalEnvToSsh) => updateTerminalSsh({ ...terminal.ssh, applyTerminalEnvToSsh })}
+                        />
+                      </div>
+                      <Field label="默认 known_hosts 策略" description="推荐 ask/manual trust；accept-new 首次连接更方便但存在首次 MITM 风险。">
+                        <SelectDropdown
+                          value={terminal.ssh.defaultKnownHostsPolicy}
+                          options={[
+                            { value: "ask", label: "ask / manual trust" },
+                            { value: "strict", label: "strict" },
+                            { value: "accept-new", label: "accept-new（首次信任风险）" },
+                          ]}
+                          onChange={(defaultKnownHostsPolicy) => updateTerminalSsh({ ...terminal.ssh, defaultKnownHostsPolicy: defaultKnownHostsPolicy as PiWebTerminalSshConfig["defaultKnownHostsPolicy"] })}
+                          ariaLabel="选择 SSH known_hosts 默认策略"
+                        />
+                      </Field>
+                    </div>
+                    <TerminalSshCredentialEditor onCredentialsChange={setTerminalCredentials} />
+                    <TerminalSshProfileEditor ssh={terminal.ssh} credentials={terminalCredentials} onChange={updateTerminalSsh} />
+                    <TerminalKnownHostsPanel />
                   </div>
                 ) : section === "chatgpt" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

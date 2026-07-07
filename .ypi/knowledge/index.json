@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-06T08:01:53.280Z",
+  "updatedAt": "2026-07-07T00:46:38.422Z",
   "entries": [
+    {
+      "id": "20260707-084638-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+      "title": "设计 Web Terminal SSH 凭证管理、多级跳板机与代理连接",
+      "taskId": "20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+      "taskKey": "archived:2026-07:20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+      "workflowId": "feature-dev",
+      "summary": "已完成 Web Terminal SSH 能力：SSH profile/config/credential 类型、credential vault、dedicated profile CRUD/test API、known_hosts 管理、OpenSSH runner/ProxyJump/proxy helper/askpass/临时文件清理、terminal session kind=local|ssh 集成、Settings SSH 管理 UI、TerminalPanel SSH profile picker。关键复用结论：pi-web.json 只保存非 secret profile/config，私钥/password/passphrase/proxy password 进入独立 vault 且 API 只返回脱敏 summary；profile create/update 与 config normalize 都要递归拒绝 secret 字段；redacted launch plan 不暴露 secret 和真实 tempDir；known_hosts 使用独立文件，ssh-keyscan 仅 advisory；custom ProxyCommand 必须全局和 profile 双重风险确认。检查阶段发现缺少 dedicated profile CRUD API，补齐后复查通过。验证：npm run lint、node_modules/.bin/tsc --noEmit、npm run test:terminal-ssh 均通过。注意本次 30142 预览曾跑错主仓库 cwd，确认开发服务 cwd 很重要。",
+      "tags": [
+        "feature-dev",
+        "web-terminal",
+        "ssh",
+        "credentials",
+        "proxy",
+        "known-hosts",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260706-161257-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接",
+      "knowledgePath": ".ypi/knowledge/20260707-084638-设计-web-terminal-ssh-凭证管理-多级跳板机与代理连接.md",
+      "createdAt": "2026-07-07T00:46:38.422Z",
+      "archivedAt": "2026-07-07T00:46:38.422Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260706-160153-优化-ypi-studio-异步子任务编排的等待与自动续跑交互",
       "title": "优化 YPI Studio 异步子任务编排的等待与自动续跑交互",

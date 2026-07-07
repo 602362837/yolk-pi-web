@@ -86,6 +86,20 @@ The archive directory is scanned separately from `SessionManager.listAll()` (whi
 - Session-scoped YPI Studio widgets use high-confidence runtime/context/transcript evidence and ignore `pi_process_*` as widget evidence. The chat UI triggers a debounced session-task recheck when Studio tool progress/results expose a task id/key, recent preview changes, or display-limit flags, so newly created/rebound Studio tasks and live `t/s`/phase updates can surface without a full page reload.
 - When all tools are disabled, `lib/rpc-manager.ts` clears the agent system prompt.
 
+## Web Terminal SSH boundary
+
+Web Terminal sessions are ephemeral in-memory processes managed by `lib/terminal-manager.ts`. Local terminal creation remains the default for legacy `POST /api/terminal/sessions` bodies; SSH creation is selected only by `{ kind: "ssh", profileId }` and is additionally gated by both `terminal.enabled` and `terminal.ssh.enabled`.
+
+SSH profiles are non-secret `terminal.ssh.profiles` entries in `~/.pi/agent/pi-web.json`. They may contain labels, host/port/user, credential ids, jump-host topology, proxy endpoints, known-hosts policy, and risk acknowledgements. They must not contain private key PEM, SSH passwords, passphrases, or proxy passwords; config validation rejects those field names recursively.
+
+SSH credential secrets live outside `pi-web.json` in the Web Terminal vault under `~/.pi/agent/terminal-secrets/` with best-effort `0700` directory and `0600` file permissions. Credential APIs return only `TerminalCredentialSummary` flags such as `hasPassword` or `hasPrivateKey`; secret inputs are write-only and are never sent back to the browser.
+
+SSH sessions use the system OpenSSH client instead of an in-app SSH protocol implementation. `lib/terminal-ssh-runner.ts` creates a session-scoped temp directory, writes a temporary `ssh_config`, temporary imported-key files, askpass context/helper files, and SOCKS5/HTTP proxy context files, then starts `ssh -F <temp-config> <target-alias>` through the same PTY/SSE channel as local terminals. Temp paths may appear in OpenSSH stderr, but secret values must not be included in command-line args, redacted plans, API responses, UI titles/tooltips, or logs. Cleanup runs on close, process exit, and startup sweep for stale `ypi-terminal-ssh-*` temp dirs.
+
+Known-host trust is stored in a dedicated `~/.pi/agent/terminal/known_hosts` file, not in profiles or the vault. Launch configs use stable `HostKeyAlias` values based on real `host:port` so session aliases do not pollute trust records. `ssh-keyscan` is advisory only; users must verify fingerprints through a trusted channel before trusting them. The default host-key policy is `ask`; `accept-new` is convenient but carries first-connection MITM risk.
+
+Custom ProxyCommand is treated as local command execution by the user running ypi. It is disabled by default and requires both the global `terminal.ssh.allowCustomProxyCommand` flag and a profile-level acknowledgement. Validation rejects control characters and `{{secret:*}}` placeholders; proxy credentials for built-in SOCKS5/HTTP helpers are passed through temp context files rather than command-line arguments.
+
 ## Session File Format
 
 Default location:

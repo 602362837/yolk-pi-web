@@ -6,6 +6,12 @@ import * as pty from "@lydell/node-pty";
 import { getAllowedRoots, isPathAllowed } from "./allowed-roots";
 import { existingCanonicalCwd } from "./cwd";
 import { readPiWebConfig, type PiWebTerminalConfig, type PiWebTerminalShell } from "./pi-web-config";
+import {
+  createTerminalSshLaunchPlan,
+  sweepTerminalSshTempDirs,
+  TerminalSshRunnerError,
+  type TerminalSshLaunchPlan,
+} from "./terminal-ssh-runner";
 
 const TERMINAL_IDLE_KILL_MS = 5_000;
 const TERMINAL_BUFFER_LIMIT = 500;
@@ -17,11 +23,19 @@ export class TerminalError extends Error {
   }
 }
 
+export type CreateTerminalSessionInput =
+  | { kind?: "local"; cwd?: unknown; cols?: unknown; rows?: unknown }
+  | { kind: "ssh"; cwd?: unknown; profileId?: unknown; cols?: unknown; rows?: unknown };
+
 export interface TerminalSessionInfo {
   id: string;
+  kind: "local" | "ssh";
   cwd: string;
   shell: string;
   backend: "pty" | "script" | "pipe";
+  profileId?: string;
+  profileLabel?: string;
+  targetLabel?: string;
 }
 
 interface TerminalProcess {
@@ -40,6 +54,7 @@ interface ResolvedShell {
 
 interface TerminalSession {
   id: string;
+  kind: "local" | "ssh";
   cwd: string;
   shell: string;
   process: TerminalProcess;
@@ -48,10 +63,20 @@ interface TerminalSession {
   buffer: string[];
   cleanupTimer: NodeJS.Timeout | null;
   closed: boolean;
+  cleanupCallbacks: Array<() => void | Promise<void>>;
+  profileId?: string;
+  profileLabel?: string;
+  targetLabel?: string;
 }
 
 declare global {
   var __piTerminalSessions: Map<string, TerminalSession> | undefined;
+  var __piTerminalSshTempSweepStarted: boolean | undefined;
+}
+
+if (!globalThis.__piTerminalSshTempSweepStarted) {
+  globalThis.__piTerminalSshTempSweepStarted = true;
+  sweepTerminalSshTempDirs().catch(() => {});
 }
 
 function getTerminalSessions(): Map<string, TerminalSession> {
@@ -155,6 +180,12 @@ function scheduleIdleKill(session: TerminalSession): void {
   }, TERMINAL_IDLE_KILL_MS);
 }
 
+function runCleanupCallbacks(session: TerminalSession): void {
+  for (const cleanup of session.cleanupCallbacks.splice(0)) {
+    Promise.resolve(cleanup()).catch(() => {});
+  }
+}
+
 function wrapPtyProcess(term: pty.IPty): TerminalProcess {
   return {
     write: (data) => term.write(data),
@@ -225,7 +256,13 @@ function spawnTerminalProcess(shell: ResolvedShell, cwd: string, env: Record<str
   }
 }
 
-export async function createTerminalSession(input: { cwd?: unknown; cols?: unknown; rows?: unknown }): Promise<TerminalSessionInfo> {
+function targetLabelFor(profileLabel: string, launchPlan: TerminalSshLaunchPlan): string {
+  const target = launchPlan.redacted.target;
+  const userPrefix = target.username ? `${target.username}@` : "";
+  return `${profileLabel} (${userPrefix}${target.host}:${target.port})`;
+}
+
+export async function createTerminalSession(input: CreateTerminalSessionInput): Promise<TerminalSessionInfo> {
   const config = readPiWebConfig().terminal;
   if (!config.enabled) throw new TerminalError("Web terminal is disabled", 403);
   if (typeof input.cwd !== "string" || !input.cwd.trim()) throw new TerminalError("cwd is required");
@@ -235,21 +272,62 @@ export async function createTerminalSession(input: { cwd?: unknown; cols?: unkno
   const roots = await getAllowedRoots();
   if (!isPathAllowed(cwd, roots)) throw new TerminalError("cwd is outside allowed workspaces", 403);
 
-  const shell = resolveShell(config);
-  const env = { ...process.env, ...validateEnv(config.env) } as Record<string, string>;
+  const rawKind = "kind" in input ? input.kind : undefined;
+  if (rawKind !== undefined && rawKind !== "local" && rawKind !== "ssh") throw new TerminalError("kind must be local or ssh");
+  const kind = rawKind === "ssh" ? "ssh" : "local";
   const cols = typeof input.cols === "number" && Number.isInteger(input.cols) && input.cols > 0 ? input.cols : 80;
   const rows = typeof input.rows === "number" && Number.isInteger(input.rows) && input.rows > 0 ? input.rows : 24;
   const id = randomUUID();
+
+  let shell: ResolvedShell;
+  let env: Record<string, string>;
+  let cleanupCallbacks: TerminalSession["cleanupCallbacks"] = [];
+  let profileId: string | undefined;
+  let profileLabel: string | undefined;
+  let targetLabel: string | undefined;
+
+  if (kind === "ssh") {
+    if (!config.ssh.enabled) throw new TerminalError("Web terminal SSH is disabled", 403);
+    const profileIdValue = "profileId" in input ? input.profileId : undefined;
+    if (typeof profileIdValue !== "string" || !profileIdValue.trim()) throw new TerminalError("profileId is required for SSH terminal sessions");
+    const profile = config.ssh.profiles.find((candidate) => candidate.id === profileIdValue.trim());
+    if (!profile) throw new TerminalError("SSH profile not found", 404);
+    let launchPlan: TerminalSshLaunchPlan;
+    try {
+      launchPlan = await createTerminalSshLaunchPlan({
+        sessionId: id,
+        profile,
+        sshConfig: config.ssh,
+        baseEnv: process.env,
+        terminalEnv: validateEnv(config.env),
+      });
+    } catch (error) {
+      if (error instanceof TerminalSshRunnerError) throw new TerminalError(error.message, error.status);
+      throw new TerminalError(`Failed to prepare SSH session: ${error instanceof Error ? error.message : String(error)}`, 500);
+    }
+    cleanupCallbacks = [launchPlan.cleanup];
+    profileId = profile.id;
+    profileLabel = profile.label;
+    targetLabel = targetLabelFor(profile.label, launchPlan);
+    shell = { command: launchPlan.command, args: launchPlan.args, label: `ssh: ${profile.label}` };
+    env = launchPlan.env as Record<string, string>;
+  } else {
+    shell = resolveShell(config);
+    env = { ...process.env, ...validateEnv(config.env) } as Record<string, string>;
+  }
 
   let terminalProcess: { process: TerminalProcess; backend: "pty" | "script" | "pipe" };
   try {
     terminalProcess = spawnTerminalProcess(shell, cwd, env, cols, rows);
   } catch (error) {
-    throw new TerminalError(`Failed to start shell: ${error instanceof Error ? error.message : String(error)}`, 500);
+    for (const cleanup of cleanupCallbacks) await Promise.resolve(cleanup()).catch(() => {});
+    const label = kind === "ssh" ? "SSH session" : "shell";
+    throw new TerminalError(`Failed to start ${label}: ${error instanceof Error ? error.message : String(error)}`, 500);
   }
 
   const session: TerminalSession = {
     id,
+    kind,
     cwd,
     shell: shell.label,
     process: terminalProcess.process,
@@ -258,6 +336,10 @@ export async function createTerminalSession(input: { cwd?: unknown; cols?: unkno
     buffer: [],
     cleanupTimer: null,
     closed: false,
+    cleanupCallbacks,
+    profileId,
+    profileLabel,
+    targetLabel,
   };
   getTerminalSessions().set(id, session);
   scheduleIdleKill(session);
@@ -275,9 +357,19 @@ export async function createTerminalSession(input: { cwd?: unknown; cols?: unkno
     for (const subscriber of session.subscribers) subscriber(message);
     session.closed = true;
     getTerminalSessions().delete(id);
+    runCleanupCallbacks(session);
   });
 
-  return { id, cwd, shell: session.shell, backend: session.backend };
+  return {
+    id,
+    kind: session.kind,
+    cwd,
+    shell: session.shell,
+    backend: session.backend,
+    profileId: session.profileId,
+    profileLabel: session.profileLabel,
+    targetLabel: session.targetLabel,
+  };
 }
 
 export function subscribeTerminalOutput(id: string, listener: (chunk: string) => void): () => void {
@@ -317,4 +409,5 @@ export function closeTerminalSession(id: string): void {
   } catch {
     // Process may already be gone.
   }
+  runCleanupCallbacks(session);
 }
