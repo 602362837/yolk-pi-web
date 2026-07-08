@@ -464,6 +464,15 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [customPathValidating, setCustomPathValidating] = useState(false);
   const [directoryPickerBusy, setDirectoryPickerBusy] = useState(false);
+  // Git add-project form state (FE-002). API wiring is handled in FE-003/API-001/API-002.
+  const [gitAddOpen, setGitAddOpen] = useState(false);
+  const [gitParentPathValue, setGitParentPathValue] = useState("");
+  const [gitRemoteRepositoryValue, setGitRemoteRepositoryValue] = useState("");
+  const [gitAddError, setGitAddError] = useState<string | null>(null);
+  const [gitParentPickerBusy, setGitParentPickerBusy] = useState(false);
+  const [gitCloneBusy, setGitCloneBusy] = useState(false);
+  const gitParentPathInputRef = useRef<HTMLInputElement>(null);
+  const gitRemoteRepositoryInputRef = useRef<HTMLInputElement>(null);
   const customPathInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
@@ -834,6 +843,21 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }, [projects, selectedCwd, selectedProjectId, selectedSpaceId]);
 
+  // Upsert a project into the local list and select its main space. Shared by
+  // the normal /api/projects registration flow and the Git clone flow so both
+  // select the backend-returned main space (including created=false re-registers).
+  const upsertProjectAndSelectMainSpace = useCallback((project: PiWebProjectRecord) => {
+    setProjects((prev) => {
+      const exists = prev.some((item) => item.id === project.id);
+      const updated = prev.map((item) => item.id === project.id ? project : item);
+      return exists ? updated : [project, ...updated];
+    });
+    const mainSpace = project.spaces.main;
+    setSelectedProjectId(project.id);
+    setSelectedSpaceId(mainSpace.id);
+    setSelectedCwd(mainSpace.path);
+  }, []);
+
   const registerAndSelectProjectPath = useCallback(async (path: string) => {
     const res = await fetch("/api/projects", {
       method: "POST",
@@ -844,22 +868,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     if (!res.ok || data.error || !data.project) {
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
-
-    setProjects((prev) => {
-      const exists = prev.some((project) => project.id === data.project!.id);
-      const updated = prev.map((project) => project.id === data.project!.id ? data.project! : project);
-      return exists ? updated : [data.project!, ...updated];
-    });
-
-    const mainSpace = data.project.spaces.main;
-    setSelectedProjectId(data.project.id);
-    setSelectedSpaceId(mainSpace.id);
-    setSelectedCwd(mainSpace.path);
+    upsertProjectAndSelectMainSpace(data.project);
     setCustomPathOpen(false);
     setCustomPathValue("");
     setCustomPathError(null);
     setDropdownOpen(false);
-  }, []);
+  }, [upsertProjectAndSelectMainSpace]);
 
   const commitCustomPath = useCallback(async () => {
     const path = customPathValue.trim();
@@ -908,6 +922,100 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }, [directoryPickerBusy, registerAndSelectProjectPath]);
 
+  // Clear all Git add-form temporary state (inputs, errors, busy flags).
+  const resetGitAddForm = useCallback(() => {
+    setGitAddOpen(false);
+    setGitParentPathValue("");
+    setGitRemoteRepositoryValue("");
+    setGitAddError(null);
+    setGitParentPickerBusy(false);
+    setGitCloneBusy(false);
+  }, []);
+
+  // Git parent directory picker: calls the shared directory picker with
+  // purpose "git-parent" and ONLY backfills the Local parent path input. It must
+  // not register the parent as a project and must not switch the current
+  // project/space/cwd — only Clone and add triggers registration.
+  const handleGitParentDirectoryPicker = useCallback(async () => {
+    if (gitParentPickerBusy || gitCloneBusy) return;
+    setGitParentPickerBusy(true);
+    setGitAddError(null);
+    try {
+      const res = await fetch("/api/projects/select-directory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purpose: "git-parent" }),
+      });
+      const data = await res.json().catch(() => ({})) as { path?: string; canceled?: boolean; error?: string };
+      if (data.canceled) return;
+      if (!res.ok || data.error || !data.path) {
+        setGitAddError(data.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      setGitParentPathValue(data.path);
+    } catch (e) {
+      setGitAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGitParentPickerBusy(false);
+    }
+  }, [gitParentPickerBusy, gitCloneBusy]);
+
+  // Git clone submit: POST /api/projects/git-clone with the parent path and
+  // remote repository. On success the backend has already registered the cloned
+  // target path (not the parent), so we upsert the returned project and select
+  // its main space. On failure we surface the error and keep the form open so the
+  // user can fix inputs; the current project/space/cwd must NOT change. If the
+  // clone succeeded but registration failed, the error includes a clonedPath so
+  // the user can recover via Add project path…
+  const handleGitCloneSubmit = useCallback(async () => {
+    if (gitCloneBusy || gitParentPickerBusy) return;
+    const parentPath = gitParentPathValue.trim();
+    const remoteRepository = gitRemoteRepositoryValue.trim();
+    if (!parentPath || !remoteRepository) {
+      setGitAddError("请填写 Local parent path 与 Remote repository。");
+      return;
+    }
+    setGitCloneBusy(true);
+    setGitAddError(null);
+    try {
+      const res = await fetch("/api/projects/git-clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentPath, remoteRepository }),
+      });
+      const data = await res.json().catch(() => ({})) as {
+        project?: PiWebProjectRecord;
+        created?: boolean;
+        clone?: { targetPath?: string };
+        error?: string;
+        code?: string;
+        clonedPath?: string;
+      };
+      if (!res.ok || data.error || !data.project) {
+        const recoveredPath = data.clonedPath || data.clone?.targetPath;
+        const suffix = recoveredPath
+          ? `（已克隆到 ${recoveredPath}，可使用 Add project path… 手动注册）`
+          : "";
+        setGitAddError(`${data.error ?? `HTTP ${res.status}`}${suffix}`);
+        return;
+      }
+      upsertProjectAndSelectMainSpace(data.project);
+      setDropdownOpen(false);
+      resetGitAddForm();
+    } catch (e) {
+      setGitAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGitCloneBusy(false);
+    }
+  }, [
+    gitCloneBusy,
+    gitParentPickerBusy,
+    gitParentPathValue,
+    gitRemoteRepositoryValue,
+    upsertProjectAndSelectMainSpace,
+    resetGitAddForm,
+  ]);
+
   // Close dropdown/context menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -919,11 +1027,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         setCustomPathOpen(false);
         setCustomPathValue("");
         setCustomPathError(null);
+        resetGitAddForm();
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [resetGitAddForm]);
 
   const handleNewSession = useCallback(() => {
     if (!selectedCwd) return;
@@ -1406,9 +1515,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 overflow: "hidden",
               }}
             >
-              {activeProjects.length === 0 && !customPathOpen && (
+              {activeProjects.length === 0 && !customPathOpen && !gitAddOpen && (
                 <div style={{ padding: "10px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>
-                  尚未注册项目。请用下方 “Add project path…” 添加项目；历史 sessions 不会被扫描生成项目。
+                  尚未注册项目。请用下方 “Add project path…” 或 “Add project from Git…” 添加项目；历史 sessions 不会被扫描生成项目。
                 </div>
               )}
               {activeProjects.map((project) => (
@@ -1431,6 +1540,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                           setCustomPathOpen(false);
                           setCustomPathValue("");
                           setCustomPathError(null);
+                          resetGitAddForm();
                           setDropdownOpen(false);
                         }}
                         onContextMenu={(e) => {
@@ -1478,7 +1588,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               ))}
 
               {/* Default cwd shortcut */}
-              {!customPathOpen && (
+              {!customPathOpen && !gitAddOpen && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDefaultCwd(); }}
                   style={{
@@ -1504,7 +1614,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               )}
 
               {/* Directory picker shortcut */}
-              {!customPathOpen && (
+              {!customPathOpen && !gitAddOpen && (
                 <button
                   onClick={(e) => { e.stopPropagation(); void handleDirectoryPicker(); }}
                   disabled={directoryPickerBusy}
@@ -1527,21 +1637,23 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
                     <path d="M5 5.5h2.5" />
                   </svg>
-                  <span>{directoryPickerBusy ? "Waiting for folder selection…" : "Choose project folder…"}</span>
+                  <span>{directoryPickerBusy ? "Waiting for folder selection…" : "Add project folder…"}</span>
                 </button>
               )}
 
-              {!customPathOpen && customPathError && (
+              {!customPathOpen && !gitAddOpen && customPathError && (
                 <div style={{ padding: "0 10px 7px", color: "#dc2626", fontSize: 11, lineHeight: 1.35, overflowWrap: "anywhere" }}>
                   {customPathError}
                 </div>
               )}
 
-              {/* Custom path entry */}
-              {!customPathOpen ? (
+              {/* Custom path entry (mutually exclusive with the Git add form) */}
+              {!customPathOpen && !gitAddOpen ? (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    // Mutex: ensure Git form is closed before opening the manual path form.
+                    resetGitAddForm();
                     setCustomPathOpen(true);
                     setCustomPathError(null);
                     setTimeout(() => customPathInputRef.current?.focus(), 0);
@@ -1644,6 +1756,221 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                       }}
                     >
                       取消
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Git add-project entry (mutually exclusive with the manual path form) */}
+              {!customPathOpen && !gitAddOpen && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Mutex: close the manual path form before opening the Git form.
+                    setCustomPathOpen(false);
+                    setCustomPathValue("");
+                    setCustomPathError(null);
+                    setGitAddOpen(true);
+                    setGitAddError(null);
+                    setTimeout(() => gitParentPathInputRef.current?.focus(), 0);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    width: "100%",
+                    padding: "8px 10px",
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontSize: 11,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <circle cx="12" cy="18" r="3" />
+                    <circle cx="6" cy="6" r="3" />
+                    <circle cx="18" cy="6" r="3" />
+                    <path d="M18 9V6H6v3" />
+                    <path d="M12 6v9" />
+                  </svg>
+                  <span>Add project from Git…</span>
+                </button>
+              )}
+
+              {/* Git add-project form (expanded panel) */}
+              {gitAddOpen && (
+                <div style={{ padding: "8px 8px", borderTop: activeProjects.length > 0 ? "1px solid var(--border)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, color: "var(--text)", fontSize: 11, fontWeight: 700 }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <circle cx="12" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <circle cx="18" cy="6" r="3" />
+                      <path d="M18 9V6H6v3" />
+                      <path d="M12 6v9" />
+                    </svg>
+                    <span>Add project from Git</span>
+                  </div>
+
+                  {/* Local parent path */}
+                  <label htmlFor="git-parent-path-input" style={{ display: "block", color: "var(--text-muted)", fontSize: 10, fontWeight: 600, marginBottom: 3 }}>
+                    Local parent path
+                  </label>
+                  <div style={{ display: "flex", gap: 5, marginBottom: 4 }}>
+                    <input
+                      id="git-parent-path-input"
+                      ref={gitParentPathInputRef}
+                      type="text"
+                      value={gitParentPathValue}
+                      disabled={gitCloneBusy || gitParentPickerBusy}
+                      onChange={(e) => {
+                        setGitParentPathValue(e.target.value);
+                        setGitAddError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleGitCloneSubmit();
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          resetGitAddForm();
+                        }
+                      }}
+                      placeholder="e.g. /Users/demo/GitProjects"
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                        padding: "5px 8px",
+                        border: "1px solid var(--border)",
+                        borderRadius: 5,
+                        outline: "none",
+                        background: "var(--bg)",
+                        color: "var(--text)",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void handleGitParentDirectoryPicker(); }}
+                      disabled={gitCloneBusy || gitParentPickerBusy}
+                      title="Select parent directory"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        width: 28,
+                        height: 28,
+                        padding: 0,
+                        background: "var(--bg-hover)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 5,
+                        color: "var(--text-muted)",
+                        cursor: gitCloneBusy || gitParentPickerBusy ? "wait" : "pointer",
+                        opacity: gitCloneBusy || gitParentPickerBusy ? 0.65 : 1,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
+                        <path d="M5 5.5h2.5" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Remote repository */}
+                  <label htmlFor="git-remote-input" style={{ display: "block", color: "var(--text-muted)", fontSize: 10, fontWeight: 600, marginBottom: 3, marginTop: 6 }}>
+                    Remote repository
+                  </label>
+                  <input
+                    id="git-remote-input"
+                    ref={gitRemoteRepositoryInputRef}
+                    type="text"
+                    value={gitRemoteRepositoryValue}
+                    disabled={gitCloneBusy || gitParentPickerBusy}
+                    onChange={(e) => {
+                      setGitRemoteRepositoryValue(e.target.value);
+                      setGitAddError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleGitCloneSubmit();
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        resetGitAddForm();
+                      }
+                    }}
+                    placeholder="https://github.com/... or git@..."
+                    style={{
+                      width: "100%",
+                      fontSize: 11,
+                      fontFamily: "var(--font-mono)",
+                      padding: "5px 8px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 5,
+                      outline: "none",
+                      background: "var(--bg)",
+                      color: "var(--text)",
+                      boxSizing: "border-box",
+                    }}
+                  />
+
+                  <div style={{ marginTop: 4, color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                    Backend will run <code style={{ fontFamily: "var(--font-mono)" }}>git clone</code> under the parent path and register the cloned workspace.
+                  </div>
+
+                  {gitAddError && (
+                    <div style={{
+                      marginTop: 5,
+                      color: "#dc2626",
+                      fontSize: 11,
+                      lineHeight: 1.35,
+                      overflowWrap: "anywhere",
+                    }}>
+                      {gitAddError}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
+                    <button
+                      onClick={() => void handleGitCloneSubmit()}
+                      disabled={gitCloneBusy || gitParentPickerBusy || !gitParentPathValue.trim() || !gitRemoteRepositoryValue.trim()}
+                      style={{
+                        flex: 1,
+                        padding: "5px 0",
+                        background: "var(--accent)",
+                        border: "none",
+                        borderRadius: 5,
+                        color: "#fff",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: gitCloneBusy || gitParentPickerBusy || !gitParentPathValue.trim() || !gitRemoteRepositoryValue.trim() ? "not-allowed" : "pointer",
+                        opacity: gitCloneBusy || gitParentPickerBusy || !gitParentPathValue.trim() || !gitRemoteRepositoryValue.trim() ? 0.65 : 1,
+                      }}
+                    >
+                      {gitCloneBusy ? "Cloning…" : "Clone and add"}
+                    </button>
+                    <button
+                      onClick={() => resetGitAddForm()}
+                      disabled={gitCloneBusy}
+                      style={{
+                        flex: 1,
+                        padding: "5px 0",
+                        background: "var(--bg-hover)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 5,
+                        color: "var(--text-muted)",
+                        fontSize: 11,
+                        cursor: gitCloneBusy ? "not-allowed" : "pointer",
+                        opacity: gitCloneBusy ? 0.65 : 1,
+                      }}
+                    >
+                      Cancel
                     </button>
                   </div>
                 </div>

@@ -37,8 +37,9 @@
       "label": "UI + 技术设计",
       "owner": "architect",
       "progress": 35,
-      "instruction": "架构师产出技术计划，并必须派发 UI 设计员基于现有项目产出 HTML 原型；ui.md 可承载原型或链接，但不能用纯 Markdown 替代。",
+      "instruction": "架构师产出技术计划和 plan-review.md 计划审批书，并必须派发 UI 设计员基于现有项目产出 HTML 原型；计划审批书应链接 ui.md 与 HTML 原型；ui.md 可承载原型或链接，但不能用纯 Markdown 替代。",
       "requiredArtifacts": [
+        "plan-review.md",
         "prd.md",
         "ui.md",
         "design.md",
@@ -53,8 +54,9 @@
       "label": "等待确认",
       "owner": "main",
       "progress": 45,
-      "instruction": "等待用户确认方案和 HTML 原型。未确认前禁止进入实现阶段。",
+      "instruction": "等待用户确认 plan-review.md 计划审批书、方案和 HTML 原型。计划审批书应链接 ui.md 与 HTML 原型；未确认前禁止进入实现阶段。",
       "requiredArtifacts": [
+        "plan-review.md",
         "prd.md",
         "ui.md",
         "design.md",

@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-08T03:22:49.154Z",
+  "updatedAt": "2026-07-08T06:54:40.485Z",
   "entries": [
+    {
+      "id": "20260708-145440-调整左侧项目选择文案并增加-git-添加项目入口",
+      "title": "调整左侧项目选择文案并增加 Git 添加项目入口",
+      "taskId": "20260708-140422-调整左侧项目选择文案并增加-git-添加项目入口",
+      "taskKey": "archived:2026-07:20260708-140422-调整左侧项目选择文案并增加-git-添加项目入口",
+      "workflowId": "feature-dev",
+      "summary": "完成左侧项目选择改造：将 `Choose project folder…` 改为 `Add project folder…`，新增 `Add project from Git…`。Git 入口采用两个输入：`Local parent path`（父目录，支持手填+文件管理器选择）和 `Remote repository`，支持 `https://...` 与 `git@host:user/repo.git`。前端需让 Git 表单与手动 path 表单互斥，目录选择只回填父目录、不注册项目；点击提交后调用独立 clone API，clone 成功后注册克隆得到的项目目录并选中返回的 main space。后端应扩展 `/api/projects/select-directory` 的 `purpose=project|git-parent`，只映射固定提示文案，避免任意 prompt 注入；新增 `POST /api/projects/git-clone`，用非 shell 的 `execFile` 执行 git clone，校验父目录、目标目录已存在、git 可用性，并在注册失败时返回 `clonedPath` 供恢复。checker 仅发现一个非阻塞 UX 备注：Git 表单打开时直接切换项目空间，应顺手清理 Git 临时状态。",
+      "tags": [
+        "feature-dev",
+        "sidebar",
+        "projects",
+        "git-clone",
+        "session-sidebar",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260708-140422-调整左侧项目选择文案并增加-git-添加项目入口",
+      "knowledgePath": ".ypi/knowledge/20260708-145440-调整左侧项目选择文案并增加-git-添加项目入口.md",
+      "createdAt": "2026-07-08T06:54:40.485Z",
+      "archivedAt": "2026-07-08T06:54:40.485Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260708-112249-优化-ypi-studio-计划审批书预览与产物去重",
       "title": "优化 YPI Studio 计划审批书预览与产物去重",

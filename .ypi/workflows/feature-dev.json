@@ -39,8 +39,9 @@
       "label": "设计",
       "owner": "architect",
       "progress": 35,
-      "instruction": "产出 PRD、Design、Implement 和 Checks；若涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。",
+      "instruction": "产出 PRD、Design、Implement、Checks 和 plan-review.md 计划审批书；计划审批书是等待用户确认时的主审阅入口，应使用 Markdown 相对链接引用关键产物。若涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。",
       "requiredArtifacts": [
+        "plan-review.md",
         "prd.md",
         "design.md",
         "implement.md",
@@ -56,8 +57,9 @@
       "label": "等待确认",
       "owner": "main",
       "progress": 45,
-      "instruction": "等待用户确认方案。涉及 UI 原型门禁时必须同时展示 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。",
+      "instruction": "等待用户确认 plan-review.md 计划审批书。计划审批书必须链接 PRD/Design/Implement/Checks 等关键产物；涉及 UI 原型门禁时必须同时链接 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。",
       "requiredArtifacts": [
+        "plan-review.md",
         "prd.md",
         "design.md",
         "implement.md",

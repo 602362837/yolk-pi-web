@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>左侧项目选择与 Git 添加入口调整 - UI 原型 (v2)</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --bg-panel: #0d1527;
+      --bg-card: #13223f;
+      --bg-hover: #1b2f54;
+      --bg-selected: #1e3a6d;
+      --border: #263c65;
+      --border-focus: #3b82f6;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      max-width: 900px;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-hover);
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .selector-container {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .btn-scenario {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-scenario.active {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+      color: #fff;
+    }
+
+    .btn-scenario:hover:not(.active) {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    /* Outer Wrapper representing the sidebar area */
+    .app-layout {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      max-width: 900px;
+      align-items: flex-start;
+      margin-top: 10px;
+    }
+
+    /* Sidebar simulation */
+    .sidebar-sim {
+      width: 280px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 12px 10px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .workspace-info {
+      margin-bottom: 10px;
+    }
+
+    .workspace-title {
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .workspace-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sidebar-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .btn-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: not-allowed;
+      flex: 1;
+      opacity: 0.6;
+    }
+
+    /* Dropdown container */
+    .dropdown-container {
+      position: relative;
+      width: 100%;
+    }
+
+    .dropdown-trigger {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--text);
+      text-align: left;
+    }
+
+    .dropdown-trigger-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    .dropdown-arrow {
+      margin-left: 6px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    /* Dropdown Menu */
+    .dropdown-menu {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-top: 4px;
+      padding: 4px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      z-index: 10;
+    }
+
+    .menu-group-title {
+      padding: 4px 8px;
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      padding: 6px 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .menu-item:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .menu-item.active {
+      color: var(--accent-hover);
+      font-weight: 600;
+    }
+
+    .menu-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .menu-action-button {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      padding: 8px 10px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+      font-size: 11px;
+      transition: color 0.1s;
+    }
+
+    .menu-action-button:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+
+    .menu-action-button.disabled {
+      cursor: wait;
+      opacity: 0.65;
+    }
+
+    /* Form Container in Dropdown */
+    .dropdown-form {
+      padding: 8px;
+      background: rgba(13, 21, 39, 0.5);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin: 4px 0;
+    }
+
+    .form-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .form-field {
+      margin-bottom: 8px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+
+    .form-input-wrapper {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .form-input {
+      flex: 1;
+      min-width: 0;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      outline: none;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    .form-input:disabled {
+      background: var(--bg-panel);
+      color: var(--text-dim);
+      border-color: var(--border);
+      cursor: not-allowed;
+    }
+
+    .btn-icon-pick {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .btn-icon-pick:hover:not(:disabled) {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .btn-icon-pick:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
+    .form-note {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+
+    .form-error {
+      color: var(--error);
+      font-size: 10px;
+      margin-top: 4px;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .btn-form-submit {
+      flex: 1;
+      padding: 5px 0;
+      background: var(--accent);
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .btn-form-submit:hover:not(:disabled) {
+      background: #2563eb;
+    }
+
+    .btn-form-submit:disabled {
+      background: var(--bg-card);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      cursor: not-allowed;
+    }
+
+    .btn-form-cancel {
+      flex: 1;
+      padding: 5px 0;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-form-cancel:hover:not(:disabled) {
+      color: var(--text);
+    }
+
+    .btn-form-cancel:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    /* Explanation Panel */
+    .details-panel {
+      flex: 1;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .details-panel h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .details-panel ul {
+      margin-left: 18px;
+      margin-bottom: 12px;
+    }
+
+    .details-panel li {
+      margin-bottom: 6px;
+      line-height: 1.4;
+      color: var(--text-muted);
+    }
+
+    .details-panel strong {
+      color: var(--text);
+    }
+
+    .highlight-box {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 10px;
+    }
+
+    .highlight-box p {
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--accent-hover);
+    }
+
+    /* Dummy items below dropdown for visual context */
+    .session-list-dummy {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      opacity: 0.5;
+    }
+    .session-item-dummy {
+      height: 32px;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>左侧项目选择与 Git 添加入口调整 - 修订版交互原型</h1>
+    <p>
+      根据用户最新反馈修订的 UI 原型，模拟 <code>components/SessionSidebar.tsx</code> 项目下拉的变化：
+      <br />
+      1. 普通文件夹选择文案修改为 <strong>Add project folder…</strong>。
+      <br />
+      2. 新增 Git 添加入口，固定文案为 <strong>Add project from Git…</strong>。
+      <br />
+      3. 展开后直接展示两个输入框：<strong>Local parent path</strong> (支持手填及右侧文件夹按钮回填) 与 <strong>Remote repository</strong>。
+      <br />
+      4. 本地目录语义为 <strong>父目录</strong>（将在该目录下 clone 仓库并注册），提交按钮文案固定为 <strong>Clone and add</strong>。
+    </p>
+    <div class="selector-container">
+      <button class="btn-scenario active" onclick="switchScenario('normal')">1. 普通项目下拉</button>
+      <button class="btn-scenario" onclick="switchScenario('empty')">2. 无项目空态</button>
+      <button class="btn-scenario" onclick="switchScenario('git-form')">3. Git 表单展开态</button>
+      <button class="btn-scenario" onclick="switchScenario('git-busy')">4. 目录选择 Busy 态</button>
+      <button class="btn-scenario" onclick="switchScenario('git-error')">5. 目录选择 Error 态</button>
+      <button class="btn-scenario" onclick="switchScenario('clone-busy')">6. Clone 执行 Busy 态</button>
+      <button class="btn-scenario" onclick="switchScenario('clone-error')">7. Clone 失败 Error 态</button>
+    </div>
+  </header>
+
+  <main class="app-layout">
+    
+    <!-- Sidebar Simulation -->
+    <div class="sidebar-sim">
+      <div class="sidebar-header">
+        <div class="workspace-info">
+          <div class="workspace-title" id="side-ws-title">pi-agnet-web</div>
+          <div class="workspace-subtitle" id="side-ws-subtitle">~/Projects/gitProjects/pi-agnet-web</div>
+        </div>
+        <div class="sidebar-actions">
+          <div class="btn-action">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="6" y1="1" x2="6" y2="11" /><line x1="1" y1="6" x2="11" y2="6" />
+            </svg>
+            New
+          </div>
+          <div class="btn-action">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6" cy="18" r="3" /><circle cx="18" cy="6" r="3" />
+              <path d="M6 15V9a3 3 0 0 1 3-3h6" /><path d="M9 18h6a3 3 0 0 0 3-3V9" />
+            </svg>
+            WorkTree
+          </div>
+        </div>
+
+        <!-- CWD Picker Dropdown Trigger -->
+        <div class="dropdown-container">
+          <button class="dropdown-trigger" onclick="toggleDropdown()">
+            <span class="dropdown-trigger-text" id="trigger-text">pi-agnet-web</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+
+          <!-- Dropdown Menu Content -->
+          <div class="dropdown-menu" id="dropdown-menu" style="display: block;">
+            
+            <!-- List of projects -->
+            <div id="project-list-section">
+              <div class="menu-group-title">Projects</div>
+              <button class="menu-item active" id="project-item-pi">
+                <span style="color: var(--accent); margin-right: 4px;">✓</span>
+                <span>pi-agnet-web</span>
+              </button>
+              <button class="menu-item" id="project-item-navi">
+                <span style="margin-right: 4px; width: 8px; display: inline-block;"></span>
+                <span>navi-web</span>
+              </button>
+              <div class="menu-separator"></div>
+            </div>
+
+            <!-- Empty State simulation placeholder -->
+            <div id="empty-state-section" style="display: none; padding: 12px 10px; text-align: center; color: var(--text-dim);">
+              No active projects registered. Use actions below to add.
+            </div>
+
+            <!-- Shortcut buttons -->
+            <button class="menu-action-button" id="btn-default-dir">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink:0;">
+                <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
+              </svg>
+              <span>Use default directory</span>
+            </button>
+
+            <!-- Choose folder - NOW Add project folder -->
+            <button class="menu-action-button" id="btn-add-folder" onclick="triggerAddFolder()">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink:0;">
+                <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
+                <path d="M5 5.5h2.5" />
+              </svg>
+              <span id="add-folder-text">Add project folder…</span>
+            </button>
+
+            <!-- Add Project Path (Manual) -->
+            <button class="menu-action-button" id="btn-add-path-trigger" onclick="showPathForm()">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" style="flex-shrink: 0;">
+                <line x1="5" y1="1" x2="5" y2="9" />
+                <line x1="1" y1="5" x2="9" y2="5" />
+              </svg>
+              <span>Add project path…</span>
+            </button>
+
+            <!-- Git Add Entry - NEW -->
+            <button class="menu-action-button" id="btn-git-add-trigger" onclick="showGitForm()">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style="width: 10px; height: 10px; flex-shrink: 0;">
+                <circle cx="12" cy="18" r="3" />
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="18" cy="6" r="3" />
+                <path d="M18 9V6H6v3" />
+                <path d="M12 6v9" />
+              </svg>
+              <span>Add project from Git…</span>
+            </button>
+
+            <!-- Git Add Form (Expanded Panel) - NEW -->
+            <div class="dropdown-form" id="git-add-form" style="display: none;">
+              <div class="form-title">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style="vertical-align: middle;">
+                  <circle cx="12" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" />
+                  <path d="M18 9V6H6v3" /><path d="M12 6v9" />
+                </svg>
+                <span>Add project from Git</span>
+              </div>
+              
+              <!-- Input 1: Local parent path -->
+              <div class="form-field">
+                <label class="form-label" for="git-parent-path-input">Local parent path</label>
+                <div class="form-input-wrapper">
+                  <input 
+                    type="text" 
+                    id="git-parent-path-input"
+                    class="form-input" 
+                    placeholder="e.g. /Users/demo/GitProjects"
+                    value="/Users/demo/GitProjects"
+                    oninput="validateFormInputs()"
+                  />
+                  <button class="btn-icon-pick" id="btn-git-picker" onclick="simulatePicker()" title="Select parent directory">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
+                      <path d="M5 5.5h2.5" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="form-error" id="git-parent-error" style="display: none;"></div>
+              </div>
+
+              <!-- Input 2: Remote repository -->
+              <div class="form-field">
+                <label class="form-label" for="git-remote-input">Remote repository</label>
+                <input 
+                  type="text" 
+                  id="git-remote-input"
+                  class="form-input" 
+                  style="width: 100%;"
+                  placeholder="https://github.com/... or git@..."
+                  value="https://github.com/alan-zhao/yolk-pi-web.git"
+                  oninput="validateFormInputs()"
+                />
+                <div class="form-error" id="git-remote-error" style="display: none;"></div>
+              </div>
+              
+              <!-- General Error Message (e.g. clone timeout/failed) -->
+              <div class="form-error" id="git-clone-error-msg" style="display: none;">
+                Error: git clone failed. Verification of repository access failed or connection timed out.
+              </div>
+
+              <div class="form-note">
+                Backend will run <code>git clone</code> under the parent path and register the cloned workspace.
+              </div>
+
+              <div class="form-actions">
+                <button class="btn-form-submit" id="btn-git-submit" onclick="simulateCloneSubmit()">
+                  Clone and add
+                </button>
+                <button class="btn-form-cancel" id="btn-git-cancel" onclick="closeGitForm()">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            <!-- Add Project Path Form (For mutual exclusivity showcase) -->
+            <div class="dropdown-form" id="path-add-form" style="display: none;">
+              <div class="form-title"><span>Add manually</span></div>
+              <div class="form-input-wrapper">
+                <input type="text" class="form-input" placeholder="/path/to/project" />
+              </div>
+              <div class="form-actions">
+                <button class="btn-form-submit">Add</button>
+                <button class="btn-form-cancel" onclick="closePathForm()">Cancel</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      
+      <!-- Dummy session items below to preserve sidebar layout visual weight -->
+      <div class="session-list-dummy">
+        <div class="session-item-dummy">Session 1 (Active)</div>
+        <div class="session-item-dummy">Session 2 (2 hours ago)</div>
+      </div>
+    </div>
+
+    <!-- Explanation Details Panel -->
+    <div class="details-panel">
+      <h2>交互与状态设计细节 (v2)</h2>
+      <ul>
+        <li><strong>普通下拉 (1) 和 空态 (2)：</strong><code>Choose project folder…</code> 变更为 <code>Add project folder…</code>，统一使用“增加”动作语义。</li>
+        <li><strong>直接提供双输入框 (3)：</strong>
+          <ul>
+            <li><strong>Local parent path</strong>: 用户在本地的开发父目录。支持直接手动编辑回填或点击右侧文件夹图标通过系统管理器选择。</li>
+            <li><strong>Remote repository</strong>: 远程仓库地址。</li>
+          </ul>
+        </li>
+        <li><strong>父目录选择 Busy 态 (4) / Error 态 (5)：</strong>
+          <ul>
+            <li>当拉起系统目录管理器时，仅仅父目录选择按钮进入等待（展示 ⌛），<code>Add project folder…</code> 的文案也随之变更，且表单不关闭。</li>
+            <li>如果父目录无效（例如权限拒绝），在 parent path 输入框下方展示独立小错误提示。</li>
+          </ul>
+        </li>
+        <li><strong>Clone 执行 Busy 态 (6)：</strong>
+          <ul>
+            <li>点击 <code>Clone and add</code> 后，两个输入框、选择按钮、Submit 及 Cancel 按钮均进入 disabled 态。</li>
+            <li>提交按钮文字变为 <code>Cloning…</code> 并展示 Spinner/加载标志，防止重复点击。</li>
+          </ul>
+        </li>
+        <li><strong>Clone 失败 Error 态 (7)：</strong>
+          <ul>
+            <li>在表单下方（Cancel / Submit 按钮之上）显示醒目的红色整体错误提示。</li>
+            <li>失败后不切换当前激活的项目/空间，允许用户修改输入并重试。</li>
+          </ul>
+        </li>
+        <li><strong>取消/关闭状态 (Cancel)：</strong>点击 Cancel 或外部空白区时，清空 Git 表单的所有临时文本及错误状态。</li>
+      </ul>
+      <div class="highlight-box">
+        <p><strong>UI 验收点说明：</strong></p>
+        <p style="margin-top: 4px; font-weight: 500;">
+          1. 提交按钮文案必须是 <code>Clone and add</code>，而非简单的 <code>Add</code> 或 <code>Clone</code>。<br />
+          2. 输入框、文件管理器选择按钮在 busy 期间必须禁用，确保并发安全。<br />
+          3. 错误消息展示位置：字段特定错误位于对应输入下方，整体流程错误（如 clone 失败）置于提交动作上方。
+        </p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const dropdown = document.getElementById('dropdown-menu');
+    const projectList = document.getElementById('project-list-section');
+    const emptyState = document.getElementById('empty-state-section');
+    const gitForm = document.getElementById('git-add-form');
+    const pathForm = document.getElementById('path-add-form');
+    const gitParentInput = document.getElementById('git-parent-path-input');
+    const gitRemoteInput = document.getElementById('git-remote-input');
+    const gitPicker = document.getElementById('btn-git-picker');
+    const gitParentError = document.getElementById('git-parent-error');
+    const gitRemoteError = document.getElementById('git-remote-error');
+    const gitCloneErrorMsg = document.getElementById('git-clone-error-msg');
+    
+    const btnGitSubmit = document.getElementById('btn-git-submit');
+    const btnGitCancel = document.getElementById('btn-git-cancel');
+
+    const gitTrigger = document.getElementById('btn-git-add-trigger');
+    const pathTrigger = document.getElementById('btn-add-path-trigger');
+    const folderText = document.getElementById('add-folder-text');
+    const triggerText = document.getElementById('trigger-text');
+    const sideWsTitle = document.getElementById('side-ws-title');
+    const sideWsSubtitle = document.getElementById('side-ws-subtitle');
+
+    function toggleDropdown() {
+      if (dropdown.style.display === 'none') {
+        dropdown.style.display = 'block';
+      } else {
+        dropdown.style.display = 'none';
+      }
+    }
+
+    function validateFormInputs() {
+      const parent = gitParentInput.value.trim();
+      const remote = gitRemoteInput.value.trim();
+      
+      // Submit is enabled if both fields are non-empty
+      btnGitSubmit.disabled = (!parent || !remote);
+    }
+
+    function switchScenario(scenario) {
+      // Reset all buttons
+      document.querySelectorAll('.btn-scenario').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Reset fields and states
+      gitForm.style.display = 'none';
+      pathForm.style.display = 'none';
+      gitTrigger.style.display = 'flex';
+      pathTrigger.style.display = 'flex';
+      
+      gitParentError.style.display = 'none';
+      gitRemoteError.style.display = 'none';
+      gitCloneErrorMsg.style.display = 'none';
+      
+      gitParentInput.disabled = false;
+      gitRemoteInput.disabled = false;
+      gitPicker.disabled = false;
+      btnGitSubmit.disabled = false;
+      btnGitCancel.disabled = false;
+
+      btnGitSubmit.innerText = "Clone and add";
+      gitPicker.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" /><path d="M5 5.5h2.5" /></svg>`;
+      folderText.innerText = "Add project folder…";
+
+      // Configure scenarios
+      if (scenario === 'normal') {
+        projectList.style.display = 'block';
+        emptyState.style.display = 'none';
+        triggerText.innerText = 'pi-agnet-web';
+        sideWsTitle.innerText = 'pi-agnet-web';
+        sideWsSubtitle.innerText = '~/Projects/gitProjects/pi-agnet-web';
+      } else if (scenario === 'empty') {
+        projectList.style.display = 'none';
+        emptyState.style.display = 'block';
+        triggerText.innerText = 'Select project…';
+        sideWsTitle.innerText = 'Select project';
+        sideWsSubtitle.innerText = 'Please select or add a project directory';
+      } else if (scenario === 'git-form') {
+        projectList.style.display = 'block';
+        emptyState.style.display = 'none';
+        showGitForm();
+        validateFormInputs();
+      } else if (scenario === 'git-busy') {
+        projectList.style.display = 'block';
+        emptyState.style.display = 'none';
+        showGitForm();
+        // Set directory picker busy state
+        gitPicker.disabled = true;
+        folderText.innerText = "Waiting for folder selection…";
+        gitPicker.innerHTML = `<span style="font-size:8px;">⌛</span>`;
+        btnGitSubmit.disabled = true;
+      } else if (scenario === 'git-error') {
+        projectList.style.display = 'block';
+        emptyState.style.display = 'none';
+        showGitForm();
+        gitParentError.innerText = "Invalid parent path: Permission denied";
+        gitParentError.style.display = 'block';
+      } else if (scenario === 'clone-busy') {
+        projectList.style.display = 'block';
+        emptyState.style.display = 'none';
+        showGitForm();
+        // Set whole clone busy state
+        gitParentInput.disabled = true;
+        gitRemoteInput.disabled = true;
+        gitPicker.disabled = true;
+        btnGitSubmit.disabled = true;
+        btnGitCancel.disabled = true;
+        btnGitSubmit.innerHTML = `<span style="font-size: 9px; animation: spin 1s linear infinite;">⏳</span> Cloning…`;
+      } else if (scenario === 'clone-error') {
+        projectList.style.display = 'block';
+        emptyState.style.display = 'none';
+        showGitForm();
+        gitCloneErrorMsg.style.display = 'block';
+      }
+    }
+
+    function showGitForm() {
+      gitForm.style.display = 'block';
+      gitTrigger.style.display = 'none';
+      pathForm.style.display = 'none';
+      pathTrigger.style.display = 'flex';
+      validateFormInputs();
+    }
+
+    function closeGitForm() {
+      gitForm.style.display = 'none';
+      gitTrigger.style.display = 'flex';
+      gitParentError.style.display = 'none';
+      gitRemoteError.style.display = 'none';
+      gitCloneErrorMsg.style.display = 'none';
+    }
+
+    function showPathForm() {
+      pathForm.style.display = 'block';
+      pathTrigger.style.display = 'none';
+      gitForm.style.display = 'none';
+      gitTrigger.style.display = 'flex';
+    }
+
+    function jsonp(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function closePathForm() {
+      pathForm.style.display = 'none';
+      pathTrigger.style.display = 'flex';
+    }
+
+    function triggerAddFolder() {
+      alert("点击了文件夹添加：即将拉起系统目录选择器，选择后将注册为常规项目空间并选中其 main space。");
+    }
+
+    function simulatePicker() {
+      if (gitPicker.disabled) return;
+      const result = prompt("模拟系统目录选择器选择 Git 父目录：", "/Users/demo/GitProjects");
+      if (result) {
+        gitParentInput.value = result;
+        validateFormInputs();
+      }
+    }
+
+    function simulateCloneSubmit() {
+      if (btnGitSubmit.disabled) return;
+      
+      // Simulate cloning progress
+      switchScenario('clone-busy');
+      
+      setTimeout(() => {
+        // Mock success
+        const confirmSuccess = confirm("模拟 Clone 成功！\n系统检测到仓库名: yolk-pi-web\n克隆路径: /Users/demo/GitProjects/yolk-pi-web\n\n是否选中其返回的 main space 并更新侧栏？");
+        if (confirmSuccess) {
+          switchScenario('normal');
+          triggerText.innerText = 'yolk-pi-web';
+          sideWsTitle.innerText = 'yolk-pi-web';
+          sideWsSubtitle.innerText = '/Users/demo/GitProjects/yolk-pi-web';
+          closeGitForm();
+        } else {
+          // Mock fail scenario instead
+          switchScenario('clone-error');
+        }
+      }, 1500);
+    }
+  </script>
+</body>
+</html>
