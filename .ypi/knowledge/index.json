@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-08T02:26:00.423Z",
+  "updatedAt": "2026-07-08T03:22:49.154Z",
   "entries": [
+    {
+      "id": "20260708-112249-优化-ypi-studio-计划审批书预览与产物去重",
+      "title": "优化 YPI Studio 计划审批书预览与产物去重",
+      "taskId": "20260708-104039-优化-ypi-studio-计划审批书预览与产物去重",
+      "taskKey": "archived:2026-07:20260708-104039-优化-ypi-studio-计划审批书预览与产物去重",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：优化 YPI Studio 计划审批书预览与产物去重。可复用结论：awaiting_approval 阶段不要依赖 Chat 文本承载审批材料，应引入 `plan-review.md` 标准 artifact 作为主审阅入口，并要求架构师在 planning 阶段生成，使用 Markdown 相对链接引用 PRD/Design/Implement/Checks/UI 原型。任务详情新增“计划审批书”Tab，在 awaiting_approval 默认高亮/优先展示；`MarkdownBody` 通过可选 `onLinkClick` 支持受控链接处理，默认 Chat Markdown 行为不变。任务目录内 HTML/文件预览应走 task-local preview API，服务端拒绝 scheme、绝对路径、`..`、目录目标与符号链接逃逸，并给 HTML preview 加 CSP sandbox。Artifacts Tab 应使用 canonical fileName 去重和稳定排序（plan-review -> required -> optional -> mapping -> documents），避免 `prd`/`prd.md` 重复。重要安全修复：`awaiting_approval -> implementing` 不能从 assistant-controlled transition reason 合成 approvalGrant，只能接受后续明确用户输入记录的 approvalGrant。验证：lint、tsc、checker 复查通过。",
+      "tags": [
+        "ypi-studio",
+        "approval",
+        "plan-review",
+        "artifacts",
+        "security",
+        "frontend",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260708-104039-优化-ypi-studio-计划审批书预览与产物去重",
+      "knowledgePath": ".ypi/knowledge/20260708-112249-优化-ypi-studio-计划审批书预览与产物去重.md",
+      "createdAt": "2026-07-08T03:22:49.154Z",
+      "archivedAt": "2026-07-08T03:22:49.154Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "review.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260708-102600-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
       "title": "修复左侧 Session 窄宽换行与 Studio 子任务 Session 命名",

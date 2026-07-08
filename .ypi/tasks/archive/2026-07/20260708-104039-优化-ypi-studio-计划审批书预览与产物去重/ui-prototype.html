@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YPI Studio 计划审批书预览与产物去重 - UI 交互原型</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --bg-panel: #0d1527;
+      --bg-card: #13223f;
+      --bg-hover: #1b2f54;
+      --bg-selected: #1e3a6d;
+      --border: #263c65;
+      --border-focus: #3b82f6;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1000px;
+      margin-bottom: 16px;
+      padding: 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-hover);
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .scenario-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-scenario {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-scenario.active {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+      color: #fff;
+    }
+
+    .btn-scenario:hover:not(.active) {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    /* Simulated App Shell */
+    .studio-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 580px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .task-title-area {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .task-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .badge-awaiting {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-planning {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent-hover);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-done {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-required {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .badge-optional {
+      background: rgba(148, 163, 184, 0.1);
+      color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .task-key {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-small {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .btn-small:hover {
+      background: var(--bg-hover);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--border-focus);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    /* Tab Buttons */
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      overflow-x: auto;
+    }
+
+    .tab-button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 6px;
+      white-space: nowrap;
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .tab-button:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .tab-button.active {
+      background: var(--bg-selected);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .tab-button.active-glowing::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 10%;
+      width: 80%;
+      height: 2px;
+      background: var(--warning);
+      box-shadow: 0 0 8px var(--warning);
+    }
+
+    /* Notice Banner */
+    .notice {
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    .notice-info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      color: var(--accent-hover);
+    }
+
+    .notice-warning {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+    }
+
+    .notice-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+
+    /* Section card styles */
+    .section-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Details Rows */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    .detail-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+    }
+
+    .detail-label {
+      color: var(--text-dim);
+    }
+
+    .detail-value {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Markdown Body Simulation */
+    .markdown-body {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      color: #cbd5e1;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+
+    .markdown-body h1 {
+      font-size: 18px;
+      color: #fff;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .markdown-body h2 {
+      font-size: 14px;
+      color: #fff;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+
+    .markdown-body ul {
+      margin-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    .markdown-body li {
+      margin-bottom: 4px;
+    }
+
+    .markdown-body p {
+      margin-bottom: 10px;
+    }
+
+    .markdown-body code {
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+      color: #e2e8f0;
+    }
+
+    /* Markdown Links */
+    .markdown-body a {
+      color: var(--accent-hover);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--accent-hover);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .markdown-body a:hover {
+      color: #93c5fd;
+      border-bottom-style: solid;
+    }
+
+    /* Tooltip */
+    .markdown-body a::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-4px);
+      background: #000;
+      color: #fff;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 10;
+      border: 1px solid var(--border);
+    }
+
+    .markdown-body a:hover::after {
+      opacity: 1;
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast-error {
+      border-left-color: var(--error);
+      background: #2a1b1b;
+    }
+
+    .toast-success {
+      border-left-color: var(--success);
+      background: #172a22;
+    }
+
+    /* Simulated File Viewer Overlay */
+    .file-viewer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 6, 23, 0.85);
+      z-index: 999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .file-viewer-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .file-viewer-container {
+      width: 90%;
+      max-width: 800px;
+      height: 80%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      transform: scale(0.95);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .file-viewer-overlay.show .file-viewer-container {
+      transform: scale(1);
+    }
+
+    .file-viewer-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-card);
+      border-radius: 12px 12px 0 0;
+    }
+
+    .file-title {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .file-path {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .btn-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+    }
+
+    .btn-close:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .file-viewer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: var(--bg);
+    }
+
+    .iframe-sandbox {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+      border-radius: 4px;
+    }
+
+    .iframe-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .iframe-bar {
+      background: #f1f5f9;
+      color: #475569;
+      padding: 6px 12px;
+      font-size: 11px;
+      border-radius: 4px 4px 0 0;
+      border-bottom: 1px solid #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .iframe-badge-sandbox {
+      background: #e2e8f0;
+      color: #64748b;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: bold;
+    }
+
+    /* Artifact Deduplication UI styling */
+    .artifact-tabs-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .artifact-tab-strip {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .artifact-tab-button {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .artifact-tab-button:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .artifact-tab-button.active {
+      background: var(--bg-selected);
+      border-color: var(--border-focus);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .artifact-tab-button.completed::after {
+      content: '✓';
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    .dedupe-explanation {
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 11.5px;
+      color: #a7f3d0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .dedupe-explanation span {
+      font-weight: bold;
+    }
+
+    .dedupe-list {
+      margin-left: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🎨 YPI Studio 计划审批书预览与产物去重原型</h1>
+    <p>
+      此原型为 <strong>UI 设计员 (ui-designer)</strong> 交付的交互与视觉设计方案。请通过下方按钮切换不同场景以审阅实际效果。
+    </p>
+    <div class="scenario-selector">
+      <button class="btn-scenario active" onclick="switchScenario('awaiting-valid')">场景 1: 审批状态且有审批书 (最常用)</button>
+      <button class="btn-scenario" onclick="switchScenario('planning-empty')">场景 2: 审批书缺失/为空 (规划阶段)</button>
+      <button class="btn-scenario" onclick="switchScenario('artifacts-dedupe')">场景 3: 产物 Tab 去重与排序效果</button>
+    </div>
+  </header>
+
+  <main class="container">
+    
+    <!-- Simulated Studio Task Detail Panel -->
+    <div class="studio-panel">
+      
+      <!-- Panel Header -->
+      <div class="panel-header">
+        <div class="task-title-area">
+          <div class="title-row">
+            <span class="task-title">优化 YPI Studio 计划审批书预览与产物去重</span>
+            <span id="task-status-badge" class="badge badge-awaiting">awaiting_approval</span>
+            <span id="task-phase-badge" class="badge badge-awaiting">等待审批</span>
+          </div>
+          <div class="task-key">20260708-104039-优化-ypi-studio-计划审批书预览与产物去重</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-small btn-primary" onclick="showToast('info', '已绑定当前聊天上下文。审批仍需要发送“批准/确认”进行授权。')">已绑定当前聊天</button>
+          <button class="btn-small" onclick="showToast('info', '已在主编辑器打开 task.json')">打开 task.json</button>
+        </div>
+      </div>
+
+      <!-- Tab Buttons -->
+      <div class="tab-bar">
+        <button id="tab-btn-approval" class="tab-button active active-glowing" onclick="setTab('approval')">计划审批书</button>
+        <button id="tab-btn-overview" class="tab-button" onclick="setTab('overview')">概览</button>
+        <button id="tab-btn-implementation" class="tab-button" onclick="setTab('implementation')">实现 0/6</button>
+        <button id="tab-btn-artifacts" class="tab-button" onclick="setTab('artifacts')">产物 7</button>
+        <button id="tab-btn-subagents" class="tab-button" onclick="setTab('subagents')">成员运行 0</button>
+        <button id="tab-btn-events" class="tab-button" onclick="setTab('events')">事件 4</button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div id="tab-content" style="display: flex; flex-direction: column; gap: 12px; flex: 1;">
+        <!-- Dynamic content goes here -->
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Simulating Toast Notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Simulated File Viewer Overlay -->
+  <div class="file-viewer-overlay" id="file-viewer">
+    <div class="file-viewer-container">
+      <div class="file-viewer-header">
+        <div class="file-title">
+          <span>📄 FileViewer</span>
+          <span class="file-path" id="viewer-file-path">./prd.md</span>
+        </div>
+        <button class="btn-close" onclick="closeFileViewer()">×</button>
+      </div>
+      <div class="file-viewer-body" id="viewer-content">
+        <!-- Rendered File Content -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    let currentScenario = 'awaiting-valid'; // awaiting-valid, planning-empty, artifacts-dedupe
+    let activeTab = 'approval'; // approval, overview, implementation, artifacts, subagents, events
+
+    // Mock Files Data
+    const mockFiles = {
+      'plan-review.md': `<h1>蛋黄派计划审批书</h1>
+<p>请审阅本任务方案。确认后在 Chat 中回复<strong>“确认”</strong>、<strong>“批准”</strong>或<strong>“开始实现”</strong>。</p>
+<h2>任务概览</h2>
+<ul>
+  <li><strong>目标</strong>：提升 YPI Studio 的审批体验，通过专用的“计划审批书”可视化渲染，减少手动文件路径复制；同时彻底解决产物 Tab 中由于 required/document 冗余展示造成的重复问题。</li>
+  <li><strong>范围外</strong>：不修改 <code>awaiting_approval -> implementing</code> 的后台权限及会话绑定规则。</li>
+</ul>
+<h2>方案设计与产物</h2>
+<ul>
+  <li><strong>需求定义</strong>：<a onclick="handleMarkdownLink('./prd.md', 'PRD — 计划审批书预览与产物去重')" data-tip="点击在项目 FileViewer 打开">PRD — 计划审批书</a></li>
+  <li><strong>技术方案</strong>：<a onclick="handleMarkdownLink('./design.md', 'Design — 计划审批书预览与产物去重')" data-tip="点击在项目 FileViewer 打开">Design — 计划审批书</a></li>
+  <li><strong>执行步骤</strong>：<a onclick="handleMarkdownLink('./implement.md', 'Implement — 执行规划')" data-tip="点击在项目 FileViewer 打开">Implement — 执行规划</a></li>
+  <li><strong>验收检查</strong>：<a onclick="handleMarkdownLink('./checks.md', 'Checks — 验收检查')" data-tip="点击在项目 FileViewer 打开">Checks — 验收检查清单</a></li>
+</ul>
+<h2>UI / 原型说明</h2>
+<ul>
+  <li><strong>设计标准</strong>：本交互方案已触发 UI 门禁。<a onclick="handleMarkdownLink('./ui.md', 'ui.md')" data-tip="点击在项目 FileViewer 打开">UI 规划说明</a>。</li>
+  <li><strong>交互原型</strong>：<a onclick="handleMarkdownLink('./ui-prototype.html', '交互原型 (HTML)', true)" data-tip="⚡ 点击以新窗口/受限沙箱预览">HTML 交互原型预览 (ui-prototype.html)</a></li>
+</ul>
+<h2>安全逃逸测试 (非法链接)</h2>
+<ul>
+  <li><strong>跨任务目录读取 (不允许)</strong>：<a onclick="handleMarkdownLink('../outside-task/some.json', 'outside.json')" data-tip="❌ 非法路径">../outside-task/some.json</a></li>
+  <li><strong>绝对路径逃逸 (不允许)</strong>：<a onclick="handleMarkdownLink('/etc/passwd', 'passwd')" data-tip="❌ 非法路径">/etc/passwd</a></li>
+  <li><strong>外部恶意 URL (不允许)</strong>：<a onclick="handleMarkdownLink('https://malicious.com', 'malicious')" data-tip="❌ 非法路径">https://malicious.com</a></li>
+</ul>`,
+      
+      'prd.md': `<h1>PRD — YPI Studio 计划审批书预览与产物去重</h1>
+<h2>目标与背景</h2>
+<p>YPI Studio 任务进入 awaiting_approval 时，用户需要审阅 PRD、设计、实现计划、检查清单以及 UI HTML 原型。当前 Chat 主要展示文件路径，用户需要手动打开多个文件；任务详情“产物”Tab 又会把同一产物的 artifact key、文件名、requiredArtifacts 和 documents 展示成多个重复项。</p>
+<p>本任务目标是在不改变 awaiting_approval -> implementing 硬门禁的前提下，引入标准 plan-review.md（显示名：计划审批书）作为审批阶段的主审阅入口，并在任务详情提供专用预览 Tab，支持计划审批书中的 Markdown 相对链接打开本任务目录内的产物或 HTML 原型，同时修复产物 Tab 去重与排序。</p>
+<h2>核心功能</h2>
+<ul>
+  <li>R1. 标准计划审批书 (plan-review.md) 必须包含有效内容才能进入 awaiting_approval 状态。</li>
+  <li>R2. 提供专用审批预览 Tab，优先渲染计划审批书。</li>
+  <li>R3. 相对链接只允许在当前任务目录下，阻止跨目录或绝对路径逃逸。</li>
+  <li>R4. 产物 Tab 智能去重并按优先级排序 (计划书 -> 必需 -> 可选)。</li>
+</ul>`,
+
+      'design.md': `<h1>Design — 计划审批书预览与产物去重</h1>
+<h2>后端设计</h2>
+<ol>
+  <li><strong>DEFAULT_ARTIFACTS</strong>: 新增 <code>"plan-review": "plan-review.md"</code> 映射。</li>
+  <li><strong>门禁校验</strong>: 在 transition 校验中，判断 <code>plan-review.md</code> 是否存在且非 TBD。</li>
+  <li><strong>安全路由</strong>: <code>/api/studio/tasks/[taskKey]/files</code> 仅解析相对路径，防御 <code>..</code> 及绝对路径。</li>
+</ol>
+<h2>前端设计</h2>
+<ol>
+  <li>新增 <code>approval</code> Tab，使用 <code>MarkdownBody</code> 配合可选 <code>onLinkClick</code> 拦截相对路径并调用 FileViewer 或 Iframe 预览。</li>
+  <li>重构产物去重逻辑 <code>buildStudioArtifactItems(task)</code>，通过 canonical fileName 作为去重 Key。</li>
+</ol>`,
+
+      'checks.md': `<h1>Checks — 计划审批书预览与产物去重</h1>
+<h2>验收清单</h2>
+<ul>
+  <li>[ ] 新任务已包含 plan-review.md。</li>
+  <li>[ ] 未编写 plan-review.md 时无法推进至 awaiting_approval。</li>
+  <li>[ ] 审批书内的 <code>./design.md</code> 链接能够成功呼起 FileViewer 预览。</li>
+  <li>[ ] 非法路径 <code>../escape/task.json</code> 点击后弹窗警告并拒绝打开。</li>
+  <li>[ ] 产物 Tab 的 <code>prd</code> 和 <code>prd.md</code> 完美去重。</li>
+</ul>`,
+
+      'ui.md': `<h1>UI 说明</h1>
+<p>已设计计划审批书 Tab 及产物 Tab 去重方案。具体布局设计请访问：</p>
+<ul>
+  <li><a onclick="handleMarkdownLink('./ui-prototype.html', 'ui-prototype.html', true)">HTML 交互原型</a></li>
+</ul>`
+    };
+
+    // Initialize Panel Content
+    function renderTabContent() {
+      const container = document.getElementById('tab-content');
+      container.innerHTML = '';
+
+      if (activeTab === 'approval') {
+        if (currentScenario === 'planning-empty') {
+          // Empty State
+          container.innerHTML = `
+            <div class="notice notice-warning">
+              <div>⚠️</div>
+              <div>
+                <strong>当前任务规划未完成</strong><br/>
+                任务尚在 <code>planning</code> 阶段。需要架构师或成员在此任务目录下创建并写入 <strong>plan-review.md</strong> 后，方可进入 awaiting_approval 审批流程。
+              </div>
+            </div>
+            <div class="section-card">
+              <div class="section-title">计划审批书 ( plan-review.md ) 缺失</div>
+              <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">
+                当任务准备进入审批状态时，计划审批书将作为用户的最优先审阅入口。
+              </p>
+              <div style="background: rgba(255,255,255,0.03); border: 1px dashed var(--border); border-radius: 6px; padding: 16px; text-align: center; color: var(--text-dim);">
+                📄 文件未生成或内容为默认 TBD 占位符
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <button class="btn-small btn-primary" onclick="showToast('success', '已发送命令写入 plan-review.md 模板')">生成计划审批书模板</button>
+                <button class="btn-small" onclick="showToast('info', '已在 FileViewer 打开本任务工作目录')">打开任务目录</button>
+              </div>
+            </div>
+          `;
+        } else {
+          // Valid State (Scenario 1 or 3 default)
+          container.innerHTML = `
+            <div class="notice notice-info">
+              <div>ℹ️</div>
+              <div>
+                <strong>请在此处审阅计划审批书。</strong> 确认无误后，您可以在当前绑定的 Chat 中回复 <strong>“确认” / “批准” / “开始实现”</strong> 推进至开发阶段。
+              </div>
+            </div>
+            <div class="section-card" style="flex: 1; display: flex; flex-direction: column;">
+              <div class="section-title">
+                <span>蛋黄派计划审批书 (plan-review.md)</span>
+                <span class="badge badge-done">已完成</span>
+              </div>
+              <div class="markdown-body" style="flex: 1; overflow-y: auto;">
+                ${mockFiles['plan-review.md']}
+              </div>
+            </div>
+          `;
+        }
+      } else if (activeTab === 'artifacts') {
+        if (currentScenario === 'artifacts-dedupe') {
+          // De-duplicated State
+          container.innerHTML = `
+            <div class="dedupe-explanation">
+              <span>💡 产物 Tab 去重机制演示 (Deduplicated & Sorted)</span>
+              <div>
+                后端冗余字段 <code>task.artifacts</code>, <code>requiredArtifacts</code>, <code>optionalArtifacts</code> 与 <code>task.documents</code> 中的 <code>prd</code>、<code>prd.md</code> 已合并为 canonical 项 <code>prd.md</code>，去除一切同名或同文件重复，排序规则如下：
+              </div>
+              <ul class="dedupe-list">
+                <li>1. <strong>计划审批书</strong> (plan-review.md)</li>
+                <li>2. <strong>工作流必需产物</strong> (prd.md, design.md, implement.md, checks.md)</li>
+                <li>3. <strong>工作流可选产物或额外文件</strong> (ui.md, ui-prototype.html)</li>
+              </ul>
+            </div>
+            <div class="artifact-tabs-container">
+              <div class="artifact-tab-strip">
+                <button class="artifact-tab-button active completed" onclick="selectArtifact('plan-review.md')">plan-review.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('prd.md')">prd.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('design.md')">design.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('implement.md')">implement.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('checks.md')">checks.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('ui.md')">ui.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('ui-prototype.html', true)">ui-prototype.html</button>
+              </div>
+              <div class="section-card" id="artifact-preview-card">
+                <div class="section-title">
+                  <span id="artifact-title-name">plan-review.md · 必需</span>
+                  <button class="btn-small" onclick="showToast('info', '已在主编辑器打开此产物源文件')">在编辑器打开</button>
+                </div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <span class="badge badge-done" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3);">已完成</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">文件相对路径</span>
+                  <span class="detail-value" id="artifact-file-path" style="font-family: var(--font-mono)">.ypi/tasks/20260708-104039-优化-ypi-studio-计划审批书预览与产物去重/plan-review.md</span>
+                </div>
+                <div class="markdown-body" id="artifact-markdown-content" style="max-height: 250px; overflow-y: auto;">
+                  ${mockFiles['plan-review.md']}
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          // Standard tab display (also de-duplicated for consistent UX)
+          container.innerHTML = `
+            <div class="notice notice-info">
+              <div>ℹ️</div>
+              <div>提示：切换到“场景 3”以查看更详细的产物去重和排序对比说明。</div>
+            </div>
+            <div class="artifact-tabs-container">
+              <div class="artifact-tab-strip">
+                <button class="artifact-tab-button active completed" onclick="selectArtifact('plan-review.md')">plan-review.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('prd.md')">prd.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('design.md')">design.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('implement.md')">implement.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('checks.md')">checks.md</button>
+                <button class="artifact-tab-button completed" onclick="selectArtifact('ui.md')">ui.md</button>
+              </div>
+              <div class="section-card" id="artifact-preview-card">
+                <div class="section-title">
+                  <span id="artifact-title-name">plan-review.md · 必需</span>
+                  <button class="btn-small" onclick="showToast('info', '已在主编辑器打开此产物')">在编辑器打开</button>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">文件</span>
+                  <span class="detail-value" id="artifact-file-path" style="font-family: var(--font-mono)">plan-review.md</span>
+                </div>
+                <div class="markdown-body" id="artifact-markdown-content">
+                  ${mockFiles['plan-review.md']}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      } else if (activeTab === 'overview') {
+        container.innerHTML = `
+          <div class="section-card">
+            <div class="section-title">基本信息</div>
+            <div class="detail-grid">
+              <div class="detail-row"><span class="detail-label">状态</span><span class="detail-value">awaiting_approval</span></div>
+              <div class="detail-row"><span class="detail-label">进度</span><span class="detail-value">规划设计完成 · 35%</span></div>
+              <div class="detail-row"><span class="detail-label">负责人</span><span class="detail-value">architect (架构师)</span></div>
+              <div class="detail-row"><span class="detail-label">CWD</span><span class="detail-value" style="font-family: var(--font-mono)">/Volumes/.../pi-agnet-web</span></div>
+            </div>
+          </div>
+          <div class="section-card">
+            <div class="section-title">审批门禁说明</div>
+            <p style="color: var(--text-muted);">
+              本任务处于“等待审批”阶段，架构师已完成系统设计并编写了计划审批书。请通过 <strong>“计划审批书”</strong> Tab 审查其产物并决定是否推进。
+            </p>
+          </div>
+        `;
+      } else if (activeTab === 'implementation') {
+        container.innerHTML = `
+          <div class="section-card">
+            <div class="section-title">子任务步骤 (等待审批后开始)</div>
+            <div style="color: var(--text-dim); text-align: center; padding: 24px; border: 1px dashed var(--border); border-radius: 6px;">
+              ⏳ 任务通过审批后，系统将按 DAG 拓扑顺序自动开始派发执行。
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="section-card">
+            <div class="section-title">暂无数据</div>
+            <p style="color: var(--text-dim);">当前状态下此 Tab 无需重点展示。</p>
+          </div>
+        `;
+      }
+    }
+
+    // Handles simulation of scenario change
+    function switchScenario(scenario) {
+      currentScenario = scenario;
+      
+      // Update Scenario buttons active class
+      document.querySelectorAll('.btn-scenario').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.btn-scenario')).find(btn => 
+        (scenario === 'awaiting-valid' && btn.innerText.includes('场景 1')) ||
+        (scenario === 'planning-empty' && btn.innerText.includes('场景 2')) ||
+        (scenario === 'artifacts-dedupe' && btn.innerText.includes('场景 3'))
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update Task detail header based on scenario
+      const statusBadge = document.getElementById('task-status-badge');
+      const phaseBadge = document.getElementById('task-phase-badge');
+      const tabApproval = document.getElementById('tab-btn-approval');
+
+      if (scenario === 'planning-empty') {
+        statusBadge.innerText = 'planning';
+        statusBadge.className = 'badge badge-planning';
+        phaseBadge.innerText = '方案规划';
+        phaseBadge.className = 'badge badge-planning';
+        tabApproval.classList.remove('active-glowing');
+        setTab('approval');
+      } else if (scenario === 'awaiting-valid') {
+        statusBadge.innerText = 'awaiting_approval';
+        statusBadge.className = 'badge badge-awaiting';
+        phaseBadge.innerText = '等待审批';
+        phaseBadge.className = 'badge badge-awaiting';
+        tabApproval.classList.add('active-glowing'); // Glowing to invite user to review
+        setTab('approval');
+      } else {
+        // artifacts dedupe scenario
+        statusBadge.innerText = 'awaiting_approval';
+        statusBadge.className = 'badge badge-awaiting';
+        phaseBadge.innerText = '等待审批';
+        phaseBadge.className = 'badge badge-awaiting';
+        tabApproval.classList.remove('active-glowing');
+        setTab('artifacts');
+      }
+    }
+
+    // Set Active Tab
+    function setTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`tab-btn-${tab}`).classList.add('active');
+      renderTabContent();
+    }
+
+    // Handle Markdown Click
+    function handleMarkdownLink(path, label, isHtml = false) {
+      // Security parsing rules check
+      if (path.startsWith('http') || path.startsWith('https') || path.startsWith('/')) {
+        showToast('error', `❌ 安全阻止：拒绝访问外部或绝对路径 ("${path}")`);
+        return;
+      }
+      
+      if (path.includes('..')) {
+        showToast('error', `❌ 安全阻止：路径包含 ".." 越权逃逸风险 ("${path}")`);
+        return;
+      }
+
+      // Legal task-relative paths
+      const cleanPath = path.replace(/^\.\//, '');
+      
+      if (isHtml && cleanPath === 'ui-prototype.html') {
+        showToast('success', `⚡ 安全检测通过：检测到合法 UI HTML 预览路径。`);
+        openFileViewer(cleanPath, 'ui-prototype.html', true);
+        return;
+      }
+
+      if (mockFiles[cleanPath] !== undefined) {
+        showToast('success', `📂 成功读取任务内文件: ${cleanPath}`);
+        openFileViewer(cleanPath, cleanPath, false);
+      } else {
+        showToast('error', `🔍 文件未找到: 当前任务目录下不存在 "${cleanPath}"`);
+      }
+    }
+
+    // Select Artifact inside Artifacts Tab (Scenario 3)
+    function selectArtifact(name, isHtml = false) {
+      document.querySelectorAll('.artifact-tab-button').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.artifact-tab-button')).find(btn => btn.innerText.replace(' ✓', '') === name);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const titleName = document.getElementById('artifact-title-name');
+      const filePath = document.getElementById('artifact-file-path');
+      const markdownContent = document.getElementById('artifact-markdown-content');
+
+      const isRequired = name !== 'ui.md' && name !== 'ui-prototype.html';
+      titleName.innerHTML = `${name} · ${isRequired ? '必需' : '可选'}`;
+      filePath.innerText = `.ypi/tasks/20260708-104039-优化-ypi-studio-计划审批书预览与产物去重/${name}`;
+
+      if (isHtml) {
+        markdownContent.innerHTML = `
+          <div style="padding: 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; margin-bottom: 12px; font-size: 12px;">
+            ℹ️ <strong>HTML 静态网页原型文件</strong><br/>
+            检测到当前产物为静态交互网页，建议使用<strong>独立沙箱预览</strong>或直接在新窗口安全打开。
+          </div>
+          <button class="btn-small btn-primary" onclick="handleMarkdownLink('./ui-prototype.html', 'ui-prototype.html', true)">⚡ 打开独立沙箱预览页 (安全 CSP & Sandbox)</button>
+        `;
+      } else {
+        markdownContent.innerHTML = mockFiles[name] || `<h1>${name}</h1><p>（此处渲染该 Markdown 文件的内容文本）</p>`;
+      }
+    }
+
+    // Open File Viewer Overlay
+    function openFileViewer(path, label, isHtml) {
+      const viewer = document.getElementById('file-viewer');
+      const titlePath = document.getElementById('viewer-file-path');
+      const content = document.getElementById('viewer-content');
+
+      titlePath.innerText = `./${path}`;
+      viewer.classList.add('show');
+
+      if (isHtml) {
+        // Simulation of sandbox CSP browser iframe
+        content.innerHTML = `
+          <div class="iframe-container">
+            <div class="iframe-bar">
+              <span class="iframe-badge-sandbox">CSP SANDBOX</span>
+              <span>Secure preview for ${path}</span>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1e293b; color: #94a3b8; border: 1px solid var(--border); border-radius: 0 0 4px 4px; padding: 24px; text-align: center;">
+              <span style="font-size: 24px; margin-bottom: 8px;">🖥️</span>
+              <strong style="color: #fff; margin-bottom: 4px;">受限沙箱 iframe / 新窗口渲染成功</strong>
+              <p style="font-size: 11px; max-width: 400px; margin-bottom: 16px;">
+                在实际产品中，点击此处将通过受限的 Studio Task Preview API 打开独立页面渲染 HTML，或以极其严格的 sandbox csp 属性在 iframe 中加载，确保代码执行不会越权读取其他 Workspace 敏感数据。
+              </p>
+              <button class="btn-small btn-primary" onclick="showToast('info', '正在模拟 window.open() 打开安全渲染页...')">模拟 window.open 渲染原型</button>
+            </div>
+          </div>
+        `;
+      } else {
+        content.innerHTML = mockFiles[path] || `<p>未找到该文件内容</p>`;
+      }
+    }
+
+    // Close File Viewer
+    function closeFileViewer() {
+      document.getElementById('file-viewer').classList.remove('show');
+    }
+
+    // Toast Notification Maker
+    function showToast(type, message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type === 'error' ? 'toast-error' : type === 'success' ? 'toast-success' : ''}`;
+      toast.innerHTML = `
+        <span>${type === 'error' ? '🛑' : type === 'success' ? '✅' : 'ℹ️'}</span>
+        <div>${message}</div>
+      `;
+      container.appendChild(toast);
+      
+      // Trigger animations
+      setTimeout(() => toast.classList.add('show'), 50);
+      
+      // Destroy
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Run on startup
+    renderTabContent();
+  </script>
+
+</body>
+</html>

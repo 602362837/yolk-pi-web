@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
@@ -12,6 +12,7 @@ interface MarkdownBodyProps {
   children: string;
   className?: string;
   isStreaming?: boolean;
+  onLinkClick?: (href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => void | boolean;
 }
 
 function copyText(text: string): Promise<void> {
@@ -33,7 +34,7 @@ function copyText(text: string): Promise<void> {
   }
 }
 
-export function MarkdownBody({ children, className, isStreaming }: MarkdownBodyProps) {
+export function MarkdownBody({ children, className, isStreaming, onLinkClick }: MarkdownBodyProps) {
   const normalizedMarkdown = useMemo(() => normalizeDisplayMath(children), [children]);
 
   return (
@@ -71,12 +72,33 @@ export function MarkdownBody({ children, className, isStreaming }: MarkdownBodyP
               </div>
             );
           },
+          a({ href, children, ...props }) {
+            if (!onLinkClick || !href) return <a href={href} {...props}>{children}</a>;
+            return (
+              <a
+                href={href}
+                {...props}
+                onClick={(event) => {
+                  const result = onLinkClick(href, flattenReactNodeText(children), event);
+                  if (result === false) event.preventDefault();
+                }}
+              >
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {normalizedMarkdown}
       </ReactMarkdown>
     </div>
   );
+}
+
+function flattenReactNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(flattenReactNodeText).join("");
+  return "";
 }
 
 function normalizeDisplayMath(markdown: string): string {

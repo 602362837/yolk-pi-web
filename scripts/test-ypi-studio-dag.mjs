@@ -16,6 +16,7 @@ import {
   selectReadyYpiStudioImplementationSubtasks,
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
+  updateYpiStudioTaskArtifact,
 } from "../lib/ypi-studio-tasks.ts";
 import {
   countActiveYpiStudioChildRunsForSession,
@@ -28,6 +29,16 @@ import {
 import { parseSessionHeaderMetadata } from "../lib/session-header-metadata.ts";
 
 const now = "2026-07-03T00:00:00.000Z";
+
+function writePlanReview(cwd, taskId, contextId) {
+  updateYpiStudioTaskArtifact(taskId, {
+    cwd,
+    action: "update_artifact",
+    artifact: "plan-review",
+    content: "# 蛋黄派计划审批书\n\n## 审批请求\n请审阅并确认。\n\n## 必读产物\n- [Implementation Plan](./implement.md)\n",
+    contextId,
+  });
+}
 
 {
   const metadata = parseSessionHeaderMetadata(JSON.stringify({
@@ -200,6 +211,7 @@ function progressFor(implementationPlan, statuses = {}) {
         ],
       },
     });
+    writePlanReview(cwd, task.id, contextId);
     transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
     recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
     transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
@@ -264,6 +276,7 @@ function progressFor(implementationPlan, statuses = {}) {
         ],
       },
     });
+    writePlanReview(cwd, task.id, contextId);
     transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
     recordYpiStudioUserApproval(cwd, contextId, "批准开始实现");
     transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
@@ -406,13 +419,18 @@ function progressFor(implementationPlan, statuses = {}) {
   const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-inline-approval-"));
   try {
     const contextId = "pi_inline_approval";
-    const approvalContextId = "pi_inline_approval_current_chat";
     const task = createYpiStudioTask({ cwd, title: "Inline approval", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
     transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
-    const transitioned = transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId: approvalContextId, reason: "用户批准开始实现" });
+    assert.throws(
+      () => transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId, reason: "用户批准开始实现" }),
+      /no approvalGrant is recorded/,
+    );
+    const approved = recordYpiStudioUserApproval(cwd, contextId, "确认，开始实现");
+    assert.equal(approved?.meta.approvalGrant?.contextId, contextId);
+    const transitioned = transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId, reason: "用户批准开始实现" });
     assert.equal(transitioned.status, "implementing");
-    assert.equal(transitioned.meta.approvalGrant?.contextId, approvalContextId);
-    assert.ok(transitioned.contextIds.includes(approvalContextId));
+    assert.equal(transitioned.meta.approvalGrant?.contextId, contextId);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -423,6 +441,7 @@ function progressFor(implementationPlan, statuses = {}) {
   try {
     const contextId = "pi_approval_fallback";
     const task = createYpiStudioTask({ cwd, title: "Approval fallback", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
     transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
     const pointer = join(cwd, ".ypi", ".runtime", "sessions", `${contextId}.json`);
     if (existsSync(pointer)) unlinkSync(pointer);

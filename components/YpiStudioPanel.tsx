@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { PiWebStudioConfig, PiWebSubagentModelRef, PiWebSubagentRunPolicy } from "@/lib/pi-web-config";
 import type {
   YpiStudioAgent,
@@ -39,7 +39,7 @@ interface Props {
 type LoadState = "idle" | "loading" | "ready" | "error";
 type LoadOptions = { background?: boolean };
 type StudioTab = "members" | "workflows" | "tasks";
-type TaskDetailTab = "overview" | "implementation" | "artifacts" | "subagents" | "events" | "metadata";
+type TaskDetailTab = "approval" | "overview" | "implementation" | "artifacts" | "subagents" | "events" | "metadata";
 
 function agentFilePath(cwd: string, agent: YpiStudioAgent): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${agent.pathLabel.replace(/^\/+/, "")}`;
@@ -51,6 +51,42 @@ function workflowFilePath(cwd: string, workflow: YpiStudioWorkflowFile): string 
 
 function taskFilePath(cwd: string, task: YpiStudioTaskSummary): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/task.json`;
+}
+
+function taskRelativeFilePath(cwd: string, task: YpiStudioTaskSummary, relativePath: string): string {
+  return `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/${relativePath.replace(/^\/+/, "")}`;
+}
+
+type TaskRelativeHrefResult =
+  | { ok: true; path: string; fileName: string; isHtml: boolean }
+  | { ok: false; message: string };
+
+function resolveTaskRelativeHref(href: string): TaskRelativeHrefResult {
+  const rawHref = href.trim();
+  if (!rawHref) return { ok: false, message: "❌ 安全阻止：链接路径为空" };
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(rawHref) || rawHref.startsWith("//") || rawHref.startsWith("/")) {
+    return { ok: false, message: "❌ 安全阻止：拒绝访问外部或绝对路径" };
+  }
+  if (/^[A-Za-z]:[\\/]/.test(rawHref)) return { ok: false, message: "❌ 安全阻止：拒绝访问外部或绝对路径" };
+
+  const withoutQueryHash = rawHref.split(/[?#]/, 1)[0];
+  let decodedPath = withoutQueryHash;
+  try {
+    decodedPath = decodeURIComponent(withoutQueryHash);
+  } catch {
+    return { ok: false, message: "❌ 安全阻止：链接路径编码无效" };
+  }
+
+  if (!decodedPath || decodedPath.includes("\0")) return { ok: false, message: "❌ 安全阻止：链接路径无效" };
+  if (decodedPath.includes("\\") || decodedPath.includes("..")) return { ok: false, message: "❌ 安全阻止：路径包含 \"..\" 越权逃逸风险" };
+  if (decodedPath.startsWith("/")) return { ok: false, message: "❌ 安全阻止：拒绝访问外部或绝对路径" };
+
+  const segments = decodedPath.split("/").filter((segment) => segment && segment !== ".");
+  if (segments.length === 0) return { ok: false, message: "❌ 安全阻止：链接路径为空" };
+  if (decodedPath.endsWith("/")) return { ok: false, message: "❌ 安全阻止：目录链接不可直接打开" };
+  const normalizedPath = segments.join("/");
+  const fileName = segments[segments.length - 1];
+  return { ok: true, path: normalizedPath, fileName, isHtml: /\.html?$/i.test(fileName) };
 }
 
 function shortCwd(cwd: string): string {
@@ -490,6 +526,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
   const [detailLoadState, setDetailLoadState] = useState<LoadState>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<TaskDetailTab>("overview");
+  const lastDefaultedDetailKeyRef = useRef<string | null>(null);
   const [bindBusyKey, setBindBusyKey] = useState<string | null>(null);
   const [bindMessage, setBindMessage] = useState<string | null>(null);
 
@@ -511,6 +548,13 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
     }
     setDetailTaskKey((current) => current && data.tasks.some((task) => task.key === current) ? current : null);
   }, [data?.tasks, focusedTaskKey]);
+
+  useEffect(() => {
+    if (!detailTaskKey || lastDefaultedDetailKeyRef.current === detailTaskKey) return;
+    const summary = data?.tasks.find((task) => task.key === detailTaskKey);
+    setDetailTab(summary?.status === "awaiting_approval" ? "approval" : "overview");
+    lastDefaultedDetailKeyRef.current = detailTaskKey;
+  }, [data?.tasks, detailTaskKey]);
 
   useEffect(() => {
     if (!detailTaskKey) {
@@ -604,7 +648,11 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
             selected={false}
             cwd={cwd}
             task={task}
-            onSelect={() => setDetailTaskKey(task.key)}
+            onSelect={() => {
+              setDetailTab(task.status === "awaiting_approval" ? "approval" : "overview");
+              lastDefaultedDetailKeyRef.current = task.key;
+              setDetailTaskKey(task.key);
+            }}
             onOpenFile={onOpenFile}
             onArchiveTask={onArchiveTask}
             currentSessionContextId={currentSessionContextId}
@@ -625,7 +673,8 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
   );
 }
 
-function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function TabButton({ active, label, onClick, attention = false }: { active: boolean; label: string; onClick: () => void; attention?: boolean }) {
+  const attentionColor = "#f59e0b";
   return (
     <button
       type="button"
@@ -633,12 +682,13 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
       style={{
         padding: "5px 9px",
         borderRadius: 999,
-        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-        background: active ? "var(--bg-selected)" : "var(--bg)",
-        color: active ? "var(--accent)" : "var(--text-muted)",
+        border: `1px solid ${attention ? attentionColor : active ? "var(--accent)" : "var(--border)"}`,
+        background: active ? "var(--bg-selected)" : attention ? "rgba(245,158,11,0.10)" : "var(--bg)",
+        color: attention ? attentionColor : active ? "var(--accent)" : "var(--text-muted)",
         cursor: "pointer",
         fontSize: 12,
         fontWeight: 700,
+        boxShadow: attention ? "0 0 0 1px rgba(245,158,11,0.16) inset, 0 0 12px rgba(245,158,11,0.22)" : undefined,
       }}
     >
       {label}
@@ -837,6 +887,7 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
   const detailMachinePhase = task.implementationProjection
     ? implementationMachinePhase(task, implementationStatusCounts(task, task.implementationProjection.subtasksWithStatus), task.implementationProjection.sessionRuntime)
     : null;
+  const approvalAttention = task.status === "awaiting_approval";
 
   return (
     <TaskDetailShell onBack={onBack}>
@@ -866,14 +917,16 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
       {bindMessage && <Notice tone="success" text={bindMessage} />}
       {canBind && !alreadyBound && <Notice tone="info" text="绑定只会关联当前聊天上下文，方便后续继续/审批；不会跳过 awaiting_approval 门禁，也不会自动进入实现。" />}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <TabButton active={activeTab === "approval"} attention={approvalAttention} label="计划审批书" onClick={() => setActiveTab("approval")} />
         <TabButton active={activeTab === "overview"} label="概览" onClick={() => setActiveTab("overview")} />
         <TabButton active={activeTab === "implementation"} label={`实现 ${task.implementation?.done ?? 0}/${task.implementation?.total ?? 0}`} onClick={() => setActiveTab("implementation")} />
-        <TabButton active={activeTab === "artifacts"} label={`产物 ${Object.keys(task.artifacts).length}`} onClick={() => setActiveTab("artifacts")} />
+        <TabButton active={activeTab === "artifacts"} label={`产物 ${buildStudioArtifactItems(task).length}`} onClick={() => setActiveTab("artifacts")} />
         <TabButton active={activeTab === "subagents"} label={`成员运行 ${task.subagents.length}`} onClick={() => setActiveTab("subagents")} />
         <TabButton active={activeTab === "events"} label={`事件 ${task.events.length}`} onClick={() => setActiveTab("events")} />
         <TabButton active={activeTab === "metadata"} label="元数据" onClick={() => setActiveTab("metadata")} />
       </div>
-      {activeTab === "overview" ? <TaskOverviewTab task={task} workflow={workflow} />
+      {activeTab === "approval" ? <TaskApprovalTab cwd={cwd} task={task} onOpenFile={onOpenFile} currentSessionContextId={currentSessionContextId} />
+        : activeTab === "overview" ? <TaskOverviewTab task={task} workflow={workflow} />
         : activeTab === "implementation" ? <TaskImplementationTab task={task} />
         : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
         : activeTab === "subagents" ? <TaskSubagentsTab task={task} />
@@ -1281,62 +1334,275 @@ function Bullets({ title, items }: { title: string; items: string[] }) {
   </div>;
 }
 
-function resolveArtifactKey(task: YpiStudioTaskDetail, value: string): string {
-  if (task.documents[value] || task.artifacts[value]) return value;
-  return Object.entries(task.artifacts).find(([, fileName]) => fileName === value)?.[0] ?? value;
+type StudioArtifactItem = {
+  key: string;
+  fileName: string;
+  label: string;
+  required: boolean;
+  optional: boolean;
+  completed: boolean;
+  document?: YpiStudioTaskDetail["documents"][string];
+  sourceRefs: string[];
+  order: number;
+};
+
+type MutableStudioArtifactItem = StudioArtifactItem & {
+  labelRank: number;
+  orderRank: number;
+};
+
+const STUDIO_ARTIFACT_LABELS: Record<string, string> = {
+  "plan-review": "计划审批书",
+  brief: "Brief",
+  prd: "PRD",
+  ui: "UI",
+  design: "Design",
+  implement: "Implement",
+  checks: "Checks",
+};
+
+function normalizeArtifactCompareKey(fileName: string): string {
+  return fileName.trim().toLowerCase();
 }
 
-function artifactFileName(task: YpiStudioTaskDetail, artifactKey: string, displayName: string): string {
-  const fromDocument = task.documents[artifactKey]?.fileName;
-  const fromMapping = task.artifacts[artifactKey];
-  if (fromDocument) return fromDocument;
-  if (fromMapping) return fromMapping;
-  return /\.[A-Za-z0-9]+$/.test(displayName) ? displayName : `${displayName}.md`;
+function hasFileExtension(value: string): boolean {
+  return /\.[A-Za-z0-9]+$/.test(value);
+}
+
+function artifactDocumentIsMeaningful(document: YpiStudioTaskDetail["documents"][string] | undefined): boolean {
+  const content = document?.content.trim() ?? "";
+  if (!content) return false;
+  return !/(^|\b)(?:_?TBD(?: by YPI Studio workflow)?_?|待填写|YPI Studio workflow)(\b|$)/i.test(content);
+}
+
+function resolveArtifactFileName(task: YpiStudioTaskDetail, ref: string): string {
+  const trimmed = ref.trim();
+  if (!trimmed) return trimmed;
+  if (task.artifacts[trimmed]) return task.artifacts[trimmed];
+  if (task.documents[trimmed]?.fileName) return task.documents[trimmed].fileName;
+  const artifactEntry = Object.entries(task.artifacts).find(([, fileName]) => fileName === trimmed);
+  if (artifactEntry) return artifactEntry[1];
+  const documentEntry = Object.values(task.documents).find((document) => document.fileName === trimmed);
+  if (documentEntry) return documentEntry.fileName;
+  return hasFileExtension(trimmed) ? trimmed : `${trimmed}.md`;
+}
+
+function resolveArtifactKey(task: YpiStudioTaskDetail, value: string): string {
+  if (task.documents[value] || task.artifacts[value]) return value;
+  return Object.entries(task.artifacts).find(([, fileName]) => fileName === value)?.[0]
+    ?? Object.values(task.documents).find((document) => document.fileName === value)?.artifact
+    ?? value;
+}
+
+function artifactLabelFor(key: string, fileName: string): { label: string; rank: number } {
+  if (STUDIO_ARTIFACT_LABELS[key]) return { label: STUDIO_ARTIFACT_LABELS[key], rank: 0 };
+  const baseName = fileName.replace(/\.[^.]+$/, "");
+  if (STUDIO_ARTIFACT_LABELS[baseName]) return { label: STUDIO_ARTIFACT_LABELS[baseName], rank: 1 };
+  if (key && key !== fileName) return { label: key, rank: 2 };
+  return { label: fileName, rank: 3 };
+}
+
+function buildStudioArtifactItems(task: YpiStudioTaskDetail): StudioArtifactItem[] {
+  const items = new Map<string, MutableStudioArtifactItem>();
+  const requiredKeys = new Set(task.progress.requiredArtifacts.map((ref) => normalizeArtifactCompareKey(resolveArtifactFileName(task, ref))));
+  const optionalKeys = new Set(task.progress.optionalArtifacts.map((ref) => normalizeArtifactCompareKey(resolveArtifactFileName(task, ref))));
+  const completedKeys = new Set(task.progress.completedArtifacts.map((ref) => normalizeArtifactCompareKey(resolveArtifactFileName(task, ref))));
+
+  const upsert = (ref: string, sourcePrefix: string, orderRank: number, sourceOrder: number) => {
+    const trimmed = ref.trim();
+    if (!trimmed) return;
+    const fileName = resolveArtifactFileName(task, trimmed);
+    if (!fileName) return;
+    const dedupeKey = normalizeArtifactCompareKey(fileName);
+    const artifactKey = resolveArtifactKey(task, trimmed);
+    const document = task.documents[artifactKey] ?? Object.values(task.documents).find((item) => item.fileName === fileName);
+    const label = artifactLabelFor(artifactKey, fileName);
+    const order = orderRank * 10000 + sourceOrder;
+    const existing = items.get(dedupeKey);
+    if (!existing) {
+      items.set(dedupeKey, {
+        key: artifactKey,
+        fileName,
+        label: label.label,
+        labelRank: label.rank,
+        required: requiredKeys.has(dedupeKey),
+        optional: optionalKeys.has(dedupeKey),
+        completed: completedKeys.has(dedupeKey) || artifactDocumentIsMeaningful(document),
+        document,
+        sourceRefs: [`${sourcePrefix}:${trimmed}`],
+        order,
+        orderRank,
+      });
+      return;
+    }
+    existing.required = existing.required || requiredKeys.has(dedupeKey);
+    existing.optional = existing.optional || optionalKeys.has(dedupeKey);
+    existing.completed = existing.completed || completedKeys.has(dedupeKey) || artifactDocumentIsMeaningful(document);
+    existing.document = existing.document ?? document;
+    if (label.rank < existing.labelRank) {
+      existing.label = label.label;
+      existing.labelRank = label.rank;
+    }
+    if (!existing.key || existing.key === existing.fileName || task.artifacts[artifactKey]) existing.key = artifactKey;
+    if (!existing.sourceRefs.includes(`${sourcePrefix}:${trimmed}`)) existing.sourceRefs.push(`${sourcePrefix}:${trimmed}`);
+    if (order < existing.order) {
+      existing.order = order;
+      existing.orderRank = orderRank;
+    }
+  };
+
+  task.progress.requiredArtifacts.forEach((ref, index) => upsert(ref, "required", ref === "plan-review.md" || ref === "plan-review" ? 0 : 1, index));
+  task.progress.optionalArtifacts.forEach((ref, index) => upsert(ref, "optional", 2, index));
+  Object.entries(task.artifacts).forEach(([key, fileName], index) => {
+    upsert(key, "artifact-key", fileName === "plan-review.md" || key === "plan-review" ? 0 : 3, index);
+    upsert(fileName, "artifact-file", fileName === "plan-review.md" || key === "plan-review" ? 0 : 3, index);
+  });
+  Object.values(task.documents).forEach((document, index) => upsert(document.fileName, "document", document.fileName === "plan-review.md" || document.artifact === "plan-review" ? 0 : 4, index));
+
+  return Array.from(items.values())
+    .sort((a, b) => a.order - b.order || a.fileName.localeCompare(b.fileName))
+    .map((item) => ({
+      key: item.key,
+      fileName: item.fileName,
+      label: item.label,
+      required: item.required,
+      optional: item.optional,
+      completed: item.completed,
+      document: item.document,
+      sourceRefs: item.sourceRefs,
+      order: item.order,
+    }));
+}
+
+function openTaskRelativeLink({ cwd, task, href, label, onOpenFile, setNotice }: {
+  cwd: string;
+  task: YpiStudioTaskDetail;
+  href: string;
+  label: string;
+  onOpenFile?: (filePath: string, fileName: string) => void;
+  setNotice: (notice: { tone: "info" | "warning" | "error" | "success"; text: string }) => void;
+}): boolean {
+  const resolved = resolveTaskRelativeHref(href);
+  if (!resolved.ok) {
+    setNotice({ tone: "error", text: resolved.message });
+    return false;
+  }
+  setNotice({ tone: "info", text: `正在打开：${label || resolved.fileName}` });
+  if (resolved.isHtml) {
+    const url = `/api/studio/tasks/${encodeURIComponent(task.key)}/files?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(resolved.path)}&mode=preview`;
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) onOpenFile?.(taskRelativeFilePath(cwd, task, resolved.path), resolved.fileName);
+    return false;
+  }
+  onOpenFile?.(taskRelativeFilePath(cwd, task, resolved.path), resolved.fileName);
+  return false;
+}
+
+function TaskApprovalTab({ cwd, task, onOpenFile, currentSessionContextId }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void; currentSessionContextId?: string | null }) {
+  const [linkNotice, setLinkNotice] = useState<{ tone: "info" | "warning" | "error" | "success"; text: string } | null>(null);
+  const artifacts = useMemo(() => buildStudioArtifactItems(task), [task]);
+  const planReview = artifacts.find((item) => item.key === "plan-review" || item.fileName === "plan-review.md");
+  const planDocument = planReview?.document;
+  const planFileName = planReview?.fileName ?? task.artifacts["plan-review"] ?? "plan-review.md";
+  const planFilePath = taskRelativeFilePath(cwd, task, planFileName);
+  const meaningful = artifactDocumentIsMeaningful(planDocument);
+  const gate = task.meta.approvalGate;
+  const grant = task.meta.approvalGrant;
+  const grantMatchesCurrentContext = !!grant && !!currentSessionContextId && grant.contextId === currentSessionContextId;
+  const quickRefs = ["prd", "design", "implement", "checks", "ui"]
+    .map((ref) => artifacts.find((item) => item.key === ref || item.fileName === `${ref}.md`))
+    .filter((item): item is StudioArtifactItem => Boolean(item));
+
+  const handleLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    return openTaskRelativeLink({ cwd, task, href, label, onOpenFile, setNotice: setLinkNotice });
+  }, [cwd, onOpenFile, task]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {task.status === "awaiting_approval" && <Notice tone="warning" text="当前任务正在等待用户审阅计划审批书。预览和打开文件不会自动批准；仍需在绑定聊天中明确回复确认/批准后才能进入实现。" />}
+      <SectionCard title="审批门禁状态">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
+          <DetailRow label="任务状态" value={task.status} />
+          <DetailRow label="进入审批" value={gate ? formatDateTime(gate.enteredAt) : "尚未进入 awaiting_approval"} />
+          <DetailRow label="审批上下文" value={gate?.contextId ?? "—"} mono />
+          <DetailRow label="批准记录" value={grant ? formatDateTime(grant.approvedAt) : "未批准"} />
+          <DetailRow label="批准上下文" value={grant?.contextId ?? "—"} mono />
+          <DetailRow label="当前聊天匹配" value={grantMatchesCurrentContext ? "已匹配" : grant ? "不匹配或当前聊天未知" : "尚无批准"} />
+        </div>
+      </SectionCard>
+      <SectionCard title="蛋黄派计划审批书" action={<button onClick={() => onOpenFile?.(planFilePath, planFileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开源文件</button>}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          <Badge label={meaningful ? "可审阅" : "待补齐"} tone={meaningful ? "success" : "warning"} />
+          {planReview?.required && <Badge label="必需" tone="neutral" />}
+          <Badge label={planFileName} tone="neutral" />
+          {planDocument?.truncated && <Badge label="已截断" tone="warning" />}
+        </div>
+        {linkNotice && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
+        {meaningful && planDocument ? (
+          <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--bg)" }}>
+            <MarkdownBody onLinkClick={handleLinkClick}>{planDocument.content}</MarkdownBody>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Notice tone="warning" text="当前任务还没有可审阅的 plan-review.md。需要架构师或成员在任务目录下创建并写入计划审批书，使用 Markdown 相对链接引用 PRD、Design、Implement、Checks 和 UI 原型。" />
+            <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+              推荐结构：审批请求、任务概览、必读产物、UI/原型、关键风险与需要用户确认的决定。
+            </div>
+          </div>
+        )}
+      </SectionCard>
+      {quickRefs.length > 0 && <SectionCard title="关键产物快捷入口">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {quickRefs.map((item) => (
+            <button key={item.fileName} type="button" onClick={() => onOpenFile?.(taskRelativeFilePath(cwd, task, item.fileName), item.fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>
+              {item.label}{item.completed ? " ✓" : ""}
+            </button>
+          ))}
+        </div>
+      </SectionCard>}
+    </div>
+  );
 }
 
 function TaskArtifactsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void }) {
-  const artifacts = useMemo(() => Array.from(new Set([
-    ...Object.values(task.artifacts),
-    ...task.progress.requiredArtifacts,
-    ...task.progress.optionalArtifacts,
-    ...Object.keys(task.artifacts),
-    ...Object.values(task.documents).map((document) => document.fileName),
-  ])), [task.artifacts, task.documents, task.progress.optionalArtifacts, task.progress.requiredArtifacts]);
-  const [activeArtifact, setActiveArtifact] = useState<string | null>(artifacts[0] ?? null);
+  const [linkNotice, setLinkNotice] = useState<{ tone: "info" | "warning" | "error" | "success"; text: string } | null>(null);
+  const artifacts = useMemo(() => buildStudioArtifactItems(task), [task]);
+  const [activeArtifact, setActiveArtifact] = useState<string | null>(artifacts[0]?.fileName ?? null);
 
   useEffect(() => {
-    setActiveArtifact((current) => current && artifacts.includes(current) ? current : artifacts[0] ?? null);
+    setActiveArtifact((current) => current && artifacts.some((item) => item.fileName === current) ? current : artifacts[0]?.fileName ?? null);
   }, [artifacts]);
 
-  if (artifacts.length === 0) return <PanelEmpty title="没有定义产物" description="当前任务还没有产物映射或文档内容。" />;
+  const artifact = artifacts.find((item) => item.fileName === activeArtifact) ?? artifacts[0];
+  const fileName = artifact?.fileName ?? "";
+  const filePath = artifact ? taskRelativeFilePath(cwd, task, fileName) : "";
+  const isPlanReview = artifact?.key === "plan-review" || fileName === "plan-review.md";
+  const handlePlanReviewLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    return openTaskRelativeLink({ cwd, task, href, label, onOpenFile, setNotice: setLinkNotice });
+  }, [cwd, onOpenFile, task]);
 
-  const artifact = activeArtifact && artifacts.includes(activeArtifact) ? activeArtifact : artifacts[0];
-  const artifactKey = resolveArtifactKey(task, artifact);
-  const document = task.documents[artifactKey];
-  const fileName = artifactFileName(task, artifactKey, artifact);
-  const required = task.progress.requiredArtifacts.includes(artifact) || task.progress.requiredArtifacts.includes(fileName) || task.progress.requiredArtifacts.includes(artifactKey);
-  const completed = task.progress.completedArtifacts.includes(artifact) || task.progress.completedArtifacts.includes(fileName) || task.progress.completedArtifacts.includes(artifactKey) || Boolean(document && !document.content.includes("_TBD by YPI Studio workflow._"));
-  const filePath = `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/${fileName}`;
+  if (artifacts.length === 0) return <PanelEmpty title="没有定义产物" description="当前任务还没有产物映射或文档内容。" />;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {artifacts.map((item) => {
-          const itemKey = resolveArtifactKey(task, item);
-          const itemDocument = task.documents[itemKey];
-          const itemFileName = artifactFileName(task, itemKey, item);
-          const itemCompleted = task.progress.completedArtifacts.includes(item) || task.progress.completedArtifacts.includes(itemKey) || task.progress.completedArtifacts.includes(itemFileName) || Boolean(itemDocument && !itemDocument.content.includes("_TBD by YPI Studio workflow._"));
-          return <TabButton key={item} active={item === artifact} label={`${item}${itemCompleted ? " ✓" : ""}`} onClick={() => setActiveArtifact(item)} />;
-        })}
+        {artifacts.map((item) => (
+          <TabButton key={item.fileName} active={item.fileName === artifact?.fileName} label={`${item.label}${item.completed ? " ✓" : ""}`} onClick={() => setActiveArtifact(item.fileName)} />
+        ))}
       </div>
-      <SectionCard title={`${artifact}${required ? " · 必需" : " · 可选"}`} action={<button onClick={() => onOpenFile?.(filePath, fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开</button>}>
+      {artifact && <SectionCard title={`${artifact.label}${artifact.required ? " · 必需" : artifact.optional ? " · 可选" : " · 其他"}`} action={<button onClick={() => onOpenFile?.(filePath, fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开</button>}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-          <Badge label={completed ? "已完成" : "缺失"} tone={completed ? "success" : "warning"} />
-          {document?.truncated && <Badge label="已截断" tone="warning" />}
+          <Badge label={artifact.completed ? "已完成" : "缺失"} tone={artifact.completed ? "success" : "warning"} />
+          {artifact.required && <Badge label="必需" tone="neutral" />}
+          {artifact.optional && !artifact.required && <Badge label="可选" tone="neutral" />}
+          {artifact.document?.truncated && <Badge label="已截断" tone="warning" />}
         </div>
         <DetailRow label="文件" value={fileName} mono />
-        {document ? <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg)" }}><MarkdownBody>{document.content || "（空文件）"}</MarkdownBody></div> : <Notice tone="warning" text="产物文件不存在或尚未写入。" />}
-      </SectionCard>
+        {linkNotice && isPlanReview && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
+        {artifact.document ? <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg)" }}><MarkdownBody onLinkClick={isPlanReview ? handlePlanReviewLinkClick : undefined}>{artifact.document.content || "（空文件）"}</MarkdownBody></div> : <Notice tone="warning" text="产物文件不存在或尚未写入。" />}
+      </SectionCard>}
     </div>
   );
 }

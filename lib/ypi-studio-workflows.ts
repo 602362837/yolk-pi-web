@@ -141,8 +141,8 @@ const BASE_TRANSITIONS: YpiStudioWorkflowTransition[] = [
 
 const STANDARD_STATES: Record<string, YpiStudioWorkflowState> = {
   intake: state("intake", "接单", "architect", 10, "理解目标、范围、约束和已有材料；需求不清楚时先问问题。", ["brief.md"], [], { requiresSubagent: true }),
-  planning: state("planning", "设计", "architect", 35, "产出 PRD、Design、Implement 和 Checks；若涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
-  awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认方案。涉及 UI 原型门禁时必须同时展示 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresUserApproval: true }),
+  planning: state("planning", "设计", "architect", 35, "产出 PRD、Design、Implement、Checks 和 plan-review.md 计划审批书；计划审批书是等待用户确认时的主审阅入口，应使用 Markdown 相对链接引用关键产物。若涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。", ["plan-review.md", "prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
+  awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认 plan-review.md 计划审批书。计划审批书必须链接 PRD/Design/Implement/Checks 等关键产物；涉及 UI 原型门禁时必须同时链接 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。", ["plan-review.md", "prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresUserApproval: true }),
   implementing: state("implementing", "制作", "implementer", 70, "主 session 必须通过 ypi_studio_subagent 指派实现员完成实现。", ["handoff.md"], [], { requiresSubagent: true }),
   checking: state("checking", "检查", "checker", 90, "主 session 必须通过 ypi_studio_subagent 指派检查员审查 diff、运行验证并修复低风险小问题。", ["review.md"], [], { requiresSubagent: true }),
   changes_requested: state("changes_requested", "请求修改", "main", 78, "检查未通过。主 session 需要决定退回实现员修复，还是退回架构师重新设计。"),
@@ -182,7 +182,7 @@ export const DEFAULT_YPI_STUDIO_WORKFLOWS: YpiStudioWorkflow[] = [
     states: {
       ...STANDARD_STATES,
       intake: state("intake", "复现接单", "architect", 10, "收集报错、复现步骤、期望行为和影响范围。", ["brief.md"], [], { requiresSubagent: true }),
-      planning: state("planning", "修复设计", "architect", 35, "定位根因，产出修复方案、验证计划和回归风险；若修复涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
+      planning: state("planning", "修复设计", "architect", 35, "定位根因，产出修复方案、验证计划、回归风险和 plan-review.md 计划审批书；计划审批书是等待用户确认时的主审阅入口，应使用 Markdown 相对链接引用关键产物。若修复涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。", ["plan-review.md", "prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
     },
     transitions: BASE_TRANSITIONS,
   },
@@ -199,8 +199,8 @@ export const DEFAULT_YPI_STUDIO_WORKFLOWS: YpiStudioWorkflow[] = [
     terminalStatuses: ["completed", "cancelled", "archived"],
     states: {
       ...STANDARD_STATES,
-      planning: state("planning", "UI + 技术设计", "architect", 35, "架构师产出技术计划，并必须派发 UI 设计员基于现有项目产出 HTML 原型；ui.md 可承载原型或链接，但不能用纯 Markdown 替代。", ["prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresSubagent: true }),
-      awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认方案和 HTML 原型。未确认前禁止进入实现阶段。", ["prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresUserApproval: true }),
+      planning: state("planning", "UI + 技术设计", "architect", 35, "架构师产出技术计划和 plan-review.md 计划审批书，并必须派发 UI 设计员基于现有项目产出 HTML 原型；计划审批书应链接 ui.md 与 HTML 原型；ui.md 可承载原型或链接，但不能用纯 Markdown 替代。", ["plan-review.md", "prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresSubagent: true }),
+      awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认 plan-review.md 计划审批书、方案和 HTML 原型。计划审批书应链接 ui.md 与 HTML 原型；未确认前禁止进入实现阶段。", ["plan-review.md", "prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresUserApproval: true }),
     },
     transitions: BASE_TRANSITIONS,
   },

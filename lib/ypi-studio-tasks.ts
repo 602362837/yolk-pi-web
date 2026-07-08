@@ -15,6 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "fs";
+import type { Stats } from "fs";
 import path from "path";
 import { canonicalizeCwd } from "./cwd";
 import {
@@ -79,6 +80,7 @@ const EVENTS_MAX_BYTES = 512 * 1024;
 const taskMutationLocks = new Set<string>();
 
 const DEFAULT_ARTIFACTS: Record<string, string> = {
+  "plan-review": "plan-review.md",
   brief: "brief.md",
   prd: "prd.md",
   ui: "ui.md",
@@ -884,6 +886,69 @@ function safeFileExists(filePath: string, workspaceRoot: string): boolean {
   }
 }
 
+const WINDOWS_RELATIVE_FILE_ABSOLUTE_RE = /^[a-zA-Z]:[\\/]/;
+const URL_SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+
+export interface YpiStudioTaskRelativeFileResolution {
+  taskDir: string;
+  taskDirRealPath: string;
+  filePath: string;
+  realPath: string;
+  relativePath: string;
+  stat: Stats;
+}
+
+function stripRelativeFileUrlParts(value: string): string {
+  const hashIndex = value.indexOf("#");
+  const queryIndex = value.indexOf("?");
+  const cutIndexes = [hashIndex, queryIndex].filter((index) => index >= 0);
+  const cutIndex = cutIndexes.length ? Math.min(...cutIndexes) : -1;
+  return cutIndex >= 0 ? value.slice(0, cutIndex) : value;
+}
+
+function pathInsideDirectory(root: string, target: string): boolean {
+  const normalizedRoot = path.resolve(root);
+  const normalizedTarget = path.resolve(target);
+  const rootWithSep = normalizedRoot.endsWith(path.sep) ? normalizedRoot : normalizedRoot + path.sep;
+  return normalizedTarget !== normalizedRoot && normalizedTarget.startsWith(rootWithSep);
+}
+
+function normalizeTaskRelativeFilePath(inputPath: string): string {
+  const rawPath = stripRelativeFileUrlParts(inputPath).trim();
+  if (!rawPath) throw new YpiStudioTaskSecurityError("Missing file path");
+  if (rawPath.includes("\0")) throw new YpiStudioTaskSecurityError("Invalid file path");
+  if (rawPath.includes("\\")) throw new YpiStudioTaskSecurityError("Backslash paths are not allowed");
+  if (URL_SCHEME_RE.test(rawPath)) throw new YpiStudioTaskSecurityError("URL schemes are not allowed");
+  if (path.posix.isAbsolute(rawPath) || WINDOWS_RELATIVE_FILE_ABSOLUTE_RE.test(rawPath) || rawPath.startsWith("//")) {
+    throw new YpiStudioTaskSecurityError("Absolute paths are not allowed");
+  }
+  const segments = rawPath.split("/");
+  if (segments.some((segment) => segment === "..")) throw new YpiStudioTaskSecurityError('Path segment ".." is not allowed');
+  const normalized = path.posix.normalize(rawPath);
+  if (!normalized || normalized === "." || normalized.endsWith("/")) throw new YpiStudioTaskSecurityError("File path must point to a file");
+  if (normalized === ".." || normalized.startsWith("../") || normalized.includes("/../")) throw new YpiStudioTaskSecurityError("Path escapes task directory");
+  return normalized.replace(/^\.\//, "");
+}
+
+export function resolveYpiStudioTaskRelativeFile(cwd: string, taskIdOrKey: string, inputPath: string): YpiStudioTaskRelativeFileResolution {
+  const ctx = createContext(cwd);
+  const record = loadTaskRecord(ctx, taskIdOrKey);
+  if (!record?.raw || record.readError) throw new Error("Task not found");
+  const relativePath = normalizeTaskRelativeFilePath(inputPath);
+  const taskDirRealPath = safeRealPath(record.dirPath, ctx.workspaceRoot);
+  const filePath = path.resolve(record.dirPath, ...relativePath.split("/"));
+  if (!pathInsideDirectory(record.dirPath, filePath)) throw new YpiStudioTaskSecurityError("Path escapes task directory");
+  let stat = safeStatFile(filePath, ctx.workspaceRoot);
+  if (!stat) throw new Error("Not a file");
+  const realPath = safeRealPath(filePath, ctx.workspaceRoot);
+  if (!pathInsideDirectory(taskDirRealPath, realPath)) {
+    throw new YpiStudioTaskSecurityError("Symlink target escapes task directory");
+  }
+  stat = statSync(realPath);
+  if (!stat.isFile()) throw new Error("Not a file");
+  return { taskDir: record.dirPath, taskDirRealPath, filePath, realPath, relativePath, stat };
+}
+
 function readFileWithLimit(filePath: string, maxBytes: number): { content: string; truncated: boolean } {
   const stat = statSync(filePath);
   if (stat.size <= maxBytes) return { content: readFileSync(filePath, "utf8"), truncated: false };
@@ -1076,9 +1141,12 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
   const title = optionalString(value.title) ?? id;
   const workflowId = optionalString(value.workflowId) ?? "feature-dev";
   const status = optionalString(value.status) ?? "intake";
-  const artifacts = isRecord(value.artifacts)
-    ? Object.fromEntries(Object.entries(value.artifacts).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
-    : { ...DEFAULT_ARTIFACTS };
+  const artifacts = {
+    ...DEFAULT_ARTIFACTS,
+    ...(isRecord(value.artifacts)
+      ? Object.fromEntries(Object.entries(value.artifacts).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
+      : {}),
+  };
   const subagents = Array.isArray(value.subagents)
     ? value.subagents.filter(isRecord).map((run): YpiStudioTaskSubagentRun => ({
         id: optionalString(run.id) ?? `run-${Date.now()}`,
@@ -1229,13 +1297,34 @@ function artifactPath(dirPath: string, task: YpiStudioTaskRecord, artifact: stri
   return path.join(dirPath, fileName);
 }
 
+function artifactIsMeaningful(content: string): boolean {
+  const trimmed = content.trim();
+  return trimmed.length > 0 && !/\bTBD\b|待填写|YPI Studio workflow/i.test(trimmed);
+}
+
 function artifactCompleted(dirPath: string, task: YpiStudioTaskRecord, artifactFile: string, workspaceRoot: string): boolean {
   const fileName = artifactFileName(task, artifactFile) ?? artifactFile;
   if (!isSafeArtifactFileName(fileName)) return false;
   const filePath = path.join(dirPath, fileName);
   if (!safeFileExists(filePath, workspaceRoot)) return false;
-  const content = readFileSync(filePath, "utf8").trim();
-  return content.length > 0 && !/\bTBD\b|待填写|YPI Studio workflow/i.test(content);
+  const content = readFileSync(filePath, "utf8");
+  return artifactIsMeaningful(content);
+}
+
+function assertPlanReviewReadyForApproval(record: TaskRecordOnDisk, workspaceRoot: string): void {
+  if (!record.raw) throw new Error("Task not found");
+  const fileName = artifactFileName(record.raw, "plan-review") ?? "plan-review.md";
+  if (fileName !== "plan-review.md" || !isSafeArtifactFileName(fileName)) {
+    throw new Error("Transition to awaiting_approval requires a valid plan-review artifact mapped to plan-review.md.");
+  }
+  const filePath = path.join(record.dirPath, fileName);
+  if (!safeFileExists(filePath, workspaceRoot)) {
+    throw new Error("Transition to awaiting_approval requires plan-review.md to exist. Write a meaningful approval plan before requesting user approval.");
+  }
+  const content = readFileSync(filePath, "utf8");
+  if (!artifactIsMeaningful(content)) {
+    throw new Error("Transition to awaiting_approval requires plan-review.md to contain meaningful content, not an empty/TBD placeholder.");
+  }
 }
 
 function progressForTask(record: TaskRecordOnDisk, workflow: YpiStudioWorkflowFile | null, workspaceRoot: string): YpiStudioTaskProgress {
@@ -1452,11 +1541,6 @@ function readKnowledgeIndex(ctx: TaskContext): YpiStudioKnowledgeIndex {
 
 function writeKnowledgeIndex(ctx: TaskContext, index: YpiStudioKnowledgeIndex): void {
   writeFileSync(ctx.knowledgeIndexPath, `${JSON.stringify(index, null, 2)}\n`, "utf8");
-}
-
-function artifactIsMeaningful(content: string): boolean {
-  const trimmed = content.trim();
-  return trimmed.length > 0 && !/\bTBD\b|待填写|YPI Studio workflow/i.test(trimmed);
 }
 
 function collectArchiveArtifacts(ctx: TaskContext, record: TaskRecordOnDisk, task: YpiStudioTaskRecord): Array<{ artifact: string; fileName: string; content: string }> {
@@ -1795,16 +1879,10 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   const from = record.raw.status;
   const transition = findYpiStudioTransition(workflow, from, body.to);
   if (!transition && !body.override) throw new Error(`Invalid Studio transition: ${from} -> ${body.to}`);
+  if (body.to === "awaiting_approval") {
+    assertPlanReviewReadyForApproval(record, ctx.workspaceRoot);
+  }
   if (isApprovalImplementationEdge(from, body.to)) {
-    if (body.contextId && body.reason && isExplicitYpiStudioApprovalText(body.reason)) {
-      if (!record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
-      const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, from, body.contextId);
-      record.raw.meta = {
-        ...record.raw.meta,
-        approvalGate: existingGate,
-        approvalGrant: approvalGrant(isoAfter(existingGate.enteredAt), body.contextId, body.reason),
-      };
-    }
     assertYpiStudioImplementationApproved(record.raw, body.contextId);
   } else if (transition?.requiresUserApproval && !body.reason && !body.override) {
     throw new Error(`Transition ${from} -> ${body.to} requires user approval reason`);
@@ -1957,6 +2035,7 @@ export function getYpiStudioTaskContextForPrompt(cwd: string, taskIdOrKey: strin
     `Progress: ${detail.progress.percent}%`,
     `Required artifacts: ${detail.progress.requiredArtifacts.join(", ") || "none"}`,
     `Missing artifacts: ${detail.progress.missingArtifacts.join(", ") || "none"}`,
+    "Plan approval book: plan-review.md is the required user-facing approval entry; it must summarize PRD/Design/Implement/Checks and link related artifacts before awaiting_approval.",
     detail.implementationPlan ? `Implementation plan: ${detail.implementation?.done ?? 0}/${detail.implementation?.total ?? detail.implementationPlan.subtasks.length} done; active=${detail.implementation?.activeSubtaskId ?? "none"}; next=${detail.implementation?.nextSubtaskId ?? "none"}; blocked=${detail.implementation?.blocked ?? 0}` : "Implementation plan: not defined",
     docs ? `\n${docs}` : "",
   ].filter(Boolean).join("\n");
