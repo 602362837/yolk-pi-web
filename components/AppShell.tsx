@@ -68,6 +68,57 @@ function projectContextMatchesBrowserTitle(
   return sameWorkspacePathForTitle(context.cwd, cwd);
 }
 
+/** Minimal hover popover for billing breakdown in the top bar. */
+function BillingPopover({ popover, children }: { popover: React.ReactNode; children: React.ReactNode }) {
+  const [show, setShow] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  const handleEnter = useCallback(() => {
+    if (timerRef.current !== null) { clearTimeout(timerRef.current); timerRef.current = null; }
+    setShow(true);
+  }, []);
+
+  const handleLeave = useCallback(() => {
+    timerRef.current = window.setTimeout(() => setShow(false), 120);
+  }, []);
+
+  useEffect(() => () => { if (timerRef.current !== null) clearTimeout(timerRef.current); }, []);
+
+  return (
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
+      {children}
+      {show && (
+        <div
+          onMouseEnter={handleEnter}
+          onMouseLeave={handleLeave}
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            zIndex: 1000,
+            background: "var(--bg-panel)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontSize: 12,
+            whiteSpace: "nowrap",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+            marginTop: 4,
+            lineHeight: 1.8,
+            minWidth: 170,
+          }}
+        >
+          {popover}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1081,11 +1132,25 @@ export function AppShell() {
               <span className="app-top-label">Terminal</span>
             </button>
           )}
-          {/* Session stats — right-aligned in top bar */}
+          {/* Session stats — right-aligned in top bar.
+           * 费用展示口径（见 lib/usage-stats.ts UsageSessionRollupResult /
+           * hooks/useAgentSession.ts SessionUsageTopbarStats，由主会话确认）：
+           * - parent：compact 显示 parent rollup（parent own + Studio children），
+           *   存在真实 child usage（child token/cost totals > 0）时追加 `incl. Studio`；
+           *   tooltip 拆分 own cost / Studio children cost。child 仅数量无 usage 时不显示 child 标记。
+           * - standalone：compact 显示该 session 自身 usage，无 child 标记。
+           * - studio_child：compact 只显示该 child 自身 usage（selectedSessionTotals），
+           *   tooltip 附带 parent rollup（parentRollupTotals）与 parent id。
+           * local 源（无 rollup）按 standalone 口径处理，且无 child 标记。 */}
           {showChat && (sessionStats || contextUsage) && (() => {
-            const t = sessionStats?.tokens;
-            const c = sessionStats?.cost ?? 0;
             const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+
+            // 选中 session 的展示口径与 totals。local 源无 selectedSessionKind → standalone。
+            const kind = sessionStats?.selectedSessionKind ?? "standalone";
+            const selectedTotals = sessionStats?.selectedSessionTotals;
+            // studio_child compact 展示该 child 自身 usage；其余使用 rollup/own totals。
+            const t = kind === "studio_child" && selectedTotals ? selectedTotals.tokens : sessionStats?.tokens;
+            const c = kind === "studio_child" && selectedTotals ? (selectedTotals.cost ?? 0) : (sessionStats?.cost ?? 0);
             const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
 
             let ctxColor = "var(--text-muted)";
@@ -1099,33 +1164,63 @@ export function AppShell() {
 
             const childCount = sessionStats?.studioChildSessionCount ?? 0;
             const ownCost = sessionStats?.own?.cost ?? 0;
-            const childCost = sessionStats?.studioChild?.cost ?? 0;
-            const hasChildUsage = childCount > 0 || childCost > 0;
-            const tooltipParts: string[] = [];
-            if (t) {
-              tooltipParts.push(`scope: ${hasChildUsage ? `current chat + ${childCount} Studio child session${childCount === 1 ? "" : "s"}` : "current chat"}`);
-              tooltipParts.push(`source: ${sessionStats?.source === "rollup" ? "usage rollup" : "local messages"}`);
-              tooltipParts.push(`in: ${t.input.toLocaleString()}`);
-              tooltipParts.push(`out: ${t.output.toLocaleString()}`);
-              tooltipParts.push(`cache read: ${t.cacheRead.toLocaleString()}`);
-              tooltipParts.push(`cache write: ${t.cacheWrite.toLocaleString()}`);
-              if (c > 0) tooltipParts.push(`cost: $${c.toFixed(4)}`);
-              if (hasChildUsage) {
-                tooltipParts.push(`own cost: $${ownCost.toFixed(4)}`);
-                tooltipParts.push(`Studio children cost: $${childCost.toFixed(4)}`);
-              }
-            }
-            if (contextUsage?.contextWindow) {
-              const pct = contextUsage.percent;
-              tooltipParts.push(`context: ${pct !== null ? pct.toFixed(1) + "%" : "unknown"} of ${contextUsage.contextWindow.toLocaleString()} tokens`);
-            }
-            const tooltip = tooltipParts.join("  |  ");
+            const studioChild = sessionStats?.studioChild;
+            const childCost = studioChild?.cost ?? 0;
+            const childTokenTotal = studioChild
+              ? studioChild.tokens.input + studioChild.tokens.output + studioChild.tokens.cacheRead + studioChild.tokens.cacheWrite
+              : 0;
+            // 真实 child usage = child token/cost totals > 0，不再因 child 数量误判。
+            const hasChildUsage = kind === "parent" && (childTokenTotal > 0 || childCost > 0);
+            const parentRollupCost = sessionStats?.parentRollupTotals?.cost ?? 0;
+            // compact 追加标记：parent 显示 `incl. Studio`，studio_child 显示 `Studio child`。
+            const compactMark = kind === "studio_child"
+              ? "Studio child"
+              : hasChildUsage
+                ? "incl. Studio"
+                : null;
+            const popoverContent = (
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--text)", fontSize: 11, letterSpacing: 0.3 }}>
+                  计费组成
+                </div>
+                {kind === "studio_child" ? (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text)" }}>
+                      <span>本会话</span>
+                      <span style={{ fontWeight: 600 }}>${(c || 0).toFixed(4)}</span>
+                    </div>
+                    {parentRollupCost > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text-muted)" }}>
+                        <span>父会话汇总</span>
+                        <span>${parentRollupCost.toFixed(4)}</span>
+                      </div>
+                    )}
+                  </>
+                ) : hasChildUsage ? (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text)" }}>
+                      <span>本会话</span>
+                      <span style={{ fontWeight: 600 }}>{(ownCost > 0 ? `$${ownCost.toFixed(4)}` : costStr ?? "-")}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text-muted)" }}>
+                      <span>Studio 子会话{childCount > 1 ? ` (${childCount})` : ""}</span>
+                      <span>${childCost.toFixed(4)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text)" }}>
+                    <span>本会话</span>
+                    <span style={{ fontWeight: 600 }}>{costStr ?? "-"}</span>
+                  </div>
+                )}
+              </div>
+            );
 
             return (
-              <div
-                className="app-top-stats"
-                title={tooltip}
-                style={{
+              <BillingPopover popover={popoverContent}>
+                <div
+                  className="app-top-stats"
+                  style={{
                   marginLeft: "auto",
                   display: "flex", alignItems: "center", gap: 10,
                   paddingLeft: 12,
@@ -1135,7 +1230,7 @@ export function AppShell() {
                   whiteSpace: "nowrap", cursor: "default",
                   fontVariantNumeric: "tabular-nums",
                 }}
-              >
+                >
                 {t && t.input > 0 && (
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
@@ -1163,7 +1258,7 @@ export function AppShell() {
                 {costStr && (
                   <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", fontWeight: 500 }}>
                     {costStr}
-                    {hasChildUsage && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>+child</span>}
+                    {compactMark && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>{compactMark}</span>}
                   </span>
                 )}
                 {ctxStr && (
@@ -1174,7 +1269,8 @@ export function AppShell() {
                     {ctxStr}
                   </span>
                 )}
-              </div>
+                </div>
+              </BillingPopover>
             );
           })()}
           {webConfig?.chatgpt.usagePanelEnabled && (

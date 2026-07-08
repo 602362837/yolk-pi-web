@@ -73,10 +73,13 @@ export class WorktreeUserError extends Error {
 }
 
 export class MainWorktreeDirtyError extends Error {
+  /** Raw `git status --porcelain` output for the main worktree. */
+  readonly dirtySummary: string;
   /** @param dirtySummary — raw `git status --porcelain` output for the main worktree */
-  constructor(public readonly dirtySummary: string) {
+  constructor(dirtySummary: string) {
     super(`⛔ 主工作树（被合并目标）有未提交的修改。请先在主工作树提交、暂存或丢弃，再执行归档。`);
     this.name = "MainWorktreeDirtyError";
+    this.dirtySummary = dirtySummary;
   }
 }
 

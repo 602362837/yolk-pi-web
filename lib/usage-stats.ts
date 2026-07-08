@@ -102,6 +102,21 @@ export interface UsageSessionRollupOptions {
   includeArchived?: boolean;
 }
 
+/**
+ * "session_rollup" 顶栏费用展示口径（由主会话确认）：
+ *
+ * - `parent`：选中父 session。compact 显示 parent rollup totals（`parentRollupTotals` =
+ *   父自身 + 所有 Studio child），当存在真实 child usage 时追加 `incl. Studio`；
+ *   tooltip 拆分 own / Studio children cost。`selectedSessionTotals` 此时等于父自身 totals。
+ * - `standalone`：选中普通 session（无 Studio child）。compact 显示该 session 自身 totals；
+ *   `selectedSessionTotals` === `parentRollupTotals` === `totals` === `ownTotals`。
+ * - `studio_child`：选中 Studio child audit session。compact 只显示该 child 自身 totals
+ *   （`selectedSessionTotals`），不再显示 parent rollup 占位语义；tooltip 可附带 parent rollup
+ *   totals（`parentRollupTotals`）与 parent id 说明。
+ *
+ * 新增字段均为 additive：`totals` / `ownTotals` / `studioChildTotals` / `childSessions` 等旧字段
+ * 语义不变，旧调用方继续可用。不改变 JSONL header，不读取 child transcript sidecar。
+ */
 export interface UsageSessionRollupResult {
   kind: "session_rollup";
   sessionId: string;
@@ -114,9 +129,25 @@ export interface UsageSessionRollupResult {
     includeStudioChildren: true;
     relation: "self-and-studio-children";
   };
+  /** Parent rollup totals = parent own + all Studio children. 旧字段，语义不变。compact 用于 parent/standalone。 */
   totals: UsageTotals;
+  /** 父 session 自身 totals（不含 Studio child）。旧字段，语义不变。 */
   ownTotals: UsageTotals;
+  /** 所有 Studio child totals 之和。旧字段，语义不变。 */
   studioChildTotals: UsageTotals;
+  /**
+   * 选中 session 自身的 totals（additive）。
+   * - parent → 父自身 totals；
+   * - standalone → 该 session 自身 totals；
+   * - studio_child → 该 child 自身 totals，作为 child compact 展示值。
+   * 不含其他 session 的 usage，不等于 `totals`（除非 standalone）。
+   */
+  selectedSessionTotals: UsageTotals;
+  /**
+   * Parent rollup totals（additive），恒等于 `totals`，命名上明确 parent rollup 语义，
+   * 供 studio_child tooltip 与 parent compact 共用，避免调用方凭 `totals` 字段名猜测口径。
+   */
+  parentRollupTotals: UsageTotals;
   studioChildSessionCount: number;
   childSessions: UsageSessionSummary[];
   scannedSessions: number;
@@ -460,6 +491,11 @@ export async function getUsageStatsForSessionRollup(options: UsageSessionRollupO
   const ownTotals = rollup ? cloneTotals(rollup.ownTotals) : createTotals();
   const studioChildTotals = rollup ? cloneTotals(rollup.studioChildTotals) : createTotals();
   const totals = rollup ? cloneTotals(rollup.totals) : createTotals();
+  // selectedSessionTotals = 选中 session 自身 usage（不含其他 session）。
+  // parent → 父自身；standalone → 自身；studio_child → 该 child 自身（用于 child compact 展示）。
+  const selectedSessionTotals = cloneTotals(bySession.get(options.sessionId)?.totals ?? createTotals());
+  // parentRollupTotals = parent rollup（父自身 + 所有 Studio child），恒等于 totals，命名上明确口径。
+  const parentRollupTotals = cloneTotals(totals);
   const childSessions = relatedSessions
     .filter((session) => session.studioChild?.parentSessionId === parentSessionId)
     .map((session) => sessionSummary(session, cloneTotals(bySession.get(session.id)?.totals ?? createTotals())))
@@ -480,6 +516,8 @@ export async function getUsageStatsForSessionRollup(options: UsageSessionRollupO
     totals,
     ownTotals,
     studioChildTotals,
+    selectedSessionTotals,
+    parentRollupTotals,
     studioChildSessionCount: childSessions.length,
     childSessions,
     scannedSessions: sessions.length,

@@ -216,6 +216,28 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
       sessionStats.studioChildSessionCount,
       sessionStats.own?.cost ?? 0,
       sessionStats.studioChild?.cost ?? 0,
+      // own / studioChild token totals 驱动 hasChildUsage 判定与 tooltip 拆分；
+      // 仅纳入 cost 会在 child 有 token 无 cost 时漏刷新，故一并纳入 token total。
+      sessionStats.own
+        ? sessionStats.own.tokens.input + sessionStats.own.tokens.output + sessionStats.own.tokens.cacheRead + sessionStats.own.tokens.cacheWrite
+        : 0,
+      sessionStats.studioChild
+        ? sessionStats.studioChild.tokens.input + sessionStats.studioChild.tokens.output + sessionStats.studioChild.tokens.cacheRead + sessionStats.studioChild.tokens.cacheWrite
+        : 0,
+      // 纳入 child-selected 展示口径与 additive totals，避免父/子 session
+      // 总额相同时 AppShell 保留旧 compact/tooltip 文案。
+      sessionStats.selectedSessionKind ?? "",
+      sessionStats.parentFound ? 1 : 0,
+      sessionStats.selectedSessionTotals
+        ? [
+          sessionStats.selectedSessionTotals.tokens.input,
+          sessionStats.selectedSessionTotals.tokens.output,
+          sessionStats.selectedSessionTotals.tokens.cacheRead,
+          sessionStats.selectedSessionTotals.tokens.cacheWrite,
+          sessionStats.selectedSessionTotals.cost ?? 0,
+        ].join(",")
+        : "none",
+      sessionStats.parentRollupTotals?.cost ?? 0,
     ].join("|")
     : null;
   const sessionStatsRef = useRef(sessionStats);

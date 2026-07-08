@@ -158,6 +158,18 @@ export interface ToolExecutionProgress {
   running: boolean;
 }
 
+/**
+ * 顶栏费用展示口径（由主会话确认，见 lib/usage-stats.ts UsageSessionRollupResult）：
+ *
+ * - `parent`：compact 显示 parent rollup（parent own + Studio children），存在真实 child usage 时追加 `incl. Studio`；
+ *   `selectedSessionKind === "parent"`。
+ * - `standalone`：compact 显示该 session 自身 usage，无 child 标记。
+ * - `studio_child`：compact 只显示该 child 自身 usage，不再显示 parent rollup / `+child` 占位；
+ *   tooltip 可附带 parent rollup。
+ *
+ * `cost` / `tokens` 字段为 compact 展示值；`own` / `studioChild` 为 parent rollup 拆分（仅 parent 场景有意义）。
+ * `selectedSessionTotals` / `parentRollupTotals` 为 additive 透传字段，供 child compact 与 parent/child tooltip 复用。
+ */
 export interface SessionUsageTopbarStats {
   tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
   cost?: number;
@@ -168,6 +180,10 @@ export interface SessionUsageTopbarStats {
   own?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
   studioChild?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
   studioChildSessionCount: number;
+  /** 选中 session 自身 totals（additive）。studio_child 场景作为 compact 展示值。 */
+  selectedSessionTotals?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
+  /** Parent rollup totals（additive），供 studio_child tooltip 与 parent compact 复用。 */
+  parentRollupTotals?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
 }
 
 export type OnSubagentChange = (runs: SubagentRun[]) => void;
@@ -394,6 +410,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           own: statsFromTotals(sessionUsageRollup.rollup.ownTotals),
           studioChild: statsFromTotals(sessionUsageRollup.rollup.studioChildTotals),
           studioChildSessionCount: sessionUsageRollup.rollup.studioChildSessionCount,
+          // additive：child compact 展示自身费用，tooltip 附带 parent rollup。
+          selectedSessionTotals: statsFromTotals(sessionUsageRollup.rollup.selectedSessionTotals),
+          parentRollupTotals: statsFromTotals(sessionUsageRollup.rollup.parentRollupTotals),
         }
         : null;
     })()
