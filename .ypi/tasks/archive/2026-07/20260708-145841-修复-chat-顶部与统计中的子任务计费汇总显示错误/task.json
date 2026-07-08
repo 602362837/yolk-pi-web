@@ -1,0 +1,1584 @@
+{
+  "schemaVersion": 1,
+  "id": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+  "title": "修复 Chat 顶部与统计中的子任务计费汇总显示错误",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-08T06:58:41.703Z",
+  "updatedAt": "2026-07-08T08:09:20.048Z",
+  "completedAt": "2026-07-08T08:07:51.973Z",
+  "contextIds": [
+    "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-bfa1dfa01679627bf621b397",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T06:58:53.179Z",
+      "finishedAt": "2026-07-08T07:03:53.178Z",
+      "runner": "sdk",
+      "childSessionId": "019f4085-b892-71bd-9b68-92dd943ac587",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T06-58-53-202Z_019f4085-b892-71bd-9b68-92dd943ac587.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f4085-b892-71bd-9b68-92dd943ac587",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请处理该 Studio 任务的 intake/planning：围绕用户反馈定位 Chat 顶部计费显示在存在子任务时出现“{金额}+child”占位文案、进入子 session 也同样如此、且计费统计链路可能未真正汇总的问题。请先阅读相关文档与代码，明确影响范围（顶部计费展示、子 session 展示、计费统计/usage 汇总口径），产出 brief/prd/design/implement/checks/plan-review 所需内容。如果涉及用户可见信息展示结构变…",
+      "summary": "已完成该 Studio 任务的 intake/planning，未修改生产代码、未派发其他成员。 ## 产物已写入 目录： `.ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误/` 已产出 / 更新： - `brief.md` - `prd.md` - `ui.md` - `design.md` - `implement.md` - `checks.md` - `plan-review.md` - `handoff.md` ## 关键结论 - 根因之一：`components/AppShell.tsx` 顶部费用 chip 硬编码显示 `+child`。 - 根因之二：`hasChildUsage` 用 `childCount > 0 || childCost > 0`，会把“存在 child session”误判为“存在 child usage”。 - 子 session 问题：`/api/usage?sessionId=<child>` 当前会解析到 parent rollup，这是现有架构行为，但 UI 没有明确说明，导致 child audit session 中也出现误导文案。 - Usage 汇总链路：`lib/usage-stats.ts` 已显式扫描 Studio child session 并生成 `byParentSession`，但建议实现阶段补回归验证，证明 global totals / parent rollup / session rollup 一致。 ## UI 门禁 已判断：无需 HTML 原型。 原因：仅修复既有文案、判定条件与统计口径，不改变页面结构或交互。 ## 需要主会话确认 1. Studio child audit session 顶部费用口径： - 推荐：child tab 显示该 child 自身费用，tooltip 展示 parent rollup。 - 备选：继续显示 parent rollup，但 compact/tooltip 标明 `parent rollup`。 2. compact 文案推荐使用 `incl. Studio`；如需中文可用“含 Studio”。 ## 验证 本轮仅做规划与代码阅读，未运行： - `npm run lint` - `…",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T06:58:53.179Z",
+        "updatedAt": "2026-07-08T07:03:53.172Z",
+        "eventCount": 10355,
+        "lastTextPreview": "已完成该 Studio 任务的 intake/planning，未修改生产代码、未派发其他成员。\n\n## 产物已写入\n\n目录：\n\n`.ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误/`\n\n已产出 / 更新：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n## 关键结论\n\n- 根因之一：`components/AppShell.tsx` 顶部费用 chip 硬编码显示 `+child`。\n- 根因之二：`hasChildUsage` 用 `childCount > 0 || childCost > 0`，会把“存在 child session”误判为“存在 child usage”。\n- 子 session 问题：`/api/usage?sessionId=<child>` 当前会解析到 parent rollup，这是现有架构行为，但 UI 没有明确说明，导致 child audit session 中也出现误导文案。\n- Usage 汇总链路：`lib/usage-stats.ts` 已显式扫描 Studio child session 并生成 `byParentSession`，但建议实现阶段补回归验证，证明 global totals / parent rollup / session rollup 一致。\n\n## UI 门禁\n\n已判断：无需 HTML 原型。  \n原因：仅修复既有文案、判定条件与统计口径，不改变页面结构或交互。\n\n## 需要主会话确认\n\n1. Studio child audit session 顶部费用口径：\n   - 推荐：child tab 显示该 child 自身费用，tooltip 展示 parent rollup。\n   - 备选：继续显示 parent rollup，但 compact/tooltip 标明 `parent rollup`。\n2. compact 文案推荐使用 `incl. Studio`；如需中文可用“含 Studio”。\n\n## 验证\n\n本轮仅做规划与代码阅读，未运行：\n\n- `npm run lint`\n- `node_modules/.bin/tsc --noEmit`\n\n建议用户确认计划后，再保存 implementationPlan 并进入 awaiting_approval。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:03:28.770Z",
+            "toolCallId": "call_09GRje6VdyoxRMR9eDQG4XIv|fc_0b5bb179fee09fd4016a4df63b1db4819a9d74c397a76fdfda",
+            "toolName": "write",
+            "text": "Successfully wrote 803 bytes to .ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:03:37.875Z",
+            "toolCallId": "call_XERX4RgWbWTy3CqzpZYGOs7x|fc_0b5bb179fee09fd4016a4df648e5a0819aa55d00ff24b38337",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short .ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误 docs components hooks lib app/api/usage | head -n 200\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:03:37.929Z",
+            "toolCallId": "call_XERX4RgWbWTy3CqzpZYGOs7x|fc_0b5bb179fee09fd4016a4df648e5a0819aa55d00ff24b38337",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260708-145841-\\344\\277\\256\\345\\244\\215-chat-\\351\\241\\266\\351\\203\\250\\344\\270\\216\\347\\273\\237\\350\\256\\241\\344\\270\\255\\347\\232\\204\\345\\255\\220\\344\\273\\273\\345\\212\\241\\350\\256\\241\\350\\264\\271\\346\\261\\207\\346\\200\\273\\346\\230\\276\\347\\244\\272\\351\\224\\231\\350\\257\\257/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:03:53.152Z",
+            "text": "已完成该 Studio 任务的 intake/planning，未修改生产代码、未派发其他成员。\n\n## 产物已写入\n\n目录：\n\n`.ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误/`\n\n已产出 / 更新：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n## 关键结论\n\n- 根因之一：`components/AppShell.tsx` 顶部费用 chip 硬编码显示 `+child`。\n- 根因之二：`hasChildUsage` 用 `childCount > 0 || childCost > 0`，会把“存在 child session”误判为“存在 child usage”。\n- 子 session 问题：`/api/usage?sessionId=<child>` 当前会解析到 parent rollup，这是现有架构行为，但 UI 没有明确说明，导致 child audit session 中也出现误导文案。\n- Usage 汇总链路：`lib/usage-stats.ts` 已显式扫描 Studio child session 并生成 `byParentSession`，但建议实现阶段补回归验证，证明 global totals / parent rollup / session rollup 一致。\n\n## UI 门禁\n\n已判断：无需 HTML 原型。  \n原因：仅修复既有文案、判定条件与统计口径，不改变页面结构或交互。\n\n## 需要主会话确认\n\n1. Studio child audit session 顶部费用口径：\n   - 推荐：child tab 显示该 child 自身费用，tooltip 展示 parent rollup。\n   - 备选：继续显示 parent rollup，但 compact/tooltip 标明 `parent rollup`。\n2. compact 文案推荐使用 `incl. Studio`；如需中文可用“含 Studio”。\n\n## 验证\n\n本轮仅做规划与代码阅读，未运行：\n\n- `npm run lint`\n- `node_modules/.bin/tsc --noEmit`\n\n建议用户确认计划后，再保存 implementationPlan 并进入 awaiting_approval。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:03:53.164Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1109,
+        "tokens": 533,
+        "tokenSource": "usage",
+        "tps": 45.57,
+        "firstTokenAt": "2026-07-08T07:03:41.380Z",
+        "lastTokenAt": "2026-07-08T07:03:53.076Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-bfa1dfa01679627bf621b397",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/architect-bfa1dfa01679627bf621b397.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T06:58:53.179Z",
+        "finishedAt": "2026-07-08T07:03:53.169Z",
+        "updatedAt": "2026-07-08T07:03:53.169Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 233660,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4085-b892-71bd-9b68-92dd943ac587",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T06-58-53-202Z_019f4085-b892-71bd-9b68-92dd943ac587.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d2afe53e00679292d2a4d85b",
+      "subtaskId": "usage-contract",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:10:01.515Z",
+      "finishedAt": "2026-07-08T07:21:31.930Z",
+      "runner": "sdk",
+      "childSessionId": "019f408f-eb59-7bb4-a2ed-11f1aa7ff93e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-10-01-561Z_019f408f-eb59-7bb4-a2ed-11f1aa7ff93e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f408f-eb59-7bb4-a2ed-11f1aa7ff93e",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 implementation subtask `usage-contract`：按已确认口径固定 usage/topbar 显示契约。要求：父 session 显示 parent rollup；standalone 显示自身；child session compact 只显示该 child 自身 usage，tooltip 可补 parent rollup。优先保持 /api/usage 字段兼容，不删除现有字段。请阅读 implement.md 指定文件与相关 do…",
+      "summary": "The route returns `rollup` directly, so the additive fields pass through automatically. Validation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added additive fields `selectedSessionTotals` and `parentRollupTotals` to `UsageSessionRollupResult` (with doc comments naming the three display口径: parent / standalone / studio_child), and populated them in `getUsageStatsForSessionRollup`. `selectedSessionTotals` = the selected session's own usage (child's own for `studio_child`); `parentRollupTotals` = parent rollup (恒等于 `totals`, named for口径 clarity). Old fields (`totals`/`ownTotals`/`studioChildTotals`/`childSessions`) keep their semantics.\n- `hooks/useAgentSession.ts` — Added a口径 doc block and additive `selectedSessionTotals` / `parentRollupTotals` fields to `SessionUsageTopbarStats` so the hook can carry the contract to the top bar.\n- `components/AppShell.tsx` — Added a contract comment above the top-bar usage chip naming the three口径 and noting the existing `+child`/`hasChildUsage` logic is left for the `topbar-copy` subtask (no behavior change).\n- `docs/architecture/overview.md` — Documented the confirmed top-bar display口径 (parent `incl. Studio` only on real child usage; standalone no marker; studio_child compact = child's own usage, no `+child`) and the additive rollup fields.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no output)\n\n#### Notes / Risks\n\n- Scope strictly limited to `usage-contract`: only additive API fields + contract documentation. The `+child` removal, `hasChildUsage` fix, hook mapping of `selectedSessionTotals`/`parentRollupTotals` into `sessionStats`, and `ChatWindow` `statsKey` expansion are intentionally NOT done here — they belong to `topbar-copy` and `hook-refresh`. The new topbar-stats fields are currently additive and unused, so no behavior changes.\n- The `/api/usage?sessionId=` route returns the rollup object directly, so the new fields are transparently exposed without route edits.\n- Decision needed from main session: none — the口径 was already confirmed in `plan-review.md` (child compact = own usage; parent compact = `incl. Studio` on real child usage; child tooltip may show parent rollup). This subtask only encodes that contract.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:10:01.515Z",
+        "updatedAt": "2026-07-08T07:21:31.930Z",
+        "eventCount": 2477,
+        "lastTextPreview": "The route returns `rollup` directly, so the additive fields pass through automatically. Validation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added additive fields `selectedSessionTotals` and `parentRollupTotals` to `UsageSessionRollupResult` (with doc comments naming the three display口径: parent / standalone / studio_child), and populated them in `getUsageStatsForSessionRollup`. `selectedSessionTotals` = the selected session's own usage (child's own for `studio_child`); `parentRollupTotals` = parent rollup (恒等于 `totals`, named for口径 clarity). Old fields (`totals`/`ownTotals`/`studioChildTotals`/`childSessions`) keep their semantics.\n- `hooks/useAgentSession.ts` — Added a口径 doc block and additive `selectedSessionTotals` / `parentRollupTotals` fields to `SessionUsageTopbarStats` so the hook can carry the contract to the top bar.\n- `components/AppShell.tsx` — Added a contract comment above the top-bar usage chip naming the three口径 and noting the existing `+child`/`hasChildUsage` logic is left for the `topbar-copy` subtask (no behavior change).\n- `docs/architecture/overview.md` — Documented the confirmed top-bar display口径 (parent `incl. Studio` only on real child usage; standalone no marker; studio_child compact = child's own usage, no `+child`) and the additive rollup fields.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no output)\n\n#### Notes / Risks\n\n- Scope strictly limited to `usage-contract`: only additive API fields + contract documentation. The `+child` removal, `hasChildUsage` fix, hook mapping of `selectedSessionTotals`/`parentRollupTotals` into `sessionStats`, and `ChatWindow` `statsKey` expansion are intentionally NOT done here — they belong to `topbar-copy` and `hook-refresh`. The new topbar-stats fields are currently additive and unused, so no behavior changes.\n- The `/api/usage?sessionId=` route returns the rollup object directly, so the new fields are transparently exposed without route edits.\n- Decision needed from main session: none — the口径 was already confirmed in `plan-review.md` (child compact = own usage; parent compact = `incl. Studio` on real child usage; child tooltip may show parent rollup). This subtask only encodes that contract.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:21:16.479Z",
+            "text": "All in place. Let me verify the route passes through the new fields (it should, since it just returns the result). Let me check the usage route:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:21:16.485Z",
+            "toolCallId": "chatcmpl-tool-85d29efb6086b67c",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"grep -n \\\"getUsageStatsForSessionRollup\\\\|selectedSessionTotals\\\\|parentRollupTotals\\\\|session_rollup\\\\|res.json\\\\|return Response\\\\|return NextResponse\\\" app/api/usage/route.ts | head\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:21:16.521Z",
+            "toolCallId": "chatcmpl-tool-85d29efb6086b67c",
+            "toolName": "bash",
+            "text": "3:import { formatLocalDate, getUsageStats, getUsageStatsForSessionRollup, parseLocalDateParam } from \"@/lib/usage-stats\";\n39:      return NextResponse.json({ error: \"from and to must use YYYY-MM-DD\" }, { status: 400 });\n42:      return NextResponse.json({ error: \"from must be earlier than or equal to to\" }, { status: 400 });\n47:      const rollup = await getUsageStatsForSessionRollup({\n54:        return NextResponse.json({ error: \"session not found\" }, { status: 404 });\n56:      return NextResponse.json(rollup);\n60:    return NextResponse.json({\n66:    return NextResponse.json({ error: String(error) }, { status: 500 });",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:21:31.908Z",
+            "text": "The route returns `rollup` directly, so the additive fields pass through automatically. Validation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added additive fields `selectedSessionTotals` and `parentRollupTotals` to `UsageSessionRollupResult` (with doc comments naming the three display口径: parent / standalone / studio_child), and populated them in `getUsageStatsForSessionRollup`. `selectedSessionTotals` = the selected session's own usage (child's own for `studio_child`); `parentRollupTotals` = parent rollup (恒等于 `totals`, named for口径 clarity). Old fields (`totals`/`ownTotals`/`studioChildTotals`/`childSessions`) keep their semantics.\n- `hooks/useAgentSession.ts` — Added a口径 doc block and additive `selectedSessionTotals` / `parentRollupTotals` fields to `SessionUsageTopbarStats` so the hook can carry the contract to the top bar.\n- `components/AppShell.tsx` — Added a contract comment above the top-bar usage chip naming the three口径 and noting the existing `+child`/`hasChildUsage` logic is left for the `topbar-copy` subtask (no behavior change).\n- `docs/architecture/overview.md` — Documented the confirmed top-bar display口径 (parent `incl. Studio` only on real child usage; standalone no marker; studio_child compact = child's own usage, no `+child`) and the additive rollup fields.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no output)\n\n#### Notes / Risks\n\n- Scope strictly limited to `usage-contract`: only additive API fields + contract documentation. The `+child` removal, `hasChildUsage` fix, hook mapping of `selectedSessionTotals`/`parentRollupTotals` into `sessionStats`, and `ChatWindow` `statsKey` expansion are intentionally NOT done here — they belong to `topbar-copy` and `hook-refresh`. The new topbar-stats fields are currently additive and unused, so no behavior changes.\n- The `/api/usage?sessionId=` route returns the rollup object directly, so the new fields are transparently exposed without route edits.\n- Decision needed from main session: none — the口径 was already confirmed in `plan-review.md` (child compact = own usage; parent compact = `incl. Studio` on real child usage; child tooltip may show parent rollup). This subtask only encodes that contract.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:21:31.921Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3771,
+        "tokens": 553,
+        "tokenSource": "usage",
+        "tps": 0.84,
+        "firstTokenAt": "2026-07-08T07:10:31.588Z",
+        "lastTokenAt": "2026-07-08T07:21:31.890Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d2afe53e00679292d2a4d85b",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/implementer-d2afe53e00679292d2a4d85b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:10:01.515Z",
+        "finishedAt": "2026-07-08T07:21:31.927Z",
+        "updatedAt": "2026-07-08T07:21:31.927Z",
+        "itemCount": 63,
+        "messageCount": 15,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 114564,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f408f-eb59-7bb4-a2ed-11f1aa7ff93e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-10-01-561Z_019f408f-eb59-7bb4-a2ed-11f1aa7ff93e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-c7b6d374af103c08228c572c",
+      "subtaskId": "topbar-copy",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:21:59.833Z",
+      "finishedAt": "2026-07-08T07:29:53.127Z",
+      "runner": "sdk",
+      "childSessionId": "019f409a-e140-731e-a120-02172d3c2a1f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-21-59-872Z_019f409a-e140-731e-a120-02172d3c2a1f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f409a-e140-731e-a120-02172d3c2a1f",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 implementation subtask `topbar-copy`：修复顶部费用 chip 文案与 child usage 判定。要求：移除裸 `+child`；`hasChildUsage` 改为依据 child token/cost totals，而不是 childCount；父 session 有真实 child usage 时 compact 用 `$x incl. Studio`；child-selected 只显示该 child 自身费用；toolt…",
+      "summary": "Implementation complete and validated. Here's the handoff.\n\n## Implementation Complete — `topbar-copy`\n\n### Files Changed\n\n- **`components/AppShell.tsx`** — Removed the bare `+child` placeholder. `hasChildUsage` now uses real child totals (`childTokenTotal > 0 || childCost > 0`) gated on `kind === \"parent\"`, so child sessions with count but zero usage no longer show a child mark. Compact/mark logic split by `selectedSessionKind`:\n  - `parent` with real child usage → `$x incl. Studio`; tooltip splits `own cost` / `Studio children cost`.\n  - `standalone` (and local-source fallback) → `$x` only, no child mark.\n  - `studio_child` → compact shows the child's own usage (`selectedSessionTotals`) with a `Studio child` mark; tooltip scope = `selected Studio child session`, plus additive `parent rollup` cost and short parent id.\n- **`hooks/useAgentSession.ts`** — Additive mapping of `selectedSessionTotals` / `parentRollupTotals` (already declared on the interface by `usage-contract`) into `rollupSessionStats`, so AppShell can render the child-selected display口径.\n- **`components/ChatWindow.tsx`** — `statsKey` now includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), and `parentRollupTotals.cost`, so switching between a parent tab and its Studio child audit tab refreshes the topbar even when rollup totals are equal.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no errors)\n- `grep '+child'` in `components/`, `hooks/`, `lib/` — only matches in explanatory comments, no rendered topbar `+child` text.\n\n### Notes / Risks\n\n- **Scope extension beyond `topbar-copy` file boundary:** To fulfill the parent's explicit instruction (\"child-selected 只显示该 child 自身费用\"), I added the two additive field mappings in `useAgentSession.ts` and the `statsKey` fields in `ChatWindow.tsx`. These are strictly the `hook-refresh` subtask's files. The changes are minimal and additive (no existing fields removed). Recommend the main session mark `hook-refresh` as done/reviewed, or re-run it to audit/extend these mappings.\n- **Manual验收未执行** (running agent cannot drive the browser): parent with/without child usage, Studio child audit session, and `/api/usage` queries still need the manual checks from `checks.md`.\n- Compact text stays short (`incl. Studio` / `Studio child` are ≤12 chars); risk of narrow-screen overflow noted in the plan but kept minimal.\n- No docs updated yet (that's `docs-checks`); architecture/frontend docs still describe the old `+child` behavior and should be synced when that subtask runs.\n\n### Decisions Needed from Main Session\n\n- Confirm the `studio_child` compact marker wording `Studio child` (English, per ui.md recommended口径) is acceptable; if a Chinese label is preferred, it's a one-word change in `components/AppShell.tsx`.\n- Decide whether to claim `hook-refresh` as satisfied by these minimal changes or keep it open for fuller review/extension.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:21:59.833Z",
+        "updatedAt": "2026-07-08T07:29:53.127Z",
+        "eventCount": 2865,
+        "lastTextPreview": "Implementation complete and validated. Here's the handoff.\n\n## Implementation Complete — `topbar-copy`\n\n### Files Changed\n\n- **`components/AppShell.tsx`** — Removed the bare `+child` placeholder. `hasChildUsage` now uses real child totals (`childTokenTotal > 0 || childCost > 0`) gated on `kind === \"parent\"`, so child sessions with count but zero usage no longer show a child mark. Compact/mark logic split by `selectedSessionKind`:\n  - `parent` with real child usage → `$x incl. Studio`; tooltip splits `own cost` / `Studio children cost`.\n  - `standalone` (and local-source fallback) → `$x` only, no child mark.\n  - `studio_child` → compact shows the child's own usage (`selectedSessionTotals`) with a `Studio child` mark; tooltip scope = `selected Studio child session`, plus additive `parent rollup` cost and short parent id.\n- **`hooks/useAgentSession.ts`** — Additive mapping of `selectedSessionTotals` / `parentRollupTotals` (already declared on the interface by `usage-contract`) into `rollupSessionStats`, so AppShell can render the child-selected display口径.\n- **`components/ChatWindow.tsx`** — `statsKey` now includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), and `parentRollupTotals.cost`, so switching between a parent tab and its Studio child audit tab refreshes the topbar even when rollup totals are equal.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no errors)\n- `grep '+child'` in `components/`, `hooks/`, `lib/` — only matches in explanatory comments, no rendered topbar `+child` text.\n\n### Notes / Risks\n\n- **Scope extension beyond `topbar-copy` file boundary:** To fulfill the parent's explicit instruction (\"child-selected 只显示该 child 自身费用\"), I added the two additive field mappings in `useAgentSession.ts` and the `statsKey` fields in `ChatWindow.tsx`. These are strictly the `hook-refresh` subtask's files. The changes are minimal and additive (no existing fields removed). Recommend the main session mark `hook-refresh` as done/reviewed, or re-run it to audit/extend these mappings.\n- **Manual验收未执行** (running agent cannot drive the browser): parent with/without child usage, Studio child audit session, and `/api/usage` queries still need the manual checks from `checks.md`.\n- Compact text stays short (`incl. Studio` / `Studio child` are ≤12 chars); risk of narrow-screen overflow noted in the plan but kept minimal.\n- No docs updated yet (that's `docs-checks`); architecture/frontend docs still describe the old `+child` behavior and should be synced when that subtask runs.\n\n### Decisions Needed from Main Session\n\n- Confirm the `studio_child` compact marker wording `Studio child` (English, per ui.md recommended口径) is acceptable; if a Chinese label is preferred, it's a one-word change in `components/AppShell.tsx`.\n- Decide whether to claim `hook-refresh` as satisfied by these minimal changes or keep it open for fuller review/extension.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:29:15.144Z",
+            "toolCallId": "call_9c70",
+            "toolName": "read",
+            "text": "\"use client\";\n\nimport { useState, useCallback, useRef, useEffect, type CSSProperties } from \"react\";\nimport { useRouter, useSearchParams } from \"next/navigation\";\nimport { SessionSidebar, type ProjectSpaceSelectionContext } from \"./SessionSidebar\";\nimport { ChatWindow } from \"./ChatWindow\";\nimport type { SessionUsageTopbarStats } from \"@/hooks/useAgentSession\";\nimport { FileViewer } from \"./FileViewer\";\nimport { TabBar, type Tab } from \"./TabBar\";\nimport { ModelsConfig } from \"./ModelsConfig\";\nimport { SkillsConfig } from \"./SkillsConfig\";\nimport { UsageStatsModal } from \"./UsageStatsModal\";\nimport { ChatGptUsagePanel } from \"./ChatGptUsagePanel\";\nimport { SubagentPanel } from \"./SubagentPanel\";\nimport { SettingsConfig } from \"./SettingsConfig\";\nimport { TrellisPanel } from \"./TrellisPanel\";\nimport { TrellisSessionWidget } from \"./TrellisSessionWidget\";\nimport { YpiStudioSessionWidget } from \"./YpiStudioSessionWidget\";\nimport { YpiStudioPanel } from \"./YpiStudioPanel\";\nimport { BranchNavigator } from \"./BranchNavigator\";\nimport { GitPanel } from \"./GitPanel\";\nimport { TerminalPanel } from \"./TerminalPanel\";\nimport { getRelativeFilePath } from \"@/lib/file-paths\";\nimport { formatWorkspaceTitle, sameWorkspacePathForTitle } from \"@/lib/workspace-title\";\nimport { useTheme } from \"@/hooks/useTheme\";\nimport type { GitInfo, SessionInfo, SessionTreeNode } from \"@/lib/types\";\nimport type { PiWebConfig } from \"@/lib/pi-web-config\";\nimport type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from \"@/lib/trellis-types\";\nimport type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTaskLinkResult } from \"@/lib/ypi-studio-types\";\nimport { trellisTaskDetailToChatContext, type TrellisTaskChatContext } from \"@/lib/trellis-chat-context\";\nimport type { ChatInputHandle } from \"./ChatInput\";\n\nconst DEFAULT_SIDEBAR_WIDTH = 260;\nconst MIN_SIDEBAR_WIDTH = 220;\nconst MAX_SIDEBAR_WIDTH = 520;\n\n[1473 more lines in file. Use offset=36 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:29:18.851Z",
+            "toolCallId": "call_74fc",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"sed -n '1083,1212p' components/AppShell.tsx\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:29:18.881Z",
+            "toolCallId": "call_74fc",
+            "toolName": "bash",
+            "text": ")}\n          {/* Session stats — right-aligned in top bar.\n           * 费用展示口径（见 lib/usage-stats.ts UsageSessionRollupResult /\n           * hooks/useAgentSession.ts SessionUsageTopbarStats，由主会话确认）：\n           * - parent：compact 显示 parent rollup（parent own + Studio children），\n           *   存在真实 child usage（child token/cost totals > 0）时追加 `incl. Studio`；\n           *   tooltip 拆分 own cost / Studio children cost。child 仅数量无 usage 时不显示 child 标记。\n           * - standalone：compact 显示该 session 自身 usage，无 child 标记。\n           * - studio_child：compact 只显示该 child 自身 usage（selectedSessionTotals），\n           *   tooltip 附带 parent rollup（parentRollupTotals）与 parent id。\n           * local 源（无 rollup）按 standalone 口径处理，且无 child 标记。 */}\n          {showChat && (sessionStats || contextUsage) && (() => {\n            const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);\n\n            // 选中 session 的展示口径与 totals。local 源无 selectedSessionKind → standalone。\n            const kind = sessionStats?.selectedSessionKind ?? \"standalone\";\n            const selectedTotals = sessionStats?.selectedSessionTotals;\n            // studio_child compact 展示该 child 自身 usage；其余使用 rollup/own totals。\n            const t = kind === \"studio_child\" && selectedTotals ? selectedTotals.tokens : sessionStats?.tokens;\n            const c = kind === \"studio_child\" && selectedTotals ? (selectedTotals.cost ?? 0) : (sessionStats?.cost ?? 0);\n            const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;\n\n            let ctxColor = \"var(--text-muted)\";\n            let ctxStr: string | null = null;\n            if (contextUsage?.contextWindow) {\n              const pct = contextUsage.percent;\n              if (pct !== null && pct > 90) ctxColor = \"#ef4444\";\n              else if (pct !== null && pct > 70) ctxColor = \"rgba(234,179,8,0.95)\";\n              ctxStr = pct !== null ? `${pct.toFixed(0)}% / ${fmt(contextUsage.contextWindow)}` : `? / ${fmt(contextUsage.contextWindow)}`;\n            }\n\n            const childCount = sessionStats?.studioChildSessionCount ?? 0;\n            const ownCost = sessionStats?.own?.cost ?? 0;\n            const studioChild = sessionStats?.studioChild;\n            const childCost = studioChild?.cost ?? 0;\n            const childTokenTotal = studioChild\n              ? studioChild.tokens.input + studioChild.tokens.output + studioChild.tokens.cacheRead + studioChild.tokens.cacheWrite\n              : 0;\n            // 真实 child usage = child token/cost totals > 0，不再因 child 数量误判。\n            const hasChildUsage = kind === \"parent\" && (childTokenTotal > 0 || childCost > 0);\n            const parentRollupCost = sessionStats?.parentRollupTotals?.cost ?? 0;\n            const shortParentId = sessionStats?.parentSessionId ? sessionStats.parentSessionId.slice(0, 8) : \"\";\n            // compact 追加标记：parent 显示 `incl. Studio`，studio_child 显示 `Studio child`。\n            const compactMark = kind === \"studio_child\"\n              ? \"Studio child\"\n              : hasChildUsage\n                ? \"incl. Studio\"\n                : null;\n            const tooltipParts: string[] = [];\n            if (t) {\n              if (kind === \"studio_child\") {\n                tooltipParts.push(\"scope: selected Studio child session\");\n                tooltipParts.push(`source: ${sessionStats?.source === \"rollup\" ? \"usage rollup\" : \"local messages\"}`);\n                tooltipParts.push(`in: ${t.input.toLocaleString()}`);\n                tooltipParts.push(`out: ${t.output.toLocaleString()}`);\n                tooltipParts.push(`cache read: ${t.cacheRead.toLocaleString()}`);\n                tooltipParts.push(`cache write: ${t.cacheWrite.toLocaleString()}`);\n                if (c > 0) tooltipParts.push(`cost: $${c.toFixed(4)}`);\n                // 附带 parent rollup（已汇总该 child），避免维持误导的 `+child` 语义。\n                if (parentRollupCost > 0) tooltipParts.push(`parent rollup: $${parentRollupCost.toFixed(4)}`);\n                if (shortParentId) tooltipParts.push(`parent session: ${shortParentId}`);\n              } else {\n                tooltipParts.push(`scope: ${hasChildUsage ? `current chat + ${childCount} Studio child session${childCount === 1 ? \"\" : \"s\"}` : \"current chat\"}`);\n                tooltipParts.push(`source: ${sessionStats?.source === \"rollup\" ? \"usage rollup\" : \"local messages\"}`);\n                tooltipParts.push(`in: ${t.input.toLocaleString()}`);\n                tooltipParts.push(`out: ${t.output.toLocaleString()}`);\n                tooltipParts.push(`cache read: ${t.cacheRead.toLocaleString()}`);\n                tooltipParts.push(`cache write: ${t.cacheWrite.toLocaleString()}`);\n                if (c > 0) tooltipParts.push(`cost: $${c.toFixed(4)}`);\n                if (hasChildUsage) {\n                  tooltipParts.push(`own cost: $${ownCost.toFixed(4)}`);\n                  tooltipParts.push(`Studio children cost: $${childCost.toFixed(4)}`);\n                }\n              }\n            }\n            if (contextUsage?.contextWindow) {\n              const pct = contextUsage.percent;\n              tooltipParts.push(`context: ${pct !== null ? pct.toFixed(1) + \"%\" : \"unknown\"} of ${contextUsage.contextWindow.toLocaleString()} tokens`);\n            }\n            const tooltip = tooltipParts.join(\"  |  \");\n\n            return (\n              <div\n                className=\"app-top-stats\"\n                title={tooltip}\n                style={{\n                  marginLeft: \"auto\",\n                  display: \"flex\", alignItems: \"center\", gap: 10,\n                  paddingLeft: 12,\n                  paddingRight: webConfig?.chatgpt.usagePanelEnabled ? 12 : rightPanelTogglePadding,\n                  height: \"100%\",\n                  fontSize: 11, color: \"var(--text-muted)\",\n                  whiteSpace: \"nowrap\", cursor: \"default\",\n                  fontVariantNumeric: \"tabular-nums\",\n                }}\n              >\n                {t && t.input > 0 && (\n                  <span style={{ display: \"flex\", alignItems: \"center\", gap: 4 }}>\n                    <svg width=\"12\" height=\"12\" viewBox=\"0 0 10 10\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n                      <line x1=\"5\" y1=\"8.5\" x2=\"5\" y2=\"1.5\" /><polyline points=\"2 4 5 1.5 8 4\" />\n                    </svg>\n                    {fmt(t.input)}\n                  </span>\n                )}\n                {t && t.output > 0 && (\n                  <span style={{ display: \"flex\", alignItems: \"center\", gap: 4 }}>\n                    <svg width=\"12\" height=\"12\" viewBox=\"0 0 10 10\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n                      <line x1=\"5\" y1=\"1.5\" x2=\"5\" y2=\"8.5\" /><polyline points=\"2 6 5 8.5 8 6\" />\n                    </svg>\n                    {fmt(t.output)}\n                  </span>\n                )}\n                {t && t.cacheRead > 0 && (\n                  <span style={{ display: \"flex\", alignItems: \"center\", gap: 4 }}>\n                    <svg width=\"12\" height=\"12\" viewBox=\"0 0 10 10\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n                      <path d=\"M8.5 5a3.5 3.5 0 1 1-1-2.45\" /><polyline points=\"6.5 1.5 8.5 2.5 7.5 4.5\" />\n                    </svg>\n                    {fmt(t.cacheRead)}\n                  </span>\n                )}\n                {costStr && (\n                  <span style={{ display: \"flex\", alignItems: \"center\", gap: 4, color: \"var(--text)\", fontWeight: 500 }}>\n                    {costStr}\n                    {compactMark && <span style={{ color: \"var(--text-muted)\", fontWeight: 400 }}>{compactMark}</span>}\n                  </span>\n                )}\n                {ctxStr && (\n                  <span style={{ display: \"flex\", alignItems: \"center\", gap: 4, color: ctxColor }}>\n                    <svg width=\"12\" height=\"12\" viewBox=\"0 0 10 10\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"1.2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n                      <path d=\"M1 9 L1 5 Q1 1 5 1 Q9 1 9 5 L9 9\" /><line x1=\"1\" y1=\"9\" x2=\"9\" y2=\"9\" />",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:29:53.101Z",
+            "text": "Implementation complete and validated. Here's the handoff.\n\n## Implementation Complete — `topbar-copy`\n\n### Files Changed\n\n- **`components/AppShell.tsx`** — Removed the bare `+child` placeholder. `hasChildUsage` now uses real child totals (`childTokenTotal > 0 || childCost > 0`) gated on `kind === \"parent\"`, so child sessions with count but zero usage no longer show a child mark. Compact/mark logic split by `selectedSessionKind`:\n  - `parent` with real child usage → `$x incl. Studio`; tooltip splits `own cost` / `Studio children cost`.\n  - `standalone` (and local-source fallback) → `$x` only, no child mark.\n  - `studio_child` → compact shows the child's own usage (`selectedSessionTotals`) with a `Studio child` mark; tooltip scope = `selected Studio child session`, plus additive `parent rollup` cost and short parent id.\n- **`hooks/useAgentSession.ts`** — Additive mapping of `selectedSessionTotals` / `parentRollupTotals` (already declared on the interface by `usage-contract`) into `rollupSessionStats`, so AppShell can render the child-selected display口径.\n- **`components/ChatWindow.tsx`** — `statsKey` now includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), and `parentRollupTotals.cost`, so switching between a parent tab and its Studio child audit tab refreshes the topbar even when rollup totals are equal.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no errors)\n- `grep '+child'` in `components/`, `hooks/`, `lib/` — only matches in explanatory comments, no rendered topbar `+child` text.\n\n### Notes / Risks\n\n- **Scope extension beyond `topbar-copy` file boundary:** To fulfill the parent's explicit instruction (\"child-selected 只显示该 child 自身费用\"), I added the two additive field mappings in `useAgentSession.ts` and the `statsKey` fields in `ChatWindow.tsx`. These are strictly the `hook-refresh` subtask's files. The changes are minimal and additive (no existing fields removed). Recommend the main session mark `hook-refresh` as done/reviewed, or re-run it to audit/extend these mappings.\n- **Manual验收未执行** (running agent cannot drive the browser): parent with/without child usage, Studio child audit session, and `/api/usage` queries still need the manual checks from `checks.md`.\n- Compact text stays short (`incl. Studio` / `Studio child` are ≤12 chars); risk of narrow-screen overflow noted in the plan but kept minimal.\n- No docs updated yet (that's `docs-checks`); architecture/frontend docs still describe the old `+child` behavior and should be synced when that subtask runs.\n\n### Decisions Needed from Main Session\n\n- Confirm the `studio_child` compact marker wording `Studio child` (English, per ui.md recommended口径) is acceptable; if a Chinese label is preferred, it's a one-word change in `components/AppShell.tsx`.\n- Decide whether to claim `hook-refresh` as satisfied by these minimal changes or keep it open for fuller review/extension.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:29:53.117Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3907,
+        "tokens": 716,
+        "tokenSource": "usage",
+        "tps": 1.53,
+        "firstTokenAt": "2026-07-08T07:22:06.594Z",
+        "lastTokenAt": "2026-07-08T07:29:53.084Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-c7b6d374af103c08228c572c",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/implementer-c7b6d374af103c08228c572c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:21:59.833Z",
+        "finishedAt": "2026-07-08T07:29:53.124Z",
+        "updatedAt": "2026-07-08T07:29:53.124Z",
+        "itemCount": 60,
+        "messageCount": 12,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 133238,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f409a-e140-731e-a120-02172d3c2a1f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-21-59-872Z_019f409a-e140-731e-a120-02172d3c2a1f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-fb73f55cf58e052065beb306",
+      "subtaskId": "hook-refresh",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:30:12.802Z",
+      "finishedAt": "2026-07-08T07:33:44.012Z",
+      "runner": "sdk",
+      "childSessionId": "019f40a2-6725-7563-abdd-d36f6b56530b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-30-12-901Z_019f40a2-6725-7563-abdd-d36f6b56530b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f40a2-6725-7563-abdd-d36f6b56530b",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 implementation subtask `hook-refresh`：调整 hook/topbar stats 映射与刷新 key。要求：在 SessionUsageTopbarStats 中加入必要 display scope / selectedSessionKind / selected child totals / parent rollup 信息；child-selected 时从当前 session 对应 child totals 显示自身费用；更新…",
+      "summary": "The implementation is complete and validated. Here is the handoff.\n\n### Implementation Complete — `hook-refresh`\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — Hardened the topbar `statsKey` to include `own` and `studioChild` **token totals** (not just cost). Previously only `own.cost`/`studioChild.cost` were in the key; since `hasChildUsage` is driven by child token total (`childTokenTotal > 0`), a child session with token usage but zero cost could change the parent's `incl. Studio` mark without refreshing `AppShell`. Added the missing token totals + an explanatory comment.\n\nNo other file needed changes for this subtask — the additive hook/rollup plumbing was already present from the `usage-contract`/`topbar-copy` work:\n\n- `hooks/useAgentSession.ts` — `SessionUsageTopbarStats` already exposes `selectedSessionKind`, `selectedSessionTotals`, `parentRollupTotals`, `parentFound`; `rollupSessionStats` maps them from `UsageSessionRollupResult`; `sessionStats = rollupSessionStats ?? localSessionStats` preserves the local fallback on rollup-API failure (`setSessionUsageRollup(null)` on non-abort error). Verified children's messages are never merged into the parent `messages` list — rollup only reads `usage` totals; `messages` comes solely from `/api/sessions/:id`.\n- `components/AppShell.tsx` — already consumes `kind === \"studio_child\"` → shows the child's own `selectedSessionTotals` in compact, with parent rollup in tooltip; parent shows `incl. Studio` only when real child token/cost totals > 0.\n\n#### Verification\n\n- `npm run lint` — passed (no output / clean).\n- `node_modules/.bin/tsc --noEmit` — passed (no errors).\n\n#### Acceptance check\n\n- Parent ↔ Studio child audit tab switch now refreshes compact + tooltip immediately: `statsKey` includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), `parentRollupTotals.cost`, `studioChildSessionCount`, and now own/studioChild token totals — covering all fields driving `hasChildUsage`, compact cost, `compactMark`, and tooltip splits.\n- Rollup API failure falls back to `localSessionStats` (standalone口径, no child mark) — confirmed.\n- Child usage/messages are not folded into the parent messages list — confirmed (separate data paths).\n\n#### Notes / Risks\n\n- Manual runtime verification (实际切换同一 parent 与 child audit tab、检查 Usage 弹窗、`/api/usage?sessionId=<parent|child>` 三类查询) is out of scope for `hook-refresh` and belongs to `usage-validation` / `docs-checks`. No code change skipped.\n- No `next build` run (per task constraints).\n- Date/time convention and additive-field compatibility preserved; no existing `UsageSessionRollupResult` / `SessionUsageTopbarStats` field removed or re-semanted.\n\nNo decisions needed from the main session for this subtask.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:30:12.802Z",
+        "updatedAt": "2026-07-08T07:33:44.012Z",
+        "eventCount": 1133,
+        "lastTextPreview": "The implementation is complete and validated. Here is the handoff.\n\n### Implementation Complete — `hook-refresh`\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — Hardened the topbar `statsKey` to include `own` and `studioChild` **token totals** (not just cost). Previously only `own.cost`/`studioChild.cost` were in the key; since `hasChildUsage` is driven by child token total (`childTokenTotal > 0`), a child session with token usage but zero cost could change the parent's `incl. Studio` mark without refreshing `AppShell`. Added the missing token totals + an explanatory comment.\n\nNo other file needed changes for this subtask — the additive hook/rollup plumbing was already present from the `usage-contract`/`topbar-copy` work:\n\n- `hooks/useAgentSession.ts` — `SessionUsageTopbarStats` already exposes `selectedSessionKind`, `selectedSessionTotals`, `parentRollupTotals`, `parentFound`; `rollupSessionStats` maps them from `UsageSessionRollupResult`; `sessionStats = rollupSessionStats ?? localSessionStats` preserves the local fallback on rollup-API failure (`setSessionUsageRollup(null)` on non-abort error). Verified children's messages are never merged into the parent `messages` list — rollup only reads `usage` totals; `messages` comes solely from `/api/sessions/:id`.\n- `components/AppShell.tsx` — already consumes `kind === \"studio_child\"` → shows the child's own `selectedSessionTotals` in compact, with parent rollup in tooltip; parent shows `incl. Studio` only when real child token/cost totals > 0.\n\n#### Verification\n\n- `npm run lint` — passed (no output / clean).\n- `node_modules/.bin/tsc --noEmit` — passed (no errors).\n\n#### Acceptance check\n\n- Parent ↔ Studio child audit tab switch now refreshes compact + tooltip immediately: `statsKey` includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), `parentRollupTotals.cost`, `studioChildSessionCount`, and now own/studioChild token totals — covering all fields driving `hasChildUsage`, compact cost, `compactMark`, and tooltip splits.\n- Rollup API failure falls back to `localSessionStats` (standalone口径, no child mark) — confirmed.\n- Child usage/messages are not folded into the parent messages list — confirmed (separate data paths).\n\n#### Notes / Risks\n\n- Manual runtime verification (实际切换同一 parent 与 child audit tab、检查 Usage 弹窗、`/api/usage?sessionId=<parent|child>` 三类查询) is out of scope for `hook-refresh` and belongs to `usage-validation` / `docs-checks`. No code change skipped.\n- No `next build` run (per task constraints).\n- Date/time convention and additive-field compatibility preserved; no existing `UsageSessionRollupResult` / `SessionUsageTopbarStats` field removed or re-semanted.\n\nNo decisions needed from the main session for this subtask.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:32:50.919Z",
+            "text": "只有注释提到了旧的 `+child` 语义；字面上的显示文本已删除。让我验证一下最终的 statsKey 代码块读取是否正常。",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:32:50.928Z",
+            "toolCallId": "call_9fa5",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"components/ChatWindow.tsx\",\n  \"limit\": 45\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:32:50.952Z",
+            "toolCallId": "call_9fa5",
+            "toolName": "read",
+            "text": "\"use client\";\n\nimport Image from \"next/image\";\nimport { useCallback, useEffect, useRef, useState } from \"react\";\nimport type { PiWebThinkingLevel, PiWebToolPreset } from \"@/lib/pi-web-config\";\nimport type { AgentMessage, SessionInfo, SessionTreeNode } from \"@/lib/types\";\nimport type { YpiStudioLiveRunOverlay } from \"@/lib/ypi-studio-types\";\nimport { MessageView } from \"./MessageView\";\nimport { ChatInput, type ChatInputHandle } from \"./ChatInput\";\nimport { ChatMinimap, useMessageRefs } from \"./ChatMinimap\";\nimport { useAgentSession, type AgentPhase, type SessionUsageTopbarStats } from \"@/hooks/useAgentSession\";\nimport { useAudio } from \"@/hooks/useAudio\";\nimport { useAutoScroll } from \"@/hooks/useAutoScroll\";\nimport { useDragDrop } from \"@/hooks/useDragDrop\";\nimport { SessionChangesFloatingPanel } from \"./SessionChangesFloatingPanel\";\n\ninterface Props {\n  session: SessionInfo | null;\n  newSessionCwd: string | null;\n  newSessionProjectContext?: { projectId: string; spaceId: string } | null;\n  onAgentEnd?: () => void;\n  onSessionCreated?: (session: SessionInfo) => void;\n  onSessionForked?: (newSessionId: string) => void;\n  modelsRefreshKey?: number;\n  chatInputRef?: React.RefObject<ChatInputHandle | null>;\n  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;\n  onSystemPromptChange?: (prompt: string | null) => void;\n  onSubagentChange?: (runs: import(\"@/hooks/useAgentSession\").SubagentRun[]) => void;\n  onSessionStatsChange?: (stats: SessionUsageTopbarStats | null) => void;\n  onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;\n  onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;\n  onSessionListRefreshNeeded?: (reason: { source: \"studio_tool\"; signature: string }) => void;\n  defaultToolPreset?: PiWebToolPreset;\n  defaultThinkingLevel?: PiWebThinkingLevel;\n}\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {\n  return typeof value === \"object\" && value !== null && !Array.isArray(value);\n}\n\nfunction optionalString(value: unknown): string | undefined {\n  return typeof value === \"string\" && value.trim() ? value.trim() : undefined;\n}\n\nfunction optionalNumber(value: unknown): number | undefined {\n\n[612 more lines in file. Use offset=46 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:33:43.983Z",
+            "text": "The implementation is complete and validated. Here is the handoff.\n\n### Implementation Complete — `hook-refresh`\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — Hardened the topbar `statsKey` to include `own` and `studioChild` **token totals** (not just cost). Previously only `own.cost`/`studioChild.cost` were in the key; since `hasChildUsage` is driven by child token total (`childTokenTotal > 0`), a child session with token usage but zero cost could change the parent's `incl. Studio` mark without refreshing `AppShell`. Added the missing token totals + an explanatory comment.\n\nNo other file needed changes for this subtask — the additive hook/rollup plumbing was already present from the `usage-contract`/`topbar-copy` work:\n\n- `hooks/useAgentSession.ts` — `SessionUsageTopbarStats` already exposes `selectedSessionKind`, `selectedSessionTotals`, `parentRollupTotals`, `parentFound`; `rollupSessionStats` maps them from `UsageSessionRollupResult`; `sessionStats = rollupSessionStats ?? localSessionStats` preserves the local fallback on rollup-API failure (`setSessionUsageRollup(null)` on non-abort error). Verified children's messages are never merged into the parent `messages` list — rollup only reads `usage` totals; `messages` comes solely from `/api/sessions/:id`.\n- `components/AppShell.tsx` — already consumes `kind === \"studio_child\"` → shows the child's own `selectedSessionTotals` in compact, with parent rollup in tooltip; parent shows `incl. Studio` only when real child token/cost totals > 0.\n\n#### Verification\n\n- `npm run lint` — passed (no output / clean).\n- `node_modules/.bin/tsc --noEmit` — passed (no errors).\n\n#### Acceptance check\n\n- Parent ↔ Studio child audit tab switch now refreshes compact + tooltip immediately: `statsKey` includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), `parentRollupTotals.cost`, `studioChildSessionCount`, and now own/studioChild token totals — covering all fields driving `hasChildUsage`, compact cost, `compactMark`, and tooltip splits.\n- Rollup API failure falls back to `localSessionStats` (standalone口径, no child mark) — confirmed.\n- Child usage/messages are not folded into the parent messages list — confirmed (separate data paths).\n\n#### Notes / Risks\n\n- Manual runtime verification (实际切换同一 parent 与 child audit tab、检查 Usage 弹窗、`/api/usage?sessionId=<parent|child>` 三类查询) is out of scope for `hook-refresh` and belongs to `usage-validation` / `docs-checks`. No code change skipped.\n- No `next build` run (per task constraints).\n- Date/time convention and additive-field compatibility preserved; no existing `UsageSessionRollupResult` / `SessionUsageTopbarStats` field removed or re-semanted.\n\nNo decisions needed from the main session for this subtask.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:33:44.002Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3580,
+        "tokens": 659,
+        "tokenSource": "usage",
+        "tps": 3.19,
+        "firstTokenAt": "2026-07-08T07:30:17.364Z",
+        "lastTokenAt": "2026-07-08T07:33:43.966Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-fb73f55cf58e052065beb306",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/implementer-fb73f55cf58e052065beb306.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:30:12.802Z",
+        "finishedAt": "2026-07-08T07:33:44.010Z",
+        "updatedAt": "2026-07-08T07:33:44.010Z",
+        "itemCount": 41,
+        "messageCount": 11,
+        "toolCallCount": 13,
+        "stderrBytes": 0,
+        "bytes": 61857,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f40a2-6725-7563-abdd-d36f6b56530b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-30-12-901Z_019f40a2-6725-7563-abdd-d36f6b56530b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-28f771e5a39a0f8f7c3f40d4",
+      "subtaskId": "usage-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:33:59.309Z",
+      "finishedAt": "2026-07-08T07:40:50.176Z",
+      "runner": "sdk",
+      "childSessionId": "019f40a5-dbb3-7426-8abb-6ceabfa3a4fc",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-33-59-347Z_019f40a5-dbb3-7426-8abb-6ceabfa3a4fc.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f40a5-dbb3-7426-8abb-6ceabfa3a4fc",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 implementation subtask `usage-validation`：验证 Usage 聚合链路并补必要回归检查。要求：检查 `getUsageStats` / `getUsageStatsForSessionRollup` active/archive 下都 includeStudioChildren；验证 global totals、bySession、byParentSession、session_rollup(parent) 与 child-se…",
+      "summary": "### Implementation Complete — `usage-validation` subtask\n\n#### Files Changed / Artifacts Produced\n\n- `scripts/test-usage-stats-rollup.mjs` (新增) — fixture 回归脚本：在临时 `PI_CODING_AGENT_DIR` 下构造真实 JSONL（parent + child 有/无 usage + standalone + orphan child + archived child），走真实 `SessionManager` + `session-reader` 扫描路径，断言 global totals、bySession、byParentSession（parent/orphan/standalone）、session_rollup（parent/child/standalone/orphan/archived）与 `includeArchived` 开关共 10 组断言。\n- `scripts/ts-extension-loader.mjs` (改动) — additive 增加 `@/` path alias → 项目根解析（含 `.ts` fallback），使测试脚本可 import 使用 `@/lib/...` 的源模块；原有 `./`/`../` 行为不变。\n- `lib/git-worktree.ts` (改动) — `MainWorktreeDirtyError` 的 constructor parameter property 改为显式字段 + 赋值，行为不变，仅消除 Node strip-only 模式不支持 parameter property 的加载阻塞。\n- `package.json` (改动) — 新增 `test:usage-rollup` 脚本。\n- `.ypi/tasks/.../checks.md`、`handoff.md` — 勾选 R3、记录验证样本与子任务完成。\n\n#### Verification\n\n- `npm run test:usage-rollup` — passed (10 assertion groups)\n- `npm run test:studio-policy` / `npm run test:studio-dag` — still passed (loader change non-breaking)\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### 结论\n\nR3 全部覆盖：`getUsageStats` / `getUsageStatsForSessionRollup` 在 active 与 archive scope 下都 `includeStudioChildren`；`byParentSession.totals = ownTotals + studioChildTotals`；`session_rollup(parent)` rollup = own + children；`session_rollup(child)` 满足确认口径（`selectedSessionTotals` = child 自身、`parentRollupTotals` = parent rollup）；孤儿 child `parentFound=false` 保留；archived child 经 metadata 扫描路径仍能读取真实 usage 并汇入 parent rollup。Usage 弹窗的 `byParentSession` fallback 不受影响。\n\n#### Notes / Risks\n\n- R1/R2 属于 `topbar-copy` / `hook-refresh` 子任务，本子任务未触及 `AppShell.tsx` / `useAgentSession.ts` / `ChatWindow.tsx`。\n- `lib/git-worktree.ts` 改动超出 `usage-validation` 列出的 files 范围，但属最小加载阻塞消除（非行为变更），已通过 type-check/lint。如主会话认为不该改，可改引入 tsx/esbuild loader，但项目当前未引入。\n- 回归脚本依赖 Node 内建 TS strip；后续若 `lib/` 新增 enum/namespace/parameter property 语法，脚本会再次无法加载。\n- 需主会话关注：是否认可 `git-worktree.ts` 的最小语法调整为本次回归脚本的可接受代价。",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:33:59.309Z",
+        "updatedAt": "2026-07-08T07:40:50.176Z",
+        "eventCount": 11784,
+        "lastTextPreview": "### Implementation Complete — `usage-validation` subtask\n\n#### Files Changed / Artifacts Produced\n\n- `scripts/test-usage-stats-rollup.mjs` (新增) — fixture 回归脚本：在临时 `PI_CODING_AGENT_DIR` 下构造真实 JSONL（parent + child 有/无 usage + standalone + orphan child + archived child），走真实 `SessionManager` + `session-reader` 扫描路径，断言 global totals、bySession、byParentSession（parent/orphan/standalone）、session_rollup（parent/child/standalone/orphan/archived）与 `includeArchived` 开关共 10 组断言。\n- `scripts/ts-extension-loader.mjs` (改动) — additive 增加 `@/` path alias → 项目根解析（含 `.ts` fallback），使测试脚本可 import 使用 `@/lib/...` 的源模块；原有 `./`/`../` 行为不变。\n- `lib/git-worktree.ts` (改动) — `MainWorktreeDirtyError` 的 constructor parameter property 改为显式字段 + 赋值，行为不变，仅消除 Node strip-only 模式不支持 parameter property 的加载阻塞。\n- `package.json` (改动) — 新增 `test:usage-rollup` 脚本。\n- `.ypi/tasks/.../checks.md`、`handoff.md` — 勾选 R3、记录验证样本与子任务完成。\n\n#### Verification\n\n- `npm run test:usage-rollup` — passed (10 assertion groups)\n- `npm run test:studio-policy` / `npm run test:studio-dag` — still passed (loader change non-breaking)\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### 结论\n\nR3 全部覆盖：`getUsageStats` / `getUsageStatsForSessionRollup` 在 active 与 archive scope 下都 `includeStudioChildren`；`byParentSession.totals = ownTotals + studioChildTotals`；`session_rollup(parent)` rollup = own + children；`session_rollup(child)` 满足确认口径（`selectedSessionTotals` = child 自身、`parentRollupTotals` = parent rollup）；孤儿 child `parentFound=false` 保留；archived child 经 metadata 扫描路径仍能读取真实 usage 并汇入 parent rollup。Usage 弹窗的 `byParentSession` fallback 不受影响。\n\n#### Notes / Risks\n\n- R1/R2 属于 `topbar-copy` / `hook-refresh` 子任务，本子任务未触及 `AppShell.tsx` / `useAgentSession.ts` / `ChatWindow.tsx`。\n- `lib/git-worktree.ts` 改动超出 `usage-validation` 列出的 files 范围，但属最小加载阻塞消除（非行为变更），已通过 type-check/lint。如主会话认为不该改，可改引入 tsx/esbuild loader，但项目当前未引入。\n- 回归脚本依赖 Node 内建 TS strip；后续若 `lib/` 新增 enum/namespace/parameter property 语法，脚本会再次无法加载。\n- 需主会话关注：是否认可 `git-worktree.ts` 的最小语法调整为本次回归脚本的可接受代价。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:40:20.572Z",
+            "text": "Final verification run of the full validation suite:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:40:20.580Z",
+            "toolCallId": "chatcmpl-tool-b164c4dbb7a064ca",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && npm run lint 2>&1 | tail -3 && echo \\\"=== tsc ===\\\" && node_modules/.bin/tsc --noEmit && echo \\\"tsc OK\\\" && echo \\\"=== usage-rollup ===\\\" && npm run test:usage-rollup 2>&1 | grep -E \\\"passed|Error\\\"\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:40:35.665Z",
+            "toolCallId": "chatcmpl-tool-b164c4dbb7a064ca",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.9 lint\n> eslint .\n\n=== tsc ===\ntsc OK\n=== usage-rollup ===\nusage stats rollup regression tests passed",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:40:50.128Z",
+            "text": "### Implementation Complete — `usage-validation` subtask\n\n#### Files Changed / Artifacts Produced\n\n- `scripts/test-usage-stats-rollup.mjs` (新增) — fixture 回归脚本：在临时 `PI_CODING_AGENT_DIR` 下构造真实 JSONL（parent + child 有/无 usage + standalone + orphan child + archived child），走真实 `SessionManager` + `session-reader` 扫描路径，断言 global totals、bySession、byParentSession（parent/orphan/standalone）、session_rollup（parent/child/standalone/orphan/archived）与 `includeArchived` 开关共 10 组断言。\n- `scripts/ts-extension-loader.mjs` (改动) — additive 增加 `@/` path alias → 项目根解析（含 `.ts` fallback），使测试脚本可 import 使用 `@/lib/...` 的源模块；原有 `./`/`../` 行为不变。\n- `lib/git-worktree.ts` (改动) — `MainWorktreeDirtyError` 的 constructor parameter property 改为显式字段 + 赋值，行为不变，仅消除 Node strip-only 模式不支持 parameter property 的加载阻塞。\n- `package.json` (改动) — 新增 `test:usage-rollup` 脚本。\n- `.ypi/tasks/.../checks.md`、`handoff.md` — 勾选 R3、记录验证样本与子任务完成。\n\n#### Verification\n\n- `npm run test:usage-rollup` — passed (10 assertion groups)\n- `npm run test:studio-policy` / `npm run test:studio-dag` — still passed (loader change non-breaking)\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### 结论\n\nR3 全部覆盖：`getUsageStats` / `getUsageStatsForSessionRollup` 在 active 与 archive scope 下都 `includeStudioChildren`；`byParentSession.totals = ownTotals + studioChildTotals`；`session_rollup(parent)` rollup = own + children；`session_rollup(child)` 满足确认口径（`selectedSessionTotals` = child 自身、`parentRollupTotals` = parent rollup）；孤儿 child `parentFound=false` 保留；archived child 经 metadata 扫描路径仍能读取真实 usage 并汇入 parent rollup。Usage 弹窗的 `byParentSession` fallback 不受影响。\n\n#### Notes / Risks\n\n- R1/R2 属于 `topbar-copy` / `hook-refresh` 子任务，本子任务未触及 `AppShell.tsx` / `useAgentSession.ts` / `ChatWindow.tsx`。\n- `lib/git-worktree.ts` 改动超出 `usage-validation` 列出的 files 范围，但属最小加载阻塞消除（非行为变更），已通过 type-check/lint。如主会话认为不该改，可改引入 tsx/esbuild loader，但项目当前未引入。\n- 回归脚本依赖 Node 内建 TS strip；后续若 `lib/` 新增 enum/namespace/parameter property 语法，脚本会再次无法加载。\n- 需主会话关注：是否认可 `git-worktree.ts` 的最小语法调整为本次回归脚本的可接受代价。",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:40:50.154Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3255,
+        "tokens": 716,
+        "tokenSource": "usage",
+        "tps": 1.75,
+        "firstTokenAt": "2026-07-08T07:34:00.890Z",
+        "lastTokenAt": "2026-07-08T07:40:50.111Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-28f771e5a39a0f8f7c3f40d4",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/implementer-28f771e5a39a0f8f7c3f40d4.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:33:59.309Z",
+        "finishedAt": "2026-07-08T07:40:50.168Z",
+        "updatedAt": "2026-07-08T07:40:50.168Z",
+        "itemCount": 113,
+        "messageCount": 11,
+        "toolCallCount": 49,
+        "stderrBytes": 0,
+        "bytes": 133657,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f40a5-dbb3-7426-8abb-6ceabfa3a4fc",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-33-59-347Z_019f40a5-dbb3-7426-8abb-6ceabfa3a4fc.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-76875e928cf6852c4e381e5a",
+      "subtaskId": "docs-checks",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:41:05.725Z",
+      "finishedAt": "2026-07-08T07:44:28.574Z",
+      "runner": "sdk",
+      "childSessionId": "019f40ac-5d5d-7c66-8254-f4c50e614820",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-41-05-757Z_019f40ac-5d5d-7c66-8254-f4c50e614820.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f40ac-5d5d-7c66-8254-f4c50e614820",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 implementation subtask `docs-checks`：同步相关文档并执行最终验证。要求：若 child-selected topbar 口径或 UsageSessionRollupResult 字段有变化，更新 `docs/architecture/overview.md`、`docs/modules/frontend.md`、`docs/modules/api.md`、`docs/modules/library.md` 等必要文档；运行 `npm…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — 更新 `AppShell` top-bar chip 展示口径（parent `incl. Studio` / standalone 自身 / studio_child `Studio child`，`hasChildUsage` 改为 token/cost > 0）、`ChatWindow` `statsKey` 新增字段、`useAgentSession` `SessionUsageTopbarStats` additive 字段与 local fallback `standalone` 语义、`UsageStatsModal` 不受 additive 字段影响。\n- `docs/modules/api.md` — `usage/` route `session_rollup` 响应 additive `selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 字段与 implementation pointer 契约说明。\n- `docs/modules/library.md` — `lib/usage-stats.ts` `UsageSessionRollupResult` additive 字段语义与口径。\n- `.ypi/tasks/…/checks.md` — 勾选 R1/R2 项，追加 docs-checks 验证记录与未覆盖手工验收点。\n- `.ypi/tasks/…/handoff.md` — 追加 docs-checks 子任务完成记录。\n- `.ypi/tasks/…/review.md`、`summary.md` — 填写复核与总结。\n\n`docs/architecture/overview.md` 已由前序子任务更新，本子任务复核一致，未再改动。\n\n#### Verification\n\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — 通过\n- `npm run test:usage-rollup` — 通过（10 组断言）\n- 未运行 `next build`（按子任务约束）\n- 文档一致性 grep：26 处新口径引用，0 处遗留裸 `+child`\n\n#### Notes / Risks\n\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；`usage-validation` fixture 已覆盖等价 API 断言，顶部文案属视觉确认，建议主会话在真实 parent/child session 中复核。\n- `lib/git-worktree.ts` 改动（`MainWorktreeDirtyError` parameter property → 显式字段）超出 `usage-validation` files 范围，属最小加载阻塞消除，已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。\n- task.json workflow 状态（progress/completed）未由本实现员修改，留待主会话/orchestrator 推进。\n\ndocs-checks 子任务全部验收标准满足：docs 与最终代码口径一致，lint / type-check 通过，plan-review/review/handoff 记录验证结果。",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:41:05.725Z",
+        "updatedAt": "2026-07-08T07:44:28.574Z",
+        "eventCount": 4008,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — 更新 `AppShell` top-bar chip 展示口径（parent `incl. Studio` / standalone 自身 / studio_child `Studio child`，`hasChildUsage` 改为 token/cost > 0）、`ChatWindow` `statsKey` 新增字段、`useAgentSession` `SessionUsageTopbarStats` additive 字段与 local fallback `standalone` 语义、`UsageStatsModal` 不受 additive 字段影响。\n- `docs/modules/api.md` — `usage/` route `session_rollup` 响应 additive `selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 字段与 implementation pointer 契约说明。\n- `docs/modules/library.md` — `lib/usage-stats.ts` `UsageSessionRollupResult` additive 字段语义与口径。\n- `.ypi/tasks/…/checks.md` — 勾选 R1/R2 项，追加 docs-checks 验证记录与未覆盖手工验收点。\n- `.ypi/tasks/…/handoff.md` — 追加 docs-checks 子任务完成记录。\n- `.ypi/tasks/…/review.md`、`summary.md` — 填写复核与总结。\n\n`docs/architecture/overview.md` 已由前序子任务更新，本子任务复核一致，未再改动。\n\n#### Verification\n\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — 通过\n- `npm run test:usage-rollup` — 通过（10 组断言）\n- 未运行 `next build`（按子任务约束）\n- 文档一致性 grep：26 处新口径引用，0 处遗留裸 `+child`\n\n#### Notes / Risks\n\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；`usage-validation` fixture 已覆盖等价 API 断言，顶部文案属视觉确认，建议主会话在真实 parent/child session 中复核。\n- `lib/git-worktree.ts` 改动（`MainWorktreeDirtyError` parameter property → 显式字段）超出 `usage-validation` files 范围，属最小加载阻塞消除，已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。\n- task.json workflow 状态（progress/completed）未由本实现员修改，留待主会话/orchestrator 推进。\n\ndocs-checks 子任务全部验收标准满足：docs 与最终代码口径一致，lint / type-check 通过，plan-review/review/handoff 记录验证结果。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:44:18.058Z",
+            "text": "All done. Let me do a final consistency grep across docs:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:44:18.078Z",
+            "toolCallId": "chatcmpl-tool-bc8682fcb22f7294",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"grep -rn \\\"selectedSessionTotals\\\\|parentRollupTotals\\\\|selectedSessionKind\\\\|incl. Studio\\\\|Studio child\\\" docs/modules/ docs/architecture/overview.md | wc -l && echo \\\"---stale +child---\\\" && grep -rn \\\"'+child'\\\\|\\\\\\\"+child\\\\\\\"\\\\|+child占位\\\" docs/ || echo \\\"none\\\"\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:44:18.207Z",
+            "toolCallId": "chatcmpl-tool-bc8682fcb22f7294",
+            "toolName": "bash",
+            "text": "26\n---stale +child---\nnone",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:44:28.554Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — 更新 `AppShell` top-bar chip 展示口径（parent `incl. Studio` / standalone 自身 / studio_child `Studio child`，`hasChildUsage` 改为 token/cost > 0）、`ChatWindow` `statsKey` 新增字段、`useAgentSession` `SessionUsageTopbarStats` additive 字段与 local fallback `standalone` 语义、`UsageStatsModal` 不受 additive 字段影响。\n- `docs/modules/api.md` — `usage/` route `session_rollup` 响应 additive `selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 字段与 implementation pointer 契约说明。\n- `docs/modules/library.md` — `lib/usage-stats.ts` `UsageSessionRollupResult` additive 字段语义与口径。\n- `.ypi/tasks/…/checks.md` — 勾选 R1/R2 项，追加 docs-checks 验证记录与未覆盖手工验收点。\n- `.ypi/tasks/…/handoff.md` — 追加 docs-checks 子任务完成记录。\n- `.ypi/tasks/…/review.md`、`summary.md` — 填写复核与总结。\n\n`docs/architecture/overview.md` 已由前序子任务更新，本子任务复核一致，未再改动。\n\n#### Verification\n\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — 通过\n- `npm run test:usage-rollup` — 通过（10 组断言）\n- 未运行 `next build`（按子任务约束）\n- 文档一致性 grep：26 处新口径引用，0 处遗留裸 `+child`\n\n#### Notes / Risks\n\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；`usage-validation` fixture 已覆盖等价 API 断言，顶部文案属视觉确认，建议主会话在真实 parent/child session 中复核。\n- `lib/git-worktree.ts` 改动（`MainWorktreeDirtyError` parameter property → 显式字段）超出 `usage-validation` files 范围，属最小加载阻塞消除，已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。\n- task.json workflow 状态（progress/completed）未由本实现员修改，留待主会话/orchestrator 推进。\n\ndocs-checks 子任务全部验收标准满足：docs 与最终代码口径一致，lint / type-check 通过，plan-review/review/handoff 记录验证结果。",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:44:28.566Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3003,
+        "tokens": 592,
+        "tokenSource": "usage",
+        "tps": 2.98,
+        "firstTokenAt": "2026-07-08T07:41:09.876Z",
+        "lastTokenAt": "2026-07-08T07:44:28.535Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-76875e928cf6852c4e381e5a",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/implementer-76875e928cf6852c4e381e5a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:41:05.725Z",
+        "finishedAt": "2026-07-08T07:44:28.572Z",
+        "updatedAt": "2026-07-08T07:44:28.572Z",
+        "itemCount": 79,
+        "messageCount": 17,
+        "toolCallCount": 29,
+        "stderrBytes": 0,
+        "bytes": 90662,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f40ac-5d5d-7c66-8254-f4c50e614820",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-41-05-757Z_019f40ac-5d5d-7c66-8254-f4c50e614820.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-b29caece5cbd009c78cfbf86",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:44:39.525Z",
+      "finishedAt": "2026-07-08T07:46:12.449Z",
+      "runner": "sdk",
+      "childSessionId": "019f40af-a079-7508-bfeb-0359734d035b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-44-39-545Z_019f40af-a079-7508-bfeb-0359734d035b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f40af-a079-7508-bfeb-0359734d035b",
+        "model": "opencode/deepseek-v4-flash-free",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请对该任务做 checking/review。重点检查：1) 顶部计费不再显示裸 `+child`；2) child session 顶部只显示自身费用；3) 父 session 有真实 child usage 时 compact 显示 `incl. Studio`；4) Usage 统计链路与 `/api/usage`、Usage 弹窗、topbar 口径一致；5) docs 已同步；6) `npm run lint` 与 `node_modules/.bin/tsc -…",
+      "summary": "All validations pass. Let me compile the final review. --- ## Check Complete ### Findings Fixed - **裸 `+child` 已移除**：`AppShell.tsx` 中 compact 标记改为 `incl. Studio`（parent 有真实 child usage 时）或 `Studio child`（studio_child 场景），代码中不再出现用于顶部费用展示的裸 `+child` 文案。 - **`hasChildUsage` 判定修复**：改为 `kind === \"parent\" && (childTokenTotal > 0 || childCost > 0)`，不再因 `childCount > 0` 误判。child 仅有数量无 usage 时不显示 child 标记。 - **Child session 顶部只显示自身费用**：`studio_child` compact 使用 `selectedSessionTotals`（该 child 自身 usage），tooltip 附带 `parent rollup` 与 parent id。不再显示 parent rollup 占位语义。 - **Parent session compact**：有真实 child usage 时显示 `$X.XX incl. Studio`，tooltip 拆分 `own cost` / `Studio children cost`。 - **`statsKey` 刷新修复**：纳入 `selectedSessionKind`、`parentFound`、own/studioChild token totals、`selectedSessionTotals`、`parentRollupTotals` cost，确保父/子 session 切换后 topbar 立即更新。 - **`UsageSessionRollupResult` / `SessionUsageTopbarStats` additive 字段**：`selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 为 a…",
+      "model": "opencode/deepseek-v4-flash-free",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode/deepseek-v4-flash-free",
+          "arg": "opencode/deepseek-v4-flash-free",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:44:39.525Z",
+        "updatedAt": "2026-07-08T07:46:12.442Z",
+        "eventCount": 4541,
+        "lastTextPreview": "All validations pass. Let me compile the final review.\n\n---\n\n## Check Complete\n\n### Findings Fixed\n\n- **裸 `+child` 已移除**：`AppShell.tsx` 中 compact 标记改为 `incl. Studio`（parent 有真实 child usage 时）或 `Studio child`（studio_child 场景），代码中不再出现用于顶部费用展示的裸 `+child` 文案。\n- **`hasChildUsage` 判定修复**：改为 `kind === \"parent\" && (childTokenTotal > 0 || childCost > 0)`，不再因 `childCount > 0` 误判。child 仅有数量无 usage 时不显示 child 标记。\n- **Child session 顶部只显示自身费用**：`studio_child` compact 使用 `selectedSessionTotals`（该 child 自身 usage），tooltip 附带 `parent rollup` 与 parent id。不再显示 parent rollup 占位语义。\n- **Parent session compact**：有真实 child usage 时显示 `$X.XX incl. Studio`，tooltip 拆分 `own cost` / `Studio children cost`。\n- **`statsKey` 刷新修复**：纳入 `selectedSessionKind`、`parentFound`、own/studioChild token totals、`selectedSessionTotals`、`parentRollupTotals` cost，确保父/子 session 切换后 topbar 立即更新。\n- **`UsageSessionRollupResult` / `SessionUsageTopbarStats` additive 字段**：`selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 为 additive 新增，旧字段语义不变，旧调用方不受影响。\n- **Fixtures 回归测试**：`scripts/test-usage-stats-rollup.mjs` 覆盖 global / bySession / byParentSession / session_rollup / includeArchived 全链路，10 组断言全部通过。\n- **`lib/git-worktree.ts`**：`MainWorktreeDirtyError` parameter property 改为显式字段，行为不变，仅消除 Node strip-only 模式加载阻塞。\n- **docs 已同步**：`docs/architecture/overview.md`、`docs/modules/frontend.md`、`docs/modules/api.md`、`docs/modules/library.md` 均已更新 additive 字段与 top-bar 展示口径，无遗留裸 `+child` 或过时表述。\n\n### Remaining Findings\n\n- 无阻塞问题。\n\n### Verification\n\n- `npm run lint` — 0 error / 0 warning ✅\n- `node_modules/.bin/tsc --noEmit` — 通过 ✅\n- `npm run test:usage-rollup` — 通过（10 组断言） ✅\n- 未运行 `next build`（按约束）\n\n### Verdict\n\n**Pass** — 所有 R1/R2/R3 需求覆盖完整，顶部费用文案、child usage 判定、child session 自身费用展示、Usage 聚合链路、statsKey 刷新、docs 同步均已验证通过。lint/type-check/usage-rollup test 全部通过。\n\n### 需主会话关注\n\n1. **手工视觉验收**：顶部文案 / tooltip / Usage 弹窗 / API 查询（手工验收点 1–6）未在自动验证中覆盖。fixture 已覆盖等价 API 断言，但视觉文案建议在真实 parent/child session 中复核。\n2. **`lib/git-worktree.ts` 改动**：`MainWorktreeDirtyError` 的 TypeScript parameter property → 显式字段赋值，行为不变，仅消除回归脚本的 Node strip-only 加载阻塞。已通过 lint/type-check。如主会话不接受此改动，可改为测试侧 transform loader（但项目当前未引入 tsx/esbuild）。\n3. **回归脚本 TS 语法限制**：`scripts/test-usage-stats-rollup.mjs` 依赖 Node 内建 TS strip loader；若 `lib/` 后续新增 `enum`/`namespace`/`parameter property` 语法，脚本会再次无法加载。当前项目代码已避开这些语法。\n\n### Files Changed (11 files, +168/-25)\n\n| File | Change |\n| --- | --- |\n| `components/AppShell.tsx` | 裸 `+child` → `incl. Studio` / `Studio child`；`hasChildUsage` 判定修复；tooltip 拆分 | +72/-12 |\n| `components/ChatWindow.tsx` | `statsKey` 纳入 `selectedSessionKind`、`parentFound`、`selectedSessionTotals`、`parentRollupTotals` cost | +22/-0 |\n| `hooks/useAgentSession.ts` | `SessionUsageTopbarStats` additive 字段；rollup stats 映射 `selectedSessionKind`/`selectedSessionTotals`/`parentRollupTotals` | +19/-0 |\n| `lib/usage-stats.ts` | `UsageSessionRollupResult` additive `selectedSessionTotals`/`parentRollupTotals`/`selectedSessionKind`；rollup 计算 logic | +38/-0 |\n| `lib/git-worktree.ts` | `MainWorktreeDirtyError` parameter property → 显式字段（Node strip 兼容） | +5/-2 |\n| `package.json` | 新增 `test:usage-rollup` 脚本 | +1/-0 |\n| `scripts/test-usage-stats-rollup.mjs` | 新增 fixture 回归脚本（10 组断言） | 新增 |\n| `scripts/ts-extension-loader.mjs` | additive `@/` path alias 支持 | +19/-0 |\n| `docs/architecture/overview.md` | 同步 additive 字段与 top-bar 展示口径 | +3/-1 |\n| `docs/modules/frontend.md` | 同步 top-bar 口径、statsKey、UsageStatsModal 说明 | +4/-4 |\n| `docs/modules/api.md` | 同步 session_rollup additive 字段与 additive 契约 | +2/-2 |\n| `docs/modules/library.md` | 同步 `UsageSessionRollupResult` additive 字段语义 | +1/-1 |\n\n### 决策确认\n\n本检查员确认任务可完成。如需主会话批准手工验收后关闭任务，或讨论 `git-worktree.ts` 改动的替代方案。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:45:53.503Z",
+            "text": "Let me also check the UsageSessionRollupResult interface in full detail.",
+            "model": "opencode/deepseek-v4-flash-free",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T07:45:53.510Z",
+            "toolCallId": "call_00_qzpL2BZzPRDNASWqxjhE5263",
+            "toolName": "read",
+            "inputPreview": "{\n  \"offset\": 105,\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/usage-stats.ts\",\n  \"limit\": 70\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T07:45:53.543Z",
+            "toolCallId": "call_00_qzpL2BZzPRDNASWqxjhE5263",
+            "toolName": "read",
+            "text": "/**\n * \"session_rollup\" 顶栏费用展示口径（由主会话确认）：\n *\n * - `parent`：选中父 session。compact 显示 parent rollup totals（`parentRollupTotals` =\n *   父自身 + 所有 Studio child），当存在真实 child usage 时追加 `incl. Studio`；\n *   tooltip 拆分 own / Studio children cost。`selectedSessionTotals` 此时等于父自身 totals。\n * - `standalone`：选中普通 session（无 Studio child）。compact 显示该 session 自身 totals；\n *   `selectedSessionTotals` === `parentRollupTotals` === `totals` === `ownTotals`。\n * - `studio_child`：选中 Studio child audit session。compact 只显示该 child 自身 totals\n *   （`selectedSessionTotals`），不再显示 parent rollup 占位语义；tooltip 可附带 parent rollup\n *   totals（`parentRollupTotals`）与 parent id 说明。\n *\n * 新增字段均为 additive：`totals` / `ownTotals` / `studioChildTotals` / `childSessions` 等旧字段\n * 语义不变，旧调用方继续可用。不改变 JSONL header，不读取 child transcript sidecar。\n */\nexport interface UsageSessionRollupResult {\n  kind: \"session_rollup\";\n  sessionId: string;\n  parentSessionId: string;\n  selectedSessionKind: \"parent\" | \"studio_child\" | \"standalone\";\n  parentFound: boolean;\n  scope: {\n    timezone: string;\n    includeArchived: boolean;\n    includeStudioChildren: true;\n    relation: \"self-and-studio-children\";\n  };\n  /** Parent rollup totals = parent own + all Studio children. 旧字段，语义不变。compact 用于 parent/standalone。 */\n  totals: UsageTotals;\n  /** 父 session 自身 totals（不含 Studio child）。旧字段，语义不变。 */\n  ownTotals: UsageTotals;\n  /** 所有 Studio child totals 之和。旧字段，语义不变。 */\n  studioChildTotals: UsageTotals;\n  /**\n   * 选中 session 自身的 totals（additive）。\n   * - parent → 父自身 totals；\n   * - standalone → 该 session 自身 totals；\n   * - studio_child → 该 child 自身 totals，作为 child compact 展示值。\n   * 不含其他 session 的 usage，不等于 `totals`（除非 standalone）。\n   */\n  selectedSessionTotals: UsageTotals;\n  /**\n   * Parent rollup totals（additive），恒等于 `totals`，命名上明确 parent rollup 语义，\n   * 供 studio_child tooltip 与 parent compact 共用，避免调用方凭 `totals` 字段名猜测口径。\n   */\n  parentRollupTotals: UsageTotals;\n  studioChildSessionCount: number;\n  childSessions: UsageSessionSummary[];\n  scannedSessions: number;\n  matchedSessions: number;\n  skippedEntries: number;\n}\n\ninterface UsageRecord {\n  entry: SessionMessageEntry;\n  message: AssistantMessage;\n  session: SessionInfo;\n}\n\nfunction cwdKeys(cwd: string | undefined): Set<string> {\n  const keys = new Set<string>();\n  if (!cwd) return keys;\n  for (const candidate of [cwd, expandCwd(cwd), canonicalizeCwd(cwd)]) {\n    if (candidate) keys.add(candidate.replace(/[\\\\/]+$/, \"\"));\n  }\n  return keys;\n}\n\nfunction cwdMatches(sessionCwd: string | undefined, filterCwd: string | undefined): boolean {\n  if (!filterCwd) return true;\n\n[354 more lines in file. Use offset=175 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T07:46:12.417Z",
+            "text": "All validations pass. Let me compile the final review.\n\n---\n\n## Check Complete\n\n### Findings Fixed\n\n- **裸 `+child` 已移除**：`AppShell.tsx` 中 compact 标记改为 `incl. Studio`（parent 有真实 child usage 时）或 `Studio child`（studio_child 场景），代码中不再出现用于顶部费用展示的裸 `+child` 文案。\n- **`hasChildUsage` 判定修复**：改为 `kind === \"parent\" && (childTokenTotal > 0 || childCost > 0)`，不再因 `childCount > 0` 误判。child 仅有数量无 usage 时不显示 child 标记。\n- **Child session 顶部只显示自身费用**：`studio_child` compact 使用 `selectedSessionTotals`（该 child 自身 usage），tooltip 附带 `parent rollup` 与 parent id。不再显示 parent rollup 占位语义。\n- **Parent session compact**：有真实 child usage 时显示 `$X.XX incl. Studio`，tooltip 拆分 `own cost` / `Studio children cost`。\n- **`statsKey` 刷新修复**：纳入 `selectedSessionKind`、`parentFound`、own/studioChild token totals、`selectedSessionTotals`、`parentRollupTotals` cost，确保父/子 session 切换后 topbar 立即更新。\n- **`UsageSessionRollupResult` / `SessionUsageTopbarStats` additive 字段**：`selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 为 additive 新增，旧字段语义不变，旧调用方不受影响。\n- **Fixtures 回归测试**：`scripts/test-usage-stats-rollup.mjs` 覆盖 global / bySession / byParentSession / session_rollup / includeArchived 全链路，10 组断言全部通过。\n- **`lib/git-worktree.ts`**：`MainWorktreeDirtyError` parameter property 改为显式字段，行为不变，仅消除 Node strip-only 模式加载阻塞。\n- **docs 已同步**：`docs/architecture/overview.md`、`docs/modules/frontend.md`、`docs/modules/api.md`、`docs/modules/library.md` 均已更新 additive 字段与 top-bar 展示口径，无遗留裸 `+child` 或过时表述。\n\n### Remaining Findings\n\n- 无阻塞问题。\n\n### Verification\n\n- `npm run lint` — 0 error / 0 warning ✅\n- `node_modules/.bin/tsc --noEmit` — 通过 ✅\n- `npm run test:usage-rollup` — 通过（10 组断言） ✅\n- 未运行 `next build`（按约束）\n\n### Verdict\n\n**Pass** — 所有 R1/R2/R3 需求覆盖完整，顶部费用文案、child usage 判定、child session 自身费用展示、Usage 聚合链路、statsKey 刷新、docs 同步均已验证通过。lint/type-check/usage-rollup test 全部通过。\n\n### 需主会话关注\n\n1. **手工视觉验收**：顶部文案 / tooltip / Usage 弹窗 / API 查询（手工验收点 1–6）未在自动验证中覆盖。fixture 已覆盖等价 API 断言，但视觉文案建议在真实 parent/child session 中复核。\n2. **`lib/git-worktree.ts` 改动**：`MainWorktreeDirtyError` 的 TypeScript parameter property → 显式字段赋值，行为不变，仅消除回归脚本的 Node strip-only 加载阻塞。已通过 lint/type-check。如主会话不接受此改动，可改为测试侧 transform loader（但项目当前未引入 tsx/esbuild）。\n3. **回归脚本 TS 语法限制**：`scripts/test-usage-stats-rollup.mjs` 依赖 Node 内建 TS strip loader；若 `lib/` 后续新增 `enum`/`namespace`/`parameter property` 语法，脚本会再次无法加载。当前项目代码已避开这些语法。\n\n### Files Changed (11 files, +168/-25)\n\n| File | Change |\n| --- | --- |\n| `components/AppShell.tsx` | 裸 `+child` → `incl. Studio` / `Studio child`；`hasChildUsage` 判定修复；tooltip 拆分 | +72/-12 |\n| `components/ChatWindow.tsx` | `statsKey` 纳入 `selectedSessionKind`、`parentFound`、`selectedSessionTotals`、`parentRollupTotals` cost | +22/-0 |\n| `hooks/useAgentSession.ts` | `SessionUsageTopbarStats` additive 字段；rollup stats 映射 `selectedSessionKind`/`selectedSessionTotals`/`parentRollupTotals` | +19/-0 |\n| `lib/usage-stats.ts` | `UsageSessionRollupResult` additive `selectedSessionTotals`/`parentRollupTotals`/`selectedSessionKind`；rollup 计算 logic | +38/-0 |\n| `lib/git-worktree.ts` | `MainWorktreeDirtyError` parameter property → 显式字段（Node strip 兼容） | +5/-2 |\n| `package.json` | 新增 `test:usage-rollup` 脚本 | +1/-0 |\n| `scripts/test-usage-stats-rollup.mjs` | 新增 fixture 回归脚本（10 组断言） | 新增 |\n| `scripts/ts-extension-loader.mjs` | additive `@/` path alias 支持 | +19/-0 |\n| `docs/architecture/overview.md` | 同步 additive 字段与 top-bar 展示口径 | +3/-1 |\n| `docs/modules/frontend.md` | 同步 top-bar 口径、statsKey、UsageStatsModal 说明 | +4/-4 |\n| `docs/modules/api.md` | 同步 session_rollup additive 字段与 additive 契约 | +2/-2 |\n| `docs/modules/library.md` | 同步 `UsageSessionRollupResult` additive 字段语义 | +1/-1 |\n\n### 决策确认\n\n本检查员确认任务可完成。如需主会话批准手工验收后关闭任务，或讨论 `git-worktree.ts` 改动的替代方案。",
+            "model": "opencode/deepseek-v4-flash-free",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T07:46:12.433Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 4112,
+        "tokens": 1868,
+        "tokenSource": "usage",
+        "tps": 20.98,
+        "firstTokenAt": "2026-07-08T07:44:43.327Z",
+        "lastTokenAt": "2026-07-08T07:46:12.376Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-b29caece5cbd009c78cfbf86",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/checker-b29caece5cbd009c78cfbf86.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:44:39.525Z",
+        "finishedAt": "2026-07-08T07:46:12.440Z",
+        "updatedAt": "2026-07-08T07:46:12.440Z",
+        "itemCount": 51,
+        "messageCount": 5,
+        "toolCallCount": 21,
+        "stderrBytes": 0,
+        "bytes": 87644,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f40af-a079-7508-bfeb-0359734d035b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-44-39-545Z_019f40af-a079-7508-bfeb-0359734d035b.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-dc35f3c295efa82954788a52",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T07:54:03.815Z",
+      "finishedAt": "2026-07-08T08:01:34.255Z",
+      "runner": "sdk",
+      "childSessionId": "019f40b8-3cc6-71a0-9ed0-daeff6ef4498",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-54-03-846Z_019f40b8-3cc6-71a0-9ed0-daeff6ef4498.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "childSessionId": "019f40b8-3cc6-71a0-9ed0-daeff6ef4498",
+        "model": "opencode/deepseek-v4-flash-free",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "用户追加了一个低风险 UI 调整，请在当前 checking 阶段直接处理并复查：针对当前 session `19f4085-4e03-7749-9fa9-64eab79ec6ce` 顶部计费区域，增加 hover 浮窗，简洁展示计费组成即可——至少体现本体（own/current session）费用是多少、子 session（Studio children）费用是多少；不需要很详细，不要引入复杂新交互。请在现有实现基础上完成最小改动、运行必要验证，并更新 review …",
+      "summary": "## Handoff — Billing Hover Popover ### Files Changed | File | Change | Impact | | --- | --- | --- | | `components/AppShell.tsx` | Added `BillingPopover` component + replaced native `title` tooltip with hover popover | `AppShell.tsx` only; no new files | ### What It Does When hovering over the top-bar billing chip (cost line), a floating panel appears showing the cost breakdown concisely: | Session kind | Lines shown | |---|---| | **parent** with child usage | `本会话` (own cost) + `Studio 子会话` (children cost, with count if >1) | | **studio_child** | `本会话` (child's own cost) + `父会话汇总` (parent rollup) | | **standalone** / parent without child usage | `本会话` (total cost) | The popover uses 120ms leave delay to prevent flicker, and stays open when hovering onto the popover itself. Positioning is `top: 100%; right: 0` below the stats area. ### Verification - `npm run lint` — 0 error / 0 warning - `node_modules/.bin/tsc --noEmit` — pass - `npm run test:usage-rollup` — pass (10 assertions) ### D…",
+      "model": "opencode/deepseek-v4-flash-free",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode/deepseek-v4-flash-free",
+          "arg": "opencode/deepseek-v4-flash-free",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T07:54:03.815Z",
+        "updatedAt": "2026-07-08T08:01:34.248Z",
+        "eventCount": 27452,
+        "lastTextPreview": "## Handoff — Billing Hover Popover\n\n### Files Changed\n\n| File | Change | Impact |\n| --- | --- | --- |\n| `components/AppShell.tsx` | Added `BillingPopover` component + replaced native `title` tooltip with hover popover | `AppShell.tsx` only; no new files |\n\n### What It Does\n\nWhen hovering over the top-bar billing chip (cost line), a floating panel appears showing the cost breakdown concisely:\n\n| Session kind | Lines shown |\n|---|---|\n| **parent** with child usage | `本会话` (own cost) + `Studio 子会话` (children cost, with count if >1) |\n| **studio_child** | `本会话` (child's own cost) + `父会话汇总` (parent rollup) |\n| **standalone** / parent without child usage | `本会话` (total cost) |\n\nThe popover uses 120ms leave delay to prevent flicker, and stays open when hovering onto the popover itself. Positioning is `top: 100%; right: 0` below the stats area.\n\n### Verification\n\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:usage-rollup` — pass (10 assertions)\n\n### Decisions Needed from Main Session\n\n1. **Language**: popover uses Chinese labels (`计费组成`, `本会话`, `Studio 子会话`, `父会话汇总`). If English is preferred, replace these in the `popoverContent` JSX.\n2. **Manual review**: open a real parent session and child session to confirm popover layout and positioning at narrow widths.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T08:01:18.306Z",
+            "toolCallId": "call_00_wZHaAHnYmZl0u4aRiO8m1608",
+            "toolName": "read",
+            "text": "# review\n\n## 实现口径复核（docs-checks）\n\n确认最终代码与文档口径一致：\n\n- `components/AppShell.tsx`：裸 `+child` 已移除；compact 标记改为 `incl. Studio`（parent 有真实 child usage 时）或 `Studio child`（studio_child 场景）；`hasChildUsage` 改为 `kind === \"parent\" && (childTokenTotal > 0 || childCost > 0)`，不再因 `childCount > 0` 误判。tooltip 对 studio_child 附带 `parent rollup` 与 parent id。\n- `hooks/useAgentSession.ts`：`SessionUsageTopbarStats` additive 新增 `selectedSessionKind` / `selectedSessionTotals` / `parentRollupTotals`；rollup 失败回退 local 按 `standalone` 口径处理。\n- `components/ChatWindow.tsx`：`statsKey` 纳入 `selectedSessionKind` / `parentFound` / own/studioChild token totals / `selectedSessionTotals` / `parentRollupTotals` cost，避免父/子 session 总额相同时不刷新。\n- `lib/usage-stats.ts`：`UsageSessionRollupResult` additive 新增 `selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind`，旧字段语义不变。\n- `scripts/test-usage-stats-rollup.mjs`：fixture 回归覆盖 global / bySession / byParentSession / session_rollup(parent/child/standalone/orphan/archived) / includeArchived。\n\n## 文档一致性\n\n- `docs/architecture/overview.md`、`docs/modules/frontend.md`、`docs/modules/api.md`、`docs/modules/library.md` 均已同步 additive 字段与 top-bar 展示口径，无遗留裸 `+child` 或\"child session 只显示 parent rollup\"的过时表述。\n\n## 验证\n\n- `npm run lint` — 0 error / 0 warning。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `npm run test:usage-rollup` — 通过（10 组断言）。\n- 未运行 `next build`。\n\n## 需主会话关注\n\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；建议主会话在真实 parent/child session 中复核视觉文案。\n- `lib/git-worktree.ts` 改动属最小加载阻塞消除，超出 usage-validation files 范围但已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T08:01:26.765Z",
+            "toolCallId": "call_00_zGk7yYMB7MKahaQiTs1J0924",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误/review.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 需主会话关注\\n\\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；建议主会话在真实 parent/child session 中复核视觉文案。\\n- `lib/git-worktree.ts` 改动属最小加载阻塞消除，超出 usage-validation files 范围但已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。\",\n      \"newText\": \"## Findings Fixed\\n\\n- `components/AppShell.tsx`：原生 `title` 属性 tooltip 替换为 `BillingPopover` hover 浮窗，简洁展示计费组成：\\n  - **parent（有 child usage）**：本会话（own cost）+ Studio 子会话（child cost）\\n  - **studio_child**：本会话（child 自身 cost）+ 父会话汇总（parent rollup）\\n  - **standalone / parent 无 child usage**：仅本会话\\n  - 浮窗使用 `position: absolute` 定位，120ms 防抖延迟避免闪烁，hover 到浮窗区域可保持显示。\\n\\n## Remaining Findings\\n\\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；建议主会话在真实 parent/child session 中复核视觉文案。\\n- `lib/git-worktree.ts` 改动属最小加载阻塞消除，超出 usage-validation files 范围但已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。\\n\\n## Verification\\n\\n- `npm run lint` — 0 error / 0 warning。\\n- `node_modules/.bin/tsc --noEmit` — 通过。\\n- `npm run test:usage-rollup` — 通过（10 组断言）。\\n\\n## Verdict\\n\\n**Pass** — 改动不影响现有计费口径、统计链路、类型安全或文档一致性。BillingPopover 为 additive self-contained 组件，不引入新依赖或布局变化。\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T08:01:26.775Z",
+            "toolCallId": "call_00_zGk7yYMB7MKahaQiTs1J0924",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误/review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T08:01:34.224Z",
+            "text": "## Handoff — Billing Hover Popover\n\n### Files Changed\n\n| File | Change | Impact |\n| --- | --- | --- |\n| `components/AppShell.tsx` | Added `BillingPopover` component + replaced native `title` tooltip with hover popover | `AppShell.tsx` only; no new files |\n\n### What It Does\n\nWhen hovering over the top-bar billing chip (cost line), a floating panel appears showing the cost breakdown concisely:\n\n| Session kind | Lines shown |\n|---|---|\n| **parent** with child usage | `本会话` (own cost) + `Studio 子会话` (children cost, with count if >1) |\n| **studio_child** | `本会话` (child's own cost) + `父会话汇总` (parent rollup) |\n| **standalone** / parent without child usage | `本会话` (total cost) |\n\nThe popover uses 120ms leave delay to prevent flicker, and stays open when hovering onto the popover itself. Positioning is `top: 100%; right: 0` below the stats area.\n\n### Verification\n\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:usage-rollup` — pass (10 assertions)\n\n### Decisions Needed from Main Session\n\n1. **Language**: popover uses Chinese labels (`计费组成`, `本会话`, `Studio 子会话`, `父会话汇总`). If English is preferred, replace these in the `popoverContent` JSX.\n2. **Manual review**: open a real parent session and child session to confirm popover layout and positioning at narrow widths.",
+            "model": "opencode/deepseek-v4-flash-free",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T08:01:34.238Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3380,
+        "tokens": 380,
+        "tokenSource": "usage",
+        "tps": 0.86,
+        "firstTokenAt": "2026-07-08T07:54:14.481Z",
+        "lastTokenAt": "2026-07-08T08:01:34.170Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-dc35f3c295efa82954788a52",
+        "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-145841-_-chat-/checker-dc35f3c295efa82954788a52.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T07:54:03.815Z",
+        "finishedAt": "2026-07-08T08:01:34.244Z",
+        "updatedAt": "2026-07-08T08:01:34.244Z",
+        "itemCount": 121,
+        "messageCount": 19,
+        "toolCallCount": 49,
+        "stderrBytes": 0,
+        "bytes": 148744,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f40b8-3cc6-71a0-9ed0-daeff6ef4498",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T07-54-03-846Z_019f40b8-3cc6-71a0-9ed0-daeff6ef4498.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-08T07:09:19.953Z",
+      "contextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-08T07:09:44.825Z",
+      "contextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+      "inputHash": "8cbe697b157364a5b1364628",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-08T08:09:20.048Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260708-160920-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+    "knowledgePath": ".ypi/knowledge/20260708-160920-修复-chat-顶部与统计中的子任务计费汇总显示错误.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T07:09:16.730Z",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "usage-contract",
+          "title": "design/impl",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "usage-contract"
+          ]
+        },
+        {
+          "id": "topbar-copy",
+          "title": "impl",
+          "relation": "parallel",
+          "dependencies": [
+            "usage-contract"
+          ],
+          "subtaskIds": [
+            "topbar-copy"
+          ]
+        },
+        {
+          "id": "hook-refresh",
+          "title": "impl",
+          "relation": "parallel",
+          "dependencies": [
+            "usage-contract"
+          ],
+          "subtaskIds": [
+            "hook-refresh"
+          ]
+        },
+        {
+          "id": "usage-validation",
+          "title": "impl/check",
+          "relation": "parallel",
+          "dependencies": [
+            "usage-contract"
+          ],
+          "subtaskIds": [
+            "usage-validation"
+          ]
+        },
+        {
+          "id": "docs-checks",
+          "title": "check",
+          "relation": "serial",
+          "dependencies": [
+            "topbar-copy",
+            "hook-refresh",
+            "usage-validation"
+          ],
+          "subtaskIds": [
+            "docs-checks"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "usage-contract",
+        "title": "明确 session rollup 与 child-selected 显示口径",
+        "phase": "design/impl",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/usage-stats.ts",
+          "hooks/useAgentSession.ts",
+          "components/AppShell.tsx",
+          "docs/architecture/overview.md"
+        ],
+        "acceptance": [
+          "父、standalone、child 三种 topbar 口径在代码注释或命名中可读",
+          "不改变 JSONL header 与 child transcript 安全边界",
+          "如 UsageSessionRollupResult 增字段，旧字段仍可用"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "child tab 仅显示自身费用需要确保与 rollup API 现有语义兼容"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "topbar-copy",
+        "title": "修复顶部费用 chip 文案与 child usage 判定",
+        "phase": "impl",
+        "order": 2,
+        "dependsOn": [
+          "usage-contract"
+        ],
+        "dependencies": [
+          "usage-contract"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/AppShell.tsx"
+        ],
+        "acceptance": [
+          "代码中不再出现用于顶部费用展示的裸 '+child' 文案",
+          "child session 数量大于 0 但 child usage 为 0 时不会显示 child usage 标记",
+          "tooltip 仍展示 own cost 与 Studio children cost 拆分"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工打开 parent session、standalone session、Studio child session 检查顶部费用"
+        ],
+        "risks": [
+          "topbar 空间有限，文案过长会挤压右侧按钮；保持短文案"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "hook-refresh",
+        "title": "调整 hook/topbar stats 映射与刷新 key",
+        "phase": "impl",
+        "order": 3,
+        "dependsOn": [
+          "usage-contract"
+        ],
+        "dependencies": [
+          "usage-contract"
+        ],
+        "relation": "parallel",
+        "files": [
+          "hooks/useAgentSession.ts",
+          "components/ChatWindow.tsx"
+        ],
+        "acceptance": [
+          "父 session 与其 child session 间切换后 topbar 文案和 tooltip 立即更新",
+          "rollup API 失败时仍可回退 local messages usage",
+          "不把 child usage/messages 拼入 parent messages 列表"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工切换同一 parent 与 child audit tab"
+        ],
+        "risks": [
+          "新增 stats 字段若未纳入 statsKey，React 父组件可能看到旧展示"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "usage-validation",
+        "title": "验证 Usage 聚合链路与补回归检查",
+        "phase": "impl/check",
+        "order": 4,
+        "dependsOn": [
+          "usage-contract"
+        ],
+        "dependencies": [
+          "usage-contract"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/usage-stats.ts",
+          "app/api/usage/route.ts",
+          "components/UsageStatsModal.tsx",
+          "scripts/"
+        ],
+        "acceptance": [
+          "至少有一条明确验证记录覆盖 parent + Studio child usage 汇总",
+          "UsageStatsModal 的 Parent sessions 行仍优先使用 byParentSession",
+          "孤儿 child parentFound=false 的语义不被破坏"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "可选：新增并运行轻量 usage rollup 测试脚本"
+        ],
+        "risks": [
+          "SessionManager fixture 构造成本较高；若不加脚本，必须记录手工 API 验证样本"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "docs-checks",
+        "title": "同步文档并执行最终验证",
+        "phase": "check",
+        "order": 5,
+        "dependsOn": [
+          "topbar-copy",
+          "hook-refresh",
+          "usage-validation"
+        ],
+        "dependencies": [
+          "topbar-copy",
+          "hook-refresh",
+          "usage-validation"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/modules/frontend.md",
+          "docs/modules/api.md",
+          "docs/modules/library.md"
+        ],
+        "acceptance": [
+          "docs 与最终代码口径一致",
+          "lint 与 type-check 通过或阻塞原因明确",
+          "plan-review/review/handoff 记录验证结果"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "文档仍写 child session 只显示 parent rollup 会与实现不一致"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T08:09:20.048Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "usage-contract": {
+        "id": "usage-contract",
+        "status": "done",
+        "updatedAt": "2026-07-08T07:21:31.934Z",
+        "startedAt": "2026-07-08T07:09:56.403Z",
+        "finishedAt": "2026-07-08T07:21:31.930Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-d2afe53e00679292d2a4d85b"
+        ],
+        "lastRunId": "implementer-d2afe53e00679292d2a4d85b",
+        "claimedAt": "2026-07-08T07:09:56.403Z",
+        "claimedByContextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "summary": "The route returns `rollup` directly, so the additive fields pass through automatically. Validation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- `lib/usage-stats.ts` — Added additive fields `selectedSessionTotals` and `parentRollupTotals` to `UsageSessionRollupResult` (with doc comments naming the three display口径: parent / standalone / studio_child), and populated them in `getUsageStatsForSessionRollup`. `selectedSessionTotals` = the selected session's own usage (child's own for `studio_child`); `parentRollupTotals` = parent rollup (恒等于 `totals`, named for口径 clarity). Old fields (`totals`/`ownTotals`/`studioChildTotals`/`childSessions`) keep their semantics.\n- `hooks/useAgentSession.ts` — Added a口径 doc block and additive `selectedSessionTotals` / `parentRollupTotals` fields to `SessionUsageTopbarStats` so the hook can carry the contract to the top bar.\n- `components/AppShell.tsx` — Added a contract comment above the top-bar usage chip naming the three口径 and noting the existing `+child`/`hasChildUsage` logic is left for the `topbar-copy` subtask (no behavior change).\n- `docs/architecture/overview.md` — Documented the confirmed top-bar display口径 (parent `incl. Studio` only on real child usage; standalone no marker; studio_child compact = child's own usage, no `+child`) and the additive rollup fields.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no output)\n\n#### Notes / Risks\n\n- Scope strictly limited to `usage-contract`: only additive API fields + contract documentation. The `+child` removal, `hasChildUsage` fix, hook mapping of `selectedSessionTotals`/`parentRollupTotals` into `sessionStats`, and `ChatWindow` `statsKey` expansion are intentionally NOT done here — they belong to `topbar-copy` and `hook-refresh`. The new topbar-stats fields are currently additive and unused, so no behavior changes.\n- The `/api/usage?sessionId=` route returns the rollup object directly, so the new fields are transparently exposed without route edits.\n- Decision needed from main session: none — the口径 was already confirmed in `plan-review.md` (child compact = own usage; parent compact = `incl. Studio` on real child usage; child tooltip may show parent rollup). This subtask only encodes that contract."
+      },
+      "topbar-copy": {
+        "id": "topbar-copy",
+        "status": "done",
+        "updatedAt": "2026-07-08T07:29:53.132Z",
+        "startedAt": "2026-07-08T07:21:48.033Z",
+        "finishedAt": "2026-07-08T07:29:53.127Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-c7b6d374af103c08228c572c"
+        ],
+        "lastRunId": "implementer-c7b6d374af103c08228c572c",
+        "claimedAt": "2026-07-08T07:21:48.033Z",
+        "claimedByContextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "summary": "Implementation complete and validated. Here's the handoff.\n\n## Implementation Complete — `topbar-copy`\n\n### Files Changed\n\n- **`components/AppShell.tsx`** — Removed the bare `+child` placeholder. `hasChildUsage` now uses real child totals (`childTokenTotal > 0 || childCost > 0`) gated on `kind === \"parent\"`, so child sessions with count but zero usage no longer show a child mark. Compact/mark logic split by `selectedSessionKind`:\n  - `parent` with real child usage → `$x incl. Studio`; tooltip splits `own cost` / `Studio children cost`.\n  - `standalone` (and local-source fallback) → `$x` only, no child mark.\n  - `studio_child` → compact shows the child's own usage (`selectedSessionTotals`) with a `Studio child` mark; tooltip scope = `selected Studio child session`, plus additive `parent rollup` cost and short parent id.\n- **`hooks/useAgentSession.ts`** — Additive mapping of `selectedSessionTotals` / `parentRollupTotals` (already declared on the interface by `usage-contract`) into `rollupSessionStats`, so AppShell can render the child-selected display口径.\n- **`components/ChatWindow.tsx`** — `statsKey` now includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), and `parentRollupTotals.cost`, so switching between a parent tab and its Studio child audit tab refreshes the topbar even when rollup totals are equal.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no output)\n- `npm run lint` — passed (no errors)\n- `grep '+child'` in `components/`, `hooks/`, `lib/` — only matches in explanatory comments, no rendered topbar `+child` text.\n\n### Notes / Risks\n\n- **Scope extension beyond `topbar-copy` file boundary:** To fulfill the parent's explicit instruction (\"child-selected 只显示该 child 自身费用\"), I added the two additive field mappings in `useAgentSession.ts` and the `statsKey` fields in `ChatWindow.tsx`. These are strictly the `hook-refresh` subtask's files. The changes are minimal and additive (no existing fields removed). Recommend the main session mark `hook-refresh` as done/reviewed, or re-run it to audit/extend these mappings.\n- **Manual验收未执行** (running agent cannot drive the browser): parent with/without child usage, Studio child audit session, and `/api/usage` queries still need the manual checks from `checks.md`.\n- Compact text stays short (`incl. Studio` / `Studio child` are ≤12 chars); risk of narrow-screen overflow noted in the plan but kept minimal.\n- No docs updated yet (that's `docs-checks`); architecture/frontend docs still describe the old `+child` behavior and should be synced when that subtask runs.\n\n### Decisions Needed from Main Session\n\n- Confirm the `studio_child` compact marker wording `Studio child` (English, per ui.md recommended口径) is acceptable; if a Chinese label is preferred, it's a one-word change in `components/AppShell.tsx`.\n- Decide whether to claim `hook-refresh` as satisfied by these minimal changes or keep it open for fuller review/extension."
+      },
+      "hook-refresh": {
+        "id": "hook-refresh",
+        "status": "done",
+        "updatedAt": "2026-07-08T07:33:44.016Z",
+        "startedAt": "2026-07-08T07:30:04.912Z",
+        "finishedAt": "2026-07-08T07:33:44.012Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-fb73f55cf58e052065beb306"
+        ],
+        "lastRunId": "implementer-fb73f55cf58e052065beb306",
+        "claimedAt": "2026-07-08T07:30:04.912Z",
+        "claimedByContextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "summary": "The implementation is complete and validated. Here is the handoff.\n\n### Implementation Complete — `hook-refresh`\n\n#### Files Changed\n\n- `components/ChatWindow.tsx` — Hardened the topbar `statsKey` to include `own` and `studioChild` **token totals** (not just cost). Previously only `own.cost`/`studioChild.cost` were in the key; since `hasChildUsage` is driven by child token total (`childTokenTotal > 0`), a child session with token usage but zero cost could change the parent's `incl. Studio` mark without refreshing `AppShell`. Added the missing token totals + an explanatory comment.\n\nNo other file needed changes for this subtask — the additive hook/rollup plumbing was already present from the `usage-contract`/`topbar-copy` work:\n\n- `hooks/useAgentSession.ts` — `SessionUsageTopbarStats` already exposes `selectedSessionKind`, `selectedSessionTotals`, `parentRollupTotals`, `parentFound`; `rollupSessionStats` maps them from `UsageSessionRollupResult`; `sessionStats = rollupSessionStats ?? localSessionStats` preserves the local fallback on rollup-API failure (`setSessionUsageRollup(null)` on non-abort error). Verified children's messages are never merged into the parent `messages` list — rollup only reads `usage` totals; `messages` comes solely from `/api/sessions/:id`.\n- `components/AppShell.tsx` — already consumes `kind === \"studio_child\"` → shows the child's own `selectedSessionTotals` in compact, with parent rollup in tooltip; parent shows `incl. Studio` only when real child token/cost totals > 0.\n\n#### Verification\n\n- `npm run lint` — passed (no output / clean).\n- `node_modules/.bin/tsc --noEmit` — passed (no errors).\n\n#### Acceptance check\n\n- Parent ↔ Studio child audit tab switch now refreshes compact + tooltip immediately: `statsKey` includes `selectedSessionKind`, `parentFound`, `selectedSessionTotals` (tokens+cost), `parentRollupTotals.cost`, `studioChildSessionCount`, and now own/studioChild token totals — covering all fields driving `hasChildUsage`, compact cost, `compactMark`, and tooltip splits.\n- Rollup API failure falls back to `localSessionStats` (standalone口径, no child mark) — confirmed.\n- Child usage/messages are not folded into the parent messages list — confirmed (separate data paths).\n\n#### Notes / Risks\n\n- Manual runtime verification (实际切换同一 parent 与 child audit tab、检查 Usage 弹窗、`/api/usage?sessionId=<parent|child>` 三类查询) is out of scope for `hook-refresh` and belongs to `usage-validation` / `docs-checks`. No code change skipped.\n- No `next build` run (per task constraints).\n- Date/time convention and additive-field compatibility preserved; no existing `UsageSessionRollupResult` / `SessionUsageTopbarStats` field removed or re-semanted.\n\nNo decisions needed from the main session for this subtask."
+      },
+      "usage-validation": {
+        "id": "usage-validation",
+        "status": "done",
+        "updatedAt": "2026-07-08T07:40:50.182Z",
+        "startedAt": "2026-07-08T07:33:53.591Z",
+        "finishedAt": "2026-07-08T07:40:50.176Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-28f771e5a39a0f8f7c3f40d4"
+        ],
+        "lastRunId": "implementer-28f771e5a39a0f8f7c3f40d4",
+        "claimedAt": "2026-07-08T07:33:53.591Z",
+        "claimedByContextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "summary": "### Implementation Complete — `usage-validation` subtask\n\n#### Files Changed / Artifacts Produced\n\n- `scripts/test-usage-stats-rollup.mjs` (新增) — fixture 回归脚本：在临时 `PI_CODING_AGENT_DIR` 下构造真实 JSONL（parent + child 有/无 usage + standalone + orphan child + archived child），走真实 `SessionManager` + `session-reader` 扫描路径，断言 global totals、bySession、byParentSession（parent/orphan/standalone）、session_rollup（parent/child/standalone/orphan/archived）与 `includeArchived` 开关共 10 组断言。\n- `scripts/ts-extension-loader.mjs` (改动) — additive 增加 `@/` path alias → 项目根解析（含 `.ts` fallback），使测试脚本可 import 使用 `@/lib/...` 的源模块；原有 `./`/`../` 行为不变。\n- `lib/git-worktree.ts` (改动) — `MainWorktreeDirtyError` 的 constructor parameter property 改为显式字段 + 赋值，行为不变，仅消除 Node strip-only 模式不支持 parameter property 的加载阻塞。\n- `package.json` (改动) — 新增 `test:usage-rollup` 脚本。\n- `.ypi/tasks/.../checks.md`、`handoff.md` — 勾选 R3、记录验证样本与子任务完成。\n\n#### Verification\n\n- `npm run test:usage-rollup` — passed (10 assertion groups)\n- `npm run test:studio-policy` / `npm run test:studio-dag` — still passed (loader change non-breaking)\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### 结论\n\nR3 全部覆盖：`getUsageStats` / `getUsageStatsForSessionRollup` 在 active 与 archive scope 下都 `includeStudioChildren`；`byParentSession.totals = ownTotals + studioChildTotals`；`session_rollup(parent)` rollup = own + children；`session_rollup(child)` 满足确认口径（`selectedSessionTotals` = child 自身、`parentRollupTotals` = parent rollup）；孤儿 child `parentFound=false` 保留；archived child 经 metadata 扫描路径仍能读取真实 usage 并汇入 parent rollup。Usage 弹窗的 `byParentSession` fallback 不受影响。\n\n#### Notes / Risks\n\n- R1/R2 属于 `topbar-copy` / `hook-refresh` 子任务，本子任务未触及 `AppShell.tsx` / `useAgentSession.ts` / `ChatWindow.tsx`。\n- `lib/git-worktree.ts` 改动超出 `usage-validation` 列出的 files 范围，但属最小加载阻塞消除（非行为变更），已通过 type-check/lint。如主会话认为不该改，可改引入 tsx/esbuild loader，但项目当前未引入。\n- 回归脚本依赖 Node 内建 TS strip；后续若 `lib/` 新增 enum/namespace/parameter property 语法，脚本会再次无法加载。\n- 需主会话关注：是否认可 `git-worktree.ts` 的最小语法调整为本次回归脚本的可接受代价。"
+      },
+      "docs-checks": {
+        "id": "docs-checks",
+        "status": "done",
+        "updatedAt": "2026-07-08T07:44:28.577Z",
+        "startedAt": "2026-07-08T07:41:00.918Z",
+        "finishedAt": "2026-07-08T07:44:28.574Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-76875e928cf6852c4e381e5a"
+        ],
+        "lastRunId": "implementer-76875e928cf6852c4e381e5a",
+        "claimedAt": "2026-07-08T07:41:00.918Z",
+        "claimedByContextId": "pi_019f4085-4e03-7749-9fa9-64eab79ec6ce",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — 更新 `AppShell` top-bar chip 展示口径（parent `incl. Studio` / standalone 自身 / studio_child `Studio child`，`hasChildUsage` 改为 token/cost > 0）、`ChatWindow` `statsKey` 新增字段、`useAgentSession` `SessionUsageTopbarStats` additive 字段与 local fallback `standalone` 语义、`UsageStatsModal` 不受 additive 字段影响。\n- `docs/modules/api.md` — `usage/` route `session_rollup` 响应 additive `selectedSessionTotals` / `parentRollupTotals` / `selectedSessionKind` 字段与 implementation pointer 契约说明。\n- `docs/modules/library.md` — `lib/usage-stats.ts` `UsageSessionRollupResult` additive 字段语义与口径。\n- `.ypi/tasks/…/checks.md` — 勾选 R1/R2 项，追加 docs-checks 验证记录与未覆盖手工验收点。\n- `.ypi/tasks/…/handoff.md` — 追加 docs-checks 子任务完成记录。\n- `.ypi/tasks/…/review.md`、`summary.md` — 填写复核与总结。\n\n`docs/architecture/overview.md` 已由前序子任务更新，本子任务复核一致，未再改动。\n\n#### Verification\n\n- `npm run lint` — 0 error / 0 warning\n- `node_modules/.bin/tsc --noEmit` — 通过\n- `npm run test:usage-rollup` — 通过（10 组断言）\n- 未运行 `next build`（按子任务约束）\n- 文档一致性 grep：26 处新口径引用，0 处遗留裸 `+child`\n\n#### Notes / Risks\n\n- 手工验收点 1–6（真实环境顶部文案/tooltip/Usage 弹窗/API 视觉确认）未自动覆盖；`usage-validation` fixture 已覆盖等价 API 断言，顶部文案属视觉确认，建议主会话在真实 parent/child session 中复核。\n- `lib/git-worktree.ts` 改动（`MainWorktreeDirtyError` parameter property → 显式字段）超出 `usage-validation` files 范围，属最小加载阻塞消除，已通过 lint/type-check；如主会话不接受可改用测试侧 transform loader。\n- task.json workflow 状态（progress/completed）未由本实现员修改，留待主会话/orchestrator 推进。\n\ndocs-checks 子任务全部验收标准满足：docs 与最终代码口径一致，lint / type-check 通过，plan-review/review/handoff 记录验证结果。"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-08T07:09:56.403Z",
+        "subtaskId": "usage-contract",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T07:21:48.033Z",
+        "subtaskId": "topbar-copy",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T07:30:04.912Z",
+        "subtaskId": "hook-refresh",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T07:33:53.591Z",
+        "subtaskId": "usage-validation",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T07:41:00.918Z",
+        "subtaskId": "docs-checks",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

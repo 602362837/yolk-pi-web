@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-08T06:54:40.485Z",
+  "updatedAt": "2026-07-08T08:09:20.048Z",
   "entries": [
+    {
+      "id": "20260708-160920-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+      "title": "修复 Chat 顶部与统计中的子任务计费汇总显示错误",
+      "taskId": "20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+      "taskKey": "archived:2026-07:20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+      "workflowId": "feature-dev",
+      "summary": "修复了 Chat 顶部与统计中的 Studio 子任务计费汇总显示错误。可复用结论：顶部计费不能用硬编码 `+child` 或 `childCount>0` 推断子任务计费，应以真实 child token/cost totals 判断；parent 顶部可显示 rollup 并用 `incl. Studio` 标示，studio_child 顶部应只显示该 child 自身费用，必要时在 hover/tooltip 中补 parent rollup。为避免父/子切换展示不刷新，topbar key 需纳入 selectedSessionKind、selected child totals、parentRollupTotals 及 child token totals。Usage rollup 应保留旧字段兼容，新增 additive 字段（如 `selectedSessionTotals`、`parentRollupTotals`、`selectedSessionKind`）支持 UI 口径。建议用 fixture 回归覆盖 global/bySession/byParentSession/session_rollup/includeArchived 一致性。",
+      "tags": [
+        "feature-dev",
+        "studio",
+        "billing",
+        "usage",
+        "topbar"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260708-145841-修复-chat-顶部与统计中的子任务计费汇总显示错误",
+      "knowledgePath": ".ypi/knowledge/20260708-160920-修复-chat-顶部与统计中的子任务计费汇总显示错误.md",
+      "createdAt": "2026-07-08T08:09:20.048Z",
+      "archivedAt": "2026-07-08T08:09:20.048Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260708-145440-调整左侧项目选择文案并增加-git-添加项目入口",
       "title": "调整左侧项目选择文案并增加 Git 添加项目入口",
