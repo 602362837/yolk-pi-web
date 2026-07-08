@@ -37,14 +37,16 @@
       "label": "修复设计",
       "owner": "architect",
       "progress": 35,
-      "instruction": "定位根因，产出修复方案、验证计划和回归风险。",
+      "instruction": "定位根因，产出修复方案、验证计划和回归风险；若修复涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。",
       "requiredArtifacts": [
         "prd.md",
         "design.md",
         "implement.md",
         "checks.md"
       ],
-      "optionalArtifacts": [],
+      "optionalArtifacts": [
+        "ui.md"
+      ],
       "requiresSubagent": true
     },
     "awaiting_approval": {
@@ -52,7 +54,7 @@
       "label": "等待确认",
       "owner": "main",
       "progress": 45,
-      "instruction": "等待用户确认方案。未确认前禁止进入实现阶段。",
+      "instruction": "等待用户确认方案。涉及 UI 原型门禁时必须同时展示 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。",
       "requiredArtifacts": [
         "prd.md",
         "design.md",

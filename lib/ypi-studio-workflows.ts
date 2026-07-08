@@ -141,8 +141,8 @@ const BASE_TRANSITIONS: YpiStudioWorkflowTransition[] = [
 
 const STANDARD_STATES: Record<string, YpiStudioWorkflowState> = {
   intake: state("intake", "接单", "architect", 10, "理解目标、范围、约束和已有材料；需求不清楚时先问问题。", ["brief.md"], [], { requiresSubagent: true }),
-  planning: state("planning", "设计", "architect", 35, "产出 PRD、Design、Implement 和 Checks；涉及界面时派发 UI 设计员。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
-  awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认方案。未确认前禁止进入实现阶段。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresUserApproval: true }),
+  planning: state("planning", "设计", "architect", 35, "产出 PRD、Design、Implement 和 Checks；若涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
+  awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认方案。涉及 UI 原型门禁时必须同时展示 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresUserApproval: true }),
   implementing: state("implementing", "制作", "implementer", 70, "主 session 必须通过 ypi_studio_subagent 指派实现员完成实现。", ["handoff.md"], [], { requiresSubagent: true }),
   checking: state("checking", "检查", "checker", 90, "主 session 必须通过 ypi_studio_subagent 指派检查员审查 diff、运行验证并修复低风险小问题。", ["review.md"], [], { requiresSubagent: true }),
   changes_requested: state("changes_requested", "请求修改", "main", 78, "检查未通过。主 session 需要决定退回实现员修复，还是退回架构师重新设计。"),
@@ -182,7 +182,7 @@ export const DEFAULT_YPI_STUDIO_WORKFLOWS: YpiStudioWorkflow[] = [
     states: {
       ...STANDARD_STATES,
       intake: state("intake", "复现接单", "architect", 10, "收集报错、复现步骤、期望行为和影响范围。", ["brief.md"], [], { requiresSubagent: true }),
-      planning: state("planning", "修复设计", "architect", 35, "定位根因，产出修复方案、验证计划和回归风险。", ["prd.md", "design.md", "implement.md", "checks.md"], [], { requiresSubagent: true }),
+      planning: state("planning", "修复设计", "architect", 35, "定位根因，产出修复方案、验证计划和回归风险；若修复涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。", ["prd.md", "design.md", "implement.md", "checks.md"], ["ui.md"], { requiresSubagent: true }),
     },
     transitions: BASE_TRANSITIONS,
   },
@@ -199,7 +199,8 @@ export const DEFAULT_YPI_STUDIO_WORKFLOWS: YpiStudioWorkflow[] = [
     terminalStatuses: ["completed", "cancelled", "archived"],
     states: {
       ...STANDARD_STATES,
-      planning: state("planning", "UI + 技术设计", "architect", 35, "架构师产出技术计划，并必须在涉及界面时派发 UI 设计员产出 ui.md。", ["prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresSubagent: true }),
+      planning: state("planning", "UI + 技术设计", "architect", 35, "架构师产出技术计划，并必须派发 UI 设计员基于现有项目产出 HTML 原型；ui.md 可承载原型或链接，但不能用纯 Markdown 替代。", ["prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresSubagent: true }),
+      awaiting_approval: state("awaiting_approval", "等待确认", "main", 45, "等待用户确认方案和 HTML 原型。未确认前禁止进入实现阶段。", ["prd.md", "ui.md", "design.md", "implement.md", "checks.md"], [], { requiresUserApproval: true }),
     },
     transitions: BASE_TRANSITIONS,
   },
@@ -337,12 +338,20 @@ function ensureWorkflowRoot(ctx: WorkflowContext): void {
   else mkdirSync(ctx.workflowsRoot);
 }
 
-function writeDefaultWorkflow(ctx: WorkflowContext, workflow: YpiStudioWorkflow): YpiStudioWorkflowWriteResult {
+function writeDefaultWorkflow(ctx: WorkflowContext, workflow: YpiStudioWorkflow, options: { overwriteDefaults?: boolean } = {}): YpiStudioWorkflowWriteResult {
   const fileName = workflowFileName(workflow);
   const filePath = path.join(ctx.workflowsRoot, fileName);
   const pathLabel = relativeLabel(ctx.workspaceRoot, filePath);
   if (existsSync(filePath)) {
     if (!safeStatFile(filePath, ctx.workspaceRoot)) throw new Error(`Existing workflow path is not a file: ${pathLabel}`);
+    if (options.overwriteDefaults) {
+      const content = `${JSON.stringify(workflow, null, 2)}\n`;
+      if (readFileSync(filePath, "utf8") !== content) {
+        writeFileSync(filePath, content, { encoding: "utf8" });
+        safeStatFile(filePath, ctx.workspaceRoot);
+        return { id: workflow.id, fileName, pathLabel, status: "updated" };
+      }
+    }
     return { id: workflow.id, fileName, pathLabel, status: "skipped" };
   }
   writeFileSync(filePath, `${JSON.stringify(workflow, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
@@ -350,20 +359,23 @@ function writeDefaultWorkflow(ctx: WorkflowContext, workflow: YpiStudioWorkflow)
   return { id: workflow.id, fileName, pathLabel, status: "created" };
 }
 
-export function initializeYpiStudioWorkflows(cwd: string): YpiStudioWorkflowsInitResponse {
+export function initializeYpiStudioWorkflows(cwd: string, options: { overwriteDefaults?: boolean } = {}): YpiStudioWorkflowsInitResponse {
   const ctx = createContext(cwd);
   ensureWorkflowRoot(ctx);
   const created: YpiStudioWorkflowWriteResult[] = [];
+  const updated: YpiStudioWorkflowWriteResult[] = [];
   const skipped: YpiStudioWorkflowWriteResult[] = [];
   for (const workflow of DEFAULT_YPI_STUDIO_WORKFLOWS) {
-    const result = writeDefaultWorkflow(ctx, workflow);
+    const result = writeDefaultWorkflow(ctx, workflow, options);
     if (result.status === "created") created.push(result);
+    else if (result.status === "updated") updated.push(result);
     else skipped.push(result);
   }
   return {
     cwd: ctx.cwd,
     pathLabel: WORKFLOWS_DIR,
     created,
+    updated,
     skipped,
     workflows: listYpiStudioWorkflows(ctx.cwd),
   };

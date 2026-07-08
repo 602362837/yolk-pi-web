@@ -64,25 +64,20 @@ function needsAgentInit(data: YpiStudioAgentsResponse | null): boolean {
 }
 
 function needsWorkflowInit(data: YpiStudioWorkflowsResponse | null): boolean {
-  return !data?.exists || (data.missingDefaultWorkflows.length ?? 0) > 0;
+  return !data?.exists || (data.missingDefaultWorkflows.length ?? 0) > 0 || (data.outdatedDefaultWorkflows?.length ?? 0) > 0;
 }
 
 function initButtonLabel(agents: YpiStudioAgentsResponse | null, workflows: YpiStudioWorkflowsResponse | null): string {
   if (!agents?.exists && !workflows?.exists) return "初始化工作室";
   if (needsAgentInit(agents) || needsWorkflowInit(workflows)) return "补齐默认配置";
-  return "重新检查";
+  return "拉取最新默认配置";
 }
 
-function initSuccessMessage(createdAgents: number, createdWorkflows: number, updatedAgents: number): string {
-  if (createdAgents + createdWorkflows > 0 && updatedAgents > 0) {
-    return `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程，已更新 ${updatedAgents} 个旧版默认成员；自定义成员未覆盖。`;
+function initSuccessMessage(createdAgents: number, createdWorkflows: number, updatedAgents: number, updatedWorkflows: number, overwriteDefaults: boolean): string {
+  if (createdAgents + createdWorkflows > 0 || updatedAgents + updatedWorkflows > 0) {
+    return `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程，已更新 ${updatedAgents} 个成员、${updatedWorkflows} 个流程；自定义命名文件未覆盖。`;
   }
-  if (createdAgents + createdWorkflows > 0) {
-    return `已创建 ${createdAgents} 个成员、${createdWorkflows} 个流程；已有自定义文件未覆盖。`;
-  }
-  if (updatedAgents > 0) {
-    return `已更新 ${updatedAgents} 个旧版默认成员；自定义成员未覆盖。`;
-  }
+  if (overwriteDefaults) return "默认成员和流程已经与内置模板一致，无需更新。";
   return "默认成员和流程已是最新，没有覆盖自定义内容。";
 }
 
@@ -309,6 +304,11 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
 
   const handleInit = useCallback(async () => {
     if (!cwd || initBusy) return;
+    const overwriteDefaults = !!data?.exists && !!workflowsData?.exists && !needsAgentInit(data) && !needsWorkflowInit(workflowsData);
+    if (overwriteDefaults) {
+      const ok = window.confirm("将用当前内置模板覆盖 .ypi/agents 和 .ypi/workflows 中同名默认成员/流程文件；自定义命名文件不会覆盖。继续吗？");
+      if (!ok) return;
+    }
     setInitBusy(true);
     setInitMessage(null);
     setInitWarning(null);
@@ -318,12 +318,12 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
         fetch("/api/studio/agents", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cwd }),
+          body: JSON.stringify({ cwd, overwriteDefaults }),
         }),
         fetch("/api/studio/workflows", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cwd }),
+          body: JSON.stringify({ cwd, overwriteDefaults }),
         }),
       ]);
       const agentsBody = await agentsRes.json() as YpiStudioAgentsInitResponse & { error?: string };
@@ -344,7 +344,8 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
       const createdAgents = agentsBody.created.length;
       const createdWorkflows = workflowsBody.created.length;
       const updatedAgents = agentsBody.updated.length;
-      setInitMessage(initSuccessMessage(createdAgents, createdWorkflows, updatedAgents));
+      const updatedWorkflows = workflowsBody.updated.length;
+      setInitMessage(initSuccessMessage(createdAgents, createdWorkflows, updatedAgents, updatedWorkflows, overwriteDefaults));
       setInitWarning(initWarningMessage(agentsBody.warnings));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -352,13 +353,14 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     } finally {
       setInitBusy(false);
     }
-  }, [cwd, initBusy, loadTasks]);
+  }, [cwd, data, initBusy, loadTasks, workflowsData]);
 
   if (!cwd) {
     return <PanelEmpty title="请选择项目空间" description="选择一个会话或工作目录后，可在该项目根目录初始化 .ypi/agents/、.ypi/workflows/ 和工作室任务。" />;
   }
 
   const canInitialize = needsAgentInit(data) || needsWorkflowInit(workflowsData);
+  const canPullDefaultTemplates = !!data?.exists && !!workflowsData?.exists && !canInitialize;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--text)" }}>
@@ -377,8 +379,8 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
               padding: "6px 10px",
               borderRadius: 8,
               border: "1px solid var(--border)",
-              background: canInitialize ? "var(--accent)" : "var(--bg)",
-              color: canInitialize ? "white" : "var(--text-muted)",
+              background: canInitialize || canPullDefaultTemplates ? "var(--accent)" : "var(--bg)",
+              color: canInitialize || canPullDefaultTemplates ? "white" : "var(--text-muted)",
               cursor: initBusy || loadState === "loading" || workflowLoadState === "loading" ? "wait" : "pointer",
               fontSize: 12,
               fontWeight: 700,
@@ -389,7 +391,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
           </button>
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-          工作室包含成员、结构化流程和任务状态机。初始化只补齐缺失默认文件，不覆盖已有自定义内容。
+          工作室包含成员、结构化流程和任务状态机。初始化会补齐缺失默认文件；配置已存在时可手动拉取最新内置默认模板，覆盖同名默认成员/流程文件但不覆盖自定义命名文件。
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <TabButton active={activeTab === "members"} label={`成员 ${data?.agents.length ?? 0}`} onClick={() => setActiveTab("members")} />

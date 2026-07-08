@@ -89,11 +89,12 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 ## 核心职责
 
 1. 将稳定需求整理为 PRD：目标、范围、用户价值、需求列表和验收标准。
-2. 判断是否需要 UI 设计员参与，并为 UI 设计员拆出原型、交互或视觉任务。
-3. 产出 Design：影响模块、边界、数据流、接口契约、兼容性、迁移、风险和缓解方案。
-4. 产出 Implement：建议实现顺序、优先读取文件、改动点、验证命令、评审门禁和回滚方案。
-5. 产出 Checks：检查清单、自动验证、人工验收点和重点风险。
-6. 推荐实现员、检查员需要读取的项目规范、研究材料和相关文件。
+2. 判断是否触发 UI 原型门禁：凡涉及页面变更、前端功能新增、已有交互变化、审批/确认体验变化或用户可见信息结构变化，必须指派 UI 设计员。
+3. 对触发 UI 原型门禁的任务，必须要求 UI 设计员基于现有项目产出 HTML 格式原型（ui.md 只能承载/说明，不能用纯 Markdown 替代），并在进入实现前交给主会话 / 用户审批。
+4. 产出 Design：影响模块、边界、数据流、接口契约、兼容性、迁移、风险和缓解方案。
+5. 产出 Implement：建议实现顺序、优先读取文件、改动点、验证命令、评审门禁和回滚方案。
+6. 产出 Checks：检查清单、自动验证、人工验收点和重点风险。
+7. 推荐实现员、检查员需要读取的项目规范、研究材料和相关文件。
 
 ## 输出格式建议
 
@@ -106,9 +107,10 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 ### UI
 
-- 是否需要 UI 设计员
+- 是否触发 UI 原型门禁；触发时必须指派 UI 设计员
 - 页面 / 组件 / 状态 / 交互要点
-- 需要原型化的问题
+- HTML 原型交付形式（fenced \`html\` 或 \`.html\` 文件路径）
+- 用户审批记录或进入 awaiting_approval 前的审批请求
 
 ### Design
 
@@ -142,6 +144,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 ## 工作原则
 
 - 规划完成后只建议主会话保存 implementationPlan 并切到 awaiting_approval；必须等待用户确认后才能实现。
+- UI 原型门禁是硬流程要求：触发条件存在时，未取得 UI 设计员 HTML 原型和用户审批前，不得建议进入实现。
 - 先证据，后方案。
 - 设计必须具体到实现员可执行、检查员可验证。
 - 复杂性必须对应真实约束；不要为了流程而流程。
@@ -332,7 +335,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 
 1. 检查当前 diff 是否完整覆盖需求和验收标准。
 2. 对照设计审查边界、数据流、接口契约、兼容性和回滚风险。
-3. 对照 UI 方案检查交互、状态、空态、错误态、窄屏和可访问性。
+3. 对照 UI 方案检查交互、状态、空态、错误态、窄屏和可访问性；若任务涉及页面变更、前端功能新增、交互变化或审批体验变化，但缺少 UI 设计员 HTML 原型或用户审批记录，必须作为阻塞问题。
 4. 审查代码质量：类型安全、错误处理、路径/权限边界、复用、命名和可维护性。
 5. 运行相关 lint、type-check、测试或手工验证。
 6. 修复范围内明确且低风险的小问题。
@@ -346,6 +349,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 - 缺失或薄弱的测试 / 验证。
 - 路径、权限、跨平台、编码和并发假设。
 - 用户可见体验和错误恢复。
+- UI 变更是否提供 HTML 原型（不能仅用纯 Markdown 说明替代）和明确的用户审批记录。
 
 ## 禁止操作
 
@@ -381,7 +385,7 @@ export const DEFAULT_YPI_STUDIO_AGENTS: DefaultStudioAgent[] = [
 const DEFAULT_AGENT_BY_FILE = new Map(DEFAULT_YPI_STUDIO_AGENTS.map((agent) => [agent.fileName, agent]));
 const DEFAULT_AGENT_ORDER = new Map(DEFAULT_YPI_STUDIO_AGENTS.map((agent, index) => [agent.fileName, index]));
 const OLD_DEFAULT_AGENT_HASHES = new Map<string, readonly string[]>([
-  ["architect.md", ["197c251f41768e628e4751bb1327b937869c0f64847e46f8bf05945188a293f9"]],
+  ["architect.md", ["197c251f41768e628e4751bb1327b937869c0f64847e46f8bf05945188a293f9", "4d3f876435f4c6a6f3e4b8f69f7490a6975301de41286c16ea7201e9e9237012"]],
   [
     "ui-designer.md",
     [
@@ -390,7 +394,7 @@ const OLD_DEFAULT_AGENT_HASHES = new Map<string, readonly string[]>([
     ],
   ],
   ["implementer.md", ["c30369447547a9ef80273a17abab0fd398f287c668e3cdb990729c443338b8b7"]],
-  ["checker.md", ["cac89b291d61f596c0c4ace30c8bd604915c31d1ef5a47ea223fbfc4a0f3f1e3"]],
+  ["checker.md", ["cac89b291d61f596c0c4ace30c8bd604915c31d1ef5a47ea223fbfc4a0f3f1e3", "ad9736e14479b6093ed7b1fa5d30af6449983c5abda49d6a6da47078ab2352f3"]],
 ]);
 const INTERNAL_REFERENCE_MARKERS = [
   "trel" + "lis",
@@ -649,16 +653,19 @@ interface AgentWriteOutcome {
   warning?: YpiStudioAgentWarning;
 }
 
-function writeDefaultAgent(ctx: ReaderContext, agent: DefaultStudioAgent): AgentWriteOutcome {
+function writeDefaultAgent(ctx: ReaderContext, agent: DefaultStudioAgent, options: { overwriteDefaults?: boolean } = {}): AgentWriteOutcome {
   const filePath = path.join(ctx.agentsRoot, agent.fileName);
   const pathLabel = relativeLabel(ctx.workspaceRoot, filePath);
   if (existsSync(filePath)) {
     if (!safeStatFile(filePath, ctx.workspaceRoot)) throw new Error(`Existing agent path is not a file: ${pathLabel}`);
     const existingContent = readFileSync(filePath, "utf8");
-    if (OLD_DEFAULT_AGENT_HASHES.get(agent.fileName)?.includes(sha256Text(existingContent))) {
-      writeFileSync(filePath, agent.content, { encoding: "utf8" });
-      safeStatFile(filePath, ctx.workspaceRoot);
-      return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "updated" } };
+    if (options.overwriteDefaults || OLD_DEFAULT_AGENT_HASHES.get(agent.fileName)?.includes(sha256Text(existingContent))) {
+      if (existingContent !== agent.content) {
+        writeFileSync(filePath, agent.content, { encoding: "utf8" });
+        safeStatFile(filePath, ctx.workspaceRoot);
+        return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "updated" } };
+      }
+      return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "skipped" } };
     }
     const warning = containsInternalReference(existingContent) ? internalReferenceWarning(agent.fileName, pathLabel) : undefined;
     return { result: { id: agent.id, fileName: agent.fileName, pathLabel, status: "skipped" }, warning };
@@ -686,7 +693,7 @@ function collectCustomReferenceWarnings(ctx: ReaderContext, knownWarnings: Set<s
   return warnings;
 }
 
-export function initializeYpiStudioAgents(cwd: string): YpiStudioAgentsInitResponse {
+export function initializeYpiStudioAgents(cwd: string, options: { overwriteDefaults?: boolean } = {}): YpiStudioAgentsInitResponse {
   const ctx = createContext(cwd);
   ensureWritableAgentsRoot(ctx);
 
@@ -695,7 +702,7 @@ export function initializeYpiStudioAgents(cwd: string): YpiStudioAgentsInitRespo
   const skipped: YpiStudioAgentWriteResult[] = [];
   const warnings: YpiStudioAgentWarning[] = [];
   for (const agent of DEFAULT_YPI_STUDIO_AGENTS) {
-    const { result, warning } = writeDefaultAgent(ctx, agent);
+    const { result, warning } = writeDefaultAgent(ctx, agent, options);
     if (result.status === "created") created.push(result);
     else if (result.status === "updated") updated.push(result);
     else skipped.push(result);
@@ -715,6 +722,6 @@ export function initializeYpiStudioAgents(cwd: string): YpiStudioAgentsInitRespo
   };
 }
 
-export function isYpiStudioAgentsInitBody(value: unknown): value is { cwd: string } {
+export function isYpiStudioAgentsInitBody(value: unknown): value is { cwd: string; overwriteDefaults?: boolean } {
   return isRecord(value) && typeof value.cwd === "string" && value.cwd.trim().length > 0;
 }

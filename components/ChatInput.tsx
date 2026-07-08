@@ -19,6 +19,7 @@ interface ModelOption {
   provider: string;
   modelId: string;
   name: string;
+  providerDisplayName?: string;
 }
 
 interface Props {
@@ -32,7 +33,7 @@ interface Props {
   isStreaming: boolean;
   model?: { provider: string; modelId: string } | null;
   modelNames?: Record<string, string>;
-  modelList?: { id: string; name: string; provider: string }[];
+  modelList?: { id: string; name: string; provider: string; providerDisplayName?: string }[];
   onModelChange?: (provider: string, modelId: string) => void;
   onCompact?: () => void;
   onAbortCompaction?: () => void;
@@ -1016,7 +1017,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     if (modelList && modelList.length > 0) {
-      return modelList.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }));
+      return modelList.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name, providerDisplayName: m.providerDisplayName }));
     }
     return Object.entries(modelNames ?? {}).map(([modelId, name]) => ({
       provider: model?.provider ?? "unknown",
@@ -1026,14 +1027,27 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   }, [model?.provider, modelList, modelNames]);
 
   const modelSelectOptions = useMemo<ModelSelectOption[]>(() => (
-    modelOptions.map((opt) => ({
-      value: formatModelSelectValue(opt),
-      label: opt.name,
-      detail: `${opt.provider}/${opt.modelId}`,
-      provider: opt.provider,
-      modelId: opt.modelId,
-      keywords: [opt.name, opt.provider, opt.modelId, `${opt.provider}/${opt.name}`],
-    }))
+    modelOptions.map((opt) => {
+      const providerLabel = opt.providerDisplayName || opt.provider;
+      return {
+        value: formatModelSelectValue(opt),
+        label: opt.name,
+        detail: opt.providerDisplayName ? `${opt.providerDisplayName} · ${opt.provider}/${opt.modelId}` : `${opt.provider}/${opt.modelId}`,
+        provider: opt.provider,
+        modelId: opt.modelId,
+        group: providerLabel,
+        keywords: [
+          opt.name,
+          opt.provider,
+          opt.modelId,
+          `${opt.provider}/${opt.name}`,
+          `${opt.provider}/${opt.modelId}`,
+          opt.providerDisplayName,
+          opt.providerDisplayName ? `${opt.providerDisplayName}/${opt.name}` : undefined,
+          opt.providerDisplayName ? `${opt.providerDisplayName}/${opt.modelId}` : undefined,
+        ].filter((keyword): keyword is string => Boolean(keyword)),
+      };
+    })
   ), [modelOptions]);
 
   const currentModelOption = useMemo(() => (

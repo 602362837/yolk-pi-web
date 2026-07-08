@@ -39,7 +39,7 @@
       "label": "设计",
       "owner": "architect",
       "progress": 35,
-      "instruction": "产出 PRD、Design、Implement 和 Checks；涉及界面时派发 UI 设计员。",
+      "instruction": "产出 PRD、Design、Implement 和 Checks；若涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化，必须派发 UI 设计员产出 HTML 原型并请求用户审批。",
       "requiredArtifacts": [
         "prd.md",
         "design.md",
@@ -56,7 +56,7 @@
       "label": "等待确认",
       "owner": "main",
       "progress": 45,
-      "instruction": "等待用户确认方案。未确认前禁止进入实现阶段。",
+      "instruction": "等待用户确认方案。涉及 UI 原型门禁时必须同时展示 HTML 原型和用户审批请求；未确认前禁止进入实现阶段。",
       "requiredArtifacts": [
         "prd.md",
         "design.md",

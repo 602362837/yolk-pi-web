@@ -134,6 +134,8 @@ First visible reply after this extension loads: say briefly in Chinese that YPI 
 This notice is one-shot: do not repeat it after the first assistant reply in the same session.
 </ypi-studio-first-reply>`;
 
+const UI_PROTOTYPE_GATE_PROMPT = "UI prototype gate: if a task changes pages, adds frontend functionality, changes existing interactions, changes approval/confirmation experience, or changes user-visible information structure, the architect MUST dispatch ui-designer to produce an HTML prototype based on the existing project, request user approval for that prototype, and avoid implementation until approval is recorded. ui.md may carry the HTML or link to an .html file, but plain Markdown alone is not acceptable.";
+
 function isObj(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -286,6 +288,7 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     state?.instruction ? `State instruction: ${state.instruction}` : "",
     state?.requiresSubagent ? "The next owner must be dispatched through ypi_studio_subagent." : "The main session may handle orchestration for this state.",
     current.implementationPlan ? `Implementation subtasks: ${current.implementation?.done ?? 0}/${current.implementation?.total ?? current.implementationPlan.subtasks.length} done; active=${current.implementation?.activeTitle ?? current.implementation?.activeSubtaskId ?? "none"}; next=${current.implementation?.nextTitle ?? current.implementation?.nextSubtaskId ?? "none"}; blocked=${current.implementation?.blocked ?? 0}.` : "Implementation plan: not saved yet.",
+    current.status === "planning" ? UI_PROTOTYPE_GATE_PROMPT : "",
     current.status === "planning" ? "When planning/design artifacts are complete, save implementationPlan with ypi_studio_task(action=update_implementation_plan), transition only to awaiting_approval, and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
     current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: fill available concurrency slots, not just one. First inspect ready work with ypi_studio_task(action=implementation_next, limit=<available slots>). Then claim ready subtask(s) up to maxConcurrency with ypi_studio_task(action=claim_implementation_subtask, limit=<available slots>, status=running) or explicit subtaskIds, and start one ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<claimed id>) per claimed subtask. Each implementer run handles exactly one subtaskId, but a single orchestration turn should launch multiple async runs when multiple ready subtasks and free slots exist. After launching async run(s), call ypi_studio_wait(runIds=<started run ids>) so this main chat waits for terminal results and continues from the tool result. Do not delegate the whole implementation at once." : "",
     current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
@@ -304,6 +307,7 @@ function startupContext(root: string): string {
     "YPI Studio workflow context is available. Studio tasks are structured under .ypi/tasks and workflows under .ypi/workflows.",
     "The main session is the orchestrator. Use ypi_studio_task for task lifecycle, ypi_studio_subagent for role delegation, and ypi_studio_wait after async delegation so the main chat waits for child results as a real tool call.",
     "Design/planning must stop at awaiting_approval for user confirmation; implementation may start only after a later explicit user approval.",
+    UI_PROTOTYPE_GATE_PROMPT,
     "</ypi-studio-context>",
     knowledge,
     FIRST_REPLY_NOTICE,
@@ -450,7 +454,7 @@ function summarizeStudioSubagentRun(run: YpiStudioTaskSubagentRun): Record<strin
 function buildNextStudioTaskAction(task: YpiStudioTaskDetail): string {
   const summary = task.implementation;
   if (task.status === "awaiting_approval") return "Summarize the saved plan/artifacts and ask the user for explicit approval; do not transition to implementing without a server-recorded approval grant.";
-  if (task.status === "planning") return "Finish design/planning artifacts, save implementationPlan if applicable, then transition only to awaiting_approval and stop for user confirmation.";
+  if (task.status === "planning") return "Finish design/planning artifacts. If the work triggers the UI prototype gate, dispatch ui-designer for an HTML prototype and request user approval. Save implementationPlan if applicable, then transition only to awaiting_approval and stop for user confirmation.";
   if (task.status === "implementing" && summary) {
     const active = summary.running + summary.queued;
     const unfinished = summary.ready + summary.waiting + summary.pending + summary.blocked + summary.failed + active;
@@ -1423,7 +1427,7 @@ function sendStudioStartPrompt(
     "请按 YPI Studio 状态机执行：",
     workflowLine,
     "2. 接单和设计阶段使用 ypi_studio_subagent(member=architect) 指派架构师。",
-    "3. 涉及界面时使用 ypi_studio_subagent(member=ui-designer)。",
+    "3. 涉及页面变更、前端功能新增、交互变化、审批体验变化或用户可见信息结构变化时，必须使用 ypi_studio_subagent(member=ui-designer) 产出 HTML 原型并请求用户审批；ui.md 不能只有纯 Markdown 说明。",
     "4. 方案稳定后只切到 awaiting_approval；本轮必须停止，向我展示 PRD/Design/Implement/Checks 摘要并请求确认或修改意见。",
     "5. 未收到后续用户明确确认前，不得进入 implementing，不得调用 implementer；确认后先领取一个 ready implementation subtask，再通过 ypi_studio_subagent(member=implementer, subtaskId=...) 逐项指派。"
   ].join("\n"));
@@ -1808,9 +1812,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
     name: "ypi_studio_task",
     label: "YPI Studio Task",
     description: "Manage structured YPI Studio workflows and tasks for the current project.",
-    promptSnippet: "Use ypi_studio_task to initialize workflows, create/bind/read Studio tasks, transition states, and update artifacts.",
+    promptSnippet: `Use ypi_studio_task to initialize workflows, create/bind/read Studio tasks, transition states, and update artifacts. ${UI_PROTOTYPE_GATE_PROMPT}`,
     promptGuidelines: [
       "Use ypi_studio_task before doing non-trivial YPI Studio work; do not invent task state outside .ypi/tasks/task.json.",
+      UI_PROTOTYPE_GATE_PROMPT,
       "After design/planning artifacts are ready, transition only to awaiting_approval, stop, and ask the user to confirm or request changes.",
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
       "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit=<available concurrency slots> to inspect the ready batch, then claim all ready subtask(s) that fit the free slots before dispatching one async implementer per claimed subtaskId.",
@@ -1956,9 +1961,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
     name: "ypi_studio_subagent",
     label: "YPI Studio Subagent",
     description: "Dispatch a YPI Studio member as a child Pi process with the active Studio task context.",
-    promptSnippet: "Use ypi_studio_subagent to assign Studio role work to architect, ui-designer, implementer, or checker.",
+    promptSnippet: `Use ypi_studio_subagent to assign Studio role work to architect, ui-designer, implementer, or checker. ${UI_PROTOTYPE_GATE_PROMPT}`,
     promptGuidelines: [
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
+      "For UI prototype gate tasks, architect must dispatch ui-designer before implementation; ui-designer must deliver an HTML prototype and the main session must obtain user approval.",
       "Do not pass model/thinking unless the user explicitly asks to override Studio Settings for this member run.",
       "When dispatching implementer for a task with implementationPlan, each ypi_studio_subagent run must pass exactly one claimed subtaskId; to use parallelism, launch multiple async implementer runs in the same orchestration turn until maxConcurrency is full.",
       "Omitting action/mode preserves the current synchronous behavior. Async orchestration uses action=start with mode=async; immediately call ypi_studio_wait with the returned runId(s) so the main chat waits on a real tool result. Background terminal continuations remain as a fallback. poll/collect/cancel by runId remain available and must be idempotent.",

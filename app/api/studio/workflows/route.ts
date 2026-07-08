@@ -18,7 +18,7 @@ async function resolveAuthorizedCwd(cwd: string): Promise<string | NextResponse>
   return canonicalCwd;
 }
 
-function isInitBody(value: unknown): value is { cwd: string } {
+function isInitBody(value: unknown): value is { cwd: string; overwriteDefaults?: boolean } {
   return typeof value === "object" && value !== null && !Array.isArray(value) && typeof (value as { cwd?: unknown }).cwd === "string";
 }
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const authorizedCwd = await resolveAuthorizedCwd(body.cwd);
     if (authorizedCwd instanceof NextResponse) return authorizedCwd;
 
-    return NextResponse.json(initializeYpiStudioWorkflows(authorizedCwd));
+    return NextResponse.json(initializeYpiStudioWorkflows(authorizedCwd, { overwriteDefaults: body.overwriteDefaults === true }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = error instanceof YpiStudioWorkflowSecurityError ? 400 : 500;

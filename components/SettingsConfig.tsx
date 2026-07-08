@@ -52,6 +52,7 @@ interface ModelListItem {
   id: string;
   name: string;
   provider: string;
+  providerDisplayName?: string;
 }
 
 interface ModelsResponse {
@@ -198,14 +199,27 @@ function ModelPolicySelect({
     { value: "followMain", label: "跟随主会话模型", detail: "策略", group: "模型策略", keywords: ["main", "current", "follow"] },
     { value: "piDefault", label: "使用 Pi 默认模型", detail: "策略", group: "模型策略", keywords: ["pi", "default"] },
     { value: "unset", label: "本层不指定", detail: "策略", group: "模型策略", keywords: ["unset", "none", "inherit"] },
-    ...models.map((model) => ({
-      value: `specific:${model.provider}/${model.id}`,
-      label: model.name,
-      detail: `${model.provider}/${model.id}`,
-      provider: model.provider,
-      modelId: model.id,
-      keywords: [model.name, model.provider, model.id, `${model.provider}/${model.name}`],
-    })),
+    ...models.map((model) => {
+      const providerLabel = model.providerDisplayName || model.provider;
+      return {
+        value: `specific:${model.provider}/${model.id}`,
+        label: model.name,
+        detail: model.providerDisplayName ? `${model.providerDisplayName} · ${model.provider}/${model.id}` : `${model.provider}/${model.id}`,
+        provider: model.provider,
+        modelId: model.id,
+        group: providerLabel,
+        keywords: [
+          model.name,
+          model.provider,
+          model.id,
+          `${model.provider}/${model.name}`,
+          `${model.provider}/${model.id}`,
+          model.providerDisplayName,
+          model.providerDisplayName ? `${model.providerDisplayName}/${model.name}` : undefined,
+          model.providerDisplayName ? `${model.providerDisplayName}/${model.id}` : undefined,
+        ].filter((keyword): keyword is string => Boolean(keyword)),
+      };
+    }),
   ], [models]);
 
   const selectedValue = formatModelValue(value);

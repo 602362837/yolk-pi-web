@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 const modelNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 function compareModelEntries(
-  a: { id: string; name: string; provider: string },
-  b: { id: string; name: string; provider: string }
+  a: { id: string; name: string; provider: string; providerDisplayName?: string },
+  b: { id: string; name: string; provider: string; providerDisplayName?: string }
 ): number {
   return modelNameCollator.compare(a.name || a.id, b.name || b.id)
     || modelNameCollator.compare(a.provider, b.provider)
@@ -17,7 +17,7 @@ function compareModelEntries(
 
 export async function GET(req: Request) {
   const nameMap = new Map<string, string>();
-  let modelList: { id: string; name: string; provider: string }[] = [];
+  let modelList: { id: string; name: string; provider: string; providerDisplayName?: string }[] = [];
   let defaultModel: { provider: string; modelId: string } | null = null;
   const thinkingLevels: Record<string, string[]> = {};
   const thinkingLevelMaps: Record<string, Record<string, string | null>> = {};
@@ -38,11 +38,15 @@ export async function GET(req: Request) {
     const services = await createAgentSessionServices({ cwd, agentDir });
     const registry = services.modelRegistry;
     const available = registry.getAvailable();
-    modelList = available.map((m: { id: string; name: string; provider: string }) => ({
-      id: m.id,
-      name: m.name,
-      provider: m.provider,
-    })).sort(compareModelEntries);
+    modelList = available.map((m: { id: string; name: string; provider: string }) => {
+      const providerDisplayName = registry.getProviderDisplayName(m.provider);
+      return {
+        id: m.id,
+        name: m.name,
+        provider: m.provider,
+        ...(providerDisplayName && providerDisplayName !== m.provider ? { providerDisplayName } : {}),
+      };
+    }).sort(compareModelEntries);
     for (const m of available) {
       const key = `${m.provider}:${m.id}`;
       nameMap.set(key, m.name);

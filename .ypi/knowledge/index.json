@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-07T08:29:33.030Z",
+  "updatedAt": "2026-07-08T01:48:40.420Z",
   "entries": [
+    {
+      "id": "20260708-094840-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+      "title": "修复项目选择、Studio 架构流程、Tab 标题与模型搜索问题",
+      "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+      "taskKey": "archived:2026-07:20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+      "workflowId": "feature-dev",
+      "summary": "完成并归档：修复项目选择、Studio 架构流程、Tab 标题与模型搜索问题。可复用结论：项目下拉的 Choose project folder 与 Add project path 应统一走 /api/projects 注册语义，后续确认需选中后端返回的项目主空间（包括 created=false 已存在项目），不能把添加入口做成只能提示/不切换。YPI Studio UI 原型门禁应同时写入 architect/checker 默认成员、feature/bugfix/ui-change workflow、runtime prompt 和项目 .ypi 配置：页面变更、前端功能新增、交互/审批体验或用户可见信息结构变化时，架构师必须指派 UI designer 输出 HTML 原型并经用户审批。默认模板更新需要提供显式“拉取最新默认配置/overwriteDefaults”能力，覆盖同名默认成员/流程但不覆盖自定义命名文件。Tab 标题应优先 projectId/spaceId 匹配，再归一化路径 fallback。模型搜索应把 providerDisplayName 从 /api/models 透出并纳入 Chat/Settings ModelSelect keywords。验证：lint、tsc、test:studio-dag 通过。",
+      "tags": [
+        "feature-dev",
+        "bugfix",
+        "frontend",
+        "ypi-studio",
+        "knowledge",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+      "knowledgePath": ".ypi/knowledge/20260708-094840-修复项目选择-studio-架构流程-tab-标题与模型搜索问题.md",
+      "createdAt": "2026-07-08T01:48:40.420Z",
+      "archivedAt": "2026-07-08T01:48:40.420Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260707-162933-修复-ypi-studio-sdk-runner-preflight-回退-cli-问题",
       "title": "修复 YPI Studio SDK runner preflight 回退 CLI 问题",

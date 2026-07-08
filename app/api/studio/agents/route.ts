@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const authorizedCwd = await resolveAuthorizedCwd(body.cwd);
     if (authorizedCwd instanceof NextResponse) return authorizedCwd;
 
-    return NextResponse.json(initializeYpiStudioAgents(authorizedCwd));
+    return NextResponse.json(initializeYpiStudioAgents(authorizedCwd, { overwriteDefaults: body.overwriteDefaults === true }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = error instanceof YpiStudioSecurityError ? 400 : 500;

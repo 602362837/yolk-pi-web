@@ -10,6 +10,20 @@ export function getPathBaseName(path: string | null | undefined): string | null 
   return parts[parts.length - 1] ?? normalized;
 }
 
+export function normalizeWorkspacePathForTitle(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (!normalized) return path;
+  if (/^[A-Za-z]:\//.test(normalized)) return normalized.toLowerCase();
+  return normalized;
+}
+
+export function sameWorkspacePathForTitle(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = normalizeWorkspacePathForTitle(a);
+  const right = normalizeWorkspacePathForTitle(b);
+  return left !== null && right !== null && left === right;
+}
+
 export function formatWorkspaceTitle(cwd: string | null | undefined, git?: GitInfo): string {
   const cwdName = getPathBaseName(cwd);
   if (!cwdName) return WORKSPACE_TITLE_FALLBACK;

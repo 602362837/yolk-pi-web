@@ -341,7 +341,7 @@ export function ModelSelect({
           />
         </label>
         <div style={{ marginTop: 5, padding: "0 2px", color: "var(--text-dim)", fontSize: 10 }}>
-          支持实时模糊跳跃搜索，例如 gpt4、sonnet、dsr1
+          支持模型、provider / 提供商名称搜索，例如 gpt4、sonnet、dsr1
         </div>
       </div>
 

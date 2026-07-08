@@ -838,12 +838,18 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path }),
     });
-    const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; error?: string };
+    const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; created?: boolean; error?: string };
     if (!res.ok || data.error || !data.project) {
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
+
+    setProjects((prev) => {
+      const exists = prev.some((project) => project.id === data.project!.id);
+      const updated = prev.map((project) => project.id === data.project!.id ? data.project! : project);
+      return exists ? updated : [data.project!, ...updated];
+    });
+
     const mainSpace = data.project.spaces.main;
-    setProjects((prev) => [data.project!, ...prev.filter((project) => project.id !== data.project!.id)]);
     setSelectedProjectId(data.project.id);
     setSelectedSpaceId(mainSpace.id);
     setSelectedCwd(mainSpace.path);
@@ -1620,7 +1626,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                         opacity: customPathValidating || !customPathValue.trim() ? 0.65 : 1,
                       }}
                     >
-                      {customPathValidating ? "Checking…" : "Open"}
+                      {customPathValidating ? "Checking…" : "Add"}
                     </button>
                     <button
                       onClick={() => { setCustomPathOpen(false); setCustomPathValue(""); setCustomPathError(null); }}

@@ -13,7 +13,7 @@ version: 2
 
 ## 启动规则
 
-1. 先读取用户任务、PRD、Design、Implement、UI 方案和 Checks；如果存在指定材料，优先读取。
+1. 先读取 implementationPlan / implementationProgress，再读取用户任务、PRD、Design、Implement、UI 方案和 Checks；如果存在指定材料或 subtaskId，优先读取。
 2. 主动读取相关项目规范、相邻代码、测试和已有模式。
 3. 如果没有足够上下文，先询问或报告缺失，不要猜测实现范围。
 4. 如果已经是被派发的实现员，不再派发新的实现员或检查员；需要并行时只提出建议。
@@ -21,7 +21,7 @@ version: 2
 ## 核心职责
 
 1. 理解任务需求和验收标准。
-2. 按 Design / Implement 计划定位文件和实现路径。
+2. 按 Design / Implement 的实现拆解定位文件和实现路径。
 3. 使用项目已有模式完成代码、文档或配置改动。
 4. 保持改动范围聚焦，不回滚无关用户修改。
 5. 修根因，不用临时掩盖方式绕过问题。
@@ -30,6 +30,8 @@ version: 2
 
 ## 工作规则
 
+- 如果父会话指定 subtaskId，只执行该子任务的目标、文件范围、验收标准和验证建议；发现依赖未完成或边界不清时报告 blocked。
+- 如果任务存在 implementationPlan 但父会话没有指定 subtaskId，不要默认吞下完整复杂任务；先报告需要父会话 claim/select 一个 ready 子任务。
 - 编辑前先读相邻代码和调用方。
 - 优先复用现有 helper、组件、类型和平台模式。
 - 保持类型安全，动态边界需要明确校验。

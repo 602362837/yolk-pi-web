@@ -1,0 +1,1482 @@
+{
+  "schemaVersion": 1,
+  "id": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+  "title": "修复项目选择、Studio 架构流程、Tab 标题与模型搜索问题",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-08T00:51:57.906Z",
+  "updatedAt": "2026-07-08T01:48:40.420Z",
+  "completedAt": "2026-07-08T01:19:40.465Z",
+  "contextIds": [
+    "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-ea3e615d0aeda9fbaf08dd71",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T00:52:06.483Z",
+      "finishedAt": "2026-07-08T01:00:13.157Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f35-ecec-749b-bfa0-562a6ef56e68",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T00-52-06-508Z_019f3f35-ecec-749b-bfa0-562a6ef56e68.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f35-ecec-749b-bfa0-562a6ef56e68",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请分析并设计以下 4 个修复项，产出实现方案、需要修改的文件清单、风险点和验证方案；不要直接实现。 1. 左侧项目下拉中的 “Choose project folder” 通过文件管理器选择文件夹时，实际语义应与通过 path 添加项目一致：加入新项目，而不是切换到已加入项目。需要修改交互/接口调用。 2. 对 YPI Studio 的架构师流程增加要求：涉及页面变更、前端功能新增、交互变化时，架构师必须指派 UI 设计师基于现有项目产出 HTML 格式原型图，交给用户审批…",
+      "summary": "## Handoff\n\n### Artifacts produced\n\nUpdated planning artifacts only; no production code implemented:\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md` — includes fenced `json ypi-implementation-plan`\n- `checks.md`\n- `handoff.md`\n\n### Key implementation targets\n\n- Project picker: `components/SessionSidebar.tsx`\n- Studio UI prototype gate: `lib/ypi-studio-agents.ts`, `lib/ypi-studio-workflows.ts`, `lib/ypi-studio-extension.ts`, `.ypi/agents/*`, `.ypi/workflows/*`\n- Tab title: `components/AppShell.tsx`, `lib/workspace-title.ts`, `app/layout.tsx`\n- Model provider search: `app/api/models/route.ts`, `hooks/useAgentSession.ts`, `components/ChatInput.tsx`, `components/SettingsConfig.tsx`, `components/ModelSelect.tsx`\n- Docs: `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md`, possibly `docs/architecture/overview.md`\n\n### Validation run\n\n- Ran JSON parse check for the `ypi-implementation-plan` block.\n- Did **not** run lint/tsc because no production code was changed.\n\nPlanned implementation validation:\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\nnpm run test:studio-dag\n```\n\n### Remaining risks\n\n- Duplicate project selection should not silently switch; main session should confirm whether to add an explicit “Switch to existing project” CTA.\n- Studio UI gate is planned as prompt/workflow/checklist enforcement, not a new hard schema validator.\n- Existing customized `.ypi` files in other projects will not auto-update.\n- Tab title fix should prioritize `projectId/spaceId` matching to avoid cwd/path-string fallback.\n\n### Decisions needed\n\n1. Approve plan and save implementationPlan, then move task to `awaiting_approval`.\n2. Confirm no UI designer is needed for this specific minor bugfix.\n3. Confirm future UI/page/interaction changes must require UI designer HTML prototype + user approval before implementation.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T00:52:06.483Z",
+        "updatedAt": "2026-07-08T01:00:13.157Z",
+        "eventCount": 5076,
+        "lastTextPreview": "## Handoff\n\n### Artifacts produced\n\nUpdated planning artifacts only; no production code implemented:\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md` — includes fenced `json ypi-implementation-plan`\n- `checks.md`\n- `handoff.md`\n\n### Key implementation targets\n\n- Project picker: `components/SessionSidebar.tsx`\n- Studio UI prototype gate: `lib/ypi-studio-agents.ts`, `lib/ypi-studio-workflows.ts`, `lib/ypi-studio-extension.ts`, `.ypi/agents/*`, `.ypi/workflows/*`\n- Tab title: `components/AppShell.tsx`, `lib/workspace-title.ts`, `app/layout.tsx`\n- Model provider search: `app/api/models/route.ts`, `hooks/useAgentSession.ts`, `components/ChatInput.tsx`, `components/SettingsConfig.tsx`, `components/ModelSelect.tsx`\n- Docs: `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md`, possibly `docs/architecture/overview.md`\n\n### Validation run\n\n- Ran JSON parse check for the `ypi-implementation-plan` block.\n- Did **not** run lint/tsc because no production code was changed.\n\nPlanned implementation validation:\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\nnpm run test:studio-dag\n```\n\n### Remaining risks\n\n- Duplicate project selection should not silently switch; main session should confirm whether to add an explicit “Switch to existing project” CTA.\n- Studio UI gate is planned as prompt/workflow/checklist enforcement, not a new hard schema validator.\n- Existing customized `.ypi` files in other projects will not auto-update.\n- Tab title fix should prioritize `projectId/spaceId` matching to avoid cwd/path-string fallback.\n\n### Decisions needed\n\n1. Approve plan and save implementationPlan, then move task to `awaiting_approval`.\n2. Confirm no UI designer is needed for this specific minor bugfix.\n3. Confirm future UI/page/interaction changes must require UI designer HTML prototype + user approval before implementation.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T00:59:48.173Z",
+            "toolCallId": "call_IFwsTTHT2ZH9cNR11Zrjzgew|fc_05d54ce88db73dbf016a4da1049b748199be8d93cebeebeb0e",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T00:59:56.653Z",
+            "toolCallId": "call_8LMxX4SKPQ7V65W17cXf1vZX|fc_05d54ce88db73dbf016a4da10b62a481998c52100fb51e6ea2",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题 && git diff -- .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题 | sed -n '1,260p'\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T00:59:56.721Z",
+            "toolCallId": "call_8LMxX4SKPQ7V65W17cXf1vZX|fc_05d54ce88db73dbf016a4da10b62a481998c52100fb51e6ea2",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260708-085157-\\344\\277\\256\\345\\244\\215\\351\\241\\271\\347\\233\\256\\351\\200\\211\\346\\213\\251-studio-\\346\\236\\266\\346\\236\\204\\346\\265\\201\\347\\250\\213-tab-\\346\\240\\207\\351\\242\\230\\344\\270\\216\\346\\250\\241\\345\\236\\213\\346\\220\\234\\347\\264\\242\\351\\227\\256\\351\\242\\230/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:00:13.132Z",
+            "text": "## Handoff\n\n### Artifacts produced\n\nUpdated planning artifacts only; no production code implemented:\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md` — includes fenced `json ypi-implementation-plan`\n- `checks.md`\n- `handoff.md`\n\n### Key implementation targets\n\n- Project picker: `components/SessionSidebar.tsx`\n- Studio UI prototype gate: `lib/ypi-studio-agents.ts`, `lib/ypi-studio-workflows.ts`, `lib/ypi-studio-extension.ts`, `.ypi/agents/*`, `.ypi/workflows/*`\n- Tab title: `components/AppShell.tsx`, `lib/workspace-title.ts`, `app/layout.tsx`\n- Model provider search: `app/api/models/route.ts`, `hooks/useAgentSession.ts`, `components/ChatInput.tsx`, `components/SettingsConfig.tsx`, `components/ModelSelect.tsx`\n- Docs: `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md`, possibly `docs/architecture/overview.md`\n\n### Validation run\n\n- Ran JSON parse check for the `ypi-implementation-plan` block.\n- Did **not** run lint/tsc because no production code was changed.\n\nPlanned implementation validation:\n\n```bash\nnpm run lint\nnode_modules/.bin/tsc --noEmit\nnpm run test:studio-dag\n```\n\n### Remaining risks\n\n- Duplicate project selection should not silently switch; main session should confirm whether to add an explicit “Switch to existing project” CTA.\n- Studio UI gate is planned as prompt/workflow/checklist enforcement, not a new hard schema validator.\n- Existing customized `.ypi` files in other projects will not auto-update.\n- Tab title fix should prioritize `projectId/spaceId` matching to avoid cwd/path-string fallback.\n\n### Decisions needed\n\n1. Approve plan and save implementationPlan, then move task to `awaiting_approval`.\n2. Confirm no UI designer is needed for this specific minor bugfix.\n3. Confirm future UI/page/interaction changes must require UI designer HTML prototype + user approval before implementation.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:00:13.145Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1935,
+        "tokens": 709,
+        "tokenSource": "usage",
+        "tps": 84.44,
+        "firstTokenAt": "2026-07-08T01:00:04.241Z",
+        "lastTokenAt": "2026-07-08T01:00:12.637Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-ea3e615d0aeda9fbaf08dd71",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/architect-ea3e615d0aeda9fbaf08dd71.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T00:52:06.483Z",
+        "finishedAt": "2026-07-08T01:00:13.150Z",
+        "updatedAt": "2026-07-08T01:00:13.150Z",
+        "itemCount": 173,
+        "messageCount": 1,
+        "toolCallCount": 84,
+        "stderrBytes": 0,
+        "bytes": 533944,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f35-ecec-749b-bfa0-562a6ef56e68",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T00-52-06-508Z_019f3f35-ecec-749b-bfa0-562a6ef56e68.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-5b24b6c07f425a7bce570c0d",
+      "subtaskId": "project-picker-add-semantics",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T01:04:34.981Z",
+      "finishedAt": "2026-07-08T01:06:43.625Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f41-58dd-7a36-b65c-5111ce074602",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-04-35-037Z_019f3f41-58dd-7a36-b65c-5111ce074602.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f41-58dd-7a36-b65c-5111ce074602",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "按已保存 implementation plan 实现子任务 project-picker-add-semantics。请先阅读相关 docs 和源文件；只修改该子任务范围内文件。完成后更新子任务状态，说明变更和验证。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - `POST /api/projects` response now reads `created`.\n  - `created: true`: updates project list and selects new project main space.\n  - `created: false`: updates cached project record only, does **not** change selected project/space/cwd, and shows: `Project already exists. Select it from the list to switch.`\n  - Manual path add and directory picker both share this behavior.\n  - Button label changed from `Open` to `Add`.\n\n- `docs/modules/frontend.md`\n  - Documented duplicate project registration as a non-switching “already exists” notice.\n\n#### Verification\n\n- `node_modules/.bin/eslint components/SessionSidebar.tsx` — passed.\n- `npm run lint` — blocked by existing/unrelated parse error:\n  - `lib/ypi-studio-agents.ts(112,22): Parsing error: ',' expected`\n- `node_modules/.bin/tsc --noEmit` — blocked by same unrelated syntax error:\n  - `lib/ypi-studio-agents.ts(112,23): error TS1005: ',' expected`\n\n#### Notes / Risks\n\n- Did not run manual folder-picker verification in browser.\n- Could not update `.ypi/tasks/.../task.json` directly: harness reports Studio child sessions may not mutate task state. Desired subtask status: `project-picker-add-semantics` completed, with validation blocked by unrelated `lib/ypi-studio-agents.ts` syntax error.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T01:04:34.981Z",
+        "updatedAt": "2026-07-08T01:06:43.625Z",
+        "eventCount": 2942,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - `POST /api/projects` response now reads `created`.\n  - `created: true`: updates project list and selects new project main space.\n  - `created: false`: updates cached project record only, does **not** change selected project/space/cwd, and shows: `Project already exists. Select it from the list to switch.`\n  - Manual path add and directory picker both share this behavior.\n  - Button label changed from `Open` to `Add`.\n\n- `docs/modules/frontend.md`\n  - Documented duplicate project registration as a non-switching “already exists” notice.\n\n#### Verification\n\n- `node_modules/.bin/eslint components/SessionSidebar.tsx` — passed.\n- `npm run lint` — blocked by existing/unrelated parse error:\n  - `lib/ypi-studio-agents.ts(112,22): Parsing error: ',' expected`\n- `node_modules/.bin/tsc --noEmit` — blocked by same unrelated syntax error:\n  - `lib/ypi-studio-agents.ts(112,23): error TS1005: ',' expected`\n\n#### Notes / Risks\n\n- Did not run manual folder-picker verification in browser.\n- Could not update `.ypi/tasks/.../task.json` directly: harness reports Studio child sessions may not mutate task state. Desired subtask status: `project-picker-add-semantics` completed, with validation blocked by unrelated `lib/ypi-studio-agents.ts` syntax error.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:06:27.582Z",
+            "toolCallId": "call_vSnzbc0mEtEAe0k1TPA4vXPA|fc_085a85d8846dec47016a4da294ea08819ba74afe414438c245",
+            "toolName": "read",
+            "text": "{\n  \"schemaVersion\": 1,\n  \"id\": \"20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题\",\n  \"title\": \"修复项目选择、Studio 架构流程、Tab 标题与模型搜索问题\",\n  \"workflowId\": \"feature-dev\",\n  \"status\": \"implementing\",\n  \"cwd\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web\",\n  \"createdAt\": \"2026-07-08T00:51:57.906Z\",\n  \"updatedAt\": \"2026-07-08T01:06:27.573Z\",\n  \"completedAt\": null,\n  \"contextIds\": [\n    \"pi_019f3f35-352e-7b43-bdd7-ddec12e7de12\"\n  ],\n  \"currentMember\": \"implementer\",\n  \"artifacts\": {\n    \"brief\": \"brief.md\",\n    \"prd\": \"prd.md\",\n    \"ui\": \"ui.md\",\n    \"design\": \"design.md\",\n    \"implement\": \"implement.md\",\n    \"checks\": \"checks.md\",\n    \"handoff\": \"handoff.md\",\n    \"review\": \"review.md\",\n    \"summary\": \"summary.md\"\n  },\n  \"subagents\": [\n    {\n      \"id\": \"architect-ea3e615d0aeda9fbaf08dd71\",\n      \"member\": \"architect\",\n      \"status\": \"succeeded\",\n      \"startedAt\": \"2026-07-08T00:52:06.483Z\",\n      \"finishedAt\": \"2026-07-08T01:00:13.157Z\",\n      \"runner\": \"sdk\",\n      \"childSessionId\": \"019f3f35-ecec-749b-bfa0-562a6ef56e68\",\n      \"childSessionFile\": \"/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T00-52-06-508Z_019f3f35-ecec-749b-bfa0-562a6ef56e68.jsonl\",\n      \"requestAffinity\": {\n        \"schemaVersion\": 1,\n        \"providerSessionIdSource\": \"childSessionId\",\n        \"parentSessionId\": \"019f3f35-352e-7b43-bdd7-ddec12e7de12\",\n        \"childSessionId\": \"019f3f35-ecec-749b-bfa0-562a6ef56e68\",\n        \"model\": \"openai-codex/gpt-5.5\",\n        \"modelSource\": \"memberConfig\",\n        \"thinking\": \"xhigh\",\n        \"thinkingSource\": \"memberConfig\",\n        \"note\": \"Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id.\"\n      },\n      \"prompt\": \"请分析并设计以下 4 个修复项，产出实现方案、需要修改的文件清单、风险点和验证方案；不要直接实现。 1. 左侧项目下拉中的 “Choose project folder” 通过文件管理器选择文件夹时，实际语义应与通过 path 添加项目一致：加入新项目，而不是切换到已加入项目。需要修改交互/接口调用。 2. 对 YPI Studio 的架构师流程增加要求：涉及页面变更、前端功能新增、交互变化时，架构师必须指派 UI 设计师基于现有项目产出 HTML 格式原型图，交给用户审批…\",\n      \"summary\": \"## Handoff\\n\\n### Artifacts produced\\n\\nUpdated planning artifacts only; no production code implemented:\\n\\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/brief.md`\\n- `prd.md`\\n- `ui.md`\\n- `design.md`\\n- `implement.md` — includes fenced `json ypi-implementation-plan`\\n- `checks.md`\\n- `handoff.md`\\n\\n### Key implementation targets\\n\\n- Project picker: `components/SessionSidebar.tsx`\\n- Studio UI prototype gate: `lib/ypi-studio-agents.ts`, `lib/ypi-studio-workflows.ts`, `lib/ypi-studio-extension.ts`, `.ypi/agents/*`, `.ypi/workflows/*`\\n- Tab title: `components/AppShell.tsx`, `lib/workspace-title.ts`, `app/layout.tsx`\\n- Model provider search: `app/api/models/route.ts`, `hooks/useAgentSession.ts`, `components/ChatInput.tsx`, `components/SettingsConfig.tsx`, `components/ModelSelect.tsx`\\n- Docs: `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md`, possibly `docs/architecture/overview.md`\\n\\n### Validation run\\n\\n- Ran JSON parse check for the `ypi-implementation-plan` block.\\n- Did **not** run lint/tsc because no production code was changed.\\n\\nPlanned implementation validation:\\n\\n```bash\\nnpm run lint\\nnode_modules/.bin/tsc --noEmit\\nnpm run test:studio-dag\\n```\\n\\n### Remaining risks\\n\\n- Duplicate project selection should not silently switch; main session should confirm whether to add an explicit “Switch to existing project” CTA.\\n- Studio UI gate is planned as prompt/workflow/checklist enforcement, not a new hard schema validator.\\n- Existing customized `.ypi` files in other projects will not auto-update.\\n- Tab title fix should prioritize `projectId/spaceId` matching to avoid cwd/path-string fallback.\\n\\n### Decisions needed\\n\\n1. Approve plan and save implementationPlan, then move task to `awaiting_approval`.\\n2. Confirm no UI designer is needed for this specific minor bugfix.\\n3. Confirm future UI/page/interaction changes must require UI designer HTML prototype + user approval before implementation.\",\n      \"model\": \"openai-codex/gpt-5.5\",\n      \"thinking\": \"xhigh\",\n      \"modelSource\": \"memberConfig\",\n      \"thinkingSource\": \"memberConfig\",\n      \"policy\": {\n        \"schemaVersion\": 1,\n        \"memberInput\": \"architect\",\n        \"member\": \"architect\",\n        \"memberPolicyFound\": true,\n        \"config\": {\n          \"exists\": true,\n          \"pathLabel\": \"~/.pi/agent/pi-web.json\"\n        },\n        \"model\": {\n          \"label\": \"openai-codex/gpt-5.5\",\n          \"arg\": \"openai-codex/gpt-5.5\",\n          \"effectiveSource\": \"memberConfig\",\n          \"configuredSource\": \"memberConfig\",\n          \"configuredMode\": \"specific\",\n          \"fallbackChain\": [\n            \"memberConfig\"\n          ]\n        },\n        \"thinking\": {\n          \"label\": \"xhigh\",\n          \"arg\": \"xhigh\",\n          \"effectiveSource\": \"memberConfig\",\n          \"configuredSource\": \"memberConfig\",\n          \"configuredMode\": \"xhigh\",\n          \"fallbackChain\": [\n            \"memberConfig\"\n          ]\n        }\n      },\n      \"progress\": {\n        \"schemaVersion\": 1,\n        \"phase\": \"finished\",\n        \"startedAt\": \"2026-07-08T00:52:06.483Z\",\n        \"updatedAt\": \"2026-07-08T01:00:13.157Z\",\n        \"eventCount\": 5076,\n        \"lastTextPreview\": \"## Handoff\\n\\n### Artifacts produced\\n\\nUpdated planning artifacts only; no production code implemented:\\n\\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/brief.md`\\n- `prd.md`\\n- `ui.md`\\n- `design.md`\\n- `implement.md` — includes fenced `json ypi-implementation-plan`\\n- `checks.md`\\n- `handoff.md`\\n\\n### Key implementation targets\\n\\n- Project picker: `components/SessionSidebar.tsx`\\n- Studio UI prototype gate: `lib/ypi-studio-agents.ts`, `lib/ypi-studio-workflows.ts`, `lib/ypi-studio-extension.ts`, `.ypi/agents/*`, `.ypi/workflows/*`\\n- Tab title: `components/AppShell.tsx`, `lib/workspace-title.ts`, `app/layout.tsx`\\n- Model provider search: `app/api/models/route.ts`, `hooks/useAgentSession.ts`, `components/ChatInput.tsx`, `components/SettingsConfig.tsx`, `components/ModelSelect.tsx`\\n- Docs: `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md`, possibly `docs/architecture/overview.md`\\n\\n### Validation run\\n\\n- Ran JSON parse check for the `ypi-implementation-plan` block.\\n- Did **not** run lint/tsc because no production code was changed.\\n\\nPlanned implementation validation:\\n\\n```bash\\nnpm run lint\\nnode_modules/.bin/tsc --noEmit\\nnpm run test:studio-dag\\n```\\n\\n### Remaining risks\\n\\n- Duplicate project selection should not silently switch; main session should confirm whether to add an explicit “Switch to existing project” CTA.\\n- Studio UI gate is planned as prompt/workflow/checklist enforcement, not a new hard schema validator.\\n- Existing customized `.ypi` files in other projects will not auto-update.\\n- Tab title fix should prioritize `projectId/spaceId` matching to avoid cwd/path-string fallback.\\n\\n### Decisions needed\\n\\n1. Approve plan and save implementationPlan, then move task to `awaiting_approval`.\\n2. Confirm no UI designer is needed for this specific minor bugfix.\\n3. Confirm future UI/page/interaction changes must require UI designer HTML prototype + user approval before implementation.\",\n        \"itemsPreview\": [\n          {\n            \"kind\": \"tool_result\",\n            \"at\": \"2026-07-08T00:59:48.173Z\",\n            \"toolCallId\": \"call_IFwsTTHT2ZH9cNR11Zrjzgew|fc_05d54ce88db73dbf016a4da1049b748199be8d93cebeebeb0e\",\n            \"toolName\": \"edit\",\n            \"text\": \"Successfully replaced 1 block(s) in .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md.\",\n            \"isError\": false,\n            \"truncated\": false\n          },\n          {\n            \"kind\": \"tool_call\",\n            \"at\": \"2026-07-08T00:59:56.653Z\",\n            \"toolCallId\": \"call_8LMxX4SKPQ7V65W17cXf1vZX|fc_05d54ce88db73dbf016a4da10b62a481998c52100fb51e6ea2\",\n            \"toolName\": \"bash\",\n            \"inputPreview\": \"{\\n  \\\"command\\\": \\\"git status --short .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题 && git diff -- .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题 | sed -n '1,260p'\\\",\\n  \\\"timeout\\\": 20\\n}\",\n            \"truncated\": false\n          },\n          {\n            \"kind\": \"tool_result\",\n            \"at\": \"2026-07-08T00:59:56.721Z\",\n            \"toolCallId\": \"call_8LMxX4SKPQ7V65W17cXf1vZX|fc_05d54ce88db73dbf016a4da10b62a481998c52100fb51e6ea2\",\n            \"toolName\": \"bash\",\n            \"text\": \"?? \\\".ypi/tasks/20260708-085157-\\\\344\\\\277\\\\256\\\\345\\\\244\\\\215\\\\351\\\\241\\\\271\\\\347\\\\233\\\\256\\\\351\\\\200\\\\211\\\\346\\\\213\\\\251-studio-\\\\346\\\\236\\\\266\\\\346\\\\236\\\\204\\\\346\\\\265\\\\201\\\\347\\\\250\\\\213-tab-\\\\346\\\\240\\\\207\\\\351\\\\242\\\\230\\\\344\\\\270\\\\216\\\\346\\\\250\\\\241\\\\345\\\\236\\\\213\\\\346\\\\220\\\\234\\\\347\\\\264\\\\242\\\\351\\\\227\\\\256\\\\351\\\\242\\\\230/\\\"\",\n            \"isError\": false,\n            \"truncated\": false\n          },\n          {\n            \"kind\": \"assistant\",\n            \"at\": \"2026-07-08T01:00:13.132Z\",\n            \"text\": \"## Handoff\\n\\n### Artifacts produced\\n\\nUpdated planning artifacts only; no production code implemented:\\n\\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/brief.md`\\n- `prd.md`\\n- `ui.md`\\n- `design.md`\\n- `implement.md` — includes fenced `json ypi-implementation-plan`\\n- `checks.md`\\n- `handoff.md`\\n\\n### Key implementation targets\\n\\n- Project picker: `components/SessionSidebar.tsx`\\n- Studio UI prototype gate: `lib/ypi-studio-agents.ts`, `lib/ypi-studio-workflows.ts`, `lib/ypi-studio-extension.ts`, `.ypi/agents/*`, `.ypi/workflows/*`\\n- Tab title: `components/AppShell.tsx`, `lib/workspace-title.ts`, `app/layout.tsx`\\n- Model provider search: `app/api/models/route.ts`, `hooks/useAgentSession.ts`, `components/ChatInput.tsx`, `components/SettingsConfig.tsx`, `components/ModelSelect.tsx`\\n- Docs: `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md`, possibly `docs/architecture/overview.md`\\n\\n### Validation run\\n\\n- Ran JSON parse check for the `ypi-implementation-plan` block.\\n- Did **not** run lint/tsc because no production code was changed.\\n\\nPlanned implementation validation:\\n\\n```bash\\nnpm run lint\\nnode_modules/.bin/tsc --noEmit\\nnpm run test:studio-dag\\n```\\n\\n### Remaining risks\\n\\n- Duplicate project selection should not silently switch; main session should confirm whether to add an explicit “Switch to existing project” CTA.\\n- Studio UI gate is planned as prompt/workflow/checklist enforcement, not a new hard schema validator.\\n- Existing customized `.ypi` files in other projects will not auto-update.\\n- Tab title fix should prioritize `projectId/spaceId` matching to avoid cwd/path-string fallback.\\n\\n### Decisions needed\\n\\n1. Approve plan and save implementationPlan, then move task to `awaiting_approval`.\\n2. Confirm no UI designer is needed for this specific minor bugfix.\\n3. Confirm future UI/page/interaction changes must require UI designer HTML prototype + user approval before implementation.\",\n            \"model\": \"openai-codex/gpt-5.5\",\n            \"truncated\": false\n          },\n          {\n            \"kind\": \"status\",\n            \"at\": \"2026-07-08T01:00:13.145Z\",\n            \"text\": \"SDK child Pi agent finished.\",\n            \"truncated\": false\n          }\n        ],\n        \"warnings\": [\n          \"studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner.\"\n        ],\n        \"outputChars\": 1935,\n        \"tokens\": 709,\n        \"tokenSource\": \"usage\",\n        \"tps\": 84.44,\n        \"firstTokenAt\": \"2026-07-08T01:00:04.241Z\",\n        \"lastTokenAt\": \"2026-07-08T01:00:12.637Z\",\n        \"display\": {\n          \"recentLimit\": 5,\n          \"previewTruncated\": true,\n          \"finalOutputTruncated\": false,\n          \"transcriptItemTruncated\": true,\n          \"transcriptCaptureLimited\": false,\n          \"apiProjectionLimited\": false\n        }\n      },\n      \"transcript\": {\n        \"schemaVersion\": 1,\n        \"format\": \"ypi-studio-subagent-transcript\",\n        \"runId\": \"architect-ea3e615d0aeda9fbaf08dd71\",\n        \"taskId\": \"20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题\",\n        \"member\": \"architect\",\n        \"pathLabel\": \".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/architect-ea3e615d0aeda9fbaf08dd71.jsonl\",\n        \"status\": \"succeeded\",\n        \"startedAt\": \"2026-07-08T00:52:06.483Z\",\n        \"finishedAt\": \"2026-07-08T01:00:13.150Z\",\n        \"updatedAt\": \"2026-07-08T01:00:13.150Z\",\n        \"itemCount\": 173,\n        \"messageCount\": 1,\n        \"toolCallCount\": 84,\n        \"stderrBytes\": 0,\n        \"bytes\": 533944,\n        \"truncated\": true,\n        \"runner\": \"sdk\",\n        \"childSessionId\": \"019f3f35-ecec-749b-bfa0-562a6ef56e68\",\n        \"childSessionFile\": \"/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T00-52-06-508Z_019f3f35-ecec-749b-bfa0-562a6ef56e68.jsonl\",\n        \"truncation\": {\n          \"itemTruncated\": true,\n          \"captureLimited\": false,\n          \"bytesLimit\": 5242880,\n          \"itemBytesLimit\": 16384\n        }\n      }\n    },\n    {\n      \"id\": \"implementer-5b24b6c07f425a7bce570c0d\",\n      \"subtaskId\": \"project-picker-add-semantics\",\n      \"member\": \"implementer\",\n      \"status\": \"running\",\n      \"startedAt\": \"2026-07-08T01:04:34.981Z\",\n      \"runner\": \"sdk\",\n      \"childSessionId\": \"019f3f41-58dd-7a36-b65c-5111ce074602\",\n      \"childSessionFile\": \"/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-04-35-037Z_019f3f41-58dd-7a36-b65c-5111ce074602.jsonl\",\n      \"requestAffinity\": {\n        \"schemaVersion\": 1,\n        \"providerSessionIdSource\": \"childSessionId\",\n        \"parentSessionId\": \"019f3f35-352e-7b43-bdd7-ddec12e7de12\",\n        \"childSessionId\": \"019f3f41-58dd-7a36-b65c-5111ce074602\",\n        \"model\": \"openai-codex/gpt-5.5\",\n        \"modelSource\": \"memberConfig\",\n        \"thinking\": \"medium\",\n        \"thinkingSource\": \"memberConfig\",\n        \"note\": \"Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id.\"\n      },\n      \"prompt\": \"按已保存 implementation plan 实现子任务 project-picker-add-semantics。请先阅读相关 docs 和源文件；只修改该子任务范围内文件。完成后更新子任务状态，说明变更和验证。\",\n      \"summary\": \"Running tool read\",\n      \"model\": \"openai-codex/gpt-5.5\",\n      \"thinking\": \"medium\",\n      \"modelSource\": \"memberConfig\",\n      \"thinkingSource\": \"memberConfig\",\n      \"policy\": {\n        \"schemaVersion\": 1,\n        \"memberInput\": \"implementer\",\n        \"member\": \"implementer\",\n        \"memberPolicyFound\": true,\n        \"config\": {\n          \"exists\": true,\n          \"pathLabel\": \"~/.pi/agent/pi-web.json\"\n        },\n        \"model\": {\n          \"label\": \"openai-codex/gpt-5.5\",\n          \"arg\": \"openai-codex/gpt-5.5\",\n          \"effectiveSource\": \"memberConfig\",\n          \"configuredSource\": \"memberConfig\",\n          \"configuredMode\": \"specific\",\n          \"fallbackChain\": [\n            \"memberConfig\"\n          ]\n        },\n        \"thinking\": {\n          \"label\": \"medium\",\n          \"arg\": \"medium\",\n          \"effectiveSource\": \"memberConfig\",\n          \"configuredSource\": \"memberConfig\",\n          \"configuredMode\": \"medium\",\n          \"fallbackChain\": [\n            \"memberConfig\"\n          ]\n    …",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T01:06:32.807Z",
+            "toolCallId": "call_MRY2nen59s7Mql8Wqr475cjR|fc_085a85d8846dec47016a4da2992f10819b9b704a91c8cfb277",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nimport json\\nfrom pathlib import Path\\np=Path('.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/task.json')\\ndata=json.loads(p.read_text())\\nprint(data.keys())\\nfor k in ['implementationPlan','implementationProgress','updatedAt']:\\n print(k, type(data.get(k)), data.get(k) if k!='implementationPlan' else '...')\\nPY\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:06:32.815Z",
+            "toolCallId": "call_MRY2nen59s7Mql8Wqr475cjR|fc_085a85d8846dec47016a4da2992f10819b9b704a91c8cfb277",
+            "toolName": "bash",
+            "text": "YPI Studio child sessions may not mutate .ypi/tasks/**/task.json via shell commands. Report the desired task update to the parent session.",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:06:43.596Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - `POST /api/projects` response now reads `created`.\n  - `created: true`: updates project list and selects new project main space.\n  - `created: false`: updates cached project record only, does **not** change selected project/space/cwd, and shows: `Project already exists. Select it from the list to switch.`\n  - Manual path add and directory picker both share this behavior.\n  - Button label changed from `Open` to `Add`.\n\n- `docs/modules/frontend.md`\n  - Documented duplicate project registration as a non-switching “already exists” notice.\n\n#### Verification\n\n- `node_modules/.bin/eslint components/SessionSidebar.tsx` — passed.\n- `npm run lint` — blocked by existing/unrelated parse error:\n  - `lib/ypi-studio-agents.ts(112,22): Parsing error: ',' expected`\n- `node_modules/.bin/tsc --noEmit` — blocked by same unrelated syntax error:\n  - `lib/ypi-studio-agents.ts(112,23): error TS1005: ',' expected`\n\n#### Notes / Risks\n\n- Did not run manual folder-picker verification in browser.\n- Could not update `.ypi/tasks/.../task.json` directly: harness reports Studio child sessions may not mutate task state. Desired subtask status: `project-picker-add-semantics` completed, with validation blocked by unrelated `lib/ypi-studio-agents.ts` syntax error.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:06:43.612Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1336,
+        "tokens": 431,
+        "tokenSource": "usage",
+        "tps": 61.13,
+        "firstTokenAt": "2026-07-08T01:06:36.479Z",
+        "lastTokenAt": "2026-07-08T01:06:43.529Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-5b24b6c07f425a7bce570c0d",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/implementer-5b24b6c07f425a7bce570c0d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T01:04:34.981Z",
+        "finishedAt": "2026-07-08T01:06:43.623Z",
+        "updatedAt": "2026-07-08T01:06:43.623Z",
+        "itemCount": 33,
+        "messageCount": 1,
+        "toolCallCount": 14,
+        "stderrBytes": 0,
+        "bytes": 95270,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f41-58dd-7a36-b65c-5111ce074602",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-04-35-037Z_019f3f41-58dd-7a36-b65c-5111ce074602.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-09a2214d698a211fb02304c1",
+      "subtaskId": "studio-ui-prototype-gate",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T01:04:35.019Z",
+      "finishedAt": "2026-07-08T01:08:47.344Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f41-58f7-7b7e-92a5-deed97cb55c8",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-04-35-063Z_019f3f41-58f7-7b7e-92a5-deed97cb55c8.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f41-58f7-7b7e-92a5-deed97cb55c8",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "按已保存 implementation plan 实现子任务 studio-ui-prototype-gate。请先阅读相关 docs 和源文件；只修改该子任务范围内文件。特别注意必须把“涉及页面/前端功能/交互/审批体验变化时架构师必须指派 UI designer 产出 HTML 原型并经用户审批”写入架构师流程门禁、checker、workflow/runtime prompt，以及本仓库 .ypi 配置。完成后更新子任务状态，说明变更和验证。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-agents.ts` — 强化 architect/checker 默认成员模板：UI 原型门禁、HTML 原型要求、用户审批、checker 阻塞项；补充旧默认 hash。\n- `lib/ypi-studio-workflows.ts` — 强化 feature-dev/bugfix/ui-change workflow planning/approval 指令；`ui-change` awaiting approval 必需 `ui.md`。\n- `lib/ypi-studio-extension.ts` — 在 runtime prompt、tool promptSnippet/guidelines、start prompt、next action 中注入 UI prototype gate。\n- `.ypi/agents/architect.md` / `.ypi/agents/checker.md` — 同步本仓库本地成员配置。\n- `.ypi/workflows/{feature-dev,bugfix,ui-change}.json` — 同步本仓库本地 workflow 配置。\n- `docs/modules/library.md` / `docs/architecture/overview.md` — 记录 Studio UI 原型门禁行为。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed\n- JSON parse check for modified `.ypi/workflows/*.json` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 本次是 prompt/workflow/checker 门禁强化，不是新增硬 schema 校验。\n- 其他项目已有自定义 `.ypi` 文件不会自动覆盖，需要重新初始化或手动同步。\n- 当前工具环境没有 `ypi_studio_task` 可调用；请父会话将 subtask `studio-ui-prototype-gate` 标记为 done。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T01:04:35.019Z",
+        "updatedAt": "2026-07-08T01:08:47.344Z",
+        "eventCount": 7903,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-agents.ts` — 强化 architect/checker 默认成员模板：UI 原型门禁、HTML 原型要求、用户审批、checker 阻塞项；补充旧默认 hash。\n- `lib/ypi-studio-workflows.ts` — 强化 feature-dev/bugfix/ui-change workflow planning/approval 指令；`ui-change` awaiting approval 必需 `ui.md`。\n- `lib/ypi-studio-extension.ts` — 在 runtime prompt、tool promptSnippet/guidelines、start prompt、next action 中注入 UI prototype gate。\n- `.ypi/agents/architect.md` / `.ypi/agents/checker.md` — 同步本仓库本地成员配置。\n- `.ypi/workflows/{feature-dev,bugfix,ui-change}.json` — 同步本仓库本地 workflow 配置。\n- `docs/modules/library.md` / `docs/architecture/overview.md` — 记录 Studio UI 原型门禁行为。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed\n- JSON parse check for modified `.ypi/workflows/*.json` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 本次是 prompt/workflow/checker 门禁强化，不是新增硬 schema 校验。\n- 其他项目已有自定义 `.ypi` 文件不会自动覆盖，需要重新初始化或手动同步。\n- 当前工具环境没有 `ypi_studio_task` 可调用；请父会话将 subtask `studio-ui-prototype-gate` 标记为 done。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:08:30.512Z",
+            "toolCallId": "call_JtIB4RD6V5EfVENT7ik4FDMc|fc_046114c8ee9fb0bf016a4da30f09448199b551d162a2e8d5b4",
+            "toolName": "bash",
+            "text": "/bin/bash: --stat: command not found\n\n\nCommand exited with code 127",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T01:08:37.077Z",
+            "toolCallId": "call_LYKknnaYlr8riTM1tI7ZOdmr|fc_046114c8ee9fb0bf016a4da3155fdc8199a77695c0a5465146",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat -- lib/ypi-studio-agents.ts lib/ypi-studio-workflows.ts lib/ypi-studio-extension.ts .ypi/agents/architect.md .ypi/agents/checker.md .ypi/workflows/feature-dev.json .ypi/workflows/bugfix.json .ypi/workflows/ui-change.json docs/modules/library.md docs/architecture/overview.md && git diff --check -- lib/ypi-studio-agents.ts lib/ypi-studio-workflows.ts lib/ypi-studio-extension.ts .ypi/agents/architect.md .ypi/agents/checker.md .ypi/workflows/feature-dev.json .ypi/workflows/bugfix.json .ypi/workflows/ui-change.json docs/modules/library.md docs/architecture/overview.md\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:08:37.142Z",
+            "toolCallId": "call_LYKknnaYlr8riTM1tI7ZOdmr|fc_046114c8ee9fb0bf016a4da3155fdc8199a77695c0a5465146",
+            "toolName": "bash",
+            "text": ".ypi/agents/architect.md        | 17 ++++++++++-------\n .ypi/agents/checker.md          |  3 ++-\n .ypi/workflows/bugfix.json      |  8 +++++---\n .ypi/workflows/feature-dev.json |  4 ++--\n .ypi/workflows/ui-change.json   |  9 ++++-----\n docs/architecture/overview.md   |  1 +\n docs/modules/library.md         |  6 +++---\n lib/ypi-studio-agents.ts        | 24 ++++++++++++++----------\n lib/ypi-studio-extension.ts     | 14 ++++++++++----\n lib/ypi-studio-workflows.ts     |  9 +++++----\n 10 files changed, 56 insertions(+), 39 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:08:47.322Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-agents.ts` — 强化 architect/checker 默认成员模板：UI 原型门禁、HTML 原型要求、用户审批、checker 阻塞项；补充旧默认 hash。\n- `lib/ypi-studio-workflows.ts` — 强化 feature-dev/bugfix/ui-change workflow planning/approval 指令；`ui-change` awaiting approval 必需 `ui.md`。\n- `lib/ypi-studio-extension.ts` — 在 runtime prompt、tool promptSnippet/guidelines、start prompt、next action 中注入 UI prototype gate。\n- `.ypi/agents/architect.md` / `.ypi/agents/checker.md` — 同步本仓库本地成员配置。\n- `.ypi/workflows/{feature-dev,bugfix,ui-change}.json` — 同步本仓库本地 workflow 配置。\n- `docs/modules/library.md` / `docs/architecture/overview.md` — 记录 Studio UI 原型门禁行为。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed\n- JSON parse check for modified `.ypi/workflows/*.json` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 本次是 prompt/workflow/checker 门禁强化，不是新增硬 schema 校验。\n- 其他项目已有自定义 `.ypi` 文件不会自动覆盖，需要重新初始化或手动同步。\n- 当前工具环境没有 `ypi_studio_task` 可调用；请父会话将 subtask `studio-ui-prototype-gate` 标记为 done。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:08:47.335Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1076,
+        "tokens": 471,
+        "tokenSource": "usage",
+        "tps": 74.09,
+        "firstTokenAt": "2026-07-08T01:08:40.397Z",
+        "lastTokenAt": "2026-07-08T01:08:46.754Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-09a2214d698a211fb02304c1",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/implementer-09a2214d698a211fb02304c1.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T01:04:35.019Z",
+        "finishedAt": "2026-07-08T01:08:47.341Z",
+        "updatedAt": "2026-07-08T01:08:47.341Z",
+        "itemCount": 81,
+        "messageCount": 1,
+        "toolCallCount": 38,
+        "stderrBytes": 0,
+        "bytes": 235162,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f41-58f7-7b7e-92a5-deed97cb55c8",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-04-35-063Z_019f3f41-58f7-7b7e-92a5-deed97cb55c8.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-5d359687549e9f433e4e9fa9",
+      "subtaskId": "browser-title-rule",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T01:09:03.141Z",
+      "finishedAt": "2026-07-08T01:11:26.700Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f45-7052-70ce-a713-e307b33bffe2",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-09-03-186Z_019f3f45-7052-70ce-a713-e307b33bffe2.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f45-7052-70ce-a713-e307b33bffe2",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "按已保存 implementation plan 实现子任务 browser-title-rule。请先阅读相关 docs 和源文件；只修改该子任务范围内文件。完成后更新子任务状态，说明变更和验证。",
+      "summary": "### Implementation Complete — `browser-title-rule`\n\n#### Files Changed\n\n- `components/AppShell.tsx` — browser title now prefers active Project Registry title when `projectId/spaceId` match; falls back to normalized cwd path match, then existing cwd/Git title.\n- `lib/workspace-title.ts` — added normalized workspace path helpers for title matching.\n- `app/layout.tsx` — default metadata title now reuses `WORKSPACE_TITLE_FALLBACK`.\n- `docs/modules/frontend.md` — documented updated AppShell title behavior.\n- `docs/modules/library.md` — documented workspace title helper role.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- Manual browser title checks — not run in browser.\n\n#### Notes / Risks\n\n- Could not update `.ypi/tasks/**/task.json` directly: Studio child guard blocks task-state mutation via shell. Desired subtask status: `browser-title-rule` completed/succeeded.\n- No remaining product decisions needed for this subtask.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T01:09:03.141Z",
+        "updatedAt": "2026-07-08T01:11:26.700Z",
+        "eventCount": 3075,
+        "lastTextPreview": "### Implementation Complete — `browser-title-rule`\n\n#### Files Changed\n\n- `components/AppShell.tsx` — browser title now prefers active Project Registry title when `projectId/spaceId` match; falls back to normalized cwd path match, then existing cwd/Git title.\n- `lib/workspace-title.ts` — added normalized workspace path helpers for title matching.\n- `app/layout.tsx` — default metadata title now reuses `WORKSPACE_TITLE_FALLBACK`.\n- `docs/modules/frontend.md` — documented updated AppShell title behavior.\n- `docs/modules/library.md` — documented workspace title helper role.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- Manual browser title checks — not run in browser.\n\n#### Notes / Risks\n\n- Could not update `.ypi/tasks/**/task.json` directly: Studio child guard blocks task-state mutation via shell. Desired subtask status: `browser-title-rule` completed/succeeded.\n- No remaining product decisions needed for this subtask.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:11:13.145Z",
+            "toolCallId": "call_U0zGcYOlMRN6Hih1nBvGYZQY|fc_0e800ca8c033af21016a4da3aa638481998c7645090f520d8f",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.9 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T01:11:20.046Z",
+            "toolCallId": "call_pAyTEjSBKuhzWx5l7j1ps3ST|fc_0e800ca8c033af21016a4da3b8d3ac81998d0f8981a6ac79a5",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat -- components/AppShell.tsx lib/workspace-title.ts app/layout.tsx docs/modules/frontend.md docs/modules/library.md && git status --short -- components/AppShell.tsx lib/workspace-title.ts app/layout.tsx docs/modules/frontend.md docs/modules/library.md\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:11:20.127Z",
+            "toolCallId": "call_pAyTEjSBKuhzWx5l7j1ps3ST|fc_0e800ca8c033af21016a4da3b8d3ac81998d0f8981a6ac79a5",
+            "toolName": "bash",
+            "text": "app/layout.tsx           |  3 ++-\n components/AppShell.tsx  | 22 ++++++++++++++++++++--\n docs/modules/frontend.md |  4 ++--\n docs/modules/library.md  |  8 ++++----\n lib/workspace-title.ts   | 14 ++++++++++++++\n 5 files changed, 42 insertions(+), 9 deletions(-)\n M app/layout.tsx\n M components/AppShell.tsx\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/workspace-title.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:11:26.674Z",
+            "text": "### Implementation Complete — `browser-title-rule`\n\n#### Files Changed\n\n- `components/AppShell.tsx` — browser title now prefers active Project Registry title when `projectId/spaceId` match; falls back to normalized cwd path match, then existing cwd/Git title.\n- `lib/workspace-title.ts` — added normalized workspace path helpers for title matching.\n- `app/layout.tsx` — default metadata title now reuses `WORKSPACE_TITLE_FALLBACK`.\n- `docs/modules/frontend.md` — documented updated AppShell title behavior.\n- `docs/modules/library.md` — documented workspace title helper role.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- Manual browser title checks — not run in browser.\n\n#### Notes / Risks\n\n- Could not update `.ypi/tasks/**/task.json` directly: Studio child guard blocks task-state mutation via shell. Desired subtask status: `browser-title-rule` completed/succeeded.\n- No remaining product decisions needed for this subtask.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:11:26.691Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 975,
+        "tokens": 279,
+        "tokenSource": "usage",
+        "tps": 89.25,
+        "firstTokenAt": "2026-07-08T01:11:23.387Z",
+        "lastTokenAt": "2026-07-08T01:11:26.513Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-5d359687549e9f433e4e9fa9",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/implementer-5d359687549e9f433e4e9fa9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T01:09:03.141Z",
+        "finishedAt": "2026-07-08T01:11:26.698Z",
+        "updatedAt": "2026-07-08T01:11:26.698Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 134766,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f45-7052-70ce-a713-e307b33bffe2",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-09-03-186Z_019f3f45-7052-70ce-a713-e307b33bffe2.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e8b2fe3ea936cca760b49e82",
+      "subtaskId": "model-provider-search",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T01:09:03.168Z",
+      "finishedAt": "2026-07-08T01:15:26.275Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f45-7058-783a-8185-5b16a45822c5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-09-03-192Z_019f3f45-7058-783a-8185-5b16a45822c5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f45-7058-783a-8185-5b16a45822c5",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "按已保存 implementation plan 实现子任务 model-provider-search。请先阅读相关 docs 和源文件；只修改该子任务范围内文件。完成后更新子任务状态，说明变更和验证。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/models/route.ts` — `/api/models` now adds optional `providerDisplayName` to `modelList`.\n- `hooks/useAgentSession.ts` — updated model list typing to carry `providerDisplayName`.\n- `components/ChatInput.tsx` — chat model dropdown now searches/group-displays provider id and provider display name while preserving `provider/modelId` value.\n- `components/SettingsConfig.tsx` — settings model policy selectors now include provider display name in detail/group/search keywords.\n- `components/ModelSelect.tsx` — updated search hint copy.\n- `docs/modules/api.md` — documented `/api/models` additive provider display name field.\n- `docs/modules/frontend.md` — documented shared model selector/provider display-name search behavior.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- ...selected files` — passed\n\n#### Notes / Risks\n\n- Manual browser search verification not run.\n- `set_model` / policy values remain unchanged as `provider/modelId`.\n- I cannot directly mutate Studio task/subtask state from this delegated child context; parent should mark `model-provider-search` as done.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T01:09:03.168Z",
+        "updatedAt": "2026-07-08T01:15:26.275Z",
+        "eventCount": 4440,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/models/route.ts` — `/api/models` now adds optional `providerDisplayName` to `modelList`.\n- `hooks/useAgentSession.ts` — updated model list typing to carry `providerDisplayName`.\n- `components/ChatInput.tsx` — chat model dropdown now searches/group-displays provider id and provider display name while preserving `provider/modelId` value.\n- `components/SettingsConfig.tsx` — settings model policy selectors now include provider display name in detail/group/search keywords.\n- `components/ModelSelect.tsx` — updated search hint copy.\n- `docs/modules/api.md` — documented `/api/models` additive provider display name field.\n- `docs/modules/frontend.md` — documented shared model selector/provider display-name search behavior.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- ...selected files` — passed\n\n#### Notes / Risks\n\n- Manual browser search verification not run.\n- `set_model` / policy values remain unchanged as `provider/modelId`.\n- I cannot directly mutate Studio task/subtask state from this delegated child context; parent should mark `model-provider-search` as done.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:14:47.797Z",
+            "toolCallId": "call_jnWmNixqhLMZ4ORmmMhuA3KN|fc_027229282e84b61b016a4da486e778819ab567342f59da4f95",
+            "toolName": "bash",
+            "text": "app/api/models/route.ts       | 20 ++++++++++++--------\n components/ChatInput.tsx      | 34 ++++++++++++++++++++++++----------\n components/ModelSelect.tsx    |  2 +-\n components/SettingsConfig.tsx | 30 ++++++++++++++++++++++--------\n docs/modules/api.md           |  2 +-\n docs/modules/frontend.md      | 10 +++++-----\n hooks/useAgentSession.ts      |  4 ++--\n 7 files changed, 67 insertions(+), 35 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T01:15:03.661Z",
+            "toolCallId": "call_RGO3BvfsGlVhKYZ41GOeantJ|fc_027229282e84b61b016a4da48d61d0819ab8d61c706058e01e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- app/api/models/route.ts hooks/useAgentSession.ts components/ChatInput.tsx components/SettingsConfig.tsx components/ModelSelect.tsx docs/modules/api.md docs/modules/frontend.md | sed -n '1,260p'\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:15:03.753Z",
+            "toolCallId": "call_RGO3BvfsGlVhKYZ41GOeantJ|fc_027229282e84b61b016a4da48d61d0819ab8d61c706058e01e",
+            "toolName": "bash",
+            "text": "diff --git a/app/api/models/route.ts b/app/api/models/route.ts\nindex bb99b1c..e08527c 100644\n--- a/app/api/models/route.ts\n+++ b/app/api/models/route.ts\n@@ -7,8 +7,8 @@ export const dynamic = \"force-dynamic\";\n const modelNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: \"base\" });\n \n function compareModelEntries(\n-  a: { id: string; name: string; provider: string },\n-  b: { id: string; name: string; provider: string }\n+  a: { id: string; name: string; provider: string; providerDisplayName?: string },\n+  b: { id: string; name: string; provider: string; providerDisplayName?: string }\n ): number {\n   return modelNameCollator.compare(a.name || a.id, b.name || b.id)\n     || modelNameCollator.compare(a.provider, b.provider)\n@@ -17,7 +17,7 @@ function compareModelEntries(\n \n export async function GET(req: Request) {\n   const nameMap = new Map<string, string>();\n-  let modelList: { id: string; name: string; provider: string }[] = [];\n+  let modelList: { id: string; name: string; provider: string; providerDisplayName?: string }[] = [];\n   let defaultModel: { provider: string; modelId: string } | null = null;\n   const thinkingLevels: Record<string, string[]> = {};\n   const thinkingLevelMaps: Record<string, Record<string, string | null>> = {};\n@@ -38,11 +38,15 @@ export async function GET(req: Request) {\n     const services = await createAgentSessionServices({ cwd, agentDir });\n     const registry = services.modelRegistry;\n     const available = registry.getAvailable();\n-    modelList = available.map((m: { id: string; name: string; provider: string }) => ({\n-      id: m.id,\n-      name: m.name,\n-      provider: m.provider,\n-    })).sort(compareModelEntries);\n+    modelList = available.map((m: { id: string; name: string; provider: string }) => {\n+      const providerDisplayName = registry.getProviderDisplayName(m.provider);\n+      return {\n+        id: m.id,\n+        name: m.name,\n+        provider: m.provider,\n+        ...(providerDisplayName && providerDisplayName !== m.provider ? { providerDisplayName } : {}),\n+      };\n+    }).sort(compareModelEntries);\n     for (const m of available) {\n       const key = `${m.provider}:${m.id}`;\n       nameMap.set(key, m.name);\ndiff --git a/components/ChatInput.tsx b/components/ChatInput.tsx\nindex 2a3bfbe..a3fcfc2 100644\n--- a/components/ChatInput.tsx\n+++ b/components/ChatInput.tsx\n@@ -19,6 +19,7 @@ interface ModelOption {\n   provider: string;\n   modelId: string;\n   name: string;\n+  providerDisplayName?: string;\n }\n \n interface Props {\n@@ -32,7 +33,7 @@ interface Props {\n   isStreaming: boolean;\n   model?: { provider: string; modelId: string } | null;\n   modelNames?: Record<string, string>;\n-  modelList?: { id: string; name: string; provider: string }[];\n+  modelList?: { id: string; name: string; provider: string; providerDisplayName?: string }[];\n   onModelChange?: (provider: string, modelId: string) => void;\n   onCompact?: () => void;\n   onAbortCompaction?: () => void;\n@@ -1016,7 +1017,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({\n \n   const modelOptions = useMemo<ModelOption[]>(() => {\n     if (modelList && modelList.length > 0) {\n-      return modelList.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name }));\n+      return modelList.map((m) => ({ provider: m.provider, modelId: m.id, name: m.name, providerDisplayName: m.providerDisplayName }));\n     }\n     return Object.entries(modelNames ?? {}).map(([modelId, name]) => ({\n       provider: model?.provider ?? \"unknown\",\n@@ -1026,14 +1027,27 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({\n   }, [model?.provider, modelList, modelNames]);\n \n   const modelSelectOptions = useMemo<ModelSelectOption[]>(() => (\n-    modelOptions.map((opt) => ({\n-      value: formatModelSelectValue(opt),\n-      label: opt.name,\n-      detail: `${opt.provider}/${opt.modelId}`,\n-      provider: opt.provider,\n-      modelId: opt.modelId,\n-      keywords: [opt.name, opt.provider, opt.modelId, `${opt.provider}/${opt.name}`],\n-    }))\n+    modelOptions.map((opt) => {\n+      const providerLabel = opt.providerDisplayName || opt.provider;\n+      return {\n+        value: formatModelSelectValue(opt),\n+        label: opt.name,\n+        detail: opt.providerDisplayName ? `${opt.providerDisplayName} · ${opt.provider}/${opt.modelId}` : `${opt.provider}/${opt.modelId}`,\n+        provider: opt.provider,\n+        modelId: opt.modelId,\n+        group: providerLabel,\n+        keywords: [\n+          opt.name,\n+          opt.provider,\n+          opt.modelId,\n+          `${opt.provider}/${opt.name}`,\n+          `${opt.provider}/${opt.modelId}`,\n+          opt.providerDisplayName,\n+          opt.providerDisplayName ? `${opt.providerDisplayName}/${opt.name}` : undefined,\n+          opt.providerDisplayName ? `${opt.providerDisplayName}/${opt.modelId}` : undefined,\n+        ].filter((keyword): keyword is string => Boolean(keyword)),\n+      };\n+    })\n   ), [modelOptions]);\n \n   const currentModelOption = useMemo(() => (\ndiff --git a/components/ModelSelect.tsx b/components/ModelSelect.tsx\nindex 502f160..9694741 100644\n--- a/components/ModelSelect.tsx\n+++ b/components/ModelSelect.tsx\n@@ -341,7 +341,7 @@ export function ModelSelect({\n           />\n         </label>\n         <div style={{ marginTop: 5, padding: \"0 2px\", color: \"var(--text-dim)\", fontSize: 10 }}>\n-          支持实时模糊跳跃搜索，例如 gpt4、sonnet、dsr1\n+          支持模型、provider / 提供商名称搜索，例如 gpt4、sonnet、dsr1\n         </div>\n       </div>\n \ndiff --git a/components/SettingsConfig.tsx b/components/SettingsConfig.tsx\nindex 4df4683..25916c2 100644\n--- a/components/SettingsConfig.tsx\n+++ b/components/SettingsConfig.tsx\n@@ -52,6 +52,7 @@ interface ModelListItem {\n   id: string;\n   name: string;\n   provider: string;\n+  providerDisplayName?: string;\n }\n \n interface ModelsResponse {\n@@ -198,14 +199,27 @@ function ModelPolicySelect({\n     { value: \"followMain\", label: \"跟随主会话模型\", detail: \"策略\", group: \"模型策略\", keywords: [\"main\", \"current\", \"follow\"] },\n     { value: \"piDefault\", label: \"使用 Pi 默认模型\", detail: \"策略\", group: \"模型策略\", keywords: [\"pi\", \"default\"] },\n     { value: \"unset\", label: \"本层不指定\", detail: \"策略\", group: \"模型策略\", keywords: [\"unset\", \"none\", \"inherit\"] },\n-    ...models.map((model) => ({\n-      value: `specific:${model.provider}/${model.id}`,\n-      label: model.name,\n-      detail: `${model.provider}/${model.id}`,\n-      provider: model.provider,\n-      modelId: model.id,\n-      keywords: [model.name, model.provider, model.id, `${model.provider}/${model.name}`],\n-    })),\n+    ...models.map((model) => {\n+      const providerLabel = model.providerDisplayName || model.provider;\n+      return {\n+        value: `specific:${model.provider}/${model.id}`,\n+        label: model.name,\n+        detail: model.providerDisplayName ? `${model.providerDisplayName} · ${model.provider}/${model.id}` : `${model.provider}/${model.id}`,\n+        provider: model.provider,\n+        modelId: model.id,\n+        group: providerLabel,\n+        keywords: [\n+          model.name,\n+          model.provider,\n+          model.id,\n+          `${model.provider}/${model.name}`,\n+          `${model.provider}/${model.id}`,\n+          model.providerDisplayName,\n+          model.providerDisplayName ? `${model.providerDisplayName}/${model.name}` : undefined,\n+          model.providerDisplayName ? `${model.providerDisplayName}/${model.id}` : undefined,\n+        ].filter((keyword): keyword is string => Boolean(keyword)),\n+      };\n+    }),\n   ], [models]);\n \n   const selectedValue = formatModelValue(value);\ndiff --git a/docs/modules/api.md b/docs/modules/api.md\nindex de82eea..a400806 100644\n--- a/docs/modules/api.md\n+++ b/docs/modules/api.md\n@@ -41,7 +41,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd\n | `files/implementations/` | GET | Lightweight workspace search for Java symbol implementations/references used by the Monaco file editor. |\n | `files/references/` | GET | Lightweight workspace text/code symbol reference search for editor “find usages” actions. |\n | `files/upload/` | POST | Upload files for chat/file workflows. |\n-| `models/` | GET | List available models and default model. |\n+| `models/` | GET | List available models and default model; each `modelList` item includes provider id and optional provider display name for shared model selector grouping/search. |\n | `models-config/` | GET/POST | Read/write `~/.pi/agent/models.json`. |\n | `models-config/test/` | POST | Test a model config with a completion request. |\n | `skills/` | GET | List installed skills for a cwd. |\ndiff --git a/docs/modules/frontend.md b/docs/modules/frontend.md\nindex 720ae78..2a1eab3 100644\n--- a/docs/modules/frontend.md\n+++ b/docs/modules/frontend.md\n@@ -4,13 +4,13 @@\n \n | File | Purpose |\n | --- | --- |\n-| `components/AppShell.tsx` | Top-level layout, URL state, active Project Registry space context, browser tab title as `Project(Space)`, tab management, Web Terminal bottom-dock toggling, resizable left drawer, right drawer mode switching between files and optional Trellis tasks, Trellis-task-to-chat context block insertion, session-scoped Studio widget polling that stays fast while implementation subtasks are running/waiting/need attention, debounced Studio tool-driven session-list refresh so newly-created child audit sessions and wait/status changes appear in the sidebar without global polling, and compact top-bar usage chips whose tooltip can show current-chat-plus-Studio-child rollup scope and own/child cost split. |\n-| `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, lazy-loads linked sessions for the selected project space, hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, registers new project paths from manual input or the local OS directory picker, provides minimal project/space metadata editing for display name, tags, pinned, and archive state, keeps WorkTree actions available for worktree spaces, and includes archive/unarchive actions plus the integrated file explorer with a resizable session/explorer split. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. |\n+| `components/AppShell.tsx` | Top-level layout, URL state, active Project Registry space context, browser tab title that prefers `Project(Space)` when project/space ids match (falling back to normalized workspace path and then cwd/Git title), tab management, Web Terminal bottom-dock toggling, resizable left drawer, right drawer mode switching between files and optional Trellis tasks, Trellis-task-to-chat context block insertion, session-scoped Studio widget polling that stays fast while implementation subtasks are running/waiting/need attention, debounced Studio tool-driven session-list refresh so newly-created child audit sessions and wait/status changes appear in the sidebar without global polling, and compact top-bar usage chips whose tooltip can show current-chat-plus-Studio-child rollup scope and own/child cost split. |\n+| `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, lazy-loads linked sessions for the selected project space, hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, registers new project paths from manual input or the local OS directory picker, treats duplicate registrations as non-switching “already exists” notices so add actions do not masquerade as project switching, provides minimal project/space metadata editing for display name, tags, pinned, and archive state, keeps WorkTree actions available for worktree spaces, and includes archive/unarchive actions plus the integrated file explorer with a resizable session/explorer split. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. |\n | `components/Checkbox.tsx` | Shared theme-aware checkbox control with custom focus, hover, checked visuals, optional label text, and native input semantics. |\n | `components/ChatWindow.tsx` | Message list, SSE streaming, fork/navigate logic. Shows archived banner and disables input for archived sessions, treats opened YPI Studio child sessions as read-only audit views, while `useAgentSession` can follow their read-only audit SSE and reload the child JSONL when `studio_child_audit_changed` arrives. It wires the effective session id and optional project/space context for precreated empty sessions into chat input controls, forwards `SessionUsageTopbarStats` from `useAgentSession` to `AppShell`, reports Studio tool signatures from `ypi_studio_subagent` / `ypi_studio_wait` / `ypi_studio_task` so `AppShell` can refresh the sidebar when child sessions or run statuses change, and reports compact YPI Studio tool live-progress overlays, including created/bound task ids/keys, `run.id ?? run.runId` fallback, task/subtask titles, phase/tokens/tps/current tool, recent preview changes, and display-limit flags, to `AppShell` for the session widget. Global Studio background/waiting state is shown by the floating `YpiStudioSessionWidget`, not a fixed card inside the chat scroll. |\n-| `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload, Browser Share binding entry, file-reference chips, slash-command autocomplete for extension commands/skills/prompt templates, and serialized Trellis task context blocks. New empty sessions receive the default tool preset and thinking level from `pi-web.json` (`yolk.defaultToolPreset`, `yolk.defaultThinkingLevel`) and can still be changed per session from the compact dropdowns; Browser Share can request a draft session before the first prompt; default/full/subagent presets include the built-in YPI Studio task tool, and the subagent preset also includes Studio member delegation. |\n+| `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload, Browser Share binding entry, file-reference chips, slash-command autocomplete for extension commands/skills/prompt templates, and serialized Trellis task context blocks. The shared model dropdown keeps `provider/modelId` values unchanged while searching by model, provider id, and provider display name. New empty sessions receive the default tool preset and thinking level from `pi-web.json` (`yolk.defaultToolPreset`, `yolk.defaultThinkingLevel`) and can still be changed per session from the compact dropdowns; Browser Share can request a draft session before the first prompt; default/full/subagent presets include the built-in YPI Studio task tool, and the subagent preset also includes Studio member delegation. |\n | `components/BrowserShareControl.tsx` | Chat-input Browser Share control that binds a Chrome extension share code to the current effective session. In New Chat it is enabled when a `cwd` is available and can lazily request an empty session before binding; it validates share-code shape before creating that session, explains the first-message Browser Share behavior, displays lifecycle, tab title/url/origin, source service URL, current chat/session operator, permission/auto-allowed/approval-required scope, captur…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:15:26.229Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/models/route.ts` — `/api/models` now adds optional `providerDisplayName` to `modelList`.\n- `hooks/useAgentSession.ts` — updated model list typing to carry `providerDisplayName`.\n- `components/ChatInput.tsx` — chat model dropdown now searches/group-displays provider id and provider display name while preserving `provider/modelId` value.\n- `components/SettingsConfig.tsx` — settings model policy selectors now include provider display name in detail/group/search keywords.\n- `components/ModelSelect.tsx` — updated search hint copy.\n- `docs/modules/api.md` — documented `/api/models` additive provider display name field.\n- `docs/modules/frontend.md` — documented shared model selector/provider display-name search behavior.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- ...selected files` — passed\n\n#### Notes / Risks\n\n- Manual browser search verification not run.\n- `set_model` / policy values remain unchanged as `provider/modelId`.\n- I cannot directly mutate Studio task/subtask state from this delegated child context; parent should mark `model-provider-search` as done.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:15:26.253Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1201,
+        "tokens": 772,
+        "tokenSource": "usage",
+        "tps": 101.3,
+        "firstTokenAt": "2026-07-08T01:15:18.591Z",
+        "lastTokenAt": "2026-07-08T01:15:26.212Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e8b2fe3ea936cca760b49e82",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/implementer-e8b2fe3ea936cca760b49e82.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T01:09:03.168Z",
+        "finishedAt": "2026-07-08T01:15:26.270Z",
+        "updatedAt": "2026-07-08T01:15:26.270Z",
+        "itemCount": 63,
+        "messageCount": 1,
+        "toolCallCount": 29,
+        "stderrBytes": 0,
+        "bytes": 198454,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f45-7058-783a-8185-5b16a45822c5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-09-03-192Z_019f3f45-7058-783a-8185-5b16a45822c5.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-36d31dd361cd9b968723ff01",
+      "subtaskId": "docs-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T01:15:38.982Z",
+      "finishedAt": "2026-07-08T01:16:46.758Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f4b-7a88-777f-b1cb-01f9fb005c69",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-15-39-016Z_019f3f4b-7a88-777f-b1cb-01f9fb005c69.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f4b-7a88-777f-b1cb-01f9fb005c69",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "按已保存 implementation plan 实现子任务 docs-validation。请检查前四个子任务的变更，补齐必要文档，运行验证命令 npm run lint、node_modules/.bin/tsc --noEmit、npm run test:studio-dag。完成后更新子任务状态，记录验证结果和任何阻塞。",
+      "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md` — updated with implementation/doc validation results and remaining risks.\n- Verified docs are updated:\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Validation\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: emitted existing Node experimental-loader warning only.\n\n#### Notes / Risks\n\n- Manual browser smoke tests were not run: project picker duplicate/new add behavior, Tab title linked-session case, and provider display-name search should still be checked in UI.\n- Studio UI prototype gate is prompt/workflow/checker enforcement, not hard schema validation.\n- Existing customized `.ypi` in other projects will not auto-update.\n- Subtask status should be recorded by parent/main Studio session; delegated child session should not mutate `.ypi/tasks/**/task.json` directly.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T01:15:38.982Z",
+        "updatedAt": "2026-07-08T01:16:46.757Z",
+        "eventCount": 1911,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md` — updated with implementation/doc validation results and remaining risks.\n- Verified docs are updated:\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Validation\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: emitted existing Node experimental-loader warning only.\n\n#### Notes / Risks\n\n- Manual browser smoke tests were not run: project picker duplicate/new add behavior, Tab title linked-session case, and provider display-name search should still be checked in UI.\n- Studio UI prototype gate is prompt/workflow/checker enforcement, not hard schema validation.\n- Existing customized `.ypi` in other projects will not auto-update.\n- Subtask status should be recorded by parent/main Studio session; delegated child session should not mutate `.ypi/tasks/**/task.json` directly.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:16:34.264Z",
+            "toolCallId": "call_X8DZTDLIpwbvHtpJbb3csZsf|fc_07ee6a5474d6f91a016a4da4eafca8819ba9433a9369788c33",
+            "toolName": "write",
+            "text": "Successfully wrote 2077 bytes to .ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T01:16:36.641Z",
+            "toolCallId": "call_q3GTxPdurlk6VI4zcGX9q2fY|fc_07ee6a5474d6f91a016a4da4f671c4819ba02019de5093e596",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:16:36.709Z",
+            "toolCallId": "call_q3GTxPdurlk6VI4zcGX9q2fY|fc_07ee6a5474d6f91a016a4da4f671c4819ba02019de5093e596",
+            "toolName": "bash",
+            "text": "M .ypi/agents/architect.md\n M .ypi/agents/checker.md\n M .ypi/workflows/bugfix.json\n M .ypi/workflows/feature-dev.json\n M .ypi/workflows/ui-change.json\n M app/api/models/route.ts\n M app/layout.tsx\n M components/AppShell.tsx\n M components/ChatInput.tsx\n M components/ModelSelect.tsx\n M components/SessionSidebar.tsx\n M components/SettingsConfig.tsx\n M docs/architecture/overview.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M hooks/useAgentSession.ts\n M lib/workspace-title.ts\n M lib/ypi-studio-agents.ts\n M lib/ypi-studio-extension.ts\n M lib/ypi-studio-workflows.ts\n?? \".ypi/tasks/20260708-085157-\\344\\277\\256\\345\\244\\215\\351\\241\\271\\347\\233\\256\\351\\200\\211\\346\\213\\251-studio-\\346\\236\\266\\346\\236\\204\\346\\265\\201\\347\\250\\213-tab-\\346\\240\\207\\351\\242\\230\\344\\270\\216\\346\\250\\241\\345\\236\\213\\346\\220\\234\\347\\264\\242\\351\\227\\256\\351\\242\\230/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:16:46.718Z",
+            "text": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md` — updated with implementation/doc validation results and remaining risks.\n- Verified docs are updated:\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Validation\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: emitted existing Node experimental-loader warning only.\n\n#### Notes / Risks\n\n- Manual browser smoke tests were not run: project picker duplicate/new add behavior, Tab title linked-session case, and provider display-name search should still be checked in UI.\n- Studio UI prototype gate is prompt/workflow/checker enforcement, not hard schema validation.\n- Existing customized `.ypi` in other projects will not auto-update.\n- Subtask status should be recorded by parent/main Studio session; delegated child session should not mutate `.ypi/tasks/**/task.json` directly.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:16:46.743Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1065,
+        "tokens": 409,
+        "tokenSource": "usage",
+        "tps": 113.42,
+        "firstTokenAt": "2026-07-08T01:16:43.092Z",
+        "lastTokenAt": "2026-07-08T01:16:46.698Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-36d31dd361cd9b968723ff01",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/implementer-36d31dd361cd9b968723ff01.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T01:15:38.982Z",
+        "finishedAt": "2026-07-08T01:16:46.755Z",
+        "updatedAt": "2026-07-08T01:16:46.755Z",
+        "itemCount": 35,
+        "messageCount": 1,
+        "toolCallCount": 15,
+        "stderrBytes": 0,
+        "bytes": 122824,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f4b-7a88-777f-b1cb-01f9fb005c69",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-15-39-016Z_019f3f4b-7a88-777f-b1cb-01f9fb005c69.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-9b96c362176ef439710d44e8",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T01:16:55.329Z",
+      "finishedAt": "2026-07-08T01:18:48.724Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f4c-a4bd-75e4-9880-a5b2f21994dc",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-16-55-357Z_019f3f4c-a4bd-75e4-9880-a5b2f21994dc.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "childSessionId": "019f3f4c-a4bd-75e4-9880-a5b2f21994dc",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请对本任务的所有变更进行检查：确认 4 个用户问题均已覆盖；验证项目选择 duplicate 不切换、Studio UI HTML 原型门禁写入默认与本仓库配置、Tab 标题 project context 匹配、模型搜索 provider display name。检查 lint/tsc/test:studio-dag 结果和文档同步。不要修改代码，输出阻塞/非阻塞问题与结论。",
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None.\n\n#### Remaining Findings\n- 阻塞：None.\n- 非阻塞：\n  - 未在本终端执行浏览器手工冒烟：项目 duplicate 添加提示、linked session 标题、provider display name 搜索仍建议主会话补一轮 UI smoke test。\n\n#### Coverage Review\n- R1 项目选择：`components/SessionSidebar.tsx` 已把 `/api/projects` 的 `created:false` 分支改为仅更新缓存并提示 `Project already exists...`，不再切换 `selectedProjectId/selectedSpaceId/selectedCwd`。\n- R2 Studio UI 原型门禁：已写入默认定义与本仓库 `.ypi`：\n  - `lib/ypi-studio-agents.ts`\n  - `lib/ypi-studio-workflows.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `.ypi/agents/architect.md`\n  - `.ypi/agents/checker.md`\n  - `.ypi/workflows/{feature-dev,bugfix,ui-change}.json`\n- R3 Tab 标题：`components/AppShell.tsx` 现优先按 `projectId/spaceId` 匹配项目上下文，其次走 `sameWorkspacePathForTitle()`；`app/layout.tsx` 复用 `WORKSPACE_TITLE_FALLBACK`。\n- R4 模型搜索：`app/api/models/route.ts` 增加可选 `providerDisplayName`，并在 `ChatInput` / `SettingsConfig` / `ModelSelect` 搜索关键词中接入，value 仍保持 `provider/modelId` 语义。\n\n#### Documentation Sync\n- 已同步：\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Verification\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed（仅现有 experimental-loader warning）\n\n#### Files Changed / Artifacts Produced\n- 代码与文档改动覆盖：\n  - `components/SessionSidebar.tsx`\n  - `components/AppShell.tsx`\n  - `lib/workspace-title.ts`\n  - `app/layout.tsx`\n  - `app/api/models/route.ts`\n  - `hooks/useAgentSession.ts`\n  - `components/ChatInput.tsx`\n  - `components/SettingsConfig.tsx`\n  - `components/ModelSelect.tsx`\n  - `lib/ypi-studio-agents.ts`\n  - `lib/ypi-studio-workflows.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `.ypi/agents/architect.md`\n  - `.ypi/agents/checker.md`\n  - `.ypi/workflows/feature-dev.json`\n  - `.ypi/workflows/bugfix.json`\n  - `.ypi/workflows/ui-change.json`\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n- 本次检查未修改代码；`review.md` 仍未落盘。\n\n#### Remaining Risks\n- 手工 UI 验收未执行。\n- Studio UI gate 仍是 workflow/prompt/checker 门禁，不是新的 schema 强校验。\n\n#### Decisions Needed from Main Session\n- 是否后续补“已存在项目 → 一键切换”CTA；当前实现按需求仅提示、不切换。\n- 是否需要主会话补写 `review.md` artifact。\n\n#### Verdict\n- **Pass** — 4 项需求均已覆盖，自动验证通过；仅剩非阻塞的手工 UI smoke test 与 review artifact 落盘。",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T01:16:55.329Z",
+        "updatedAt": "2026-07-08T01:18:48.724Z",
+        "eventCount": 2063,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None.\n\n#### Remaining Findings\n- 阻塞：None.\n- 非阻塞：\n  - 未在本终端执行浏览器手工冒烟：项目 duplicate 添加提示、linked session 标题、provider display name 搜索仍建议主会话补一轮 UI smoke test。\n\n#### Coverage Review\n- R1 项目选择：`components/SessionSidebar.tsx` 已把 `/api/projects` 的 `created:false` 分支改为仅更新缓存并提示 `Project already exists...`，不再切换 `selectedProjectId/selectedSpaceId/selectedCwd`。\n- R2 Studio UI 原型门禁：已写入默认定义与本仓库 `.ypi`：\n  - `lib/ypi-studio-agents.ts`\n  - `lib/ypi-studio-workflows.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `.ypi/agents/architect.md`\n  - `.ypi/agents/checker.md`\n  - `.ypi/workflows/{feature-dev,bugfix,ui-change}.json`\n- R3 Tab 标题：`components/AppShell.tsx` 现优先按 `projectId/spaceId` 匹配项目上下文，其次走 `sameWorkspacePathForTitle()`；`app/layout.tsx` 复用 `WORKSPACE_TITLE_FALLBACK`。\n- R4 模型搜索：`app/api/models/route.ts` 增加可选 `providerDisplayName`，并在 `ChatInput` / `SettingsConfig` / `ModelSelect` 搜索关键词中接入，value 仍保持 `provider/modelId` 语义。\n\n#### Documentation Sync\n- 已同步：\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Verification\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed（仅现有 experimental-loader warning）\n\n#### Files Changed / Artifacts Produced\n- 代码与文档改动覆盖：\n  - `components/SessionSidebar.tsx`\n  - `components/AppShell.tsx`\n  - `lib/workspace-title.ts`\n  - `app/layout.tsx`\n  - `app/api/models/route.ts`\n  - `hooks/useAgentSession.ts`\n  - `components/ChatInput.tsx`\n  - `components/SettingsConfig.tsx`\n  - `components/ModelSelect.tsx`\n  - `lib/ypi-studio-agents.ts`\n  - `lib/ypi-studio-workflows.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `.ypi/agents/architect.md`\n  - `.ypi/agents/checker.md`\n  - `.ypi/workflows/feature-dev.json`\n  - `.ypi/workflows/bugfix.json`\n  - `.ypi/workflows/ui-change.json`\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n- 本次检查未修改代码；`review.md` 仍未落盘。\n\n#### Remaining Risks\n- 手工 UI 验收未执行。\n- Studio UI gate 仍是 workflow/prompt/checker 门禁，不是新的 schema 强校验。\n\n#### Decisions Needed from Main Session\n- 是否后续补“已存在项目 → 一键切换”CTA；当前实现按需求仅提示、不切换。\n- 是否需要主会话补写 `review.md` artifact。\n\n#### Verdict\n- **Pass** — 4 项需求均已覆盖，自动验证通过；仅剩非阻塞的手工 UI smoke test 与 review artifact 落盘。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:18:00.775Z",
+            "toolCallId": "call_YUuIbk5x8VE8tsGAqusmhjrw|fc_033309ea095d27da016a4da54185d4819b9d258a30c76327b0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.9 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T01:18:05.375Z",
+            "toolCallId": "call_lSNJQ36Qf3kYrgTJlx6uvWSl|fc_033309ea095d27da016a4da54f0618819b9cb712ec59817596",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"UI prototype|HTML 原型|provider display name|already exists|Project\\\\(Space\\\\)|normalized workspace path\\\" docs/architecture/overview.md docs/modules/api.md docs/modules/frontend.md docs/modules/library.md\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T01:18:05.421Z",
+            "toolCallId": "call_lSNJQ36Qf3kYrgTJlx6uvWSl|fc_033309ea095d27da016a4da54f0618819b9cb712ec59817596",
+            "toolName": "bash",
+            "text": "docs/architecture/overview.md:114:- YPI Studio UI prototype gate is a workflow/prompt/checker invariant: if a task changes pages, adds frontend functionality, changes existing interactions, changes approval/confirmation experience, or changes user-visible information structure, the architect must dispatch the UI designer to produce an HTML prototype based on the existing project and request user approval before implementation. `ui.md` may carry the HTML prototype or link to a `.html` file, but pure Markdown cannot satisfy the gate; checker treats missing HTML prototype or approval record as blocking.\ndocs/modules/library.md:54:| `lib/ypi-studio-workflows.ts` | Project-local YPI Studio structured workflow reader/initializer for `.ypi/workflows/`, including default workflow state machines, trigger metadata, transitions, progress states, UI prototype gate instructions for feature/bugfix planning, required `ui.md` for UI-change approval, non-overwriting backfill, and re-exports of pure workflow flow helpers. |\ndocs/modules/library.md:63:| `lib/ypi-studio-extension.ts` | Built-in Pi extension factory loaded by `lib/rpc-manager.ts`; injects YPI Studio workflow state, UI prototype gate reminders, implementation subtask guidance, and bounded `.ypi/knowledge` summaries, exports the Studio slash-command catalog, registers `/studio-init`, `/studio-start`, `/studio-feature`, `/studio-bugfix`, `/studio-ui`, `/studio-continue`, `/studio-check`, `/studio-archive`, exports `ypi_studio_task` and `ypi_studio_subagent`, records explicit user approval grants while a task is in `awaiting_approval`, supports `update_implementation_plan` / `implementation_next` / `claim_implementation_subtask` / `update_implementation_subtask`, returns compact `ypi_studio_task current/get` tool payloads by default (artifact paths, recent 10 events plus total count, subtask/run summaries, and next action hints) and treats `detail=\"full\"` as a context-safe summary-plus-file-paths request instead of injecting complete task JSON, keeps synchronous `ypi_studio_subagent` details compact by embedding task summaries and bounded run projections instead of full task documents/events/transcripts, returns `ypi_studio_subagent(action=start, mode=async)` as a lightweight start confirmation (`ypi_studio_subagent_async_start_v1`) with only task identity, run identity/member/model/thinking/startedAt, a tiny starting progress object, warnings, and an explicit `ypi_studio_wait` hint, suppresses async child progress from continuing to update the original start tool while persistence still writes task state/transcript sidecars/runtime registry for wait and APIs, returns `poll`/`collect`/`cancel` through lightweight lifecycle projections (`ypi_studio_subagent_lifecycle_v1`) with task identity plus short run status/summary/error/transcript metadata and no task compact, events, implementation projection, transcript preview, or progress item preview, keeps `ypi_studio_wait` even smaller with only task identity plus per-run `id`/`runId`, task key, status, subtask title, phase/current tool, token speed, timestamps, and short terminal summary/error fields, provides `ypi_studio_wait` as the preferred long-running tool for waiting on async child runs and streaming progress back to the main chat, defines the compatible `ypi_studio_subagent` action/mode/runId contract for async `start/poll/collect/cancel` while defaulting omitted action/mode to current synchronous behavior, binds member runs to optional `subtaskId`, prefers stable `pi_<sessionId>` context keys before process fallbacks while still allowing runtime pointer recovery for process fallback contexts, resolves Studio member model/thinking policy through `lib/ypi-studio-policy.ts`, starts child Pi with separated `--model`/`--thinking` args and Trellis child-disable env, parses child stdout as JSONL into safe progress/final projections without retaining or surfacing raw stdout/stderr, ignores non-text deltas such as tool-call/thinking updates for parent output, enforces line/stderr/idle/runtime limits with process-group cancellation, streams Studio member child progress with `phase`, token/tps estimates, current tool, policy diagnostics, warnings, and transcript previews through `onUpdate` only for synchronous starts, records transcript sidecars, promotes blocking child extension UI requests to `waiting_for_user` tool results, and adds `YPI_STUDIO_CONTEXT_ID` to bash commands for runtime task binding. |\ndocs/modules/api.md:44:| `models/` | GET | List available models and default model; each `modelList` item includes provider id and optional provider display name for shared model selector grouping/search. |\ndocs/modules/frontend.md:7:| `components/AppShell.tsx` | Top-level layout, URL state, active Project Registry space context, browser tab title that prefers `Project(Space)` when project/space ids match (falling back to normalized workspace path and then cwd/Git title), tab management, Web Terminal bottom-dock toggling, resizable left drawer, right drawer mode switching between files and optional Trellis tasks, Trellis-task-to-chat context block insertion, session-scoped Studio widget polling that stays fast while implementation subtasks are running/waiting/need attention, debounced Studio tool-driven session-list refresh so newly-created child audit sessions and wait/status changes appear in the sidebar without global polling, and compact top-bar usage chips whose tooltip can show current-chat-plus-Studio-child rollup scope and own/child cost split. |\ndocs/modules/frontend.md:8:| `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, lazy-loads linked sessions for the selected project space, hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, registers new project paths from manual input or the local OS directory picker, treats duplicate registrations as non-switching “already exists” notices so add actions do not masquerade as project switching, provides minimal project/space metadata editing for display name, tags, pinned, and archive state, keeps WorkTree actions available for worktree spaces, and includes archive/unarchive actions plus the integrated file explorer with a resizable session/explorer split. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. |\ndocs/modules/frontend.md:11:| `components/ChatInput.tsx` | Input bar, model dropdown, thinking level, tool preset, image upload, Browser Share binding entry, file-reference chips, slash-command autocomplete for extension commands/skills/prompt templates, and serialized Trellis task context blocks. The shared model dropdown keeps `provider/modelId` values unchanged while searching by model, provider id, and provider display name. New empty sessions receive the default tool preset and thinking level from `pi-web.json` (`yolk.defaultToolPreset`, `yolk.defaultThinkingLevel`) and can still be changed per session from the compact dropdowns; Browser Share can request a draft session before the first prompt; default/full/subagent presets include the built-in YPI Studio task tool, and the subagent preset also includes Studio member delegation. |\ndocs/modules/frontend.md:13:| `components/ModelSelect.tsx` | Shared searchable model selector used by chat and settings model policy fields, with grouped options and fuzzy jump/subsequence search across model labels, provider ids, and provider display names. |",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T01:18:48.691Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None.\n\n#### Remaining Findings\n- 阻塞：None.\n- 非阻塞：\n  - 未在本终端执行浏览器手工冒烟：项目 duplicate 添加提示、linked session 标题、provider display name 搜索仍建议主会话补一轮 UI smoke test。\n\n#### Coverage Review\n- R1 项目选择：`components/SessionSidebar.tsx` 已把 `/api/projects` 的 `created:false` 分支改为仅更新缓存并提示 `Project already exists...`，不再切换 `selectedProjectId/selectedSpaceId/selectedCwd`。\n- R2 Studio UI 原型门禁：已写入默认定义与本仓库 `.ypi`：\n  - `lib/ypi-studio-agents.ts`\n  - `lib/ypi-studio-workflows.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `.ypi/agents/architect.md`\n  - `.ypi/agents/checker.md`\n  - `.ypi/workflows/{feature-dev,bugfix,ui-change}.json`\n- R3 Tab 标题：`components/AppShell.tsx` 现优先按 `projectId/spaceId` 匹配项目上下文，其次走 `sameWorkspacePathForTitle()`；`app/layout.tsx` 复用 `WORKSPACE_TITLE_FALLBACK`。\n- R4 模型搜索：`app/api/models/route.ts` 增加可选 `providerDisplayName`，并在 `ChatInput` / `SettingsConfig` / `ModelSelect` 搜索关键词中接入，value 仍保持 `provider/modelId` 语义。\n\n#### Documentation Sync\n- 已同步：\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Verification\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed（仅现有 experimental-loader warning）\n\n#### Files Changed / Artifacts Produced\n- 代码与文档改动覆盖：\n  - `components/SessionSidebar.tsx`\n  - `components/AppShell.tsx`\n  - `lib/workspace-title.ts`\n  - `app/layout.tsx`\n  - `app/api/models/route.ts`\n  - `hooks/useAgentSession.ts`\n  - `components/ChatInput.tsx`\n  - `components/SettingsConfig.tsx`\n  - `components/ModelSelect.tsx`\n  - `lib/ypi-studio-agents.ts`\n  - `lib/ypi-studio-workflows.ts`\n  - `lib/ypi-studio-extension.ts`\n  - `.ypi/agents/architect.md`\n  - `.ypi/agents/checker.md`\n  - `.ypi/workflows/feature-dev.json`\n  - `.ypi/workflows/bugfix.json`\n  - `.ypi/workflows/ui-change.json`\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n- 本次检查未修改代码；`review.md` 仍未落盘。\n\n#### Remaining Risks\n- 手工 UI 验收未执行。\n- Studio UI gate 仍是 workflow/prompt/checker 门禁，不是新的 schema 强校验。\n\n#### Decisions Needed from Main Session\n- 是否后续补“已存在项目 → 一键切换”CTA；当前实现按需求仅提示、不切换。\n- 是否需要主会话补写 `review.md` artifact。\n\n#### Verdict\n- **Pass** — 4 项需求均已覆盖，自动验证通过；仅剩非阻塞的手工 UI smoke test 与 review artifact 落盘。",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T01:18:48.711Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 2324,
+        "tokens": 1229,
+        "tokenSource": "usage",
+        "tps": 40.8,
+        "firstTokenAt": "2026-07-08T01:18:18.552Z",
+        "lastTokenAt": "2026-07-08T01:18:48.671Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-9b96c362176ef439710d44e8",
+        "taskId": "20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-085157-_-studio-_-tab-/checker-9b96c362176ef439710d44e8.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T01:16:55.329Z",
+        "finishedAt": "2026-07-08T01:18:48.722Z",
+        "updatedAt": "2026-07-08T01:18:48.722Z",
+        "itemCount": 67,
+        "messageCount": 1,
+        "toolCallCount": 31,
+        "stderrBytes": 0,
+        "bytes": 206803,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f4c-a4bd-75e4-9880-a5b2f21994dc",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T01-16-55-357Z_019f3f4c-a4bd-75e4-9880-a5b2f21994dc.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-08T01:01:38.162Z",
+      "contextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-08T01:04:21.778Z",
+      "contextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+      "inputHash": "e1d8e672f49adeaf1d4bcdfe",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-08T01:48:40.420Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260708-094840-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
+    "knowledgePath": ".ypi/knowledge/20260708-094840-修复项目选择-studio-架构流程-tab-标题与模型搜索问题.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T01:01:33.939Z",
+    "summary": "修复项目添加语义、Studio UI 原型门禁、浏览器标题规则和模型 provider 名称搜索。",
+    "strategy": "independent-fixes-then-validation",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "project-picker-add-semantics",
+          "title": "frontend",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "project-picker-add-semantics"
+          ]
+        },
+        {
+          "id": "studio-ui-prototype-gate",
+          "title": "studio",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "studio-ui-prototype-gate"
+          ]
+        },
+        {
+          "id": "browser-title-rule",
+          "title": "frontend",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "browser-title-rule"
+          ]
+        },
+        {
+          "id": "model-provider-search",
+          "title": "frontend-api",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "model-provider-search"
+          ]
+        },
+        {
+          "id": "docs-validation",
+          "title": "validation",
+          "relation": "serial",
+          "dependencies": [
+            "project-picker-add-semantics",
+            "studio-ui-prototype-gate",
+            "browser-title-rule",
+            "model-provider-search"
+          ],
+          "subtaskIds": [
+            "docs-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "project-picker-add-semantics",
+        "title": "文件夹选择器按添加项目处理",
+        "phase": "frontend",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "components/SessionSidebar.tsx",
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "选择新目录会注册并选中主空间",
+          "选择已存在目录不切换当前项目",
+          "手动路径和文件夹选择 duplicate 行为一致"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工选择新目录和重复目录"
+        ],
+        "risks": [
+          "用户过去可能依赖重复添加来快速切换；需要提示从列表切换"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "studio-ui-prototype-gate",
+        "title": "增强 Studio 架构/UI 原型审批门禁",
+        "phase": "studio",
+        "order": 2,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "lib/ypi-studio-agents.ts",
+          "lib/ypi-studio-workflows.ts",
+          "lib/ypi-studio-extension.ts",
+          ".ypi/agents/architect.md",
+          ".ypi/agents/checker.md",
+          ".ypi/workflows/feature-dev.json",
+          ".ypi/workflows/bugfix.json",
+          ".ypi/workflows/ui-change.json",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md"
+        ],
+        "acceptance": [
+          "architect prompt 明确未来页面变更必须 UI designer HTML prototype",
+          "ui-change 任务审批前 requiredArtifacts 包含 ui.md",
+          "feature-dev/bugfix planning 指令包含条件 UI 门禁",
+          "checker 能把缺失 HTML 原型/审批视为阻塞"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-dag",
+          "Studio 面板检查 workflow detail 和 member markdown"
+        ],
+        "risks": [
+          "默认 workflow 初始化不会覆盖用户自定义项目；本仓库需同步 .ypi，其他项目需重新初始化或手动更新",
+          "只做声明门禁不是强 schema 条件校验"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "browser-title-rule",
+        "title": "修复 Tab 标题 project context 匹配",
+        "phase": "frontend",
+        "order": 3,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "components/AppShell.tsx",
+          "lib/workspace-title.ts",
+          "app/layout.tsx",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md"
+        ],
+        "acceptance": [
+          "已登记项目标题稳定为 Project(Space)",
+          "linked session cwd 与 registry path 字符串差异时不回退到 repo basename",
+          "无项目上下文仍显示 cwd/Git fallback"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工打开项目/linked session/未登记路径观察 document.title"
+        ],
+        "risks": [
+          "浏览器端无法 realpath；projectId/spaceId 匹配必须优先",
+          "Next metadata 和客户端 title 写入需避免闪烁"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "model-provider-search",
+        "title": "模型搜索匹配 provider display name",
+        "phase": "frontend-api",
+        "order": 4,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "app/api/models/route.ts",
+          "hooks/useAgentSession.ts",
+          "components/ChatInput.tsx",
+          "components/SettingsConfig.tsx",
+          "components/ModelSelect.tsx",
+          "docs/modules/api.md",
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "搜索 provider id 可匹配",
+          "搜索 provider display name/中文名可匹配",
+          "聊天和设置模型策略下拉一致",
+          "set_model payload 不变"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工搜索 openai-codex 和其展示名"
+        ],
+        "risks": [
+          "provider display name 可能等于 id；keywords 去重不是必须但避免空字符串",
+          "旧 API shape 需要 optional 字段兼容"
+        ],
+        "parallelizable": true,
+        "localReview": {
+          "required": true
+        }
+      },
+      {
+        "id": "docs-validation",
+        "title": "更新文档并验证",
+        "phase": "validation",
+        "order": 5,
+        "dependsOn": [
+          "project-picker-add-semantics",
+          "studio-ui-prototype-gate",
+          "browser-title-rule",
+          "model-provider-search"
+        ],
+        "dependencies": [
+          "project-picker-add-semantics",
+          "studio-ui-prototype-gate",
+          "browser-title-rule",
+          "model-provider-search"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/api.md",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md"
+        ],
+        "acceptance": [
+          "文档与实际行为一致",
+          "验证命令通过或有明确阻塞",
+          "handoff 记录变更文件和风险"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-dag"
+        ],
+        "risks": [
+          "文档遗漏会误导后续 agent"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T01:48:40.420Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "project-picker-add-semantics": {
+        "id": "project-picker-add-semantics",
+        "status": "done",
+        "updatedAt": "2026-07-08T01:06:43.628Z",
+        "startedAt": "2026-07-08T01:04:27.237Z",
+        "finishedAt": "2026-07-08T01:06:43.625Z",
+        "attempts": 1,
+        "runIds": [
+          "main-orchestration-1",
+          "implementer-5b24b6c07f425a7bce570c0d"
+        ],
+        "lastRunId": "implementer-5b24b6c07f425a7bce570c0d",
+        "claimedAt": "2026-07-08T01:04:27.237Z",
+        "claimedByContextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx`\n  - `POST /api/projects` response now reads `created`.\n  - `created: true`: updates project list and selects new project main space.\n  - `created: false`: updates cached project record only, does **not** change selected project/space/cwd, and shows: `Project already exists. Select it from the list to switch.`\n  - Manual path add and directory picker both share this behavior.\n  - Button label changed from `Open` to `Add`.\n\n- `docs/modules/frontend.md`\n  - Documented duplicate project registration as a non-switching “already exists” notice.\n\n#### Verification\n\n- `node_modules/.bin/eslint components/SessionSidebar.tsx` — passed.\n- `npm run lint` — blocked by existing/unrelated parse error:\n  - `lib/ypi-studio-agents.ts(112,22): Parsing error: ',' expected`\n- `node_modules/.bin/tsc --noEmit` — blocked by same unrelated syntax error:\n  - `lib/ypi-studio-agents.ts(112,23): error TS1005: ',' expected`\n\n#### Notes / Risks\n\n- Did not run manual folder-picker verification in browser.\n- Could not update `.ypi/tasks/.../task.json` directly: harness reports Studio child sessions may not mutate task state. Desired subtask status: `project-picker-add-semantics` completed, with validation blocked by unrelated `lib/ypi-studio-agents.ts` syntax error."
+      },
+      "studio-ui-prototype-gate": {
+        "id": "studio-ui-prototype-gate",
+        "status": "done",
+        "updatedAt": "2026-07-08T01:08:47.346Z",
+        "startedAt": "2026-07-08T01:04:27.237Z",
+        "finishedAt": "2026-07-08T01:08:47.344Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-09a2214d698a211fb02304c1"
+        ],
+        "lastRunId": "implementer-09a2214d698a211fb02304c1",
+        "claimedAt": "2026-07-08T01:04:27.237Z",
+        "claimedByContextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-agents.ts` — 强化 architect/checker 默认成员模板：UI 原型门禁、HTML 原型要求、用户审批、checker 阻塞项；补充旧默认 hash。\n- `lib/ypi-studio-workflows.ts` — 强化 feature-dev/bugfix/ui-change workflow planning/approval 指令；`ui-change` awaiting approval 必需 `ui.md`。\n- `lib/ypi-studio-extension.ts` — 在 runtime prompt、tool promptSnippet/guidelines、start prompt、next action 中注入 UI prototype gate。\n- `.ypi/agents/architect.md` / `.ypi/agents/checker.md` — 同步本仓库本地成员配置。\n- `.ypi/workflows/{feature-dev,bugfix,ui-change}.json` — 同步本仓库本地 workflow 配置。\n- `docs/modules/library.md` / `docs/architecture/overview.md` — 记录 Studio UI 原型门禁行为。\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed\n- JSON parse check for modified `.ypi/workflows/*.json` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n\n- 本次是 prompt/workflow/checker 门禁强化，不是新增硬 schema 校验。\n- 其他项目已有自定义 `.ypi` 文件不会自动覆盖，需要重新初始化或手动同步。\n- 当前工具环境没有 `ypi_studio_task` 可调用；请父会话将 subtask `studio-ui-prototype-gate` 标记为 done。"
+      },
+      "browser-title-rule": {
+        "id": "browser-title-rule",
+        "status": "done",
+        "updatedAt": "2026-07-08T01:11:26.703Z",
+        "startedAt": "2026-07-08T01:08:57.246Z",
+        "finishedAt": "2026-07-08T01:11:26.700Z",
+        "attempts": 1,
+        "runIds": [
+          "main-orchestration-2",
+          "implementer-5d359687549e9f433e4e9fa9"
+        ],
+        "lastRunId": "implementer-5d359687549e9f433e4e9fa9",
+        "claimedAt": "2026-07-08T01:08:57.246Z",
+        "claimedByContextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "summary": "### Implementation Complete — `browser-title-rule`\n\n#### Files Changed\n\n- `components/AppShell.tsx` — browser title now prefers active Project Registry title when `projectId/spaceId` match; falls back to normalized cwd path match, then existing cwd/Git title.\n- `lib/workspace-title.ts` — added normalized workspace path helpers for title matching.\n- `app/layout.tsx` — default metadata title now reuses `WORKSPACE_TITLE_FALLBACK`.\n- `docs/modules/frontend.md` — documented updated AppShell title behavior.\n- `docs/modules/library.md` — documented workspace title helper role.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- Manual browser title checks — not run in browser.\n\n#### Notes / Risks\n\n- Could not update `.ypi/tasks/**/task.json` directly: Studio child guard blocks task-state mutation via shell. Desired subtask status: `browser-title-rule` completed/succeeded.\n- No remaining product decisions needed for this subtask."
+      },
+      "model-provider-search": {
+        "id": "model-provider-search",
+        "status": "done",
+        "updatedAt": "2026-07-08T01:15:26.281Z",
+        "startedAt": "2026-07-08T01:08:57.246Z",
+        "finishedAt": "2026-07-08T01:15:26.275Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-e8b2fe3ea936cca760b49e82"
+        ],
+        "lastRunId": "implementer-e8b2fe3ea936cca760b49e82",
+        "claimedAt": "2026-07-08T01:08:57.246Z",
+        "claimedByContextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/models/route.ts` — `/api/models` now adds optional `providerDisplayName` to `modelList`.\n- `hooks/useAgentSession.ts` — updated model list typing to carry `providerDisplayName`.\n- `components/ChatInput.tsx` — chat model dropdown now searches/group-displays provider id and provider display name while preserving `provider/modelId` value.\n- `components/SettingsConfig.tsx` — settings model policy selectors now include provider display name in detail/group/search keywords.\n- `components/ModelSelect.tsx` — updated search hint copy.\n- `docs/modules/api.md` — documented `/api/models` additive provider display name field.\n- `docs/modules/frontend.md` — documented shared model selector/provider display-name search behavior.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- ...selected files` — passed\n\n#### Notes / Risks\n\n- Manual browser search verification not run.\n- `set_model` / policy values remain unchanged as `provider/modelId`.\n- I cannot directly mutate Studio task/subtask state from this delegated child context; parent should mark `model-provider-search` as done."
+      },
+      "docs-validation": {
+        "id": "docs-validation",
+        "status": "done",
+        "updatedAt": "2026-07-08T01:16:46.763Z",
+        "startedAt": "2026-07-08T01:15:35.017Z",
+        "finishedAt": "2026-07-08T01:16:46.758Z",
+        "attempts": 1,
+        "runIds": [
+          "main-orchestration-3",
+          "implementer-36d31dd361cd9b968723ff01"
+        ],
+        "lastRunId": "implementer-36d31dd361cd9b968723ff01",
+        "claimedAt": "2026-07-08T01:15:35.017Z",
+        "claimedByContextId": "pi_019f3f35-352e-7b43-bdd7-ddec12e7de12",
+        "summary": "### Implementation Complete\n\n#### Files Changed / Artifacts\n\n- `.ypi/tasks/20260708-085157-修复项目选择-studio-架构流程-tab-标题与模型搜索问题/handoff.md` — updated with implementation/doc validation results and remaining risks.\n- Verified docs are updated:\n  - `docs/modules/frontend.md`\n  - `docs/modules/api.md`\n  - `docs/modules/library.md`\n  - `docs/architecture/overview.md`\n\n#### Validation\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:studio-dag` — passed  \n  - Note: emitted existing Node experimental-loader warning only.\n\n#### Notes / Risks\n\n- Manual browser smoke tests were not run: project picker duplicate/new add behavior, Tab title linked-session case, and provider display-name search should still be checked in UI.\n- Studio UI prototype gate is prompt/workflow/checker enforcement, not hard schema validation.\n- Existing customized `.ypi` in other projects will not auto-update.\n- Subtask status should be recorded by parent/main Studio session; delegated child session should not mutate `.ypi/tasks/**/task.json` directly."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-08T01:04:27.237Z",
+        "subtaskId": "project-picker-add-semantics",
+        "from": "ready",
+        "to": "running",
+        "runId": "main-orchestration-1"
+      },
+      {
+        "at": "2026-07-08T01:04:27.237Z",
+        "subtaskId": "studio-ui-prototype-gate",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T01:08:57.246Z",
+        "subtaskId": "browser-title-rule",
+        "from": "ready",
+        "to": "running",
+        "runId": "main-orchestration-2"
+      },
+      {
+        "at": "2026-07-08T01:08:57.246Z",
+        "subtaskId": "model-provider-search",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T01:15:35.017Z",
+        "subtaskId": "docs-validation",
+        "from": "ready",
+        "to": "running",
+        "runId": "main-orchestration-3"
+      }
+    ]
+  }
+}

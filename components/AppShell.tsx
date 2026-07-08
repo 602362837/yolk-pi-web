@@ -21,7 +21,7 @@ import { BranchNavigator } from "./BranchNavigator";
 import { GitPanel } from "./GitPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import { getRelativeFilePath } from "@/lib/file-paths";
-import { formatWorkspaceTitle } from "@/lib/workspace-title";
+import { formatWorkspaceTitle, sameWorkspacePathForTitle } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
 import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
@@ -50,6 +50,22 @@ function studioContextIdForSession(sessionId: string | null | undefined): string
   if (!sessionId) return null;
   const safe = sessionId.replace(/[^A-Za-z0-9._-]+/g, "_");
   return `pi_${safe || sessionId}`;
+}
+
+function projectContextMatchesBrowserTitle(
+  context: ProjectSpaceSelectionContext | null,
+  selectedSession: SessionInfo | null,
+  newSessionProjectContext: { projectId: string; spaceId: string } | null,
+  cwd: string | null | undefined,
+): context is ProjectSpaceSelectionContext {
+  if (!context) return false;
+  if (selectedSession?.projectId && selectedSession.spaceId) {
+    return selectedSession.projectId === context.projectId && selectedSession.spaceId === context.spaceId;
+  }
+  if (newSessionProjectContext) {
+    return newSessionProjectContext.projectId === context.projectId && newSessionProjectContext.spaceId === context.spaceId;
+  }
+  return sameWorkspacePathForTitle(context.cwd, cwd);
 }
 
 export function AppShell() {
@@ -402,7 +418,9 @@ export function AppShell() {
   const rightPanelTogglePadding = rightPanelOpen ? 12 : 48 + 36 + (trellisEnabled ? 36 : 0);
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
-  const browserTitleProjectContext = activeProjectContext?.cwd === browserTitleCwd ? activeProjectContext : null;
+  const browserTitleProjectContext = projectContextMatchesBrowserTitle(activeProjectContext, selectedSession, newSessionProjectContext, browserTitleCwd)
+    ? activeProjectContext
+    : null;
 
   const loadTrellisSessionTask = useCallback(async (signal?: AbortSignal) => {
     if (!trellisEnabled || !selectedSession || selectedSession.archived) {

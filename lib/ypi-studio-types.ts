@@ -124,7 +124,7 @@ export interface YpiStudioWorkflowWriteResult {
   id: string;
   fileName: string;
   pathLabel: string;
-  status: "created" | "skipped";
+  status: "created" | "updated" | "skipped";
 }
 
 export interface YpiStudioWorkflowsResponse {
@@ -133,6 +133,7 @@ export interface YpiStudioWorkflowsResponse {
   pathLabel: string;
   workflows: YpiStudioWorkflowFile[];
   missingDefaultWorkflows: string[];
+  outdatedDefaultWorkflows?: string[];
   errors: Array<{ fileName?: string; pathLabel?: string; message: string }>;
 }
 
@@ -140,6 +141,7 @@ export interface YpiStudioWorkflowsInitResponse {
   cwd: string;
   pathLabel: string;
   created: YpiStudioWorkflowWriteResult[];
+  updated: YpiStudioWorkflowWriteResult[];
   skipped: YpiStudioWorkflowWriteResult[];
   workflows: YpiStudioWorkflowsResponse;
 }
