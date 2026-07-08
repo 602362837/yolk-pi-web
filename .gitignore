@@ -53,6 +53,9 @@ update-pi-web.sh
 logs/
 .ypi/.runtime/
 
+# Studio task runtime event logs (large, never commit)
+.ypi/tasks/**/events.jsonl
+
 # work handoff / task notes (not project code)
 handoff/
 
