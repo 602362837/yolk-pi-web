@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-08T01:48:40.420Z",
+  "updatedAt": "2026-07-08T02:26:00.423Z",
   "entries": [
+    {
+      "id": "20260708-102600-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+      "title": "修复左侧 Session 窄宽换行与 Studio 子任务 Session 命名",
+      "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+      "taskKey": "archived:2026-07:20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+      "workflowId": "feature-dev",
+      "summary": "修复左侧 Session 窄宽换行错乱与 Studio 子任务 Session 命名优先级。通过 CSS flex 布局改造实现了窄侧栏下所有 Session 行的单行截断/不换行；调整了 Studio child session 展示标题优先级（subtaskTitle > member·taskTitle > fallback）；改进了 SDK child session_info 命名以优先使用 implementation subtask 标题。lint 和 type-check 均通过。",
+      "tags": [
+        "bugfix",
+        "ui-change",
+        "feature-dev",
+        "session-sidebar",
+        "studio-child-title",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+      "knowledgePath": ".ypi/knowledge/20260708-102600-修复左侧-session-窄宽换行与-studio-子任务-session-命名.md",
+      "createdAt": "2026-07-08T02:26:00.423Z",
+      "archivedAt": "2026-07-08T02:26:00.423Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md"
+      ]
+    },
     {
       "id": "20260708-094840-修复项目选择-studio-架构流程-tab-标题与模型搜索问题",
       "title": "修复项目选择、Studio 架构流程、Tab 标题与模型搜索问题",

@@ -121,11 +121,13 @@ function WorktreeBadge({ worktree }: { worktree?: WorktreeInfo }) {
         fontWeight: 700,
         lineHeight: 1.35,
         flexShrink: 0,
+        overflow: "hidden",
+        whiteSpace: "nowrap",
       }}
     >
-      <span>WT</span>
+      <span style={{ flexShrink: 0 }}>WT</span>
       {worktree.branch && (
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>
           {worktree.branch}
         </span>
       )}
@@ -2401,16 +2403,19 @@ function SessionItem({
         transition: "background 0.1s",
         opacity: deleting ? 0.5 : 1,
         gap: 6,
+        minWidth: 0,
         overflow: "hidden",
+        whiteSpace: "nowrap",
+        flexWrap: "nowrap",
       }}
     >
       {confirmDelete ? (
         /* ── Delete confirmation: same height, two flat buttons ── */
         <>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ flex: "1 1 auto", minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             Delete <span style={{ fontWeight: 600 }}>&ldquo;{title.slice(0, 22)}{title.length > 22 ? "…" : ""}&rdquo;</span>?
           </div>
-          <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 5, flexShrink: 0, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
             <button
               onClick={handleDeleteConfirm}
               style={{
@@ -2458,7 +2463,8 @@ function SessionItem({
           }}
           autoFocus
           style={{
-            flex: 1,
+            flex: "1 1 auto",
+            minWidth: 0,
             fontSize: 12,
             padding: "5px 8px",
             border: "1px solid var(--accent)",
@@ -2495,8 +2501,8 @@ function SessionItem({
               <path d="M18 9a9 9 0 0 1-9 9" />
             </svg>
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+          <div style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", flexWrap: "nowrap" }}>
               <div
                 style={{
                   fontSize: 12,
@@ -2506,6 +2512,7 @@ function SessionItem({
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                   color: "var(--text)",
+                  flex: "1 1 auto",
                   minWidth: 0,
                 }}
                 title={titleTooltip}
@@ -2514,16 +2521,16 @@ function SessionItem({
               </div>
               <WorktreeBadge worktree={session.worktree} />
               {studioBadge && (
-                <span title="YPI Studio child audit session" style={{ flexShrink: 0, padding: "1px 5px", borderRadius: 999, background: "rgba(37,99,235,0.10)", border: "1px solid rgba(37,99,235,0.22)", color: "var(--accent)", fontSize: 9, fontWeight: 800 }}>
+                <span title="YPI Studio child audit session" style={{ flexShrink: 0, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "1px 5px", borderRadius: 999, background: "rgba(37,99,235,0.10)", border: "1px solid rgba(37,99,235,0.22)", color: "var(--accent)", fontSize: 9, fontWeight: 800 }}>
                   {studioBadge}
                 </span>
               )}
             </div>
-            <div style={{ marginTop: 2, display: "flex", gap: 8, color: "var(--text-dim)", fontSize: 11 }}>
-              <span title={session.modified}>{formatRelativeTime(session.modified)}</span>
-              <span>{session.messageCount} msgs</span>
-              {session.legacyUnassigned && <span title="缺少 projectId/spaceId，按 cwd 匹配显示，不会自动回写">未关联</span>}
-              {studioDetail && <span title={studioDetail}>{studioDetail}</span>}
+            <div style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", flexWrap: "nowrap", color: "var(--text-dim)", fontSize: 11 }}>
+              <span title={session.modified} style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatRelativeTime(session.modified)}</span>
+              <span style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.messageCount} msgs</span>
+              {session.legacyUnassigned && <span title="缺少 projectId/spaceId，按 cwd 匹配显示，不会自动回写" style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>未关联</span>}
+              {studioDetail && <span title={studioDetail} style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{studioDetail}</span>}
             </div>
           </div>
 
@@ -2549,7 +2556,7 @@ function SessionItem({
 
           {/* Action buttons — shown on hover */}
           {hovered && (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
               <button
                 onClick={startRename}
                 title="Rename"
@@ -2713,15 +2720,18 @@ function ArchivedSessionItem({
         borderLeft: confirmDelete ? "2px solid #ef4444" : "2px solid transparent",
         opacity: deleting ? 0.5 : 1,
         gap: 6,
+        minWidth: 0,
         overflow: "hidden",
+        whiteSpace: "nowrap",
+        flexWrap: "nowrap",
       }}
     >
       {confirmDelete ? (
         <>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ flex: "1 1 auto", minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             Delete <span style={{ fontWeight: 600 }}>&ldquo;{title.slice(0, 22)}{title.length > 22 ? "…" : ""}&rdquo;</span>?
           </div>
-          <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 5, flexShrink: 0, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
             <button onClick={handleDeleteConfirm} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 30, padding: "0 11px", background: "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
@@ -2743,8 +2753,8 @@ function ArchivedSessionItem({
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          <div style={{ flex: 1, minWidth: 0, fontStyle: "italic" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+          <div style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", fontStyle: "italic" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", flexWrap: "nowrap" }}>
               <div
                 style={{
                   fontSize: 12,
@@ -2754,6 +2764,7 @@ function ArchivedSessionItem({
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                   color: "var(--text-dim)",
+                  flex: "1 1 auto",
                   minWidth: 0,
                 }}
                 title={title}
@@ -2761,13 +2772,13 @@ function ArchivedSessionItem({
                 {title}
               </div>
             </div>
-            <div style={{ marginTop: 2, display: "flex", gap: 8, color: "var(--text-dim)", fontSize: 11 }}>
-              <span title={session.modified}>{formatRelativeTime(session.modified)}</span>
-              <span>{session.messageCount} msgs</span>
+            <div style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", flexWrap: "nowrap", color: "var(--text-dim)", fontSize: 11 }}>
+              <span title={session.modified} style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatRelativeTime(session.modified)}</span>
+              <span style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.messageCount} msgs</span>
             </div>
           </div>
           {hovered && (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
               <button
                 onClick={handleUnarchiveClick}
                 title="Unarchive"

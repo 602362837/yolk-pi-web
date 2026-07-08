@@ -29,16 +29,25 @@ function taskIdTitleFallback(taskId?: string): string {
   const value = taskId?.trim();
   if (!value) return "";
   const parts = value.split(/[\\/]+/).filter(Boolean);
-  return truncateSessionTitle(parts[parts.length - 1] ?? value);
+  return parts[parts.length - 1] ?? value;
+}
+
+function memberPrefixedStudioChildTitle(member: string | undefined, value: string | undefined): string {
+  const normalized = collapseWhitespace(value ?? "");
+  if (!normalized) return "";
+  const normalizedMember = collapseWhitespace(member ?? "");
+  return truncateSessionTitle(normalizedMember ? `${normalizedMember} · ${normalized}` : normalized);
 }
 
 export function displayTitleForSession(session: Pick<SessionInfo, "id" | "name" | "firstMessage" | "messageCount" | "studioChild" | "studioChildDisplay">): string {
   if (session.studioChild) {
-    const taskTitle = truncateSessionTitle(session.studioChildDisplay?.taskTitle ?? "");
+    const subtaskTitle = truncateSessionTitle(session.studioChildDisplay?.subtaskTitle ?? "");
+    if (subtaskTitle) return subtaskTitle;
+    const taskTitle = memberPrefixedStudioChildTitle(session.studioChild.member, session.studioChildDisplay?.taskTitle);
     if (taskTitle) return taskTitle;
-    const runSummary = truncateSessionTitle(session.studioChildDisplay?.runSummary ?? "");
+    const runSummary = memberPrefixedStudioChildTitle(session.studioChild.member, session.studioChildDisplay?.runSummary);
     if (runSummary) return runSummary;
-    const taskId = taskIdTitleFallback(session.studioChild.taskId);
+    const taskId = memberPrefixedStudioChildTitle(session.studioChild.member, taskIdTitleFallback(session.studioChild.taskId));
     if (taskId) return taskId;
   }
   if (session.name?.trim()) return session.name.trim();

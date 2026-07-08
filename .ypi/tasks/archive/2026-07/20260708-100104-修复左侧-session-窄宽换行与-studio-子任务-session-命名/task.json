@@ -1,0 +1,1638 @@
+{
+  "schemaVersion": 1,
+  "id": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+  "title": "修复左侧 Session 窄宽换行与 Studio 子任务 Session 命名",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-08T02:01:04.719Z",
+  "updatedAt": "2026-07-08T02:26:00.423Z",
+  "completedAt": "2026-07-08T02:23:59.497Z",
+  "contextIds": [
+    "pi_019f3f74-c38a-7413-a610-321b50bea00a"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-33d217a1989a1140d4c094bb",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:01:11.970Z",
+      "finishedAt": "2026-07-08T02:05:27.866Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f75-2e37-7cfe-84d8-e233878771ba",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-01-11-991Z_019f3f75-2e37-7cfe-84d8-e233878771ba.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f75-2e37-7cfe-84d8-e233878771ba",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请为本任务做架构/修复设计。用户诉求：1）左侧 Session 列表在侧栏宽度很小时，上下内容显示错乱，Session 项内容不应自动换行，宽度不足时应单行截断/省略；2）YPI Studio 指派 subagent 产生的 child session 当前任务名称取错，不能直接用主任务名称，应优先使用 implementation subtask 的名称/标题，取不到再回退为“角色 + 主任务名称”。 请按项目规则：这是 UI 行为变化，必须安排 ui-designer …",
+      "summary": "已完成架构/修复设计，未修改生产代码。\n\n## Artifacts produced\n\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## Key design\n\n- `components/SessionSidebar.tsx`\n  - 修复 `SessionItem` / `ArchivedSessionItem` 窄侧栏换行错乱。\n  - 统一应用 `minWidth: 0`、`overflow: hidden`、`whiteSpace: nowrap`、`textOverflow: ellipsis`、`flexWrap: nowrap`。\n  - 重点处理 metadata row、Studio detail、hover actions、delete confirm。\n\n- `lib/session-title.ts`\n  - Studio child display title 改为：\n    1. `studioChildDisplay.subtaskTitle`\n    2. `member · taskTitle`\n    3. run/task fallback\n\n- `lib/ypi-studio-child-session-runner.ts`\n  - `studioChildSessionInfoName()` 改为 future SDK child session 的 `session_info` 名称优先使用 implementation subtask title。\n  - 无 subtask title 时回退为 `member · 主任务名称`。\n\n- `lib/session-reader.ts`\n  - 现有 `projectStudioChildDisplay()` 已解析 `subtaskTitle`，预计无需新增 API 字段。\n\n## Validation run\n\n- 已执行源码/文档读取与定位。\n- 已校验 `implement.md` 内 `ypi-implementation-plan` JSON 可解析。\n- 未运行 `npm run lint` / `tsc`，因为本轮仅产出规划，未改生产代码。\n\n## Remaining blockers / decisions\n\n1. UI 门禁未完成：必须由 `ui-designer` 输出 HTML 原型并取得用户/主会话审批后才能实现。\n2. 需确认 fallback 是否接受英文 member id，如 `implementer · 主任务名称`，或要求中文角色映射。\n3. 主会话需采用/保存 `implement.md` 中 implementation plan，并在 UI 审批后切到实现。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:01:11.970Z",
+        "updatedAt": "2026-07-08T02:05:27.866Z",
+        "eventCount": 2260,
+        "lastTextPreview": "已完成架构/修复设计，未修改生产代码。\n\n## Artifacts produced\n\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## Key design\n\n- `components/SessionSidebar.tsx`\n  - 修复 `SessionItem` / `ArchivedSessionItem` 窄侧栏换行错乱。\n  - 统一应用 `minWidth: 0`、`overflow: hidden`、`whiteSpace: nowrap`、`textOverflow: ellipsis`、`flexWrap: nowrap`。\n  - 重点处理 metadata row、Studio detail、hover actions、delete confirm。\n\n- `lib/session-title.ts`\n  - Studio child display title 改为：\n    1. `studioChildDisplay.subtaskTitle`\n    2. `member · taskTitle`\n    3. run/task fallback\n\n- `lib/ypi-studio-child-session-runner.ts`\n  - `studioChildSessionInfoName()` 改为 future SDK child session 的 `session_info` 名称优先使用 implementation subtask title。\n  - 无 subtask title 时回退为 `member · 主任务名称`。\n\n- `lib/session-reader.ts`\n  - 现有 `projectStudioChildDisplay()` 已解析 `subtaskTitle`，预计无需新增 API 字段。\n\n## Validation run\n\n- 已执行源码/文档读取与定位。\n- 已校验 `implement.md` 内 `ypi-implementation-plan` JSON 可解析。\n- 未运行 `npm run lint` / `tsc`，因为本轮仅产出规划，未改生产代码。\n\n## Remaining blockers / decisions\n\n1. UI 门禁未完成：必须由 `ui-designer` 输出 HTML 原型并取得用户/主会话审批后才能实现。\n2. 需确认 fallback 是否接受英文 member id，如 `implementer · 主任务名称`，或要求中文角色映射。\n3. 主会话需采用/保存 `implement.md` 中 implementation plan，并在 UI 审批后切到实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:05:08.045Z",
+            "toolCallId": "call_lHqw5SDVBoOanrBW1hLJwoTU|fc_009dea12cbceed73016a4db055508c819b9f06e6b5c41ea5a2",
+            "toolName": "bash",
+            "text": "implementation plan JSON OK",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:05:10.508Z",
+            "toolCallId": "call_xKMHkhxMplUgWHDtZHauXR1G|fc_009dea12cbceed73016a4db0580a4c819b9874e38e3f9ba540",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:05:10.586Z",
+            "toolCallId": "call_xKMHkhxMplUgWHDtZHauXR1G|fc_009dea12cbceed73016a4db0580a4c819b9874e38e3f9ba540",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260708-100104-\\344\\277\\256\\345\\244\\215\\345\\267\\246\\344\\276\\247-session-\\347\\252\\204\\345\\256\\275\\346\\215\\242\\350\\241\\214\\344\\270\\216-studio-\\345\\255\\220\\344\\273\\273\\345\\212\\241-session-\\345\\221\\275\\345\\220\\215/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:05:27.849Z",
+            "text": "已完成架构/修复设计，未修改生产代码。\n\n## Artifacts produced\n\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## Key design\n\n- `components/SessionSidebar.tsx`\n  - 修复 `SessionItem` / `ArchivedSessionItem` 窄侧栏换行错乱。\n  - 统一应用 `minWidth: 0`、`overflow: hidden`、`whiteSpace: nowrap`、`textOverflow: ellipsis`、`flexWrap: nowrap`。\n  - 重点处理 metadata row、Studio detail、hover actions、delete confirm。\n\n- `lib/session-title.ts`\n  - Studio child display title 改为：\n    1. `studioChildDisplay.subtaskTitle`\n    2. `member · taskTitle`\n    3. run/task fallback\n\n- `lib/ypi-studio-child-session-runner.ts`\n  - `studioChildSessionInfoName()` 改为 future SDK child session 的 `session_info` 名称优先使用 implementation subtask title。\n  - 无 subtask title 时回退为 `member · 主任务名称`。\n\n- `lib/session-reader.ts`\n  - 现有 `projectStudioChildDisplay()` 已解析 `subtaskTitle`，预计无需新增 API 字段。\n\n## Validation run\n\n- 已执行源码/文档读取与定位。\n- 已校验 `implement.md` 内 `ypi-implementation-plan` JSON 可解析。\n- 未运行 `npm run lint` / `tsc`，因为本轮仅产出规划，未改生产代码。\n\n## Remaining blockers / decisions\n\n1. UI 门禁未完成：必须由 `ui-designer` 输出 HTML 原型并取得用户/主会话审批后才能实现。\n2. 需确认 fallback 是否接受英文 member id，如 `implementer · 主任务名称`，或要求中文角色映射。\n3. 主会话需采用/保存 `implement.md` 中 implementation plan，并在 UI 审批后切到实现。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:05:27.859Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1310,
+        "tokens": 531,
+        "tokenSource": "usage",
+        "tps": 44.02,
+        "firstTokenAt": "2026-07-08T02:05:15.772Z",
+        "lastTokenAt": "2026-07-08T02:05:27.836Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-33d217a1989a1140d4c094bb",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/architect-33d217a1989a1140d4c094bb.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:01:11.970Z",
+        "finishedAt": "2026-07-08T02:05:27.864Z",
+        "updatedAt": "2026-07-08T02:05:27.864Z",
+        "itemCount": 65,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 248107,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f75-2e37-7cfe-84d8-e233878771ba",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-01-11-991Z_019f3f75-2e37-7cfe-84d8-e233878771ba.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-d617b13a3649e4b4676b7e8b",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:05:37.845Z",
+      "finishedAt": "2026-07-08T02:06:30.042Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f79-3cd7-7ad4-8b2e-b185e9bd6320",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-05-37-879Z_019f3f79-3cd7-7ad4-8b2e-b185e9bd6320.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f79-3cd7-7ad4-8b2e-b185e9bd6320",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请基于现有项目为本 UI 变化制作 HTML 原型并更新 ui.md（必须包含 HTML 或链接到 .html 文件，不能只写 Markdown）。范围：左侧 Session 列表窄侧栏时，行内容不自动换行，标题/副信息/徽标等单行截断省略，避免上下错乱；并展示 Studio child session 标题使用子任务名称后的预期列表效果。请不要修改生产代码，只输出原型和简短交互说明，供用户审批。",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:05:37.845Z",
+        "updatedAt": "2026-07-08T02:06:30.042Z",
+        "eventCount": 147,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:06:14.996Z",
+            "toolCallId": "call_1783476404131749047_122|fc_call_1783476404131749047_122",
+            "toolName": "read",
+            "text": "import { basename } from \"node:path\";\nimport type { ResolvedYpiStudioMemberPolicy } from \"./ypi-studio-policy\";\nimport { readSessionHeaderFromFile } from \"./session-project-link\";\nimport { writeSessionHeader } from \"./ypi-studio-child-session-header\";\nimport { createYpiStudioChildGuardExtension } from \"./ypi-studio-child-guard\";\nimport {\n  appendYpiStudioSubagentTranscriptItem,\n  finalizeYpiStudioSubagentTranscript,\n  previewYpiStudioTranscriptText,\n  type YpiStudioSubagentTranscriptWriter,\n} from \"./ypi-studio-transcripts\";\nimport { registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from \"./ypi-studio-subagent-runtime\";\nimport { getYpiStudioTaskDetail } from \"./ypi-studio-tasks\";\nimport type { SessionHeader, StudioChildSessionInfo } from \"./types\";\nimport type {\n  YpiStudioSubagentCurrentTool,\n  YpiStudioSubagentRunProgress,\n  YpiStudioSubagentRunPhase,\n  YpiStudioSubagentTranscriptItem,\n  YpiStudioSubagentTranscriptStatus,\n  YpiStudioTaskSubagentRun,\n} from \"./ypi-studio-types\";\n\ntype JsonObject = Record<string, unknown>;\ntype ToolUpdateCallback = (result: { content: { type: \"text\"; text: string }[]; details: unknown; isError?: boolean }) => void;\n\nexport interface StudioSdkChildRunMeta {\n  runId: string;\n  taskId: string;\n  member: string;\n  startedAt: string;\n  parentSessionId?: string;\n  parentSessionFile?: string;\n  subtaskId?: string;\n  continuationOnFinal?: boolean;\n}\n\nexport interface StudioSdkChildRunResult {\n  output: string;\n  status: YpiStudioTaskSubagentRun[\"status\"];\n  transcript?: YpiStudioTaskSubagentRun[\"transcript\"];\n  warnings: string[];\n  progress: YpiStudioSubagentRunProgress;\n  terminationReason?: string;\n  runner: \"sdk\";\n  childSessionId?: string;\n  childSessionFile?: string;\n  requestAffinity?: YpiStudioTaskSubagentRun[\"requestAffinity\"];\n}\n\nexport interface StudioSdkChildRunCallbacks {\n  onProgress?: (run: YpiStudioTaskSubagentRun) => void;\n  onFinal?: (run: YpiStudioTaskSubagentRun, result: StudioSdkChildRunResult) => void;\n}\n\nexport interface StudioSdkChildRunOptions {\n  root: string;\n  prompt: string;\n  policy: ResolvedYpiStudioMemberPolicy;\n  meta: StudioSdkChildRunMeta;\n  writer: YpiStudioSubagentTranscriptWriter | null;\n  signal?: AbortSignal;\n  onUpdate?: ToolUpdateCallback;\n  persistence?: StudioSdkChildRunCallbacks;\n}\n\nconst CHILD_RECENT_PROGRESS_LIMIT = 5;\nconst MAX_CHILD_LIVE_PREVIEW_BYTES = 16 * 1024;\nconst MAX_CHILD_FINAL_OUTPUT_BYTES = 128 * 1024;\nconst EXCLUDED_CHILD_TOOLS = [\n  \"ypi_studio_task\",\n  \"ypi_studio_subagent\",\n  \"ypi_studio_wait\",\n  \"browser_share_click\",\n  \"browser_share_type\",\n  \"browser_share_scroll\",\n  \"browser_share_navigate\",\n  \"trellis_subagent\",\n  \"subagent\",\n];\n\nfunction isObj(value: unknown): value is JsonObject {\n  return typeof value === \"object\" && value !== null && !Array.isArray(value);\n}\n\nfunction str(value: unknown): string | undefined {\n  return typeof value === \"string\" && value.trim() ? value.trim() : undefined;\n}\n\nfunction safeJson(value: unknown): string {\n  try { return JSON.stringify(value, null, 2); } catch { return String(value); }\n}\n\nfunction byteLength(value: string): number {\n  return Buffer.byteLength(value, \"utf8\");\n}\n\nfunction truncateBytes(value: string, maxBytes: number): { text: string; truncated: boolean } {\n  if (byteLength(value) <= maxBytes) return { text: value, truncated: false };\n  let end = Math.min(value.length, maxBytes);\n  while (end > 0 && byteLength(value.slice(0, end)) > maxBytes) end -= 1;\n  return { text: `${value.slice(0, Math.max(0, end - 1))}…`, truncated: true };\n}\n\nfunction oneLine(value: string, max = 160): string {\n  const normalized = value.replace(/\\s+/g, \" \").trim();\n  return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;\n}\n\nfunction studioChildSessionInfoName(root: string, meta: StudioSdkChildRunMeta): string {\n  try {\n    const title = getYpiStudioTaskDetail(root, meta.taskId)?.title;\n    if (title?.trim()) return `YPI Studio ${oneLine(title, 80)} · ${meta.member} · ${meta.runId.slice(0, 8)}`;\n  } catch {\n    // Durable session_info is only a fallback; task.json remains the display authority.\n  }\n  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`;\n}\n\nfunction boundedAppendTail(previous: string, addition: string, maxBytes: number): string {\n  const combined = `${previous}${addition}`;\n  if (byteLength(combined) <= maxBytes) return combined;\n  let start = Math.max(0, combined.length - maxBytes);\n  while (start < combined.length && byteLength(combined.slice(start)) > maxBytes) start += 1;\n  return combined.slice(start);\n}\n\nfunction resultText(value: unknown): string {\n  if (typeof value === \"string\") return value;\n  if (Array.isArray(value)) return value.map(resultText).filter(Boolean).join(\"\\n\");\n  if (isObj(value)) {\n    if (typeof value.text === \"string\") return value.text;\n    if (Array.isArray(value.content)) return value.content.map(resultText).filter(Boolean).join(\"\\n\");\n    if (typeof value.message === \"string\") return value.message;\n  }\n  return value == null ? \"\" : safeJson(value);\n}\n\nfunction eventMessageText(event: unknown): string {\n  if (!isObj(event)) return \"\";\n  const message = isObj(event.message) ? event.message : event;\n  if (typeof message.text === \"string\") return message.text;\n  if (typeof message.content === \"string\") return message.content;\n  if (Array.isArray(message.content)) return message.content.map((part) => isObj(part) && part.type === \"text\" && typeof part.text === \"string\" ? part.text : \"\").join(\"\");\n  return \"\";\n}\n\nfunction eventAssistantDeltaText(event: unknown): string {\n  if (!isObj(event)) return \"\";\n  const delta = event.delta;\n  if (typeof delta === \"string\") return delta;\n  if (isObj(delta) && typeof delta.text === \"string\") return delta.text;\n  if (typeof event.text === \"string\") return event.text;\n  return \"\";\n}\n\nfunction usageOutputTokens(event: unknown): number | undefined {\n  if (!isObj(event)) return undefined;\n  const usage = isObj(event.usage) ? event.usage : isObj(event.message) && isObj(event.message.usage) ? event.message.usage : undefined;\n  const value = usage ? usage.outputTokens ?? usage.output_tokens ?? usage.output ?? usage.completion_tokens : undefined;\n  return typeof value === \"number\" && Number.isFinite(value) && value >= 0 ? value : undefined;\n}\n\ntype WritableSessionManagerInternals = {\n  flushed?: boolean;\n  fileEntries?: unknown[];\n};\n\nfunction markSessionManagerHeaderFlushed(sessionManager: unknown, header: SessionHeader): void {\n  const internals = sessionManager as WritableSessionManagerInternals;\n  const firstEntry = Array.isArray(internals.fileEntries) ? internals.fileEntries[0] : undefined;\n  if (isObj(firstEntry) && firstEntry.type === \"session\") Object.assign(firstEntry, header);\n  internals.flushed = true;\n}\n\nfunction updateStudioChildHeader(filePath: string | undefined, patch: Partial<StudioChildSessionInfo>): void {\n  if (!filePath) return;\n  try {\n    const header = readSessionHeaderFromFile(filePath);\n    if (!header?.studioChild) return;\n    writeSessionHeader(filePath, { studioChild: { ...header.studioChild, ...patch } });\n  } catch {\n    // Header updates are audit-only; task.json remains the status source of truth.\n  }\n}\n\nfunction modelFromPolicyArg(policy: ResolvedYpiStudioMemberPolicy, modelRegistry: { find?: (provider: string, modelId: string) => unknown }, warnings: string[]): unknown {\n  const arg = policy.modelArg;\n  if (!arg) return undefined;\n  const slash = arg.indexOf(\"/\");\n  if (slash <= 0 || slash === arg.length - 1) return undefined;\n  const provider = arg.slice(0, slash);\n  const modelId = arg.slice(slash + 1);\n  const model = modelRegistry.find?.(provider, modelId);\n  if (!model) warnings.push(`Configured Studio child model ${arg} was not found; using Pi default model.`);\n  return model;\n}\n\nexport async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOptions): Promise<StudioSdkChildRunResult> {\n  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence } = options;\n\n[370 more lines in file. Use offset=201 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:06:18.088Z",
+            "toolCallId": "call_1783476407227162139_123|fc_call_1783476407227162139_123",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"mkdir -p .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:06:18.103Z",
+            "toolCallId": "call_1783476407227162139_123|fc_call_1783476407227162139_123",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:06:30.029Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:06:30.040Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-d617b13a3649e4b4676b7e8b",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/ui-designer-d617b13a3649e4b4676b7e8b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:05:37.845Z",
+        "finishedAt": "2026-07-08T02:06:30.040Z",
+        "updatedAt": "2026-07-08T02:06:30.040Z",
+        "itemCount": 29,
+        "messageCount": 1,
+        "toolCallCount": 12,
+        "stderrBytes": 0,
+        "bytes": 63268,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3f79-3cd7-7ad4-8b2e-b185e9bd6320",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-05-37-879Z_019f3f79-3cd7-7ad4-8b2e-b185e9bd6320.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-80061727bb62a2423fca1863",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:06:51.983Z",
+      "finishedAt": "2026-07-08T02:08:02.746Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f7a-5e77-7388-9159-9597f127d97a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-06-52-023Z_019f3f7a-5e77-7388-9159-9597f127d97a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f7a-5e77-7388-9159-9597f127d97a",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "上一次 ui-designer run 未能写入 HTML 原型。请立即完成：创建 `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/ui-prototype.html`，并更新 `ui.md` 链接该 HTML。原型需覆盖左侧 Session 列表窄宽不换行、单行截断、hover 按钮不改变行高、Studio child session 标题优先子任务标题、无子任务标题时 fallba…",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:06:51.983Z",
+        "updatedAt": "2026-07-08T02:08:02.746Z",
+        "eventCount": 207,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:07:49.752Z",
+            "toolCallId": "call_1783476498808953934_139|fc_call_1783476498808953934_139",
+            "toolName": "bash",
+            "text": "app/globals.css",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:07:52.418Z",
+            "toolCallId": "call_1783476501563368900_140|fc_call_1783476501563368900_140",
+            "toolName": "read",
+            "inputPreview": "{\n  \"offset\": 1,\n  \"path\": \"app/globals.css\",\n  \"limit\": 200\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:07:52.428Z",
+            "toolCallId": "call_1783476501563368900_140|fc_call_1783476501563368900_140",
+            "toolName": "read",
+            "text": "@import \"tailwindcss\";\n@import \"@xterm/xterm/css/xterm.css\";\n\n@theme {\n  --color-bg: var(--bg);\n  --color-bg-panel: var(--bg-panel);\n  --color-bg-hover: var(--bg-hover);\n  --color-bg-selected: var(--bg-selected);\n  --color-border: var(--border);\n  --color-text: var(--text);\n  --color-text-muted: var(--text-muted);\n  --color-text-dim: var(--text-dim);\n  --color-accent: var(--accent);\n  --color-accent-hover: var(--accent-hover);\n  --color-user-bg: var(--user-bg);\n  --color-assistant-bg: var(--assistant-bg);\n  --color-tool-bg: var(--tool-bg);\n  --color-bg-subtle: var(--bg-subtle);\n  --font-mono-font: var(--font-mono);\n}\n\n:root {\n  --bg: #ffffff;\n  --bg-panel: #f5f5f5;\n  --bg-hover: #eeeeee;\n  --bg-selected: #e8e8e8;\n  --border: #e0e0e0;\n  --text: #1a1a1a;\n  --text-muted: #6b7280;\n  --text-dim: #9ca3af;\n  --accent: #2563eb;\n  --accent-hover: #1d4ed8;\n  --user-bg: #eff6ff;\n  --assistant-bg: #ffffff;\n  --tool-bg: #f9fafb;\n  --bg-subtle: rgba(0,0,0,0.03);\n}\n\nhtml.dark {\n  --bg: #1a1a1a;\n  --bg-panel: #242424;\n  --bg-hover: #2e2e2e;\n  --bg-selected: #383838;\n  --border: #3a3a3a;\n  --text: #e8e8e8;\n  --text-muted: #9ca3af;\n  --text-dim: #6b7280;\n  --accent: #60a5fa;\n  --accent-hover: #93c5fd;\n  --user-bg: #1e293b;\n  --assistant-bg: #1a1a1a;\n  --tool-bg: #1f2937;\n  --bg-subtle: rgba(255,255,255,0.04);\n}\n\n/* Theme toggle: circular wipe via View Transitions API.\n   Disable the UA cross-fade; the actual clip-path animation is driven by\n   Element.animate() in hooks/useTheme.ts after transition.ready resolves. */\n::view-transition-old(root),\n::view-transition-new(root) {\n  animation: none;\n  mix-blend-mode: normal;\n}\n::view-transition-old(root) {\n  z-index: 1;\n}\n::view-transition-new(root) {\n  z-index: 2;\n}\n\n* {\n  box-sizing: border-box;\n}\n\nhtml, body {\n  height: 100%;\n  margin: 0;\n  padding: 0;\n  background: var(--bg);\n  color: var(--text);\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n  font-size: 14px;\n  overscroll-behavior: none;\n}\n\nbody {\n  height: 100dvh;\n}\n\n::-webkit-scrollbar {\n  width: 4px;\n  height: 4px;\n}\n::-webkit-scrollbar-track {\n  background: transparent;\n}\n::-webkit-scrollbar-thumb {\n  background: var(--border);\n  border-radius: 2px;\n}\n::-webkit-scrollbar-thumb:hover {\n  background: var(--text-dim);\n}\n\n:root {\n  --font-mono: var(--font-noto-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;\n}\n\npre, code {\n  font-family: var(--font-mono);\n}\n\n/* react-markdown output styles */\n.markdown-body {\n  font-size: 14px;\n  line-height: 1.7;\n  color: var(--text);\n  word-break: break-word;\n}\n.markdown-body p { margin: 0 0 8px; }\n.markdown-body p:last-child { margin-bottom: 0; }\n.markdown-body h1, .markdown-body h2, .markdown-body h3,\n.markdown-body h4, .markdown-body h5, .markdown-body h6 {\n  font-weight: 600;\n  margin: 10px 0 5px;\n  color: var(--text);\n  line-height: 1.35;\n  letter-spacing: 0;\n}\n.markdown-body h1 { font-size: 1.16em; }\n.markdown-body h2 { font-size: 1.08em; }\n.markdown-body h3 { font-size: 0.98em; color: color-mix(in srgb, var(--text) 88%, var(--text-muted)); }\n.markdown-body ul, .markdown-body ol {\n  padding-left: 22px;\n  margin: 5px 0 8px;\n  list-style-position: outside;\n}\n.markdown-body li { margin: 3px 0; padding-left: 2px; }\n.markdown-body ul > li { list-style-type: disc; }\n.markdown-body ol > li { list-style-type: decimal; }\n.markdown-body li > p { margin: 0; }\n.markdown-body li::marker {\n  color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));\n  font-weight: 600;\n}\n.markdown-body strong {\n  color: color-mix(in srgb, var(--text) 88%, var(--accent));\n  font-weight: 700;\n}\n.markdown-body em { color: var(--text-muted); }\n.markdown-body a {\n  color: var(--accent);\n  text-decoration: underline;\n  text-decoration-thickness: 1px;\n  text-underline-offset: 3px;\n  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);\n}\n.markdown-body a:hover { text-decoration-color: var(--accent); }\n.markdown-body .markdown-inline-code {\n  background: var(--bg-subtle);\n  border-radius: 5px;\n  padding: 1px 5px;\n  color: var(--text);\n  font-family: var(--font-mono);\n  font-size: 0.92em;\n  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);\n}\n.markdown-body .contains-task-list {\n  padding-left: 0;\n  list-style: none;\n}\n.markdown-body .task-list-item {\n  display: grid;\n  grid-template-columns: 18px minmax(0, 1fr);\n  gap: 7px;\n  align-items: start;\n  padding-left: 0;\n}\n.markdown-body .task-list-item::marker { content: \"\"; }\n.markdown-body .task-list-item input[type=\"checkbox\"] {\n  appearance: none;\n  width: 14px;\n  height: 14px;\n  margin: 5px 0 0;\n  border: 1px solid var(--border);\n  border-radius: 4px;\n  background: var(--bg);\n  display: inline-grid;\n  place-content: center;\n}\n.markdown-body .task-list-item input[type=\"checkbox\"]:checked {\n  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));\n  background: color-mix(in srgb, var(--accent) 10%, var(--bg));\n}\n.markdown-body .task-list-item input[type=\"checkbox\"]:checked::before {\n  content: \"\";\n  width: 4px;\n  height: 8px;\n  border: solid var(--accent);\n  border-width: 0 1.5px 1.5px 0;\n\n[785 more lines in file. Use offset=201 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:08:02.731Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:08:02.744Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-80061727bb62a2423fca1863",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/ui-designer-80061727bb62a2423fca1863.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:06:51.983Z",
+        "finishedAt": "2026-07-08T02:08:02.745Z",
+        "updatedAt": "2026-07-08T02:08:02.745Z",
+        "itemCount": 39,
+        "messageCount": 1,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 74833,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f3f7a-5e77-7388-9159-9597f127d97a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-06-52-023Z_019f3f7a-5e77-7388-9159-9597f127d97a.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-823d7595f20c8e41b8b4638a",
+      "subtaskId": "studio-child-title-display",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:12:03.749Z",
+      "finishedAt": "2026-07-08T02:13:20.315Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f7f-2034-7b03-a0b2-108d6c95125c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-12-03-764Z_019f3f7f-2034-7b03-a0b2-108d6c95125c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f7f-2034-7b03-a0b2-108d6c95125c",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 studio-child-title-display：调整 Studio child session 展示标题优先级，使 child session 有 implementation subtask 标题时优先显示子任务标题；没有子任务标题时回退为“角色/member + 主任务名称”，再做安全 fallback。请先阅读 AGENTS.md、docs/modules/library.md、docs/standards/code-style.md、任务 desi…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Studio child display title priority changed to:\n  1. `studioChildDisplay.subtaskTitle`\n  2. `member · taskTitle`\n  3. `member · runSummary`\n  4. `member · taskId basename`\n  5. existing ordinary session fallbacks\n- `docs/modules/library.md` — Updated `lib/session-title.ts` behavior description.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `lib/session-reader.ts` already projects `subtaskTitle`; no API/type changes were needed.\n- Fallback uses raw `studioChild.member` (e.g. `implementer · 主任务名称`). If Chinese role labels are required, main session needs to decide mapping.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:12:03.749Z",
+        "updatedAt": "2026-07-08T02:13:20.315Z",
+        "eventCount": 1615,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Studio child display title priority changed to:\n  1. `studioChildDisplay.subtaskTitle`\n  2. `member · taskTitle`\n  3. `member · runSummary`\n  4. `member · taskId basename`\n  5. existing ordinary session fallbacks\n- `docs/modules/library.md` — Updated `lib/session-title.ts` behavior description.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `lib/session-reader.ts` already projects `subtaskTitle`; no API/type changes were needed.\n- Fallback uses raw `studioChild.member` (e.g. `implementer · 主任务名称`). If Chinese role labels are required, main session needs to decide mapping.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:13:09.356Z",
+            "toolCallId": "call_P8RHeDu4oCbA8GLs6ZvpiAmL|fc_0353601fe1b83158016a4db233ffb48198a4d32a1fa75dd223",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:13:11.307Z",
+            "toolCallId": "call_Zx4rw3NfLzy79aWaRcAAB7lB|fc_0353601fe1b83158016a4db2394a548198bf4d909ba9aa2843",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/session-title.ts docs/modules/library.md\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:13:11.368Z",
+            "toolCallId": "call_Zx4rw3NfLzy79aWaRcAAB7lB|fc_0353601fe1b83158016a4db2394a548198bf4d909ba9aa2843",
+            "toolName": "bash",
+            "text": "diff --git a/docs/modules/library.md b/docs/modules/library.md\nindex 3e5db53..27e761d 100644\n--- a/docs/modules/library.md\n+++ b/docs/modules/library.md\n@@ -12,7 +12,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by\n | `lib/agent-session-bootstrap.ts` | Shared API helper for validating/canonicalizing cwd, creating configured empty AgentSessions, registering allowed roots, and applying initial tool/model/thinking selections before a prompt is sent. |\n | `lib/session-reader.ts` | Parse `.jsonl` session files, resolve session paths, return lightweight active session summaries (Git/worktree metadata is opt-in), hide YPI Studio child audit sessions by default unless explicitly requested, and parse `studioChild`/project-space header metadata for active and archived sessions when callers pass `includeStudioChildren: true` (used by Usage/audit flows). Studio child summaries set `legacyUnassigned=false` without changing normal sidebar defaults, and UI callers may opt in to `studioChildDisplay` projection from Studio task metadata so child titles prefer task names without adding task I/O to usage scans. Also prunes/deletes sessions for removed WorkTree cwd paths and reads model/default config. Archive helpers: `getSessionsArchiveDir()`, `archiveSessionFile()`, `unarchiveSessionFile()`, `scanArchivedCwds()`, `listArchivedSessionsForCwd()`, `resolveArchivedSessionPath()`. |\n | `lib/session-header-metadata.ts` | Pure parser for session header metadata shared by session listing/tests, including optional Project Registry linkage and YPI Studio `studioChild` audit metadata extraction. |\n-| `lib/session-title.ts` | Pure helpers for deriving display titles from sessions and first user messages, including the pending empty-session label used by Browser Share precreated sessions. Studio child sessions prefer the optional `studioChildDisplay.taskTitle`, then run/task fallbacks, before ordinary session title fallbacks. |\n+| `lib/session-title.ts` | Pure helpers for deriving display titles from sessions and first user messages, including the pending empty-session label used by Browser Share precreated sessions. Studio child sessions prefer the optional `studioChildDisplay.subtaskTitle`, then `member · taskTitle`, followed by member-prefixed run/task fallbacks before ordinary session title fallbacks. |\n | `lib/types.ts` | Shared TypeScript types for messages, sessions, Studio child-session header metadata, Git/worktree metadata including optional `baseRef`, Git status/graph/commit/diff wire payloads, and API payloads. |\n | `lib/pi-types.ts` | `AgentSessionLike` wrapper interface expected by hooks/components. |\n | `lib/normalize.ts` | Normalize pi tool-call fields to web UI shape. |\ndiff --git a/lib/session-title.ts b/lib/session-title.ts\nindex 443859d..2642f2c 100644\n--- a/lib/session-title.ts\n+++ b/lib/session-title.ts\n@@ -29,16 +29,25 @@ function taskIdTitleFallback(taskId?: string): string {\n   const value = taskId?.trim();\n   if (!value) return \"\";\n   const parts = value.split(/[\\\\/]+/).filter(Boolean);\n-  return truncateSessionTitle(parts[parts.length - 1] ?? value);\n+  return parts[parts.length - 1] ?? value;\n+}\n+\n+function memberPrefixedStudioChildTitle(member: string | undefined, value: string | undefined): string {\n+  const normalized = collapseWhitespace(value ?? \"\");\n+  if (!normalized) return \"\";\n+  const normalizedMember = collapseWhitespace(member ?? \"\");\n+  return truncateSessionTitle(normalizedMember ? `${normalizedMember} · ${normalized}` : normalized);\n }\n \n export function displayTitleForSession(session: Pick<SessionInfo, \"id\" | \"name\" | \"firstMessage\" | \"messageCount\" | \"studioChild\" | \"studioChildDisplay\">): string {\n   if (session.studioChild) {\n-    const taskTitle = truncateSessionTitle(session.studioChildDisplay?.taskTitle ?? \"\");\n+    const subtaskTitle = truncateSessionTitle(session.studioChildDisplay?.subtaskTitle ?? \"\");\n+    if (subtaskTitle) return subtaskTitle;\n+    const taskTitle = memberPrefixedStudioChildTitle(session.studioChild.member, session.studioChildDisplay?.taskTitle);\n     if (taskTitle) return taskTitle;\n-    const runSummary = truncateSessionTitle(session.studioChildDisplay?.runSummary ?? \"\");\n+    const runSummary = memberPrefixedStudioChildTitle(session.studioChild.member, session.studioChildDisplay?.runSummary);\n     if (runSummary) return runSummary;\n-    const taskId = taskIdTitleFallback(session.studioChild.taskId);\n+    const taskId = memberPrefixedStudioChildTitle(session.studioChild.member, taskIdTitleFallback(session.studioChild.taskId));\n     if (taskId) return taskId;\n   }\n   if (session.name?.trim()) return session.name.trim();",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:13:20.298Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Studio child display title priority changed to:\n  1. `studioChildDisplay.subtaskTitle`\n  2. `member · taskTitle`\n  3. `member · runSummary`\n  4. `member · taskId basename`\n  5. existing ordinary session fallbacks\n- `docs/modules/library.md` — Updated `lib/session-title.ts` behavior description.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `lib/session-reader.ts` already projects `subtaskTitle`; no API/type changes were needed.\n- Fallback uses raw `studioChild.member` (e.g. `implementer · 主任务名称`). If Chinese role labels are required, main session needs to decide mapping.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:13:20.308Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 720,
+        "tokens": 376,
+        "tokenSource": "usage",
+        "tps": 145.96,
+        "firstTokenAt": "2026-07-08T02:13:17.594Z",
+        "lastTokenAt": "2026-07-08T02:13:20.170Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-823d7595f20c8e41b8b4638a",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/implementer-823d7595f20c8e41b8b4638a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:12:03.749Z",
+        "finishedAt": "2026-07-08T02:13:20.314Z",
+        "updatedAt": "2026-07-08T02:13:20.314Z",
+        "itemCount": 35,
+        "messageCount": 1,
+        "toolCallCount": 15,
+        "stderrBytes": 0,
+        "bytes": 77576,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f7f-2034-7b03-a0b2-108d6c95125c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-12-03-764Z_019f3f7f-2034-7b03-a0b2-108d6c95125c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-6b0a2c087a2dbdb9cb38c84b",
+      "subtaskId": "sidebar-nowrap",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:11:57.757Z",
+      "finishedAt": "2026-07-08T02:15:14.462Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f7f-08e5-7ae2-b8e5-0eae9a5a15e4",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-11-57-797Z_019f3f7f-08e5-7ae2-b8e5-0eae9a5a15e4.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f7f-08e5-7ae2-b8e5-0eae9a5a15e4",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 sidebar-nowrap：修复 components/SessionSidebar.tsx 中普通、Studio child、归档、删除确认/hover 操作等 Session 行在窄侧栏宽度下自动换行导致的上下错乱。请先阅读 AGENTS.md、docs/modules/frontend.md、docs/standards/code-style.md、任务 design/implement/ui-prototype，再精确修改。目标：行内容不换行，宽度不足…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — tightened narrow-width layout for normal, Studio child, delete-confirm, hover-action, WorkTree badge, and archived session rows using `minWidth: 0`, `overflow: hidden`, `nowrap`, ellipsis, and stable flex shrink rules.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- components/SessionSidebar.tsx` — passed\n\n#### Notes / Risks\n\n- Manual browser resize/hover/delete-confirm validation was not run in this delegated session.\n- Scope kept to assigned `sidebar-nowrap`; Studio child title naming/display logic was not changed.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:11:57.757Z",
+        "updatedAt": "2026-07-08T02:15:14.461Z",
+        "eventCount": 5344,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — tightened narrow-width layout for normal, Studio child, delete-confirm, hover-action, WorkTree badge, and archived session rows using `minWidth: 0`, `overflow: hidden`, `nowrap`, ellipsis, and stable flex shrink rules.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- components/SessionSidebar.tsx` — passed\n\n#### Notes / Risks\n\n- Manual browser resize/hover/delete-confirm validation was not run in this delegated session.\n- Scope kept to assigned `sidebar-nowrap`; Studio child title naming/display logic was not changed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:15:04.166Z",
+            "toolCallId": "call_u4koZWSarmqqrpcUHokenCdi|fc_048413d24a94698f016a4db2a78388819ba969cfd24890fa0f",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:15:08.961Z",
+            "toolCallId": "call_AvRF7ewyWWLivVxjv4vdSiQr|fc_048413d24a94698f016a4db2aedd70819bbd5351fa34d7fd1c",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --check -- components/SessionSidebar.tsx\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:15:09.009Z",
+            "toolCallId": "call_AvRF7ewyWWLivVxjv4vdSiQr|fc_048413d24a94698f016a4db2aedd70819bbd5351fa34d7fd1c",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:15:14.441Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — tightened narrow-width layout for normal, Studio child, delete-confirm, hover-action, WorkTree badge, and archived session rows using `minWidth: 0`, `overflow: hidden`, `nowrap`, ellipsis, and stable flex shrink rules.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- components/SessionSidebar.tsx` — passed\n\n#### Notes / Risks\n\n- Manual browser resize/hover/delete-confirm validation was not run in this delegated session.\n- Scope kept to assigned `sidebar-nowrap`; Studio child title naming/display logic was not changed.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:15:14.451Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 672,
+        "tokens": 157,
+        "tokenSource": "usage",
+        "tps": 57.74,
+        "firstTokenAt": "2026-07-08T02:15:11.582Z",
+        "lastTokenAt": "2026-07-08T02:15:14.301Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-6b0a2c087a2dbdb9cb38c84b",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/implementer-6b0a2c087a2dbdb9cb38c84b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:11:57.757Z",
+        "finishedAt": "2026-07-08T02:15:14.460Z",
+        "updatedAt": "2026-07-08T02:15:14.460Z",
+        "itemCount": 65,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 137141,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f7f-08e5-7ae2-b8e5-0eae9a5a15e4",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-11-57-797Z_019f3f7f-08e5-7ae2-b8e5-0eae9a5a15e4.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-590fa249a0be0e79f54ac4c5",
+      "subtaskId": "sdk-child-session-info-name",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:15:31.421Z",
+      "finishedAt": "2026-07-08T02:17:26.064Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f82-4b83-7dc1-91f7-5da5ba14e184",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-15-31-459Z_019f3f82-4b83-7dc1-91f7-5da5ba14e184.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f82-4b83-7dc1-91f7-5da5ba14e184",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 sdk-child-session-info-name：调整 SDK child session_info 命名，优先用 implementation subtask 标题；取不到时回退为“角色/member + 主任务名称”（必要时附 run id 以区分）。请先阅读 AGENTS.md、docs/modules/library.md、docs/standards/code-style.md、任务 design/implement，以及前一子任务对 sessi…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — updated SDK child `session_info` naming:\n  - Resolves task detail by key, with archived/all-task fallback by task id.\n  - Prefers `implementationProjection.subtasksWithStatus[].title`, then `implementationPlan.subtasks[].title`.\n  - Falls back to `YPI Studio <member> · <taskTitle> · <runShortId>`.\n  - Final fallback remains `YPI Studio <member> · <taskId basename> · <runShortId>`.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Did not create a new Studio child session manually; behavior verified by code path and type/lint checks.\n- Only future SDK child sessions get the corrected persisted `session_info`; historical display is handled by the prior display-title change.\n- Existing unrelated working tree diffs were present in sidebar/title/docs; I did not modify them.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:15:31.421Z",
+        "updatedAt": "2026-07-08T02:17:26.064Z",
+        "eventCount": 1864,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — updated SDK child `session_info` naming:\n  - Resolves task detail by key, with archived/all-task fallback by task id.\n  - Prefers `implementationProjection.subtasksWithStatus[].title`, then `implementationPlan.subtasks[].title`.\n  - Falls back to `YPI Studio <member> · <taskTitle> · <runShortId>`.\n  - Final fallback remains `YPI Studio <member> · <taskId basename> · <runShortId>`.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Did not create a new Studio child session manually; behavior verified by code path and type/lint checks.\n- Only future SDK child sessions get the corrected persisted `session_info`; historical display is handled by the prior display-title change.\n- Existing unrelated working tree diffs were present in sidebar/title/docs; I did not modify them.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:17:12.921Z",
+            "toolCallId": "call_zPXGJ1L2Ho6IfLQPmNLnfhW4|fc_047b989b0771418a016a4db32994e081988f4159781c24b7ad",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:17:16.413Z",
+            "toolCallId": "call_28aF9AQnUP9LU75S5FxS5Wsv|fc_047b989b0771418a016a4db32e370881988c401e4e9b46da5a",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/ypi-studio-child-session-runner.ts\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:17:16.473Z",
+            "toolCallId": "call_28aF9AQnUP9LU75S5FxS5Wsv|fc_047b989b0771418a016a4db32e370881988c401e4e9b46da5a",
+            "toolName": "bash",
+            "text": "diff --git a/lib/ypi-studio-child-session-runner.ts b/lib/ypi-studio-child-session-runner.ts\nindex 0464a05..a5ed9b2 100644\n--- a/lib/ypi-studio-child-session-runner.ts\n+++ b/lib/ypi-studio-child-session-runner.ts\n@@ -10,7 +10,7 @@ import {\n   type YpiStudioSubagentTranscriptWriter,\n } from \"./ypi-studio-transcripts\";\n import { registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from \"./ypi-studio-subagent-runtime\";\n-import { getYpiStudioTaskDetail } from \"./ypi-studio-tasks\";\n+import { getYpiStudioTaskDetail, listYpiStudioTasks } from \"./ypi-studio-tasks\";\n import type { SessionHeader, StudioChildSessionInfo } from \"./types\";\n import type {\n   YpiStudioSubagentCurrentTool,\n@@ -107,14 +107,31 @@ function oneLine(value: string, max = 160): string {\n   return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;\n }\n \n+function getStudioChildTaskDetail(root: string, taskId: string): NonNullable<ReturnType<typeof getYpiStudioTaskDetail>> | null {\n+  const detail = getYpiStudioTaskDetail(root, taskId);\n+  if (detail) return detail;\n+  const match = listYpiStudioTasks(root, { scope: \"all\" }).tasks.find((task) => task.id === taskId);\n+  return match ? getYpiStudioTaskDetail(root, match.key) : null;\n+}\n+\n+function studioChildSubtaskTitle(detail: NonNullable<ReturnType<typeof getYpiStudioTaskDetail>>, subtaskId?: string): string | undefined {\n+  if (!subtaskId) return undefined;\n+  return str(detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === subtaskId)?.title)\n+    ?? str(detail.implementationPlan?.subtasks.find((item) => item.id === subtaskId)?.title);\n+}\n+\n function studioChildSessionInfoName(root: string, meta: StudioSdkChildRunMeta): string {\n+  const runShortId = meta.runId.slice(0, 8);\n   try {\n-    const title = getYpiStudioTaskDetail(root, meta.taskId)?.title;\n-    if (title?.trim()) return `YPI Studio ${oneLine(title, 80)} · ${meta.member} · ${meta.runId.slice(0, 8)}`;\n+    const detail = getStudioChildTaskDetail(root, meta.taskId);\n+    const subtaskTitle = detail ? studioChildSubtaskTitle(detail, meta.subtaskId) : undefined;\n+    if (subtaskTitle) return `YPI Studio ${oneLine(subtaskTitle, 80)} · ${meta.member} · ${runShortId}`;\n+    const taskTitle = str(detail?.title);\n+    if (taskTitle) return `YPI Studio ${meta.member} · ${oneLine(taskTitle, 80)} · ${runShortId}`;\n   } catch {\n     // Durable session_info is only a fallback; task.json remains the display authority.\n   }\n-  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`;\n+  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${runShortId}`;\n }\n \n function boundedAppendTail(previous: string, addition: string, maxBytes: number): string {",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:17:26.046Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — updated SDK child `session_info` naming:\n  - Resolves task detail by key, with archived/all-task fallback by task id.\n  - Prefers `implementationProjection.subtasksWithStatus[].title`, then `implementationPlan.subtasks[].title`.\n  - Falls back to `YPI Studio <member> · <taskTitle> · <runShortId>`.\n  - Final fallback remains `YPI Studio <member> · <taskId basename> · <runShortId>`.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Did not create a new Studio child session manually; behavior verified by code path and type/lint checks.\n- Only future SDK child sessions get the corrected persisted `session_info`; historical display is handled by the prior display-title change.\n- Existing unrelated working tree diffs were present in sidebar/title/docs; I did not modify them.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:17:26.058Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 936,
+        "tokens": 415,
+        "tokenSource": "usage",
+        "tps": 242.97,
+        "firstTokenAt": "2026-07-08T02:17:24.324Z",
+        "lastTokenAt": "2026-07-08T02:17:26.032Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-590fa249a0be0e79f54ac4c5",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/implementer-590fa249a0be0e79f54ac4c5.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:15:31.421Z",
+        "finishedAt": "2026-07-08T02:17:26.063Z",
+        "updatedAt": "2026-07-08T02:17:26.063Z",
+        "itemCount": 49,
+        "messageCount": 1,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 120410,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f82-4b83-7dc1-91f7-5da5ba14e184",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-15-31-459Z_019f3f82-4b83-7dc1-91f7-5da5ba14e184.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d7fd70e1dc0e058bc62ce7a3",
+      "subtaskId": "docs-validation",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:17:42.530Z",
+      "finishedAt": "2026-07-08T02:19:16.800Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f84-4b95-78d8-a80d-41da21f8a58a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-17-42-549Z_019f3f84-4b95-78d8-a80d-41da21f8a58a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f84-4b95-78d8-a80d-41da21f8a58a",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 docs-validation：检查本任务所有代码改动，必要时更新 docs/modules/frontend.md、docs/modules/library.md 中关于 SessionSidebar 窄宽截断和 Studio child session 标题命名的行为说明；运行 `npm run lint` 和 `node_modules/.bin/tsc --noEmit`，记录结果。不要做无关重构。完成后更新子任务状态。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented SessionSidebar narrow-width single-line truncation behavior.\n- `docs/modules/library.md` — documented Studio child title priority and SDK child `session_info` naming behavior.\n- `.ypi/tasks/.../handoff.md` — updated final handoff with validation results.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Reviewed existing code changes for the selected `docs-validation` boundary.\n- Manual narrow-sidebar UI regression is still recommended for checker review.\n- Could not directly mark `docs-validation` complete in `task.json`; Studio child guard blocks delegated sessions from mutating `.ypi/tasks/**/task.json`. Parent session should update subtask status.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:17:42.530Z",
+        "updatedAt": "2026-07-08T02:19:16.800Z",
+        "eventCount": 2560,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented SessionSidebar narrow-width single-line truncation behavior.\n- `docs/modules/library.md` — documented Studio child title priority and SDK child `session_info` naming behavior.\n- `.ypi/tasks/.../handoff.md` — updated final handoff with validation results.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Reviewed existing code changes for the selected `docs-validation` boundary.\n- Manual narrow-sidebar UI regression is still recommended for checker review.\n- Could not directly mark `docs-validation` complete in `task.json`; Studio child guard blocks delegated sessions from mutating `.ypi/tasks/**/task.json`. Parent session should update subtask status.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:19:01.080Z",
+            "toolCallId": "call_8z06iPtjRciaGachQGJAe3AX|fc_0b7c2b08433d7a12016a4db39629788198be346a1bc3fd8dff",
+            "toolName": "read",
+            "text": "# handoff\n\n## 架构结论\n\n已完成需求梳理、源码定位、UI 门禁说明、修复设计与 implementation plan。未修改生产代码。\n\n## 产物\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `handoff.md`\n\n## 关键定位\n\n- 窄宽错乱：`components/SessionSidebar.tsx` 的 `SessionItem` / `ArchivedSessionItem` 需要统一单行截断规则，尤其是 metadata row、Studio detail 和 flex 容器的 `minWidth:0`/`overflow:hidden`/`whiteSpace:nowrap`。\n- child session 命名：\n  - 展示标题：`lib/session-title.ts` 当前 Studio child 优先 `studioChildDisplay.taskTitle`，应改为 `subtaskTitle -> member + taskTitle -> fallback`。\n  - 未来持久名称：`lib/ypi-studio-child-session-runner.ts` 的 `studioChildSessionInfoName()` 当前使用主任务 title，应改为 subtask 优先。\n  - 现有投影：`lib/session-reader.ts` 的 `projectStudioChildDisplay()` 已能解析 `subtaskTitle`，预计无需新增 API 字段。\n\n## 验证状态\n\n- 已执行：文档与源码读取、`rg` 定位。\n- 未执行：`npm run lint`、`node_modules/.bin/tsc --noEmit`（本轮为架构规划，未改生产代码）。\n\n## 阻塞 / 待决策\n\n1. UI 门禁未完成：需主会话指派 `ui-designer` 输出 HTML 原型并取得用户/主会话审批后，才可进入实现。\n2. 需确认 fallback 展示是否接受英文 member id（如 `implementer · 主任务名称`），或要求中文角色名映射。\n3. 主会话需保存/采用 `implement.md` 中的 implementation plan，并在审批通过后切入实现。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:19:10.493Z",
+            "toolCallId": "call_2dmLuRfgmNFngnC01uhCIH2C|fc_0b7c2b08433d7a12016a4db39a594c81989fa645c6eb83f895",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/handoff.md\",\n  \"content\": \"# handoff\\n\\n## Implementation Complete\\n\\n### Files Changed\\n\\n- `components/SessionSidebar.tsx` — Session/Studio child/archived rows now apply narrow-width-safe flex constraints so title rows, metadata rows, Studio detail, hover actions, and delete confirmation stay single-line with ellipsis/clipping.\\n- `lib/session-title.ts` — Studio child display titles now prefer `studioChildDisplay.subtaskTitle`, then fall back to `member · taskTitle`, then member-prefixed run/task fallbacks.\\n- `lib/ypi-studio-child-session-runner.ts` — new SDK child `session_info` names now prefer the assigned implementation subtask title and otherwise use member + task title before task-id fallback.\\n- `docs/modules/frontend.md` — documented SessionSidebar narrow-width single-line truncation behavior.\\n- `docs/modules/library.md` — documented Studio child title priority and SDK child `session_info` naming behavior.\\n\\n### Verification\\n\\n- `npm run lint` — passed.\\n- `node_modules/.bin/tsc --noEmit` — passed.\\n\\n### Notes / Risks\\n\\n- Manual browser validation of very narrow sidebar, hover actions, delete confirmation, and archived rows is still recommended for checker review.\\n- I could not directly mark the implementation subtask complete in `.ypi/tasks/**/task.json`; the Studio child guard blocks task JSON mutation from delegated child sessions. Parent session should record `docs-validation` as complete.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:19:10.510Z",
+            "toolCallId": "call_2dmLuRfgmNFngnC01uhCIH2C|fc_0b7c2b08433d7a12016a4db39a594c81989fa645c6eb83f895",
+            "toolName": "write",
+            "text": "Successfully wrote 1387 bytes to .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:19:16.777Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented SessionSidebar narrow-width single-line truncation behavior.\n- `docs/modules/library.md` — documented Studio child title priority and SDK child `session_info` naming behavior.\n- `.ypi/tasks/.../handoff.md` — updated final handoff with validation results.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Reviewed existing code changes for the selected `docs-validation` boundary.\n- Manual narrow-sidebar UI regression is still recommended for checker review.\n- Could not directly mark `docs-validation` complete in `task.json`; Studio child guard blocks delegated sessions from mutating `.ypi/tasks/**/task.json`. Parent session should update subtask status.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:19:16.792Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 815,
+        "tokens": 230,
+        "tokenSource": "usage",
+        "tps": 129.43,
+        "firstTokenAt": "2026-07-08T02:19:14.978Z",
+        "lastTokenAt": "2026-07-08T02:19:16.755Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d7fd70e1dc0e058bc62ce7a3",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/implementer-d7fd70e1dc0e058bc62ce7a3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:17:42.530Z",
+        "finishedAt": "2026-07-08T02:19:16.798Z",
+        "updatedAt": "2026-07-08T02:19:16.798Z",
+        "itemCount": 35,
+        "messageCount": 1,
+        "toolCallCount": 15,
+        "stderrBytes": 0,
+        "bytes": 117433,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f84-4b95-78d8-a80d-41da21f8a58a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-17-42-549Z_019f3f84-4b95-78d8-a80d-41da21f8a58a.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-1c4bf02e5da1d40dd1a36645",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:19:37.627Z",
+      "finishedAt": "2026-07-08T02:21:21.078Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f86-0d40-7ae2-8523-9ec327ed1c20",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-19-37-664Z_019f3f86-0d40-7ae2-8523-9ec327ed1c20.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f86-0d40-7ae2-8523-9ec327ed1c20",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请对本任务进行最终检查：1）审查代码 diff 是否满足左侧 Session 窄宽不换行/单行截断、Studio child 标题优先子任务标题、SDK child session_info 命名优先子任务标题；2）检查是否有类型/样式/逻辑风险；3）确认 docs 更新是否合理；4）运行或核对 `npm run lint` 和 `node_modules/.bin/tsc --noEmit` 结果。请更新 review.md/checks.md，给出通过或需修改的问题。",
+      "summary": "### Check Complete\n\n#### Files changed / artifacts produced\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md`\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md`\n\n#### Review summary\n- `components/SessionSidebar.tsx`：静态审查通过，已补齐窄宽单行截断所需的 `minWidth: 0` / `overflow: hidden` / `whiteSpace: \"nowrap\"` / `textOverflow: \"ellipsis\"` 组合，覆盖普通行、Studio child 行、hover 操作区、delete confirm、archived 行。\n- `lib/session-title.ts`：静态审查通过，Studio child 标题优先级已改为 `subtaskTitle -> member · taskTitle -> member · runSummary/taskId -> 普通 fallback`。\n- `lib/ypi-studio-child-session-runner.ts`：静态审查通过，新建 SDK child 的 `session_info` 命名已优先取 subtask 标题，否则回退 `member · taskTitle`。\n- `docs/modules/frontend.md`、`docs/modules/library.md`：更新内容与实现一致。\n\n#### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Remaining risks / blockers\n- **阻塞**：`ui.md` 仍写明“用户/主会话审批：待审批”。该任务属于用户可见 UI 变更，按门禁不能判定最终通过。\n- **未完成验证**：未执行浏览器窄宽/hover/delete confirm 手工验收。\n- **未完成验证**：未实际触发新的 SDK child run 来核对 durable `session_info` 命名。\n\n#### Verdict\n- **Needs work**\n\n#### Decisions needed from main session\n1. 补齐 HTML 原型的用户/主会话审批记录。\n2. 安排一次手工 UI 验收（窄宽、hover、delete confirm、archived）。\n3. 如需最终关闭，再触发一个真实 SDK child run 验证新命名。",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:19:37.627Z",
+        "updatedAt": "2026-07-08T02:21:21.078Z",
+        "eventCount": 2600,
+        "lastTextPreview": "### Check Complete\n\n#### Files changed / artifacts produced\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md`\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md`\n\n#### Review summary\n- `components/SessionSidebar.tsx`：静态审查通过，已补齐窄宽单行截断所需的 `minWidth: 0` / `overflow: hidden` / `whiteSpace: \"nowrap\"` / `textOverflow: \"ellipsis\"` 组合，覆盖普通行、Studio child 行、hover 操作区、delete confirm、archived 行。\n- `lib/session-title.ts`：静态审查通过，Studio child 标题优先级已改为 `subtaskTitle -> member · taskTitle -> member · runSummary/taskId -> 普通 fallback`。\n- `lib/ypi-studio-child-session-runner.ts`：静态审查通过，新建 SDK child 的 `session_info` 命名已优先取 subtask 标题，否则回退 `member · taskTitle`。\n- `docs/modules/frontend.md`、`docs/modules/library.md`：更新内容与实现一致。\n\n#### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Remaining risks / blockers\n- **阻塞**：`ui.md` 仍写明“用户/主会话审批：待审批”。该任务属于用户可见 UI 变更，按门禁不能判定最终通过。\n- **未完成验证**：未执行浏览器窄宽/hover/delete confirm 手工验收。\n- **未完成验证**：未实际触发新的 SDK child run 来核对 durable `session_info` 命名。\n\n#### Verdict\n- **Needs work**\n\n#### Decisions needed from main session\n1. 补齐 HTML 原型的用户/主会话审批记录。\n2. 安排一次手工 UI 验收（窄宽、hover、delete confirm、archived）。\n3. 如需最终关闭，再触发一个真实 SDK child run 验证新命名。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:21:01.836Z",
+            "toolCallId": "call_vlQhfl2koxGoSOCpT9eqnMqF|fc_0a4dacdff44c35ec016a4db409ac308191ae595942a4ea0e2c",
+            "toolName": "write",
+            "text": "Successfully wrote 738 bytes to .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:21:08.732Z",
+            "toolCallId": "call_uDUy1ZnbSM6S9v2S77DVXV23|fc_0a4dacdff44c35ec016a4db415210c81919406a6e3176cb8b8",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md && printf '\\\\n---STATUS---\\\\n' && git status --short .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:21:08.854Z",
+            "toolCallId": "call_uDUy1ZnbSM6S9v2S77DVXV23|fc_0a4dacdff44c35ec016a4db415210c81919406a6e3176cb8b8",
+            "toolName": "bash",
+            "text": "---STATUS---\n?? \".ypi/tasks/20260708-100104-\\344\\277\\256\\345\\244\\215\\345\\267\\246\\344\\276\\247-session-\\347\\252\\204\\345\\256\\275\\346\\215\\242\\350\\241\\214\\344\\270\\216-studio-\\345\\255\\220\\344\\273\\273\\345\\212\\241-session-\\345\\221\\275\\345\\220\\215/checks.md\"\n?? \".ypi/tasks/20260708-100104-\\344\\277\\256\\345\\244\\215\\345\\267\\246\\344\\276\\247-session-\\347\\252\\204\\345\\256\\275\\346\\215\\242\\350\\241\\214\\344\\270\\216-studio-\\345\\255\\220\\344\\273\\273\\345\\212\\241-session-\\345\\221\\275\\345\\220\\215/review.md\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:21:21.054Z",
+            "text": "### Check Complete\n\n#### Files changed / artifacts produced\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md`\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md`\n\n#### Review summary\n- `components/SessionSidebar.tsx`：静态审查通过，已补齐窄宽单行截断所需的 `minWidth: 0` / `overflow: hidden` / `whiteSpace: \"nowrap\"` / `textOverflow: \"ellipsis\"` 组合，覆盖普通行、Studio child 行、hover 操作区、delete confirm、archived 行。\n- `lib/session-title.ts`：静态审查通过，Studio child 标题优先级已改为 `subtaskTitle -> member · taskTitle -> member · runSummary/taskId -> 普通 fallback`。\n- `lib/ypi-studio-child-session-runner.ts`：静态审查通过，新建 SDK child 的 `session_info` 命名已优先取 subtask 标题，否则回退 `member · taskTitle`。\n- `docs/modules/frontend.md`、`docs/modules/library.md`：更新内容与实现一致。\n\n#### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Remaining risks / blockers\n- **阻塞**：`ui.md` 仍写明“用户/主会话审批：待审批”。该任务属于用户可见 UI 变更，按门禁不能判定最终通过。\n- **未完成验证**：未执行浏览器窄宽/hover/delete confirm 手工验收。\n- **未完成验证**：未实际触发新的 SDK child run 来核对 durable `session_info` 命名。\n\n#### Verdict\n- **Needs work**\n\n#### Decisions needed from main session\n1. 补齐 HTML 原型的用户/主会话审批记录。\n2. 安排一次手工 UI 验收（窄宽、hover、delete confirm、archived）。\n3. 如需最终关闭，再触发一个真实 SDK child run 验证新命名。",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:21:21.069Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1265,
+        "tokens": 582,
+        "tokenSource": "usage",
+        "tps": 95.72,
+        "firstTokenAt": "2026-07-08T02:21:14.917Z",
+        "lastTokenAt": "2026-07-08T02:21:20.997Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-1c4bf02e5da1d40dd1a36645",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/checker-1c4bf02e5da1d40dd1a36645.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:19:37.627Z",
+        "finishedAt": "2026-07-08T02:21:21.076Z",
+        "updatedAt": "2026-07-08T02:21:21.076Z",
+        "itemCount": 45,
+        "messageCount": 1,
+        "toolCallCount": 20,
+        "stderrBytes": 0,
+        "bytes": 134568,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f86-0d40-7ae2-8523-9ec327ed1c20",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-19-37-664Z_019f3f86-0d40-7ae2-8523-9ec327ed1c20.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-38d13ba7a3be798bc68e4b92",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T02:22:05.144Z",
+      "finishedAt": "2026-07-08T02:23:05.257Z",
+      "runner": "sdk",
+      "childSessionId": "019f3f88-4d84-7854-be03-a62e988b99a6",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-22-05-188Z_019f3f88-4d84-7854-be03-a62e988b99a6.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f3f74-c38a-7413-a610-321b50bea00a",
+        "childSessionId": "019f3f88-4d84-7854-be03-a62e988b99a6",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请复查上一轮 blocker 已处理：用户已在主会话明确回复“批准”，ui.md 和 checks.md 已记录审批。请重新检查最终状态，确认是否还有 blocker/needs-work；如仅剩未做浏览器手工验收或真实 child run 核对，请明确标为非阻塞建议。请更新 review.md/checks.md，给出最终 verdict。",
+      "summary": "已完成复查并更新结论。\n\n### Files changed / artifacts\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md`\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md`\n\n### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff -- components/SessionSidebar.tsx lib/session-title.ts lib/ypi-studio-child-session-runner.ts docs/modules/frontend.md docs/modules/library.md` — reviewed\n- `ui.md` / `checks.md` — reviewed, approval record confirmed\n\n### Final verdict\n- **Pass**\n\n### Remaining risks\n- 非阻塞建议：主会话后续可补做浏览器窄宽/hover/delete confirm/archived rows 手工回归。\n- 非阻塞建议：可补触发一次真实 SDK child run，确认 durable `session_info` 命名符合预期。\n\n### Decisions needed from main session\n- None.",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T02:22:05.144Z",
+        "updatedAt": "2026-07-08T02:23:05.257Z",
+        "eventCount": 1740,
+        "lastTextPreview": "已完成复查并更新结论。\n\n### Files changed / artifacts\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md`\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md`\n\n### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff -- components/SessionSidebar.tsx lib/session-title.ts lib/ypi-studio-child-session-runner.ts docs/modules/frontend.md docs/modules/library.md` — reviewed\n- `ui.md` / `checks.md` — reviewed, approval record confirmed\n\n### Final verdict\n- **Pass**\n\n### Remaining risks\n- 非阻塞建议：主会话后续可补做浏览器窄宽/hover/delete confirm/archived rows 手工回归。\n- 非阻塞建议：可补触发一次真实 SDK child run，确认 durable `session_info` 命名符合预期。\n\n### Decisions needed from main session\n- None.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:22:54.539Z",
+            "toolCallId": "call_UMGsdvdBPpI55ZdhncAgRrjc|fc_038cfd039cdb7c19016a4db47832a08198a1841dbed300c22e",
+            "toolName": "write",
+            "text": "Successfully wrote 816 bytes to .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T02:22:59.198Z",
+            "toolCallId": "call_IaOWFVIH24b53eABzBK3oN4R|fc_038cfd039cdb7c19016a4db4806bbc81989a6602e600b57fcf",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 自动验证\\n\\n实现后至少运行：\\n\",\n      \"newText\": \"## 自动验证\\n\\n当前检查结论：UI 审批门禁已满足；`npm run lint` 与 `node_modules/.bin/tsc --noEmit` 已通过。浏览器窄宽回归与真实 SDK child run 命名核对仍建议补做，但在本轮作为非阻塞建议处理。\\n\\n实现后至少运行：\\n\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T02:22:59.205Z",
+            "toolCallId": "call_IaOWFVIH24b53eABzBK3oN4R|fc_038cfd039cdb7c19016a4db4806bbc81989a6602e600b57fcf",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T02:23:05.234Z",
+            "text": "已完成复查并更新结论。\n\n### Files changed / artifacts\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/review.md`\n- `.ypi/tasks/20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名/checks.md`\n\n### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff -- components/SessionSidebar.tsx lib/session-title.ts lib/ypi-studio-child-session-runner.ts docs/modules/frontend.md docs/modules/library.md` — reviewed\n- `ui.md` / `checks.md` — reviewed, approval record confirmed\n\n### Final verdict\n- **Pass**\n\n### Remaining risks\n- 非阻塞建议：主会话后续可补做浏览器窄宽/hover/delete confirm/archived rows 手工回归。\n- 非阻塞建议：可补触发一次真实 SDK child run，确认 durable `session_info` 命名符合预期。\n\n### Decisions needed from main session\n- None.",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T02:23:05.247Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 751,
+        "tokens": 283,
+        "tokenSource": "usage",
+        "tps": 101.51,
+        "firstTokenAt": "2026-07-08T02:23:02.284Z",
+        "lastTokenAt": "2026-07-08T02:23:05.072Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-38d13ba7a3be798bc68e4b92",
+        "taskId": "20260708-100104-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-100104-_-session-_-studio-_-session-/checker-38d13ba7a3be798bc68e4b92.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T02:22:05.144Z",
+        "finishedAt": "2026-07-08T02:23:05.256Z",
+        "updatedAt": "2026-07-08T02:23:05.256Z",
+        "itemCount": 25,
+        "messageCount": 1,
+        "toolCallCount": 10,
+        "stderrBytes": 0,
+        "bytes": 35349,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f3f88-4d84-7854-be03-a62e988b99a6",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-08T02-22-05-188Z_019f3f88-4d84-7854-be03-a62e988b99a6.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-08T02:09:37.112Z",
+      "contextId": "pi_019f3f74-c38a-7413-a610-321b50bea00a",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-08T02:11:44.436Z",
+      "contextId": "pi_019f3f74-c38a-7413-a610-321b50bea00a",
+      "inputHash": "0f498bc9ce7c551a70985f36",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-08T02:26:00.423Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260708-102600-修复左侧-session-窄宽换行与-studio-子任务-session-命名",
+    "knowledgePath": ".ypi/knowledge/20260708-102600-修复左侧-session-窄宽换行与-studio-子任务-session-命名.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T02:09:33.210Z",
+    "summary": "Fix narrow sidebar Session row wrapping and make YPI Studio child session titles prefer implementation subtask names.",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "sidebar-nowrap",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "sidebar-nowrap"
+          ]
+        },
+        {
+          "id": "studio-child-title-display",
+          "title": "library",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "studio-child-title-display"
+          ]
+        },
+        {
+          "id": "sdk-child-session-info-name",
+          "title": "library",
+          "relation": "serial",
+          "dependencies": [
+            "studio-child-title-display"
+          ],
+          "subtaskIds": [
+            "sdk-child-session-info-name"
+          ]
+        },
+        {
+          "id": "docs-validation",
+          "title": "checks",
+          "relation": "serial",
+          "dependencies": [
+            "sidebar-nowrap",
+            "studio-child-title-display",
+            "sdk-child-session-info-name"
+          ],
+          "subtaskIds": [
+            "docs-validation"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "sidebar-nowrap",
+        "title": "修复 SessionSidebar 窄宽单行截断",
+        "phase": "frontend",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "Manual narrow sidebar hover/delete-confirm check"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "studio-child-title-display",
+        "title": "Studio child 展示标题优先使用子任务标题",
+        "phase": "library",
+        "order": 20,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/session-title.ts",
+          "lib/session-reader.ts"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "sdk-child-session-info-name",
+        "title": "SDK child session_info 命名优先子任务标题",
+        "phase": "library",
+        "order": 30,
+        "dependsOn": [
+          "studio-child-title-display"
+        ],
+        "dependencies": [
+          "studio-child-title-display"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-child-session-runner.ts"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "Inspect or create a new Studio child session"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "docs-validation",
+        "title": "文档、验证与交付检查",
+        "phase": "checks",
+        "order": 40,
+        "dependsOn": [
+          "sidebar-nowrap",
+          "studio-child-title-display",
+          "sdk-child-session-info-name"
+        ],
+        "dependencies": [
+          "sidebar-nowrap",
+          "studio-child-title-display",
+          "sdk-child-session-info-name"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/library.md"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "checker review"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T02:26:00.423Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 4,
+      "skipped": 0
+    },
+    "subtasks": {
+      "sidebar-nowrap": {
+        "id": "sidebar-nowrap",
+        "status": "done",
+        "updatedAt": "2026-07-08T02:15:14.464Z",
+        "startedAt": "2026-07-08T02:11:52.376Z",
+        "finishedAt": "2026-07-08T02:15:14.462Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-6b0a2c087a2dbdb9cb38c84b"
+        ],
+        "lastRunId": "implementer-6b0a2c087a2dbdb9cb38c84b",
+        "claimedAt": "2026-07-08T02:11:52.376Z",
+        "claimedByContextId": "pi_019f3f74-c38a-7413-a610-321b50bea00a",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — tightened narrow-width layout for normal, Studio child, delete-confirm, hover-action, WorkTree badge, and archived session rows using `minWidth: 0`, `overflow: hidden`, `nowrap`, ellipsis, and stable flex shrink rules.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check -- components/SessionSidebar.tsx` — passed\n\n#### Notes / Risks\n\n- Manual browser resize/hover/delete-confirm validation was not run in this delegated session.\n- Scope kept to assigned `sidebar-nowrap`; Studio child title naming/display logic was not changed."
+      },
+      "studio-child-title-display": {
+        "id": "studio-child-title-display",
+        "status": "done",
+        "updatedAt": "2026-07-08T02:13:20.317Z",
+        "startedAt": "2026-07-08T02:11:52.376Z",
+        "finishedAt": "2026-07-08T02:13:20.315Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-823d7595f20c8e41b8b4638a"
+        ],
+        "lastRunId": "implementer-823d7595f20c8e41b8b4638a",
+        "claimedAt": "2026-07-08T02:11:52.376Z",
+        "claimedByContextId": "pi_019f3f74-c38a-7413-a610-321b50bea00a",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Studio child display title priority changed to:\n  1. `studioChildDisplay.subtaskTitle`\n  2. `member · taskTitle`\n  3. `member · runSummary`\n  4. `member · taskId basename`\n  5. existing ordinary session fallbacks\n- `docs/modules/library.md` — Updated `lib/session-title.ts` behavior description.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- `lib/session-reader.ts` already projects `subtaskTitle`; no API/type changes were needed.\n- Fallback uses raw `studioChild.member` (e.g. `implementer · 主任务名称`). If Chinese role labels are required, main session needs to decide mapping."
+      },
+      "sdk-child-session-info-name": {
+        "id": "sdk-child-session-info-name",
+        "status": "done",
+        "updatedAt": "2026-07-08T02:17:26.067Z",
+        "startedAt": "2026-07-08T02:15:21.855Z",
+        "finishedAt": "2026-07-08T02:17:26.064Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-590fa249a0be0e79f54ac4c5"
+        ],
+        "lastRunId": "implementer-590fa249a0be0e79f54ac4c5",
+        "claimedAt": "2026-07-08T02:15:21.855Z",
+        "claimedByContextId": "pi_019f3f74-c38a-7413-a610-321b50bea00a",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-child-session-runner.ts` — updated SDK child `session_info` naming:\n  - Resolves task detail by key, with archived/all-task fallback by task id.\n  - Prefers `implementationProjection.subtasksWithStatus[].title`, then `implementationPlan.subtasks[].title`.\n  - Falls back to `YPI Studio <member> · <taskTitle> · <runShortId>`.\n  - Final fallback remains `YPI Studio <member> · <taskId basename> · <runShortId>`.\n\n#### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n\n- Did not create a new Studio child session manually; behavior verified by code path and type/lint checks.\n- Only future SDK child sessions get the corrected persisted `session_info`; historical display is handled by the prior display-title change.\n- Existing unrelated working tree diffs were present in sidebar/title/docs; I did not modify them."
+      },
+      "docs-validation": {
+        "id": "docs-validation",
+        "status": "done",
+        "updatedAt": "2026-07-08T02:19:16.803Z",
+        "startedAt": "2026-07-08T02:17:37.721Z",
+        "finishedAt": "2026-07-08T02:19:16.800Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-d7fd70e1dc0e058bc62ce7a3"
+        ],
+        "lastRunId": "implementer-d7fd70e1dc0e058bc62ce7a3",
+        "claimedAt": "2026-07-08T02:17:37.721Z",
+        "claimedByContextId": "pi_019f3f74-c38a-7413-a610-321b50bea00a",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — documented SessionSidebar narrow-width single-line truncation behavior.\n- `docs/modules/library.md` — documented Studio child title priority and SDK child `session_info` naming behavior.\n- `.ypi/tasks/.../handoff.md` — updated final handoff with validation results.\n\n#### Verification\n\n- `npm run lint` — passed.\n- `node_modules/.bin/tsc --noEmit` — passed.\n\n#### Notes / Risks\n\n- Reviewed existing code changes for the selected `docs-validation` boundary.\n- Manual narrow-sidebar UI regression is still recommended for checker review.\n- Could not directly mark `docs-validation` complete in `task.json`; Studio child guard blocks delegated sessions from mutating `.ypi/tasks/**/task.json`. Parent session should update subtask status."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-08T02:11:52.376Z",
+        "subtaskId": "sidebar-nowrap",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T02:11:52.376Z",
+        "subtaskId": "studio-child-title-display",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T02:15:21.855Z",
+        "subtaskId": "sdk-child-session-info-name",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T02:17:37.721Z",
+        "subtaskId": "docs-validation",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

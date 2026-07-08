@@ -10,7 +10,7 @@ import {
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
 import { registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
-import { getYpiStudioTaskDetail } from "./ypi-studio-tasks";
+import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
 import type { SessionHeader, StudioChildSessionInfo } from "./types";
 import type {
   YpiStudioSubagentCurrentTool,
@@ -107,14 +107,31 @@ function oneLine(value: string, max = 160): string {
   return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;
 }
 
+function getStudioChildTaskDetail(root: string, taskId: string): NonNullable<ReturnType<typeof getYpiStudioTaskDetail>> | null {
+  const detail = getYpiStudioTaskDetail(root, taskId);
+  if (detail) return detail;
+  const match = listYpiStudioTasks(root, { scope: "all" }).tasks.find((task) => task.id === taskId);
+  return match ? getYpiStudioTaskDetail(root, match.key) : null;
+}
+
+function studioChildSubtaskTitle(detail: NonNullable<ReturnType<typeof getYpiStudioTaskDetail>>, subtaskId?: string): string | undefined {
+  if (!subtaskId) return undefined;
+  return str(detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === subtaskId)?.title)
+    ?? str(detail.implementationPlan?.subtasks.find((item) => item.id === subtaskId)?.title);
+}
+
 function studioChildSessionInfoName(root: string, meta: StudioSdkChildRunMeta): string {
+  const runShortId = meta.runId.slice(0, 8);
   try {
-    const title = getYpiStudioTaskDetail(root, meta.taskId)?.title;
-    if (title?.trim()) return `YPI Studio ${oneLine(title, 80)} · ${meta.member} · ${meta.runId.slice(0, 8)}`;
+    const detail = getStudioChildTaskDetail(root, meta.taskId);
+    const subtaskTitle = detail ? studioChildSubtaskTitle(detail, meta.subtaskId) : undefined;
+    if (subtaskTitle) return `YPI Studio ${oneLine(subtaskTitle, 80)} · ${meta.member} · ${runShortId}`;
+    const taskTitle = str(detail?.title);
+    if (taskTitle) return `YPI Studio ${meta.member} · ${oneLine(taskTitle, 80)} · ${runShortId}`;
   } catch {
     // Durable session_info is only a fallback; task.json remains the display authority.
   }
-  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${meta.runId.slice(0, 8)}`;
+  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${runShortId}`;
 }
 
 function boundedAppendTail(previous: string, addition: string, maxBytes: number): string {
