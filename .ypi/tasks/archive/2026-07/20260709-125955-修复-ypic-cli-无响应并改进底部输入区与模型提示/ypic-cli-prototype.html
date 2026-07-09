@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ypic CLI Terminal Interface - HTML Prototype</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-panel: #161b22;
+      --bg-card: #21262d;
+      --bg-hover: #30363d;
+      --border: #30363d;
+      --border-focus: #58a6ff;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --text-dim: #484f58;
+      --accent: #1f6feb;
+      --accent-hover: #58a6ff;
+      --success: #238636;
+      --warning: #d29922;
+      --error: #f85149;
+      --terminal-bg: #010409;
+      --terminal-text: #e6edf3;
+      --font-mono: "Fira Code", "JetBrains Mono", Consolas, "PingFang SC", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1100px;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--accent-hover);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 span.tag {
+      font-size: 11px;
+      font-weight: normal;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent-hover);
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .scenario-tabs {
+      display: flex;
+      gap: 6px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(31, 111, 235, 0.4);
+    }
+
+    main {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Terminal Simulation Container */
+    .terminal-container {
+      background: var(--terminal-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+    }
+
+    .terminal-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .terminal-dot.red { background: #ff5f56; }
+    .terminal-dot.yellow { background: #ffbd2e; }
+    .terminal-dot.green { background: #27c93f; }
+
+    .terminal-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .terminal-size {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .terminal-body {
+      flex: 1;
+      padding: 14px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--terminal-text);
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .terminal-history {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow-y: auto;
+      padding-bottom: 8px;
+    }
+
+    /* Terminal text elements */
+    .t-banner {
+      color: var(--warning);
+      margin-bottom: 8px;
+    }
+    .t-cyan { color: #58a6ff; }
+    .t-green { color: #3fb950; }
+    .t-gray { color: #8b949e; }
+    .t-yellow { color: #d29922; }
+    .t-red { color: #f85149; }
+    .t-magenta { color: #bc8cff; }
+    .t-dim { color: #484f58; }
+    
+    .t-prompt {
+      color: #58a6ff;
+      font-weight: bold;
+    }
+    .t-input-cmd {
+      color: #e6edf3;
+    }
+    .t-result-block {
+      margin: 6px 0 12px 0;
+      padding-left: 12px;
+      border-left: 2px solid var(--border);
+    }
+
+    /* Fixed Bottom Input Area */
+    .terminal-input-bar {
+      border-top: 1px solid var(--border);
+      background: var(--terminal-bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .terminal-divider-line {
+      height: 1px;
+      background: var(--border);
+      width: 100%;
+    }
+
+    .terminal-input-row {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: #090d16;
+    }
+
+    .terminal-prompt-prefix {
+      color: #3fb950;
+      margin-right: 8px;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    .terminal-input-text {
+      flex: 1;
+      color: #e6edf3;
+      outline: none;
+      caret-color: #58a6ff;
+      border: none;
+      background: transparent;
+    }
+
+    .terminal-input-text.placeholder {
+      color: var(--text-dim);
+    }
+
+    .terminal-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-left: 1px solid var(--border);
+      padding-left: 12px;
+      margin-left: 12px;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-dot.idle { background: #8b949e; }
+    .status-dot.active { background: #3fb950; animation: blink 1.5s infinite; }
+    .status-dot.busy { background: #d29922; animation: blink 1.2s infinite; }
+    .status-dot.error { background: #f85149; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    /* Explanation Sidebar styling */
+    .sidebar-desc {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      height: 520px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-desc h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #ffffff;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .desc-section {
+      margin-bottom: 16px;
+    }
+
+    .desc-section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-hover);
+      margin-bottom: 6px;
+    }
+
+    .desc-section p, .desc-section li {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .desc-section ul {
+      margin-left: 16px;
+    }
+
+    .state-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    .state-table th, .state-table td {
+      border: 1px solid var(--border);
+      padding: 6px;
+      text-align: left;
+    }
+
+    .state-table th {
+      background: var(--bg-card);
+      color: var(--text);
+    }
+
+    /* Interactive /model selector simulated layout */
+    .simulated-selector {
+      margin-top: 8px;
+      border: 1px dashed var(--border);
+      padding: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .selector-item {
+      padding: 4px 6px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .selector-item:hover {
+      background: var(--bg-hover);
+    }
+    .selector-item.selected {
+      background: var(--accent);
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>ypic CLI 终端交互原型 <span class="tag">UI 设计稿 (v2)</span></h1>
+    <p>
+      此原型模拟 <code>ypic</code> CLI 终端在不同运行状态下的布局与交互方案。
+      本方案重点解决：1) 提示不足以引起用户对 Web 配套的注意；2) 输入框容易在终端翻滚中丢失；3) 模型/思考深度无切换入口；4) 普通输入无响应没有可见状态与心跳检测。
+    </p>
+    
+    <div class="scenario-tabs">
+      <button class="tab-btn active" onclick="switchState('startup')">1. 启动欢迎状态 (Startup)</button>
+      <button class="tab-btn" onclick="switchState('idle')">2. 空闲输入状态 (Idle)</button>
+      <button class="tab-btn" onclick="switchState('running')">3. 运行/流式状态 (Running/Streaming)</button>
+      <button class="tab-btn" onclick="switchState('model')">4. /model 模型切换 (Model Select)</button>
+      <button class="tab-btn" onclick="switchState('error')">5. 诊断/错误状态 (Error State)</button>
+      <button class="tab-btn" onclick="switchState('fallback')">6. 非 TTY 降级 (Plain Fallback)</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Simulated Terminal -->
+    <div class="terminal-container">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <div class="terminal-dot red"></div>
+          <div class="terminal-dot yellow"></div>
+          <div class="terminal-dot green"></div>
+        </div>
+        <div class="terminal-title" id="terminal-title">ypic - /Volumes/01/ExternalStorage/.../pi-agnet-web</div>
+        <div class="terminal-size">80x24</div>
+      </div>
+      
+      <div class="terminal-body" id="terminal-body">
+        <!-- Rendered dynamically by javascript -->
+      </div>
+
+      <!-- Bottom Interactive Input Area -->
+      <div class="terminal-input-bar" id="terminal-input-bar">
+        <div class="terminal-divider-line"></div>
+        <div class="terminal-input-row">
+          <div class="terminal-prompt-prefix" id="input-prompt-prefix">&gt;</div>
+          <div class="terminal-input-text" id="input-display">Message...</div>
+          <div class="terminal-status-badge" id="status-badge">
+            <span class="status-dot idle" id="status-dot"></span>
+            <span id="status-model-text">openai-codex/gpt-5.5 · high</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Details Sidebar -->
+    <div class="sidebar-desc" id="sidebar-desc">
+      <!-- Loaded dynamically -->
+    </div>
+  </main>
+
+  <script>
+    const states = {
+      startup: {
+        title: "ypic - /Volumes/01/ExternalStorage/.../pi-20260709-125346",
+        html: `
+<div class="t-banner">YPI CLI Chat (ypic) - yolk-pi-web terminal companion</div>
+<div>[YPIC] Connected to yolk-pi-web at <span class="t-cyan">http://127.0.0.1:30141</span> (v1.2.0)</div>
+<div>[YPIC] Workspace registered: <span class="t-cyan">pi-agnet-web</span> (cwd: /Volumes/01/.../pi-20260709-125346)</div>
+<div>[YPIC] Session: <span class="t-magenta">20260709_125955_abcd</span> (forked from parent: none)</div>
+<div>[YPIC] Model config: <span class="t-green">openai-codex/gpt-5.5</span> (thinking: <span class="t-yellow">high</span>)</div>
+<br />
+<div class="t-dim">────────────────────────────────────────────────────────────────────────────────</div>
+<div class="t-yellow">In-session Commands:</div>
+  <span class="t-cyan">/help</span>          Show in-session commands
+  <span class="t-cyan">/model</span>         Switch provider, model, and thinking level
+  <span class="t-cyan">/config</span>        Open Web UI configuration (auth, models, settings)
+  <span class="t-cyan">/oweb</span>          Open this exact session in the Web UI browser
+  <span class="t-cyan">/status</span>        Display current agent state and memory usage
+  <span class="t-cyan">/abort</span>         Interrupt the running agent turn (or press Ctrl-C)
+  <span class="t-cyan">/quit</span>          Exit CLI session
+<div class="t-dim">────────────────────────────────────────────────────────────────────────────────</div>
+<div class="t-gray">💡 Web Capability Guide:</div>
+<div>- Complex settings, File Explorer & YPI Studio tasks are managed in the browser UI.</div>
+<div>- Running <span class="t-cyan">/config</span> will launch your browser directly to settings.</div>
+<br />
+        `,
+        input: "Message...",
+        inputIsPlaceholder: true,
+        statusDot: "idle",
+        statusText: "openai-codex/gpt-5.5 · high",
+        desc: `
+<h2>启动欢迎状态 (Startup)</h2>
+<div class="desc-section">
+  <h3>交互与信息架构</h3>
+  <p>用户在终端运行 <code>ypic</code> 后，首先呈现清晰的<strong>欢迎横幅</strong>与<strong>上下文诊断信息</strong>。</p>
+  <ul>
+    <li>明确给出当前连接的 Web 服务 URL、版本。</li>
+    <li>明确显示当前 Session ID 方便追踪。</li>
+    <li>输出核心 Slash Commands 清单，引导用户使用 <code>/model</code>、<code>/config</code> 等新功能。</li>
+    <li>友情提示：提示复杂交互 (例如文件管理、Studio task审批) 在 Web 端完成。</li>
+  </ul>
+</div>
+<div class="desc-section">
+  <h3>实现细节</h3>
+  <p>启动时将发起 <code>GET /api/cli/health</code> 与 <code>POST /api/agent/draft</code> 并拉取默认模型设置。</p>
+</div>
+        `
+      },
+      idle: {
+        title: "ypic - /Volumes/01/ExternalStorage/.../pi-20260709-125346",
+        html: `
+<div class="t-gray">... (scrolled welcoming info) ...</div>
+<br />
+<div class="t-prompt">&gt; 帮我写个 debounce 函数</div>
+<div class="t-dim">Sending prompt to agent...</div>
+<div class="t-result-block">
+<div>[assistant] 这里是 debounce 函数的实现：</div>
+<pre style="color:#a5d6ff; background:#161b22; padding:8px; border-radius:4px; margin:4px 0;">
+function debounce(fn, delay) {
+  let timer = null;
+  return function(...args) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}</pre>
+<div>是否还需要节流 (throttle) 的实现？</div>
+</div>
+<br />
+        `,
+        input: "Message...",
+        inputIsPlaceholder: true,
+        statusDot: "idle",
+        statusText: "openai-codex/gpt-5.5 · high",
+        desc: `
+<h2>空闲输入状态 (Idle)</h2>
+<div class="desc-section">
+  <h3>底部固定输入区</h3>
+  <p>当终端滚动较多历史内容时，输入行<strong>始终固定在屏幕最底部</strong>，不与历史输出混杂。</p>
+  <ul>
+    <li>上方聊天历史区独立滚动。</li>
+    <li>底部由一条 ANSI 绘制的分隔线隔离。</li>
+    <li>右侧常驻显示当前模型及思考等级 <code>openai-codex/gpt-5.5 · high</code>。</li>
+    <li>状态灯显示灰色 (idle 闲置)。</li>
+  </ul>
+</div>
+<div class="desc-section">
+  <h3>状态反馈说明</h3>
+  <p>用户随时可以通过键盘直接输入或使用 Tab 自动补全命令。</p>
+</div>
+        `
+      },
+      running: {
+        title: "ypic - /Volumes/01/ExternalStorage/.../pi-20260709-125346",
+        html: `
+<div class="t-prompt">&gt; 帮我看一下一级债动态表头的判定逻辑</div>
+<div class="t-dim">[YPIC] Sending message to agent...</div>
+<div class="t-dim">[YPIC] SSE connection established.</div>
+<br />
+<div>[assistant] 好的，我来帮你排查一级债动态表头的判定逻辑。我需要先查看下代码库中的相关组件。</div>
+<br />
+<div class="t-cyan">[tool_start] read_file: { "path": "src/components/DynamicHeader.tsx" }</div>
+<div class="t-cyan">[tool_end] success (read 120 lines)</div>
+<br />
+<div class="t-dim">thinking (14s)... 🔍 正在分析判定分支...</div>
+        `,
+        input: "(Running tool: read_file... Enter to steer)",
+        inputIsPlaceholder: true,
+        statusDot: "busy",
+        statusText: "openai-codex/gpt-5.5 · high [RUNNING]",
+        desc: `
+<h2>运行/流式状态 (Running)</h2>
+<div class="desc-section">
+  <h3>无响应痛点解决</h3>
+  <p>用户反馈普通输入无响应。原型在此状态下引入了<strong>多重状态反馈</strong>：</p>
+  <ul>
+    <li>输入后，底部状态灯立即变为黄色闪烁 (busy)，模型后缀显示 <code>[RUNNING]</code>。</li>
+    <li>终端正文立即打印 <code>[YPIC] Sending message...</code> 与 <code>[YPIC] SSE connection established.</code>，确保连接可见。</li>
+    <li>工具调用 (Tool Call) 与大模型思考 (Thinking) 分段渲染，提供毫秒级反馈。</li>
+  </ul>
+</div>
+<div class="desc-section">
+  <h3>运行时交互</h3>
+  <p>此时底部输入框文本提示 <code>(Running tool... Enter to steer)</code>，允许用户输入文本进行运行时<strong>微调 (steer)</strong>，或输入 <code>/abort</code> 中断执行。</p>
+</div>
+        `
+      },
+      model: {
+        title: "ypic - /Volumes/01/ExternalStorage/.../pi-20260709-125346",
+        html: `
+<div class="t-prompt">&gt; /model</div>
+<br />
+<div class="t-yellow">? Select Provider:</div>
+<div>  1. anthropic (claude-3-5-sonnet)</div>
+<div class="t-green">❯ 2. openai (gpt-4o, gpt-5.5)</div>
+<div>  3. deepseek (deepseek-chat, deepseek-coder)</div>
+<div>  4. local-ollama (qwen2.5-coder)</div>
+<br />
+<div class="t-yellow">? Select Model for openai:</div>
+<div>  1. gpt-4o</div>
+<div class="t-green">❯ 2. gpt-5.5</div>
+<div>  3. o1-mini</div>
+<br />
+<div class="t-yellow">? Select Thinking Level:</div>
+<div>  1. off (disable thinking)</div>
+<div>  2. auto</div>
+<div class="t-green">❯ 3. high (recommended)</div>
+<div>  4. xhigh</div>
+<br />
+<div class="t-green">✔ Model updated successfully to openai/gpt-5.5 with thinking 'high'.</div>
+<br />
+        `,
+        input: "/model _",
+        inputIsPlaceholder: false,
+        statusDot: "idle",
+        statusText: "openai-codex/gpt-5.5 · high",
+        desc: `
+<h2>/model 模型切换 (Model Select)</h2>
+<div class="desc-section">
+  <h3>交互式切换流程</h3>
+  <p>在终端中输入 <code>/model</code> 将调出交互式模型选择菜单：</p>
+  <ul>
+    <li><strong>第一步</strong>：选择 Provider 供应商。</li>
+    <li><strong>第二步</strong>：选择该供应商下的具体 Model 模型。</li>
+    <li><strong>第三步</strong>：选择 Thinking Level (如果模型支持思考)。</li>
+    <li>支持命令行参数直接切换，如 <code>/model openai/gpt-5.5 high</code>。</li>
+  </ul>
+</div>
+<div class="desc-section">
+  <h3>限制与安全边界</h3>
+  <p>当 Agent 正在执行 (Running) 时，模型切换是禁用的，底部状态栏会提示先使用 <code>/abort</code> 中断或等待执行完毕。</p>
+</div>
+        `
+      },
+      error: {
+        title: "ypic - /Volumes/01/ExternalStorage/.../pi-20260709-125346",
+        html: `
+<div class="t-banner">YPI CLI Chat (ypic)</div>
+<div>[YPIC] Connecting to http://127.0.0.1:9999...</div>
+<br />
+<div class="t-red">❌ [ERROR] Could not connect to yolk-pi-web server at http://127.0.0.1:9999.</div>
+<br />
+<div class="t-yellow">Possible causes:</div>
+<div>1. Server is offline. Please run <span class="t-cyan">ypi</span> in your terminal to start the Web UI server.</div>
+<div>2. Incorrect port. Default is 30141. Use <span class="t-cyan">--port &lt;port&gt;</span> to specify.</div>
+<br />
+<div class="t-dim">────────────────────────────────────────────────────────────────────────────────</div>
+<br />
+<div>[YPIC] Press Enter to try connecting again, or Ctrl-C to exit.</div>
+<br />
+        `,
+        input: "Enter to reconnect...",
+        inputIsPlaceholder: true,
+        statusDot: "error",
+        statusText: "offline",
+        desc: `
+<h2>诊断/错误状态 (Error State)</h2>
+<div class="desc-section">
+  <h3>容错与清晰反馈</h3>
+  <p>避免“无响应”现象的终极策略是<strong>任何异常都必须显式捕获并呈现</strong>：</p>
+  <ul>
+    <li><strong>服务不可达</strong>：输出排查指南 (检查 <code>ypi</code> 服务、<code>--port</code> 冲突等)。</li>
+    <li><strong>模型配置缺失/AK缺失</strong>：直接给出警告，并提示运行 <code>/config</code> 直达 Web UI 配置面板。</li>
+    <li><strong>运行中网络中断/SSE异常</strong>：状态灯变为红色，并在终端输出重连 Attempt 计数。</li>
+  </ul>
+</div>
+        `
+      },
+      fallback: {
+        title: "Plain Logs - ypic fallback mode",
+        html: `
+<div class="t-dim">$ YPIC_PLAIN=1 ypic</div>
+<div>[YPIC] Connected to yolk-pi-web at http://127.0.0.1:30141</div>
+<div>[YPIC] Model: openai-codex/gpt-5.5 · thinking: high</div>
+<br />
+<div class="t-prompt">&gt; 帮我写个 debounce</div>
+<div>[YPIC:info] Sending message...</div>
+<div>[YPIC:info] SSE connected.</div>
+<div>[assistant] Here is the debounce function:</div>
+<div>...</div>
+<br />
+<div class="t-prompt">&gt; _</div>
+        `,
+        input: "(Plain REPL mode - no bottom status bar)",
+        inputIsPlaceholder: true,
+        statusDot: "idle",
+        statusText: "plain-mode",
+        desc: `
+<h2>非 TTY 降级 (Plain Fallback)</h2>
+<div class="desc-section">
+  <h3>无害的日志输出</h3>
+  <p>在 CI 环境、管道重定向 (pipe) 或 <code>YPIC_PLAIN=1</code>、不支持 ANSI 颜色转义的终端中，CLI 必须平滑降级：</p>
+  <ul>
+    <li>不使用复杂的 TTY 光标控制，避免产生乱码与 <code>\x1b[2K</code> 等转义污染。</li>
+    <li>回退到经典的 readline REPL (输入行随历史滚动，不固定底部)。</li>
+    <li>以日志前缀 <code>[YPIC:info]</code> 输出关键状态。</li>
+  </ul>
+</div>
+        `
+      }
+    };
+
+    function switchState(stateKey) {
+      // Update tabs
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      // Find the tab that matches the onclick
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => {
+        return btn.getAttribute('onclick').includes(stateKey);
+      });
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const state = states[stateKey];
+      
+      // Update terminal title
+      document.getElementById('terminal-title').innerText = state.title;
+
+      // Update terminal body
+      document.getElementById('terminal-body').innerHTML = state.html;
+
+      // Update input row
+      const inputEl = document.getElementById('input-display');
+      inputEl.innerText = state.input;
+      if (state.inputIsPlaceholder) {
+        inputEl.classList.add('placeholder');
+      } else {
+        inputEl.classList.remove('placeholder');
+      }
+
+      // Update status dot & text
+      const dotEl = document.getElementById('status-dot');
+      dotEl.className = 'status-dot ' + state.statusDot;
+      document.getElementById('status-model-text').innerText = state.statusText;
+
+      // Show/Hide input bar layout for fallback (which doesn't use the fixed bottom)
+      const inputBar = document.getElementById('terminal-input-bar');
+      const prefixEl = document.getElementById('input-prompt-prefix');
+      
+      if (stateKey === 'fallback') {
+        inputBar.style.background = '#0d1117';
+        prefixEl.style.opacity = '0.3';
+        document.getElementById('status-badge').style.opacity = '0.3';
+      } else {
+        inputBar.style.background = '#010409';
+        prefixEl.style.opacity = '1';
+        document.getElementById('status-badge').style.opacity = '1';
+      }
+
+      // Update sidebar explanation
+      document.getElementById('sidebar-desc').innerHTML = state.desc;
+
+      // Auto scroll terminal to bottom
+      const bodyEl = document.getElementById('terminal-body');
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
+
+    // Initialize with startup state
+    switchState('startup');
+  </script>
+</body>
+</html>

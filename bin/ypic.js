@@ -63,6 +63,7 @@ run \`ypic\` in the project directory you want to chat in.
 
 In-session commands:
   /help        Show in-session commands.
+  /model       Manage model and thinking level.
   /config      Open the ypi Web page in your browser.
   /open        Alias for /config.
   /oweb        Open this exact session in the Web UI.
@@ -75,6 +76,20 @@ In-session commands:
 
 function debug(...args) {
   if (process.env.YPIC_DEBUG) console.error("[ypic:debug]", ...args);
+}
+
+let debugTimingEnabled = false;
+function debugTiming(label, startMs) {
+  if (!debugTimingEnabled) return;
+  const elapsed = Date.now() - startMs;
+  console.error(`[ypic:timing] ${label} (${elapsed}ms)`);
+}
+
+// Write a status/diagnostic line that is always visible, even when stdout is
+// fully buffered (e.g. pipe / non-TTY). Uses stderr so it cannot be swallowed
+// by libc stdio buffering.
+function ypicInfo(text) {
+  console.error(text);
 }
 
 /**
@@ -122,7 +137,15 @@ function resolveCanonicalPath(p) {
 }
 
 async function fetchJson(url, init) {
-  const res = await fetch(url, init);
+  const t0 = Date.now();
+  let res;
+  try {
+    res = await fetch(url, init);
+    debugTiming(`HTTP ${init?.method ?? "GET"} ${url} status=${res.status}`, t0);
+  } catch (error) {
+    debugTiming(`HTTP ${init?.method ?? "GET"} ${url} FAILED: ${error instanceof Error ? error.message : String(error)}`, t0);
+    throw error;
+  }
   const text = await res.text();
   let body = null;
   if (text) {
@@ -244,15 +267,47 @@ async function draftSession(baseUrl, cwd, projectContext) {
 }
 
 async function sendAgentCommand(baseUrl, sessionId, command) {
-  const { ok, status, body } = await fetchJson(`${baseUrl}/api/agent/${encodeURIComponent(sessionId)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(command),
-  });
-  if (!ok) {
-    throw new Error(body?.error ?? `HTTP ${status}`);
+  const controller = new AbortController();
+  // Longer timeout for prompt commands which involve model preflight;
+  // abort/steer/follow_up resolve quickly.
+  const timeoutMs = command.type === "prompt" ? 120_000 : 30_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const { ok, status, body } = await fetchJson(
+      `${baseUrl}/api/agent/${encodeURIComponent(sessionId)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(command),
+        signal: controller.signal,
+      },
+    );
+    if (!ok) {
+      const errMsg = body?.error ?? `HTTP ${status}`;
+      const hint = categorizeAgentError(errMsg);
+      const err = new Error(errMsg);
+      err.hint = hint;
+      throw err;
+    }
+    return body?.data;
+  } catch (error) {
+    if (error.name === "AbortError" || controller.signal.aborted) {
+      const err = new Error(`Request timed out after ${timeoutMs / 1000}s`);
+      err.hint = "The server may be stuck loading a model or waiting for auth. Try /config to check your model/auth setup, or restart the ypi server.";
+      throw err;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  return body?.data;
+}
+
+function categorizeAgentError(msg) {
+  if (/auth|401|403|unauthorized|api.key|token/i.test(msg)) return "Authentication or API key issue. Run /config to open the Web page and configure your model provider credentials.";
+  if (/model|provider|no.*model|not found/i.test(msg)) return "Model configuration issue. Run /config to open the Web page and select a valid model.";
+  if (/preflight/i.test(msg)) return "Server preflight failed. This may be a temporary issue — try again, or run /config to check your setup.";
+  if (/already.*running/i.test(msg)) return "Another turn is already running. Wait for it to finish or use /abort.";
+  return null;
 }
 
 async function getAgentState(baseUrl, sessionId) {
@@ -273,6 +328,83 @@ function buildResumeCommand(opts, sessionId) {
   if (opts.hostname) parts.push("--hostname", String(opts.hostname));
   parts.push("--resume", sessionId);
   return parts.join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// Model helpers
+// ---------------------------------------------------------------------------
+
+const THINKING_LEVELS = ["off", "auto", "low", "medium", "high", "xhigh"];
+
+function modelKey(provider, modelId) {
+  return `${provider}:${modelId}`;
+}
+
+function modelDisplayName(m) {
+  const pd = m.providerDisplayName || m.provider;
+  return `${pd}/${m.name || m.id}`;
+}
+
+function findModel(list, provider, modelId) {
+  return list.find((m) => m.provider === provider && m.id === modelId) || null;
+}
+
+function getSupportedThinkingLevels(modelState, provider, modelId) {
+  const key = modelKey(provider, modelId);
+  const levels = modelState.thinkingLevels?.[key];
+  if (Array.isArray(levels) && levels.length > 0) return levels;
+  return ["off", "auto"];
+}
+
+/**
+ * Parse "/model <provider>/<modelId> [<thinking>]" input.
+ * The provider is everything before the first "/"; modelId is the rest,
+ * minus an optional trailing thinking-level keyword.
+ * Returns { provider, modelId, thinking } or null if not a valid model switch.
+ */
+function parseModelSwitch(rest) {
+  const trimmed = rest.trim();
+  const slashIdx = trimmed.indexOf("/");
+  if (slashIdx <= 0) return null;
+  const provider = trimmed.slice(0, slashIdx);
+  const afterSlash = trimmed.slice(slashIdx + 1).trim();
+  if (!afterSlash) return null;
+  const parts = afterSlash.split(" ");
+  const lastWord = parts[parts.length - 1].toLowerCase();
+  if (parts.length > 1 && THINKING_LEVELS.includes(lastWord)) {
+    return {
+      provider,
+      modelId: parts.slice(0, -1).join(" "),
+      thinking: lastWord,
+    };
+  }
+  return { provider, modelId: afterSlash, thinking: null };
+}
+
+async function fetchModels(baseUrl) {
+  const { ok, status, body } = await fetchJson(`${baseUrl}/api/models`);
+  if (!ok) throw new Error(`Failed to load models: ${body?.error ?? `HTTP ${status}`}`);
+  return body;
+}
+
+function resolveCurrentModel(agentState, modelList) {
+  if (!agentState?.state?.model) return null;
+  const m = agentState.state.model;
+  if (!m || typeof m.provider !== "string" || typeof m.id !== "string") return null;
+  const match = findModel(modelList, m.provider, m.id);
+  return {
+    provider: m.provider,
+    modelId: m.id,
+    displayName: match ? modelDisplayName(match) : `${m.provider}/${m.id}`,
+    thinkingLevel: typeof agentState.state.thinkingLevel === "string"
+      ? agentState.state.thinkingLevel
+      : "off",
+  };
+}
+
+function formatModelSummary(m) {
+  if (!m) return "No model configured. Use /config to set up a model in the Web UI.";
+  return `${m.displayName} · thinking: ${m.thinkingLevel}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -471,6 +603,500 @@ function summarizeStudioWaitUpdate(event, renderer) {
 }
 
 // ---------------------------------------------------------------------------
+// Terminal Frame — TTY bottom-input-area and status bar
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a frame abstraction for rendering output and accepting input.
+ *
+ * TerminalFrame (TTY): manages a fixed bottom area (separator, status bar,
+ * input line) via the alternate screen buffer. Output scrolls in the history
+ * region above; the bottom three rows stay pinned. Handles SIGINT / resize.
+ *
+ * PlainFrame (non-TTY / NO_COLOR / YPIC_PLAIN): thin wrapper around the
+ * classic readline REPL — writes go directly to stdout, status messages use
+ * "[YPIC:info]" on stderr, and no ANSI escape sequences are emitted.
+ */
+
+const ANSI = {
+  RESET: "\x1b[0m",
+  BOLD: "\x1b[1m",
+  DIM: "\x1b[2m",
+  RED: "\x1b[31m",
+  GREEN: "\x1b[32m",
+  YELLOW: "\x1b[33m",
+  CYAN: "\x1b[36m",
+  GRAY: "\x1b[90m",
+  homeClear: "\x1b[H\x1b[J",     // cursor home + erase to end
+  hideCursor: "\x1b[?25l",
+  showCursor: "\x1b[?25h",
+  altScreenOn: "\x1b[?1049h",
+  altScreenOff: "\x1b[?1049l",
+};
+
+function stripAnsi(s) {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+// Visual width of a string (crude: CJK ≈ 2 columns, ASCII ≈ 1).
+// Used only for positioning approximations; off-by-one is tolerable.
+function visualWidth(s) {
+  let w = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    // CJK, fullwidth forms, etc.
+    if (
+      (cp >= 0x1100 && cp <= 0x115f) || // Hangul
+      cp === 0x2329 || cp === 0x232a ||
+      (cp >= 0x2e80 && cp <= 0xa4cf && cp !== 0x303f) ||
+      (cp >= 0xac00 && cp <= 0xd7a3) ||
+      (cp >= 0xf900 && cp <= 0xfaff) ||
+      (cp >= 0xfe10 && cp <= 0xfe19) ||
+      (cp >= 0xfe30 && cp <= 0xfe6f) ||
+      (cp >= 0xff01 && cp <= 0xff60) ||
+      (cp >= 0xffe0 && cp <= 0xffe6) ||
+      (cp >= 0x1f300 && cp <= 0x1f64f) ||
+      (cp >= 0x1f900 && cp <= 0x1f9ff) ||
+      (cp >= 0x20000 && cp <= 0x2fffd) ||
+      (cp >= 0x30000 && cp <= 0x3fffd)
+    ) {
+      w += 2;
+    } else {
+      w += 1;
+    }
+  }
+  return w;
+}
+
+/**
+ * TerminalFrame — TTY alternate-screen rendering with fixed bottom bar.
+ *
+ * Layout:
+ *   rows 1 .. rows-3   history area (scrollable output)
+ *   row  rows-2        separator "───…" (gray)
+ *   row  rows-1        status bar: ● {idle|RUNNING|ERROR} … model-info
+ *   row  rows          input line: > {user text}_
+ *
+ * The frame redraws the terminal on every output event, throttled to ~60 Hz.
+ * It reads raw keyboard input with basic line-editing (Backspace, Enter,
+ * Ctrl-C/D, printable characters). Arrow keys and IME composition are not
+ * explicitly handled; `YPIC_PLAIN=1` is the recommended fallback when the
+ * terminal or input method is incompatible.
+ */
+function createTerminalFrame() {
+  const frame = {
+    kind: "tty",
+    stdin: process.stdin,
+    stdout: process.stdout,
+    rows: Math.max(process.stdout.rows || 24, 10),
+    cols: Math.max(process.stdout.columns || 80, 40),
+    bottomReserved: 3, // separator + status + input = 3 rows
+
+    // Output buffer
+    _lines: [],         // completed history lines (ring buffer)
+    _partial: "",       // current streaming partial line
+    _maxLines: 2000,    // cap to avoid unbounded growth
+
+    // Status
+    _statusDot: "idle",   // "idle" | "busy" | "error"
+    _statusText: "",
+    _modelText: "",
+
+    // Input
+    _inputChars: [],     // array of code-points (for correct cursor movement)
+    _inputCursor: 0,     // index into _inputChars
+    _prompt: "> ",
+    _hint: "",            // dim placeholder when input is empty
+
+    // Callbacks
+    _onLine: null,
+    _onSigint: null,
+    _onAbort: null,       // first Ctrl-C during running → abort
+
+    _exiting: false,
+    _dirty: false,
+    _redrawTimer: null,
+    _sigintCount: 0,
+    _sigintResetTimer: null,
+  };
+
+  function historyHeight() {
+    return Math.max(frame.rows - frame.bottomReserved, 1);
+  }
+
+  // ── public API ──────────────────────────────────────────────
+
+  function start(onLine, onSigint, onAbort) {
+    frame._onLine = onLine;
+    frame._onSigint = onSigint;
+    frame._onAbort = onAbort || onSigint;
+
+    // Enter alternate screen
+    frame.stdout.write(ANSI.altScreenOn);
+    frame.stdout.write(ANSI.hideCursor);
+
+    // Raw-mode input
+    frame.stdin.setRawMode(true);
+    frame.stdin.resume();
+    frame.stdin.setEncoding("utf8");
+    frame.stdin.on("data", _onData);
+    frame.stdout.on("resize", _onResize);
+
+    _redraw();
+  }
+
+  function destroy() {
+    frame._exiting = true;
+    if (frame._redrawTimer) { clearTimeout(frame._redrawTimer); frame._redrawTimer = null; }
+    if (frame._sigintResetTimer) { clearTimeout(frame._sigintResetTimer); frame._sigintResetTimer = null; }
+    frame.stdin.setRawMode(false);
+    frame.stdin.pause();
+    frame.stdin.removeAllListeners("data");
+    frame.stdout.removeAllListeners("resize");
+    // Restore terminal
+    frame.stdout.write(ANSI.altScreenOff);
+    frame.stdout.write(ANSI.showCursor);
+  }
+
+  function write(text) {
+    if (frame._exiting || !text) return;
+    const parts = text.split("\n");
+    for (let i = 0; i < parts.length; i++) {
+      const seg = parts[i];
+      const isLast = i === parts.length - 1;
+      if (isLast && seg === "") {
+        // trailing newline → finalize partial
+        frame._lines.push(frame._partial);
+        frame._partial = "";
+      } else if (isLast) {
+        frame._partial += seg;
+      } else {
+        frame._lines.push(frame._partial + seg);
+        frame._partial = "";
+      }
+    }
+    // Ring-buffer cap
+    while (frame._lines.length > frame._maxLines) frame._lines.shift();
+    _scheduleRedraw();
+  }
+
+  // Convenience: write text followed by a newline.
+  function writeLine(text) {
+    write(text + "\n");
+  }
+
+  // Write an info/diagnostic line (same as writeLine in TTY mode).
+  function info(text) {
+    writeLine(text);
+  }
+
+  function setStatusDot(dot) {
+    frame._statusDot = dot;
+    _scheduleRedraw();
+  }
+
+  function setStatusText(text) {
+    frame._statusText = text;
+    _scheduleRedraw();
+  }
+
+  function setModelText(text) {
+    frame._modelText = text;
+    _scheduleRedraw();
+  }
+
+  function setInputHint(hint) {
+    frame._hint = hint;
+    _scheduleRedraw();
+  }
+
+  function setPrompt(text) {
+    frame._prompt = text;
+    _scheduleRedraw();
+  }
+
+  // Always-on in TTY mode; input is never disabled (steer during running).
+  function enableInput() { /* no-op */ }
+  function disableInput() { /* no-op */ }
+
+  // ── internal helpers ───────────────────────────────────────
+
+  function _scheduleRedraw() {
+    frame._dirty = true;
+    if (!frame._redrawTimer) {
+      frame._redrawTimer = setTimeout(() => {
+        frame._redrawTimer = null;
+        if (frame._dirty && !frame._exiting) _redraw();
+      }, 16); // ~60 Hz throttle
+    }
+  }
+
+  function _redraw() {
+    if (frame._exiting) return;
+    frame._dirty = false;
+
+    const histH = historyHeight();
+    const allLines = frame._lines.concat(frame._partial || []);
+    // Show last histH non-empty lines (at least one line so partial has a home)
+    const visible = allLines.slice(-Math.max(histH, 1));
+
+    const parts = [];
+
+    // Clear + home
+    parts.push(ANSI.homeClear);
+
+    // History lines
+    for (const ln of visible) {
+      // Clip each line to terminal width to avoid wrapping artefacts
+      parts.push(ln.length > frame.cols ? ln.slice(0, frame.cols - 1) + "…" : ln);
+      parts.push("\r\n");
+    }
+
+    // Pad remaining rows in history area so separator always sits at the same row
+    const filled = Math.min(visible.length, histH);
+    for (let i = filled; i < histH; i++) {
+      parts.push("\r\n");
+    }
+
+    // Separator (row rows-2)
+    parts.push(ANSI.GRAY + "─".repeat(frame.cols) + ANSI.RESET + "\r\n");
+
+    // Status line (row rows-1)
+    parts.push(_statusLine());
+    parts.push("\r\n");
+
+    // Input line (row rows)
+    parts.push(_inputLine());
+
+    // Position cursor on input line after prompt + cursor offset
+    // +1 for 1-based terminal column
+    const promptWidth = visualWidth(frame._prompt);
+    const cursorChars = frame._inputChars.slice(0, frame._inputCursor);
+    const cursorVisualOffset = visualWidth(cursorChars.join(""));
+    const col = promptWidth + cursorVisualOffset + 1;
+    parts.push(`\x1b[${frame.rows};${Math.max(col, 1)}H`);
+    parts.push(ANSI.showCursor);
+
+    frame.stdout.write(parts.join(""));
+  }
+
+  function _statusLine() {
+    const dotColors = { idle: ANSI.GRAY, busy: ANSI.YELLOW, error: ANSI.RED };
+    const dc = dotColors[frame._statusDot] || ANSI.GRAY;
+
+    let left = dc + "●" + ANSI.RESET + " ";
+    if (frame._statusDot === "busy") left += ANSI.YELLOW + "RUNNING" + ANSI.RESET + " ";
+    else if (frame._statusDot === "error") left += ANSI.RED + "ERROR" + ANSI.RESET + " ";
+    else left += ANSI.GRAY + "idle" + ANSI.RESET + " ";
+
+    if (frame._statusText) left += ANSI.GRAY + frame._statusText + ANSI.RESET + " ";
+
+    const right = frame._modelText ? ANSI.CYAN + frame._modelText + ANSI.RESET : "";
+
+    const leftLen = visualWidth(stripAnsi(left));
+    const rightLen = visualWidth(stripAnsi(right));
+    const pad = Math.max(1, frame.cols - leftLen - rightLen);
+
+    return left + " ".repeat(pad) + right;
+  }
+
+  function _inputLine() {
+    const prompt = ANSI.GREEN + frame._prompt + ANSI.RESET;
+    if (frame._inputChars.length === 0 && frame._hint) {
+      return prompt + ANSI.GRAY + frame._hint + ANSI.RESET;
+    }
+    return prompt + frame._inputChars.join("");
+  }
+
+  // ── keyboard input ─────────────────────────────────────────
+
+  function _onData(data) {
+    if (frame._exiting) return;
+
+    const cp = data.codePointAt(0);
+
+    // Ctrl-C (0x03)
+    if (cp === 0x03) {
+      frame._sigintCount += 1;
+      if (frame._sigintResetTimer) clearTimeout(frame._sigintResetTimer);
+      frame._sigintResetTimer = setTimeout(() => { frame._sigintCount = 0; }, 1500);
+      if (frame._sigintCount === 1 && frame._onAbort) {
+        frame._onAbort();
+        return;
+      }
+      if (frame._onSigint) frame._onSigint();
+      return;
+    }
+
+    // Ctrl-D (0x04) on empty line → exit
+    if (cp === 0x04) {
+      if (frame._inputChars.length === 0) {
+        if (frame._onSigint) frame._onSigint();
+      }
+      return;
+    }
+
+    // Enter / CR (0x0d) — submit line
+    if (cp === 0x0d || cp === 0x0a) {
+      const line = frame._inputChars.join("");
+      // Echo submitted line into history
+      frame._lines.push(frame._prompt + line);
+      frame._inputChars = [];
+      frame._inputCursor = 0;
+      _redraw();
+      if (frame._onLine) frame._onLine(line);
+      return;
+    }
+
+    // Backspace (0x7f) or Ctrl-H (0x08)
+    if (cp === 0x7f || cp === 0x08) {
+      if (frame._inputCursor > 0) {
+        frame._inputChars.splice(frame._inputCursor - 1, 1);
+        frame._inputCursor -= 1;
+        _scheduleRedraw();
+      }
+      return;
+    }
+
+    // Ctrl-L (0x0c) — repaint
+    if (cp === 0x0c) {
+      _redraw();
+      return;
+    }
+
+    // Escape sequence (arrow keys, etc.) — ignore for now
+    if (cp === 0x1b) return;
+
+    // Printable character (including multi-byte / composed)
+    // Treat the whole data string as a single code-point insertion
+    if (data && data.length > 0) {
+      frame._inputChars.splice(frame._inputCursor, 0, data);
+      frame._inputCursor += 1;
+      _scheduleRedraw();
+    }
+  }
+
+  // ── resize ─────────────────────────────────────────────────
+
+  function _onResize() {
+    frame.rows = Math.max(process.stdout.rows || 24, 10);
+    frame.cols = Math.max(process.stdout.columns || 80, 40);
+    _redraw();
+  }
+
+  // ── expose public methods ──────────────────────────────────
+
+  frame.start = start;
+  frame.destroy = destroy;
+  frame.write = write;
+  frame.writeLine = writeLine;
+  frame.info = info;
+  frame.setStatusDot = setStatusDot;
+  frame.setStatusText = setStatusText;
+  frame.setModelText = setModelText;
+  frame.setInputHint = setInputHint;
+  frame.setPrompt = setPrompt;
+  frame.enableInput = enableInput;
+  frame.disableInput = disableInput;
+
+  return frame;
+}
+
+/**
+ * PlainFrame — non-TTY / NO_COLOR / YPIC_PLAIN fallback.
+ *
+ * Delegates to a user-supplied readline interface. Output goes directly to
+ * stdout; status messages use "[YPIC:info]" on stderr. No ANSI escapes are
+ * emitted, making it safe for pipes, CI logs, and non-TTY environments.
+ */
+function createPlainFrame(rl) {
+  const frame = {
+    kind: "plain",
+    _rl: rl,
+    _exiting: false,
+  };
+
+  function start(onLine, onSigint, onAbort, onClose) {
+    frame._rl.on("line", (line) => { if (!frame._exiting) onLine(line); });
+    frame._rl.on("SIGINT", () => {
+      if (onAbort) onAbort(); else onSigint();
+    });
+    frame._rl.on("close", () => {
+      if (frame._exiting) return;
+      if (onClose) onClose(); else onSigint();
+    });
+  }
+
+  function destroy() {
+    frame._exiting = true;
+    // rl is owned by the caller (main), not managed here
+  }
+
+  function write(text) {
+    process.stdout.write(text);
+  }
+
+  function writeLine(text) {
+    process.stdout.write(text + "\n");
+  }
+
+  function info(text) {
+    console.error(`[YPIC:info] ${text}`);
+  }
+
+  function setStatusDot() { /* no-op — no status bar in plain mode */ }
+  function setStatusText() { /* no-op */ }
+  function setModelText() { /* no-op */ }
+  function setInputHint() { /* no-op */ }
+
+  function setPrompt(text) {
+    if (!frame._rl.closed) frame._rl.setPrompt(text);
+  }
+
+  function enableInput() {
+    if (!frame._exiting && !frame._rl.closed) frame._rl.prompt();
+  }
+
+  function disableInput() { /* no-op — input is always available in plain mode */ }
+
+  frame.start = start;
+  frame.destroy = destroy;
+  frame.write = write;
+  frame.writeLine = writeLine;
+  frame.info = info;
+  frame.setStatusDot = setStatusDot;
+  frame.setStatusText = setStatusText;
+  frame.setModelText = setModelText;
+  frame.setInputHint = setInputHint;
+  frame.setPrompt = setPrompt;
+  frame.enableInput = enableInput;
+  frame.disableInput = disableInput;
+
+  return frame;
+}
+
+/**
+ * Factory: pick TerminalFrame or PlainFrame based on the environment.
+ *
+ * TerminalFrame is used when:
+ *   - stdout is a TTY
+ *   - NO_COLOR is NOT set
+ *   - YPIC_PLAIN is NOT set
+ *   - stdin is a TTY (needed for raw-mode input)
+ *
+ * Otherwise PlainFrame with a readline interface is used.
+ */
+function createFrame(rl) {
+  const useTty =
+    process.stdout.isTTY &&
+    process.stdin.isTTY &&
+    !process.env.NO_COLOR &&
+    !process.env.YPIC_PLAIN;
+  if (useTty) return createTerminalFrame();
+  return createPlainFrame(rl);
+}
+
+// ---------------------------------------------------------------------------
 // SSE streaming + rendering
 // ---------------------------------------------------------------------------
 
@@ -484,21 +1110,56 @@ function summarizeStudioWaitUpdate(event, renderer) {
  */
 function connectSse(baseUrl, sessionId, onEvent) {
   const url = `${baseUrl}/api/agent/${encodeURIComponent(sessionId)}/events`;
-  const state = { closed: false, controller: new AbortController() };
+  const state = {
+    closed: false,
+    connected: false,
+    everConnected: false,
+    connectionError: null,
+    controller: new AbortController(),
+  };
+
+  let resolveConnected;
+  let rejectConnected;
+  const connectedPromise = new Promise((resolve, reject) => {
+    resolveConnected = resolve;
+    rejectConnected = reject;
+  });
+
+  // Wrap onEvent to track connection state and resolve the connected promise.
+  const wrappedOnEvent = (event) => {
+    if (event.type === "connected") {
+      state.connected = true;
+      state.everConnected = true;
+      resolveConnected(true);
+      debug("SSE connected");
+    }
+    if (event.type === "_sse_error" && !state.connected) {
+      // Only capture pre-connected errors as connection failures.
+      // Post-connected _sse_error means the stream hit an issue mid-flight
+      // — it goes to the renderer for display, not the connection gate.
+      state.connectionError = event.error;
+      ypicInfo(`  ✗ SSE connection failed: ${event.error}`);
+      rejectConnected(new Error(event.error));
+    }
+    onEvent(event);
+  };
 
   const decoder = new TextDecoder();
   let buffer = "";
 
+  debug("SSE: connecting to", url);
   (async () => {
+    const t0 = Date.now();
     let res;
     try {
       res = await fetch(url, { signal: state.controller.signal, headers: { Accept: "text/event-stream" } });
+      debugTiming(`SSE connect ${url} status=${res.status}`, t0);
     } catch (error) {
-      if (!state.closed) onEvent({ type: "_sse_error", error: error instanceof Error ? error.message : String(error) });
+      if (!state.closed) wrappedOnEvent({ type: "_sse_error", error: error instanceof Error ? error.message : String(error) });
       return;
     }
     if (!res.ok || !res.body) {
-      if (!state.closed) onEvent({ type: "_sse_error", error: `SSE connect failed: HTTP ${res.status}` });
+      if (!state.closed) wrappedOnEvent({ type: "_sse_error", error: `SSE connect failed: HTTP ${res.status}` });
       return;
     }
     const reader = res.body.getReader();
@@ -512,14 +1173,14 @@ function connectSse(baseUrl, sessionId, onEvent) {
         while ((sep = buffer.indexOf("\n\n")) !== -1) {
           const rawEvent = buffer.slice(0, sep);
           buffer = buffer.slice(sep + 2);
-          handleRawEvent(rawEvent, onEvent);
+          handleRawEvent(rawEvent, wrappedOnEvent);
         }
       }
     } catch (error) {
-      if (!state.closed) onEvent({ type: "_sse_error", error: error instanceof Error ? error.message : String(error) });
+      if (!state.closed) wrappedOnEvent({ type: "_sse_error", error: error instanceof Error ? error.message : String(error) });
     } finally {
       state.closed = true;
-      onEvent({ type: "_sse_closed" });
+      wrappedOnEvent({ type: "_sse_closed" });
     }
   })();
 
@@ -531,6 +1192,16 @@ function connectSse(baseUrl, sessionId, onEvent) {
     isClosed() {
       return state.closed;
     },
+    isConnected() {
+      return state.connected;
+    },
+    isEverConnected() {
+      return state.everConnected;
+    },
+    getConnectionError() {
+      return state.connectionError;
+    },
+    connected: connectedPromise,
   };
 }
 
@@ -586,7 +1257,7 @@ function shortToolHint(name, args) {
  * Keeps track of running state, streaming assistant text deltas, and open
  * tool calls, printing compact progress to stdout.
  */
-function createRenderer() {
+function createRenderer(frame) {
   const renderer = {
     running: false,
     printedTextLen: 0,        // cumulative assistant text already printed this message
@@ -596,11 +1267,12 @@ function createRenderer() {
     lastWaitSig: null,        // last ypi_studio_wait update signature (dedupe)
     lastWaitPrintAt: 0,       // last ypi_studio_wait update print time (throttle)
     baseUrl: null,            // server base url, for approval/open hints
+    frame: frame,             // rendering target
   };
 
   function ensureNewline() {
     if (renderer.pendingNewline) {
-      process.stdout.write("\n");
+      frame.write("\n");
       renderer.pendingNewline = false;
     }
   }
@@ -608,7 +1280,7 @@ function createRenderer() {
   function writeAssistantDelta(text) {
     if (text.length > renderer.printedTextLen) {
       const delta = text.slice(renderer.printedTextLen);
-      process.stdout.write(delta);
+      frame.write(delta);
       renderer.printedTextLen = text.length;
       renderer.pendingNewline = !text.endsWith("\n");
     }
@@ -651,12 +1323,12 @@ function createRenderer() {
         const name = event.toolName || "tool";
         renderer.toolNamesById.set(id, name);
         if (STUDIO_TOOLS.has(name)) {
-          if (name === "ypi_studio_task") process.stdout.write(`  ${summarizeStudioTaskStart(event.args)}\n`);
-          else if (name === "ypi_studio_subagent") process.stdout.write(`  ${summarizeStudioSubagentStart(event.args)}\n`);
-          else if (name === "ypi_studio_wait") process.stdout.write(`  ${summarizeStudioWaitStart(event.args)}\n`);
+          if (name === "ypi_studio_task") frame.writeLine(`  ${summarizeStudioTaskStart(event.args)}`);
+          else if (name === "ypi_studio_subagent") frame.writeLine(`  ${summarizeStudioSubagentStart(event.args)}`);
+          else if (name === "ypi_studio_wait") frame.writeLine(`  ${summarizeStudioWaitStart(event.args)}`);
         } else {
           const hint = shortToolHint(name, event.args);
-          process.stdout.write(`  ⚒ ${name}${hint}\n`);
+          frame.writeLine(`  ⚒ ${name}${hint}`);
         }
         break;
       }
@@ -666,7 +1338,7 @@ function createRenderer() {
         const updateName = event.toolName || renderer.toolNamesById.get(event.toolCallId) || "";
         if (updateName === "ypi_studio_wait") {
           const line = summarizeStudioWaitUpdate(event, renderer);
-          if (line) { ensureNewline(); process.stdout.write(line + "\n"); }
+          if (line) { ensureNewline(); frame.writeLine(line); }
         }
         break;
       }
@@ -676,12 +1348,12 @@ function createRenderer() {
         renderer.toolNamesById.delete(id);
         if (STUDIO_TOOLS.has(name)) {
           ensureNewline();
-          if (name === "ypi_studio_task") process.stdout.write(summarizeStudioTaskEnd(event, renderer, renderer.baseUrl) + "\n");
-          else if (name === "ypi_studio_subagent") process.stdout.write(summarizeStudioSubagentEnd(event) + "\n");
-          else if (name === "ypi_studio_wait") process.stdout.write(summarizeStudioWaitEnd(event) + "\n");
+          if (name === "ypi_studio_task") frame.writeLine(summarizeStudioTaskEnd(event, renderer, renderer.baseUrl));
+          else if (name === "ypi_studio_subagent") frame.writeLine(summarizeStudioSubagentEnd(event));
+          else if (name === "ypi_studio_wait") frame.writeLine(summarizeStudioWaitEnd(event));
         } else {
           const mark = event.isError ? "✗" : "✓";
-          process.stdout.write(`  ${mark} ${name}\n`);
+          frame.writeLine(`  ${mark} ${name}`);
         }
         break;
       }
@@ -689,7 +1361,7 @@ function createRenderer() {
         ensureNewline();
         const childRuns = typeof event.studioChildRunCount === "number" ? event.studioChildRunCount : 0;
         if (childRuns > 0) {
-          process.stdout.write(`  … Studio 子任务仍在后台运行 (${childRuns})，主会话会在结束后自动续跑。\n`);
+          frame.writeLine(`  … Studio 子任务仍在后台运行 (${childRuns})，主会话会在结束后自动续跑。`);
         }
         renderer.running = false;
         renderer.printedTextLen = 0;
@@ -698,26 +1370,26 @@ function createRenderer() {
       }
       case "agent_error":
         ensureNewline();
-        process.stdout.write(`  ✗ agent error: ${event.errorMessage || "agent failed to start"}\n`);
+        frame.writeLine(`  ✗ agent error: ${event.errorMessage || "agent failed to start"}`);
         renderer.running = false;
         renderer.printedTextLen = 0;
         break;
       case "auto_retry_start":
-        process.stdout.write(`  ↻ retry ${event.attempt}/${event.maxAttempts}${event.errorMessage ? `: ${event.errorMessage}` : ""}\n`);
+        frame.writeLine(`  ↻ retry ${event.attempt}/${event.maxAttempts}${event.errorMessage ? `: ${event.errorMessage}` : ""}`);
         break;
       case "auto_retry_end":
         break;
       case "chatgpt_account_failover":
-        process.stdout.write(`  ↻ ChatGPT 账号切换: ${event.status}\n`);
+        frame.writeLine(`  ↻ ChatGPT 账号切换: ${event.status}`);
         break;
       case "auto_compaction_start":
       case "compaction_start":
-        process.stdout.write("  ⚙ compacting context…\n");
+        frame.writeLine("  ⚙ compacting context…");
         break;
       case "auto_compaction_end":
       case "compaction_end":
-        if (event.errorMessage) process.stdout.write(`  ✗ compaction failed: ${event.errorMessage}\n`);
-        else process.stdout.write("  ✓ context compacted\n");
+        if (event.errorMessage) frame.writeLine(`  ✗ compaction failed: ${event.errorMessage}`);
+        else frame.writeLine("  ✓ context compacted");
         break;
       case "session_file_changes_update":
         // File-change sidecars are a Web overlay concern; not rendered in CLI.
@@ -728,10 +1400,13 @@ function createRenderer() {
         break;
       case "_sse_error":
         ensureNewline();
-        process.stdout.write(`  ✗ stream error: ${event.error}\n`);
+        frame.writeLine(`  ✗ stream error: ${event.error}`);
         break;
       case "_sse_closed":
         // Stream closed (server stop / network). Caller may reconnect.
+        if (!renderer.running) {
+          debug("SSE stream closed while idle");
+        }
         break;
       default:
         debug("unhandled event type:", event.type);
@@ -763,6 +1438,9 @@ async function main() {
   const baseUrl = buildBaseUrl(opts);
   const cwd = process.cwd();
 
+  // Enable debug timing when YPIC_DEBUG is set.
+  debugTimingEnabled = Boolean(process.env.YPIC_DEBUG);
+
   // Health check — never self-start a server.
   const health = await checkHealth(baseUrl);
   if (!health.ok) {
@@ -775,16 +1453,43 @@ async function main() {
     process.exit(1);
   }
 
-  process.stdout.write(`YPI CLI chat · cwd: ${cwd}\n`);
-  process.stdout.write(`Using local ypi server: ${baseUrl} (v${health.body.version})\n`);
-  process.stdout.write(`Type /help for commands, /config to open Web settings, /oweb to open this session in Web, /quit to exit.\n\n`);
+  // Create readline (used by PlainFrame or for non-TTY fallback only).
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: process.stdout.isTTY,
+    prompt: "> ",
+  });
+
+  // Frame: TTY bottom-bar rendering or plain readline fallback.
+  const frame = createFrame(rl);
+
+  // ── helpers that depend on frame ──────────────────────────
+
+  let currentModel = null;
+  let modelState = { list: [], defaultModel: null, thinkingLevels: {}, thinkingLevelMaps: {} };
+
+  function updateFrameModel() {
+    if (currentModel) {
+      frame.setModelText(`${currentModel.displayName} · ${currentModel.thinkingLevel}`);
+    } else {
+      frame.setModelText("no model");
+    }
+  }
+
+  // ── startup output through frame ──────────────────────────
+
+  frame.writeLine(`YPI CLI chat · cwd: ${cwd}`);
+  frame.writeLine(`Using local ypi server: ${baseUrl} (v${health.body.version})`);
+  frame.writeLine(`Type /help for commands, /config to open Web settings, /oweb to open this session in Web, /quit to exit.`);
+  frame.write("\n");
 
   let sessionId;
   let projectContext = null;
 
   if (opts.resume) {
     sessionId = opts.resume;
-    process.stdout.write(`Resuming session: ${sessionId}\n`);
+    frame.writeLine(`Resuming session: ${sessionId}`);
   } else if (opts.continue) {
     const recent = await findRecentSessionForCwd(baseUrl, cwd);
     if (recent) {
@@ -792,22 +1497,21 @@ async function main() {
       projectContext = recent.projectId && recent.spaceId
         ? { projectId: recent.projectId, spaceId: recent.spaceId }
         : null;
-      process.stdout.write(`Continuing session: ${sessionId}\n`);
+      frame.writeLine(`Continuing session: ${sessionId}`);
     } else {
-      process.stdout.write(`No existing session for this cwd; creating a new one.\n`);
+      frame.writeLine(`No existing session for this cwd; creating a new one.`);
     }
   }
 
   if (!sessionId) {
-    // Ensure the cwd is a known project/space, then create an empty session.
     try {
       projectContext = await resolveProjectContext(baseUrl, cwd);
     } catch (error) {
-      process.stdout.write(`  ! project context skipped: ${error instanceof Error ? error.message : String(error)}\n`);
+      frame.writeLine(`  ! project context skipped: ${error instanceof Error ? error.message : String(error)}`);
       projectContext = null;
     }
     sessionId = await draftSession(baseUrl, cwd, projectContext);
-    process.stdout.write(`Session created: ${sessionId}\n`);
+    frame.writeLine(`Session created: ${sessionId}`);
   }
 
   // Resume awareness: check whether the session is already running.
@@ -817,46 +1521,99 @@ async function main() {
   }
   const initiallyRunning = Boolean(agentState?.running);
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: process.stdout.isTTY,
-    prompt: "> ",
-  });
-
-  let exiting = false;
-
-  // Guard against calling rl.prompt() after stdin closed (pipe/EOF).
-  function safePrompt() {
-    if (!exiting && !rl.closed) rl.prompt();
+  // Load models and resolve current model state.
+  try {
+    const loaded = await fetchModels(baseUrl);
+    modelState = {
+      list: loaded.modelList || [],
+      defaultModel: loaded.defaultModel || null,
+      thinkingLevels: loaded.thinkingLevels || {},
+      thinkingLevelMaps: loaded.thinkingLevelMaps || {},
+    };
+  } catch (error) {
+    debug("Failed to load models:", error instanceof Error ? error.message : String(error));
   }
 
-  const renderer = createRenderer();
+  // Resolve current model from agent state + model list.
+  currentModel = resolveCurrentModel(agentState, modelState.list);
+
+  // If no model is set but a default exists and the session is not running, set it.
+  if (!currentModel && modelState.defaultModel && !initiallyRunning) {
+    const dm = modelState.defaultModel;
+    try {
+      await sendAgentCommand(baseUrl, sessionId, { type: "set_model", provider: dm.provider, modelId: dm.modelId });
+      const match = findModel(modelState.list, dm.provider, dm.modelId);
+      currentModel = {
+        provider: dm.provider,
+        modelId: dm.modelId,
+        displayName: match ? modelDisplayName(match) : `${dm.provider}/${dm.modelId}`,
+        thinkingLevel: "off",
+      };
+    } catch (error) {
+      debug("Failed to set default model:", error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  // Display model info and sync to frame status bar.
+  if (currentModel) {
+    frame.writeLine(`Model: ${formatModelSummary(currentModel)}`);
+  } else {
+    frame.writeLine("Model: not configured — use /config to open Web settings and set up a model.");
+  }
+  frame.write("\n");
+  updateFrameModel();
+
+  // ── renderer ──────────────────────────────────────────────
+
+  const renderer = createRenderer(frame);
   renderer.baseUrl = baseUrl;
+
+  let exiting = false;
+  let sseReconnectAttempted = false;
   let sse = null;
   let reconnectTimer = null;
+  let sigintCount = 0;
+  let sigintResetTimer = null;
 
-  // If the stream dies while the agent is running, attempt one reconnect.
+  // Guard against prompting when finished.
+  function safePrompt() {
+    if (frame.kind === "plain" && !exiting && !rl.closed) rl.prompt();
+    // TTY frame is always accepting input; no explicit prompt needed.
+  }
+
+  // If the stream dies while the agent is running, attempt ONE reconnect.
   const handleSseClosed = () => {
-    if (exiting || !renderer.running || !sse?.isClosed()) return;
+    if (exiting || !sse?.isClosed()) return;
     if (reconnectTimer) return;
+    if (!renderer.running) {
+      debug("SSE stream closed while idle");
+      return;
+    }
+    if (sseReconnectAttempted) {
+      frame.writeLine("  ✗ SSE stream lost again after reconnect. The agent may not respond. Try /abort or /quit and restart.");
+      return;
+    }
+    sseReconnectAttempted = true;
+    frame.writeLine("  ⚡ SSE stream disconnected. Reconnecting (one attempt)…");
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
-      if (exiting || !renderer.running) return;
+      if (exiting) return;
       debug("reconnecting SSE");
       sse = connectSse(baseUrl, sessionId, (event) => renderer.handleEvent(event));
+      sse.connected.then(() => {
+        frame.writeLine("  ✓ SSE reconnected");
+      }).catch((err) => {
+        frame.writeLine(`  ✗ SSE reconnect failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
     }, 1000);
   };
 
-  // Wrap the renderer's handler so we can also drive reconnect logic on
-  // stream close, and run a light Studio approval backup check on agent_end.
-  // Connect the SSE stream once, after wrapping.
+  // Wrap the renderer's handler so we can also drive reconnect and approval.
   const originalHandle = renderer.handleEvent;
   renderer.handleEvent = (event) => {
     originalHandle(event);
     if (event.type === "agent_end") {
       void maybePromptStudioApproval();
-      // In one-shot mode with non-TTY stdin, exit after the turn finishes.
       if (opts.message && !process.stdin.isTTY && !exiting) {
         void quit();
       }
@@ -866,9 +1623,8 @@ async function main() {
   sse = connectSse(baseUrl, sessionId, (event) => renderer.handleEvent(event));
 
   // Backup detection: when a turn ends with the bound Studio task in
-  // awaiting_approval (e.g. the transition happened outside a ypi_studio_task
-  // tool result), fetch the session's studio task and print the plan-review
-  // prompt once. Never auto-approves.
+  // awaiting_approval, fetch the session's studio task and print the
+  // plan-review prompt once. Never auto-approves.
   async function maybePromptStudioApproval() {
     if (renderer.approvalPrompted || exiting) return;
     try {
@@ -877,7 +1633,7 @@ async function main() {
       if (task && task.status === "awaiting_approval") {
         renderer.approvalPrompted = true;
         renderer.ensureNewline();
-        process.stdout.write(approvalPromptText(task, baseUrl));
+        frame.write(approvalPromptText(task, baseUrl));
       }
     } catch (error) {
       debug("studio approval backup check failed:", error instanceof Error ? error.message : String(error));
@@ -888,8 +1644,7 @@ async function main() {
     renderer.running = true;
   }
 
-  let sigintCount = 0;
-  let sigintResetTimer = null;
+  // ── quit ──────────────────────────────────────────────────
 
   async function quit() {
     if (exiting) return;
@@ -898,9 +1653,11 @@ async function main() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
     const sessionWebUrl = buildSessionWebUrl(baseUrl, sessionId);
     const resumeCommand = buildResumeCommand(opts, sessionId);
-    // Light Studio exit protection: the CLI never owns the server lifecycle; if
-    // Studio child runs are still active or the task awaits the user, just point
-    // the user to the Web panel instead of killing background work.
+
+    // Destroy the frame (restores terminal for TTY mode).
+    frame.destroy();
+
+    // Light Studio exit protection.
     try {
       const taskBody = await getStudioTask(baseUrl, sessionId);
       const task = taskBody?.task;
@@ -928,7 +1685,6 @@ async function main() {
       }
     } catch (error) {
       debug("studio-task check failed:", error instanceof Error ? error.message : String(error));
-      // Non-Studio sessions and transient fetch errors must not block exit.
     }
     process.stdout.write(
       `\nResume this session with:\n  ${resumeCommand}\n` +
@@ -938,19 +1694,38 @@ async function main() {
     process.exit(0);
   }
 
-  function printHelp() {
-    process.stdout.write(
-      "In-session commands:\n" +
-      "  /help          show this help\n" +
-      "  /config /open  open ypi Web in your browser\n" +
-      "  /oweb          open this exact session in the Web UI\n" +
-      "  /status        show current agent state\n" +
-      "  /abort         abort a running turn\n" +
-      "  /steer <text>  steer a running agent\n" +
-      "  /follow <text> queue a follow-up message\n" +
-      "  /quit          exit (Ctrl-C also works)\n",
-    );
+  // ── SIGINT / abort handling ───────────────────────────────
+
+  function onSigintAbort() {
+    sigintCount += 1;
+    if (sigintResetTimer) clearTimeout(sigintResetTimer);
+    sigintResetTimer = setTimeout(() => { sigintCount = 0; }, 1500);
+    if (renderer.running && sigintCount === 1) {
+      frame.writeLine("  ⏹ aborting… (Ctrl-C again to quit)");
+      sendAgentCommand(baseUrl, sessionId, { type: "abort" }).catch(() => {});
+      // Keep accepting input; don't change status.
+      if (frame.kind === "plain") safePrompt();
+      return;
+    }
+    void quit();
   }
+
+  // ── help ──────────────────────────────────────────────────
+
+  function printHelp() {
+    frame.writeLine("In-session commands:");
+    frame.writeLine("  /help          show this help");
+    frame.writeLine("  /model         manage model and thinking level");
+    frame.writeLine("  /config /open  open ypi Web in your browser");
+    frame.writeLine("  /oweb          open this exact session in the Web UI");
+    frame.writeLine("  /status        show current agent state");
+    frame.writeLine("  /abort         abort a running turn");
+    frame.writeLine("  /steer <text>  steer a running agent");
+    frame.writeLine("  /follow <text> queue a follow-up message");
+    frame.writeLine("  /quit          exit (Ctrl-C also works)");
+  }
+
+  // ── input handler ─────────────────────────────────────────
 
   async function handleLine(line) {
     const input = String(line ?? "");
@@ -971,59 +1746,218 @@ async function main() {
     }
     if (trimmed === "/config" || trimmed === "/open") {
       openBrowser(baseUrl);
-      process.stdout.write(`Opened ${baseUrl} in your browser.\nUse Settings for models, auth, Studio member policy, terminal, usage, and editor configuration.\n`);
+      frame.writeLine(`Opened ${baseUrl} in your browser.`);
+      frame.writeLine("Use Settings for models, auth, Studio member policy, terminal, usage, and editor configuration.");
       safePrompt();
       return;
     }
     if (trimmed === "/oweb") {
       const sessionWebUrl = buildSessionWebUrl(baseUrl, sessionId);
       openBrowser(sessionWebUrl);
-      process.stdout.write(`Opened ${sessionWebUrl} in your browser.\n`);
+      frame.writeLine(`Opened ${sessionWebUrl} in your browser.`);
       safePrompt();
       return;
     }
     if (trimmed === "/status") {
       const state = await getAgentState(baseUrl, sessionId);
       if (!state) {
-        process.stdout.write("No agent state available.\n");
+        frame.writeLine("No agent state available.");
       } else if (state.running) {
-        process.stdout.write(`Agent running.\n`);
+        frame.writeLine("Agent running.");
       } else {
-        process.stdout.write(`Agent idle.\n`);
+        frame.writeLine("Agent idle.");
       }
       safePrompt();
       return;
     }
     if (trimmed === "/abort") {
       if (!renderer.running) {
-        process.stdout.write("Nothing to abort (agent is idle).\n");
+        frame.writeLine("Nothing to abort (agent is idle).");
         safePrompt();
         return;
       }
       await sendAgentCommand(baseUrl, sessionId, { type: "abort" }).catch((e) => {
-        process.stdout.write(`abort failed: ${e instanceof Error ? e.message : String(e)}\n`);
+        frame.writeLine(`abort failed: ${e instanceof Error ? e.message : String(e)}`);
       });
       safePrompt();
       return;
     }
     if (trimmed.startsWith("/steer ")) {
       const text = trimmed.slice("/steer ".length).trim();
-      if (!text) { process.stdout.write("Usage: /steer <text>\n"); safePrompt(); return; }
+      if (!text) { frame.writeLine("Usage: /steer <text>"); safePrompt(); return; }
       await sendAgentCommand(baseUrl, sessionId, { type: "steer", message: text }).catch((e) => {
-        process.stdout.write(`steer failed: ${e instanceof Error ? e.message : String(e)}\n`);
+        frame.writeLine(`steer failed: ${e instanceof Error ? e.message : String(e)}`);
       });
       safePrompt();
       return;
     }
     if (trimmed.startsWith("/follow ")) {
       const text = trimmed.slice("/follow ".length).trim();
-      if (!text) { process.stdout.write("Usage: /follow <text>\n"); safePrompt(); return; }
+      if (!text) { frame.writeLine("Usage: /follow <text>"); safePrompt(); return; }
       await sendAgentCommand(baseUrl, sessionId, { type: "follow_up", message: text }).catch((e) => {
-        process.stdout.write(`follow_up failed: ${e instanceof Error ? e.message : String(e)}\n`);
+        frame.writeLine(`follow_up failed: ${e instanceof Error ? e.message : String(e)}`);
       });
       safePrompt();
       return;
     }
+    // --- /model command ---
+    if (trimmed === "/model" || trimmed.startsWith("/model ")) {
+      const rest = trimmed === "/model" ? "" : trimmed.slice("/model ".length).trim();
+
+      if (rest === "" || rest === "help") {
+        frame.writeLine("Model selection commands:");
+        frame.writeLine("  /model current            Show current model and thinking level");
+        frame.writeLine("  /model list [provider]    List available models");
+        frame.writeLine("  /model <provider>/<modelId> [<thinking>]  Switch model");
+        frame.writeLine("  /model thinking <level>   Switch thinking (off/auto/low/medium/high/xhigh)");
+        frame.write("\n");
+        if (currentModel) {
+          frame.writeLine(`  Current: ${formatModelSummary(currentModel)}`);
+        } else {
+          frame.writeLine("  No model configured.");
+        }
+        frame.write("\n");
+        safePrompt();
+        return;
+      }
+
+      if (rest === "current") {
+        if (currentModel) {
+          frame.writeLine(`Current model: ${formatModelSummary(currentModel)}`);
+          const levels = getSupportedThinkingLevels(modelState, currentModel.provider, currentModel.modelId);
+          frame.writeLine(`Supported thinking levels: ${levels.join(", ")}`);
+        } else {
+          frame.writeLine("No model configured. Use /config to open Web settings.");
+        }
+        safePrompt();
+        return;
+      }
+
+      if (rest === "list" || rest.startsWith("list ")) {
+        const filterProvider = rest.startsWith("list ") ? rest.slice("list ".length).trim() : null;
+        if (modelState.list.length === 0) {
+          frame.writeLine("No models available. Check your server configuration and ensure at least one model provider is set up.");
+          safePrompt();
+          return;
+        }
+        const groups = new Map();
+        for (const m of modelState.list) {
+          if (filterProvider && m.provider !== filterProvider) continue;
+          const key = m.providerDisplayName || m.provider;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(m);
+        }
+        if (groups.size === 0) {
+          frame.writeLine(`No models found for provider "${filterProvider}".`);
+          safePrompt();
+          return;
+        }
+        for (const [pd, models] of groups) {
+          frame.writeLine(`${pd}:`);
+          for (const m of models) {
+            const marker = currentModel && currentModel.provider === m.provider && currentModel.modelId === m.id ? " *" : "  ";
+            frame.writeLine(`${marker} ${m.provider}/${m.id}  ${m.name}`);
+          }
+        }
+        frame.writeLine("  * = current model. Switch with /model <provider>/<modelId>");
+        safePrompt();
+        return;
+      }
+
+      if (rest.startsWith("thinking ")) {
+        const level = rest.slice("thinking ".length).trim().toLowerCase();
+        if (!THINKING_LEVELS.includes(level)) {
+          frame.writeLine(`Invalid thinking level: "${level}". Supported: ${THINKING_LEVELS.join(", ")}`);
+          safePrompt();
+          return;
+        }
+        if (renderer.running) {
+          frame.writeLine("Agent is running. Use /abort first to stop the current turn before switching models.");
+          safePrompt();
+          return;
+        }
+        if (!currentModel) {
+          frame.writeLine("No model configured. Use /config to set up a model first.");
+          safePrompt();
+          return;
+        }
+        const supported = getSupportedThinkingLevels(modelState, currentModel.provider, currentModel.modelId);
+        if (!supported.includes(level)) {
+          frame.writeLine(`Thinking level "${level}" is not supported for ${currentModel.displayName}. Supported: ${supported.join(", ")}`);
+          safePrompt();
+          return;
+        }
+        try {
+          await sendAgentCommand(baseUrl, sessionId, { type: "set_thinking_level", level });
+          currentModel.thinkingLevel = level;
+          frame.writeLine(`Thinking level set to "${level}" for ${currentModel.displayName}.`);
+          updateFrameModel();
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          frame.writeLine(`Failed to set thinking level: ${msg}`);
+        }
+        safePrompt();
+        return;
+      }
+
+      // Parse as provider/modelId [thinking]
+      const parsed = parseModelSwitch(rest);
+      if (!parsed) {
+        frame.writeLine("Invalid /model syntax. Use /model for help.");
+        safePrompt();
+        return;
+      }
+
+      if (renderer.running) {
+        frame.writeLine("Agent is running. Use /abort first to stop the current turn before switching models.");
+        safePrompt();
+        return;
+      }
+
+      const { provider, modelId, thinking: parsedThinking } = parsed;
+      const model = findModel(modelState.list, provider, modelId);
+      if (!model) {
+        frame.writeLine(`Model not found: ${provider}/${modelId}. Use /model list to see available models.`);
+        safePrompt();
+        return;
+      }
+
+      try {
+        await sendAgentCommand(baseUrl, sessionId, { type: "set_model", provider, modelId });
+        currentModel = {
+          provider,
+          modelId,
+          displayName: modelDisplayName(model),
+          thinkingLevel: currentModel?.thinkingLevel ?? "off",
+        };
+        frame.writeLine(`Model switched to ${currentModel.displayName}.`);
+        updateFrameModel();
+
+        if (parsedThinking) {
+          const supported = getSupportedThinkingLevels(modelState, provider, modelId);
+          if (!supported.includes(parsedThinking)) {
+            frame.writeLine(`Warning: thinking level "${parsedThinking}" is not supported for ${currentModel.displayName}. Supported: ${supported.join(", ")}. Thinking level unchanged.`);
+          } else {
+            try {
+              await sendAgentCommand(baseUrl, sessionId, { type: "set_thinking_level", level: parsedThinking });
+              currentModel.thinkingLevel = parsedThinking;
+              frame.writeLine(`Thinking level set to "${parsedThinking}".`);
+              updateFrameModel();
+            } catch (error) {
+              const msg = error instanceof Error ? error.message : String(error);
+              frame.writeLine(`Warning: failed to set thinking level: ${msg}`);
+            }
+          }
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        frame.writeLine(`Failed to switch model: ${msg}`);
+      }
+      safePrompt();
+      return;
+    }
+    // --- end /model ---
+
     if (trimmed.startsWith("/")) {
       // Unknown slash command — send it through as a chat prompt so existing
       // Studio slash commands (e.g. /studio-feature) work transparently.
@@ -1032,50 +1966,111 @@ async function main() {
     // Regular chat input.
     try {
       if (renderer.running) {
-        // Mid-turn input defaults to steer (keeps the turn going with a new
-        // instruction). Use /follow to queue a post-turn follow-up instead.
         await sendAgentCommand(baseUrl, sessionId, { type: "steer", message: trimmed });
       } else {
+        frame.writeLine("Sending…");
+        if (frame.kind === "tty") frame.setStatusDot("busy");
         renderer.running = true;
         renderer.resetMessage();
         await sendAgentCommand(baseUrl, sessionId, { type: "prompt", message: trimmed });
+        // POST returned — server accepted the prompt. Check SSE status.
+        if (!sse?.isConnected()) {
+          const connErr = sse?.getConnectionError();
+          if (connErr) {
+            frame.writeLine(`  ✗ SSE connection failed earlier: ${connErr}`);
+            frame.writeLine("  hint: The agent may not stream output. Check your server or restart with /quit and try again.");
+          } else {
+            frame.writeLine("  ⚡ Waiting for SSE connection…");
+            try {
+              await Promise.race([
+                sse?.connected,
+                new Promise((_, reject) => setTimeout(() => reject(new Error("SSE connect timeout")), 10_000)),
+              ]);
+              frame.writeLine("  ✓ SSE connected");
+            } catch (sseErr) {
+              if (sseErr instanceof Error && sseErr.message === "SSE connect timeout") {
+                frame.writeLine("  ⚠ SSE not connected after 10s. The agent may still respond; if no output appears, check the server or restart.");
+              } else {
+                frame.writeLine(`  ✗ SSE connection error: ${sseErr instanceof Error ? sseErr.message : String(sseErr)}`);
+                frame.writeLine("  hint: The server may be unreachable for SSE. Check your network or restart the server.");
+              }
+              debug("SSE connect gate failed:", sseErr instanceof Error ? sseErr.message : String(sseErr));
+            }
+          }
+        }
+        frame.writeLine("Waiting for model response…");
+        if (frame.kind === "tty") frame.setInputHint("(Running… Enter to steer, Ctrl-C to abort)");
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      const msg = err.message;
       renderer.ensureNewline();
-      process.stdout.write(`  ✗ send failed: ${msg}\n`);
-      if (/auth|provider|model|401|403|no.*model/i.test(msg)) {
-        process.stdout.write(`  hint: run /config to open the Web page and configure models/auth.\n`);
+      frame.writeLine(`  ✗ send failed: ${msg}`);
+      if (err.hint) {
+        frame.writeLine(`  hint: ${err.hint}`);
+      } else if (/auth|provider|model|401|403|no.*model/i.test(msg)) {
+        frame.writeLine("  hint: run /config to open the Web page and configure models/auth.");
       }
       renderer.running = false;
+      if (frame.kind === "tty") { frame.setStatusDot("idle"); frame.setInputHint(""); }
     }
     safePrompt();
   }
 
-  // SIGINT handling: first Ctrl-C aborts a running turn; a second Ctrl-C
-  // (or Ctrl-C while idle) exits.
-  rl.on("SIGINT", () => {
-    sigintCount += 1;
-    if (sigintResetTimer) clearTimeout(sigintResetTimer);
-    sigintResetTimer = setTimeout(() => { sigintCount = 0; }, 1500);
-    if (renderer.running && sigintCount === 1) {
-      process.stdout.write("\n  ⏹ aborting… (Ctrl-C again to quit)\n");
-      sendAgentCommand(baseUrl, sessionId, { type: "abort" }).catch(() => {});
-      return;
-    }
-    void quit();
-  });
+  // ── wire frame input / lifecycle ──────────────────────────
 
-  rl.on("line", (line) => { void handleLine(line); });
-  rl.on("close", () => {
-    // In one-shot mode (ypic "message" with non-TTY stdin), wait for the
-    // agent turn to finish instead of aborting on EOF. Interactive TTY
-    // sessions exit immediately on Ctrl-D / close.
-    if (!exiting && !opts.message) void quit();
-  });
+  // The frame.start() wires its own input handling.
+  // For TTY: raw-mode keyboard input → handleLine
+  // For Plain: readline 'line' event → handleLine
+  // Ctrl-C is handled by onSigintAbort.
+  frame.start(
+    (line) => { void handleLine(line); },
+    () => { void quit(); },        // onSigint (quit on idle / second Ctrl-C)
+    onSigintAbort,                 // onAbort  (first Ctrl-C when running)
+    () => {
+      // In one-shot mode with non-TTY stdin, EOF should not tear down the
+      // process before the positional message finishes streaming.
+      if (!exiting && !opts.message) void quit();
+    },
+  );
+
+  // ── status synchronisation ────────────────────────────────
+
+  // Sync frame status dot when renderer running state changes.
+  const originalAgentEnd = renderer.handleEvent;
+  renderer.handleEvent = (event) => {
+    originalAgentEnd(event);
+    // After event processing, sync the status dot.
+    if (event.type === "agent_start") {
+      if (frame.kind === "tty") { frame.setStatusDot("busy"); frame.setInputHint("(Running… Enter to steer, Ctrl-C to abort)"); }
+    } else if (event.type === "agent_end" || event.type === "agent_error") {
+      if (frame.kind === "tty") { frame.setStatusDot("idle"); frame.setInputHint(""); }
+    } else if (event.type === "_sse_error" && !renderer.running) {
+      if (frame.kind === "tty") { frame.setStatusDot("error"); frame.setInputHint(""); }
+    } else if (event.type === "_sse_closed" && !renderer.running) {
+      if (frame.kind === "tty") { frame.setStatusDot("idle"); frame.setInputHint(""); }
+    }
+  };
+
+  // ── initial state ──────────────────────────────────────────
+
+  if (initiallyRunning) {
+    renderer.running = true;
+    if (frame.kind === "tty") { frame.setStatusDot("busy"); frame.setInputHint("(Running… Enter to steer, Ctrl-C to abort)"); }
+  }
 
   // Send the initial positional message (if any) as the first prompt.
   if (opts.message) {
+    if (!sse.isConnected()) {
+      try {
+        await Promise.race([
+          sse.connected,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("connect timeout")), 5_000)),
+        ]);
+      } catch {
+        debug("SSE not connected before positional message; proceeding");
+      }
+    }
     void handleLine(opts.message);
   } else {
     safePrompt();
@@ -1102,4 +2097,20 @@ module.exports = {
   oneLineTrunc,
   planReviewPathForTask,
   shortToolHint,
+  // Model helpers (exported for tests)
+  THINKING_LEVELS,
+  modelKey,
+  modelDisplayName,
+  findModel,
+  parseModelSwitch,
+  getSupportedThinkingLevels,
+  resolveCurrentModel,
+  formatModelSummary,
+  // Frame helpers (exported for tests)
+  ANSI,
+  stripAnsi,
+  visualWidth,
+  createFrame,
+  createTerminalFrame,
+  createPlainFrame,
 };
