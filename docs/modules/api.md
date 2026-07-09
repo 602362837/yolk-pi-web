@@ -112,6 +112,7 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `chatgpt/usage-refresh/ensure/` | POST | Start or re-arm the backend ChatGPT usage auto-refresh scheduler according to `pi-web.json`. |
 | `chatgpt/usage-refresh/repair-lock/` | POST | Risk-gated stale lock repair for the ChatGPT usage auto-refresh scheduler. Requires `{ confirm: true }`. |
 | `chatgpt/usage-refresh/run/` | POST | Trigger a best-effort immediate ChatGPT usage refresh cycle through the backend scheduler. |
+| `cli/health/` | GET | Minimal health check used by the `ypic` CLI to identify a reusable yolk-pi-web server and distinguish it from another service on the same port. Returns `{ ok, app: "yolk-pi-web", version, pid, capabilities: { agentApi, studio } }` and never exposes env, tokens, user paths, or secrets. Existing `/api/agent/*` contracts are unchanged; `ypic` reuses `agent/draft`, `agent/[id]`, and `agent/[id]/events`, and uses `GET/POST /api/projects` to reuse or auto-register the current cwd as a project/space (idempotent by canonical `pathKey`). `ypic` never self-starts a server. |
 
 ## Implementation Pointers
 

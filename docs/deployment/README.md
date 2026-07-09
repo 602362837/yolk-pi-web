@@ -18,7 +18,7 @@ Web Terminal uses `@lydell/node-pty` as the server-side PTY dependency. If a tar
 
 Published npm package name: `@alan-zhao/yolk-pi-web`
 
-CLI command: `ypi`
+CLI commands: `ypi` (Web workspace) and `ypic` (terminal chat). Both ship in the same package under `bin/`; `bin/pi-web.js` is the Web entrypoint, `bin/ypic.js` is the terminal chat entrypoint, and `bin/server-runner.js` is the shared server-startup helper used by `ypi`.
 
 Run without installing:
 
@@ -57,6 +57,39 @@ When proxy options or proxy environment variables are present, `ypi` forwards
 `--use-env-proxy` to `NODE_OPTIONS` so Node/Next server-side fetch calls use the
 proxy. It also accepts the same environment aliases as the proxy startup scripts:
 `PROXY_URL` for HTTP/HTTPS proxy and `SOCKS_PROXY_URL` for `ALL_PROXY`.
+
+### `ypic` terminal chat
+
+`ypic` is an additive terminal chat entry that reuses a running ypi Web server over HTTP/SSE; it does **not** self-start a server. Start `ypi` (or the Web server) first, then run `ypic` in the project directory you want to chat in.
+
+```bash
+ypic                       # chat in the current directory (first message creates the session)
+ypic "explain this repo"   # send an initial prompt, then continue the chat loop
+ypic -c, --continue        # continue the most recent session for this cwd
+ypic --resume <sessionId>  # resume a specific session directly
+ypic -p 8080               # ypi server port (default: 30141; env: PI_WEB_PORT/PORT)
+ypic -H 127.0.0.1          # ypi server host (default: 127.0.0.1; env: PI_WEB_HOST/HOSTNAME)
+ypic -h, --help            # show CLI usage
+```
+
+On launch `ypic` performs `GET /api/cli/health`; if the responder is not
+`yolk-pi-web` or the check fails, it prints guidance to start `ypi` first and
+exits. It binds `process.cwd()` as the workspace, auto-registers the directory
+through the Project Registry API when it is not already a known project/space
+(idempotent by canonical `pathKey`), then drives chat via `POST /api/agent/draft`,
+`GET /api/agent/[id]/events`, and `POST /api/agent/[id]`. No new session format
+is introduced.
+
+In-session commands: `/help`, `/config` (or `/open`) to open the Web page in a
+browser, `/oweb` to open the current session’s fixed Web URL, `/status`,
+`/abort`, `/steer <text>`, `/follow <text>`, and `/quit`. Regular `/studio-*`
+slash commands are forwarded as chat prompts so the existing YPI Studio
+extension handles them; the CLI shows compact task/run status and the
+`plan-review.md` path, but full task details, artifacts, and member config stay
+in the Web Studio panel. Studio approval is never auto-granted by the CLI. On
+exit, `ypic` prints a `--resume <sessionId>` command plus the fixed Web URL for
+the current session.
+
 
 ## Data and Configuration
 
@@ -191,4 +224,7 @@ After publishing, verify the package:
 ```bash
 npm view @alan-zhao/yolk-pi-web version --prefer-online
 npx @alan-zhao/yolk-pi-web@latest --port 30141
+npx -p @alan-zhao/yolk-pi-web@latest ypic --help   # or: ypic --help once installed globally
 ```
+
+`npm pack --dry-run` should include `bin/pi-web.js`, `bin/ypic.js`, and `bin/server-runner.js` (the whole `bin/` directory is published).

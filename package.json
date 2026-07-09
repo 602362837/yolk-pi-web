@@ -19,7 +19,8 @@
     "nextjs"
   ],
   "bin": {
-    "ypi": "bin/pi-web.js"
+    "ypi": "bin/pi-web.js",
+    "ypic": "bin/ypic.js"
   },
   "files": [
     "bin",
@@ -40,6 +41,7 @@
     "test:studio-policy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-policy.mjs",
     "test:studio-dag": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-dag.mjs",
     "test:studio-sdk-runner": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-sdk-runner.mjs",
+    "test:ypic-cli": "node scripts/test-ypic-cli.mjs",
     "test:terminal-ssh": "node scripts/test-terminal-ssh-config.mjs",
     "test:usage-rollup": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-usage-stats-rollup.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
@@ -80,6 +82,6 @@
     "eslint-config-next": "16.2.9",
     "postcss": "^8",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5"
+    "typescript": "5.9.3"
   }
 }

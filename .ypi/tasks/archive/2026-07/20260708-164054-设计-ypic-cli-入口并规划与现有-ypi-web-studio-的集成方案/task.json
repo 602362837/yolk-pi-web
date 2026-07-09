@@ -1,0 +1,1516 @@
+{
+  "schemaVersion": 1,
+  "id": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+  "title": "设计 ypic CLI 入口并规划与现有 ypi/web/Studio 的集成方案",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260708-163020",
+  "createdAt": "2026-07-08T08:40:54.898Z",
+  "updatedAt": "2026-07-09T02:20:51.777Z",
+  "completedAt": "2026-07-08T09:54:30.852Z",
+  "contextIds": [
+    "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-740e9a22588653bd18122a01",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T08:41:07.018Z",
+      "finishedAt": "2026-07-08T08:47:51.780Z",
+      "runner": "sdk",
+      "childSessionId": "019f40e3-50de-77e8-b9f8-e35be3bfcb77",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T08-41-07-038Z_019f40e3-50de-77e8-b9f8-e35be3bfcb77.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f40e3-50de-77e8-b9f8-e35be3bfcb77",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "基于当前仓库，为新增 `ypic` CLI 入口做方案设计与任务规划。已知约束：1) `ypi` 命令已被现有 web 使用，不改其现有定位；2) 新增 `ypic` 作为 CLI 入口；3) CLI 目标尽量简洁，像常见 AI CLI，一般在当前目录启动即绑定当前目录 session/workspace；4) 复杂配置不在 CLI 里做，直接拉起浏览器到 Web 页面配置；5) CLI 只提供 chat 内操作；6) 需要考虑蛋黄派 / YPI Studio 工作流如何在…",
+      "summary": "完成规划，未进入实现，未修改生产代码。 Artifacts produced/updated: - `.ypi/tasks/20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案/brief.md` - `prd.md` - `ui.md` - `design.md` - `implement.md`（含 `json ypi-implementation-plan`，5 个子任务） - `checks.md` - `plan-review.md` - `handoff.md` Validation run: - 已校验 `implement.md` 中 implementation plan JSON 可解析：`5 subtasks` - 未运行 `npm run lint` / `tsc`，因为本轮仅写规划文档。 核心方案： - 新增 `ypic`，保留 `ypi` Web 入口不变。 - `ypic` 作为轻量终端 chat 控制器，复用/拉起现有 ypi Web server，通过现有 Agent API/SSE 驱动会话。 - Studio 在 CLI 中只做 slash command 轻入口、状态摘要、plan-review/Web 跳转提示，不复制 Web Studio 工作台。 - 当前结论：不需要 HTML UI 原型，除非后续要做富 TUI 或改变 Web 页面/审批交互。 剩余风险： - 重构 `bin/pi-web.js` 时必须保证 `ypi` 启动和自动开浏览器不回归。 - `ypic` 不能 import 未编译 TS，需发布包内 Node 可直接运行。 - CLI 退出时不能误杀仍有 Studio 后台任务的 server。 - 首条消息建议 draft → connect SSE → prompt，避免早期流事件丢失。 需要主会话/用户确认： 1. 是否接受 `ypic` 复用 ypi Web server API，而非独立 SDK runtime。 2. MVP 是否默认不自动注册 Project Registry。 3. `ypic` 自启 server 退出策略是否采用“无后台 Studio run 则关闭，有后台 run/`--keep-server` 则保留”。…",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T08:41:07.018Z",
+        "updatedAt": "2026-07-08T08:47:51.773Z",
+        "eventCount": 14119,
+        "lastTextPreview": "完成规划，未进入实现，未修改生产代码。\n\nArtifacts produced/updated:\n\n- `.ypi/tasks/20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 `json ypi-implementation-plan`，5 个子任务）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\nValidation run:\n\n- 已校验 `implement.md` 中 implementation plan JSON 可解析：`5 subtasks`\n- 未运行 `npm run lint` / `tsc`，因为本轮仅写规划文档。\n\n核心方案：\n\n- 新增 `ypic`，保留 `ypi` Web 入口不变。\n- `ypic` 作为轻量终端 chat 控制器，复用/拉起现有 ypi Web server，通过现有 Agent API/SSE 驱动会话。\n- Studio 在 CLI 中只做 slash command 轻入口、状态摘要、plan-review/Web 跳转提示，不复制 Web Studio 工作台。\n- 当前结论：不需要 HTML UI 原型，除非后续要做富 TUI 或改变 Web 页面/审批交互。\n\n剩余风险：\n\n- 重构 `bin/pi-web.js` 时必须保证 `ypi` 启动和自动开浏览器不回归。\n- `ypic` 不能 import 未编译 TS，需发布包内 Node 可直接运行。\n- CLI 退出时不能误杀仍有 Studio 后台任务的 server。\n- 首条消息建议 draft → connect SSE → prompt，避免早期流事件丢失。\n\n需要主会话/用户确认：\n\n1. 是否接受 `ypic` 复用 ypi Web server API，而非独立 SDK runtime。\n2. MVP 是否默认不自动注册 Project Registry。\n3. `ypic` 自启 server 退出策略是否采用“无后台 Studio run 则关闭，有后台 run/`--keep-server` 则保留”。\n4. 是否接受首版 `/config` 只打开 Web 根页，不做 Web deep link。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T08:47:35.848Z",
+            "toolCallId": "call_W5iAYwHQpoYWPqnGTiiOpVgn|fc_086e8d47d29184f9016a4e0ea5b6e48199aa3ac80ba697b07b",
+            "toolName": "bash",
+            "text": "implementation plan JSON ok: 5 subtasks",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T08:47:40.630Z",
+            "toolCallId": "call_cjm7RP2t7rrzHPbhJgiiacTv|fc_086e8d47d29184f9016a4e0eac52888199bfb51d926bc09b3f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short .ypi/tasks/20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T08:47:40.689Z",
+            "toolCallId": "call_cjm7RP2t7rrzHPbhJgiiacTv|fc_086e8d47d29184f9016a4e0eac52888199bfb51d926bc09b3f",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260708-164054-\\350\\256\\276\\350\\256\\241-ypic-cli-\\345\\205\\245\\345\\217\\243\\345\\271\\266\\350\\247\\204\\345\\210\\222\\344\\270\\216\\347\\216\\260\\346\\234\\211-ypi-web-studio-\\347\\232\\204\\351\\233\\206\\346\\210\\220\\346\\226\\271\\346\\241\\210/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T08:47:51.742Z",
+            "text": "完成规划，未进入实现，未修改生产代码。\n\nArtifacts produced/updated:\n\n- `.ypi/tasks/20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案/brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 `json ypi-implementation-plan`，5 个子任务）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\nValidation run:\n\n- 已校验 `implement.md` 中 implementation plan JSON 可解析：`5 subtasks`\n- 未运行 `npm run lint` / `tsc`，因为本轮仅写规划文档。\n\n核心方案：\n\n- 新增 `ypic`，保留 `ypi` Web 入口不变。\n- `ypic` 作为轻量终端 chat 控制器，复用/拉起现有 ypi Web server，通过现有 Agent API/SSE 驱动会话。\n- Studio 在 CLI 中只做 slash command 轻入口、状态摘要、plan-review/Web 跳转提示，不复制 Web Studio 工作台。\n- 当前结论：不需要 HTML UI 原型，除非后续要做富 TUI 或改变 Web 页面/审批交互。\n\n剩余风险：\n\n- 重构 `bin/pi-web.js` 时必须保证 `ypi` 启动和自动开浏览器不回归。\n- `ypic` 不能 import 未编译 TS，需发布包内 Node 可直接运行。\n- CLI 退出时不能误杀仍有 Studio 后台任务的 server。\n- 首条消息建议 draft → connect SSE → prompt，避免早期流事件丢失。\n\n需要主会话/用户确认：\n\n1. 是否接受 `ypic` 复用 ypi Web server API，而非独立 SDK runtime。\n2. MVP 是否默认不自动注册 Project Registry。\n3. `ypic` 自启 server 退出策略是否采用“无后台 Studio run 则关闭，有后台 run/`--keep-server` 则保留”。\n4. 是否接受首版 `/config` 只打开 Web 根页，不做 Web deep link。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T08:47:51.761Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1058,
+        "tokens": 525,
+        "tokenSource": "usage",
+        "tps": 75.11,
+        "firstTokenAt": "2026-07-08T08:47:44.602Z",
+        "lastTokenAt": "2026-07-08T08:47:51.592Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-740e9a22588653bd18122a01",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/architect-740e9a22588653bd18122a01.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T08:41:07.018Z",
+        "finishedAt": "2026-07-08T08:47:51.768Z",
+        "updatedAt": "2026-07-08T08:47:51.768Z",
+        "itemCount": 87,
+        "messageCount": 1,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 323320,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f40e3-50de-77e8-b9f8-e35be3bfcb77",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T08-41-07-038Z_019f40e3-50de-77e8-b9f8-e35be3bfcb77.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-355961e2eb67ea559dbfe472",
+      "subtaskId": "cli-contract-health",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T08:59:35.775Z",
+      "finishedAt": "2026-07-08T09:02:26.607Z",
+      "runner": "sdk",
+      "childSessionId": "019f40f4-3c04-7425-8507-42d2d86908fb",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T08-59-35-812Z_019f40f4-3c04-7425-8507-42d2d86908fb.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f40f4-3c04-7425-8507-42d2d86908fb",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 cli-contract-health：定义 ypic CLI 契约并增加 server 健康检查。请先按 implement.md 要求阅读相关文档与代码，做最小必要改动，更新相关 docs。关键约束：ypic 不自启 server；健康检查用于区分 ypi server 与端口冲突服务；不要修改现有 /api/agent/* 契约；必要时补充架构/API 文档；保持改动聚焦。完成后运行要求的最小验证（至少 lint/tsc 若受限请说明），并汇总修改文件、验…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/cli/health/route.ts` (new) — `GET /api/cli/health` returns `{ ok, app: \"yolk-pi-web\", version, pid, capabilities: { agentApi, studio } }`. Uses `process.env.NEXT_PUBLIC_APP_VERSION` (already exposed by `next.config.ts`), mirrors the existing `browser-share/health` route style, and exposes no env/token/path secrets.\n- `docs/modules/api.md` — added `cli/health/` row to the API route map documenting purpose, response shape, secret boundary, and that `ypic` reuses existing `agent/draft`/`agent/[id]`/`agent/[id]/events` contracts.\n- `docs/architecture/overview.md` — added a `ypic` CLI reuse flow subsection under Runtime Flow describing the health → draft → events → prompt sequence, the single-wrapper/extension/approval-gate invariants shared with Web sessions, and that no new session format is introduced.\n\nNo existing `/api/agent/*` contract was modified.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` → exit 0 (clean). The worktree had no `node_modules`; I temporarily symlinked the main repo's `node_modules` to resolve modules for the check, then removed the symlink. My route produced zero errors; the sibling `browser-share/health` route resolves identically, confirming the pattern is consistent.\n- `eslint .` → exit 0 (clean), same symlink approach.\n- `curl http://127.0.0.1:30141/api/cli/health` — not run: no server is running in this worktree and the subtask constraint forbids `ypic`/server auto-start. The route is a trivial static-JSON handler matching an already-deployed pattern; manual smoke recommended during the next subtask when a server is running.\n\n#### Notes / Risks\n\n- Environment limitation: this worktree ships without `node_modules`, so lint/tsc cannot run standalone. I validated by temporarily symlinking the main repo's `node_modules` and restored the original state afterward. The parent may want to run `npm install` here before later subtasks (`server-runner-refactor`, `ypic-chat-client`) which need to execute `node bin/ypic.js --help` and smoke-test.\n- `version` field relies on `NEXT_PUBLIC_APP_VERSION` being baked in at build time via `next.config.ts`; in a production build it is correct, and in raw `next dev` it is also populated from `package.json`. The fallback `\"0.0.0\"` only triggers if the env var is somehow absent.\n- No secrets leak: the response contains only `ok`, `app`, `version`, `pid`, and capability flags. `pid` is intentionally included per the plan so the CLI can identify the server process; if the parent considers `pid` sensitive, it can be dropped in a follow-up.\n- Decisions needed from main session: none for this subtask. The four plan-level decisions in `plan-review.md` are already confirmed/approved; this subtask stayed within its boundary.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T08:59:35.775Z",
+        "updatedAt": "2026-07-08T09:02:26.607Z",
+        "eventCount": 4191,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/cli/health/route.ts` (new) — `GET /api/cli/health` returns `{ ok, app: \"yolk-pi-web\", version, pid, capabilities: { agentApi, studio } }`. Uses `process.env.NEXT_PUBLIC_APP_VERSION` (already exposed by `next.config.ts`), mirrors the existing `browser-share/health` route style, and exposes no env/token/path secrets.\n- `docs/modules/api.md` — added `cli/health/` row to the API route map documenting purpose, response shape, secret boundary, and that `ypic` reuses existing `agent/draft`/`agent/[id]`/`agent/[id]/events` contracts.\n- `docs/architecture/overview.md` — added a `ypic` CLI reuse flow subsection under Runtime Flow describing the health → draft → events → prompt sequence, the single-wrapper/extension/approval-gate invariants shared with Web sessions, and that no new session format is introduced.\n\nNo existing `/api/agent/*` contract was modified.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` → exit 0 (clean). The worktree had no `node_modules`; I temporarily symlinked the main repo's `node_modules` to resolve modules for the check, then removed the symlink. My route produced zero errors; the sibling `browser-share/health` route resolves identically, confirming the pattern is consistent.\n- `eslint .` → exit 0 (clean), same symlink approach.\n- `curl http://127.0.0.1:30141/api/cli/health` — not run: no server is running in this worktree and the subtask constraint forbids `ypic`/server auto-start. The route is a trivial static-JSON handler matching an already-deployed pattern; manual smoke recommended during the next subtask when a server is running.\n\n#### Notes / Risks\n\n- Environment limitation: this worktree ships without `node_modules`, so lint/tsc cannot run standalone. I validated by temporarily symlinking the main repo's `node_modules` and restored the original state afterward. The parent may want to run `npm install` here before later subtasks (`server-runner-refactor`, `ypic-chat-client`) which need to execute `node bin/ypic.js --help` and smoke-test.\n- `version` field relies on `NEXT_PUBLIC_APP_VERSION` being baked in at build time via `next.config.ts`; in a production build it is correct, and in raw `next dev` it is also populated from `package.json`. The fallback `\"0.0.0\"` only triggers if the env var is somehow absent.\n- No secrets leak: the response contains only `ok`, `app`, `version`, `pid`, and capability flags. `pid` is intentionally included per the plan so the CLI can identify the server process; if the parent considers `pid` sensitive, it can be dropped in a follow-up.\n- Decisions needed from main session: none for this subtask. The four plan-level decisions in `plan-review.md` are already confirmed/approved; this subtask stayed within its boundary.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:02:05.634Z",
+            "toolCallId": "chatcmpl-tool-9cc4febf65640c0d",
+            "toolName": "bash",
+            "text": "node_modules symlink removed",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T09:02:11.087Z",
+            "toolCallId": "chatcmpl-tool-adb07851fe43511f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260708-163020 && git status --short && echo \\\"---\\\" && git diff --stat\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:02:11.176Z",
+            "toolCallId": "chatcmpl-tool-adb07851fe43511f",
+            "toolName": "bash",
+            "text": "M docs/architecture/overview.md\n M docs/modules/api.md\n?? \".ypi/tasks/20260708-164054-\\350\\256\\276\\350\\256\\241-ypic-cli-\\345\\205\\245\\345\\217\\243\\345\\271\\266\\350\\247\\204\\345\\210\\222\\344\\270\\216\\347\\216\\260\\346\\234\\211-ypi-web-studio-\\347\\232\\204\\351\\233\\206\\346\\210\\220\\346\\226\\271\\346\\241\\210/\"\n?? app/api/cli/\n---\n docs/architecture/overview.md | 17 +++++++++++++++++\n docs/modules/api.md           |  1 +\n 2 files changed, 18 insertions(+)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:02:26.586Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/cli/health/route.ts` (new) — `GET /api/cli/health` returns `{ ok, app: \"yolk-pi-web\", version, pid, capabilities: { agentApi, studio } }`. Uses `process.env.NEXT_PUBLIC_APP_VERSION` (already exposed by `next.config.ts`), mirrors the existing `browser-share/health` route style, and exposes no env/token/path secrets.\n- `docs/modules/api.md` — added `cli/health/` row to the API route map documenting purpose, response shape, secret boundary, and that `ypic` reuses existing `agent/draft`/`agent/[id]`/`agent/[id]/events` contracts.\n- `docs/architecture/overview.md` — added a `ypic` CLI reuse flow subsection under Runtime Flow describing the health → draft → events → prompt sequence, the single-wrapper/extension/approval-gate invariants shared with Web sessions, and that no new session format is introduced.\n\nNo existing `/api/agent/*` contract was modified.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` → exit 0 (clean). The worktree had no `node_modules`; I temporarily symlinked the main repo's `node_modules` to resolve modules for the check, then removed the symlink. My route produced zero errors; the sibling `browser-share/health` route resolves identically, confirming the pattern is consistent.\n- `eslint .` → exit 0 (clean), same symlink approach.\n- `curl http://127.0.0.1:30141/api/cli/health` — not run: no server is running in this worktree and the subtask constraint forbids `ypic`/server auto-start. The route is a trivial static-JSON handler matching an already-deployed pattern; manual smoke recommended during the next subtask when a server is running.\n\n#### Notes / Risks\n\n- Environment limitation: this worktree ships without `node_modules`, so lint/tsc cannot run standalone. I validated by temporarily symlinking the main repo's `node_modules` and restored the original state afterward. The parent may want to run `npm install` here before later subtasks (`server-runner-refactor`, `ypic-chat-client`) which need to execute `node bin/ypic.js --help` and smoke-test.\n- `version` field relies on `NEXT_PUBLIC_APP_VERSION` being baked in at build time via `next.config.ts`; in a production build it is correct, and in raw `next dev` it is also populated from `package.json`. The fallback `\"0.0.0\"` only triggers if the env var is somehow absent.\n- No secrets leak: the response contains only `ok`, `app`, `version`, `pid`, and capability flags. `pid` is intentionally included per the plan so the CLI can identify the server process; if the parent considers `pid` sensitive, it can be dropped in a follow-up.\n- Decisions needed from main session: none for this subtask. The four plan-level decisions in `plan-review.md` are already confirmed/approved; this subtask stayed within its boundary.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T09:02:26.600Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 4014,
+        "tokens": 672,
+        "tokenSource": "usage",
+        "tps": 4.05,
+        "firstTokenAt": "2026-07-08T08:59:40.768Z",
+        "lastTokenAt": "2026-07-08T09:02:26.576Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-355961e2eb67ea559dbfe472",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/implementer-355961e2eb67ea559dbfe472.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T08:59:35.775Z",
+        "finishedAt": "2026-07-08T09:02:26.606Z",
+        "updatedAt": "2026-07-08T09:02:26.606Z",
+        "itemCount": 65,
+        "messageCount": 15,
+        "toolCallCount": 23,
+        "stderrBytes": 0,
+        "bytes": 67488,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f40f4-3c04-7425-8507-42d2d86908fb",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T08-59-35-812Z_019f40f4-3c04-7425-8507-42d2d86908fb.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-047538abca26354fb6f425af",
+      "subtaskId": "server-runner-refactor",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T09:02:39.284Z",
+      "finishedAt": "2026-07-08T09:06:55.257Z",
+      "runner": "sdk",
+      "childSessionId": "019f40f7-08c8-79ce-93e5-3dc30e66e351",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-02-39-304Z_019f40f7-08c8-79ce-93e5-3dc30e66e351.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f40f7-08c8-79ce-93e5-3dc30e66e351",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 server-runner-refactor：提取 ypi/ypic 共用 server 启动器并保持 ypi 兼容。请按 implement.md/设计约束执行：共用 helper 主要供 ypi 复用，首版不要求 ypic 自启 server；保持 `ypi` 默认打开浏览器和参数兼容；CommonJS；不引入 shell:true；做最小必要改动。完成后运行相关验证并汇总修改文件、验证结果、剩余风险。",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/server-runner.js` (new) — CommonJS server startup helper extracted from `pi-web.js`. Exports `parseServerArgs`, `resolveNextBin`, `createRuntimeEnv`, `openBrowser`, `startNextServer`, plus `DEFAULT_PORT`/`SERVER_ARG_SPEC`. `startNextServer({ pkgDir, port, hostname, httpProxy, socksProxy, noProxy, openBrowser, onReady })` handles `.next` existence guard, next-bin resolve, proxy env build, `process.execPath`+`nextBin` spawn (no `shell:true`), stdout Ready detection, optional browser open, and an `onReady(url)` callback. Pure Node built-ins only — no TS imports, safe for the published package.\n- `bin/pi-web.js` (refactored) — `ypi` entrypoint now delegates spawn/proxy/Ready/browser logic to `server-runner.js`. Arg parsing (`--port/--hostname/--proxy/--socks-proxy/--no-proxy`) and env fallbacks remain inline; `openBrowser: true` preserves the default open-browser-on-Ready behavior. `child.on(\"exit\")` forwarding preserved.\n\n#### Verification\n\n- `npm run lint` — clean (0 problems).\n- `node_modules/.bin/tsc --noEmit` — exit 0.\n- `node bin/pi-web.js --help` — exits with the \"Build artifacts not found\" guard (expected: `.next` absent in this dev worktree); arg parsing does not crash. `--help` is not a declared flag (`strict:false`); Next would handle it once `.next` exists.\n- Helper smoke: `parseServerArgs`/`resolveNextBin`/`createRuntimeEnv` exercised via `node -e` — port/hostname/proxy parsed correctly, `NODE_OPTIONS` gets `--use-env-proxy` appended, next-bin resolves to the real path.\n\n> Note: `node_modules` was absent in this worktree; I symlinked it from the main repo solely to run lint/tsc. The symlink is gitignored and not a repo change.\n\n#### Notes / Risks\n\n- Behavior equivalence: the refactor keeps the identical spawn command, stdio config, proxy env, Ready-based browser open, and exit forwarding. `ypi --port/--hostname/proxy` behavior should not regress; a full runtime smoke (actual `ypi` launch + auto browser open) could not be run here because `.next` build artifacts don't exist in this worktree — recommend the checker/parent run that smoke in a built environment.\n- `server-runner.js` is exported for reuse but, per design, `ypic` (next subtask) is not required to self-start a server; it may reuse `parseServerArgs`/`DEFAULT_PORT`/URL conventions only.\n- No git commit/push performed, per member rules.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T09:02:39.284Z",
+        "updatedAt": "2026-07-08T09:06:55.257Z",
+        "eventCount": 6424,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/server-runner.js` (new) — CommonJS server startup helper extracted from `pi-web.js`. Exports `parseServerArgs`, `resolveNextBin`, `createRuntimeEnv`, `openBrowser`, `startNextServer`, plus `DEFAULT_PORT`/`SERVER_ARG_SPEC`. `startNextServer({ pkgDir, port, hostname, httpProxy, socksProxy, noProxy, openBrowser, onReady })` handles `.next` existence guard, next-bin resolve, proxy env build, `process.execPath`+`nextBin` spawn (no `shell:true`), stdout Ready detection, optional browser open, and an `onReady(url)` callback. Pure Node built-ins only — no TS imports, safe for the published package.\n- `bin/pi-web.js` (refactored) — `ypi` entrypoint now delegates spawn/proxy/Ready/browser logic to `server-runner.js`. Arg parsing (`--port/--hostname/--proxy/--socks-proxy/--no-proxy`) and env fallbacks remain inline; `openBrowser: true` preserves the default open-browser-on-Ready behavior. `child.on(\"exit\")` forwarding preserved.\n\n#### Verification\n\n- `npm run lint` — clean (0 problems).\n- `node_modules/.bin/tsc --noEmit` — exit 0.\n- `node bin/pi-web.js --help` — exits with the \"Build artifacts not found\" guard (expected: `.next` absent in this dev worktree); arg parsing does not crash. `--help` is not a declared flag (`strict:false`); Next would handle it once `.next` exists.\n- Helper smoke: `parseServerArgs`/`resolveNextBin`/`createRuntimeEnv` exercised via `node -e` — port/hostname/proxy parsed correctly, `NODE_OPTIONS` gets `--use-env-proxy` appended, next-bin resolves to the real path.\n\n> Note: `node_modules` was absent in this worktree; I symlinked it from the main repo solely to run lint/tsc. The symlink is gitignored and not a repo change.\n\n#### Notes / Risks\n\n- Behavior equivalence: the refactor keeps the identical spawn command, stdio config, proxy env, Ready-based browser open, and exit forwarding. `ypi --port/--hostname/proxy` behavior should not regress; a full runtime smoke (actual `ypi` launch + auto browser open) could not be run here because `.next` build artifacts don't exist in this worktree — recommend the checker/parent run that smoke in a built environment.\n- `server-runner.js` is exported for reuse but, per design, `ypic` (next subtask) is not required to self-start a server; it may reuse `parseServerArgs`/`DEFAULT_PORT`/URL conventions only.\n- No git commit/push performed, per member rules.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:06:41.826Z",
+            "text": "Only my intended files (`bin/pi-web.js`, `bin/server-runner.js`) changed from this subtask; the rest belong to the prior `cli-contract-health` subtask and task artifacts. Let me do a final review:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T09:06:41.831Z",
+            "toolCallId": "chatcmpl-tool-b903b3e03d1b45b6",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"bin/pi-web.js\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:06:41.843Z",
+            "toolCallId": "chatcmpl-tool-b903b3e03d1b45b6",
+            "toolName": "read",
+            "text": "#!/usr/bin/env node\n\"use strict\";\n\n// `ypi` — Web workspace entrypoint.\n//\n// Starts the bundled Next server and, on Ready, opens the user's browser.\n// The server startup/proxy/spawn logic lives in bin/server-runner.js so it\n// can be shared with `ypic` without duplicating the cross-platform spawn\n// strategy. Behavior of `ypi` is intentionally unchanged by the refactor.\n\n// eslint-disable-next-line @typescript-eslint/no-require-imports\nconst path = require(\"path\");\n// eslint-disable-next-line @typescript-eslint/no-require-imports\nconst serverRunner = require(\"./server-runner\");\nconst { parseServerArgs, startNextServer } = serverRunner;\n\nconst pkgDir = path.join(__dirname, \"..\");\n\nconst cliArgs = parseServerArgs(process.argv.slice(2));\n\nconst port       = cliArgs.port     ?? process.env.PORT     ?? \"30141\";\nconst hostname   = cliArgs.hostname ?? process.env.HOSTNAME ?? null;\nconst httpProxy  = cliArgs.proxy ?? process.env.PROXY_URL ?? process.env.HTTP_PROXY ?? process.env.http_proxy ?? null;\nconst socksProxy = cliArgs[\"socks-proxy\"] ?? process.env.SOCKS_PROXY_URL ?? process.env.ALL_PROXY ?? process.env.all_proxy ?? null;\nconst noProxy    = cliArgs[\"no-proxy\"] ?? process.env.NO_PROXY ?? process.env.no_proxy ?? null;\n\nconst { child } = startNextServer({\n  pkgDir,\n  port,\n  hostname,\n  httpProxy,\n  socksProxy,\n  noProxy,\n  openBrowser: true,\n});\n\nchild.on(\"exit\", (code) => process.exit(code ?? 0));",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:06:55.239Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/server-runner.js` (new) — CommonJS server startup helper extracted from `pi-web.js`. Exports `parseServerArgs`, `resolveNextBin`, `createRuntimeEnv`, `openBrowser`, `startNextServer`, plus `DEFAULT_PORT`/`SERVER_ARG_SPEC`. `startNextServer({ pkgDir, port, hostname, httpProxy, socksProxy, noProxy, openBrowser, onReady })` handles `.next` existence guard, next-bin resolve, proxy env build, `process.execPath`+`nextBin` spawn (no `shell:true`), stdout Ready detection, optional browser open, and an `onReady(url)` callback. Pure Node built-ins only — no TS imports, safe for the published package.\n- `bin/pi-web.js` (refactored) — `ypi` entrypoint now delegates spawn/proxy/Ready/browser logic to `server-runner.js`. Arg parsing (`--port/--hostname/--proxy/--socks-proxy/--no-proxy`) and env fallbacks remain inline; `openBrowser: true` preserves the default open-browser-on-Ready behavior. `child.on(\"exit\")` forwarding preserved.\n\n#### Verification\n\n- `npm run lint` — clean (0 problems).\n- `node_modules/.bin/tsc --noEmit` — exit 0.\n- `node bin/pi-web.js --help` — exits with the \"Build artifacts not found\" guard (expected: `.next` absent in this dev worktree); arg parsing does not crash. `--help` is not a declared flag (`strict:false`); Next would handle it once `.next` exists.\n- Helper smoke: `parseServerArgs`/`resolveNextBin`/`createRuntimeEnv` exercised via `node -e` — port/hostname/proxy parsed correctly, `NODE_OPTIONS` gets `--use-env-proxy` appended, next-bin resolves to the real path.\n\n> Note: `node_modules` was absent in this worktree; I symlinked it from the main repo solely to run lint/tsc. The symlink is gitignored and not a repo change.\n\n#### Notes / Risks\n\n- Behavior equivalence: the refactor keeps the identical spawn command, stdio config, proxy env, Ready-based browser open, and exit forwarding. `ypi --port/--hostname/proxy` behavior should not regress; a full runtime smoke (actual `ypi` launch + auto browser open) could not be run here because `.next` build artifacts don't exist in this worktree — recommend the checker/parent run that smoke in a built environment.\n- `server-runner.js` is exported for reuse but, per design, `ypic` (next subtask) is not required to self-start a server; it may reuse `parseServerArgs`/`DEFAULT_PORT`/URL conventions only.\n- No git commit/push performed, per member rules.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T09:06:55.251Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3585,
+        "tokens": 600,
+        "tokenSource": "usage",
+        "tps": 2.43,
+        "firstTokenAt": "2026-07-08T09:02:48.382Z",
+        "lastTokenAt": "2026-07-08T09:06:55.166Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-047538abca26354fb6f425af",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/implementer-047538abca26354fb6f425af.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T09:02:39.284Z",
+        "finishedAt": "2026-07-08T09:06:55.256Z",
+        "updatedAt": "2026-07-08T09:06:55.256Z",
+        "itemCount": 60,
+        "messageCount": 12,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 39473,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f40f7-08c8-79ce-93e5-3dc30e66e351",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-02-39-304Z_019f40f7-08c8-79ce-93e5-3dc30e66e351.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-35d6cb05a1cbc1bbaab0345b",
+      "subtaskId": "ypic-chat-client",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T09:07:05.716Z",
+      "finishedAt": "2026-07-08T09:16:53.897Z",
+      "runner": "sdk",
+      "childSessionId": "019f40fb-1988-7ebd-b13f-eb2da71c134e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-07-05-736Z_019f40fb-1988-7ebd-b13f-eb2da71c134e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f40fb-1988-7ebd-b13f-eb2da71c134e",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 ypic-chat-client：新增 `bin/ypic.js` 和 package bin 配置，完成 chat loop、HTTP 调用、SSE 渲染。关键约束：ypic 不自启 server；启动时仅 health check，失败则提示用户手动启动 ypi/Web server；使用 process.cwd()；若当前目录未注册需自动建立/注册项目上下文；不要 import 未编译 TS；实现 /config /open /quit、普通 prompt…",
+      "summary": "实现已完成。所有验证均已通过。这是我的交接说明。\n\n### 实现完成 — 子任务 `ypic-chat-client`\n\n#### 已修改文件\n\n- **`bin/ypic.js`** (新增, 28.3KB) — `ypic` 终端聊天客户端。CommonJS，仅依赖 Node 内置模块 + `bin/server-runner.js#openBrowser`。实现内容：\n  - 参数解析：`--port/-p`、`--hostname/-H`、`--continue/-c`、`--help/-h`，位置参数 `[message]`，以及 `PI_WEB_PORT/PI_WEB_HOST` 环境变量回退。\n  - 启动时执行 `GET /api/cli/health` 健康检查；若失败或应用非 `yolk-pi-web`，打印明确指引并退出（**不自启服务器**）。\n  - 当前目录未注册时，通过现有 Project Registry API 自动建立项目/空间上下文：先 `GET /api/projects` 按 `path/realPath` 查找已有 space（避免 worktree 重复注册），未命中则 `POST /api/projects {path}`（幂等 by pathKey）。\n  - 创建会话顺序：`resolveProjectContext` → `POST /api/agent/draft {cwd, projectId, spaceId}` → 连接 `GET /api/agent/:id/events` SSE → 发送 prompt，避免早期事件丢失。\n  - `--continue`：`GET /api/sessions` 按 cwd 过滤最近非子会话。\n  - 轻量 SSE parser：处理 chunk 边界、多行 `data:`、注释心跳、非 JSON payload。\n  - 紧凑渲染：assistant 文本流式增量输出（cumulative diff）、`tool_execution_start/end` 单行 `⚒ name` / `✓|✗ name`、`agent_end`/`agent_error`、retry/compaction 摘要；未知事件忽略或 `YPIC_DEBUG` 显示。\n  - readline chat loop：普通输入 idle→prompt、running→steer；`/help /config /open /status /abort /steer /follow /quit`；未知 `/` 命令透传为 prompt（支持 `/studio-*`）；`/config` 用共享 `openBrowser` 打开 Web 根页。\n  - Ctrl-C：running 时首次 abort，二次或 idle 时退出；`/quit` 轻量检查 `/api/sessions/:id/studio-task` 的 `implementationProjection.statusCounts`，有 active/queued child run 时提示改到 Web 查看，不管理服务器生命周期。\n  - 错误提示：auth/model 类错误引导 `/config`。\n- **`package.json`** — 增加 `\"bin\": { \"ypi\": \"bin/pi-web.js\", \"ypic\": \"bin/ypic.js\" }`。\n\n#### 验证\n\n- `node bin/ypic.js --help` — 正常显示用法。\n- `node --check bin/ypic.js` — 语法 OK。\n- `node bin/ypic.js --port 30142`（无服务器）— 打印明确指引并退出。\n- `npm run lint` — 0 errors / 0 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `npm pack --dry-run` — 确认 `bin/ypic.js`、`bin/server-runner.js`、`bin/pi-web.js` 均在发布包内。\n\n#### 备注 / 风险\n\n- **未进行端到端服务器冒烟测试**：当前 worktree 无 `.next` 构建产物，无法启动 `ypi` 服务器进行真实 chat/SSE 端到端验证。建议在具备构建产物的环境手工执行 `implement.md` 中的 smoke 步骤（复用服务器、当前 cwd 创建 session、`/config`、`/studio-feature` smoke）。\n- assistant 文本增量基于 `message_update` 携带 cumulative content 的假设（与 Web `streamingMessage` 替换式渲染一致）；若 pi SDK 发送 delta 式 content，渲染会偏差——需真实服务器验证。\n- Studio 紧凑状态渲染（`ypi_studio_task/subagent/wait` 摘要）与完整退出保护属于子任务 `studio-light-controller` 边界，本轮仅做容错忽略 + 基本 `/quit` studio-task 检查，未渲染 Studio 事件详情。\n- `--continue` 续接会话时未重新注册项目上下文（会话已自带 projectId/spaceId）；符合“仅首条消息前确保上下文”的设计。\n- ANSI 颜色未使用（仅 Unicode 符号 `⚒ ✓ ✗ ↻ ⏹`），避免终端兼容问题；如需颜色可后续加可降级处理。\n\n#### 需要主会话决策\n\n无阻塞决策。若真实服务器 smoke 发现 SSE 事件形态或 assistant 文本增量假设有偏差，需在 `studio-light-controller` 子任务中一并修正渲染逻辑。",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T09:07:05.716Z",
+        "updatedAt": "2026-07-08T09:16:53.897Z",
+        "eventCount": 18038,
+        "lastTextPreview": "实现已完成。所有验证均已通过。这是我的交接说明。\n\n### 实现完成 — 子任务 `ypic-chat-client`\n\n#### 已修改文件\n\n- **`bin/ypic.js`** (新增, 28.3KB) — `ypic` 终端聊天客户端。CommonJS，仅依赖 Node 内置模块 + `bin/server-runner.js#openBrowser`。实现内容：\n  - 参数解析：`--port/-p`、`--hostname/-H`、`--continue/-c`、`--help/-h`，位置参数 `[message]`，以及 `PI_WEB_PORT/PI_WEB_HOST` 环境变量回退。\n  - 启动时执行 `GET /api/cli/health` 健康检查；若失败或应用非 `yolk-pi-web`，打印明确指引并退出（**不自启服务器**）。\n  - 当前目录未注册时，通过现有 Project Registry API 自动建立项目/空间上下文：先 `GET /api/projects` 按 `path/realPath` 查找已有 space（避免 worktree 重复注册），未命中则 `POST /api/projects {path}`（幂等 by pathKey）。\n  - 创建会话顺序：`resolveProjectContext` → `POST /api/agent/draft {cwd, projectId, spaceId}` → 连接 `GET /api/agent/:id/events` SSE → 发送 prompt，避免早期事件丢失。\n  - `--continue`：`GET /api/sessions` 按 cwd 过滤最近非子会话。\n  - 轻量 SSE parser：处理 chunk 边界、多行 `data:`、注释心跳、非 JSON payload。\n  - 紧凑渲染：assistant 文本流式增量输出（cumulative diff）、`tool_execution_start/end` 单行 `⚒ name` / `✓|✗ name`、`agent_end`/`agent_error`、retry/compaction 摘要；未知事件忽略或 `YPIC_DEBUG` 显示。\n  - readline chat loop：普通输入 idle→prompt、running→steer；`/help /config /open /status /abort /steer /follow /quit`；未知 `/` 命令透传为 prompt（支持 `/studio-*`）；`/config` 用共享 `openBrowser` 打开 Web 根页。\n  - Ctrl-C：running 时首次 abort，二次或 idle 时退出；`/quit` 轻量检查 `/api/sessions/:id/studio-task` 的 `implementationProjection.statusCounts`，有 active/queued child run 时提示改到 Web 查看，不管理服务器生命周期。\n  - 错误提示：auth/model 类错误引导 `/config`。\n- **`package.json`** — 增加 `\"bin\": { \"ypi\": \"bin/pi-web.js\", \"ypic\": \"bin/ypic.js\" }`。\n\n#### 验证\n\n- `node bin/ypic.js --help` — 正常显示用法。\n- `node --check bin/ypic.js` — 语法 OK。\n- `node bin/ypic.js --port 30142`（无服务器）— 打印明确指引并退出。\n- `npm run lint` — 0 errors / 0 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `npm pack --dry-run` — 确认 `bin/ypic.js`、`bin/server-runner.js`、`bin/pi-web.js` 均在发布包内。\n\n#### 备注 / 风险\n\n- **未进行端到端服务器冒烟测试**：当前 worktree 无 `.next` 构建产物，无法启动 `ypi` 服务器进行真实 chat/SSE 端到端验证。建议在具备构建产物的环境手工执行 `implement.md` 中的 smoke 步骤（复用服务器、当前 cwd 创建 session、`/config`、`/studio-feature` smoke）。\n- assistant 文本增量基于 `message_update` 携带 cumulative content 的假设（与 Web `streamingMessage` 替换式渲染一致）；若 pi SDK 发送 delta 式 content，渲染会偏差——需真实服务器验证。\n- Studio 紧凑状态渲染（`ypi_studio_task/subagent/wait` 摘要）与完整退出保护属于子任务 `studio-light-controller` 边界，本轮仅做容错忽略 + 基本 `/quit` studio-task 检查，未渲染 Studio 事件详情。\n- `--continue` 续接会话时未重新注册项目上下文（会话已自带 projectId/spaceId）；符合“仅首条消息前确保上下文”的设计。\n- ANSI 颜色未使用（仅 Unicode 符号 `⚒ ✓ ✗ ↻ ⏹`），避免终端兼容问题；如需颜色可后续加可降级处理。\n\n#### 需要主会话决策\n\n无阻塞决策。若真实服务器 smoke 发现 SSE 事件形态或 assistant 文本增量假设有偏差，需在 `studio-light-controller` 子任务中一并修正渲染逻辑。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:16:27.278Z",
+            "text": "Everything is wired correctly. Let me do a final review of the complete main flow to ensure correctness:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T09:16:27.283Z",
+            "toolCallId": "chatcmpl-tool-b962604def85933e",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"bin/ypic.js\",\n  \"offset\": 520,\n  \"limit\": 90\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:16:27.295Z",
+            "toolCallId": "chatcmpl-tool-b962604def85933e",
+            "toolName": "read",
+            "text": "async function main() {\n  const opts = parseCliArgs(process.argv.slice(2));\n  if (opts.help) {\n    process.stdout.write(HELP_TEXT);\n    process.exit(0);\n  }\n\n  const baseUrl = buildBaseUrl(opts);\n  const cwd = process.cwd();\n\n  // Health check — never self-start a server.\n  const health = await checkHealth(baseUrl);\n  if (!health.ok) {\n    process.stderr.write(\n      `ypic: cannot find a yolk-pi-web server at ${baseUrl}.\\n` +\n      `       ${health.reason}\\n` +\n      `       Start it first with \\`ypi\\` (or run the Web server), then run \\`ypic\\` again.\\n` +\n      `       Use --port / --hostname to point at a different server.\\n`,\n    );\n    process.exit(1);\n  }\n\n  process.stdout.write(`YPI CLI chat · cwd: ${cwd}\\n`);\n  process.stdout.write(`Using local ypi server: ${baseUrl} (v${health.body.version})\\n`);\n  process.stdout.write(`Type /help for commands, /config to open Web settings, /quit to exit.\\n\\n`);\n\n  let sessionId;\n  let projectContext = null;\n\n  if (opts.continue) {\n    const recent = await findRecentSessionForCwd(baseUrl, cwd);\n    if (recent) {\n      sessionId = recent.id;\n      projectContext = recent.projectId && recent.spaceId\n        ? { projectId: recent.projectId, spaceId: recent.spaceId }\n        : null;\n      process.stdout.write(`Continuing session: ${sessionId}\\n`);\n    } else {\n      process.stdout.write(`No existing session for this cwd; creating a new one.\\n`);\n    }\n  }\n\n  if (!sessionId) {\n    // Ensure the cwd is a known project/space, then create an empty session.\n    try {\n      projectContext = await resolveProjectContext(baseUrl, cwd);\n    } catch (error) {\n      process.stdout.write(`  ! project context skipped: ${error instanceof Error ? error.message : String(error)}\\n`);\n      projectContext = null;\n    }\n    sessionId = await draftSession(baseUrl, cwd, projectContext);\n    process.stdout.write(`Session created: ${sessionId}\\n`);\n  }\n\n  // Resume awareness: check whether the session is already running.\n  const agentState = await getAgentState(baseUrl, sessionId);\n  const initiallyRunning = Boolean(agentState?.running);\n\n  const rl = readline.createInterface({\n    input: process.stdin,\n    output: process.stdout,\n    terminal: process.stdout.isTTY,\n    prompt: \"> \",\n  });\n\n  let exiting = false;\n\n  const renderer = createRenderer();\n  let sse = null;\n  let reconnectTimer = null;\n\n  // If the stream dies while the agent is running, attempt one reconnect.\n  const handleSseClosed = () => {\n    if (exiting || !renderer.running || !sse?.isClosed()) return;\n    if (reconnectTimer) return;\n    reconnectTimer = setTimeout(() => {\n      reconnectTimer = null;\n      if (exiting || !renderer.running) return;\n      debug(\"reconnecting SSE\");\n      sse = connectSse(baseUrl, sessionId, (event) => renderer.handleEvent(event));\n    }, 1000);\n  };\n\n  // Wrap the renderer's handler so we can also drive reconnect logic on\n  // stream close. Connect the SSE stream once, after wrapping.\n  const originalHandle = renderer.handleEvent;\n  renderer.handleEvent = (event) => {\n    originalHandle(event);\n    if (event.type === \"_sse_closed\") handleSseClosed();\n  };\n\n[172 more lines in file. Use offset=610 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:16:53.878Z",
+            "text": "实现已完成。所有验证均已通过。这是我的交接说明。\n\n### 实现完成 — 子任务 `ypic-chat-client`\n\n#### 已修改文件\n\n- **`bin/ypic.js`** (新增, 28.3KB) — `ypic` 终端聊天客户端。CommonJS，仅依赖 Node 内置模块 + `bin/server-runner.js#openBrowser`。实现内容：\n  - 参数解析：`--port/-p`、`--hostname/-H`、`--continue/-c`、`--help/-h`，位置参数 `[message]`，以及 `PI_WEB_PORT/PI_WEB_HOST` 环境变量回退。\n  - 启动时执行 `GET /api/cli/health` 健康检查；若失败或应用非 `yolk-pi-web`，打印明确指引并退出（**不自启服务器**）。\n  - 当前目录未注册时，通过现有 Project Registry API 自动建立项目/空间上下文：先 `GET /api/projects` 按 `path/realPath` 查找已有 space（避免 worktree 重复注册），未命中则 `POST /api/projects {path}`（幂等 by pathKey）。\n  - 创建会话顺序：`resolveProjectContext` → `POST /api/agent/draft {cwd, projectId, spaceId}` → 连接 `GET /api/agent/:id/events` SSE → 发送 prompt，避免早期事件丢失。\n  - `--continue`：`GET /api/sessions` 按 cwd 过滤最近非子会话。\n  - 轻量 SSE parser：处理 chunk 边界、多行 `data:`、注释心跳、非 JSON payload。\n  - 紧凑渲染：assistant 文本流式增量输出（cumulative diff）、`tool_execution_start/end` 单行 `⚒ name` / `✓|✗ name`、`agent_end`/`agent_error`、retry/compaction 摘要；未知事件忽略或 `YPIC_DEBUG` 显示。\n  - readline chat loop：普通输入 idle→prompt、running→steer；`/help /config /open /status /abort /steer /follow /quit`；未知 `/` 命令透传为 prompt（支持 `/studio-*`）；`/config` 用共享 `openBrowser` 打开 Web 根页。\n  - Ctrl-C：running 时首次 abort，二次或 idle 时退出；`/quit` 轻量检查 `/api/sessions/:id/studio-task` 的 `implementationProjection.statusCounts`，有 active/queued child run 时提示改到 Web 查看，不管理服务器生命周期。\n  - 错误提示：auth/model 类错误引导 `/config`。\n- **`package.json`** — 增加 `\"bin\": { \"ypi\": \"bin/pi-web.js\", \"ypic\": \"bin/ypic.js\" }`。\n\n#### 验证\n\n- `node bin/ypic.js --help` — 正常显示用法。\n- `node --check bin/ypic.js` — 语法 OK。\n- `node bin/ypic.js --port 30142`（无服务器）— 打印明确指引并退出。\n- `npm run lint` — 0 errors / 0 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `npm pack --dry-run` — 确认 `bin/ypic.js`、`bin/server-runner.js`、`bin/pi-web.js` 均在发布包内。\n\n#### 备注 / 风险\n\n- **未进行端到端服务器冒烟测试**：当前 worktree 无 `.next` 构建产物，无法启动 `ypi` 服务器进行真实 chat/SSE 端到端验证。建议在具备构建产物的环境手工执行 `implement.md` 中的 smoke 步骤（复用服务器、当前 cwd 创建 session、`/config`、`/studio-feature` smoke）。\n- assistant 文本增量基于 `message_update` 携带 cumulative content 的假设（与 Web `streamingMessage` 替换式渲染一致）；若 pi SDK 发送 delta 式 content，渲染会偏差——需真实服务器验证。\n- Studio 紧凑状态渲染（`ypi_studio_task/subagent/wait` 摘要）与完整退出保护属于子任务 `studio-light-controller` 边界，本轮仅做容错忽略 + 基本 `/quit` studio-task 检查，未渲染 Studio 事件详情。\n- `--continue` 续接会话时未重新注册项目上下文（会话已自带 projectId/spaceId）；符合“仅首条消息前确保上下文”的设计。\n- ANSI 颜色未使用（仅 Unicode 符号 `⚒ ✓ ✗ ↻ ⏹`），避免终端兼容问题；如需颜色可后续加可降级处理。\n\n#### 需要主会话决策\n\n无阻塞决策。若真实服务器 smoke 发现 SSE 事件形态或 assistant 文本增量假设有偏差，需在 `studio-light-controller` 子任务中一并修正渲染逻辑。",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T09:16:53.890Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3373,
+        "tokens": 1097,
+        "tokenSource": "usage",
+        "tps": 1.89,
+        "firstTokenAt": "2026-07-08T09:07:13.427Z",
+        "lastTokenAt": "2026-07-08T09:16:53.862Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-35d6cb05a1cbc1bbaab0345b",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/implementer-35d6cb05a1cbc1bbaab0345b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T09:07:05.716Z",
+        "finishedAt": "2026-07-08T09:16:53.895Z",
+        "updatedAt": "2026-07-08T09:16:53.895Z",
+        "itemCount": 115,
+        "messageCount": 13,
+        "toolCallCount": 49,
+        "stderrBytes": 0,
+        "bytes": 152954,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f40fb-1988-7ebd-b13f-eb2da71c134e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-07-05-736Z_019f40fb-1988-7ebd-b13f-eb2da71c134e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-7f5000c2eb042d4b062b9b40",
+      "subtaskId": "studio-light-controller",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T09:17:08.389Z",
+      "finishedAt": "2026-07-08T09:36:30.681Z",
+      "runner": "sdk",
+      "childSessionId": "019f4104-4bbc-7226-8bf3-7050612128d8",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-17-08-412Z_019f4104-4bbc-7226-8bf3-7050612128d8.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f4104-4bbc-7226-8bf3-7050612128d8",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 studio-light-controller：在 `bin/ypic.js` 中补齐 YPI Studio 轻入口与状态提示。要求：/studio-* 输入原样转发；对 ypi_studio_task / ypi_studio_subagent / ypi_studio_wait 工具事件做紧凑摘要；awaiting_approval 时提示 plan-review.md 路径和 /open；CLI 不得写 approvalGrant；ypic 不管理 ser…",
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/ypic.js` — Added YPI Studio light-controller behavior on top of the existing chat client (subtask `ypic-chat-client` output):\n  - New module-scope helpers for the three Studio tools: `summarizeStudioTask{Start,End}`, `summarizeStudioSubagent{Start,End}`, `summarizeStudioWait{Start,End}`, `summarizeStudioWaitUpdate`, `planReviewPathForTask`, `approvalPromptText`. All extractors are defensive (`taskFromResult`/`runsFromResult`/`resultDetails`/`asArgs`), tolerate missing/odd payloads, and never print raw tool args or child transcripts.\n  - Renderer `tool_execution_start`/`tool_execution_update`/`tool_execution_end` now branch on `STUDIO_TOOLS = {ypi_studio_task, ypi_studio_subagent, ypi_studio_wait}` and print compact one-line summaries (`⚑ studio task/subagent/wait …`) with taskId/status/member/runId/subtaskId/phase/tps hints; non-Studio tools keep the previous `⚒/✓/✗` rendering.\n  - `ypi_studio_wait` `tool_execution_update` poll progress is rendered throttled+deduped (`◷ studio wait …`) to avoid flooding the terminal.\n  - awaiting_approval detection: on `ypi_studio_task` end with `result.details.task.status === \"awaiting_approval\"`, prints the plan-review path and `/open` review URL with a \"reply 确认/批准/开始实现\" note; the CLI never writes `approvalGrant`. A backup `maybePromptStudioApproval()` fetches `GET /api/sessions/:id/studio-task` on `agent_end` to catch awaiting states reached outside a task tool result (deduped via shared `approvalPrompted` flag).\n  - `quit()` exit protection now also counts `waiting_for_user` runs and prints plan-review guidance when awaiting_approval; explicitly states the local server is left running and points to the Web Studio panel instead of managing server lifecycle. Sessions without a Studio task / transient fetch errors fall through cleanly.\n  - `createRenderer()` now returns the shared state object directly so `baseUrl`/`approvalPrompted` set from `main` are visible inside the closure-based handlers (fixes a state-split bug introduced by the additions).\n  - `/studio-*` inputs continue to be forwarded as chat prompts (unchanged from prior subtask); the existing `/config`/`/open` behavior is untouched.\n\n#### Verification\n\n```bash\nnode --check bin/ypic.js            # SYNTAX_OK\nnode_modules/.bin/tsc --noEmit      # exit 0\nnpm run lint                        # exit 0 (0 errors, 0 warnings)\nnode bin/ypic.js --help             # ok\n```\n\nFunctional smoke (load module without auto-`main()`, feed synthetic SSE Studio events):\n- `ypi_studio_task` transition→awaiting_approval renders `⚑ studio task <id> · awaiting_approval` + plan-review block with `/open` review URL; `approvalPrompted` set true.\n- Malformed/empty `result`/`partialResult` for all three Studio tools do not throw; dubious wait update returns null gracefully.\n- `ypi_studio_subagent` end with runs renders `⚑ studio subagent <runId> · <member> · <status> subtask=… · <phase> · <tps>tps`.\n- `planReviewPathForTask` falls back to `<pathLabel>/plan-review.md` when the tool result’s artifact `files` map is absent (matches the studio-task API widget projection).\n\n#### Notes / Risks\n\n- **Not yet hand-verified end-to-end** with a live `ypi` server driving a real `/studio-feature` flow to `awaiting_approval` (requires a running server, configured provider/auth, and a Studio task). The studio-tool summarizers are shape-based and were validated against the actual extension payloads (`compactYpiStudioTaskForTool`, `compactSubagentRunForLifecycle`, widget projection `YpiStudioTaskWidgetProjection`); the live smoke per `checks.md` should still be run by the checker/parent before release.\n- Approval gate is preserved hard: the CLI only renders guidance and forwards user chat input; it never calls approval / `recordYpiStudioUserApproval` / `transition(override)`. The server-side gate is the sole authority.\n- `ypic` still does not self-start or kill the server; exit only prints Web Studio continuation hints, satisfying the \"no server lifecycle management\" invariant.\n- Decisions for main session: none required. Suggested parent/next step is `docs-tests-release-check` (final subtask) to update `docs/modules/api.md`/`README.md`/`docs/architecture/overview.md` for `ypic` + Studio light-controller wording and add any smoke-script coverage.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T09:17:08.389Z",
+        "updatedAt": "2026-07-08T09:36:30.681Z",
+        "eventCount": 4992,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/ypic.js` — Added YPI Studio light-controller behavior on top of the existing chat client (subtask `ypic-chat-client` output):\n  - New module-scope helpers for the three Studio tools: `summarizeStudioTask{Start,End}`, `summarizeStudioSubagent{Start,End}`, `summarizeStudioWait{Start,End}`, `summarizeStudioWaitUpdate`, `planReviewPathForTask`, `approvalPromptText`. All extractors are defensive (`taskFromResult`/`runsFromResult`/`resultDetails`/`asArgs`), tolerate missing/odd payloads, and never print raw tool args or child transcripts.\n  - Renderer `tool_execution_start`/`tool_execution_update`/`tool_execution_end` now branch on `STUDIO_TOOLS = {ypi_studio_task, ypi_studio_subagent, ypi_studio_wait}` and print compact one-line summaries (`⚑ studio task/subagent/wait …`) with taskId/status/member/runId/subtaskId/phase/tps hints; non-Studio tools keep the previous `⚒/✓/✗` rendering.\n  - `ypi_studio_wait` `tool_execution_update` poll progress is rendered throttled+deduped (`◷ studio wait …`) to avoid flooding the terminal.\n  - awaiting_approval detection: on `ypi_studio_task` end with `result.details.task.status === \"awaiting_approval\"`, prints the plan-review path and `/open` review URL with a \"reply 确认/批准/开始实现\" note; the CLI never writes `approvalGrant`. A backup `maybePromptStudioApproval()` fetches `GET /api/sessions/:id/studio-task` on `agent_end` to catch awaiting states reached outside a task tool result (deduped via shared `approvalPrompted` flag).\n  - `quit()` exit protection now also counts `waiting_for_user` runs and prints plan-review guidance when awaiting_approval; explicitly states the local server is left running and points to the Web Studio panel instead of managing server lifecycle. Sessions without a Studio task / transient fetch errors fall through cleanly.\n  - `createRenderer()` now returns the shared state object directly so `baseUrl`/`approvalPrompted` set from `main` are visible inside the closure-based handlers (fixes a state-split bug introduced by the additions).\n  - `/studio-*` inputs continue to be forwarded as chat prompts (unchanged from prior subtask); the existing `/config`/`/open` behavior is untouched.\n\n#### Verification\n\n```bash\nnode --check bin/ypic.js            # SYNTAX_OK\nnode_modules/.bin/tsc --noEmit      # exit 0\nnpm run lint                        # exit 0 (0 errors, 0 warnings)\nnode bin/ypic.js --help             # ok\n```\n\nFunctional smoke (load module without auto-`main()`, feed synthetic SSE Studio events):\n- `ypi_studio_task` transition→awaiting_approval renders `⚑ studio task <id> · awaiting_approval` + plan-review block with `/open` review URL; `approvalPrompted` set true.\n- Malformed/empty `result`/`partialResult` for all three Studio tools do not throw; dubious wait update returns null gracefully.\n- `ypi_studio_subagent` end with runs renders `⚑ studio subagent <runId> · <member> · <status> subtask=… · <phase> · <tps>tps`.\n- `planReviewPathForTask` falls back to `<pathLabel>/plan-review.md` when the tool result’s artifact `files` map is absent (matches the studio-task API widget projection).\n\n#### Notes / Risks\n\n- **Not yet hand-verified end-to-end** with a live `ypi` server driving a real `/studio-feature` flow to `awaiting_approval` (requires a running server, configured provider/auth, and a Studio task). The studio-tool summarizers are shape-based and were validated against the actual extension payloads (`compactYpiStudioTaskForTool`, `compactSubagentRunForLifecycle`, widget projection `YpiStudioTaskWidgetProjection`); the live smoke per `checks.md` should still be run by the checker/parent before release.\n- Approval gate is preserved hard: the CLI only renders guidance and forwards user chat input; it never calls approval / `recordYpiStudioUserApproval` / `transition(override)`. The server-side gate is the sole authority.\n- `ypic` still does not self-start or kill the server; exit only prints Web Studio continuation hints, satisfying the \"no server lifecycle management\" invariant.\n- Decisions for main session: none required. Suggested parent/next step is `docs-tests-release-check` (final subtask) to update `docs/modules/api.md`/`README.md`/`docs/architecture/overview.md` for `ypic` + Studio light-controller wording and add any smoke-script coverage.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:36:03.923Z",
+            "text": "All green: Studio start/end summaries render compactly, awaiting_approval prompts plan-review path + `/open`, dedupe flag works, malformed payloads don't throw, plan path fallback to `pathLabel` works. Let me clean up temp files.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T09:36:03.929Z",
+            "toolCallId": "call_a85b",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rm -f /tmp/ypic-smoke.cjs; echo done\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:36:03.953Z",
+            "toolCallId": "call_a85b",
+            "toolName": "bash",
+            "text": "done",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:36:30.661Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/ypic.js` — Added YPI Studio light-controller behavior on top of the existing chat client (subtask `ypic-chat-client` output):\n  - New module-scope helpers for the three Studio tools: `summarizeStudioTask{Start,End}`, `summarizeStudioSubagent{Start,End}`, `summarizeStudioWait{Start,End}`, `summarizeStudioWaitUpdate`, `planReviewPathForTask`, `approvalPromptText`. All extractors are defensive (`taskFromResult`/`runsFromResult`/`resultDetails`/`asArgs`), tolerate missing/odd payloads, and never print raw tool args or child transcripts.\n  - Renderer `tool_execution_start`/`tool_execution_update`/`tool_execution_end` now branch on `STUDIO_TOOLS = {ypi_studio_task, ypi_studio_subagent, ypi_studio_wait}` and print compact one-line summaries (`⚑ studio task/subagent/wait …`) with taskId/status/member/runId/subtaskId/phase/tps hints; non-Studio tools keep the previous `⚒/✓/✗` rendering.\n  - `ypi_studio_wait` `tool_execution_update` poll progress is rendered throttled+deduped (`◷ studio wait …`) to avoid flooding the terminal.\n  - awaiting_approval detection: on `ypi_studio_task` end with `result.details.task.status === \"awaiting_approval\"`, prints the plan-review path and `/open` review URL with a \"reply 确认/批准/开始实现\" note; the CLI never writes `approvalGrant`. A backup `maybePromptStudioApproval()` fetches `GET /api/sessions/:id/studio-task` on `agent_end` to catch awaiting states reached outside a task tool result (deduped via shared `approvalPrompted` flag).\n  - `quit()` exit protection now also counts `waiting_for_user` runs and prints plan-review guidance when awaiting_approval; explicitly states the local server is left running and points to the Web Studio panel instead of managing server lifecycle. Sessions without a Studio task / transient fetch errors fall through cleanly.\n  - `createRenderer()` now returns the shared state object directly so `baseUrl`/`approvalPrompted` set from `main` are visible inside the closure-based handlers (fixes a state-split bug introduced by the additions).\n  - `/studio-*` inputs continue to be forwarded as chat prompts (unchanged from prior subtask); the existing `/config`/`/open` behavior is untouched.\n\n#### Verification\n\n```bash\nnode --check bin/ypic.js            # SYNTAX_OK\nnode_modules/.bin/tsc --noEmit      # exit 0\nnpm run lint                        # exit 0 (0 errors, 0 warnings)\nnode bin/ypic.js --help             # ok\n```\n\nFunctional smoke (load module without auto-`main()`, feed synthetic SSE Studio events):\n- `ypi_studio_task` transition→awaiting_approval renders `⚑ studio task <id> · awaiting_approval` + plan-review block with `/open` review URL; `approvalPrompted` set true.\n- Malformed/empty `result`/`partialResult` for all three Studio tools do not throw; dubious wait update returns null gracefully.\n- `ypi_studio_subagent` end with runs renders `⚑ studio subagent <runId> · <member> · <status> subtask=… · <phase> · <tps>tps`.\n- `planReviewPathForTask` falls back to `<pathLabel>/plan-review.md` when the tool result’s artifact `files` map is absent (matches the studio-task API widget projection).\n\n#### Notes / Risks\n\n- **Not yet hand-verified end-to-end** with a live `ypi` server driving a real `/studio-feature` flow to `awaiting_approval` (requires a running server, configured provider/auth, and a Studio task). The studio-tool summarizers are shape-based and were validated against the actual extension payloads (`compactYpiStudioTaskForTool`, `compactSubagentRunForLifecycle`, widget projection `YpiStudioTaskWidgetProjection`); the live smoke per `checks.md` should still be run by the checker/parent before release.\n- Approval gate is preserved hard: the CLI only renders guidance and forwards user chat input; it never calls approval / `recordYpiStudioUserApproval` / `transition(override)`. The server-side gate is the sole authority.\n- `ypic` still does not self-start or kill the server; exit only prints Web Studio continuation hints, satisfying the \"no server lifecycle management\" invariant.\n- Decisions for main session: none required. Suggested parent/next step is `docs-tests-release-check` (final subtask) to update `docs/modules/api.md`/`README.md`/`docs/architecture/overview.md` for `ypic` + Studio light-controller wording and add any smoke-script coverage.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T09:36:30.673Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 7431,
+        "tokens": 1041,
+        "tokenSource": "usage",
+        "tps": 0.9,
+        "firstTokenAt": "2026-07-08T09:17:14.490Z",
+        "lastTokenAt": "2026-07-08T09:36:30.500Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-7f5000c2eb042d4b062b9b40",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/implementer-7f5000c2eb042d4b062b9b40.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T09:17:08.389Z",
+        "finishedAt": "2026-07-08T09:36:30.679Z",
+        "updatedAt": "2026-07-08T09:36:30.679Z",
+        "itemCount": 139,
+        "messageCount": 21,
+        "toolCallCount": 57,
+        "stderrBytes": 0,
+        "bytes": 213801,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4104-4bbc-7226-8bf3-7050612128d8",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-17-08-412Z_019f4104-4bbc-7226-8bf3-7050612128d8.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-38f0f2d5aa2fc7c0ca397a1d",
+      "subtaskId": "docs-tests-release-check",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T09:36:43.830Z",
+      "finishedAt": "2026-07-08T09:45:31.390Z",
+      "runner": "sdk",
+      "childSessionId": "019f4116-3b4f-7538-afde-0d84da656733",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-36-43-855Z_019f4116-3b4f-7538-afde-0d84da656733.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f4116-3b4f-7538-afde-0d84da656733",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现子任务 docs-tests-release-check：补齐 README / docs / 必要脚本，反映最终方案（ypic 不自启 server、当前目录可自动建立项目上下文、/config 打开 Web 根页、Studio 仅轻控制），并执行最低验证。若合适可补轻量 smoke/test 脚本。完成后请汇总修改文件、验证结果、是否可进入 checker。",
+      "summary": "All gates green. Here is the handoff.\n\n## Implementation Complete — subtask `docs-tests-release-check`\n\n### Files Changed\n\n- `bin/ypic.js` — additive only: guarded the auto-run `main()` with `if (require.main === module)` and exported pure helpers (`parseCliArgs`, `buildBaseUrl`, `resolveCanonicalPath`, `handleRawEvent`, `oneLineTrunc`, `planReviewPathForTask`, `shortToolHint`) so they can be unit-tested. `node bin/ypic.js` behavior is unchanged; requiring the module no longer starts a chat.\n- `scripts/test-ypic-cli.mjs` (new) — 16 lightweight smoke checks covering arg parsing (flags/env/positional/`--help`), health URL construction, SSE `handleRawEvent` (single-line, multi-line `data:`, comments, empty, non-JSON), `planReviewPathForTask` fallbacks, and `shortToolHint` truncation. Uses `createRequire` to load the CJS bin safely.\n- `package.json` — added `test:ypic-cli` script entry.\n- `README.md` — added `ypic` as a co-equal CLI entry in the header line, a new \"终端聊天入口 `ypic`\" section (quick start, positioning,不自启 server, auto project registration, Studio 轻控制/审批不绕过, session format unchanged), and updated the project-structure `bin/` row.\n- `docs/deployment/README.md` — documented both `ypi`/`ypic` bins and `bin/server-runner.js`, added a \"`ypic` terminal chat\" subsection (options, env fallbacks, in-session commands, Studio limits, no new session format), and updated the post-publish verification to include `ypic --help` + a `npm pack --dry-run` bin note.\n- `docs/architecture/overview.md` — expanded the `ypic` reuse-flow diagram/notes to include the `GET/POST /api/projects` auto-registration step, no-self-start invariant, canonical-pathKey dedupe, JSONL-format-unchanged invariant, and the `bin/` CommonJS/no-TS-import rule.\n- `docs/modules/api.md` — enriched the `cli/health/` route description to mention `ypic` reuses `/api/projects` for idempotent cwd registration and never self-starts a server.\n- `docs/modules/library.md` — added a reuse rule noting `bin/ypic.js` + `bin/server-runner.js` live under `bin/` (not `lib/`), are CommonJS/Node-built-in-only, must not import `lib/**`, reuse the HTTP/SSE API, and introduce no new session store/format.\n\n### Verification\n\n- `node bin/ypic.js --help` — OK\n- `node scripts/test-ypic-cli.mjs` (npm run test:ypic-cli) — 16/16 checks pass\n- `node_modules/.bin/tsc --noEmit` — OK (exit 0)\n- `npm run lint` — OK (exit 0)\n- `npm pack --dry-run` — includes `bin/pi-web.js`, `bin/server-runner.js`, `bin/ypic.js`, and `scripts/test-ypic-cli.mjs`\n\n### Notes / Risks\n\n- `bin/ypic.js` was legally touched by this subtask only to export pure helpers and guard `main()`; its chat/SSE/Studio logic is unchanged. The earlier subtasks (`ypic-chat-client`, `studio-light-controller`) own that behavior — the exports are additive and behind `require.main === module`.\n- Out-of-scope item intentionally left for the main session: `AGENTS.md` still says the published binary is \"`bin/pi-web.js` exposed as `ypi`\" and the Project Structure row / Quick Start table do not mention `ypic`. The subtask file list did not include `AGENTS.md`; per the subtask boundary I did not edit it. Recommend a tiny follow-up to add `ypic` to `AGENTS.md`'s Deployment/Dependencies + Project Structure rows.\n- Docs intentionally only promise `/config` opens the Web **root page** (no deep link), per the confirmed decision — no UI gate change.\n- Manual smoke (no-server guidance, server reuse, cwd session, `/config`, `/studio-feature` to planning) still recommended before release as listed in `docs/deployment/README.md`; this subtask covers the automated portion.\n- No blockers. Ready for the checker.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T09:36:43.830Z",
+        "updatedAt": "2026-07-08T09:45:31.390Z",
+        "eventCount": 2461,
+        "lastTextPreview": "All gates green. Here is the handoff.\n\n## Implementation Complete — subtask `docs-tests-release-check`\n\n### Files Changed\n\n- `bin/ypic.js` — additive only: guarded the auto-run `main()` with `if (require.main === module)` and exported pure helpers (`parseCliArgs`, `buildBaseUrl`, `resolveCanonicalPath`, `handleRawEvent`, `oneLineTrunc`, `planReviewPathForTask`, `shortToolHint`) so they can be unit-tested. `node bin/ypic.js` behavior is unchanged; requiring the module no longer starts a chat.\n- `scripts/test-ypic-cli.mjs` (new) — 16 lightweight smoke checks covering arg parsing (flags/env/positional/`--help`), health URL construction, SSE `handleRawEvent` (single-line, multi-line `data:`, comments, empty, non-JSON), `planReviewPathForTask` fallbacks, and `shortToolHint` truncation. Uses `createRequire` to load the CJS bin safely.\n- `package.json` — added `test:ypic-cli` script entry.\n- `README.md` — added `ypic` as a co-equal CLI entry in the header line, a new \"终端聊天入口 `ypic`\" section (quick start, positioning,不自启 server, auto project registration, Studio 轻控制/审批不绕过, session format unchanged), and updated the project-structure `bin/` row.\n- `docs/deployment/README.md` — documented both `ypi`/`ypic` bins and `bin/server-runner.js`, added a \"`ypic` terminal chat\" subsection (options, env fallbacks, in-session commands, Studio limits, no new session format), and updated the post-publish verification to include `ypic --help` + a `npm pack --dry-run` bin note.\n- `docs/architecture/overview.md` — expanded the `ypic` reuse-flow diagram/notes to include the `GET/POST /api/projects` auto-registration step, no-self-start invariant, canonical-pathKey dedupe, JSONL-format-unchanged invariant, and the `bin/` CommonJS/no-TS-import rule.\n- `docs/modules/api.md` — enriched the `cli/health/` route description to mention `ypic` reuses `/api/projects` for idempotent cwd registration and never self-starts a server.\n- `docs/modules/library.md` — added a reuse rule noting `bin/ypic.js` + `bin/server-runner.js` live under `bin/` (not `lib/`), are CommonJS/Node-built-in-only, must not import `lib/**`, reuse the HTTP/SSE API, and introduce no new session store/format.\n\n### Verification\n\n- `node bin/ypic.js --help` — OK\n- `node scripts/test-ypic-cli.mjs` (npm run test:ypic-cli) — 16/16 checks pass\n- `node_modules/.bin/tsc --noEmit` — OK (exit 0)\n- `npm run lint` — OK (exit 0)\n- `npm pack --dry-run` — includes `bin/pi-web.js`, `bin/server-runner.js`, `bin/ypic.js`, and `scripts/test-ypic-cli.mjs`\n\n### Notes / Risks\n\n- `bin/ypic.js` was legally touched by this subtask only to export pure helpers and guard `main()`; its chat/SSE/Studio logic is unchanged. The earlier subtasks (`ypic-chat-client`, `studio-light-controller`) own that behavior — the exports are additive and behind `require.main === module`.\n- Out-of-scope item intentionally left for the main session: `AGENTS.md` still says the published binary is \"`bin/pi-web.js` exposed as `ypi`\" and the Project Structure row / Quick Start table do not mention `ypic`. The subtask file list did not include `AGENTS.md`; per the subtask boundary I did not edit it. Recommend a tiny follow-up to add `ypic` to `AGENTS.md`'s Deployment/Dependencies + Project Structure rows.\n- Docs intentionally only promise `/config` opens the Web **root page** (no deep link), per the confirmed decision — no UI gate change.\n- Manual smoke (no-server guidance, server reuse, cwd session, `/config`, `/studio-feature` to planning) still recommended before release as listed in `docs/deployment/README.md`; this subtask covers the automated portion.\n- No blockers. Ready for the checker.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:44:41.492Z",
+            "text": "All validation passes. Let me give a final confirmation of the full validation suite running clean together:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T09:44:41.498Z",
+            "toolCallId": "call_1f4f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"echo \\\"=== ypic --help ===\\\" && node bin/ypic.js --help >/dev/null && echo OK\\necho \\\"=== test:ypic-cli ===\\\" && npm run test:ypic-cli --silent >/dev/null && echo OK\\necho \\\"=== tsc ===\\\" && node_modules/.bin/tsc --noEmit && echo OK\\necho \\\"=== lint ===\\\" && npm run lint --silent && echo OK\\necho \\\"=== pack dry-run bins ===\\\" && npm pack --dry-run 2>&1 | rg -c \\\"bin/ypic.js|bin/server-runner.js|bin/pi-web.js\\\"\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:44:54.395Z",
+            "toolCallId": "call_1f4f",
+            "toolName": "bash",
+            "text": "=== ypic --help ===\nOK\n=== test:ypic-cli ===\nOK\n=== tsc ===\nOK\n=== lint ===\nOK\n=== pack dry-run bins ===\n3",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:45:31.352Z",
+            "text": "All gates green. Here is the handoff.\n\n## Implementation Complete — subtask `docs-tests-release-check`\n\n### Files Changed\n\n- `bin/ypic.js` — additive only: guarded the auto-run `main()` with `if (require.main === module)` and exported pure helpers (`parseCliArgs`, `buildBaseUrl`, `resolveCanonicalPath`, `handleRawEvent`, `oneLineTrunc`, `planReviewPathForTask`, `shortToolHint`) so they can be unit-tested. `node bin/ypic.js` behavior is unchanged; requiring the module no longer starts a chat.\n- `scripts/test-ypic-cli.mjs` (new) — 16 lightweight smoke checks covering arg parsing (flags/env/positional/`--help`), health URL construction, SSE `handleRawEvent` (single-line, multi-line `data:`, comments, empty, non-JSON), `planReviewPathForTask` fallbacks, and `shortToolHint` truncation. Uses `createRequire` to load the CJS bin safely.\n- `package.json` — added `test:ypic-cli` script entry.\n- `README.md` — added `ypic` as a co-equal CLI entry in the header line, a new \"终端聊天入口 `ypic`\" section (quick start, positioning,不自启 server, auto project registration, Studio 轻控制/审批不绕过, session format unchanged), and updated the project-structure `bin/` row.\n- `docs/deployment/README.md` — documented both `ypi`/`ypic` bins and `bin/server-runner.js`, added a \"`ypic` terminal chat\" subsection (options, env fallbacks, in-session commands, Studio limits, no new session format), and updated the post-publish verification to include `ypic --help` + a `npm pack --dry-run` bin note.\n- `docs/architecture/overview.md` — expanded the `ypic` reuse-flow diagram/notes to include the `GET/POST /api/projects` auto-registration step, no-self-start invariant, canonical-pathKey dedupe, JSONL-format-unchanged invariant, and the `bin/` CommonJS/no-TS-import rule.\n- `docs/modules/api.md` — enriched the `cli/health/` route description to mention `ypic` reuses `/api/projects` for idempotent cwd registration and never self-starts a server.\n- `docs/modules/library.md` — added a reuse rule noting `bin/ypic.js` + `bin/server-runner.js` live under `bin/` (not `lib/`), are CommonJS/Node-built-in-only, must not import `lib/**`, reuse the HTTP/SSE API, and introduce no new session store/format.\n\n### Verification\n\n- `node bin/ypic.js --help` — OK\n- `node scripts/test-ypic-cli.mjs` (npm run test:ypic-cli) — 16/16 checks pass\n- `node_modules/.bin/tsc --noEmit` — OK (exit 0)\n- `npm run lint` — OK (exit 0)\n- `npm pack --dry-run` — includes `bin/pi-web.js`, `bin/server-runner.js`, `bin/ypic.js`, and `scripts/test-ypic-cli.mjs`\n\n### Notes / Risks\n\n- `bin/ypic.js` was legally touched by this subtask only to export pure helpers and guard `main()`; its chat/SSE/Studio logic is unchanged. The earlier subtasks (`ypic-chat-client`, `studio-light-controller`) own that behavior — the exports are additive and behind `require.main === module`.\n- Out-of-scope item intentionally left for the main session: `AGENTS.md` still says the published binary is \"`bin/pi-web.js` exposed as `ypi`\" and the Project Structure row / Quick Start table do not mention `ypic`. The subtask file list did not include `AGENTS.md`; per the subtask boundary I did not edit it. Recommend a tiny follow-up to add `ypic` to `AGENTS.md`'s Deployment/Dependencies + Project Structure rows.\n- Docs intentionally only promise `/config` opens the Web **root page** (no deep link), per the confirmed decision — no UI gate change.\n- Manual smoke (no-server guidance, server reuse, cwd session, `/config`, `/studio-feature` to planning) still recommended before release as listed in `docs/deployment/README.md`; this subtask covers the automated portion.\n- No blockers. Ready for the checker.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T09:45:31.369Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 6157,
+        "tokens": 961,
+        "tokenSource": "usage",
+        "tps": 1.86,
+        "firstTokenAt": "2026-07-08T09:36:55.097Z",
+        "lastTokenAt": "2026-07-08T09:45:31.338Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-38f0f2d5aa2fc7c0ca397a1d",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/implementer-38f0f2d5aa2fc7c0ca397a1d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T09:36:43.830Z",
+        "finishedAt": "2026-07-08T09:45:31.383Z",
+        "updatedAt": "2026-07-08T09:45:31.383Z",
+        "itemCount": 105,
+        "messageCount": 21,
+        "toolCallCount": 40,
+        "stderrBytes": 0,
+        "bytes": 156055,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4116-3b4f-7538-afde-0d84da656733",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-36-43-855Z_019f4116-3b4f-7538-afde-0d84da656733.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-88201c4ff53e999be0ae00be",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-08T09:45:45.590Z",
+      "finishedAt": "2026-07-08T09:49:20.598Z",
+      "runner": "sdk",
+      "childSessionId": "019f411e-7f8c-7c2c-b0c3-18d355bb63f7",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-45-45-612Z_019f411e-7f8c-7c2c-b0c3-18d355bb63f7.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "childSessionId": "019f411e-7f8c-7c2c-b0c3-18d355bb63f7",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请对已完成的实现进行检查。重点核对：1) `ypi` 保持现有 Web 启动行为与自动打开浏览器；2) 新增 `ypic`，但不自启 server，health check 失败时给明确引导；3) 当前目录未加入项目时可自动建立/注册项目上下文；4) `/config` 只打开 Web 根页；5) Studio 在 CLI 中只做轻量状态/审批提示，不绕过 approval gate；6) 文档与验证是否完整。请运行必要验证，给出问题列表、严重级别、是否可通过。",
+      "summary": "---\n\n## Check Complete — Handoff\n\n### Verdict: **Pass** ✅\n\nAll 5 implementation subtasks are complete and meet the design/PRD/checks requirements. Automated verification passes cleanly.\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `app/api/cli/health/route.ts` | **New** — `GET /api/cli/health` (ok/app/version/pid/capabilities, no secrets) |\n| `bin/server-runner.js` | **New** — Shared server startup helper (proxy env, spawn, Ready detection, openBrowser) |\n| `bin/ypic.js` | **New** — Terminal chat CLI (health check, project registration, SSE renderer, Studio summaries, readline loop, 41 KB) |\n| `bin/pi-web.js` | **Refactored** — Extracts startup logic to `server-runner.js`; `ypi` behavior unchanged |\n| `scripts/test-ypic-cli.mjs` | **New** — 16 pure-function smoke tests (arg parsing, URL, SSE parsing, plan-review, hints) |\n| `package.json` | Added `bin.ypic`, `test:ypic-cli` script |\n| `README.md` | ypic quick start, usage, constraints, differences from ypi |\n| `docs/architecture/overview.md` | ypic CLI reuse flow diagram + invariants |\n| `docs/deployment/README.md` | ypic CLI options, commands, server-requirement, npm pack note |\n| `docs/modules/api.md` | `cli/health/` route row |\n| `docs/modules/library.md` | bin boundary rule (no TS imports, HTTP/SSE reuse only) |\n\n### Validation Results\n\n| Command | Result |\n|---------|--------|\n| `npm run lint` | Clean |\n| `tsc --noEmit` | Clean |\n| `node bin/ypic.js --help` | Pass |\n| `node scripts/test-ypic-cli.mjs` | 16/16 passed |\n| `npm pack --dry-run` | All 3 bin files included |\n\n### Remaining Risks (non-blocking)\n\n1. **`checkHealth()` minor indentation** — 2-space vs 4-space in try body; cosmetic only.\n2. **`findRecentSessionForCwd` `!s.archived` filter** — Always true since `listAllSessions` doesn't include `archived`; no functional impact (archived sessions are in separate directory).\n3. **Manual smoke unavailable** — End-to-end chat/Studio workflow requires running ypi server; deferred to main session per `checks.md` checklist.\n\n### Decisions Needed from Main Session\n\nNone — all 4 plan-review decisions are confirmed and the implementation follows them faithfully.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-08T09:45:45.590Z",
+        "updatedAt": "2026-07-08T09:49:20.598Z",
+        "eventCount": 10155,
+        "lastTextPreview": "---\n\n## Check Complete — Handoff\n\n### Verdict: **Pass** ✅\n\nAll 5 implementation subtasks are complete and meet the design/PRD/checks requirements. Automated verification passes cleanly.\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `app/api/cli/health/route.ts` | **New** — `GET /api/cli/health` (ok/app/version/pid/capabilities, no secrets) |\n| `bin/server-runner.js` | **New** — Shared server startup helper (proxy env, spawn, Ready detection, openBrowser) |\n| `bin/ypic.js` | **New** — Terminal chat CLI (health check, project registration, SSE renderer, Studio summaries, readline loop, 41 KB) |\n| `bin/pi-web.js` | **Refactored** — Extracts startup logic to `server-runner.js`; `ypi` behavior unchanged |\n| `scripts/test-ypic-cli.mjs` | **New** — 16 pure-function smoke tests (arg parsing, URL, SSE parsing, plan-review, hints) |\n| `package.json` | Added `bin.ypic`, `test:ypic-cli` script |\n| `README.md` | ypic quick start, usage, constraints, differences from ypi |\n| `docs/architecture/overview.md` | ypic CLI reuse flow diagram + invariants |\n| `docs/deployment/README.md` | ypic CLI options, commands, server-requirement, npm pack note |\n| `docs/modules/api.md` | `cli/health/` route row |\n| `docs/modules/library.md` | bin boundary rule (no TS imports, HTTP/SSE reuse only) |\n\n### Validation Results\n\n| Command | Result |\n|---------|--------|\n| `npm run lint` | Clean |\n| `tsc --noEmit` | Clean |\n| `node bin/ypic.js --help` | Pass |\n| `node scripts/test-ypic-cli.mjs` | 16/16 passed |\n| `npm pack --dry-run` | All 3 bin files included |\n\n### Remaining Risks (non-blocking)\n\n1. **`checkHealth()` minor indentation** — 2-space vs 4-space in try body; cosmetic only.\n2. **`findRecentSessionForCwd` `!s.archived` filter** — Always true since `listAllSessions` doesn't include `archived`; no functional impact (archived sessions are in separate directory).\n3. **Manual smoke unavailable** — End-to-end chat/Studio workflow requires running ypi server; deferred to main session per `checks.md` checklist.\n\n### Decisions Needed from Main Session\n\nNone — all 4 plan-review decisions are confirmed and the implementation follows them faithfully.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:49:08.983Z",
+            "text": "All checks complete. Let me now write the formal review.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-08T09:49:08.989Z",
+            "toolCallId": "call_00_8xZ79ZfmwHsa6TPBCT9e8616",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260708-163020/.ypi/tasks/20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案/review.md\",\n  \"content\": \"# review\\n\\n## Check Complete\\n\\n### Findings Fixed\\n\\nNone — no issues required fixing during review.\\n\\n### Remaining Findings\\n\\n#### Non-blocking\\n\\n1. **Minor indentation inconsistency in `bin/ypic.js` `checkHealth()`** — The `try` body is indented at 2 spaces while surrounding code uses 4-space convention. Purely cosmetic; does not affect execution.\\n\\n2. **`findRecentSessionForCwd` filters by `!s.archived` but `listAllSessions` does not include `archived` field** — The filter is always a no-op (`undefined` is falsy, `!undefined` is true), so all non-StudioChild sessions pass. This is not a bug because `listAllSessions` only returns non-archived sessions (archived sessions live in a separate `sessions-archive/` directory). The filter is defensive but redundant. No functional impact.\\n\\n3. **Health endpoint exposes `process.pid`** — This is an intentional design choice per the plan for server process identification. The PID is only visible to localhost callers. If PID exposure is considered sensitive, it can be removed in a follow-up without breaking the contract (`ypic` does not read `pid` from the health response).\\n\\nNo blocking findings.\\n\\n### Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run lint` | Pass (clean) |\\n| `node_modules/.bin/tsc --noEmit` | Pass (clean) |\\n| `node bin/ypic.js --help` | Pass — displays usage, options, in-session commands |\\n| `node scripts/test-ypic-cli.mjs` | Pass — 16/16 checks |\\n| `npm pack --dry-run` | Pass — includes `bin/pi-web.js`, `bin/server-runner.js`, `bin/ypic.js` |\\n| `node -e \\\"require('./bin/server-runner')\\\"` | Pass — CommonJS loads, all 7 exports present |\\n| `node -e \\\"require('./bin/ypic')\\\"` | Pass — CommonJS loads, all 7 pure-helper exports present; `require.main === module` guard prevents `main()` execution |\\n\\n### Per-requirement Verification\\n\\n| # | Requirement | Status | Evidence |\\n| --- | --- | --- | --- |\\n| R1 | `ypi` / `ypic` dual bin; `ypi` compatible | ✅ Pass | `package.json` has both; `bin/pi-web.js` delegates to `server-runner.js` with identical param/env resolution and `openBrowser: true` |\\n| R2 | cwd session binding | ✅ Pass | `ypic` sends `cwd` in `POST /api/agent/draft` payload; `draftSession()` resolves canonical path via `fs.realpathSync` |\\n| R3 | Reuse ypi server, no self-start | ✅ Pass | `checkHealth()` validates `app === \\\"yolk-pi-web\\\"`; failure prints guidance and `process.exit(1)`; `startNextServer` is never called in ypic |\\n| R4 | Chat-only terminal experience | ✅ Pass | readline loop with `/help`, `/config`, `/open`, `/status`, `/abort`, `/steer`, `/follow`, `/quit`; SSE renders text deltas, tool start/end, compact Studio summaries |\\n| R5 | Studio light entry | ✅ Pass | `/studio-*` forwarded as chat prompts; `ypi_studio_task/ypi_studio_subagent/ypi_studio_wait` render compact summaries; `plan-review.md` path + Web URL displayed on `awaiting_approval`; `approvalPromptText()` explicitly states \\\"CLI will not auto-approve\\\"; backup `maybePromptStudioApproval()` after `agent_end` catches out-of-band approval transitions |\\n| R6 | Documentation | ✅ Pass | README, deployment, API, architecture, library docs all updated with ypic usage, constraints, and data flow |\\n| — | Project auto-registration | ✅ Pass | `resolveProjectContext()` calls `GET /api/projects` to find existing space, `POST /api/projects` to register; `registerProject` uses `canonicalizeProjectPath` + `pathKey` deduping |\\n| — | No TS imports in bin | ✅ Pass | `bin/ypic.js` and `bin/server-runner.js` use only `require('util')`, `require('child_process')`, `require('readline')`, `require('fs')`, `require('path')` — zero TypeScript/library imports |\\n\\n### Verdict\\n\\n**Pass** — All 5 subtasks are implemented according to the plan. All automated verification passes cleanly. The implementation:\\n\\n- Preserves `ypi` backward compatibility\\n- Correctly reuses the ypi Web server over HTTP/SSE\\n- Never self-starts a server\\n- Handles project auto-registration with canonical path deduplication\\n- Provides Studio lightweight status display without bypassing the approval gate\\n- Includes documentation across README, deployment, API, architecture, and library docs\\n- Includes 16 pure-function smoke tests\\n- Is publishable (all `bin/` files included in `npm pack --dry-run`)\\n\\n**Manual smoke testing deferred** to the main session: a running ypi server is needed to verify end-to-end chat flow, Studio workflow, and server reuse. The smoke checklist is documented in `docs/deployment/README.md` and `checks.md`.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-08T09:49:09.009Z",
+            "toolCallId": "call_00_8xZ79ZfmwHsa6TPBCT9e8616",
+            "toolName": "write",
+            "text": "Successfully wrote 4476 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260708-163020/.ypi/tasks/20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-08T09:49:20.573Z",
+            "text": "---\n\n## Check Complete — Handoff\n\n### Verdict: **Pass** ✅\n\nAll 5 implementation subtasks are complete and meet the design/PRD/checks requirements. Automated verification passes cleanly.\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `app/api/cli/health/route.ts` | **New** — `GET /api/cli/health` (ok/app/version/pid/capabilities, no secrets) |\n| `bin/server-runner.js` | **New** — Shared server startup helper (proxy env, spawn, Ready detection, openBrowser) |\n| `bin/ypic.js` | **New** — Terminal chat CLI (health check, project registration, SSE renderer, Studio summaries, readline loop, 41 KB) |\n| `bin/pi-web.js` | **Refactored** — Extracts startup logic to `server-runner.js`; `ypi` behavior unchanged |\n| `scripts/test-ypic-cli.mjs` | **New** — 16 pure-function smoke tests (arg parsing, URL, SSE parsing, plan-review, hints) |\n| `package.json` | Added `bin.ypic`, `test:ypic-cli` script |\n| `README.md` | ypic quick start, usage, constraints, differences from ypi |\n| `docs/architecture/overview.md` | ypic CLI reuse flow diagram + invariants |\n| `docs/deployment/README.md` | ypic CLI options, commands, server-requirement, npm pack note |\n| `docs/modules/api.md` | `cli/health/` route row |\n| `docs/modules/library.md` | bin boundary rule (no TS imports, HTTP/SSE reuse only) |\n\n### Validation Results\n\n| Command | Result |\n|---------|--------|\n| `npm run lint` | Clean |\n| `tsc --noEmit` | Clean |\n| `node bin/ypic.js --help` | Pass |\n| `node scripts/test-ypic-cli.mjs` | 16/16 passed |\n| `npm pack --dry-run` | All 3 bin files included |\n\n### Remaining Risks (non-blocking)\n\n1. **`checkHealth()` minor indentation** — 2-space vs 4-space in try body; cosmetic only.\n2. **`findRecentSessionForCwd` `!s.archived` filter** — Always true since `listAllSessions` doesn't include `archived`; no functional impact (archived sessions are in separate directory).\n3. **Manual smoke unavailable** — End-to-end chat/Studio workflow requires running ypi server; deferred to main session per `checks.md` checklist.\n\n### Decisions Needed from Main Session\n\nNone — all 4 plan-review decisions are confirmed and the implementation follows them faithfully.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-08T09:49:20.585Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 2746,
+        "tokens": 618,
+        "tokenSource": "usage",
+        "tps": 2.95,
+        "firstTokenAt": "2026-07-08T09:45:51.144Z",
+        "lastTokenAt": "2026-07-08T09:49:20.528Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-88201c4ff53e999be0ae00be",
+        "taskId": "20260708-164054-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260708-164054-_-ypic-cli-_-ypi-web-studio-/checker-88201c4ff53e999be0ae00be.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-08T09:45:45.590Z",
+        "finishedAt": "2026-07-08T09:49:20.597Z",
+        "updatedAt": "2026-07-08T09:49:20.597Z",
+        "itemCount": 76,
+        "messageCount": 8,
+        "toolCallCount": 32,
+        "stderrBytes": 0,
+        "bytes": 112337,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f411e-7f8c-7c2c-b0c3-18d355bb63f7",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260708-163020--/2026-07-08T09-45-45-612Z_019f411e-7f8c-7c2c-b0c3-18d355bb63f7.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-08T08:58:35.655Z",
+      "contextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+      "from": "awaiting_approval",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-08T08:59:17.527Z",
+      "contextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+      "inputHash": "0ebac5180108d3b8605d1539",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-09T02:20:51.777Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260709-102051-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
+    "knowledgePath": ".ypi/knowledge/20260709-102051-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-08T08:58:35.655Z",
+    "summary": "新增 ypic 终端 chat 入口，复用现有 ypi Web server 与 AgentSession/YPI Studio API；ypi Web 入口保持兼容。ypic 不自启 server，当前目录未注册时自动建立项目上下文。",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "cli-contract-health",
+          "title": "api-contract",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "cli-contract-health"
+          ]
+        },
+        {
+          "id": "server-runner-refactor",
+          "title": "cli-runtime",
+          "relation": "serial",
+          "dependencies": [
+            "cli-contract-health"
+          ],
+          "subtaskIds": [
+            "server-runner-refactor"
+          ]
+        },
+        {
+          "id": "ypic-chat-client",
+          "title": "cli-chat",
+          "relation": "serial",
+          "dependencies": [
+            "server-runner-refactor"
+          ],
+          "subtaskIds": [
+            "ypic-chat-client"
+          ]
+        },
+        {
+          "id": "studio-light-controller",
+          "title": "studio-integration",
+          "relation": "serial",
+          "dependencies": [
+            "ypic-chat-client"
+          ],
+          "subtaskIds": [
+            "studio-light-controller"
+          ]
+        },
+        {
+          "id": "docs-tests-release-check",
+          "title": "quality",
+          "relation": "serial",
+          "dependencies": [
+            "cli-contract-health",
+            "server-runner-refactor",
+            "ypic-chat-client",
+            "studio-light-controller"
+          ],
+          "subtaskIds": [
+            "docs-tests-release-check"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "cli-contract-health",
+        "title": "定义 ypic CLI 契约并增加 server 健康检查",
+        "phase": "api-contract",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "app/api/cli/health/route.ts",
+          "docs/modules/api.md",
+          "docs/architecture/overview.md"
+        ],
+        "instructions": [
+          "新增 GET /api/cli/health，返回 ok/app/version/pid/capabilities，不返回 secrets。",
+          "健康检查用于 ypic 区分可复用的 ypi server 与端口冲突的其他服务。",
+          "在架构/API 文档中记录 ypic 复用 Web API 的运行流和 route 用途。",
+          "不要修改现有 /api/agent/* 契约；ypic 优先复用 draft/prompt/events/get_state。"
+        ],
+        "acceptance": [
+          "GET /api/cli/health 返回稳定 JSON，HTTP 200。",
+          "未启动 ypi server 时 ypic 会给出明确提示，引导用户先手动启动 server。",
+          "现有 API route 行为不变。"
+        ],
+        "validation": [
+          "curl http://127.0.0.1:30141/api/cli/health",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "读取 package version 时不要依赖不可发布路径；package.json 已在 files 中。",
+          "健康检查不应泄露环境变量、token 或用户目录细节。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "server-runner-refactor",
+        "title": "提取 ypi/ypic 共用 server 启动器并保持 ypi 兼容",
+        "phase": "cli-runtime",
+        "order": 20,
+        "dependsOn": [
+          "cli-contract-health"
+        ],
+        "dependencies": [
+          "cli-contract-health"
+        ],
+        "relation": "serial",
+        "files": [
+          "bin/pi-web.js",
+          "bin/server-runner.js"
+        ],
+        "instructions": [
+          "把 bin/pi-web.js 中 Next bin resolve、proxy env、spawn、Ready 检测、open browser 逻辑提取到 CommonJS helper。",
+          "bin/pi-web.js 继续解析现有 port/hostname/proxy/socks-proxy/no-proxy 参数，默认 openBrowser=true，行为与当前版本一致。",
+          "helper 至少支持 ready callback，供 ypi 复用；首版不要求 ypic 使用它自启 server。",
+          "不要引入 shell:true 启动 Next；延续当前 process.execPath + nextBin 的跨平台策略。"
+        ],
+        "acceptance": [
+          "ypi 默认仍在 Ready 后打开浏览器。",
+          "ypi --port/--hostname/proxy 参数行为不回归。",
+          "ypic 与该 helper 的耦合仅限共享参数/URL 约定，不要求自启 server。"
+        ],
+        "validation": [
+          "node bin/pi-web.js --help 或最小 smoke 检查参数解析不崩溃（如不支持 help，记录原因）",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "bin 是 CommonJS，避免使用 ESM-only 语法。",
+          "改动 pi-web.js 属于回归高风险点；保持小步提取并手工 smoke。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "ypic-chat-client",
+        "title": "实现 ypic chat loop、HTTP 命令与 SSE 渲染",
+        "phase": "cli-chat",
+        "order": 30,
+        "dependsOn": [
+          "server-runner-refactor"
+        ],
+        "dependencies": [
+          "server-runner-refactor"
+        ],
+        "relation": "serial",
+        "files": [
+          "bin/ypic.js",
+          "package.json"
+        ],
+        "instructions": [
+          "package.json 增加 bin.ypic。",
+          "ypic 使用 process.cwd() 作为默认 cwd；支持 --port、--hostname、--continue、--help。",
+          "启动时先 GET /api/cli/health；失败则打印明确提示，引导用户先手动启动 `ypi` / Web server。",
+          "首条消息推荐先确保当前 cwd 已建立/注册 project/space 上下文，再 POST /api/agent/draft 创建 session，连接 /api/agent/:id/events 后 POST /api/agent/:id {type:'prompt'}，避免早期 SSE 丢失。",
+          "实现 readline chat loop：普通输入发 prompt；agent running 时提供 steer/follow-up/abort 策略；/quit 退出；/config 或 /open 打开 Web 根页。",
+          "实现轻量 SSE parser：解析 data 行 JSON，渲染 assistant text delta、tool start/end、agent_end、agent_error；未知事件忽略或 debug 显示。",
+          "不要直接 import 项目 TS lib；bin/ypic.js 必须在发布包中可由 Node 直接执行。"
+        ],
+        "acceptance": [
+          "npm link 或 node bin/ypic.js 能在当前目录进入聊天。",
+          "生成 session 的 cwd 为启动目录，且当前目录未注册时会自动建立/注册项目上下文。",
+          "assistant 文本可流式显示；工具事件不会输出大块 raw JSON。",
+          "Ctrl-C 在 running 时 abort，idle 时可退出。",
+          "ypi 入口不受 ypic 影响。"
+        ],
+        "validation": [
+          "node bin/ypic.js --help",
+          "手工运行 ypic，发送一条简单消息",
+          "在已有 ypi server 运行时再次运行 ypic，确认复用 server",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Node fetch streaming/SSE parsing要处理 chunk 边界和多行 data。",
+          "终端渲染不能假设 ANSI 支持；颜色应可关闭或降级。",
+          "如果 provider/auth 未配置，错误提示应引导 /config 打开 Web。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "studio-light-controller",
+        "title": "补齐 YPI Studio 轻入口与状态提示",
+        "phase": "studio-integration",
+        "order": 40,
+        "dependsOn": [
+          "ypic-chat-client"
+        ],
+        "dependencies": [
+          "ypic-chat-client"
+        ],
+        "relation": "serial",
+        "files": [
+          "bin/ypic.js"
+        ],
+        "instructions": [
+          "将 /studio-* 输入原样作为 chat prompt 发送，依赖现有 Studio extension 处理。",
+          "对 ypi_studio_task / ypi_studio_subagent / ypi_studio_wait 相关 tool events 做紧凑摘要：taskId/status/member/runId/phase/tps/currentTool/plan-review path。",
+          "当工具结果或 session studio-task API 显示 awaiting_approval，提示 plan-review.md 路径和 /open；不要由 CLI 直接写 approvalGrant。",
+          "退出时调用 get_state 和/或 /api/sessions/:id/studio-task，若存在 running/queued/waiting_for_user child runs，则提示用户改到 Web 继续查看；不要尝试管理 server 生命周期。",
+          "文案明确：完整任务详情、artifact/HTML prototype preview、成员配置在 Web 中查看。"
+        ],
+        "acceptance": [
+          "/studio-feature 能在 CLI 中创建/推进任务。",
+          "CLI 显示 plan-review 路径和 Web 打开提示。",
+          "awaiting_approval -> implementing 仍只能由用户明确聊天输入触发现有服务器 grant 逻辑。",
+          "有后台 Studio run 时 /quit 会提示用户改到 Web 继续查看，不影响已存在 server。"
+        ],
+        "validation": [
+          "手工运行 /studio-feature <small goal> 到 planning/awaiting_approval 前的 smoke（不进入实现）",
+          "确认 Web Studio 面板能看到同一 task/session",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "工具事件 payload 形态多样，摘要逻辑必须容错，不因字段缺失崩溃。",
+          "不要把 child transcript/raw tool args 大量打印到终端。",
+          "不要绕过 Studio 审批硬门禁。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "docs-tests-release-check",
+        "title": "更新文档、补充 smoke 测试并执行验证",
+        "phase": "quality",
+        "order": 50,
+        "dependsOn": [
+          "cli-contract-health",
+          "server-runner-refactor",
+          "ypic-chat-client",
+          "studio-light-controller"
+        ],
+        "dependencies": [
+          "cli-contract-health",
+          "server-runner-refactor",
+          "ypic-chat-client",
+          "studio-light-controller"
+        ],
+        "relation": "serial",
+        "files": [
+          "README.md",
+          "docs/deployment/README.md",
+          "docs/modules/api.md",
+          "docs/architecture/overview.md",
+          "docs/modules/library.md",
+          "package.json",
+          "scripts/test-ypic-cli.mjs"
+        ],
+        "instructions": [
+          "README 增加 ypic 快速开始、与 ypi 的区别、配置跳转、Studio 限制。",
+          "deployment 文档补充 npm package runtime 两个 bin 的用法与参数。",
+          "architecture/API/library 文档记录 ypic 复用 Web server/API，不新增 session 格式。",
+          "可新增轻量 script 测试 CLI 参数解析、SSE parser、health URL 构造等纯函数；若未拆纯函数，至少记录手工 smoke。",
+          "执行 lint 和 type-check；不直接运行 next build。"
+        ],
+        "acceptance": [
+          "文档能让用户区分 ypi 和 ypic。",
+          "验证命令通过或有明确 blocker。",
+          "npm pack --dry-run（如 release 前执行）能包含 bin/ypic.js 和 bin/server-runner.js。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "node bin/ypic.js --help",
+          "npm pack --dry-run（仅发布验证时）"
+        ],
+        "risks": [
+          "文档若提到未实现 deep link 会误导用户；首版只承诺打开 Web 根页。",
+          "新增 npm script 时同步 package/docs。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-09T02:20:51.777Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "cli-contract-health": {
+        "id": "cli-contract-health",
+        "status": "done",
+        "updatedAt": "2026-07-08T09:02:26.610Z",
+        "startedAt": "2026-07-08T08:59:29.904Z",
+        "finishedAt": "2026-07-08T09:02:26.607Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-355961e2eb67ea559dbfe472"
+        ],
+        "lastRunId": "implementer-355961e2eb67ea559dbfe472",
+        "claimedAt": "2026-07-08T08:59:29.904Z",
+        "claimedByContextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `app/api/cli/health/route.ts` (new) — `GET /api/cli/health` returns `{ ok, app: \"yolk-pi-web\", version, pid, capabilities: { agentApi, studio } }`. Uses `process.env.NEXT_PUBLIC_APP_VERSION` (already exposed by `next.config.ts`), mirrors the existing `browser-share/health` route style, and exposes no env/token/path secrets.\n- `docs/modules/api.md` — added `cli/health/` row to the API route map documenting purpose, response shape, secret boundary, and that `ypic` reuses existing `agent/draft`/`agent/[id]`/`agent/[id]/events` contracts.\n- `docs/architecture/overview.md` — added a `ypic` CLI reuse flow subsection under Runtime Flow describing the health → draft → events → prompt sequence, the single-wrapper/extension/approval-gate invariants shared with Web sessions, and that no new session format is introduced.\n\nNo existing `/api/agent/*` contract was modified.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` → exit 0 (clean). The worktree had no `node_modules`; I temporarily symlinked the main repo's `node_modules` to resolve modules for the check, then removed the symlink. My route produced zero errors; the sibling `browser-share/health` route resolves identically, confirming the pattern is consistent.\n- `eslint .` → exit 0 (clean), same symlink approach.\n- `curl http://127.0.0.1:30141/api/cli/health` — not run: no server is running in this worktree and the subtask constraint forbids `ypic`/server auto-start. The route is a trivial static-JSON handler matching an already-deployed pattern; manual smoke recommended during the next subtask when a server is running.\n\n#### Notes / Risks\n\n- Environment limitation: this worktree ships without `node_modules`, so lint/tsc cannot run standalone. I validated by temporarily symlinking the main repo's `node_modules` and restored the original state afterward. The parent may want to run `npm install` here before later subtasks (`server-runner-refactor`, `ypic-chat-client`) which need to execute `node bin/ypic.js --help` and smoke-test.\n- `version` field relies on `NEXT_PUBLIC_APP_VERSION` being baked in at build time via `next.config.ts`; in a production build it is correct, and in raw `next dev` it is also populated from `package.json`. The fallback `\"0.0.0\"` only triggers if the env var is somehow absent.\n- No secrets leak: the response contains only `ok`, `app`, `version`, `pid`, and capability flags. `pid` is intentionally included per the plan so the CLI can identify the server process; if the parent considers `pid` sensitive, it can be dropped in a follow-up.\n- Decisions needed from main session: none for this subtask. The four plan-level decisions in `plan-review.md` are already confirmed/approved; this subtask stayed within its boundary."
+      },
+      "server-runner-refactor": {
+        "id": "server-runner-refactor",
+        "status": "done",
+        "updatedAt": "2026-07-08T09:06:55.260Z",
+        "startedAt": "2026-07-08T09:02:34.655Z",
+        "finishedAt": "2026-07-08T09:06:55.257Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-047538abca26354fb6f425af"
+        ],
+        "lastRunId": "implementer-047538abca26354fb6f425af",
+        "claimedAt": "2026-07-08T09:02:34.655Z",
+        "claimedByContextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/server-runner.js` (new) — CommonJS server startup helper extracted from `pi-web.js`. Exports `parseServerArgs`, `resolveNextBin`, `createRuntimeEnv`, `openBrowser`, `startNextServer`, plus `DEFAULT_PORT`/`SERVER_ARG_SPEC`. `startNextServer({ pkgDir, port, hostname, httpProxy, socksProxy, noProxy, openBrowser, onReady })` handles `.next` existence guard, next-bin resolve, proxy env build, `process.execPath`+`nextBin` spawn (no `shell:true`), stdout Ready detection, optional browser open, and an `onReady(url)` callback. Pure Node built-ins only — no TS imports, safe for the published package.\n- `bin/pi-web.js` (refactored) — `ypi` entrypoint now delegates spawn/proxy/Ready/browser logic to `server-runner.js`. Arg parsing (`--port/--hostname/--proxy/--socks-proxy/--no-proxy`) and env fallbacks remain inline; `openBrowser: true` preserves the default open-browser-on-Ready behavior. `child.on(\"exit\")` forwarding preserved.\n\n#### Verification\n\n- `npm run lint` — clean (0 problems).\n- `node_modules/.bin/tsc --noEmit` — exit 0.\n- `node bin/pi-web.js --help` — exits with the \"Build artifacts not found\" guard (expected: `.next` absent in this dev worktree); arg parsing does not crash. `--help` is not a declared flag (`strict:false`); Next would handle it once `.next` exists.\n- Helper smoke: `parseServerArgs`/`resolveNextBin`/`createRuntimeEnv` exercised via `node -e` — port/hostname/proxy parsed correctly, `NODE_OPTIONS` gets `--use-env-proxy` appended, next-bin resolves to the real path.\n\n> Note: `node_modules` was absent in this worktree; I symlinked it from the main repo solely to run lint/tsc. The symlink is gitignored and not a repo change.\n\n#### Notes / Risks\n\n- Behavior equivalence: the refactor keeps the identical spawn command, stdio config, proxy env, Ready-based browser open, and exit forwarding. `ypi --port/--hostname/proxy` behavior should not regress; a full runtime smoke (actual `ypi` launch + auto browser open) could not be run here because `.next` build artifacts don't exist in this worktree — recommend the checker/parent run that smoke in a built environment.\n- `server-runner.js` is exported for reuse but, per design, `ypic` (next subtask) is not required to self-start a server; it may reuse `parseServerArgs`/`DEFAULT_PORT`/URL conventions only.\n- No git commit/push performed, per member rules."
+      },
+      "ypic-chat-client": {
+        "id": "ypic-chat-client",
+        "status": "done",
+        "updatedAt": "2026-07-08T09:16:53.900Z",
+        "startedAt": "2026-07-08T09:07:00.739Z",
+        "finishedAt": "2026-07-08T09:16:53.897Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-35d6cb05a1cbc1bbaab0345b"
+        ],
+        "lastRunId": "implementer-35d6cb05a1cbc1bbaab0345b",
+        "claimedAt": "2026-07-08T09:07:00.739Z",
+        "claimedByContextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "summary": "实现已完成。所有验证均已通过。这是我的交接说明。\n\n### 实现完成 — 子任务 `ypic-chat-client`\n\n#### 已修改文件\n\n- **`bin/ypic.js`** (新增, 28.3KB) — `ypic` 终端聊天客户端。CommonJS，仅依赖 Node 内置模块 + `bin/server-runner.js#openBrowser`。实现内容：\n  - 参数解析：`--port/-p`、`--hostname/-H`、`--continue/-c`、`--help/-h`，位置参数 `[message]`，以及 `PI_WEB_PORT/PI_WEB_HOST` 环境变量回退。\n  - 启动时执行 `GET /api/cli/health` 健康检查；若失败或应用非 `yolk-pi-web`，打印明确指引并退出（**不自启服务器**）。\n  - 当前目录未注册时，通过现有 Project Registry API 自动建立项目/空间上下文：先 `GET /api/projects` 按 `path/realPath` 查找已有 space（避免 worktree 重复注册），未命中则 `POST /api/projects {path}`（幂等 by pathKey）。\n  - 创建会话顺序：`resolveProjectContext` → `POST /api/agent/draft {cwd, projectId, spaceId}` → 连接 `GET /api/agent/:id/events` SSE → 发送 prompt，避免早期事件丢失。\n  - `--continue`：`GET /api/sessions` 按 cwd 过滤最近非子会话。\n  - 轻量 SSE parser：处理 chunk 边界、多行 `data:`、注释心跳、非 JSON payload。\n  - 紧凑渲染：assistant 文本流式增量输出（cumulative diff）、`tool_execution_start/end` 单行 `⚒ name` / `✓|✗ name`、`agent_end`/`agent_error`、retry/compaction 摘要；未知事件忽略或 `YPIC_DEBUG` 显示。\n  - readline chat loop：普通输入 idle→prompt、running→steer；`/help /config /open /status /abort /steer /follow /quit`；未知 `/` 命令透传为 prompt（支持 `/studio-*`）；`/config` 用共享 `openBrowser` 打开 Web 根页。\n  - Ctrl-C：running 时首次 abort，二次或 idle 时退出；`/quit` 轻量检查 `/api/sessions/:id/studio-task` 的 `implementationProjection.statusCounts`，有 active/queued child run 时提示改到 Web 查看，不管理服务器生命周期。\n  - 错误提示：auth/model 类错误引导 `/config`。\n- **`package.json`** — 增加 `\"bin\": { \"ypi\": \"bin/pi-web.js\", \"ypic\": \"bin/ypic.js\" }`。\n\n#### 验证\n\n- `node bin/ypic.js --help` — 正常显示用法。\n- `node --check bin/ypic.js` — 语法 OK。\n- `node bin/ypic.js --port 30142`（无服务器）— 打印明确指引并退出。\n- `npm run lint` — 0 errors / 0 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `npm pack --dry-run` — 确认 `bin/ypic.js`、`bin/server-runner.js`、`bin/pi-web.js` 均在发布包内。\n\n#### 备注 / 风险\n\n- **未进行端到端服务器冒烟测试**：当前 worktree 无 `.next` 构建产物，无法启动 `ypi` 服务器进行真实 chat/SSE 端到端验证。建议在具备构建产物的环境手工执行 `implement.md` 中的 smoke 步骤（复用服务器、当前 cwd 创建 session、`/config`、`/studio-feature` smoke）。\n- assistant 文本增量基于 `message_update` 携带 cumulative content 的假设（与 Web `streamingMessage` 替换式渲染一致）；若 pi SDK 发送 delta 式 content，渲染会偏差——需真实服务器验证。\n- Studio 紧凑状态渲染（`ypi_studio_task/subagent/wait` 摘要）与完整退出保护属于子任务 `studio-light-controller` 边界，本轮仅做容错忽略 + 基本 `/quit` studio-task 检查，未渲染 Studio 事件详情。\n- `--continue` 续接会话时未重新注册项目上下文（会话已自带 projectId/spaceId）；符合“仅首条消息前确保上下文”的设计。\n- ANSI 颜色未使用（仅 Unicode 符号 `⚒ ✓ ✗ ↻ ⏹`），避免终端兼容问题；如需颜色可后续加可降级处理。\n\n#### 需要主会话决策\n\n无阻塞决策。若真实服务器 smoke 发现 SSE 事件形态或 assistant 文本增量假设有偏差，需在 `studio-light-controller` 子任务中一并修正渲染逻辑。"
+      },
+      "studio-light-controller": {
+        "id": "studio-light-controller",
+        "status": "done",
+        "updatedAt": "2026-07-08T09:36:30.687Z",
+        "startedAt": "2026-07-08T09:17:03.583Z",
+        "finishedAt": "2026-07-08T09:36:30.681Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-7f5000c2eb042d4b062b9b40"
+        ],
+        "lastRunId": "implementer-7f5000c2eb042d4b062b9b40",
+        "claimedAt": "2026-07-08T09:17:03.583Z",
+        "claimedByContextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `bin/ypic.js` — Added YPI Studio light-controller behavior on top of the existing chat client (subtask `ypic-chat-client` output):\n  - New module-scope helpers for the three Studio tools: `summarizeStudioTask{Start,End}`, `summarizeStudioSubagent{Start,End}`, `summarizeStudioWait{Start,End}`, `summarizeStudioWaitUpdate`, `planReviewPathForTask`, `approvalPromptText`. All extractors are defensive (`taskFromResult`/`runsFromResult`/`resultDetails`/`asArgs`), tolerate missing/odd payloads, and never print raw tool args or child transcripts.\n  - Renderer `tool_execution_start`/`tool_execution_update`/`tool_execution_end` now branch on `STUDIO_TOOLS = {ypi_studio_task, ypi_studio_subagent, ypi_studio_wait}` and print compact one-line summaries (`⚑ studio task/subagent/wait …`) with taskId/status/member/runId/subtaskId/phase/tps hints; non-Studio tools keep the previous `⚒/✓/✗` rendering.\n  - `ypi_studio_wait` `tool_execution_update` poll progress is rendered throttled+deduped (`◷ studio wait …`) to avoid flooding the terminal.\n  - awaiting_approval detection: on `ypi_studio_task` end with `result.details.task.status === \"awaiting_approval\"`, prints the plan-review path and `/open` review URL with a \"reply 确认/批准/开始实现\" note; the CLI never writes `approvalGrant`. A backup `maybePromptStudioApproval()` fetches `GET /api/sessions/:id/studio-task` on `agent_end` to catch awaiting states reached outside a task tool result (deduped via shared `approvalPrompted` flag).\n  - `quit()` exit protection now also counts `waiting_for_user` runs and prints plan-review guidance when awaiting_approval; explicitly states the local server is left running and points to the Web Studio panel instead of managing server lifecycle. Sessions without a Studio task / transient fetch errors fall through cleanly.\n  - `createRenderer()` now returns the shared state object directly so `baseUrl`/`approvalPrompted` set from `main` are visible inside the closure-based handlers (fixes a state-split bug introduced by the additions).\n  - `/studio-*` inputs continue to be forwarded as chat prompts (unchanged from prior subtask); the existing `/config`/`/open` behavior is untouched.\n\n#### Verification\n\n```bash\nnode --check bin/ypic.js            # SYNTAX_OK\nnode_modules/.bin/tsc --noEmit      # exit 0\nnpm run lint                        # exit 0 (0 errors, 0 warnings)\nnode bin/ypic.js --help             # ok\n```\n\nFunctional smoke (load module without auto-`main()`, feed synthetic SSE Studio events):\n- `ypi_studio_task` transition→awaiting_approval renders `⚑ studio task <id> · awaiting_approval` + plan-review block with `/open` review URL; `approvalPrompted` set true.\n- Malformed/empty `result`/`partialResult` for all three Studio tools do not throw; dubious wait update returns null gracefully.\n- `ypi_studio_subagent` end with runs renders `⚑ studio subagent <runId> · <member> · <status> subtask=… · <phase> · <tps>tps`.\n- `planReviewPathForTask` falls back to `<pathLabel>/plan-review.md` when the tool result’s artifact `files` map is absent (matches the studio-task API widget projection).\n\n#### Notes / Risks\n\n- **Not yet hand-verified end-to-end** with a live `ypi` server driving a real `/studio-feature` flow to `awaiting_approval` (requires a running server, configured provider/auth, and a Studio task). The studio-tool summarizers are shape-based and were validated against the actual extension payloads (`compactYpiStudioTaskForTool`, `compactSubagentRunForLifecycle`, widget projection `YpiStudioTaskWidgetProjection`); the live smoke per `checks.md` should still be run by the checker/parent before release.\n- Approval gate is preserved hard: the CLI only renders guidance and forwards user chat input; it never calls approval / `recordYpiStudioUserApproval` / `transition(override)`. The server-side gate is the sole authority.\n- `ypic` still does not self-start or kill the server; exit only prints Web Studio continuation hints, satisfying the \"no server lifecycle management\" invariant.\n- Decisions for main session: none required. Suggested parent/next step is `docs-tests-release-check` (final subtask) to update `docs/modules/api.md`/`README.md`/`docs/architecture/overview.md` for `ypic` + Studio light-controller wording and add any smoke-script coverage."
+      },
+      "docs-tests-release-check": {
+        "id": "docs-tests-release-check",
+        "status": "done",
+        "updatedAt": "2026-07-08T09:45:31.393Z",
+        "startedAt": "2026-07-08T09:36:39.462Z",
+        "finishedAt": "2026-07-08T09:45:31.390Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-38f0f2d5aa2fc7c0ca397a1d"
+        ],
+        "lastRunId": "implementer-38f0f2d5aa2fc7c0ca397a1d",
+        "claimedAt": "2026-07-08T09:36:39.462Z",
+        "claimedByContextId": "pi_019f40dd-aafe-7ed7-82bf-4f1bff2adde7",
+        "summary": "All gates green. Here is the handoff.\n\n## Implementation Complete — subtask `docs-tests-release-check`\n\n### Files Changed\n\n- `bin/ypic.js` — additive only: guarded the auto-run `main()` with `if (require.main === module)` and exported pure helpers (`parseCliArgs`, `buildBaseUrl`, `resolveCanonicalPath`, `handleRawEvent`, `oneLineTrunc`, `planReviewPathForTask`, `shortToolHint`) so they can be unit-tested. `node bin/ypic.js` behavior is unchanged; requiring the module no longer starts a chat.\n- `scripts/test-ypic-cli.mjs` (new) — 16 lightweight smoke checks covering arg parsing (flags/env/positional/`--help`), health URL construction, SSE `handleRawEvent` (single-line, multi-line `data:`, comments, empty, non-JSON), `planReviewPathForTask` fallbacks, and `shortToolHint` truncation. Uses `createRequire` to load the CJS bin safely.\n- `package.json` — added `test:ypic-cli` script entry.\n- `README.md` — added `ypic` as a co-equal CLI entry in the header line, a new \"终端聊天入口 `ypic`\" section (quick start, positioning,不自启 server, auto project registration, Studio 轻控制/审批不绕过, session format unchanged), and updated the project-structure `bin/` row.\n- `docs/deployment/README.md` — documented both `ypi`/`ypic` bins and `bin/server-runner.js`, added a \"`ypic` terminal chat\" subsection (options, env fallbacks, in-session commands, Studio limits, no new session format), and updated the post-publish verification to include `ypic --help` + a `npm pack --dry-run` bin note.\n- `docs/architecture/overview.md` — expanded the `ypic` reuse-flow diagram/notes to include the `GET/POST /api/projects` auto-registration step, no-self-start invariant, canonical-pathKey dedupe, JSONL-format-unchanged invariant, and the `bin/` CommonJS/no-TS-import rule.\n- `docs/modules/api.md` — enriched the `cli/health/` route description to mention `ypic` reuses `/api/projects` for idempotent cwd registration and never self-starts a server.\n- `docs/modules/library.md` — added a reuse rule noting `bin/ypic.js` + `bin/server-runner.js` live under `bin/` (not `lib/`), are CommonJS/Node-built-in-only, must not import `lib/**`, reuse the HTTP/SSE API, and introduce no new session store/format.\n\n### Verification\n\n- `node bin/ypic.js --help` — OK\n- `node scripts/test-ypic-cli.mjs` (npm run test:ypic-cli) — 16/16 checks pass\n- `node_modules/.bin/tsc --noEmit` — OK (exit 0)\n- `npm run lint` — OK (exit 0)\n- `npm pack --dry-run` — includes `bin/pi-web.js`, `bin/server-runner.js`, `bin/ypic.js`, and `scripts/test-ypic-cli.mjs`\n\n### Notes / Risks\n\n- `bin/ypic.js` was legally touched by this subtask only to export pure helpers and guard `main()`; its chat/SSE/Studio logic is unchanged. The earlier subtasks (`ypic-chat-client`, `studio-light-controller`) own that behavior — the exports are additive and behind `require.main === module`.\n- Out-of-scope item intentionally left for the main session: `AGENTS.md` still says the published binary is \"`bin/pi-web.js` exposed as `ypi`\" and the Project Structure row / Quick Start table do not mention `ypic`. The subtask file list did not include `AGENTS.md`; per the subtask boundary I did not edit it. Recommend a tiny follow-up to add `ypic` to `AGENTS.md`'s Deployment/Dependencies + Project Structure rows.\n- Docs intentionally only promise `/config` opens the Web **root page** (no deep link), per the confirmed decision — no UI gate change.\n- Manual smoke (no-server guidance, server reuse, cwd session, `/config`, `/studio-feature` to planning) still recommended before release as listed in `docs/deployment/README.md`; this subtask covers the automated portion.\n- No blockers. Ready for the checker."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-08T08:59:29.904Z",
+        "subtaskId": "cli-contract-health",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T09:02:34.655Z",
+        "subtaskId": "server-runner-refactor",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T09:07:00.739Z",
+        "subtaskId": "ypic-chat-client",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T09:17:03.583Z",
+        "subtaskId": "studio-light-controller",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-08T09:36:39.462Z",
+        "subtaskId": "docs-tests-release-check",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

@@ -19,6 +19,26 @@ Browser                Next.js Server              AgentSession (in-process)
   │◀── data: {...} ────────│                               │
 ```
 
+### `ypic` CLI reuse flow
+
+`ypic` is an additive terminal chat entry that does not embed its own Pi SDK runtime. Instead it reuses a running yolk-pi-web server over the existing HTTP/SSE API and never auto-starts a server:
+
+```text
+Terminal ypic
+  ├─ GET /api/cli/health
+  │    ├─ ok + app: "yolk-pi-web"  → reuse this server
+  │    └─ fail / mismatched app    → print guidance to start `ypi` / Web server manually
+  ├─ GET  /api/projects          → find an existing non-archived space matching cwd
+  │    └─ POST /api/projects { path }  → if none, register cwd as a project/space
+  │                                       (idempotent by canonical pathKey)
+  ├─ POST /api/agent/draft  { cwd, projectId, spaceId } → create empty session
+  ├─ GET  /api/agent/[id]/events               → connect SSE before the first prompt
+  └─ POST /api/agent/[id] { type: "prompt" }   → send the first and follow-up messages
+```
+
+`ypic` never self-starts a server: the health endpoint (`GET /api/cli/health`) returns stable identification metadata only (`ok`, `app`, `version`, `pid`, `capabilities`) so the CLI can distinguish a reusable ypi server from another service occupying the same port, and it never exposes env, tokens, user paths, or secrets. When the current directory is not already a known project/space, `ypic` registers it through the existing Project Registry API (idempotent by canonical `pathKey`, reusing `fs.realpath`) so the Web/Studio side treats the directory as a normal project space; chat still works even if registration is skipped, since pi binds sessions by `cwd`. Sessions created through this flow still go through `createConfiguredEmptyAgentSession()` and `startRpcSession()`, so the single-wrapper invariant, YPI Studio / Browser Share extension injection, tool-call normalization, file-change sidecars, usage accounting, and the Studio approval gate all remain identical to Web-created sessions. No new session storage format is introduced. `ypic` is a thin HTTP/SSE client over `bin/ypic.js` (CommonJS, Node built-ins only) and must not import project TypeScript (`lib/**`) so the npm-published package can execute it directly; the shared server-startup helper lives in `bin/server-runner.js`.
+
+
 ## Key Boundaries
 
 - Project Registry is the only top-level project list data source: `/api/projects` reads `~/.pi/agent/pi-web-projects.json` and never scans sessions to synthesize projects.

@@ -4,7 +4,7 @@
 
 npm 包名：`@alan-zhao/yolk-pi-web`
 
-命令行入口：`ypi`
+命令行入口：`ypi`（Web 工作台）、`ypic`（终端 chat）
 
 ## 运行环境
 
@@ -35,6 +35,30 @@ ypi
 ```
 
 默认监听 `http://localhost:30141`。服务就绪后，CLI 会尝试自动打开浏览器。
+
+## 终端聊天入口 `ypic`
+
+`ypic` 是面向当前目录的轻量终端 chat 入口：在任意项目目录运行 `ypic`，即以该目录为 workspace 与 agent 对话，复用同一个 ypi Web server 的会话、Studio 与模型能力。
+
+```bash
+npm install -g @alan-zhao/yolk-pi-web
+ypi          # 先启动 Web server（ypic 不会自启 server）
+cd your-project
+ypic         # 在当前目录进入终端聊天
+ypic "解释这个仓库"   # 也可直接带上第一条消息
+ypic -c                # 续接当前目录最近的会话
+ypic --resume <sid>    # 直接恢复指定 session
+ypic --port 8080       # 指定 ypi server 端口
+```
+
+定位与限制：
+
+- `ypic` 不替代 `ypi`，也不在终端重做 Web 工作台。模型、账号、Studio 成员策略、Web Terminal 等复杂配置请用 `/config` 打开 Web 页面完成。
+- CLI 内支持 `/oweb` 直接打开当前 session 的固定 Web 链接；退出时也会打印 `--resume <sessionId>` 提示与对应 Web 链接。
+- `ypic` 不会自启 server。启动时先 `GET /api/cli/health` 探测；未检测到 ypi server 或端口被其他服务占用时，会提示先手动运行 `ypi`。
+- 当前目录尚未注册为项目时，`ypic` 会通过现有 Project Registry API 自动建立/注册对应 project/space 上下文（按 canonical pathKey 去重）。
+- YPI Studio 在终端只做轻控制：`/studio-feature`、`/studio-continue`、`/studio-check` 等 slash command 透传给同一会话；CLI 展示 task id/status 和 `plan-review.md` 路径提示，完整任务详情、artifact 预览、成员配置仍在 Web Studio 面板查看。审批仍由用户在聊天中明确确认触发，CLI 不会自动批准。
+- 会话仍以 pi JSONL 存于 `~/.pi/agent/`，未新增独立会话格式；Web 打开同一会话内容一致。
 
 ## Chrome 标签页分享（Browser Share）
 
@@ -139,7 +163,7 @@ components/   # 浏览器端 UI 组件
 hooks/        # 会话状态、主题、拖拽、音频等 React hooks
 lib/          # 会话解析、RPC 生命周期、路径/配置/提供商等共享逻辑
 scripts/      # 构建和运维脚本
-bin/          # ypi CLI 入口
+bin/          # ypi / ypic CLI 入口（ypic 为终端 chat，复用 ypi Web server）
 public/       # 静态资源
 docs/         # 架构、模块、部署和运维文档
 ```
