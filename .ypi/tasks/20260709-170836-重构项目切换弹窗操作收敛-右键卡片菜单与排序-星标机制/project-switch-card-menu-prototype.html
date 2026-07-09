@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project Switch Card Menu Prototype</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #f5f5f5;
+      --hover: #eeeeee;
+      --selected: #e8eefc;
+      --border: #e2e8f0;
+      --text: #111827;
+      --muted: #6b7280;
+      --dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-soft: rgba(37,99,235,0.12);
+      --warn: #dc2626;
+      --star: #ca8a04;
+      --star-bg: rgba(234,179,8,0.16);
+      --shadow: 0 18px 48px rgba(0,0,0,0.18);
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    .app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+    .sidebar { border-right: 1px solid var(--border); background: var(--panel); padding: 12px 10px; }
+    .switch-wrap { display: flex; gap: 8px; align-items: stretch; }
+    .switch-btn {
+      flex: 1; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; padding: 8px 10px;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+    }
+    .switch-btn:hover, .more-btn:hover, .workspace-menu button:hover, .card:hover, .space:hover { background: var(--hover); }
+    .logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent); color: white; display: grid; place-items: center; font-weight: 700; }
+    .switch-text { min-width: 0; flex: 1; }
+    .title { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .more-btn { width: 34px; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; cursor: pointer; }
+    .sessions { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+    .session { padding: 8px 10px; border-radius: 8px; color: var(--muted); margin-bottom: 6px; background: transparent; }
+    .session.active { background: var(--selected); color: var(--text); font-weight: 600; }
+    .main { padding: 24px; }
+    .hero { border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .hero h1 { margin: 0 0 8px; font-size: 22px; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.32); display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .dialog {
+      width: min(1040px, calc(100vw - 32px)); height: min(720px, calc(100vh - 40px)); background: var(--bg); border: 1px solid var(--border);
+      border-radius: 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
+    }
+    .dialog-header { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .dialog-header h2 { margin: 0; font-size: 17px; }
+    .dialog-header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .toolbar { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .toolbar input { flex: 1; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; }
+    .hint { font-size: 11px; color: var(--muted); }
+    .content { flex: 1; display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+    .pane { min-height: 0; display: flex; flex-direction: column; }
+    .pane + .pane { border-left: 1px solid var(--border); }
+    .pane-title { padding: 12px 16px 8px; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .list { overflow: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .card, .space {
+      position: relative; border: 1px solid transparent; border-radius: 10px; padding: 10px; background: transparent; cursor: pointer;
+    }
+    .card.active, .space.active { background: var(--selected); border-color: rgba(37,99,235,0.24); }
+    .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .name { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 700; }
+    .path { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+    .chip { border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; font-size: 10px; color: var(--muted); background: var(--panel); }
+    .star { color: var(--star); background: var(--star-bg); border: 1px solid rgba(234,179,8,0.3); border-radius: 999px; font-size: 10px; padding: 1px 6px; }
+    .wt { color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(37,99,235,0.24); border-radius: 999px; font-size: 10px; padding: 1px 6px; }
+    .ghost-note { padding: 10px 16px; border-top: 1px dashed var(--border); color: var(--muted); font-size: 11px; }
+    .drag { color: var(--dim); cursor: grab; font-size: 14px; }
+    .space.dragging { outline: 2px dashed rgba(37,99,235,0.5); background: rgba(37,99,235,0.05); }
+    .footer { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--muted); }
+    .menu {
+      position: absolute; z-index: 20; width: 190px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+      padding: 6px; display: none;
+    }
+    .menu.open { display: block; }
+    .menu button, .workspace-menu button {
+      width: 100%; border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--text); font-size: 12px;
+    }
+    .menu .danger, .workspace-menu .danger { color: var(--warn); }
+    .menu .sep { height: 1px; background: var(--border); margin: 5px 0; }
+    .workspace-menu {
+      position: fixed; top: 68px; left: 222px; width: 210px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 6px;
+    }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="switch-wrap">
+        <button class="switch-btn" aria-label="切换项目空间">
+          <div class="logo">⌘</div>
+          <div class="switch-text">
+            <div class="title">Pi Agent Web</div>
+            <div class="sub">主空间 · branch: main</div>
+          </div>
+          <div class="wt">WT feat-ui</div>
+        </button>
+        <button class="more-btn" aria-label="当前工作区菜单">⋯</button>
+      </div>
+
+      <div class="sessions">
+        <div class="sub" style="margin:0 4px 8px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;">Sessions</div>
+        <div class="session active">优化项目切换交互</div>
+        <div class="session">修复 worktree 归档同步</div>
+        <div class="session">检查 Studio 子任务</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="hero">
+        <h1>项目切换弹窗 · 右键卡片菜单 / 星标 / 拖动排序</h1>
+        <p>原型演示新的操作分工：顶部三点菜单继续保留，但浏览态的项目/空间操作收敛到弹窗卡片右键；空间列表中主空间固定第一，其余空间按用户拖动顺序，静默新加入项落到底部。</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="overlay">
+    <section class="dialog" aria-label="切换项目空间原型">
+      <div class="dialog-header">
+        <div>
+          <h2>切换项目空间</h2>
+          <p>右键 project card / main space / WorkTree row 可直接执行操作；顶部三点菜单保留当前工作区快捷动作。</p>
+        </div>
+        <div class="legend">
+          <span><em class="star">★ 星标</em></span>
+          <span><em class="wt">WT WorkTree</em></span>
+          <span><strong style="font-size:12px;color:var(--muted)">⋮⋮</strong> 非主空间可拖动</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input value="pi" aria-label="搜索项目或空间" />
+        <div class="hint">Project Registry 来源；不扫描历史会话</div>
+      </div>
+
+      <div class="content">
+        <div class="pane">
+          <div class="pane-title">Projects（右键卡片）</div>
+          <div class="list">
+            <div class="card active" data-menu="project-menu" style="margin-top:2px;">
+              <div class="row">
+                <span class="star">★</span>
+                <div class="name">Pi Agent Web</div>
+                <div class="chip">4 spaces</div>
+              </div>
+              <div class="path">~/Projects/pi-agent-web</div>
+              <div class="menu" id="project-menu" style="top: 16px; right: -178px; display:block;">
+                <button>切换到主空间</button>
+                <button>编辑项目元数据…</button>
+                <button>取消星标项目</button>
+                <div class="sep"></div>
+                <button class="danger">归档项目</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="name">Navi</div>
+                <div class="chip">3 spaces</div>
+              </div>
+              <div class="path">~/IdeaProjects/navi</div>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <span class="star">★</span>
+                <div class="name">Internal Tools</div>
+                <div class="chip">2 spaces</div>
+              </div>
+              <div class="path">~/Workspace/internal-tools</div>
+            </div>
+          </div>
+          <div class="ghost-note">项目列表仍按“星标优先 → 最近打开 → 名称”。本次不默认扩展到项目拖动排序。</div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-title">Spaces（main 固定第一；其他支持拖动排序）</div>
+          <div class="list">
+            <div class="space active">
+              <div class="row">
+                <div class="name">主空间</div>
+                <div class="chip">main</div>
+              </div>
+              <div class="path">branch: main · 永远固定在第一位</div>
+            </div>
+
+            <div class="space" data-menu="space-menu-a">
+              <div class="row">
+                <div class="drag">⋮⋮</div>
+                <span class="star">★</span>
+                <div class="name">feat/project-modal-polish</div>
+                <span class="wt">WT feat/project-modal-polish</span>
+              </div>
+              <div class="path">用户拖动顺序 #1 · branch: feat/project-modal-polish · base: main</div>
+              <div class="menu" id="space-menu-a" style="top: 14px; right: 18px; display:block;">
+                <button>切换到此空间</button>
+                <button>编辑空间元数据…</button>
+                <button>取消星标空间</button>
+                <div class="sep"></div>
+                <button>归档当前空间</button>
+                <button class="danger">删除 WorkTree…</button>
+              </div>
+            </div>
+
+            <div class="space dragging">
+              <div class="row">
+                <div class="drag">⋮⋮</div>
+                <div class="name">review/fix-registry-cleanup</div>
+                <span class="wt">WT review/fix-registry-cleanup</span>
+              </div>
+              <div class="path">拖动中：从 #3 调整到 #2</div>
+            </div>
+
+            <div class="space">
+              <div class="row">
+                <div class="drag">⋮⋮</div>
+                <div class="name">experiment/new-sort-model</div>
+                <span class="wt">WT experiment/new-sort-model</span>
+              </div>
+              <div class="path">用户拖动顺序 #3</div>
+            </div>
+
+            <div class="space">
+              <div class="row">
+                <div class="drag">⋮⋮</div>
+                <div class="name">newly-opened-space</div>
+                <span class="chip">new</span>
+              </div>
+              <div class="path">静默新增 / 新打开 → 默认追加到底部，不抢前排</div>
+            </div>
+          </div>
+          <div class="ghost-note">星标在空间列表中主要用于标记与快速识别；不应打乱“主空间第一 + 用户拖动顺序”的主规则。</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>顶部三点菜单保留：当前工作区相关快捷动作与全局动作。</div>
+        <div>弹窗右键菜单承担：浏览态下对任意 project / space 的就地操作。</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="workspace-menu">
+    <button>编辑当前项目元数据…</button>
+    <button>编辑当前空间元数据…</button>
+    <button>星标当前项目</button>
+    <button>星标当前空间</button>
+    <div class="menu sep"></div>
+    <button>归档所有会话</button>
+    <button class="danger">归档当前空间</button>
+  </div>
+</body>
+</html>

@@ -35,6 +35,12 @@ export interface PiWebProjectSpaceRecord {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt?: string;
+  /**
+   * User-defined display order for non-main spaces within the same project.
+   * Smaller values sort earlier. `main` space ignores this field.
+   * Absent for legacy spaces — display helpers use a stable createdAt fallback.
+   */
+  sortOrder?: number;
   worktree?: PiWebProjectSpaceWorktreeInfo;
 }
 
@@ -51,6 +57,12 @@ export interface PiWebProjectRecord {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt?: string;
+  /**
+   * User-defined display order for active projects.
+   * Smaller values sort earlier.
+   * Absent for legacy projects — display helpers use stable input-order fallback.
+   */
+  sortOrder?: number;
   spaces: Record<ProjectSpaceId, PiWebProjectSpaceRecord>;
 }
 

@@ -1,0 +1,1847 @@
+{
+  "schemaVersion": 1,
+  "id": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+  "title": "重构左侧项目切换为弹窗分层选择并优化多项目显示",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-09T08:11:21.849Z",
+  "updatedAt": "2026-07-09T09:29:27.677Z",
+  "completedAt": "2026-07-09T08:57:50.852Z",
+  "contextIds": [
+    "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-41ea1fa1ce9e14ef46d6122d",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:11:28.147Z",
+      "finishedAt": "2026-07-09T08:18:07.675Z",
+      "runner": "sdk",
+      "childSessionId": "019f45ee-882b-735e-ba6b-2f0e1d0895c7",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-11-28-171Z_019f45ee-882b-735e-ba6b-2f0e1d0895c7.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f45ee-882b-735e-ba6b-2f0e1d0895c7",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请为该任务完成 intake→planning 设计产物准备，聚焦左侧项目切换交互重构。用户要求：1) 当前左侧选择项目在项目特别多时显示错乱，需要优化；2) 不再使用下拉；3) 左侧顶部改成触发弹窗的切换按钮；4) 弹窗采用分层选择，先项目，再项目空间；5) 需要考虑新环境一个项目都没有的情况。请先阅读相关项目文档与代码，梳理现状、问题、约束，产出 PRD/设计说明/实现建议；该需求属于用户可见交互改动，必须遵守 UI prototype gate：需要安排 ui-des…",
+      "summary": "Completed planning artifacts for task `20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示`.\n\nFiles produced/updated:\n- `.ypi/tasks/.../brief.md`\n- `.ypi/tasks/.../prd.md`\n- `.ypi/tasks/.../design.md`\n- `.ypi/tasks/.../implement.md`\n- `.ypi/tasks/.../checks.md`\n- `.ypi/tasks/.../ui.md`\n- `.ypi/tasks/.../plan-review.md`\n- `.ypi/tasks/.../handoff.md`\n- `.ypi/tasks/.../project-switch-modal-prototype.html`\n\nValidation run:\n- Did not run `npm run lint` / `tsc` because no production code was changed.\n- Ran artifact sanity check: no `TBD`/`TODO` remains in planning/prototype files.\n\nKey outcome:\n- `plan-review.md` is now the user-facing approval entry and links PRD / UI / HTML prototype / Design / Implement / Checks.\n- `implement.md` includes both human-readable subtasks and a fenced `json ypi-implementation-plan` block.\n- HTML prototype gate artifact exists at `project-switch-modal-prototype.html`.\n\nRemaining risks / blockers:\n- UI prototype still needs UI designer or user approval before implementation.\n- Task state and structured implementationPlan were not written into `task.json`; main session should transition/save via normal Studio flow.\n- Decisions needed:\n  1. Confirm search behavior: keep project→space hierarchy while filtering.\n  2. Confirm click-space behavior: immediately switch and close.\n  3. Confirm HTML prototype as implementation baseline.",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:11:28.147Z",
+        "updatedAt": "2026-07-09T08:18:07.675Z",
+        "eventCount": 1239,
+        "lastTextPreview": "Completed planning artifacts for task `20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示`.\n\nFiles produced/updated:\n- `.ypi/tasks/.../brief.md`\n- `.ypi/tasks/.../prd.md`\n- `.ypi/tasks/.../design.md`\n- `.ypi/tasks/.../implement.md`\n- `.ypi/tasks/.../checks.md`\n- `.ypi/tasks/.../ui.md`\n- `.ypi/tasks/.../plan-review.md`\n- `.ypi/tasks/.../handoff.md`\n- `.ypi/tasks/.../project-switch-modal-prototype.html`\n\nValidation run:\n- Did not run `npm run lint` / `tsc` because no production code was changed.\n- Ran artifact sanity check: no `TBD`/`TODO` remains in planning/prototype files.\n\nKey outcome:\n- `plan-review.md` is now the user-facing approval entry and links PRD / UI / HTML prototype / Design / Implement / Checks.\n- `implement.md` includes both human-readable subtasks and a fenced `json ypi-implementation-plan` block.\n- HTML prototype gate artifact exists at `project-switch-modal-prototype.html`.\n\nRemaining risks / blockers:\n- UI prototype still needs UI designer or user approval before implementation.\n- Task state and structured implementationPlan were not written into `task.json`; main session should transition/save via normal Studio flow.\n- Decisions needed:\n  1. Confirm search behavior: keep project→space hierarchy while filtering.\n  2. Confirm click-space behavior: immediately switch and close.\n  3. Confirm HTML prototype as implementation baseline.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:17:51.018Z",
+            "toolCallId": "call_vCrDH391Ntgfd1HG7tGZnYfv|fc_0929a8c1c617b1ad016a4f592df9ac819985e537c95b26046b",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示/plan-review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:17:55.033Z",
+            "toolCallId": "call_ancNqVPyHu8ltTKN769Qna4t|fc_0929a8c1c617b1ad016a4f5931cd5881999702f438fc95b729",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"TBD|_TBD|TODO\\\" .ypi/tasks/20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示/{brief.md,prd.md,ui.md,design.md,implement.md,checks.md,plan-review.md,handoff.md,project-switch-modal-prototype.html} || true\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:17:55.063Z",
+            "toolCallId": "call_ancNqVPyHu8ltTKN769Qna4t|fc_0929a8c1c617b1ad016a4f5931cd5881999702f438fc95b729",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:18:07.658Z",
+            "text": "Completed planning artifacts for task `20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示`.\n\nFiles produced/updated:\n- `.ypi/tasks/.../brief.md`\n- `.ypi/tasks/.../prd.md`\n- `.ypi/tasks/.../design.md`\n- `.ypi/tasks/.../implement.md`\n- `.ypi/tasks/.../checks.md`\n- `.ypi/tasks/.../ui.md`\n- `.ypi/tasks/.../plan-review.md`\n- `.ypi/tasks/.../handoff.md`\n- `.ypi/tasks/.../project-switch-modal-prototype.html`\n\nValidation run:\n- Did not run `npm run lint` / `tsc` because no production code was changed.\n- Ran artifact sanity check: no `TBD`/`TODO` remains in planning/prototype files.\n\nKey outcome:\n- `plan-review.md` is now the user-facing approval entry and links PRD / UI / HTML prototype / Design / Implement / Checks.\n- `implement.md` includes both human-readable subtasks and a fenced `json ypi-implementation-plan` block.\n- HTML prototype gate artifact exists at `project-switch-modal-prototype.html`.\n\nRemaining risks / blockers:\n- UI prototype still needs UI designer or user approval before implementation.\n- Task state and structured implementationPlan were not written into `task.json`; main session should transition/save via normal Studio flow.\n- Decisions needed:\n  1. Confirm search behavior: keep project→space hierarchy while filtering.\n  2. Confirm click-space behavior: immediately switch and close.\n  3. Confirm HTML prototype as implementation baseline.",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:18:07.667Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1360,
+        "tokens": 551,
+        "tokenSource": "usage",
+        "tps": 93.2,
+        "firstTokenAt": "2026-07-09T08:18:01.735Z",
+        "lastTokenAt": "2026-07-09T08:18:07.647Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-41ea1fa1ce9e14ef46d6122d",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/architect-41ea1fa1ce9e14ef46d6122d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:11:28.147Z",
+        "finishedAt": "2026-07-09T08:18:07.672Z",
+        "updatedAt": "2026-07-09T08:18:07.672Z",
+        "itemCount": 79,
+        "messageCount": 1,
+        "toolCallCount": 37,
+        "stderrBytes": 0,
+        "bytes": 296894,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45ee-882b-735e-ba6b-2f0e1d0895c7",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-11-28-171Z_019f45ee-882b-735e-ba6b-2f0e1d0895c7.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-93b95908adee3127297e949c",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:18:25.702Z",
+      "finishedAt": "2026-07-09T08:21:29.423Z",
+      "runner": "sdk",
+      "childSessionId": "019f45f4-e740-76b0-a2b9-5b97edce76ed",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-18-25-728Z_019f45f4-e740-76b0-a2b9-5b97edce76ed.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f45f4-e740-76b0-a2b9-5b97edce76ed",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请基于现有项目风格，为该任务审阅并完善 UI 原型，重点确认/更新以下交互：1) 左侧顶部切换按钮替代 dropdown；2) 点击打开项目/空间分层选择弹窗；3) 左栏项目、右栏项目空间；4) 项目很多时的可读性、滚动、搜索、长文本省略；5) 新环境零项目空状态；6) 选择空间后立即切换并关闭；7) 焦点/Esc/关闭行为。请检查并更新任务目录中的 `project-switch-modal-prototype.html` 与 `ui.md`（如需要），确保 HTML 原…",
+      "summary": "# Handoff Summary\n\n作为蛋黄派工作室的 **UI 设计员 (ui-designer)**，我已经为当前任务审阅、优化并更新了相关设计产物与原型。在整个审阅和更新过程中，完全没有修改或实现任何生产代码，亦没有执行任何 git commit/push/merge 操作。\n\n## 变更与产出 (Files Changed & Artifacts Produced)\n\n1. **HTML 交互式原型 (`project-switch-modal-prototype.html`)**：\n   - 将原来静态的原型升级为**高可玩性、带完整交互与状态模拟**的交互式 HTML 原型。\n   - **交互点确认与实现**：\n     - **左侧顶部切换按钮**：完全融入侧边栏风格，显示当前激活项目/空间，点击弹窗。\n     - **分层选择**：左侧为项目（支持置顶置顶、带 Space 数量 Badge），点击仅切换 pending 项目；右侧为空间，点击可用空间时触发实际工作区切换并关闭弹窗（带 Toast 动画）。\n     - **大量项目/空间优化**：提供“大量项目 (50+)”数据模拟切换，左右区域支持独立滚动，搜索框固定在顶部并能在过滤时保持项目-空间层级。\n     - **空环境 Onboarding**：提供“空项目 (0)”状态模拟，右侧区域会自适应渲染出添加第一个项目的主引导通道。\n     - **表单状态与互斥**：完美支持 `Add Path` 与 `Git Clone` 两种手动添加表单的互斥交互、克隆中的 Busy Loading 状态、路径错误显示以及 Esc 键盘与遮罩点击关闭行为。\n     - **设计语言规范**：完全匹配 `app/globals.css` 中的主题色彩 CSS 变量，支持**明暗主题切换**模拟。\n2. **UI 规划说明 (`ui.md`)**：\n   - 补充说明更新后的 HTML 原型是具备交互的验证版本。\n3. **计划审批书 (`plan-review.md`)**：\n   - 更新了 UI 原型部分的摘要说明，标注 UI 设计员已完成原型确认，等待用户最终确认。\n\n## 验证情况 (Validation Run)\n- 运行 `npm run lint` 和 `npm run build` (内部包含 `tsc --noEmit`) 验证项目构建无任何退化或故障。\n\n## 遗留风险与需要主会话/用户确认的问题 (Remaining Risks & Decisions Needed)\n1. **搜索时的空间过滤**：首版推荐交互（搜索框在过滤项目的同时过滤右侧空间，但不打破“项目 → 空间”的二级层级结构）已在原型中以最佳体验模拟实现，需要主会话和用户确认此策略是否通过。\n2. **退出机制**：Git clone 等 busy 状态下为了防止状态不一致，原型禁止了 Esc / backdrop 关闭，此机制需要在实际开发时遵循。\n\n目前 UI 门禁已全部就绪，主会话可将状态切换至 `awaiting_approval`，将 `plan-review.md` 呈现给用户进行计划审批与原型审阅。",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:18:25.702Z",
+        "updatedAt": "2026-07-09T08:21:29.423Z",
+        "eventCount": 344,
+        "lastTextPreview": "# Handoff Summary\n\n作为蛋黄派工作室的 **UI 设计员 (ui-designer)**，我已经为当前任务审阅、优化并更新了相关设计产物与原型。在整个审阅和更新过程中，完全没有修改或实现任何生产代码，亦没有执行任何 git commit/push/merge 操作。\n\n## 变更与产出 (Files Changed & Artifacts Produced)\n\n1. **HTML 交互式原型 (`project-switch-modal-prototype.html`)**：\n   - 将原来静态的原型升级为**高可玩性、带完整交互与状态模拟**的交互式 HTML 原型。\n   - **交互点确认与实现**：\n     - **左侧顶部切换按钮**：完全融入侧边栏风格，显示当前激活项目/空间，点击弹窗。\n     - **分层选择**：左侧为项目（支持置顶置顶、带 Space 数量 Badge），点击仅切换 pending 项目；右侧为空间，点击可用空间时触发实际工作区切换并关闭弹窗（带 Toast 动画）。\n     - **大量项目/空间优化**：提供“大量项目 (50+)”数据模拟切换，左右区域支持独立滚动，搜索框固定在顶部并能在过滤时保持项目-空间层级。\n     - **空环境 Onboarding**：提供“空项目 (0)”状态模拟，右侧区域会自适应渲染出添加第一个项目的主引导通道。\n     - **表单状态与互斥**：完美支持 `Add Path` 与 `Git Clone` 两种手动添加表单的互斥交互、克隆中的 Busy Loading 状态、路径错误显示以及 Esc 键盘与遮罩点击关闭行为。\n     - **设计语言规范**：完全匹配 `app/globals.css` 中的主题色彩 CSS 变量，支持**明暗主题切换**模拟。\n2. **UI 规划说明 (`ui.md`)**：\n   - 补充说明更新后的 HTML 原型是具备交互的验证版本。\n3. **计划审批书 (`plan-review.md`)**：\n   - 更新了 UI 原型部分的摘要说明，标注 UI 设计员已完成原型确认，等待用户最终确认。\n\n## 验证情况 (Validation Run)\n- 运行 `npm run lint` 和 `npm run build` (内部包含 `tsc --noEmit`) 验证项目构建无任何退化或故障。\n\n## 遗留风险与需要主会话/用户确认的问题 (Remaining Risks & Decisions Needed)\n1. **搜索时的空间过滤**：首版推荐交互（搜索框在过滤项目的同时过滤右侧空间，但不打破“项目 → 空间”的二级层级结构）已在原型中以最佳体验模拟实现，需要主会话和用户确认此策略是否通过。\n2. **退出机制**：Git clone 等 busy 状态下为了防止状态不一致，原型禁止了 Esc / backdrop 关闭，此机制需要在实际开发时遵循。\n\n目前 UI 门禁已全部就绪，主会话可将状态切换至 `awaiting_approval`，将 `plan-review.md` 呈现给用户进行计划审批与原型审阅。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:21:20.936Z",
+            "toolCallId": "call_1783585281069522427_158|fc_call_1783585281069522427_158",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in ./.ypi/tasks/20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示/plan-review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:21:23.683Z",
+            "toolCallId": "call_1783585283846993803_159|fc_call_1783585283846993803_159",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:21:23.749Z",
+            "toolCallId": "call_1783585283846993803_159|fc_call_1783585283846993803_159",
+            "toolName": "bash",
+            "text": "On branch main\nYour branch is up to date with 'origin/main'.\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t\".ypi/tasks/20260709-161121-\\351\\207\\215\\346\\236\\204\\345\\267\\246\\344\\276\\247\\351\\241\\271\\347\\233\\256\\345\\210\\207\\346\\215\\242\\344\\270\\272\\345\\274\\271\\347\\252\\227\\345\\210\\206\\345\\261\\202\\351\\200\\211\\346\\213\\251\\345\\271\\266\\344\\274\\230\\345\\214\\226\\345\\244\\232\\351\\241\\271\\347\\233\\256\\346\\230\\276\\347\\244\\272/\"\n\nnothing added to commit but untracked files present (use \"git add\" to track)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:21:29.408Z",
+            "text": "# Handoff Summary\n\n作为蛋黄派工作室的 **UI 设计员 (ui-designer)**，我已经为当前任务审阅、优化并更新了相关设计产物与原型。在整个审阅和更新过程中，完全没有修改或实现任何生产代码，亦没有执行任何 git commit/push/merge 操作。\n\n## 变更与产出 (Files Changed & Artifacts Produced)\n\n1. **HTML 交互式原型 (`project-switch-modal-prototype.html`)**：\n   - 将原来静态的原型升级为**高可玩性、带完整交互与状态模拟**的交互式 HTML 原型。\n   - **交互点确认与实现**：\n     - **左侧顶部切换按钮**：完全融入侧边栏风格，显示当前激活项目/空间，点击弹窗。\n     - **分层选择**：左侧为项目（支持置顶置顶、带 Space 数量 Badge），点击仅切换 pending 项目；右侧为空间，点击可用空间时触发实际工作区切换并关闭弹窗（带 Toast 动画）。\n     - **大量项目/空间优化**：提供“大量项目 (50+)”数据模拟切换，左右区域支持独立滚动，搜索框固定在顶部并能在过滤时保持项目-空间层级。\n     - **空环境 Onboarding**：提供“空项目 (0)”状态模拟，右侧区域会自适应渲染出添加第一个项目的主引导通道。\n     - **表单状态与互斥**：完美支持 `Add Path` 与 `Git Clone` 两种手动添加表单的互斥交互、克隆中的 Busy Loading 状态、路径错误显示以及 Esc 键盘与遮罩点击关闭行为。\n     - **设计语言规范**：完全匹配 `app/globals.css` 中的主题色彩 CSS 变量，支持**明暗主题切换**模拟。\n2. **UI 规划说明 (`ui.md`)**：\n   - 补充说明更新后的 HTML 原型是具备交互的验证版本。\n3. **计划审批书 (`plan-review.md`)**：\n   - 更新了 UI 原型部分的摘要说明，标注 UI 设计员已完成原型确认，等待用户最终确认。\n\n## 验证情况 (Validation Run)\n- 运行 `npm run lint` 和 `npm run build` (内部包含 `tsc --noEmit`) 验证项目构建无任何退化或故障。\n\n## 遗留风险与需要主会话/用户确认的问题 (Remaining Risks & Decisions Needed)\n1. **搜索时的空间过滤**：首版推荐交互（搜索框在过滤项目的同时过滤右侧空间，但不打破“项目 → 空间”的二级层级结构）已在原型中以最佳体验模拟实现，需要主会话和用户确认此策略是否通过。\n2. **退出机制**：Git clone 等 busy 状态下为了防止状态不一致，原型禁止了 Esc / backdrop 关闭，此机制需要在实际开发时遵循。\n\n目前 UI 门禁已全部就绪，主会话可将状态切换至 `awaiting_approval`，将 `plan-review.md` 呈现给用户进行计划审批与原型审阅。",
+            "model": "cpa/gemini-3.5-flash-low",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:21:29.417Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1360,
+        "tokens": 689,
+        "tokenSource": "usage",
+        "tps": 5838.98,
+        "firstTokenAt": "2026-07-09T08:21:29.278Z",
+        "lastTokenAt": "2026-07-09T08:21:29.396Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-93b95908adee3127297e949c",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/ui-designer-93b95908adee3127297e949c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:18:25.702Z",
+        "finishedAt": "2026-07-09T08:21:29.422Z",
+        "updatedAt": "2026-07-09T08:21:29.422Z",
+        "itemCount": 55,
+        "messageCount": 1,
+        "toolCallCount": 25,
+        "stderrBytes": 0,
+        "bytes": 166871,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45f4-e740-76b0-a2b9-5b97edce76ed",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-18-25-728Z_019f45f4-e740-76b0-a2b9-5b97edce76ed.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a6a930310acba3d565415639",
+      "subtaskId": "FE-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:26:19.383Z",
+      "finishedAt": "2026-07-09T08:31:50.762Z",
+      "runner": "sdk",
+      "childSessionId": "019f45fc-21a3-708f-95e8-5e98366af4e9",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-26-19-427Z_019f45fc-21a3-708f-95e8-5e98366af4e9.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f45fc-21a3-708f-95e8-5e98366af4e9",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 FE-001：Replace sidebar CWD dropdown trigger with project-space switch button state。请遵循任务 implement.md、design.md、ui.md、HTML 原型以及项目文档。重点：1) 在 `components/SessionSidebar.tsx` 中引入顶部 switch button 与 modal open state；2) 去掉旧的项目选择 dropdown 作为主选…",
+      "summary": "---\n\n## Implementation Complete — FE-001\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Replaced the old CWD picker dropdown with a compact top switch button and modal placeholder state.\n\n### What Was Done\n\n1. **State changes:** Replaced `dropdownOpen` with `projectSwitchOpen` state. Removed `dropdownRef`. All 6 references to `setDropdownOpen` in callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`, `handleNewWorktree`, `openWorktreeAction`) updated to `setProjectSwitchOpen` or removed where no longer needed.\n\n2. **New switch button:** The sidebar header now shows a compact clickable button displaying `ProjectName / SpaceName` (e.g. `my-app / 主空间`). Falls back to `shortenCwd + homeDir` for legacy unassigned cwds, or `选择项目空间` when nothing is selected. Includes a chevron icon indicating it opens a dialog.\n\n3. **Right-click preserved:** Right-clicking the switch button when the current space is a WorkTree still opens the WorkTree context menu (archive/delete).\n\n4. **New/WorkTree/Refresh/workspace actions:** Fully preserved and unchanged.\n\n5. **Placeholder modal:** Opens via `setProjectSwitchOpen(true)` with `role=\"dialog\"`, `aria-modal=\"true\"`, `aria-label=\"切换项目空间\"`. Closes via backdrop click, X button, or Escape key. Content area shows a placeholder message with the active project count — FE-002 will fill in the full layered UI.\n\n6. **Form state preserved:** All add-project form state (`customPathOpen`, `gitAddOpen`, etc.), refs, and callbacks (`commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) remain in the component for FE-003 to wire into the dialog.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **passes cleanly** (0 errors)\n- `npm run lint` — **0 errors**, 13 warnings (all expected: form state/callbacks/refs intentionally preserved for FE-003 migration, `formatWorktreeDetailTooltip` kept for future dialog use)\n\n### Notes / Risks\n\n- **Add-project forms temporarily inaccessible:** Between FE-001 and FE-003, users cannot add projects through the UI. This is expected per the phased implementation plan — the forms will be migrated into the dialog by FE-003.\n- **The switch button uses `displayProjectName` + `displaySpaceName`** for the visible label. The tooltip shows `formatProjectSpaceDetail` with full path, branch, WorkTree info.\n- **Modal z-index is 1100**, matching existing `ProjectMetadataDialog` and `worktreeAction` confirmation dialogs. No conflict risk with workspace menu (z-index 1000).\n- **WorkTree right-click** on the switch button is only active when `selectedWorktree` exists — same guard as the original code.\n- Ready for FE-002 to build the full layered project/space dialog content.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:26:19.383Z",
+        "updatedAt": "2026-07-09T08:31:50.762Z",
+        "eventCount": 18974,
+        "lastTextPreview": "---\n\n## Implementation Complete — FE-001\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Replaced the old CWD picker dropdown with a compact top switch button and modal placeholder state.\n\n### What Was Done\n\n1. **State changes:** Replaced `dropdownOpen` with `projectSwitchOpen` state. Removed `dropdownRef`. All 6 references to `setDropdownOpen` in callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`, `handleNewWorktree`, `openWorktreeAction`) updated to `setProjectSwitchOpen` or removed where no longer needed.\n\n2. **New switch button:** The sidebar header now shows a compact clickable button displaying `ProjectName / SpaceName` (e.g. `my-app / 主空间`). Falls back to `shortenCwd + homeDir` for legacy unassigned cwds, or `选择项目空间` when nothing is selected. Includes a chevron icon indicating it opens a dialog.\n\n3. **Right-click preserved:** Right-clicking the switch button when the current space is a WorkTree still opens the WorkTree context menu (archive/delete).\n\n4. **New/WorkTree/Refresh/workspace actions:** Fully preserved and unchanged.\n\n5. **Placeholder modal:** Opens via `setProjectSwitchOpen(true)` with `role=\"dialog\"`, `aria-modal=\"true\"`, `aria-label=\"切换项目空间\"`. Closes via backdrop click, X button, or Escape key. Content area shows a placeholder message with the active project count — FE-002 will fill in the full layered UI.\n\n6. **Form state preserved:** All add-project form state (`customPathOpen`, `gitAddOpen`, etc.), refs, and callbacks (`commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) remain in the component for FE-003 to wire into the dialog.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **passes cleanly** (0 errors)\n- `npm run lint` — **0 errors**, 13 warnings (all expected: form state/callbacks/refs intentionally preserved for FE-003 migration, `formatWorktreeDetailTooltip` kept for future dialog use)\n\n### Notes / Risks\n\n- **Add-project forms temporarily inaccessible:** Between FE-001 and FE-003, users cannot add projects through the UI. This is expected per the phased implementation plan — the forms will be migrated into the dialog by FE-003.\n- **The switch button uses `displayProjectName` + `displaySpaceName`** for the visible label. The tooltip shows `formatProjectSpaceDetail` with full path, branch, WorkTree info.\n- **Modal z-index is 1100**, matching existing `ProjectMetadataDialog` and `worktreeAction` confirmation dialogs. No conflict risk with workspace menu (z-index 1000).\n- **WorkTree right-click** on the switch button is only active when `selectedWorktree` exists — same guard as the original code.\n- Ready for FE-002 to build the full layered project/space dialog content.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:31:23.636Z",
+            "text": "Everything looks correct. Let me run the final validation one more time.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:31:23.641Z",
+            "toolCallId": "call_00_0UwZuNNtFJE6c65WAZV86728",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && npm run lint 2>&1 | tail -5 && echo \\\"---\\\" && node_modules/.bin/tsc --noEmit 2>&1 | tail -5\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:31:35.639Z",
+            "toolCallId": "call_00_0UwZuNNtFJE6c65WAZV86728",
+            "toolName": "bash",
+            "text": "938:9   warning  'handleGitParentDirectoryPicker' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  969:9   warning  'handleGitCloneSubmit' is assigned a value but never used            @typescript-eslint/no-unused-vars\n\n✖ 13 problems (0 errors, 13 warnings)\n\n---",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:31:50.743Z",
+            "text": "---\n\n## Implementation Complete — FE-001\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Replaced the old CWD picker dropdown with a compact top switch button and modal placeholder state.\n\n### What Was Done\n\n1. **State changes:** Replaced `dropdownOpen` with `projectSwitchOpen` state. Removed `dropdownRef`. All 6 references to `setDropdownOpen` in callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`, `handleNewWorktree`, `openWorktreeAction`) updated to `setProjectSwitchOpen` or removed where no longer needed.\n\n2. **New switch button:** The sidebar header now shows a compact clickable button displaying `ProjectName / SpaceName` (e.g. `my-app / 主空间`). Falls back to `shortenCwd + homeDir` for legacy unassigned cwds, or `选择项目空间` when nothing is selected. Includes a chevron icon indicating it opens a dialog.\n\n3. **Right-click preserved:** Right-clicking the switch button when the current space is a WorkTree still opens the WorkTree context menu (archive/delete).\n\n4. **New/WorkTree/Refresh/workspace actions:** Fully preserved and unchanged.\n\n5. **Placeholder modal:** Opens via `setProjectSwitchOpen(true)` with `role=\"dialog\"`, `aria-modal=\"true\"`, `aria-label=\"切换项目空间\"`. Closes via backdrop click, X button, or Escape key. Content area shows a placeholder message with the active project count — FE-002 will fill in the full layered UI.\n\n6. **Form state preserved:** All add-project form state (`customPathOpen`, `gitAddOpen`, etc.), refs, and callbacks (`commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) remain in the component for FE-003 to wire into the dialog.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **passes cleanly** (0 errors)\n- `npm run lint` — **0 errors**, 13 warnings (all expected: form state/callbacks/refs intentionally preserved for FE-003 migration, `formatWorktreeDetailTooltip` kept for future dialog use)\n\n### Notes / Risks\n\n- **Add-project forms temporarily inaccessible:** Between FE-001 and FE-003, users cannot add projects through the UI. This is expected per the phased implementation plan — the forms will be migrated into the dialog by FE-003.\n- **The switch button uses `displayProjectName` + `displaySpaceName`** for the visible label. The tooltip shows `formatProjectSpaceDetail` with full path, branch, WorkTree info.\n- **Modal z-index is 1100**, matching existing `ProjectMetadataDialog` and `worktreeAction` confirmation dialogs. No conflict risk with workspace menu (z-index 1000).\n- **WorkTree right-click** on the switch button is only active when `selectedWorktree` exists — same guard as the original code.\n- Ready for FE-002 to build the full layered project/space dialog content.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:31:50.753Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3714,
+        "tokens": 841,
+        "tokenSource": "usage",
+        "tps": 2.65,
+        "firstTokenAt": "2026-07-09T08:26:33.098Z",
+        "lastTokenAt": "2026-07-09T08:31:50.400Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a6a930310acba3d565415639",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/implementer-a6a930310acba3d565415639.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:26:19.383Z",
+        "finishedAt": "2026-07-09T08:31:50.758Z",
+        "updatedAt": "2026-07-09T08:31:50.758Z",
+        "itemCount": 89,
+        "messageCount": 11,
+        "toolCallCount": 37,
+        "stderrBytes": 0,
+        "bytes": 138496,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45fc-21a3-708f-95e8-5e98366af4e9",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-26-19-427Z_019f45fc-21a3-708f-95e8-5e98366af4e9.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-fb8f8802dfa7ade4ce45e64c",
+      "subtaskId": "FE-002",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:32:07.839Z",
+      "finishedAt": "2026-07-09T08:36:10.339Z",
+      "runner": "sdk",
+      "childSessionId": "019f4601-72c0-7f5d-93cc-52d81d877f85",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-32-07-872Z_019f4601-72c0-7f5d-93cc-52d81d877f85.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f4601-72c0-7f5d-93cc-52d81d877f85",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 FE-002：Build layered ProjectSpaceSwitchDialog UI。请基于 FE-001 的结果继续。要求：1) 新增 `components/ProjectSpaceSwitchDialog.tsx`（如合适）；2) 实现分层弹窗 UI：左侧项目列表+搜索，右侧当前项目的空间列表；3) 展示 pinned、WorkTree badge、branch/base/path 摘要、missing disabled 状态、独立滚动、长文本省略；…",
+      "summary": "## Implementation Complete (FE-002)\n\n### Files Changed\n\n1. **`lib/project-display.ts`** — **NEW**. Extracted shared display helpers: `displayProjectName`, `displaySpaceName`, `activeProjectSpaces`, `sortProjectsForSidebar`, `worktreeInfoFromSpace`, `shortenCwd`.\n\n2. **`components/ProjectSpaceSwitchDialog.tsx`** — **NEW** (~719 lines). Full layered project/space switch dialog:\n   - **Left pane**: project list with search input, sorted (pinned first, then last-opened, then name), `★` pin badge, space-count badge, ellipsized paths, independent scroll\n   - **Right pane**: selected project header (name, rootPath), space cards with Main/WT badges, `✓` current marker, branch/base/path meta, `路径缺失` disabled state, Worktree mini-badge, independent scroll\n   - **Empty state**: onboarding message when zero projects (explains Project Registry sourcing, add-project buttons are disabled placeholders for FE-003)\n   - **Search**: filters projects by name/rootPath/space names/paths/branch; also filters right-pane spaces\n   - **Interaction**: click non-missing space → `onSelectSpace` + close; Esc/backdrop/close-button all work; keyboard handler built-in\n   - **Responsive**: `grid-template-columns` switches to single-column rows on ≤720px\n   - Follows existing CSS variables and HTML prototype patterns\n\n3. **`components/SessionSidebar.tsx`** — **MODIFIED**:\n   - Added imports from `lib/project-display` and `ProjectSpaceSwitchDialog`\n   - Removed duplicated local definitions of the extracted helpers\n   - Replaced the FE-001 placeholder modal body with `<ProjectSpaceSwitchDialog>` wired to `selectedProjectId`, `selectedSpaceId`, `homeDir`, `onSelectSpace` (sets project/space/cwd), and `onClose`\n   - Removed redundant local Escape handler (now handled by the dialog component)\n\n### Verification\n\n```bash\nnode_modules/.bin/tsc --noEmit  # ✅ 0 errors\nnpm run lint                     # ✅ 0 errors, 13 warnings (all expected: FE-003 wiring targets)\n```\n\nThe 13 lint warnings are for state/callbacks (`customPathOpen`, `gitAddOpen`, `commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) that existed before and will be consumed when FE-003 wires the add-project forms into the dialog.\n\n### Notes / Risks\n\n- **Add-project buttons are disabled placeholders** in the dialog toolbar — wired in FE-003.\n- **The existing `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` is called directly** in `onSelectSpace`. The downstream session reload/Git info/AppShell effects already subscribe to these state changes via existing `useEffect` hooks in SessionSidebar. Full FE-004 side-effect verification is deferred to that subtask.\n- **`WorktreeBadge` is duplicated** in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx` — acceptable at FE-002 since they render in different contexts (sidebar vs. modal). Can be extracted to a shared component later if desired.\n- **Dialog z-index is 1100** — consistent with other modals (WorkTree action, metadata edit, archive confirmation). Should not conflict.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:32:07.839Z",
+        "updatedAt": "2026-07-09T08:36:10.339Z",
+        "eventCount": 15006,
+        "lastTextPreview": "## Implementation Complete (FE-002)\n\n### Files Changed\n\n1. **`lib/project-display.ts`** — **NEW**. Extracted shared display helpers: `displayProjectName`, `displaySpaceName`, `activeProjectSpaces`, `sortProjectsForSidebar`, `worktreeInfoFromSpace`, `shortenCwd`.\n\n2. **`components/ProjectSpaceSwitchDialog.tsx`** — **NEW** (~719 lines). Full layered project/space switch dialog:\n   - **Left pane**: project list with search input, sorted (pinned first, then last-opened, then name), `★` pin badge, space-count badge, ellipsized paths, independent scroll\n   - **Right pane**: selected project header (name, rootPath), space cards with Main/WT badges, `✓` current marker, branch/base/path meta, `路径缺失` disabled state, Worktree mini-badge, independent scroll\n   - **Empty state**: onboarding message when zero projects (explains Project Registry sourcing, add-project buttons are disabled placeholders for FE-003)\n   - **Search**: filters projects by name/rootPath/space names/paths/branch; also filters right-pane spaces\n   - **Interaction**: click non-missing space → `onSelectSpace` + close; Esc/backdrop/close-button all work; keyboard handler built-in\n   - **Responsive**: `grid-template-columns` switches to single-column rows on ≤720px\n   - Follows existing CSS variables and HTML prototype patterns\n\n3. **`components/SessionSidebar.tsx`** — **MODIFIED**:\n   - Added imports from `lib/project-display` and `ProjectSpaceSwitchDialog`\n   - Removed duplicated local definitions of the extracted helpers\n   - Replaced the FE-001 placeholder modal body with `<ProjectSpaceSwitchDialog>` wired to `selectedProjectId`, `selectedSpaceId`, `homeDir`, `onSelectSpace` (sets project/space/cwd), and `onClose`\n   - Removed redundant local Escape handler (now handled by the dialog component)\n\n### Verification\n\n```bash\nnode_modules/.bin/tsc --noEmit  # ✅ 0 errors\nnpm run lint                     # ✅ 0 errors, 13 warnings (all expected: FE-003 wiring targets)\n```\n\nThe 13 lint warnings are for state/callbacks (`customPathOpen`, `gitAddOpen`, `commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) that existed before and will be consumed when FE-003 wires the add-project forms into the dialog.\n\n### Notes / Risks\n\n- **Add-project buttons are disabled placeholders** in the dialog toolbar — wired in FE-003.\n- **The existing `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` is called directly** in `onSelectSpace`. The downstream session reload/Git info/AppShell effects already subscribe to these state changes via existing `useEffect` hooks in SessionSidebar. Full FE-004 side-effect verification is deferred to that subtask.\n- **`WorktreeBadge` is duplicated** in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx` — acceptable at FE-002 since they render in different contexts (sidebar vs. modal). Can be extracted to a shared component later if desired.\n- **Dialog z-index is 1100** — consistent with other modals (WorkTree action, metadata edit, archive confirmation). Should not conflict.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:35:51.869Z",
+            "text": "All imports and usages are clean. Let me verify there are no issues with the `WorktreeInfo` type import — needed by the remaining SessionSidebar helpers:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:35:51.874Z",
+            "toolCallId": "call_00_b0wyQjTd9NK8RTIpwJTu3918",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && grep -n \\\"WorktreeInfo\\\" components/SessionSidebar.tsx | head -5\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:35:51.896Z",
+            "toolCallId": "call_00_b0wyQjTd9NK8RTIpwJTu3918",
+            "toolName": "bash",
+            "text": "5:import type { GitInfo, SessionInfo, WorktreeInfo } from \"@/lib/types\";\n85:function formatWorktreeTooltip(worktree: WorktreeInfo): string {\n91:function formatWorktreeDetailTooltip(worktree: WorktreeInfo, path?: string): string {\n99:function WorktreeBadge({ worktree }: { worktree?: WorktreeInfo }) {\n135:  worktree?: WorktreeInfo;",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:36:10.317Z",
+            "text": "## Implementation Complete (FE-002)\n\n### Files Changed\n\n1. **`lib/project-display.ts`** — **NEW**. Extracted shared display helpers: `displayProjectName`, `displaySpaceName`, `activeProjectSpaces`, `sortProjectsForSidebar`, `worktreeInfoFromSpace`, `shortenCwd`.\n\n2. **`components/ProjectSpaceSwitchDialog.tsx`** — **NEW** (~719 lines). Full layered project/space switch dialog:\n   - **Left pane**: project list with search input, sorted (pinned first, then last-opened, then name), `★` pin badge, space-count badge, ellipsized paths, independent scroll\n   - **Right pane**: selected project header (name, rootPath), space cards with Main/WT badges, `✓` current marker, branch/base/path meta, `路径缺失` disabled state, Worktree mini-badge, independent scroll\n   - **Empty state**: onboarding message when zero projects (explains Project Registry sourcing, add-project buttons are disabled placeholders for FE-003)\n   - **Search**: filters projects by name/rootPath/space names/paths/branch; also filters right-pane spaces\n   - **Interaction**: click non-missing space → `onSelectSpace` + close; Esc/backdrop/close-button all work; keyboard handler built-in\n   - **Responsive**: `grid-template-columns` switches to single-column rows on ≤720px\n   - Follows existing CSS variables and HTML prototype patterns\n\n3. **`components/SessionSidebar.tsx`** — **MODIFIED**:\n   - Added imports from `lib/project-display` and `ProjectSpaceSwitchDialog`\n   - Removed duplicated local definitions of the extracted helpers\n   - Replaced the FE-001 placeholder modal body with `<ProjectSpaceSwitchDialog>` wired to `selectedProjectId`, `selectedSpaceId`, `homeDir`, `onSelectSpace` (sets project/space/cwd), and `onClose`\n   - Removed redundant local Escape handler (now handled by the dialog component)\n\n### Verification\n\n```bash\nnode_modules/.bin/tsc --noEmit  # ✅ 0 errors\nnpm run lint                     # ✅ 0 errors, 13 warnings (all expected: FE-003 wiring targets)\n```\n\nThe 13 lint warnings are for state/callbacks (`customPathOpen`, `gitAddOpen`, `commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) that existed before and will be consumed when FE-003 wires the add-project forms into the dialog.\n\n### Notes / Risks\n\n- **Add-project buttons are disabled placeholders** in the dialog toolbar — wired in FE-003.\n- **The existing `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` is called directly** in `onSelectSpace`. The downstream session reload/Git info/AppShell effects already subscribe to these state changes via existing `useEffect` hooks in SessionSidebar. Full FE-004 side-effect verification is deferred to that subtask.\n- **`WorktreeBadge` is duplicated** in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx` — acceptable at FE-002 since they render in different contexts (sidebar vs. modal). Can be extracted to a shared component later if desired.\n- **Dialog z-index is 1100** — consistent with other modals (WorkTree action, metadata edit, archive confirmation). Should not conflict.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:36:10.330Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 4331,
+        "tokens": 1047,
+        "tokenSource": "usage",
+        "tps": 4.54,
+        "firstTokenAt": "2026-07-09T08:32:19.539Z",
+        "lastTokenAt": "2026-07-09T08:36:10.209Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-fb8f8802dfa7ade4ce45e64c",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/implementer-fb8f8802dfa7ade4ce45e64c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:32:07.839Z",
+        "finishedAt": "2026-07-09T08:36:10.336Z",
+        "updatedAt": "2026-07-09T08:36:10.336Z",
+        "itemCount": 52,
+        "messageCount": 10,
+        "toolCallCount": 19,
+        "stderrBytes": 0,
+        "bytes": 155834,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4601-72c0-7f5d-93cc-52d81d877f85",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-32-07-872Z_019f4601-72c0-7f5d-93cc-52d81d877f85.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-607fc52ac224e7667c65722a",
+      "subtaskId": "FE-003",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:36:25.213Z",
+      "finishedAt": "2026-07-09T08:42:16.930Z",
+      "runner": "sdk",
+      "childSessionId": "019f4605-6011-7bf7-8a16-548c8d4a1dce",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-36-25-233Z_019f4605-6011-7bf7-8a16-548c8d4a1dce.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f4605-6011-7bf7-8a16-548c8d4a1dce",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 FE-003：Migrate add-project and Git clone flows into the dialog。请基于前两个子任务结果继续。要求：1) 将 Use default directory、Add project folder、Add project path、Add project from Git 迁移到新弹窗；2) manual path 与 Git form 保持互斥；3) 复用现有 callbacks/busy/error state…",
+      "summary": "All changes verified. Let me provide the summary.\n\n---\n\n## Implementation Complete — FE-003\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Expanded `ProjectSpaceSwitchDialogProps` with 10 add-project form state fields, 6 value-change callbacks, 6 action callbacks, and `onResetAddForms`. Replaced placeholder disabled toolbar buttons with working buttons for \"Add project folder…\", \"Add path…\", \"From Git…\". Added inline mutually-exclusive form rendering for manual path input and Git clone (parent path picker + remote URL). Added `addFormKind` local state (`null | \"path\" | \"git\"`) with toggle logic. Added `handleDialogClose` that resets forms and closes; all three close paths (button, Esc, backdrop) now call it. Added `cloneActive` guard that disables close/Esc/backdrop during Git clone. Updated empty registry onboarding with fully functional add-project buttons + inline form rendering. Updated footer \"Use default directory\" button to be functional.\n\n- **`components/SessionSidebar.tsx`** — Removed `customPathOpen` and `gitAddOpen` state (form visibility now managed by dialog's `addFormKind`). Removed now-unused `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`, `customPathInputRef` refs. Updated `registerAndSelectProjectPath` to drop `setCustomPathOpen(false)`. Updated `resetGitAddForm` to drop `setGitAddOpen(false)`. Added `resetAllAddForms` callback. Updated `handleNewWorktree` to drop `setCustomPathOpen(false)`. Wired `ProjectSpaceSwitchDialog` with all form state props, value-change handlers, and action callbacks.\n\n### Key Design Decisions\n\n1. **Form visibility lives in the dialog** (`addFormKind` local state), not in SessionSidebar. Values/busy/errors remain in SessionSidebar and flow down as props. This prevents leaking dialog UI state into the sidebar.\n\n2. **Mutual exclusivity** between manual path and Git forms via `addFormKind` toggle — clicking one toggles it on, clicking the other switches; clicking the active one closes it.\n\n3. **Close guard**: `cloneActive` (derived from `gitCloneBusy`) blocks dialog close via all three paths (button disabled, Esc ignored, backdrop ignored), preventing half-updated state during Git clone.\n\n4. **Form reset on close**: `handleDialogClose` calls `onResetAddForms()` (clears customPath + git values/errors) then `onClose()` before unmounting.\n\n5. **Success flow preserved**: Existing callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`) already call `upsertProjectAndSelectMainSpace` + `setProjectSwitchOpen(false)`, so successful add/clone selects the new main space and closes the dialog. The dialog's `useEffect` on `open` resets `addFormKind` on next open.\n\n### Verification\n\n```bash\nnpm run lint        # PASS — 0 errors, 1 pre-existing warning (formatWorktreeDetailTooltip unused)\nnode_modules/.bin/tsc --noEmit  # PASS — 0 errors\n```\n\n### Notes / Risks\n\n1. **Pre-existing warning**: `formatWorktreeDetailTooltip` in SessionSidebar is unused (defined but removed from active use during FE-001/FE-002 refactor). Not related to FE-003.\n\n2. **`addBusy` covers `gitParentPickerBusy` too aggressively**: During Git parent directory pick, all add buttons are disabled. This matches the old behavior but could be refined in FE-005.\n\n3. **Empty-state inline forms share refs** with the left-pane forms (`customPathInputRef`, `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`). Only one instance is mounted at a time (left-pane when projects exist, right-pane onboarding when empty), so there's no ref conflict.\n\n4. **Escape during directory picker**: The `handleDialogClose` guard only blocks on `cloneActive`, not during native directory picker dialog. The OS-level picker handles its own lifecycle. If the user cancels the picker, `directoryPickerBusy` clears, then Esc will close the dialog normally.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:36:25.213Z",
+        "updatedAt": "2026-07-09T08:42:16.930Z",
+        "eventCount": 21090,
+        "lastTextPreview": "All changes verified. Let me provide the summary.\n\n---\n\n## Implementation Complete — FE-003\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Expanded `ProjectSpaceSwitchDialogProps` with 10 add-project form state fields, 6 value-change callbacks, 6 action callbacks, and `onResetAddForms`. Replaced placeholder disabled toolbar buttons with working buttons for \"Add project folder…\", \"Add path…\", \"From Git…\". Added inline mutually-exclusive form rendering for manual path input and Git clone (parent path picker + remote URL). Added `addFormKind` local state (`null | \"path\" | \"git\"`) with toggle logic. Added `handleDialogClose` that resets forms and closes; all three close paths (button, Esc, backdrop) now call it. Added `cloneActive` guard that disables close/Esc/backdrop during Git clone. Updated empty registry onboarding with fully functional add-project buttons + inline form rendering. Updated footer \"Use default directory\" button to be functional.\n\n- **`components/SessionSidebar.tsx`** — Removed `customPathOpen` and `gitAddOpen` state (form visibility now managed by dialog's `addFormKind`). Removed now-unused `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`, `customPathInputRef` refs. Updated `registerAndSelectProjectPath` to drop `setCustomPathOpen(false)`. Updated `resetGitAddForm` to drop `setGitAddOpen(false)`. Added `resetAllAddForms` callback. Updated `handleNewWorktree` to drop `setCustomPathOpen(false)`. Wired `ProjectSpaceSwitchDialog` with all form state props, value-change handlers, and action callbacks.\n\n### Key Design Decisions\n\n1. **Form visibility lives in the dialog** (`addFormKind` local state), not in SessionSidebar. Values/busy/errors remain in SessionSidebar and flow down as props. This prevents leaking dialog UI state into the sidebar.\n\n2. **Mutual exclusivity** between manual path and Git forms via `addFormKind` toggle — clicking one toggles it on, clicking the other switches; clicking the active one closes it.\n\n3. **Close guard**: `cloneActive` (derived from `gitCloneBusy`) blocks dialog close via all three paths (button disabled, Esc ignored, backdrop ignored), preventing half-updated state during Git clone.\n\n4. **Form reset on close**: `handleDialogClose` calls `onResetAddForms()` (clears customPath + git values/errors) then `onClose()` before unmounting.\n\n5. **Success flow preserved**: Existing callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`) already call `upsertProjectAndSelectMainSpace` + `setProjectSwitchOpen(false)`, so successful add/clone selects the new main space and closes the dialog. The dialog's `useEffect` on `open` resets `addFormKind` on next open.\n\n### Verification\n\n```bash\nnpm run lint        # PASS — 0 errors, 1 pre-existing warning (formatWorktreeDetailTooltip unused)\nnode_modules/.bin/tsc --noEmit  # PASS — 0 errors\n```\n\n### Notes / Risks\n\n1. **Pre-existing warning**: `formatWorktreeDetailTooltip` in SessionSidebar is unused (defined but removed from active use during FE-001/FE-002 refactor). Not related to FE-003.\n\n2. **`addBusy` covers `gitParentPickerBusy` too aggressively**: During Git parent directory pick, all add buttons are disabled. This matches the old behavior but could be refined in FE-005.\n\n3. **Empty-state inline forms share refs** with the left-pane forms (`customPathInputRef`, `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`). Only one instance is mounted at a time (left-pane when projects exist, right-pane onboarding when empty), so there's no ref conflict.\n\n4. **Escape during directory picker**: The `handleDialogClose` guard only blocks on `cloneActive`, not during native directory picker dialog. The OS-level picker handles its own lifecycle. If the user cancels the picker, `directoryPickerBusy` clears, then Esc will close the dialog normally.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:41:51.776Z",
+            "toolCallId": "call_00_OHsEUJxKiMEChPtW0ayD0845",
+            "toolName": "bash",
+            "text": "M components/SessionSidebar.tsx\n?? \".ypi/tasks/20260709-161121-\\351\\207\\215\\346\\236\\204\\345\\267\\246\\344\\276\\247\\351\\241\\271\\347\\233\\256\\345\\210\\207\\346\\215\\242\\344\\270\\272\\345\\274\\271\\347\\252\\227\\345\\210\\206\\345\\261\\202\\351\\200\\211\\346\\213\\251\\345\\271\\266\\344\\274\\230\\345\\214\\226\\345\\244\\232\\351\\241\\271\\347\\233\\256\\346\\230\\276\\347\\244\\272/\"\n?? components/ProjectSpaceSwitchDialog.tsx\n?? lib/project-display.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:41:57.117Z",
+            "toolCallId": "call_00_XE4mvonX0NJjrp6EtA9b0208",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && git diff HEAD -- components/SessionSidebar.tsx | head -100\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:41:57.151Z",
+            "toolCallId": "call_00_XE4mvonX0NJjrp6EtA9b0208",
+            "toolName": "bash",
+            "text": "diff --git a/components/SessionSidebar.tsx b/components/SessionSidebar.tsx\nindex ceffcf5..177742e 100644\n--- a/components/SessionSidebar.tsx\n+++ b/components/SessionSidebar.tsx\n@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback, useRef } from \"react\";\n import type { TrellisSetupStatus } from \"@/lib/trellis-setup-types\";\n import type { GitInfo, SessionInfo, WorktreeInfo } from \"@/lib/types\";\n import type { PiWebProjectRecord, PiWebProjectSpaceRecord } from \"@/lib/project-registry-types\";\n+import { displayProjectName, displaySpaceName, activeProjectSpaces, sortProjectsForSidebar, worktreeInfoFromSpace, shortenCwd } from \"@/lib/project-display\";\n import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from \"@/lib/workspace-title\";\n import { displayTitleForSession } from \"@/lib/session-title\";\n import { Checkbox } from \"./Checkbox\";\n import { FileExplorer } from \"./FileExplorer\";\n+import { ProjectSpaceSwitchDialog } from \"./ProjectSpaceSwitchDialog\";\n \n export interface ProjectSpaceSelectionContext {\n   projectId: string;\n@@ -50,14 +52,6 @@ function formatRelativeTime(dateStr: string): string {\n   return date.toLocaleDateString();\n }\n \n-function shortenCwd(cwd: string, homeDir?: string): string {\n-  const path = (homeDir && cwd.startsWith(homeDir)) ? \"~\" + cwd.slice(homeDir.length) : cwd;\n-  const sep = path.includes(\"/\") ? \"/\" : \"\\\\\";\n-  const parts = path.split(sep).filter(Boolean);\n-  if (parts.length <= 2) return path;\n-  return \"…/\" + parts.slice(-2).join(sep);\n-}\n-\n function shellQuote(value: string): string {\n   return `'${value.replace(/'/g, `'\\\\''`)}'`;\n }\n@@ -259,16 +253,6 @@ function WorkspaceHeaderLine({\n   );\n }\n \n-function displayProjectName(project: PiWebProjectRecord): string {\n-  return project.displayName?.trim() || project.rootPath.split(/[\\\\/]+/).filter(Boolean).pop() || project.rootPath;\n-}\n-\n-function displaySpaceName(space: PiWebProjectSpaceRecord): string {\n-  if (space.displayName?.trim()) return space.displayName.trim();\n-  if (space.kind === \"main\") return \"主空间\";\n-  return space.worktree?.branch || space.path.split(/[\\\\/]+/).filter(Boolean).pop() || space.path;\n-}\n-\n function formatUnknownGitBranch(): string {\n   return \"未检测到 Git 分支\";\n }\n@@ -313,41 +297,6 @@ function formatProjectSpaceDetail(space: PiWebProjectSpaceRecord, git: GitInfo |\n   return lines.join(\"\\n\");\n }\n \n-function activeProjectSpaces(project: PiWebProjectRecord): PiWebProjectSpaceRecord[] {\n-  return Object.values(project.spaces)\n-    .filter((space) => !space.archived)\n-    .sort((a, b) => {\n-      if (a.id === \"main\") return -1;\n-      if (b.id === \"main\") return 1;\n-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;\n-      return displaySpaceName(a).localeCompare(displaySpaceName(b));\n-    });\n-}\n-\n-function sortProjectsForSidebar(projects: PiWebProjectRecord[]): PiWebProjectRecord[] {\n-  return projects\n-    .filter((project) => !project.archived)\n-    .sort((a, b) => {\n-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;\n-      const aTime = a.lastOpenedAt ?? a.updatedAt;\n-      const bTime = b.lastOpenedAt ?? b.updatedAt;\n-      const timeCompare = bTime.localeCompare(aTime);\n-      return timeCompare || displayProjectName(a).localeCompare(displayProjectName(b));\n-    });\n-}\n-\n-function worktreeInfoFromSpace(space: PiWebProjectSpaceRecord): WorktreeInfo | undefined {\n-  if (space.kind !== \"worktree\") return undefined;\n-  return {\n-    isWorktree: true,\n-    branch: space.worktree?.branch,\n-    repoRoot: space.worktree?.repoRoot,\n-    mainWorktreePath: space.worktree?.mainWorktreePath,\n-    mainWorktreeBranch: space.worktree?.mainWorktreeBranch,\n-    baseRef: space.worktree?.baseRef,\n-  };\n-}\n-\n function findProjectSpace(projects: PiWebProjectRecord[], projectId: string | null, spaceId: string | null): { project: PiWebProjectRecord; space: PiWebProjectSpaceRecord } | null {\n   if (!projectId || !spaceId) return null;\n   const project = projects.find((item) => item.id === projectId);\n@@ -458,23 +407,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio\n   const [error, setError] = useState<string | null>(null);\n   const [selectedCwd, setSelectedCwd] = useState<string | null>(null);\n   const [homeDir, setHomeDir] = useState<string>(\"\");\n-  const [dropdownOpen, setDropdownOpen] = useState(false);\n-  const [customPathOpen, setCustomPathOpen] = useState(false);\n+  const [projectSwitchOpen, setProjectSwitchOpen] = useState(false);\n   const [customPathValue, setCustomPathValue] = useState(\"\");\n   const [customPathError, setCustomPathError] = useState<string | null>(null);",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:42:16.911Z",
+            "text": "All changes verified. Let me provide the summary.\n\n---\n\n## Implementation Complete — FE-003\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Expanded `ProjectSpaceSwitchDialogProps` with 10 add-project form state fields, 6 value-change callbacks, 6 action callbacks, and `onResetAddForms`. Replaced placeholder disabled toolbar buttons with working buttons for \"Add project folder…\", \"Add path…\", \"From Git…\". Added inline mutually-exclusive form rendering for manual path input and Git clone (parent path picker + remote URL). Added `addFormKind` local state (`null | \"path\" | \"git\"`) with toggle logic. Added `handleDialogClose` that resets forms and closes; all three close paths (button, Esc, backdrop) now call it. Added `cloneActive` guard that disables close/Esc/backdrop during Git clone. Updated empty registry onboarding with fully functional add-project buttons + inline form rendering. Updated footer \"Use default directory\" button to be functional.\n\n- **`components/SessionSidebar.tsx`** — Removed `customPathOpen` and `gitAddOpen` state (form visibility now managed by dialog's `addFormKind`). Removed now-unused `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`, `customPathInputRef` refs. Updated `registerAndSelectProjectPath` to drop `setCustomPathOpen(false)`. Updated `resetGitAddForm` to drop `setGitAddOpen(false)`. Added `resetAllAddForms` callback. Updated `handleNewWorktree` to drop `setCustomPathOpen(false)`. Wired `ProjectSpaceSwitchDialog` with all form state props, value-change handlers, and action callbacks.\n\n### Key Design Decisions\n\n1. **Form visibility lives in the dialog** (`addFormKind` local state), not in SessionSidebar. Values/busy/errors remain in SessionSidebar and flow down as props. This prevents leaking dialog UI state into the sidebar.\n\n2. **Mutual exclusivity** between manual path and Git forms via `addFormKind` toggle — clicking one toggles it on, clicking the other switches; clicking the active one closes it.\n\n3. **Close guard**: `cloneActive` (derived from `gitCloneBusy`) blocks dialog close via all three paths (button disabled, Esc ignored, backdrop ignored), preventing half-updated state during Git clone.\n\n4. **Form reset on close**: `handleDialogClose` calls `onResetAddForms()` (clears customPath + git values/errors) then `onClose()` before unmounting.\n\n5. **Success flow preserved**: Existing callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`) already call `upsertProjectAndSelectMainSpace` + `setProjectSwitchOpen(false)`, so successful add/clone selects the new main space and closes the dialog. The dialog's `useEffect` on `open` resets `addFormKind` on next open.\n\n### Verification\n\n```bash\nnpm run lint        # PASS — 0 errors, 1 pre-existing warning (formatWorktreeDetailTooltip unused)\nnode_modules/.bin/tsc --noEmit  # PASS — 0 errors\n```\n\n### Notes / Risks\n\n1. **Pre-existing warning**: `formatWorktreeDetailTooltip` in SessionSidebar is unused (defined but removed from active use during FE-001/FE-002 refactor). Not related to FE-003.\n\n2. **`addBusy` covers `gitParentPickerBusy` too aggressively**: During Git parent directory pick, all add buttons are disabled. This matches the old behavior but could be refined in FE-005.\n\n3. **Empty-state inline forms share refs** with the left-pane forms (`customPathInputRef`, `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`). Only one instance is mounted at a time (left-pane when projects exist, right-pane onboarding when empty), so there's no ref conflict.\n\n4. **Escape during directory picker**: The `handleDialogClose` guard only blocks on `cloneActive`, not during native directory picker dialog. The OS-level picker handles its own lifecycle. If the user cancels the picker, `directoryPickerBusy` clears, then Esc will close the dialog normally.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:42:16.922Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 5321,
+        "tokens": 1155,
+        "tokenSource": "usage",
+        "tps": 3.65,
+        "firstTokenAt": "2026-07-09T08:37:00.544Z",
+        "lastTokenAt": "2026-07-09T08:42:16.891Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-607fc52ac224e7667c65722a",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/implementer-607fc52ac224e7667c65722a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:36:25.213Z",
+        "finishedAt": "2026-07-09T08:42:16.927Z",
+        "updatedAt": "2026-07-09T08:42:16.927Z",
+        "itemCount": 70,
+        "messageCount": 14,
+        "toolCallCount": 25,
+        "stderrBytes": 0,
+        "bytes": 117033,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4605-6011-7bf7-8a16-548c8d4a1dce",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-36-25-233Z_019f4605-6011-7bf7-8a16-548c8d4a1dce.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-87645531913efb9068a40d52",
+      "subtaskId": "FE-004",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:42:30.865Z",
+      "finishedAt": "2026-07-09T08:46:22.086Z",
+      "runner": "sdk",
+      "childSessionId": "019f460a-f466-72fc-9ba9-6a9a0f015f0d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-42-30-886Z_019f460a-f466-72fc-9ba9-6a9a0f015f0d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f460a-f466-72fc-9ba9-6a9a0f015f0d",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 FE-004：Wire selection side effects, WorkTree actions, and empty registry behavior。请继续接线并验证：1) 弹窗选择 space 后执行现有 setSelectedProjectId/setSelectedSpaceId/setSelectedCwd 语义；2) sessions/Git/file explorer/AppShell project context/new session …",
+      "summary": "All edits are correct and verified. Here is the handoff for FE-004:\n\n---\n\n## Implementation Complete — FE-004\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Two targeted edits:\n  1. Removed unused `formatWorktreeDetailTooltip` helper (lint warning)\n  2. Added `setWorktreeError(null)` to the `onSelectSpace` callback so WorkTree errors clear when switching spaces via the dialog\n\n### FE-004 Wiring Verification (by checklist item)\n\n| # | Requirement | Status | Notes |\n|---|------------|--------|-------|\n| 1 | Dialog space selection → `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` | ✅ | Already wired in `onSelectSpace` prop (line ~1537); now also clears `worktreeError`. |\n| 2 | Sessions reload on space switch | ✅ | `loadSessions` depends on `selectedProjectId`/`selectedSpaceId`/`projects`; re-fires on change. |\n| 2 | Git info reloads on cwd change | ✅ | Effect depends on `selectedCwd`; fetches `/api/git/info`. |\n| 2 | AppShell project context notified | ✅ | Effect calls `onProjectSpaceChange` when `selectedProjectId`/`selectedSpaceId` change. |\n| 2 | New session cwd follows selection | ✅ | `handleNewSession` uses `selectedCwd`. |\n| 2 | File explorer follows cwd | ✅ | `FileExplorer` receives `selectedCwdProp ?? selectedCwd`. |\n| 3 | WorkTree right-click menu reachable | ✅ | `onContextMenu` on switch button opens `worktreeContextMenu` (archive/delete). |\n| 3 | WorkTree creation preserves selection | ✅ | `handleNewWorktree` sets project/space/cwd + creates session. |\n| 3 | WorkTree archive/delete fallback selection | ✅ | `confirmWorktreeAction` handles fallback to main/active space. |\n| 4 | Zero-project → button opens onboarding modal | ✅ | Switch button says \"选择项目空间\"; dialog shows onboarding right pane. |\n| 4 | Zero-project → New/WorkTree disabled | ✅ | Both check `!selectedCwd`; titles say \"请先选择一个项目\". |\n| 5 | No session scanning for projects | ✅ | Projects come only from `/api/projects?sync=missing`. |\n\n### Verification\n\n```bash\n$ npm run lint\n# ✅ 0 errors, 0 warnings\n\n$ node_modules/.bin/tsc --noEmit\n# ✅ 0 errors\n```\n\n### Notes / Risks\n\n- **Stale form state on space selection**: When the user types in the add-path/Git form but then selects a space to switch, the dialog closes without calling `onResetAddForms`. The parent-level form values (`customPathValue`, `gitParentPathValue`, etc.) persist. On next dialog open, `addFormKind` resets to `null` (forms hidden), so stale values aren't visible — but they'll reappear if the user reactivates the same form. This is a minor UX consideration, not a functional regression. A follow-up could decide whether to reset forms on space selection or leave them \"sticky\".\n\n- **Clone-in-progress + space switch**: The dialog's `handleSelectSpace` doesn't guard against `cloneActive`. If a user clicks a space while a Git clone is in progress, the dialog closes and the space switches, but the clone continues in the background. On clone success, `upsertProjectAndSelectMainSpace` overrides the user's manual selection. The design doc notes this risk under FE-003. Not addressed here — scope is FE-004 only.\n\n- **All existing flows preserved**: WorkTree archive/delete confirm dialog, metadata editing dialog, archive-all, batch archive, session context menu, Trellis init prompt — all untouched and remain at `zIndex` levels compatible with the new modal (`zIndex: 1100`).",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:42:30.865Z",
+        "updatedAt": "2026-07-09T08:46:22.086Z",
+        "eventCount": 12663,
+        "lastTextPreview": "All edits are correct and verified. Here is the handoff for FE-004:\n\n---\n\n## Implementation Complete — FE-004\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Two targeted edits:\n  1. Removed unused `formatWorktreeDetailTooltip` helper (lint warning)\n  2. Added `setWorktreeError(null)` to the `onSelectSpace` callback so WorkTree errors clear when switching spaces via the dialog\n\n### FE-004 Wiring Verification (by checklist item)\n\n| # | Requirement | Status | Notes |\n|---|------------|--------|-------|\n| 1 | Dialog space selection → `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` | ✅ | Already wired in `onSelectSpace` prop (line ~1537); now also clears `worktreeError`. |\n| 2 | Sessions reload on space switch | ✅ | `loadSessions` depends on `selectedProjectId`/`selectedSpaceId`/`projects`; re-fires on change. |\n| 2 | Git info reloads on cwd change | ✅ | Effect depends on `selectedCwd`; fetches `/api/git/info`. |\n| 2 | AppShell project context notified | ✅ | Effect calls `onProjectSpaceChange` when `selectedProjectId`/`selectedSpaceId` change. |\n| 2 | New session cwd follows selection | ✅ | `handleNewSession` uses `selectedCwd`. |\n| 2 | File explorer follows cwd | ✅ | `FileExplorer` receives `selectedCwdProp ?? selectedCwd`. |\n| 3 | WorkTree right-click menu reachable | ✅ | `onContextMenu` on switch button opens `worktreeContextMenu` (archive/delete). |\n| 3 | WorkTree creation preserves selection | ✅ | `handleNewWorktree` sets project/space/cwd + creates session. |\n| 3 | WorkTree archive/delete fallback selection | ✅ | `confirmWorktreeAction` handles fallback to main/active space. |\n| 4 | Zero-project → button opens onboarding modal | ✅ | Switch button says \"选择项目空间\"; dialog shows onboarding right pane. |\n| 4 | Zero-project → New/WorkTree disabled | ✅ | Both check `!selectedCwd`; titles say \"请先选择一个项目\". |\n| 5 | No session scanning for projects | ✅ | Projects come only from `/api/projects?sync=missing`. |\n\n### Verification\n\n```bash\n$ npm run lint\n# ✅ 0 errors, 0 warnings\n\n$ node_modules/.bin/tsc --noEmit\n# ✅ 0 errors\n```\n\n### Notes / Risks\n\n- **Stale form state on space selection**: When the user types in the add-path/Git form but then selects a space to switch, the dialog closes without calling `onResetAddForms`. The parent-level form values (`customPathValue`, `gitParentPathValue`, etc.) persist. On next dialog open, `addFormKind` resets to `null` (forms hidden), so stale values aren't visible — but they'll reappear if the user reactivates the same form. This is a minor UX consideration, not a functional regression. A follow-up could decide whether to reset forms on space selection or leave them \"sticky\".\n\n- **Clone-in-progress + space switch**: The dialog's `handleSelectSpace` doesn't guard against `cloneActive`. If a user clicks a space while a Git clone is in progress, the dialog closes and the space switches, but the clone continues in the background. On clone success, `upsertProjectAndSelectMainSpace` overrides the user's manual selection. The design doc notes this risk under FE-003. Not addressed here — scope is FE-004 only.\n\n- **All existing flows preserved**: WorkTree archive/delete confirm dialog, metadata editing dialog, archive-all, batch archive, session context menu, Trellis init prompt — all untouched and remain at `zIndex` levels compatible with the new modal (`zIndex: 1100`).",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:46:06.151Z",
+            "text": "Let me verify the edited section reads correctly:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:46:06.160Z",
+            "toolCallId": "call_00_D4gH1mdIoCXdgFvow78n4743",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/SessionSidebar.tsx\",\n  \"offset\": 1530,\n  \"limit\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:46:06.507Z",
+            "toolCallId": "call_00_D4gH1mdIoCXdgFvow78n4743",
+            "toolName": "read",
+            "text": "onGitRemoteRepositoryValueChange={setGitRemoteRepositoryValue}\n          onUseDefaultDirectory={() => void handleDefaultCwd()}\n          onPickProjectFolder={() => void handleDirectoryPicker()}\n          onSubmitCustomPath={() => void commitCustomPath()}\n          onPickGitParent={() => void handleGitParentDirectoryPicker()}\n          onSubmitGitClone={() => void handleGitCloneSubmit()}\n          onResetAddForms={resetAllAddForms}\n          onSelectSpace={(project, space) => {\n            setSelectedProjectId(project.id);\n            setSelectedSpaceId(space.id);\n            setSelectedCwd(space.path);\n            setWorktreeError(null);\n          }}\n          onClose={() => setProjectSwitchOpen(false)}\n        />\n      </div>\n\n      {metadataEditTarget && (\n        <ProjectMetadataDialog\n          target={metadataEditTarget}\n\n[1187 more lines in file. Use offset=1550 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:46:22.067Z",
+            "text": "All edits are correct and verified. Here is the handoff for FE-004:\n\n---\n\n## Implementation Complete — FE-004\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Two targeted edits:\n  1. Removed unused `formatWorktreeDetailTooltip` helper (lint warning)\n  2. Added `setWorktreeError(null)` to the `onSelectSpace` callback so WorkTree errors clear when switching spaces via the dialog\n\n### FE-004 Wiring Verification (by checklist item)\n\n| # | Requirement | Status | Notes |\n|---|------------|--------|-------|\n| 1 | Dialog space selection → `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` | ✅ | Already wired in `onSelectSpace` prop (line ~1537); now also clears `worktreeError`. |\n| 2 | Sessions reload on space switch | ✅ | `loadSessions` depends on `selectedProjectId`/`selectedSpaceId`/`projects`; re-fires on change. |\n| 2 | Git info reloads on cwd change | ✅ | Effect depends on `selectedCwd`; fetches `/api/git/info`. |\n| 2 | AppShell project context notified | ✅ | Effect calls `onProjectSpaceChange` when `selectedProjectId`/`selectedSpaceId` change. |\n| 2 | New session cwd follows selection | ✅ | `handleNewSession` uses `selectedCwd`. |\n| 2 | File explorer follows cwd | ✅ | `FileExplorer` receives `selectedCwdProp ?? selectedCwd`. |\n| 3 | WorkTree right-click menu reachable | ✅ | `onContextMenu` on switch button opens `worktreeContextMenu` (archive/delete). |\n| 3 | WorkTree creation preserves selection | ✅ | `handleNewWorktree` sets project/space/cwd + creates session. |\n| 3 | WorkTree archive/delete fallback selection | ✅ | `confirmWorktreeAction` handles fallback to main/active space. |\n| 4 | Zero-project → button opens onboarding modal | ✅ | Switch button says \"选择项目空间\"; dialog shows onboarding right pane. |\n| 4 | Zero-project → New/WorkTree disabled | ✅ | Both check `!selectedCwd`; titles say \"请先选择一个项目\". |\n| 5 | No session scanning for projects | ✅ | Projects come only from `/api/projects?sync=missing`. |\n\n### Verification\n\n```bash\n$ npm run lint\n# ✅ 0 errors, 0 warnings\n\n$ node_modules/.bin/tsc --noEmit\n# ✅ 0 errors\n```\n\n### Notes / Risks\n\n- **Stale form state on space selection**: When the user types in the add-path/Git form but then selects a space to switch, the dialog closes without calling `onResetAddForms`. The parent-level form values (`customPathValue`, `gitParentPathValue`, etc.) persist. On next dialog open, `addFormKind` resets to `null` (forms hidden), so stale values aren't visible — but they'll reappear if the user reactivates the same form. This is a minor UX consideration, not a functional regression. A follow-up could decide whether to reset forms on space selection or leave them \"sticky\".\n\n- **Clone-in-progress + space switch**: The dialog's `handleSelectSpace` doesn't guard against `cloneActive`. If a user clicks a space while a Git clone is in progress, the dialog closes and the space switches, but the clone continues in the background. On clone success, `upsertProjectAndSelectMainSpace` overrides the user's manual selection. The design doc notes this risk under FE-003. Not addressed here — scope is FE-004 only.\n\n- **All existing flows preserved**: WorkTree archive/delete confirm dialog, metadata editing dialog, archive-all, batch archive, session context menu, Trellis init prompt — all untouched and remain at `zIndex` levels compatible with the new modal (`zIndex: 1100`).",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:46:22.078Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 5031,
+        "tokens": 902,
+        "tokenSource": "usage",
+        "tps": 4.09,
+        "firstTokenAt": "2026-07-09T08:42:41.479Z",
+        "lastTokenAt": "2026-07-09T08:46:21.992Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-87645531913efb9068a40d52",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/implementer-87645531913efb9068a40d52.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:42:30.865Z",
+        "finishedAt": "2026-07-09T08:46:22.084Z",
+        "updatedAt": "2026-07-09T08:46:22.084Z",
+        "itemCount": 37,
+        "messageCount": 9,
+        "toolCallCount": 12,
+        "stderrBytes": 0,
+        "bytes": 72253,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f460a-f466-72fc-9ba9-6a9a0f015f0d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-42-30-886Z_019f460a-f466-72fc-9ba9-6a9a0f015f0d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-06de9e8513c6a0cef45537b3",
+      "subtaskId": "FE-005",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:46:38.683Z",
+      "finishedAt": "2026-07-09T08:50:53.397Z",
+      "runner": "sdk",
+      "childSessionId": "019f460e-bc78-743c-b12a-3d45f6409820",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-46-38-712Z_019f460e-bc78-743c-b12a-3d45f6409820.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f460e-bc78-743c-b12a-3d45f6409820",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 FE-005：Polish responsive, accessibility, and many-project display。请聚焦：1) focus 管理、Esc/backdrop/close、返回焦点到 trigger；2) 键盘友好、viewport 限高限宽、必要时窄屏单列回退；3) 50+ 项目与长路径的省略/tooltip/滚动表现；4) busy 状态下关闭策略明确；5) 如需更新 `app/globals.css` 可做最小改动；6) 完成后更新…",
+      "summary": "All checks pass. Let me provide the handoff summary.\n\n---\n\n## FE-005 Implementation Complete\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Focus management, keyboard accessibility, responsive polish\n  1. **Focus return**: Saved `document.activeElement` on open via a dedicated `useEffect`, restored on unmount (close) via its cleanup function — focus always returns to the trigger button regardless of close method (Esc, backdrop, close button, or space selection).\n  2. **Focus trap**: Merged into the existing keyboard handler — Tab/Shift+Tab now wraps within the dialog panel (covers header close button, body controls, and footer). If focus somehow escapes, it's also pulled back on the next Tab.\n  3. **Empty-state focus**: When `activeProjects.length === 0`, the dialog now focuses the first onboarding button (`Add project folder…`) instead of the (less useful) search input.\n  4. **Dialog ref**: Moved `dialogRef` from the body div to the panel div so the focus trap covers the close button and footer, not just the two-pane body.\n  5. **Removed inline `<style>`**: The responsive single-column fallback media query was moved out of the component into `app/globals.css`.\n\n- **`app/globals.css`** — Minimal responsive CSS addition\n  - Added `.project-switch-dialog-body` media query at `max-width: 720px` for single-column fallback (preserving the exact same rules previously in the inline `<style>` tag).\n\n### Verification\n\n| Check | Result |\n|---|---|\n| `npm run lint` | ✅ Pass |\n| `node_modules/.bin/tsc --noEmit` | ✅ Pass |\n\n### Feature Coverage per FE-005 Acceptance Criteria\n\n| Criterion | Status |\n|---|---|\n| Focus management (return to trigger on close) | ✅ — Cleanup in open effect restores `prevFocusRef` |\n| Esc close (safe during clone) | ✅ — Esc blocked during `cloneActive` |\n| Backdrop click close | ✅ — Blocked during `cloneActive` |\n| Focus trap (Tab/Shift+Tab within dialog) | ✅ — Includes header close button and footer |\n| Keyboard-friendly buttons | ✅ — All buttons are native `<button>`, forms respond to Enter/Esc |\n| Viewport-bounded max sizes | ✅ — Already present: `min(920px, 100vw-24px)` × `min(680px, 100vh-48px)` |\n| Responsive single-column fallback | ✅ — Moved to `globals.css`, same breakpoint and rules |\n| 50+ projects scroll/ellipsis | ✅ — Independent scroll areas, ellipsis + `title` on all long text |\n| Busy state close protection | ✅ — `cloneActive` blocks Esc, backdrop, close button; button shows tooltip |\n| `app/globals.css` minimal change | ✅ — Only the media query added |\n\n### Notes / Risks\n\n- **Focus trap with Shadow DOM**: The `querySelectorAll` approach works for all standard DOM elements. If future components use Shadow DOM inside the dialog, the focus trap won't find them — unlikely for this project's dialog.\n- **Narrow viewport (< 720px)**: The single-column fallback has been moved to globals.css and matches the prototype's intended behavior. With very small viewports (~320px), the form inputs may still feel cramped — this is acceptable per the \"首版\" scope.\n- **Clone busy + close**: When Git clone is active, all close paths are blocked and the close button shows an explanatory tooltip. If the user force-closes the tab/browser, this is out of scope.\n- **No SessionSidebar changes needed**: The trigger button and dialog wiring were already complete from FE-001–FE-004. The focus return uses `document.activeElement` capture, which is self-contained in the dialog.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:46:38.683Z",
+        "updatedAt": "2026-07-09T08:50:53.397Z",
+        "eventCount": 11242,
+        "lastTextPreview": "All checks pass. Let me provide the handoff summary.\n\n---\n\n## FE-005 Implementation Complete\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Focus management, keyboard accessibility, responsive polish\n  1. **Focus return**: Saved `document.activeElement` on open via a dedicated `useEffect`, restored on unmount (close) via its cleanup function — focus always returns to the trigger button regardless of close method (Esc, backdrop, close button, or space selection).\n  2. **Focus trap**: Merged into the existing keyboard handler — Tab/Shift+Tab now wraps within the dialog panel (covers header close button, body controls, and footer). If focus somehow escapes, it's also pulled back on the next Tab.\n  3. **Empty-state focus**: When `activeProjects.length === 0`, the dialog now focuses the first onboarding button (`Add project folder…`) instead of the (less useful) search input.\n  4. **Dialog ref**: Moved `dialogRef` from the body div to the panel div so the focus trap covers the close button and footer, not just the two-pane body.\n  5. **Removed inline `<style>`**: The responsive single-column fallback media query was moved out of the component into `app/globals.css`.\n\n- **`app/globals.css`** — Minimal responsive CSS addition\n  - Added `.project-switch-dialog-body` media query at `max-width: 720px` for single-column fallback (preserving the exact same rules previously in the inline `<style>` tag).\n\n### Verification\n\n| Check | Result |\n|---|---|\n| `npm run lint` | ✅ Pass |\n| `node_modules/.bin/tsc --noEmit` | ✅ Pass |\n\n### Feature Coverage per FE-005 Acceptance Criteria\n\n| Criterion | Status |\n|---|---|\n| Focus management (return to trigger on close) | ✅ — Cleanup in open effect restores `prevFocusRef` |\n| Esc close (safe during clone) | ✅ — Esc blocked during `cloneActive` |\n| Backdrop click close | ✅ — Blocked during `cloneActive` |\n| Focus trap (Tab/Shift+Tab within dialog) | ✅ — Includes header close button and footer |\n| Keyboard-friendly buttons | ✅ — All buttons are native `<button>`, forms respond to Enter/Esc |\n| Viewport-bounded max sizes | ✅ — Already present: `min(920px, 100vw-24px)` × `min(680px, 100vh-48px)` |\n| Responsive single-column fallback | ✅ — Moved to `globals.css`, same breakpoint and rules |\n| 50+ projects scroll/ellipsis | ✅ — Independent scroll areas, ellipsis + `title` on all long text |\n| Busy state close protection | ✅ — `cloneActive` blocks Esc, backdrop, close button; button shows tooltip |\n| `app/globals.css` minimal change | ✅ — Only the media query added |\n\n### Notes / Risks\n\n- **Focus trap with Shadow DOM**: The `querySelectorAll` approach works for all standard DOM elements. If future components use Shadow DOM inside the dialog, the focus trap won't find them — unlikely for this project's dialog.\n- **Narrow viewport (< 720px)**: The single-column fallback has been moved to globals.css and matches the prototype's intended behavior. With very small viewports (~320px), the form inputs may still feel cramped — this is acceptable per the \"首版\" scope.\n- **Clone busy + close**: When Git clone is active, all close paths are blocked and the close button shows an explanatory tooltip. If the user force-closes the tab/browser, this is out of scope.\n- **No SessionSidebar changes needed**: The trigger button and dialog wiring were already complete from FE-001–FE-004. The focus return uses `document.activeElement` capture, which is self-contained in the dialog.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:50:27.201Z",
+            "toolCallId": "call_00_xRaBEUfVLWT1VudZDnY64650",
+            "toolName": "bash",
+            "text": "}}\n          >\n            Use default directory\n          </button>\n        </div>\n      </div>\n\n    </div>\n  );\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:50:32.894Z",
+            "toolCallId": "call_00_w4b8IbNmHGEU6ICabBpv5783",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"tail -15 /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/app/globals.css\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:50:32.917Z",
+            "toolCallId": "call_00_w4b8IbNmHGEU6ICabBpv5783",
+            "toolName": "bash",
+            "text": "color: var(--text-dim);\n  pointer-events: none;\n}\n\n/* ProjectSpaceSwitchDialog: responsive single-column fallback */\n@media (max-width: 720px) {\n  .project-switch-dialog-body {\n    grid-template-columns: 1fr !important;\n    grid-template-rows: minmax(180px, 0.8fr) minmax(240px, 1fr) !important;\n  }\n  .project-switch-dialog-body > div:first-child {\n    border-right: 0 !important;\n    border-bottom: 1px solid var(--border) !important;\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:50:53.377Z",
+            "text": "All checks pass. Let me provide the handoff summary.\n\n---\n\n## FE-005 Implementation Complete\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Focus management, keyboard accessibility, responsive polish\n  1. **Focus return**: Saved `document.activeElement` on open via a dedicated `useEffect`, restored on unmount (close) via its cleanup function — focus always returns to the trigger button regardless of close method (Esc, backdrop, close button, or space selection).\n  2. **Focus trap**: Merged into the existing keyboard handler — Tab/Shift+Tab now wraps within the dialog panel (covers header close button, body controls, and footer). If focus somehow escapes, it's also pulled back on the next Tab.\n  3. **Empty-state focus**: When `activeProjects.length === 0`, the dialog now focuses the first onboarding button (`Add project folder…`) instead of the (less useful) search input.\n  4. **Dialog ref**: Moved `dialogRef` from the body div to the panel div so the focus trap covers the close button and footer, not just the two-pane body.\n  5. **Removed inline `<style>`**: The responsive single-column fallback media query was moved out of the component into `app/globals.css`.\n\n- **`app/globals.css`** — Minimal responsive CSS addition\n  - Added `.project-switch-dialog-body` media query at `max-width: 720px` for single-column fallback (preserving the exact same rules previously in the inline `<style>` tag).\n\n### Verification\n\n| Check | Result |\n|---|---|\n| `npm run lint` | ✅ Pass |\n| `node_modules/.bin/tsc --noEmit` | ✅ Pass |\n\n### Feature Coverage per FE-005 Acceptance Criteria\n\n| Criterion | Status |\n|---|---|\n| Focus management (return to trigger on close) | ✅ — Cleanup in open effect restores `prevFocusRef` |\n| Esc close (safe during clone) | ✅ — Esc blocked during `cloneActive` |\n| Backdrop click close | ✅ — Blocked during `cloneActive` |\n| Focus trap (Tab/Shift+Tab within dialog) | ✅ — Includes header close button and footer |\n| Keyboard-friendly buttons | ✅ — All buttons are native `<button>`, forms respond to Enter/Esc |\n| Viewport-bounded max sizes | ✅ — Already present: `min(920px, 100vw-24px)` × `min(680px, 100vh-48px)` |\n| Responsive single-column fallback | ✅ — Moved to `globals.css`, same breakpoint and rules |\n| 50+ projects scroll/ellipsis | ✅ — Independent scroll areas, ellipsis + `title` on all long text |\n| Busy state close protection | ✅ — `cloneActive` blocks Esc, backdrop, close button; button shows tooltip |\n| `app/globals.css` minimal change | ✅ — Only the media query added |\n\n### Notes / Risks\n\n- **Focus trap with Shadow DOM**: The `querySelectorAll` approach works for all standard DOM elements. If future components use Shadow DOM inside the dialog, the focus trap won't find them — unlikely for this project's dialog.\n- **Narrow viewport (< 720px)**: The single-column fallback has been moved to globals.css and matches the prototype's intended behavior. With very small viewports (~320px), the form inputs may still feel cramped — this is acceptable per the \"首版\" scope.\n- **Clone busy + close**: When Git clone is active, all close paths are blocked and the close button shows an explanatory tooltip. If the user force-closes the tab/browser, this is out of scope.\n- **No SessionSidebar changes needed**: The trigger button and dialog wiring were already complete from FE-001–FE-004. The focus return uses `document.activeElement` capture, which is self-contained in the dialog.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:50:53.388Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 4969,
+        "tokens": 1022,
+        "tokenSource": "usage",
+        "tps": 4.09,
+        "firstTokenAt": "2026-07-09T08:46:43.256Z",
+        "lastTokenAt": "2026-07-09T08:50:53.324Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-06de9e8513c6a0cef45537b3",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/implementer-06de9e8513c6a0cef45537b3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:46:38.683Z",
+        "finishedAt": "2026-07-09T08:50:53.394Z",
+        "updatedAt": "2026-07-09T08:50:53.394Z",
+        "itemCount": 65,
+        "messageCount": 13,
+        "toolCallCount": 24,
+        "stderrBytes": 0,
+        "bytes": 130530,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f460e-bc78-743c-b12a-3d45f6409820",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-46-38-712Z_019f460e-bc78-743c-b12a-3d45f6409820.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-63543934ec14766077dfd723",
+      "subtaskId": "DOC-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:51:07.859Z",
+      "finishedAt": "2026-07-09T08:52:53.603Z",
+      "runner": "sdk",
+      "childSessionId": "019f4612-d7f1-722d-85bd-8d7d548318f1",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-51-07-889Z_019f4612-d7f1-722d-85bd-8d7d548318f1.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f4612-d7f1-722d-85bd-8d7d548318f1",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实现 DOC-001：Update frontend module documentation。请更新 `docs/modules/frontend.md` 中 `components/SessionSidebar.tsx` 相关条目，说明新的 modal-based project/space switcher、空 registry onboarding、保留 add-project/WorkTree 能力，以及新组件边界（如新增 `ProjectSpaceSwitchD…",
+      "summary": "Both `npm run lint` and `tsc --noEmit` pass cleanly with zero errors.\n\n---\n\n## Implementation Complete — DOC-001\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `SessionSidebar.tsx` entry to describe the new modal-based project/space switcher (replacing old inline dropdown) and added new `ProjectSpaceSwitchDialog.tsx` entry documenting the layered two-pane dialog, add-project forms, empty registry onboarding, keyboard/accessibility behavior, and component boundaries.\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run lint` | Passed, no errors |\n| `node_modules/.bin/tsc --noEmit` | Passed, no errors |\n\n### Notes / Risks\n\n- **None.** The documentation update is an additive, non-code change. It accurately reflects the FE-001 through FE-005 implementation as inspected in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx`. The updated docs cover: modal-based switcher, empty registry onboarding, preserved add-project paths (folder/path/Git/default), WorkTree right-click context menu on switch button, keyboard/Esc/focus management, and the pure-UI-shell component contract between the sidebar and dialog.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:51:07.859Z",
+        "updatedAt": "2026-07-09T08:52:53.603Z",
+        "eventCount": 5051,
+        "lastTextPreview": "Both `npm run lint` and `tsc --noEmit` pass cleanly with zero errors.\n\n---\n\n## Implementation Complete — DOC-001\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `SessionSidebar.tsx` entry to describe the new modal-based project/space switcher (replacing old inline dropdown) and added new `ProjectSpaceSwitchDialog.tsx` entry documenting the layered two-pane dialog, add-project forms, empty registry onboarding, keyboard/accessibility behavior, and component boundaries.\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run lint` | Passed, no errors |\n| `node_modules/.bin/tsc --noEmit` | Passed, no errors |\n\n### Notes / Risks\n\n- **None.** The documentation update is an additive, non-code change. It accurately reflects the FE-001 through FE-005 implementation as inspected in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx`. The updated docs cover: modal-based switcher, empty registry onboarding, preserved add-project paths (folder/path/Git/default), WorkTree right-click context menu on switch button, keyboard/Esc/focus management, and the pure-UI-shell component contract between the sidebar and dialog.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:52:44.885Z",
+            "text": "Lint passed clean. Now run TypeScript check:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:52:44.892Z",
+            "toolCallId": "call_00_97yXyJLSDzWso0SBikLO4959",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && node_modules/.bin/tsc --noEmit 2>&1 | tail -20\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:52:46.961Z",
+            "toolCallId": "call_00_97yXyJLSDzWso0SBikLO4959",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:52:53.580Z",
+            "text": "Both `npm run lint` and `tsc --noEmit` pass cleanly with zero errors.\n\n---\n\n## Implementation Complete — DOC-001\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `SessionSidebar.tsx` entry to describe the new modal-based project/space switcher (replacing old inline dropdown) and added new `ProjectSpaceSwitchDialog.tsx` entry documenting the layered two-pane dialog, add-project forms, empty registry onboarding, keyboard/accessibility behavior, and component boundaries.\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run lint` | Passed, no errors |\n| `node_modules/.bin/tsc --noEmit` | Passed, no errors |\n\n### Notes / Risks\n\n- **None.** The documentation update is an additive, non-code change. It accurately reflects the FE-001 through FE-005 implementation as inspected in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx`. The updated docs cover: modal-based switcher, empty registry onboarding, preserved add-project paths (folder/path/Git/default), WorkTree right-click context menu on switch button, keyboard/Esc/focus management, and the pure-UI-shell component contract between the sidebar and dialog.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:52:53.593Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1539,
+        "tokens": 289,
+        "tokenSource": "usage",
+        "tps": 3.18,
+        "firstTokenAt": "2026-07-09T08:51:22.667Z",
+        "lastTokenAt": "2026-07-09T08:52:53.514Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-63543934ec14766077dfd723",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/implementer-63543934ec14766077dfd723.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:51:07.859Z",
+        "finishedAt": "2026-07-09T08:52:53.601Z",
+        "updatedAt": "2026-07-09T08:52:53.601Z",
+        "itemCount": 30,
+        "messageCount": 6,
+        "toolCallCount": 10,
+        "stderrBytes": 0,
+        "bytes": 111579,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4612-d7f1-722d-85bd-8d7d548318f1",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-51-07-889Z_019f4612-d7f1-722d-85bd-8d7d548318f1.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-be9bc11494e127140b9b8934",
+      "subtaskId": "QA-001",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T08:53:09.144Z",
+      "finishedAt": "2026-07-09T08:56:55.346Z",
+      "runner": "sdk",
+      "childSessionId": "019f4614-b1c1-7ea2-8f0b-fa20cdd6c134",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-53-09-185Z_019f4614-b1c1-7ea2-8f0b-fa20cdd6c134.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "childSessionId": "019f4614-b1c1-7ea2-8f0b-fa20cdd6c134",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "执行 QA-001：Run validation and manual UI regression checks。请基于当前实现进行检查：1) 运行 `npm run lint` 与 `node_modules/.bin/tsc --noEmit`；2) 阅读 `checks.md` 并尽可能完成代码层/静态层手工核查，重点关注正常切换、50+ 项目显示、WorkTree、missing space、empty registry、add path/folder/Git/de…",
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n已修复 1 个阻塞问题：\n- 弹窗内 `WorkTree` 空间行原先没有保留右键归档/删除入口；现已补回，右键会透传到现有 WorkTree context menu。\n- 顺手把“点击空间关闭弹窗”改为走统一关闭逻辑，关闭时会清理弹窗临时表单状态。\n\n#### Remaining Findings\n- None blocking.\n- 未做真实浏览器/OS 级手工操作，因此以下仅完成代码/静态核查，仍建议主会话补一次交互验收：50+ 项目滚动、目录选择器、Git clone 成功/失败、焦点恢复、窄窗口显示。\n\n#### Verification\n- `npm run lint` — pass (`EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — pass (`EXIT:0`)\n\n#### Static review notes\n- 旧 sidebar dropdown 已移除，顶部按钮改为打开 modal。\n- 弹窗保持“左项目 / 右空间”分层选择。\n- 搜索、独立滚动、长文本省略、empty registry onboarding、missing 禁用态、add path/folder/Git/default 入口均在代码中可见。\n- 选择空间仍走 `setSelectedProjectId` + `setSelectedSpaceId` + `setSelectedCwd`。\n- 未发现扫描 sessions 生成顶层项目的回退。\n- `docs/modules/frontend.md` 已同步到当前实现。\n\n#### Files changed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n#### Verdict\n- **Pass**（代码层/静态层）\n- 建议主会话补做一次实际 UI 手工验收后再结束 QA。",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T08:53:09.144Z",
+        "updatedAt": "2026-07-09T08:56:55.346Z",
+        "eventCount": 3917,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n已修复 1 个阻塞问题：\n- 弹窗内 `WorkTree` 空间行原先没有保留右键归档/删除入口；现已补回，右键会透传到现有 WorkTree context menu。\n- 顺手把“点击空间关闭弹窗”改为走统一关闭逻辑，关闭时会清理弹窗临时表单状态。\n\n#### Remaining Findings\n- None blocking.\n- 未做真实浏览器/OS 级手工操作，因此以下仅完成代码/静态核查，仍建议主会话补一次交互验收：50+ 项目滚动、目录选择器、Git clone 成功/失败、焦点恢复、窄窗口显示。\n\n#### Verification\n- `npm run lint` — pass (`EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — pass (`EXIT:0`)\n\n#### Static review notes\n- 旧 sidebar dropdown 已移除，顶部按钮改为打开 modal。\n- 弹窗保持“左项目 / 右空间”分层选择。\n- 搜索、独立滚动、长文本省略、empty registry onboarding、missing 禁用态、add path/folder/Git/default 入口均在代码中可见。\n- 选择空间仍走 `setSelectedProjectId` + `setSelectedSpaceId` + `setSelectedCwd`。\n- 未发现扫描 sessions 生成顶层项目的回退。\n- `docs/modules/frontend.md` 已同步到当前实现。\n\n#### Files changed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n#### Verdict\n- **Pass**（代码层/静态层）\n- 建议主会话补做一次实际 UI 手工验收后再结束 QA。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:56:35.447Z",
+            "toolCallId": "call_VwoeIY16Y1eYsKBisyOV1Oti|fc_07731bf2691abc07016a4f6238d014819bb9e12f585e6a893e",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.10 lint\n> eslint .\n\nEXIT:0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T08:56:40.406Z",
+            "toolCallId": "call_gc1tC9X9QLoqg1EJ4by5Y0py|fc_07731bf2691abc07016a4f6247c11c819bb508eff1b71e424f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short components/SessionSidebar.tsx components/ProjectSpaceSwitchDialog.tsx docs/modules/frontend.md lib/project-display.ts app/globals.css\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T08:56:40.482Z",
+            "toolCallId": "call_gc1tC9X9QLoqg1EJ4by5Y0py|fc_07731bf2691abc07016a4f6247c11c819bb508eff1b71e424f",
+            "toolName": "bash",
+            "text": "M app/globals.css\n M components/SessionSidebar.tsx\n M docs/modules/frontend.md\n?? components/ProjectSpaceSwitchDialog.tsx\n?? lib/project-display.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T08:56:55.321Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n已修复 1 个阻塞问题：\n- 弹窗内 `WorkTree` 空间行原先没有保留右键归档/删除入口；现已补回，右键会透传到现有 WorkTree context menu。\n- 顺手把“点击空间关闭弹窗”改为走统一关闭逻辑，关闭时会清理弹窗临时表单状态。\n\n#### Remaining Findings\n- None blocking.\n- 未做真实浏览器/OS 级手工操作，因此以下仅完成代码/静态核查，仍建议主会话补一次交互验收：50+ 项目滚动、目录选择器、Git clone 成功/失败、焦点恢复、窄窗口显示。\n\n#### Verification\n- `npm run lint` — pass (`EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — pass (`EXIT:0`)\n\n#### Static review notes\n- 旧 sidebar dropdown 已移除，顶部按钮改为打开 modal。\n- 弹窗保持“左项目 / 右空间”分层选择。\n- 搜索、独立滚动、长文本省略、empty registry onboarding、missing 禁用态、add path/folder/Git/default 入口均在代码中可见。\n- 选择空间仍走 `setSelectedProjectId` + `setSelectedSpaceId` + `setSelectedCwd`。\n- 未发现扫描 sessions 生成顶层项目的回退。\n- `docs/modules/frontend.md` 已同步到当前实现。\n\n#### Files changed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n#### Verdict\n- **Pass**（代码层/静态层）\n- 建议主会话补做一次实际 UI 手工验收后再结束 QA。",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T08:56:55.334Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1030,
+        "tokens": 619,
+        "tokenSource": "usage",
+        "tps": 89.45,
+        "firstTokenAt": "2026-07-09T08:56:48.279Z",
+        "lastTokenAt": "2026-07-09T08:56:55.199Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-be9bc11494e127140b9b8934",
+        "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-161121-/checker-be9bc11494e127140b9b8934.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T08:53:09.144Z",
+        "finishedAt": "2026-07-09T08:56:55.342Z",
+        "updatedAt": "2026-07-09T08:56:55.342Z",
+        "itemCount": 63,
+        "messageCount": 1,
+        "toolCallCount": 29,
+        "stderrBytes": 0,
+        "bytes": 135132,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f4614-b1c1-7ea2-8f0b-fa20cdd6c134",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T08-53-09-185Z_019f4614-b1c1-7ea2-8f0b-fa20cdd6c134.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-09T08:25:28.681Z",
+      "contextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+      "from": "awaiting_approval",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-09T08:25:54.570Z",
+      "contextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+      "inputHash": "74e21680eac7385ca408cb01",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-09T09:29:27.677Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260709-172927-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+    "knowledgePath": ".ypi/knowledge/20260709-172927-重构左侧项目切换为弹窗分层选择并优化多项目显示.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-09T08:25:28.681Z",
+    "summary": "Replace the left sidebar project dropdown with a layered project/space switch modal while preserving existing Project Registry APIs and session side effects.",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "FE-001",
+          "title": "implementing",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "FE-001"
+          ]
+        },
+        {
+          "id": "FE-002",
+          "title": "implementing",
+          "relation": "serial",
+          "dependencies": [
+            "FE-001"
+          ],
+          "subtaskIds": [
+            "FE-002"
+          ]
+        },
+        {
+          "id": "FE-003",
+          "title": "implementing",
+          "relation": "serial",
+          "dependencies": [
+            "FE-002"
+          ],
+          "subtaskIds": [
+            "FE-003"
+          ]
+        },
+        {
+          "id": "FE-004",
+          "title": "implementing",
+          "relation": "serial",
+          "dependencies": [
+            "FE-002",
+            "FE-003"
+          ],
+          "subtaskIds": [
+            "FE-004"
+          ]
+        },
+        {
+          "id": "FE-005",
+          "title": "implementing",
+          "relation": "serial",
+          "dependencies": [
+            "FE-004"
+          ],
+          "subtaskIds": [
+            "FE-005"
+          ]
+        },
+        {
+          "id": "DOC-001",
+          "title": "implementing",
+          "relation": "parallel",
+          "dependencies": [
+            "FE-005"
+          ],
+          "subtaskIds": [
+            "DOC-001"
+          ]
+        },
+        {
+          "id": "QA-001",
+          "title": "checking",
+          "relation": "serial",
+          "dependencies": [
+            "FE-001",
+            "FE-002",
+            "FE-003",
+            "FE-004",
+            "FE-005",
+            "DOC-001"
+          ],
+          "subtaskIds": [
+            "QA-001"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "FE-001",
+        "title": "Replace sidebar CWD dropdown trigger with project-space switch button state",
+        "phase": "implementing",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Breaking selectedCwd initialization",
+          "Accidentally removing WorkTree context menu access"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "FE-002",
+        "title": "Build layered ProjectSpaceSwitchDialog UI",
+        "phase": "implementing",
+        "order": 2,
+        "dependsOn": [
+          "FE-001"
+        ],
+        "dependencies": [
+          "FE-001"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/ProjectSpaceSwitchDialog.tsx",
+          "components/SessionSidebar.tsx"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Dialog z-index conflicts",
+          "Search flattening the required hierarchy"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "FE-003",
+        "title": "Migrate add-project and Git clone flows into the dialog",
+        "phase": "implementing",
+        "order": 3,
+        "dependsOn": [
+          "FE-002"
+        ],
+        "dependencies": [
+          "FE-002"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/ProjectSpaceSwitchDialog.tsx",
+          "components/SessionSidebar.tsx"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Registration success not closing dialog",
+          "Git clone failure accidentally switching workspace"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "FE-004",
+        "title": "Wire selection side effects, WorkTree actions, and empty registry behavior",
+        "phase": "implementing",
+        "order": 4,
+        "dependsOn": [
+          "FE-002",
+          "FE-003"
+        ],
+        "dependencies": [
+          "FE-002",
+          "FE-003"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Race between selectedCwd and selected project effects",
+          "Empty registry opening blank dialog"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "FE-005",
+        "title": "Polish responsive, accessibility, and many-project display",
+        "phase": "implementing",
+        "order": 5,
+        "dependsOn": [
+          "FE-004"
+        ],
+        "dependencies": [
+          "FE-004"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/ProjectSpaceSwitchDialog.tsx",
+          "components/SessionSidebar.tsx",
+          "app/globals.css"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Focus trap complexity",
+          "Mobile/narrow viewport regressions"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "DOC-001",
+        "title": "Update frontend module documentation",
+        "phase": "implementing",
+        "order": 6,
+        "dependsOn": [
+          "FE-005"
+        ],
+        "dependencies": [
+          "FE-005"
+        ],
+        "relation": "parallel",
+        "files": [
+          "docs/modules/frontend.md"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Docs drifting from final implementation"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "QA-001",
+        "title": "Run validation and manual UI regression checks",
+        "phase": "checking",
+        "order": 7,
+        "dependsOn": [
+          "FE-001",
+          "FE-002",
+          "FE-003",
+          "FE-004",
+          "FE-005",
+          "DOC-001"
+        ],
+        "dependencies": [
+          "FE-001",
+          "FE-002",
+          "FE-003",
+          "FE-004",
+          "FE-005",
+          "DOC-001"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx",
+          "components/ProjectSpaceSwitchDialog.tsx",
+          "docs/modules/frontend.md"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "Manual checks from checks.md"
+        ],
+        "risks": [
+          "Manual data setup insufficient to reproduce many-project case"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-09T09:29:27.677Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 7,
+      "skipped": 0
+    },
+    "subtasks": {
+      "FE-001": {
+        "id": "FE-001",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:31:50.765Z",
+        "startedAt": "2026-07-09T08:26:12.121Z",
+        "finishedAt": "2026-07-09T08:31:50.762Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-a6a930310acba3d565415639"
+        ],
+        "lastRunId": "implementer-a6a930310acba3d565415639",
+        "claimedAt": "2026-07-09T08:26:12.121Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "---\n\n## Implementation Complete — FE-001\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Replaced the old CWD picker dropdown with a compact top switch button and modal placeholder state.\n\n### What Was Done\n\n1. **State changes:** Replaced `dropdownOpen` with `projectSwitchOpen` state. Removed `dropdownRef`. All 6 references to `setDropdownOpen` in callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`, `handleNewWorktree`, `openWorktreeAction`) updated to `setProjectSwitchOpen` or removed where no longer needed.\n\n2. **New switch button:** The sidebar header now shows a compact clickable button displaying `ProjectName / SpaceName` (e.g. `my-app / 主空间`). Falls back to `shortenCwd + homeDir` for legacy unassigned cwds, or `选择项目空间` when nothing is selected. Includes a chevron icon indicating it opens a dialog.\n\n3. **Right-click preserved:** Right-clicking the switch button when the current space is a WorkTree still opens the WorkTree context menu (archive/delete).\n\n4. **New/WorkTree/Refresh/workspace actions:** Fully preserved and unchanged.\n\n5. **Placeholder modal:** Opens via `setProjectSwitchOpen(true)` with `role=\"dialog\"`, `aria-modal=\"true\"`, `aria-label=\"切换项目空间\"`. Closes via backdrop click, X button, or Escape key. Content area shows a placeholder message with the active project count — FE-002 will fill in the full layered UI.\n\n6. **Form state preserved:** All add-project form state (`customPathOpen`, `gitAddOpen`, etc.), refs, and callbacks (`commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) remain in the component for FE-003 to wire into the dialog.\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **passes cleanly** (0 errors)\n- `npm run lint` — **0 errors**, 13 warnings (all expected: form state/callbacks/refs intentionally preserved for FE-003 migration, `formatWorktreeDetailTooltip` kept for future dialog use)\n\n### Notes / Risks\n\n- **Add-project forms temporarily inaccessible:** Between FE-001 and FE-003, users cannot add projects through the UI. This is expected per the phased implementation plan — the forms will be migrated into the dialog by FE-003.\n- **The switch button uses `displayProjectName` + `displaySpaceName`** for the visible label. The tooltip shows `formatProjectSpaceDetail` with full path, branch, WorkTree info.\n- **Modal z-index is 1100**, matching existing `ProjectMetadataDialog` and `worktreeAction` confirmation dialogs. No conflict risk with workspace menu (z-index 1000).\n- **WorkTree right-click** on the switch button is only active when `selectedWorktree` exists — same guard as the original code.\n- Ready for FE-002 to build the full layered project/space dialog content."
+      },
+      "FE-002": {
+        "id": "FE-002",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:36:10.342Z",
+        "startedAt": "2026-07-09T08:32:01.387Z",
+        "finishedAt": "2026-07-09T08:36:10.339Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-fb8f8802dfa7ade4ce45e64c"
+        ],
+        "lastRunId": "implementer-fb8f8802dfa7ade4ce45e64c",
+        "claimedAt": "2026-07-09T08:32:01.387Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "## Implementation Complete (FE-002)\n\n### Files Changed\n\n1. **`lib/project-display.ts`** — **NEW**. Extracted shared display helpers: `displayProjectName`, `displaySpaceName`, `activeProjectSpaces`, `sortProjectsForSidebar`, `worktreeInfoFromSpace`, `shortenCwd`.\n\n2. **`components/ProjectSpaceSwitchDialog.tsx`** — **NEW** (~719 lines). Full layered project/space switch dialog:\n   - **Left pane**: project list with search input, sorted (pinned first, then last-opened, then name), `★` pin badge, space-count badge, ellipsized paths, independent scroll\n   - **Right pane**: selected project header (name, rootPath), space cards with Main/WT badges, `✓` current marker, branch/base/path meta, `路径缺失` disabled state, Worktree mini-badge, independent scroll\n   - **Empty state**: onboarding message when zero projects (explains Project Registry sourcing, add-project buttons are disabled placeholders for FE-003)\n   - **Search**: filters projects by name/rootPath/space names/paths/branch; also filters right-pane spaces\n   - **Interaction**: click non-missing space → `onSelectSpace` + close; Esc/backdrop/close-button all work; keyboard handler built-in\n   - **Responsive**: `grid-template-columns` switches to single-column rows on ≤720px\n   - Follows existing CSS variables and HTML prototype patterns\n\n3. **`components/SessionSidebar.tsx`** — **MODIFIED**:\n   - Added imports from `lib/project-display` and `ProjectSpaceSwitchDialog`\n   - Removed duplicated local definitions of the extracted helpers\n   - Replaced the FE-001 placeholder modal body with `<ProjectSpaceSwitchDialog>` wired to `selectedProjectId`, `selectedSpaceId`, `homeDir`, `onSelectSpace` (sets project/space/cwd), and `onClose`\n   - Removed redundant local Escape handler (now handled by the dialog component)\n\n### Verification\n\n```bash\nnode_modules/.bin/tsc --noEmit  # ✅ 0 errors\nnpm run lint                     # ✅ 0 errors, 13 warnings (all expected: FE-003 wiring targets)\n```\n\nThe 13 lint warnings are for state/callbacks (`customPathOpen`, `gitAddOpen`, `commitCustomPath`, `handleDirectoryPicker`, `handleGitCloneSubmit`, etc.) that existed before and will be consumed when FE-003 wires the add-project forms into the dialog.\n\n### Notes / Risks\n\n- **Add-project buttons are disabled placeholders** in the dialog toolbar — wired in FE-003.\n- **The existing `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` is called directly** in `onSelectSpace`. The downstream session reload/Git info/AppShell effects already subscribe to these state changes via existing `useEffect` hooks in SessionSidebar. Full FE-004 side-effect verification is deferred to that subtask.\n- **`WorktreeBadge` is duplicated** in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx` — acceptable at FE-002 since they render in different contexts (sidebar vs. modal). Can be extracted to a shared component later if desired.\n- **Dialog z-index is 1100** — consistent with other modals (WorkTree action, metadata edit, archive confirmation). Should not conflict."
+      },
+      "FE-003": {
+        "id": "FE-003",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:42:16.933Z",
+        "startedAt": "2026-07-09T08:36:19.803Z",
+        "finishedAt": "2026-07-09T08:42:16.930Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-607fc52ac224e7667c65722a"
+        ],
+        "lastRunId": "implementer-607fc52ac224e7667c65722a",
+        "claimedAt": "2026-07-09T08:36:19.803Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "All changes verified. Let me provide the summary.\n\n---\n\n## Implementation Complete — FE-003\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Expanded `ProjectSpaceSwitchDialogProps` with 10 add-project form state fields, 6 value-change callbacks, 6 action callbacks, and `onResetAddForms`. Replaced placeholder disabled toolbar buttons with working buttons for \"Add project folder…\", \"Add path…\", \"From Git…\". Added inline mutually-exclusive form rendering for manual path input and Git clone (parent path picker + remote URL). Added `addFormKind` local state (`null | \"path\" | \"git\"`) with toggle logic. Added `handleDialogClose` that resets forms and closes; all three close paths (button, Esc, backdrop) now call it. Added `cloneActive` guard that disables close/Esc/backdrop during Git clone. Updated empty registry onboarding with fully functional add-project buttons + inline form rendering. Updated footer \"Use default directory\" button to be functional.\n\n- **`components/SessionSidebar.tsx`** — Removed `customPathOpen` and `gitAddOpen` state (form visibility now managed by dialog's `addFormKind`). Removed now-unused `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`, `customPathInputRef` refs. Updated `registerAndSelectProjectPath` to drop `setCustomPathOpen(false)`. Updated `resetGitAddForm` to drop `setGitAddOpen(false)`. Added `resetAllAddForms` callback. Updated `handleNewWorktree` to drop `setCustomPathOpen(false)`. Wired `ProjectSpaceSwitchDialog` with all form state props, value-change handlers, and action callbacks.\n\n### Key Design Decisions\n\n1. **Form visibility lives in the dialog** (`addFormKind` local state), not in SessionSidebar. Values/busy/errors remain in SessionSidebar and flow down as props. This prevents leaking dialog UI state into the sidebar.\n\n2. **Mutual exclusivity** between manual path and Git forms via `addFormKind` toggle — clicking one toggles it on, clicking the other switches; clicking the active one closes it.\n\n3. **Close guard**: `cloneActive` (derived from `gitCloneBusy`) blocks dialog close via all three paths (button disabled, Esc ignored, backdrop ignored), preventing half-updated state during Git clone.\n\n4. **Form reset on close**: `handleDialogClose` calls `onResetAddForms()` (clears customPath + git values/errors) then `onClose()` before unmounting.\n\n5. **Success flow preserved**: Existing callbacks (`registerAndSelectProjectPath`, `handleGitCloneSubmit`) already call `upsertProjectAndSelectMainSpace` + `setProjectSwitchOpen(false)`, so successful add/clone selects the new main space and closes the dialog. The dialog's `useEffect` on `open` resets `addFormKind` on next open.\n\n### Verification\n\n```bash\nnpm run lint        # PASS — 0 errors, 1 pre-existing warning (formatWorktreeDetailTooltip unused)\nnode_modules/.bin/tsc --noEmit  # PASS — 0 errors\n```\n\n### Notes / Risks\n\n1. **Pre-existing warning**: `formatWorktreeDetailTooltip` in SessionSidebar is unused (defined but removed from active use during FE-001/FE-002 refactor). Not related to FE-003.\n\n2. **`addBusy` covers `gitParentPickerBusy` too aggressively**: During Git parent directory pick, all add buttons are disabled. This matches the old behavior but could be refined in FE-005.\n\n3. **Empty-state inline forms share refs** with the left-pane forms (`customPathInputRef`, `gitParentPathInputRef`, `gitRemoteRepositoryInputRef`). Only one instance is mounted at a time (left-pane when projects exist, right-pane onboarding when empty), so there's no ref conflict.\n\n4. **Escape during directory picker**: The `handleDialogClose` guard only blocks on `cloneActive`, not during native directory picker dialog. The OS-level picker handles its own lifecycle. If the user cancels the picker, `directoryPickerBusy` clears, then Esc will close the dialog normally."
+      },
+      "FE-004": {
+        "id": "FE-004",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:46:22.088Z",
+        "startedAt": "2026-07-09T08:42:25.650Z",
+        "finishedAt": "2026-07-09T08:46:22.086Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-87645531913efb9068a40d52"
+        ],
+        "lastRunId": "implementer-87645531913efb9068a40d52",
+        "claimedAt": "2026-07-09T08:42:25.650Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "All edits are correct and verified. Here is the handoff for FE-004:\n\n---\n\n## Implementation Complete — FE-004\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — Two targeted edits:\n  1. Removed unused `formatWorktreeDetailTooltip` helper (lint warning)\n  2. Added `setWorktreeError(null)` to the `onSelectSpace` callback so WorkTree errors clear when switching spaces via the dialog\n\n### FE-004 Wiring Verification (by checklist item)\n\n| # | Requirement | Status | Notes |\n|---|------------|--------|-------|\n| 1 | Dialog space selection → `setSelectedProjectId`/`setSelectedSpaceId`/`setSelectedCwd` | ✅ | Already wired in `onSelectSpace` prop (line ~1537); now also clears `worktreeError`. |\n| 2 | Sessions reload on space switch | ✅ | `loadSessions` depends on `selectedProjectId`/`selectedSpaceId`/`projects`; re-fires on change. |\n| 2 | Git info reloads on cwd change | ✅ | Effect depends on `selectedCwd`; fetches `/api/git/info`. |\n| 2 | AppShell project context notified | ✅ | Effect calls `onProjectSpaceChange` when `selectedProjectId`/`selectedSpaceId` change. |\n| 2 | New session cwd follows selection | ✅ | `handleNewSession` uses `selectedCwd`. |\n| 2 | File explorer follows cwd | ✅ | `FileExplorer` receives `selectedCwdProp ?? selectedCwd`. |\n| 3 | WorkTree right-click menu reachable | ✅ | `onContextMenu` on switch button opens `worktreeContextMenu` (archive/delete). |\n| 3 | WorkTree creation preserves selection | ✅ | `handleNewWorktree` sets project/space/cwd + creates session. |\n| 3 | WorkTree archive/delete fallback selection | ✅ | `confirmWorktreeAction` handles fallback to main/active space. |\n| 4 | Zero-project → button opens onboarding modal | ✅ | Switch button says \"选择项目空间\"; dialog shows onboarding right pane. |\n| 4 | Zero-project → New/WorkTree disabled | ✅ | Both check `!selectedCwd`; titles say \"请先选择一个项目\". |\n| 5 | No session scanning for projects | ✅ | Projects come only from `/api/projects?sync=missing`. |\n\n### Verification\n\n```bash\n$ npm run lint\n# ✅ 0 errors, 0 warnings\n\n$ node_modules/.bin/tsc --noEmit\n# ✅ 0 errors\n```\n\n### Notes / Risks\n\n- **Stale form state on space selection**: When the user types in the add-path/Git form but then selects a space to switch, the dialog closes without calling `onResetAddForms`. The parent-level form values (`customPathValue`, `gitParentPathValue`, etc.) persist. On next dialog open, `addFormKind` resets to `null` (forms hidden), so stale values aren't visible — but they'll reappear if the user reactivates the same form. This is a minor UX consideration, not a functional regression. A follow-up could decide whether to reset forms on space selection or leave them \"sticky\".\n\n- **Clone-in-progress + space switch**: The dialog's `handleSelectSpace` doesn't guard against `cloneActive`. If a user clicks a space while a Git clone is in progress, the dialog closes and the space switches, but the clone continues in the background. On clone success, `upsertProjectAndSelectMainSpace` overrides the user's manual selection. The design doc notes this risk under FE-003. Not addressed here — scope is FE-004 only.\n\n- **All existing flows preserved**: WorkTree archive/delete confirm dialog, metadata editing dialog, archive-all, batch archive, session context menu, Trellis init prompt — all untouched and remain at `zIndex` levels compatible with the new modal (`zIndex: 1100`)."
+      },
+      "FE-005": {
+        "id": "FE-005",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:50:53.400Z",
+        "startedAt": "2026-07-09T08:46:30.320Z",
+        "finishedAt": "2026-07-09T08:50:53.397Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-06de9e8513c6a0cef45537b3"
+        ],
+        "lastRunId": "implementer-06de9e8513c6a0cef45537b3",
+        "claimedAt": "2026-07-09T08:46:30.320Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "All checks pass. Let me provide the handoff summary.\n\n---\n\n## FE-005 Implementation Complete\n\n### Files Changed\n\n- **`components/ProjectSpaceSwitchDialog.tsx`** — Focus management, keyboard accessibility, responsive polish\n  1. **Focus return**: Saved `document.activeElement` on open via a dedicated `useEffect`, restored on unmount (close) via its cleanup function — focus always returns to the trigger button regardless of close method (Esc, backdrop, close button, or space selection).\n  2. **Focus trap**: Merged into the existing keyboard handler — Tab/Shift+Tab now wraps within the dialog panel (covers header close button, body controls, and footer). If focus somehow escapes, it's also pulled back on the next Tab.\n  3. **Empty-state focus**: When `activeProjects.length === 0`, the dialog now focuses the first onboarding button (`Add project folder…`) instead of the (less useful) search input.\n  4. **Dialog ref**: Moved `dialogRef` from the body div to the panel div so the focus trap covers the close button and footer, not just the two-pane body.\n  5. **Removed inline `<style>`**: The responsive single-column fallback media query was moved out of the component into `app/globals.css`.\n\n- **`app/globals.css`** — Minimal responsive CSS addition\n  - Added `.project-switch-dialog-body` media query at `max-width: 720px` for single-column fallback (preserving the exact same rules previously in the inline `<style>` tag).\n\n### Verification\n\n| Check | Result |\n|---|---|\n| `npm run lint` | ✅ Pass |\n| `node_modules/.bin/tsc --noEmit` | ✅ Pass |\n\n### Feature Coverage per FE-005 Acceptance Criteria\n\n| Criterion | Status |\n|---|---|\n| Focus management (return to trigger on close) | ✅ — Cleanup in open effect restores `prevFocusRef` |\n| Esc close (safe during clone) | ✅ — Esc blocked during `cloneActive` |\n| Backdrop click close | ✅ — Blocked during `cloneActive` |\n| Focus trap (Tab/Shift+Tab within dialog) | ✅ — Includes header close button and footer |\n| Keyboard-friendly buttons | ✅ — All buttons are native `<button>`, forms respond to Enter/Esc |\n| Viewport-bounded max sizes | ✅ — Already present: `min(920px, 100vw-24px)` × `min(680px, 100vh-48px)` |\n| Responsive single-column fallback | ✅ — Moved to `globals.css`, same breakpoint and rules |\n| 50+ projects scroll/ellipsis | ✅ — Independent scroll areas, ellipsis + `title` on all long text |\n| Busy state close protection | ✅ — `cloneActive` blocks Esc, backdrop, close button; button shows tooltip |\n| `app/globals.css` minimal change | ✅ — Only the media query added |\n\n### Notes / Risks\n\n- **Focus trap with Shadow DOM**: The `querySelectorAll` approach works for all standard DOM elements. If future components use Shadow DOM inside the dialog, the focus trap won't find them — unlikely for this project's dialog.\n- **Narrow viewport (< 720px)**: The single-column fallback has been moved to globals.css and matches the prototype's intended behavior. With very small viewports (~320px), the form inputs may still feel cramped — this is acceptable per the \"首版\" scope.\n- **Clone busy + close**: When Git clone is active, all close paths are blocked and the close button shows an explanatory tooltip. If the user force-closes the tab/browser, this is out of scope.\n- **No SessionSidebar changes needed**: The trigger button and dialog wiring were already complete from FE-001–FE-004. The focus return uses `document.activeElement` capture, which is self-contained in the dialog."
+      },
+      "DOC-001": {
+        "id": "DOC-001",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:52:53.607Z",
+        "startedAt": "2026-07-09T08:51:02.749Z",
+        "finishedAt": "2026-07-09T08:52:53.603Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-63543934ec14766077dfd723"
+        ],
+        "lastRunId": "implementer-63543934ec14766077dfd723",
+        "claimedAt": "2026-07-09T08:51:02.749Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "Both `npm run lint` and `tsc --noEmit` pass cleanly with zero errors.\n\n---\n\n## Implementation Complete — DOC-001\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `SessionSidebar.tsx` entry to describe the new modal-based project/space switcher (replacing old inline dropdown) and added new `ProjectSpaceSwitchDialog.tsx` entry documenting the layered two-pane dialog, add-project forms, empty registry onboarding, keyboard/accessibility behavior, and component boundaries.\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run lint` | Passed, no errors |\n| `node_modules/.bin/tsc --noEmit` | Passed, no errors |\n\n### Notes / Risks\n\n- **None.** The documentation update is an additive, non-code change. It accurately reflects the FE-001 through FE-005 implementation as inspected in both `SessionSidebar.tsx` and `ProjectSpaceSwitchDialog.tsx`. The updated docs cover: modal-based switcher, empty registry onboarding, preserved add-project paths (folder/path/Git/default), WorkTree right-click context menu on switch button, keyboard/Esc/focus management, and the pure-UI-shell component contract between the sidebar and dialog."
+      },
+      "QA-001": {
+        "id": "QA-001",
+        "status": "done",
+        "updatedAt": "2026-07-09T08:56:55.349Z",
+        "startedAt": "2026-07-09T08:53:00.988Z",
+        "finishedAt": "2026-07-09T08:56:55.346Z",
+        "attempts": 1,
+        "runIds": [
+          "checker-be9bc11494e127140b9b8934"
+        ],
+        "lastRunId": "checker-be9bc11494e127140b9b8934",
+        "claimedAt": "2026-07-09T08:53:00.988Z",
+        "claimedByContextId": "pi_019f45ee-1306-72d5-8dc3-f4fbf459d88a",
+        "summary": "### Check Complete\n\n#### Findings Fixed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n已修复 1 个阻塞问题：\n- 弹窗内 `WorkTree` 空间行原先没有保留右键归档/删除入口；现已补回，右键会透传到现有 WorkTree context menu。\n- 顺手把“点击空间关闭弹窗”改为走统一关闭逻辑，关闭时会清理弹窗临时表单状态。\n\n#### Remaining Findings\n- None blocking.\n- 未做真实浏览器/OS 级手工操作，因此以下仅完成代码/静态核查，仍建议主会话补一次交互验收：50+ 项目滚动、目录选择器、Git clone 成功/失败、焦点恢复、窄窗口显示。\n\n#### Verification\n- `npm run lint` — pass (`EXIT:0`)\n- `node_modules/.bin/tsc --noEmit` — pass (`EXIT:0`)\n\n#### Static review notes\n- 旧 sidebar dropdown 已移除，顶部按钮改为打开 modal。\n- 弹窗保持“左项目 / 右空间”分层选择。\n- 搜索、独立滚动、长文本省略、empty registry onboarding、missing 禁用态、add path/folder/Git/default 入口均在代码中可见。\n- 选择空间仍走 `setSelectedProjectId` + `setSelectedSpaceId` + `setSelectedCwd`。\n- 未发现扫描 sessions 生成顶层项目的回退。\n- `docs/modules/frontend.md` 已同步到当前实现。\n\n#### Files changed\n- `components/ProjectSpaceSwitchDialog.tsx`\n- `components/SessionSidebar.tsx`\n- `docs/modules/frontend.md`\n\n#### Verdict\n- **Pass**（代码层/静态层）\n- 建议主会话补做一次实际 UI 手工验收后再结束 QA。"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-09T08:26:12.121Z",
+        "subtaskId": "FE-001",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-09T08:32:01.387Z",
+        "subtaskId": "FE-002",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-09T08:36:19.803Z",
+        "subtaskId": "FE-003",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-09T08:42:25.650Z",
+        "subtaskId": "FE-004",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-09T08:46:30.320Z",
+        "subtaskId": "FE-005",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-09T08:51:02.749Z",
+        "subtaskId": "DOC-001",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-09T08:53:00.988Z",
+        "subtaskId": "QA-001",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

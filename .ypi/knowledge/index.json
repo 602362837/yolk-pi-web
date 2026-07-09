@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-09T08:03:51.765Z",
+  "updatedAt": "2026-07-09T09:29:27.677Z",
   "entries": [
+    {
+      "id": "20260709-172927-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+      "title": "重构左侧项目切换为弹窗分层选择并优化多项目显示",
+      "taskId": "20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+      "taskKey": "archived:2026-07:20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+      "workflowId": "feature-dev",
+      "summary": "已完成左侧项目切换重构：用顶部切换按钮替代 sidebar 内旧 dropdown，并新增项目/空间分层弹窗。可复用结论：优先纯前端重构，不改 Project Registry/API/会话模型；弹窗采用左侧项目、右侧空间的层级选择，支持搜索、独立滚动、长文本省略、零项目 onboarding；新增项目的默认目录/文件夹/手动路径/Git clone 流程可迁入弹窗但继续复用 SessionSidebar 现有回调；WorkTree 右键入口需要在新弹窗里保留；验证至少覆盖 lint、tsc 与多项目/空状态/WorkTree/键盘焦点等手工场景。",
+      "tags": [
+        "feature-dev",
+        "ui",
+        "project-selector",
+        "knowledge",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260709-161121-重构左侧项目切换为弹窗分层选择并优化多项目显示",
+      "knowledgePath": ".ypi/knowledge/20260709-172927-重构左侧项目切换为弹窗分层选择并优化多项目显示.md",
+      "createdAt": "2026-07-09T09:29:27.677Z",
+      "archivedAt": "2026-07-09T09:29:27.677Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260709-160351-修复工作树归档后项目空间未同步清理",
       "title": "修复工作树归档后项目空间未同步清理",

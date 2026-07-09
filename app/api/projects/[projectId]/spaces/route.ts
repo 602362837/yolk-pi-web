@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listProjectSpaces, ProjectRegistryError } from "@/lib/project-registry";
+import { listProjectSpaces, ProjectRegistryError, reorderProjectSpaces } from "@/lib/project-registry";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,6 +19,23 @@ export async function GET(_request: Request, context: RouteContext) {
     const { projectId } = await context.params;
     const spaces = await listProjectSpaces(decodeURIComponent(projectId));
     return NextResponse.json({ spaces });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  try {
+    const { projectId } = await context.params;
+    const body = await request.json();
+    const { orderedSpaceIds } = body;
+
+    if (!Array.isArray(orderedSpaceIds)) {
+      return NextResponse.json({ error: "orderedSpaceIds must be an array" }, { status: 400 });
+    }
+
+    const result = await reorderProjectSpaces(decodeURIComponent(projectId), orderedSpaceIds);
+    return NextResponse.json({ project: result.project, spaces: result.spaces });
   } catch (error) {
     return errorResponse(error);
   }

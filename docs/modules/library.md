@@ -4,8 +4,9 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 
 | File | Purpose |
 | --- | --- |
-| `lib/project-registry-types.ts` | Shared Project Registry schema and wire types for projects, spaces, worktree metadata, and metadata patch payloads. WorkTree space metadata may include `branch`, `repoRoot`, `mainWorktreePath`, `mainWorktreeBranch`, optional creation-time `baseRef`, and `discoveredAt`. |
-| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, Git worktree space sync from `git worktree list --porcelain` (`syncProjectWorktreeSpaces`), creation-time WorkTree `baseRef` preservation when available, unified worktree space archive helper (`archiveWorktreeSpacesByPaths`) with multi-path-alias matching (`pathKey` primary, `displayPath`/`realPath` fallback), lightweight passive missing-only sync (`syncMissingWorktreeSpaces`) for detecting filesystem-removed worktree spaces, and legacy `markWorktreeSpaceArchivedByPath` (now delegates to `archiveWorktreeSpacesByPaths`). |
+| `lib/project-registry-types.ts` | Shared Project Registry schema and wire types for projects, spaces, worktree metadata, and metadata patch payloads. `PiWebProjectSpaceRecord` includes optional `sortOrder?: number` for persisted user-defined non-main space ordering (smaller values sort earlier; `main` ignores this field). WorkTree space metadata may include `branch`, `repoRoot`, `mainWorktreePath`, `mainWorktreeBranch`, optional creation-time `baseRef`, and `discoveredAt`. |
+| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, `computeNextSortOrder(project)` helper for new-space sort-order assignment using interval stepping (max + 1024), Git worktree space sync from `git worktree list --porcelain` (`syncProjectWorktreeSpaces`) with new-space `sortOrder` auto-assignment and existing-space `sortOrder` preservation, creation-time WorkTree `baseRef` preservation when available, unified worktree space archive helper (`archiveWorktreeSpacesByPaths`) with multi-path-alias matching (`pathKey` primary, `displayPath`/`realPath` fallback), lightweight passive missing-only sync (`syncMissingWorktreeSpaces`) for detecting filesystem-removed worktree spaces, legacy `markWorktreeSpaceArchivedByPath` (now delegates to `archiveWorktreeSpacesByPaths`), and `reorderProjectSpaces(projectId, orderedSpaceIds)` for batch-reordering non-main spaces with validation (rejects main/unknown/archived/duplicate/cross-project ids, appends non-payload active spaces to the end, writes interval-based `sortOrder` values at 1024 steps). |
+| `lib/project-display.ts` | Project/space display-name helpers (`displayProjectName`, `displaySpaceName`), `activeProjectSpaces()` sorting (main always first, non-main by `sortOrder` ascending with `createdAt` fallback for legacy spaces — `pinned` no longer affects space ordering), `sortProjectsForSidebar()` (pinned-first, then lastOpenedAt/updatedAt, then name), and `worktreeInfoFromSpace()` / `shortenCwd()` helpers. |
 | `lib/project-session-index.ts` | Best-effort `~/.pi/agent/pi-web-session-index.json` maintenance for new/forked sessions linked to project spaces; session headers remain the source of truth. |
 | `lib/session-project-link.ts` | Helpers for reading/writing optional `projectId`/`spaceId` on session headers, deriving `legacyUnassigned`, and canonical path matching for legacy exact-cwd display. |
 | `lib/rpc-manager.ts` | `AgentSessionWrapper`, global registry, `startRpcSession()`, cwd-scoped session cleanup, lifecycle handling, built-in YPI Studio extension factory injection for web-created AgentSessions, Studio child terminal continuation prompts, idle-timeout extension while Studio children are active, and ChatGPT account failover retry hook wiring. |
@@ -87,6 +88,14 @@ Lightweight passive missing-only sync for worktree spaces whose directories no l
 - `options.projectId`: Optional single-project scope.
 - `options.reason`: Audit label (default `"passive_missing"`).
 - Returns `{ archivedSpaces, unmatchedPaths }`.
+
+### `reorderProjectSpaces(projectId, orderedSpaceIds)`
+
+Batch-reorder non-main spaces for a single project. Validates that `orderedSpaceIds` is a string array; rejects `main`, unknown, archived, duplicate, or cross-project ids. Active non-main spaces missing from the payload are appended to the end while preserving their relative effective order. Writes clean interval-based `sortOrder` values (1024, 2048, …) to support future local insertions. Returns the updated project and all active spaces.
+
+- `projectId`: The project owning the spaces.
+- `orderedSpaceIds`: Desired order of active non-main space ids (first → last).
+- Returns `{ project: PiWebProjectRecord; spaces: PiWebProjectSpaceRecord[] }`.
 
 ### `markWorktreeSpaceArchivedByPath(worktreePath)`
 

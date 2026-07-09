@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { TrellisSetupStatus } from "@/lib/trellis-setup-types";
 import type { GitInfo, SessionInfo, WorktreeInfo } from "@/lib/types";
 import type { PiWebProjectRecord, PiWebProjectSpaceRecord } from "@/lib/project-registry-types";
+import { displayProjectName, displaySpaceName, activeProjectSpaces, sortProjectsForSidebar, worktreeInfoFromSpace, shortenCwd } from "@/lib/project-display";
 import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
 import { displayTitleForSession } from "@/lib/session-title";
 import { Checkbox } from "./Checkbox";
 import { FileExplorer } from "./FileExplorer";
+import { ProjectSpaceSwitchDialog } from "./ProjectSpaceSwitchDialog";
 
 export interface ProjectSpaceSelectionContext {
   projectId: string;
@@ -50,14 +52,6 @@ function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-function shortenCwd(cwd: string, homeDir?: string): string {
-  const path = (homeDir && cwd.startsWith(homeDir)) ? "~" + cwd.slice(homeDir.length) : cwd;
-  const sep = path.includes("/") ? "/" : "\\";
-  const parts = path.split(sep).filter(Boolean);
-  if (parts.length <= 2) return path;
-  return "…/" + parts.slice(-2).join(sep);
-}
-
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -92,14 +86,6 @@ function formatWorktreeTooltip(worktree: WorktreeInfo): string {
   const branch = worktree.branch || "未知分支";
   const base = resolveWorktreeBase(worktree) || "未知";
   return `WorkTree：${branch} / 基准：${base}`;
-}
-
-function formatWorktreeDetailTooltip(worktree: WorktreeInfo, path?: string): string {
-  return [
-    path,
-    formatWorktreeTooltip(worktree),
-    "右键点击查看更多 WorkTree 操作",
-  ].filter(Boolean).join("\n");
 }
 
 function WorktreeBadge({ worktree }: { worktree?: WorktreeInfo }) {
@@ -195,78 +181,11 @@ interface SessionTreeNode {
   children: SessionTreeNode[];
 }
 
-function WorkspaceHeaderLine({
-  text,
-  detail,
-  strong = false,
-}: {
-  text: string;
-  detail: string;
-  strong?: boolean;
-}) {
-  const [showTooltip, setShowTooltip] = useState(false);
-  return (
-    <div
-      style={{ position: "relative", minWidth: 0 }}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      <div
-        tabIndex={0}
-        onFocus={() => setShowTooltip(true)}
-        onBlur={() => setShowTooltip(false)}
-        title={detail}
-        style={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          color: strong ? "var(--text)" : "var(--text-dim)",
-          fontSize: strong ? 13 : 11,
-          fontWeight: strong ? 800 : 400,
-          lineHeight: 1.25,
-          letterSpacing: strong ? "-0.02em" : undefined,
-          outline: "none",
-        }}
-      >
-        {text}
-      </div>
-      {showTooltip && (
-        <div
-          role="tooltip"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            zIndex: 150,
-            maxWidth: 280,
-            padding: "5px 7px",
-            borderRadius: 6,
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
-            boxShadow: "0 6px 18px rgba(0,0,0,0.14)",
-            color: "var(--text)",
-            fontSize: 11,
-            lineHeight: 1.35,
-            overflowWrap: "anywhere",
-            whiteSpace: "pre-line",
-            pointerEvents: "none",
-          }}
-        >
-          {detail}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function displayProjectName(project: PiWebProjectRecord): string {
-  return project.displayName?.trim() || project.rootPath.split(/[\\/]+/).filter(Boolean).pop() || project.rootPath;
-}
-
-function displaySpaceName(space: PiWebProjectSpaceRecord): string {
-  if (space.displayName?.trim()) return space.displayName.trim();
-  if (space.kind === "main") return "主空间";
-  return space.worktree?.branch || space.path.split(/[\\/]+/).filter(Boolean).pop() || space.path;
+interface ProjectSpaceContextMenuState {
+  x: number;
+  y: number;
+  project: PiWebProjectRecord;
+  space?: PiWebProjectSpaceRecord;
 }
 
 function formatUnknownGitBranch(): string {
@@ -311,41 +230,6 @@ function formatProjectSpaceDetail(space: PiWebProjectSpaceRecord, git: GitInfo |
   const shortPath = shortenCwd(space.path, homeDir);
   if (shortPath !== space.path) lines.push(`短路径：${shortPath}`);
   return lines.join("\n");
-}
-
-function activeProjectSpaces(project: PiWebProjectRecord): PiWebProjectSpaceRecord[] {
-  return Object.values(project.spaces)
-    .filter((space) => !space.archived)
-    .sort((a, b) => {
-      if (a.id === "main") return -1;
-      if (b.id === "main") return 1;
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return displaySpaceName(a).localeCompare(displaySpaceName(b));
-    });
-}
-
-function sortProjectsForSidebar(projects: PiWebProjectRecord[]): PiWebProjectRecord[] {
-  return projects
-    .filter((project) => !project.archived)
-    .sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      const aTime = a.lastOpenedAt ?? a.updatedAt;
-      const bTime = b.lastOpenedAt ?? b.updatedAt;
-      const timeCompare = bTime.localeCompare(aTime);
-      return timeCompare || displayProjectName(a).localeCompare(displayProjectName(b));
-    });
-}
-
-function worktreeInfoFromSpace(space: PiWebProjectSpaceRecord): WorktreeInfo | undefined {
-  if (space.kind !== "worktree") return undefined;
-  return {
-    isWorktree: true,
-    branch: space.worktree?.branch,
-    repoRoot: space.worktree?.repoRoot,
-    mainWorktreePath: space.worktree?.mainWorktreePath,
-    mainWorktreeBranch: space.worktree?.mainWorktreeBranch,
-    baseRef: space.worktree?.baseRef,
-  };
 }
 
 function findProjectSpace(projects: PiWebProjectRecord[], projectId: string | null, spaceId: string | null): { project: PiWebProjectRecord; space: PiWebProjectSpaceRecord } | null {
@@ -458,23 +342,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [error, setError] = useState<string | null>(null);
   const [selectedCwd, setSelectedCwd] = useState<string | null>(null);
   const [homeDir, setHomeDir] = useState<string>("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [customPathOpen, setCustomPathOpen] = useState(false);
+  const [projectSwitchOpen, setProjectSwitchOpen] = useState(false);
   const [customPathValue, setCustomPathValue] = useState("");
   const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [customPathValidating, setCustomPathValidating] = useState(false);
   const [directoryPickerBusy, setDirectoryPickerBusy] = useState(false);
-  // Git add-project form state (FE-002). API wiring is handled in FE-003/API-001/API-002.
-  const [gitAddOpen, setGitAddOpen] = useState(false);
+  // Git add-project form state — toggled/rendered inside ProjectSpaceSwitchDialog.
   const [gitParentPathValue, setGitParentPathValue] = useState("");
   const [gitRemoteRepositoryValue, setGitRemoteRepositoryValue] = useState("");
   const [gitAddError, setGitAddError] = useState<string | null>(null);
   const [gitParentPickerBusy, setGitParentPickerBusy] = useState(false);
   const [gitCloneBusy, setGitCloneBusy] = useState(false);
-  const gitParentPathInputRef = useRef<HTMLInputElement>(null);
-  const gitRemoteRepositoryInputRef = useRef<HTMLInputElement>(null);
-  const customPathInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const [selectedForArchive, setSelectedForArchive] = useState<Set<string>>(new Set());
@@ -496,6 +374,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [metadataBusy, setMetadataBusy] = useState(false);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [worktreeAction, setWorktreeAction] = useState<WorktreeActionState | null>(null);
+  const [projectSpaceContextMenu, setProjectSpaceContextMenu] = useState<ProjectSpaceContextMenuState | null>(null);
   const [removedWorktreeCwds, setRemovedWorktreeCwds] = useState<string[]>([]);
   const [selectedCwdGit, setSelectedCwdGit] = useState<GitInfo | undefined>(undefined);
   const [archivedCounts, setArchivedCounts] = useState<Record<string, number>>({});
@@ -869,10 +748,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
     upsertProjectAndSelectMainSpace(data.project);
-    setCustomPathOpen(false);
     setCustomPathValue("");
     setCustomPathError(null);
-    setDropdownOpen(false);
+    setProjectSwitchOpen(false);
   }, [upsertProjectAndSelectMainSpace]);
 
   const commitCustomPath = useCallback(async () => {
@@ -924,13 +802,20 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   // Clear all Git add-form temporary state (inputs, errors, busy flags).
   const resetGitAddForm = useCallback(() => {
-    setGitAddOpen(false);
     setGitParentPathValue("");
     setGitRemoteRepositoryValue("");
     setGitAddError(null);
     setGitParentPickerBusy(false);
     setGitCloneBusy(false);
   }, []);
+
+  // Reset all add-form state (called by dialog on close/cancel).
+  const resetAllAddForms = useCallback(() => {
+    setCustomPathValue("");
+    setCustomPathError(null);
+    setCustomPathValidating(false);
+    resetGitAddForm();
+  }, [resetGitAddForm]);
 
   // Git parent directory picker: calls the shared directory picker with
   // purpose "git-parent" and ONLY backfills the Local parent path input. It must
@@ -1000,7 +885,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         return;
       }
       upsertProjectAndSelectMainSpace(data.project);
-      setDropdownOpen(false);
+      setProjectSwitchOpen(false);
       resetGitAddForm();
     } catch (e) {
       setGitAddError(e instanceof Error ? e.message : String(e));
@@ -1016,23 +901,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     resetGitAddForm,
   ]);
 
-  // Close dropdown/context menu on outside click
+  // Close context menus on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = () => {
       setWorktreeContextMenu(null);
       setSessionContextMenu(null);
-      if (workspaceMenuRef.current && workspaceMenuRef.current.contains(e.target as Node)) return;
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-        setCustomPathOpen(false);
-        setCustomPathValue("");
-        setCustomPathError(null);
-        resetGitAddForm();
-      }
+      setProjectSpaceContextMenu(null);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [resetGitAddForm]);
+  }, []);
 
   const handleNewSession = useCallback(() => {
     if (!selectedCwd) return;
@@ -1073,8 +951,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         setSelectedSpaceId(linkedSpaceId);
       }
       setSelectedCwd(data.cwd);
-      setDropdownOpen(false);
-      setCustomPathOpen(false);
+      setProjectSwitchOpen(false);
       setCustomPathValue("");
       setCustomPathError(null);
       onNewSession?.(makeTempSessionId(), data.cwd, linkedProjectId, linkedSpaceId);
@@ -1088,8 +965,89 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   const openWorktreeAction = useCallback((kind: "delete" | "archive", cwd: string, worktree: WorktreeInfo) => {
     setWorktreeContextMenu(null);
-    setDropdownOpen(false);
     setWorktreeAction({ kind, cwd, worktree, force: false, busy: false, error: null });
+  }, []);
+
+  const handleDialogProjectContextMenu = useCallback((event: React.MouseEvent, project: PiWebProjectRecord) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setProjectSpaceContextMenu({ x: event.clientX, y: event.clientY, project });
+  }, []);
+
+  const handleDialogSpaceContextMenu = useCallback((event: React.MouseEvent, project: PiWebProjectRecord, space: PiWebProjectSpaceRecord) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setProjectSpaceContextMenu({ x: event.clientX, y: event.clientY, project, space });
+  }, []);
+
+  // Rollback snapshot for drag-reorder optimistic updates
+  const projectsBeforeReorder = useRef<PiWebProjectRecord[] | null>(null);
+
+  const handleReorderProjects = useCallback(async (orderedProjectIds: string[]) => {
+    setProjects((prev) => {
+      projectsBeforeReorder.current = prev;
+      return prev.map((project, index) => {
+        const nextIndex = orderedProjectIds.indexOf(project.id);
+        return nextIndex >= 0
+          ? { ...project, sortOrder: (nextIndex + 1) * 1024, updatedAt: new Date().toISOString() }
+          : { ...project, sortOrder: (orderedProjectIds.length + index + 1) * 1024, updatedAt: new Date().toISOString() };
+      });
+    });
+
+    try {
+      const res = await fetch(`/api/projects`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedProjectIds }),
+      });
+      const data = await res.json().catch(() => ({})) as { projects?: PiWebProjectRecord[]; error?: string };
+      if (!res.ok || data.error || !data.projects) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setProjects(data.projects);
+      projectsBeforeReorder.current = null;
+    } catch {
+      if (projectsBeforeReorder.current) {
+        setProjects(projectsBeforeReorder.current);
+        projectsBeforeReorder.current = null;
+      }
+    }
+  }, []);
+
+  const handleReorderSpaces = useCallback(async (projectId: string, orderedSpaceIds: string[]) => {
+    // Optimistically update local state with temporary sortOrders
+    setProjects((prev) => {
+      projectsBeforeReorder.current = prev;
+      return prev.map((p) => {
+        if (p.id !== projectId) return p;
+        const updatedSpaces = { ...p.spaces };
+        orderedSpaceIds.forEach((id, i) => {
+          if (updatedSpaces[id]) {
+            updatedSpaces[id] = { ...updatedSpaces[id], sortOrder: (i + 1) * 1024 };
+          }
+        });
+        return { ...p, spaces: updatedSpaces, updatedAt: new Date().toISOString() };
+      });
+    });
+
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/spaces`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedSpaceIds }),
+      });
+      const data = await res.json().catch(() => ({})) as { project?: PiWebProjectRecord; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      // Apply authoritative server response so sortOrder values converge
+      if (data.project) {
+        setProjects((prev) => prev.map((p) => (p.id === data.project!.id ? data.project! : p)));
+      }
+      projectsBeforeReorder.current = null;
+    } catch {
+      // Rollback to pre-drag state on failure
+      if (projectsBeforeReorder.current) {
+        setProjects(projectsBeforeReorder.current);
+        projectsBeforeReorder.current = null;
+      }
+    }
   }, []);
 
   const patchProjectMetadata = useCallback(async (projectId: string, patch: Record<string, unknown>) => {
@@ -1290,11 +1248,94 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           flexShrink: 0,
         }}
       >
-        <div style={{ marginBottom: 10, minWidth: 0 }}>
-          <WorkspaceHeaderLine text={workspaceTitle} detail={workspaceTitleDetail} strong />
-          <div style={{ marginTop: 2 }}>
-            <WorkspaceHeaderLine text={workspaceSubtitle} detail={workspaceSubtitleDetail} />
-          </div>
+        {/* Project-space switch button */}
+        <div style={{ position: "relative", marginBottom: 10 }}>
+          <button
+            onClick={() => setProjectSwitchOpen(true)}
+            onContextMenu={(e) => {
+              const worktree = selectedWorktree;
+              if (!selectedCwd || !worktree) return;
+              e.preventDefault();
+              e.stopPropagation();
+              setWorktreeContextMenu({ x: e.clientX, y: e.clientY, cwd: selectedCwd, worktree });
+            }}
+            style={{
+              width: "100%",
+              border: "1px solid var(--border)",
+              background: selectedCwd ? "var(--bg)" : "var(--bg-hover)",
+              borderRadius: 7,
+              padding: "6px 10px",
+              cursor: "pointer",
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              color: "var(--text)",
+              transition: "border-color 0.15s, background 0.15s",
+            }}
+            title={selectedProjectSpace
+              ? `${workspaceTitleDetail}\n${workspaceSubtitleDetail}`
+              : selectedCwd ?? undefined}
+          >
+            <span
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                background: "var(--accent)",
+                color: "#fff",
+                display: "grid",
+                placeItems: "center",
+                flex: "0 0 auto",
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              ⌘
+            </span>
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  color: selectedCwd ? "var(--text)" : "var(--text-dim)",
+                }}
+              >
+                {selectedProjectSpace ? workspaceTitle : (selectedCwd ? shortenCwd(selectedCwd, homeDir) : "切换项目空间")}
+              </span>
+              <span
+                style={{
+                  display: "block",
+                  marginTop: 1,
+                  fontSize: 10,
+                  color: "var(--text-muted)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {selectedProjectSpace ? workspaceSubtitle : (selectedCwd ? shortenCwd(selectedCwd, homeDir) : "选择项目后即可在这里切换空间")}
+              </span>
+            </span>
+            <WorktreeBadge worktree={selectedWorktree} />
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              stroke="var(--text-dim)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0 }}
+            >
+              <polyline points="2 3.5 5 6.5 8 3.5" />
+            </svg>
+          </button>
         </div>
         <div className="session-sidebar-actions" style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             <button
@@ -1467,10 +1508,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                             编辑空间元数据…
                           </WorkspaceMenuButton>
                           <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchProjectMetadata(selectedProjectSpace.project.id, { pinned: !selectedProjectSpace.project.pinned }); }}>
-                            {selectedProjectSpace.project.pinned ? "取消置顶项目" : "置顶项目"}
+                            {selectedProjectSpace.project.pinned ? "取消星标项目" : "星标项目"}
                           </WorkspaceMenuButton>
                           <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { pinned: !selectedProjectSpace.space.pinned }); }}>
-                            {selectedProjectSpace.space.pinned ? "取消置顶空间" : "置顶空间"}
+                            {selectedProjectSpace.space.pinned ? "取消星标空间" : "星标空间"}
                           </WorkspaceMenuButton>
                         </>
                       )}
@@ -1514,528 +1555,44 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           </div>
         )}
 
-        {/* CWD picker */}
-        <div ref={dropdownRef} style={{ position: "relative" }}>
-          <button
-            onClick={() => setDropdownOpen((v) => !v)}
-            onContextMenu={(e) => {
-              const worktree = selectedWorktree;
-              if (!selectedCwd || !worktree) return;
-              e.preventDefault();
-              e.stopPropagation();
-              setWorktreeContextMenu({ x: e.clientX, y: e.clientY, cwd: selectedCwd, worktree });
-            }}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              padding: "6px 10px",
-              background: selectedCwd ? "var(--bg-hover)" : "rgba(37,99,235,0.06)",
-              border: selectedCwd ? "1px solid var(--border)" : "1px solid rgba(37,99,235,0.4)",
-              borderRadius: 7,
-              cursor: "pointer",
-              fontSize: 12,
-              color: "var(--text)",
-              textAlign: "left",
-              transition: "border-color 0.15s, background 0.15s",
-            }}
-          >
-            <span
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: selectedCwd ? "var(--text)" : "var(--text-dim)",
-              }}
-              title={selectedWorktree ? formatWorktreeDetailTooltip(selectedWorktree, selectedCwd ?? undefined) : selectedCwd ?? ""}
-            >
-              {selectedCwd ? shortenCwd(selectedCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : "Select project…")}
-            </span>
-            <WorktreeBadge worktree={selectedWorktree} />
-          </button>
-
-          {dropdownOpen && (
-            <div
-              className="session-sidebar-cwd-menu"
-              style={{
-                position: "absolute",
-                top: "calc(100% + 4px)",
-                left: 0,
-                right: 0,
-                zIndex: 100,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 6px 20px rgba(0,0,0,0.10)",
-                overflow: "hidden",
-              }}
-            >
-              {activeProjects.length === 0 && !customPathOpen && !gitAddOpen && (
-                <div style={{ padding: "10px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>
-                  尚未注册项目。请用下方 “Add project path…” 或 “Add project from Git…” 添加项目；历史 sessions 不会被扫描生成项目。
-                </div>
-              )}
-              {activeProjects.map((project) => (
-                <div key={project.id}>
-                  <div style={{ padding: "8px 10px 5px", color: "var(--text)", fontSize: 11, fontWeight: 800, borderTop: "1px solid var(--border)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={project.rootPath}>
-                    {project.pinned ? "★ " : ""}{displayProjectName(project)}
-                  </div>
-                  {activeProjectSpaces(project).map((space) => {
-                    const selected = project.id === selectedProjectId && space.id === selectedSpaceId;
-                    const worktree = worktreeInfoFromSpace(space);
-                    return (
-                      <button
-                        key={`${project.id}:${space.id}`}
-                        onClick={() => {
-                          if (space.missing) return;
-                          setSelectedProjectId(project.id);
-                          setSelectedSpaceId(space.id);
-                          setSelectedCwd(space.path);
-                          setWorktreeError(null);
-                          setCustomPathOpen(false);
-                          setCustomPathValue("");
-                          setCustomPathError(null);
-                          resetGitAddForm();
-                          setDropdownOpen(false);
-                        }}
-                        onContextMenu={(e) => {
-                          if (!worktree) return;
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setWorktreeContextMenu({ x: e.clientX, y: e.clientY, cwd: space.path, worktree });
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 7,
-                          width: "100%",
-                          padding: space.kind === "worktree" ? "7px 10px 7px 28px" : "7px 10px 7px 18px",
-                          background: selected ? "var(--bg-selected)" : space.kind === "worktree" ? "var(--bg-subtle)" : "none",
-                          border: "none",
-                          color: selected ? "var(--text)" : "var(--text-muted)",
-                          cursor: space.missing ? "not-allowed" : "pointer",
-                          opacity: space.missing ? 0.55 : 1,
-                          textAlign: "left",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={worktree ? formatWorktreeDetailTooltip(worktree, space.path) : space.path}
-                      >
-                        {selected ? (
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                          </svg>
-                        ) : (
-                          <span style={{ width: 10, flexShrink: 0 }} />
-                        )}
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {displaySpaceName(space)}
-                          {space.missing && <span style={{ color: "var(--text-dim)", marginLeft: 5 }}>(missing)</span>}
-                        </span>
-                        <WorktreeBadge worktree={worktree} />
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-
-              {/* Default cwd shortcut */}
-              {!customPathOpen && !gitAddOpen && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDefaultCwd(); }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "none",
-                    border: "none",
-                    borderTop: activeProjects.length > 0 ? "1px solid var(--border)" : "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 11,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-                  </svg>
-                  <span>Use default directory</span>
-                </button>
-              )}
-
-              {/* Directory picker shortcut */}
-              {!customPathOpen && !gitAddOpen && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); void handleDirectoryPicker(); }}
-                  disabled={directoryPickerBusy}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: directoryPickerBusy ? "wait" : "pointer",
-                    opacity: directoryPickerBusy ? 0.65 : 1,
-                    textAlign: "left",
-                    fontSize: 11,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-                    <path d="M5 5.5h2.5" />
-                  </svg>
-                  <span>{directoryPickerBusy ? "Waiting for folder selection…" : "Add project folder…"}</span>
-                </button>
-              )}
-
-              {!customPathOpen && !gitAddOpen && customPathError && (
-                <div style={{ padding: "0 10px 7px", color: "#dc2626", fontSize: 11, lineHeight: 1.35, overflowWrap: "anywhere" }}>
-                  {customPathError}
-                </div>
-              )}
-
-              {/* Custom path entry (mutually exclusive with the Git add form) */}
-              {!customPathOpen && !gitAddOpen ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Mutex: ensure Git form is closed before opening the manual path form.
-                    resetGitAddForm();
-                    setCustomPathOpen(true);
-                    setCustomPathError(null);
-                    setTimeout(() => customPathInputRef.current?.focus(), 0);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 11,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" style={{ flexShrink: 0 }}>
-                    <line x1="5" y1="1" x2="5" y2="9" />
-                    <line x1="1" y1="5" x2="9" y2="5" />
-                  </svg>
-                  <span>Add project path…</span>
-                </button>
-              ) : (
-                <div style={{ padding: "6px 8px", borderTop: activeProjects.length > 0 ? "none" : undefined }}>
-                  <input
-                    ref={customPathInputRef}
-                    value={customPathValue}
-                    onChange={(e) => {
-                      setCustomPathValue(e.target.value);
-                      setCustomPathError(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void commitCustomPath();
-                      }
-                      if (e.key === "Escape") {
-                        setCustomPathOpen(false);
-                        setCustomPathValue("");
-                        setCustomPathError(null);
-                      }
-                    }}
-                    placeholder="/path/to/project"
-                    style={{
-                      width: "100%",
-                      fontSize: 11,
-                      fontFamily: "var(--font-mono)",
-                      padding: "5px 8px",
-                      border: "1px solid var(--accent)",
-                      borderRadius: 5,
-                      outline: "none",
-                      background: "var(--bg)",
-                      color: "var(--text)",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                  {customPathError && (
-                    <div style={{
-                      marginTop: 5,
-                      color: "#dc2626",
-                      fontSize: 11,
-                      lineHeight: 1.35,
-                      overflowWrap: "anywhere",
-                    }}>
-                      {customPathError}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-                    <button
-                      onClick={() => void commitCustomPath()}
-                      disabled={customPathValidating || !customPathValue.trim()}
-                      style={{
-                        flex: 1,
-                        padding: "4px 0",
-                        background: "var(--accent)",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: customPathValidating || !customPathValue.trim() ? "not-allowed" : "pointer",
-                        opacity: customPathValidating || !customPathValue.trim() ? 0.65 : 1,
-                      }}
-                    >
-                      {customPathValidating ? "Checking…" : "Add"}
-                    </button>
-                    <button
-                      onClick={() => { setCustomPathOpen(false); setCustomPathValue(""); setCustomPathError(null); }}
-                      style={{
-                        flex: 1,
-                        padding: "4px 0",
-                        background: "var(--bg-hover)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 5,
-                        color: "var(--text-muted)",
-                        fontSize: 11,
-                        cursor: "pointer",
-                      }}
-                    >
-                      取消
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Git add-project entry (mutually exclusive with the manual path form) */}
-              {!customPathOpen && !gitAddOpen && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Mutex: close the manual path form before opening the Git form.
-                    setCustomPathOpen(false);
-                    setCustomPathValue("");
-                    setCustomPathError(null);
-                    setGitAddOpen(true);
-                    setGitAddError(null);
-                    setTimeout(() => gitParentPathInputRef.current?.focus(), 0);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 7,
-                    width: "100%",
-                    padding: "8px 10px",
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 11,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <circle cx="12" cy="18" r="3" />
-                    <circle cx="6" cy="6" r="3" />
-                    <circle cx="18" cy="6" r="3" />
-                    <path d="M18 9V6H6v3" />
-                    <path d="M12 6v9" />
-                  </svg>
-                  <span>Add project from Git…</span>
-                </button>
-              )}
-
-              {/* Git add-project form (expanded panel) */}
-              {gitAddOpen && (
-                <div style={{ padding: "8px 8px", borderTop: activeProjects.length > 0 ? "1px solid var(--border)" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, color: "var(--text)", fontSize: 11, fontWeight: 700 }}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <circle cx="12" cy="18" r="3" />
-                      <circle cx="6" cy="6" r="3" />
-                      <circle cx="18" cy="6" r="3" />
-                      <path d="M18 9V6H6v3" />
-                      <path d="M12 6v9" />
-                    </svg>
-                    <span>Add project from Git</span>
-                  </div>
-
-                  {/* Local parent path */}
-                  <label htmlFor="git-parent-path-input" style={{ display: "block", color: "var(--text-muted)", fontSize: 10, fontWeight: 600, marginBottom: 3 }}>
-                    Local parent path
-                  </label>
-                  <div style={{ display: "flex", gap: 5, marginBottom: 4 }}>
-                    <input
-                      id="git-parent-path-input"
-                      ref={gitParentPathInputRef}
-                      type="text"
-                      value={gitParentPathValue}
-                      disabled={gitCloneBusy || gitParentPickerBusy}
-                      onChange={(e) => {
-                        setGitParentPathValue(e.target.value);
-                        setGitAddError(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void handleGitCloneSubmit();
-                        }
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          resetGitAddForm();
-                        }
-                      }}
-                      placeholder="e.g. /Users/demo/GitProjects"
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        padding: "5px 8px",
-                        border: "1px solid var(--border)",
-                        borderRadius: 5,
-                        outline: "none",
-                        background: "var(--bg)",
-                        color: "var(--text)",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); void handleGitParentDirectoryPicker(); }}
-                      disabled={gitCloneBusy || gitParentPickerBusy}
-                      title="Select parent directory"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        width: 28,
-                        height: 28,
-                        padding: 0,
-                        background: "var(--bg-hover)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 5,
-                        color: "var(--text-muted)",
-                        cursor: gitCloneBusy || gitParentPickerBusy ? "wait" : "pointer",
-                        opacity: gitCloneBusy || gitParentPickerBusy ? 0.65 : 1,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
-                        <path d="M5 5.5h2.5" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* Remote repository */}
-                  <label htmlFor="git-remote-input" style={{ display: "block", color: "var(--text-muted)", fontSize: 10, fontWeight: 600, marginBottom: 3, marginTop: 6 }}>
-                    Remote repository
-                  </label>
-                  <input
-                    id="git-remote-input"
-                    ref={gitRemoteRepositoryInputRef}
-                    type="text"
-                    value={gitRemoteRepositoryValue}
-                    disabled={gitCloneBusy || gitParentPickerBusy}
-                    onChange={(e) => {
-                      setGitRemoteRepositoryValue(e.target.value);
-                      setGitAddError(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleGitCloneSubmit();
-                      }
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        resetGitAddForm();
-                      }
-                    }}
-                    placeholder="https://github.com/... or git@..."
-                    style={{
-                      width: "100%",
-                      fontSize: 11,
-                      fontFamily: "var(--font-mono)",
-                      padding: "5px 8px",
-                      border: "1px solid var(--border)",
-                      borderRadius: 5,
-                      outline: "none",
-                      background: "var(--bg)",
-                      color: "var(--text)",
-                      boxSizing: "border-box",
-                    }}
-                  />
-
-                  <div style={{ marginTop: 4, color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
-                    Backend will run <code style={{ fontFamily: "var(--font-mono)" }}>git clone</code> under the parent path and register the cloned workspace.
-                  </div>
-
-                  {gitAddError && (
-                    <div style={{
-                      marginTop: 5,
-                      color: "#dc2626",
-                      fontSize: 11,
-                      lineHeight: 1.35,
-                      overflowWrap: "anywhere",
-                    }}>
-                      {gitAddError}
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
-                    <button
-                      onClick={() => void handleGitCloneSubmit()}
-                      disabled={gitCloneBusy || gitParentPickerBusy || !gitParentPathValue.trim() || !gitRemoteRepositoryValue.trim()}
-                      style={{
-                        flex: 1,
-                        padding: "5px 0",
-                        background: "var(--accent)",
-                        border: "none",
-                        borderRadius: 5,
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: gitCloneBusy || gitParentPickerBusy || !gitParentPathValue.trim() || !gitRemoteRepositoryValue.trim() ? "not-allowed" : "pointer",
-                        opacity: gitCloneBusy || gitParentPickerBusy || !gitParentPathValue.trim() || !gitRemoteRepositoryValue.trim() ? 0.65 : 1,
-                      }}
-                    >
-                      {gitCloneBusy ? "Cloning…" : "Clone and add"}
-                    </button>
-                    <button
-                      onClick={() => resetGitAddForm()}
-                      disabled={gitCloneBusy}
-                      style={{
-                        flex: 1,
-                        padding: "5px 0",
-                        background: "var(--bg-hover)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 5,
-                        color: "var(--text-muted)",
-                        fontSize: 11,
-                        cursor: gitCloneBusy ? "not-allowed" : "pointer",
-                        opacity: gitCloneBusy ? 0.65 : 1,
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <ProjectSpaceSwitchDialog
+          open={projectSwitchOpen}
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          selectedSpaceId={selectedSpaceId}
+          homeDir={homeDir}
+          customPathValue={customPathValue}
+          customPathError={customPathError}
+          customPathValidating={customPathValidating}
+          directoryPickerBusy={directoryPickerBusy}
+          gitParentPathValue={gitParentPathValue}
+          gitRemoteRepositoryValue={gitRemoteRepositoryValue}
+          gitAddError={gitAddError}
+          gitParentPickerBusy={gitParentPickerBusy}
+          gitCloneBusy={gitCloneBusy}
+          onCustomPathValueChange={setCustomPathValue}
+          onGitParentPathValueChange={setGitParentPathValue}
+          onGitRemoteRepositoryValueChange={setGitRemoteRepositoryValue}
+          onUseDefaultDirectory={() => void handleDefaultCwd()}
+          onPickProjectFolder={() => void handleDirectoryPicker()}
+          onSubmitCustomPath={() => void commitCustomPath()}
+          onPickGitParent={() => void handleGitParentDirectoryPicker()}
+          onSubmitGitClone={() => void handleGitCloneSubmit()}
+          onResetAddForms={resetAllAddForms}
+          onSelectSpace={(project, space) => {
+            setSelectedProjectId(project.id);
+            setSelectedSpaceId(space.id);
+            setSelectedCwd(space.path);
+            setWorktreeError(null);
+          }}
+          onProjectContextMenu={handleDialogProjectContextMenu}
+          onSpaceContextMenu={handleDialogSpaceContextMenu}
+          onToggleProjectStar={(project) => void patchProjectMetadata(project.id, { pinned: !project.pinned })}
+          onToggleSpaceStar={(project, space) => void patchSpaceMetadata(project.id, space.id, { pinned: !space.pinned })}
+          onReorderProjects={handleReorderProjects}
+          onReorderSpaces={handleReorderSpaces}
+          onClose={() => setProjectSwitchOpen(false)}
+        />
       </div>
 
       {metadataEditTarget && (
@@ -2131,6 +1688,147 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           </button>
         </div>
       )}
+
+      {projectSpaceContextMenu && (() => {
+        const { project, space } = projectSpaceContextMenu;
+        const isProjectMenu = !space;
+        const targetSpace = space ?? project.spaces.main;
+        const canSwitch = targetSpace && !targetSpace.missing;
+        const menuZIndex = 1250;
+
+        const closeMenu = () => setProjectSpaceContextMenu(null);
+
+        const handleSwitchSpace = () => {
+          closeMenu();
+          setSelectedProjectId(project.id);
+          setSelectedSpaceId(targetSpace.id);
+          setSelectedCwd(targetSpace.path);
+          setProjectSwitchOpen(false);
+          setWorktreeError(null);
+        };
+
+        const btnStyle: React.CSSProperties = {
+          width: "100%",
+          padding: "8px 10px",
+          background: "none",
+          border: "none",
+          color: "var(--text)",
+          textAlign: "left",
+          cursor: "pointer",
+          fontSize: 12,
+          borderRadius: 6,
+        };
+
+        return (
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              left: projectSpaceContextMenu.x,
+              top: projectSpaceContextMenu.y,
+              zIndex: menuZIndex,
+              minWidth: 190,
+              padding: 4,
+              borderRadius: 8,
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              boxShadow: "0 10px 28px rgba(0,0,0,0.18)",
+            }}
+          >
+            {isProjectMenu ? (
+              <>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleSwitchSpace(); }}
+                  style={{ ...btnStyle, color: targetSpace?.missing ? "var(--text-dim)" : "var(--text)", cursor: targetSpace?.missing ? "not-allowed" : "pointer" }}
+                  disabled={!!targetSpace?.missing}
+                >
+                  切换到主空间
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); setMetadataError(null); setMetadataEditTarget({ kind: "project", project }); }}
+                  style={btnStyle}
+                >
+                  编辑项目元数据…
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); void patchProjectMetadata(project.id, { pinned: !project.pinned }); }}
+                  style={btnStyle}
+                >
+                  {project.pinned ? "取消星标项目" : "星标项目"}
+                </button>
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (!window.confirm(`归档项目 "${displayProjectName(project)}"？项目会从侧边栏隐藏，sessions 不会被删除。`)) return;
+                    closeMenu();
+                    void patchProjectMetadata(project.id, { archived: true });
+                  }}
+                  style={{ ...btnStyle, color: "#dc2626" }}
+                >
+                  归档项目
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); if (canSwitch) handleSwitchSpace(); }}
+                  style={{ ...btnStyle, color: canSwitch ? "var(--text)" : "var(--text-dim)", cursor: canSwitch ? "pointer" : "not-allowed" }}
+                >
+                  切换到此空间
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); setMetadataError(null); setMetadataEditTarget({ kind: "space", project, space }); }}
+                  style={btnStyle}
+                >
+                  编辑空间元数据…
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); void patchSpaceMetadata(project.id, space.id, { pinned: !space.pinned }); }}
+                  style={btnStyle}
+                >
+                  {space.pinned ? "取消星标空间" : "星标空间"}
+                </button>
+                {space.kind === "worktree" ? (() => {
+                  const wt = worktreeInfoFromSpace(space);
+                  if (!wt) {
+                    return (
+                      <button
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); void patchSpaceMetadata(project.id, space.id, { archived: true }); }}
+                        style={btnStyle}
+                      >
+                        归档当前空间
+                      </button>
+                    );
+                  }
+                  return (
+                    <>
+                      <button
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); openWorktreeAction("archive", space.path, wt); }}
+                        style={btnStyle}
+                      >
+                        归档 WorkTree…
+                      </button>
+                      <button
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); openWorktreeAction("delete", space.path, wt); }}
+                        style={{ ...btnStyle, color: "#dc2626" }}
+                      >
+                        删除 WorkTree…
+                      </button>
+                    </>
+                  );
+                })() : (
+                  <button
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu(); void patchSpaceMetadata(project.id, space.id, { archived: true }); }}
+                    style={btnStyle}
+                  >
+                    归档当前空间
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {worktreeAction && (
         <div
@@ -2558,7 +2256,7 @@ function ProjectMetadataDialog({
           />
         </label>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-          <Checkbox checked={pinned} label="置顶（影响侧边栏排序）" onChange={(event) => setPinned(event.currentTarget.checked)} rootStyle={{ fontSize: 12 }} />
+          <Checkbox checked={pinned} label={target.kind === "project" ? "星标（仅用于标记，不影响项目排序）" : "星标（仅用于标记，不影响空间排序）"} onChange={(event) => setPinned(event.currentTarget.checked)} rootStyle={{ fontSize: 12 }} />
           <Checkbox checked={archived} label="归档（从活动侧边栏隐藏，不删除 sessions）" onChange={(event) => setArchived(event.currentTarget.checked)} rootStyle={{ fontSize: 12 }} />
         </div>
         {target.kind === "space" && target.space?.missing && (

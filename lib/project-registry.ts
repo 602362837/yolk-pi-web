@@ -139,6 +139,7 @@ export async function registerProject(input: CreateProjectInput): Promise<{ proj
 
   const timestamp = nowIso();
   const projectId = createProjectId();
+  const projectSortOrder = computeNextProjectSortOrder(registry.projects);
   const mainSpace: PiWebProjectSpaceRecord = {
     id: "main",
     projectId,
@@ -169,6 +170,7 @@ export async function registerProject(input: CreateProjectInput): Promise<{ proj
     createdAt: timestamp,
     updatedAt: timestamp,
     lastOpenedAt: mainSpace.lastOpenedAt,
+    sortOrder: projectSortOrder,
     spaces: { main: mainSpace },
   };
 
@@ -179,6 +181,30 @@ export async function registerProject(input: CreateProjectInput): Promise<{ proj
 
 function createWorktreeSpaceId(pathKey: string): ProjectSpaceId {
   return `wt_${createHash("sha256").update(pathKey).digest("hex").slice(0, 16)}`;
+}
+
+/**
+ * Compute the next sortOrder value for a new active project.
+ * Returns max(existing active project sortOrder, 0) + 1024.
+ */
+export function computeNextProjectSortOrder(projects: PiWebProjectRecord[]): number {
+  const maxOrder = projects
+    .filter((project) => !project.archived && typeof project.sortOrder === "number")
+    .reduce((max, project) => Math.max(max, project.sortOrder as number), 0);
+  return maxOrder + 1024;
+}
+
+/**
+ * Compute the next sortOrder value for a new non-main space in a project.
+ * Returns max(existing non-main active sortOrder, 0) + 1024.
+ * Uses interval stepping so future insertions can be placed between values
+ * without rewriting the whole list.
+ */
+export function computeNextSortOrder(project: PiWebProjectRecord): number {
+  const maxOrder = Object.values(project.spaces)
+    .filter((s) => !s.archived && s.id !== "main" && typeof s.sortOrder === "number")
+    .reduce((max, s) => Math.max(max, s.sortOrder as number), 0);
+  return maxOrder + 1024;
 }
 
 function worktreeInfoFromRecord(
@@ -236,6 +262,7 @@ async function upsertWorktreeSpace(
     metadata: {},
     createdAt: timestamp,
     updatedAt: timestamp,
+    sortOrder: computeNextSortOrder(project),
     worktree: worktreeInfoFromRecord(record, mainWorktree),
   };
   project.spaces = { ...project.spaces, [spaceId]: space };
@@ -538,6 +565,153 @@ export async function getProjectSpace(projectId: string, spaceId: string): Promi
   const space = project.spaces[spaceId as ProjectSpaceId];
   if (!space) throw new ProjectRegistryError("Project space not found", 404);
   return space;
+}
+
+/**
+ * Batch-reorder non-main spaces for a single project.
+ *
+ * Rules:
+ * - `main` must not appear in orderedSpaceIds.
+ * - Only active, non-archived, non-main spaces owned by the project are accepted.
+ * - Unknown, archived, duplicate, or cross-project ids are rejected.
+ * - Active non-main spaces not in the payload are appended to the end while
+ *   preserving their relative effective order.
+ * - Each space receives a clean interval-based sortOrder (1024, 2048, …)
+ *   to support future local insertions.
+ *
+ * @param projectId - The project owning the spaces.
+ * @param orderedSpaceIds - Desired order of active non-main space ids (first → last).
+ * @returns Updated project and its active spaces.
+ */
+export async function reorderProjects(
+  orderedProjectIds: string[],
+): Promise<{ projects: PiWebProjectRecord[] }> {
+  const registry = await readProjectRegistry();
+
+  if (!Array.isArray(orderedProjectIds)) {
+    throw new ProjectRegistryError("orderedProjectIds must be an array");
+  }
+
+  const seen = new Set<string>();
+  const orderedSet = new Set<string>();
+  for (const id of orderedProjectIds) {
+    if (typeof id !== "string" || !id.trim()) {
+      throw new ProjectRegistryError("orderedProjectIds must contain non-empty strings");
+    }
+    if (seen.has(id)) {
+      throw new ProjectRegistryError(`Duplicate project id in orderedProjectIds: ${id}`);
+    }
+    seen.add(id);
+    orderedSet.add(id);
+
+    const project = registry.projects.find((item) => item.id === id);
+    if (!project) {
+      throw new ProjectRegistryError(`Unknown project id: ${id}`);
+    }
+    if (project.archived) {
+      throw new ProjectRegistryError(`Project is archived: ${id}`);
+    }
+  }
+
+  const remaining = registry.projects
+    .filter((project) => !project.archived && !orderedSet.has(project.id))
+    .sort((a, b) => {
+      const aOrder = typeof a.sortOrder === "number" ? a.sortOrder : Infinity;
+      const bOrder = typeof b.sortOrder === "number" ? b.sortOrder : Infinity;
+      return aOrder - bOrder;
+    });
+
+  const finalOrder = [...orderedProjectIds, ...remaining.map((project) => project.id)] as ProjectId[];
+  const timestamp = nowIso();
+  const STEP = 1024;
+  const projectById = new Map<ProjectId, PiWebProjectRecord>(registry.projects.map((project) => [project.id, project]));
+
+  for (let i = 0; i < finalOrder.length; i++) {
+    const id = finalOrder[i];
+    const project = projectById.get(id);
+    if (!project) continue;
+    project.sortOrder = (i + 1) * STEP;
+    project.updatedAt = timestamp;
+  }
+
+  registry.updatedAt = timestamp;
+  await writeRegistry(registry);
+  return { projects: registry.projects };
+}
+
+export async function reorderProjectSpaces(
+  projectId: string,
+  orderedSpaceIds: string[],
+): Promise<{ project: PiWebProjectRecord; spaces: PiWebProjectSpaceRecord[] }> {
+  const registry = await readProjectRegistry();
+  const projectIndex = registry.projects.findIndex((p) => p.id === projectId);
+  if (projectIndex < 0) throw new ProjectRegistryError("Project not found", 404);
+  const project = registry.projects[projectIndex];
+
+  // --- validation ---
+  if (!Array.isArray(orderedSpaceIds)) {
+    throw new ProjectRegistryError("orderedSpaceIds must be an array");
+  }
+
+  const seen = new Set<string>();
+  const orderedSet = new Set<string>();
+  for (const id of orderedSpaceIds) {
+    if (typeof id !== "string" || !id.trim()) {
+      throw new ProjectRegistryError("orderedSpaceIds must contain non-empty strings");
+    }
+    if (id === "main") {
+      throw new ProjectRegistryError("main space cannot be reordered");
+    }
+    if (seen.has(id)) {
+      throw new ProjectRegistryError(`Duplicate space id in orderedSpaceIds: ${id}`);
+    }
+    seen.add(id);
+    orderedSet.add(id);
+
+    const space = project.spaces[id];
+    if (!space) {
+      throw new ProjectRegistryError(`Unknown space id: ${id}`);
+    }
+    if (space.archived) {
+      throw new ProjectRegistryError(`Space is archived: ${id}`);
+    }
+    if (space.kind === "main") {
+      throw new ProjectRegistryError("main space cannot be reordered");
+    }
+    if (space.projectId !== projectId) {
+      throw new ProjectRegistryError(`Space ${id} does not belong to project ${projectId}`);
+    }
+  }
+
+  // Collect active non-main spaces not in the payload, keeping their relative effective order
+  const remaining = Object.values(project.spaces)
+    .filter((s) => s.id !== "main" && !s.archived && !orderedSet.has(s.id))
+    .sort((a, b) => {
+      const aOrder = typeof a.sortOrder === "number" ? a.sortOrder : Infinity;
+      const bOrder = typeof b.sortOrder === "number" ? b.sortOrder : Infinity;
+      return aOrder - bOrder || a.createdAt.localeCompare(b.createdAt);
+    });
+
+  const finalOrder = [...orderedSpaceIds, ...remaining.map((s) => s.id)];
+  const timestamp = nowIso();
+  const STEP = 1024;
+
+  for (let i = 0; i < finalOrder.length; i++) {
+    const id = finalOrder[i];
+    const space = project.spaces[id];
+    project.spaces[id] = {
+      ...space,
+      sortOrder: (i + 1) * STEP,
+      updatedAt: timestamp,
+    };
+  }
+
+  project.updatedAt = timestamp;
+  registry.projects[projectIndex] = project;
+  await writeRegistry(registry);
+
+  const spaces = Object.values(project.spaces).filter((s) => !s.archived);
+  return { project, spaces };
 }
 
 export async function updateProjectSpace(projectId: string, spaceId: string, patch: SpacePatchInput): Promise<PiWebProjectSpaceRecord> {

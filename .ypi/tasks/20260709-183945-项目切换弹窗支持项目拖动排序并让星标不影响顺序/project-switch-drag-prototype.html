@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YPI Project Switch Drag-and-Drop & Star Semantic Prototype</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f8fafc;
+      --bg-hover: #f1f5f9;
+      --bg-selected: #e2e8f0;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --accent: #2563eb;
+      --accent-soft: rgba(37,99,235,0.12);
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --star: #eab308;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body.dark {
+      --bg: #0f172a;
+      --bg-panel: #1e293b;
+      --bg-hover: #334155;
+      --bg-selected: #475569;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #cbd5e1;
+      --text-dim: #64748b;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96,165,250,0.16);
+      --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header-bar {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-panel);
+    }
+    
+    .theme-toggle {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .app-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.05);
+      padding: 20px;
+    }
+
+    .dialog {
+      width: min(960px, 100%);
+      height: min(650px, 100%);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .dialog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .dialog-header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .dialog-header p {
+      margin: 3px 0 0 0;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .dialog-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      min-height: 0;
+    }
+
+    .pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .pane-left {
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .search-container {
+      padding: 12px;
+      flex-shrink: 0;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .search-warn {
+      margin-top: 6px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+      font-size: 10px;
+      display: none;
+    }
+
+    .list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 10px 10px;
+    }
+
+    .card, .space-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      position: relative;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .card:hover, .space-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .card.active, .space-item.active {
+      background: var(--bg-selected);
+      border-color: rgba(37, 99, 235, 0.2);
+    }
+
+    .card.dragging, .space-item.dragging {
+      opacity: 0.4;
+      border: 1px dashed var(--accent);
+      background: var(--bg-hover);
+    }
+
+    .card.dragover, .space-item.dragover {
+      border-top: 2px solid var(--accent);
+    }
+    
+    .card.dragover-below, .space-item.dragover-below {
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .item-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: bold;
+      user-select: none;
+      letter-spacing: -2px;
+      padding: 0 4px;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+    .drag-handle.disabled {
+      cursor: not-allowed;
+      opacity: 0.3;
+    }
+
+    .star-btn {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .star-btn.starred {
+      color: var(--star);
+    }
+    .star-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .item-name {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .item-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      background: var(--bg-hover);
+      color: var(--text-muted);
+    }
+
+    .item-path {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-left: 20px; /* aligns with name */
+    }
+
+    .pane-right-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      flex-shrink: 0;
+    }
+
+    .project-title {
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .project-path {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    .project-desc {
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .dialog-footer {
+      padding: 10px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-panel);
+      flex-shrink: 0;
+    }
+
+    .console-pane {
+      width: 100%;
+      border-top: 2px solid var(--border);
+      background: #1e293b;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 10px;
+      height: 120px;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+
+    .console-line {
+      margin: 2px 0;
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 2000;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 4px;
+      display: none;
+      min-width: 160px;
+    }
+
+    .context-menu button {
+      width: 100%;
+      border: none;
+      background: transparent;
+      padding: 6px 12px;
+      text-align: left;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .context-menu button:hover {
+      background: var(--bg-hover);
+    }
+    
+    .context-menu .danger {
+      color: var(--danger);
+    }
+
+    .context-menu .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-bar">
+    <div>
+      <span style="font-weight:800; font-size:14px;">Yolk Pi Web — Project Switcher Drag & Star Prototype</span>
+      <span style="margin-left:12px; font-size:11px; color:var(--text-muted);">UI Design Prototype (Gate Approval)</span>
+    </div>
+    <button class="theme-toggle" id="theme-btn">切换深色模式</button>
+  </div>
+
+  <div class="app-container">
+    <div class="dialog">
+      <!-- Header -->
+      <div class="dialog-header">
+        <div>
+          <h3>切换项目空间</h3>
+          <p>项目与空间排序由手动拖动决定。星标仅作为视觉标记，不再影响列表排序，点击时不会触发重新排列或跳动。</p>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted);">
+          <span style="margin-right:10px;">★ 星标 (纯视觉)</span>
+          <span>⋮⋮ 拖动把手</span>
+        </div>
+      </div>
+
+      <!-- Main Body -->
+      <div class="dialog-body">
+        <!-- Left: Project list -->
+        <div class="pane pane-left">
+          <div class="search-container">
+            <input type="text" class="search-input" id="search-input" placeholder="搜索项目或空间..." />
+            <div class="search-warn" id="search-warn">
+              ⚠️ 搜索状态下禁用拖动排序，请清空搜索后重新排序。
+            </div>
+          </div>
+          <div class="list-scroll" id="project-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Right: Space list -->
+        <div class="pane">
+          <div class="pane-right-header" id="right-header">
+            <!-- Rendered by JS -->
+          </div>
+          <div class="list-scroll" id="space-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Console Logger -->
+      <div class="console-pane" id="console-logs">
+        <div class="console-line" style="color:#64748b;">[System] Interactive prototype console initialized. Drag items or toggle stars.</div>
+      </div>
+
+      <!-- Footer -->
+      <div class="dialog-footer">
+        <span><strong>提示：</strong> 在卡片或行上右键可打开就地操作菜单。非搜索态下可拖动排序。</span>
+        <div>
+          <button style="padding:4px 8px; font-size:10px; border-radius:4px; border:1px solid var(--border); background:var(--bg); cursor:pointer;" onclick="resetRegistry()">重置演示数据</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menus -->
+  <div class="context-menu" id="project-context-menu">
+    <button onclick="logMenuAction('切换到主空间')">切换到主空间</button>
+    <button onclick="logMenuAction('编辑项目元数据…')">编辑项目元数据…</button>
+    <button id="menu-toggle-project-star" onclick="toggleMenuProjectStar()">星标项目</button>
+    <div class="divider"></div>
+    <button class="danger" onclick="logMenuAction('归档项目')">归档项目</button>
+  </div>
+
+  <div class="context-menu" id="space-context-menu">
+    <button onclick="logMenuAction('切换到此空间')">切换到此空间</button>
+    <button onclick="logMenuAction('编辑空间元数据…')">编辑空间元数据…</button>
+    <button id="menu-toggle-space-star" onclick="toggleMenuSpaceStar()">星标空间</button>
+    <div class="divider"></div>
+    <button class="danger" id="menu-delete-wt" onclick="logMenuAction('删除 WorkTree…')">删除 WorkTree…</button>
+  </div>
+
+  <script>
+    // Theme toggle
+    const themeBtn = document.getElementById('theme-btn');
+    themeBtn.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      themeBtn.innerText = document.body.classList.contains('dark') ? '切换浅色模式' : '切换深色模式';
+    });
+
+    // Mock Registry Data
+    const INITIAL_PROJECTS = [
+      {
+        id: 'prj_1',
+        displayName: 'Pi Agent Web',
+        rootPath: '~/Projects/pi-agent-web',
+        pinned: true,
+        spaces: [
+          { id: 'main', kind: 'main', path: '~/Projects/pi-agent-web', displayName: '主空间', pinned: true, branch: 'main' },
+          { id: 'wt_1', kind: 'worktree', path: '~/Projects/pi-agent-web-wt1', displayName: 'feat/project-drag-sort', pinned: false, branch: 'feat/project-drag-sort', baseRef: 'main' },
+          { id: 'wt_2', kind: 'worktree', path: '~/Projects/pi-agent-web-wt2', displayName: 'bugfix/star-jump-fix', pinned: true, branch: 'bugfix/star-jump-fix', baseRef: 'main' },
+          { id: 'wt_3', kind: 'worktree', path: '~/Projects/pi-agent-web-wt3', displayName: 'refactor/spaces-menu', pinned: false, branch: 'refactor/spaces-menu', baseRef: 'main' }
+        ]
+      },
+      {
+        id: 'prj_2',
+        displayName: 'Navi Core Gateway',
+        rootPath: '~/IdeaProjects/navi',
+        pinned: false,
+        spaces: [
+          { id: 'main', kind: 'main', path: '~/IdeaProjects/navi', displayName: '主空间', pinned: false, branch: 'master' },
+          { id: 'wt_4', kind: 'worktree', path: '~/IdeaProjects/navi-wt1', displayName: 'release/v2.1', pinned: false, branch: 'release/v2.1', baseRef: 'master' }
+        ]
+      },
+      {
+        id: 'prj_3',
+        displayName: 'Internal Admin Panel',
+        rootPath: '~/Workspace/internal-tools',
+        pinned: true,
+        spaces: [
+          { id: 'main', kind: 'main', path: '~/Workspace/internal-tools', displayName: '主空间', pinned: false, branch: 'prod' }
+        ]
+      },
+      {
+        id: 'prj_4',
+        displayName: 'Ypi Studio CLI Client',
+        rootPath: '~/Projects/ypic-cli',
+        pinned: false,
+        spaces: [
+          { id: 'main', kind: 'main', path: '~/Projects/ypic-cli', displayName: '主空间', pinned: false, branch: 'main' },
+          { id: 'wt_5', kind: 'worktree', path: '~/Projects/ypic-cli-wt', displayName: 'experiment/async-task', pinned: false, branch: 'experiment/async-task', baseRef: 'main' }
+        ]
+      }
+    ];
+
+    let projects = JSON.parse(localStorage.getItem('ypi_drag_proto_projects')) || INITIAL_PROJECTS;
+    let selectedProjectId = localStorage.getItem('ypi_drag_proto_selected_project') || projects[0].id;
+    let searchQuery = '';
+
+    // Logger
+    function log(message, type = 'info') {
+      const consolePane = document.getElementById('console-logs');
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'success' ? '#4ade80' : type === 'warn' ? '#fbbf24' : type === 'error' ? '#f87171' : '#38bdf8';
+      
+      const line = document.createElement('div');
+      line.className = 'console-line';
+      line.style.color = color;
+      line.innerHTML = `[${time}] ${message}`;
+      consolePane.appendChild(line);
+      consolePane.scrollTop = consolePane.scrollHeight;
+    }
+
+    function saveState() {
+      localStorage.setItem('ypi_drag_proto_projects', JSON.stringify(projects));
+      localStorage.setItem('ypi_drag_proto_selected_project', selectedProjectId);
+    }
+
+    function resetRegistry() {
+      projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
+      selectedProjectId = projects[0].id;
+      saveState();
+      log("演示数据已重置", "warn");
+      render();
+    }
+
+    // Context menu states
+    let activeContextItem = null; // { type: 'project'|'space', projectId, spaceId }
+    
+    // Setup Context Menus
+    window.addEventListener('click', () => {
+      document.getElementById('project-context-menu').style.display = 'none';
+      document.getElementById('space-context-menu').style.display = 'none';
+    });
+
+    function showContextMenu(e, type, projectId, spaceId = null) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      activeContextItem = { type, projectId, spaceId };
+      const menuId = type === 'project' ? 'project-context-menu' : 'space-context-menu';
+      const menu = document.getElementById(menuId);
+      
+      // Update menu actions labels
+      if (type === 'project') {
+        const prj = projects.find(p => p.id === projectId);
+        const toggleStarBtn = document.getElementById('menu-toggle-project-star');
+        toggleStarBtn.innerText = prj.pinned ? '取消星标项目' : '星标项目';
+      } else {
+        const prj = projects.find(p => p.id === projectId);
+        const spc = prj.spaces.find(s => s.id === spaceId);
+        const toggleStarBtn = document.getElementById('menu-toggle-space-star');
+        toggleStarBtn.innerText = spc.pinned ? '取消星标空间' : '星标空间';
+        
+        const deleteWtBtn = document.getElementById('menu-delete-wt');
+        if (spc.kind === 'main') {
+          deleteWtBtn.style.display = 'none';
+        } else {
+          deleteWtBtn.style.display = 'block';
+        }
+      }
+
+      menu.style.display = 'block';
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+    }
+
+    function logMenuAction(action) {
+      const item = activeContextItem;
+      if (item.type === 'project') {
+        const prj = projects.find(p => p.id === item.projectId);
+        log(`右键菜单 - 项目 [${prj.displayName}]: 执行了「${action}」`, "success");
+      } else {
+        const prj = projects.find(p => p.id === item.projectId);
+        const spc = prj.spaces.find(s => s.id === item.spaceId);
+        log(`右键菜单 - 空间 [${spc.displayName}]: 执行了「${action}」`, "success");
+      }
+    }
+
+    function toggleMenuProjectStar() {
+      const item = activeContextItem;
+      const prj = projects.find(p => p.id === item.projectId);
+      prj.pinned = !prj.pinned;
+      saveState();
+      log(`项目 [${prj.displayName}] 星标更改为 ${prj.pinned ? '★' : '☆'} (纯视觉标记，不影响列表相对顺序，没有任何位置跳动)`, "success");
+      render();
+    }
+
+    function toggleMenuSpaceStar() {
+      const item = activeContextItem;
+      const prj = projects.find(p => p.id === item.projectId);
+      const spc = prj.spaces.find(s => s.id === item.spaceId);
+      spc.pinned = !spc.pinned;
+      saveState();
+      log(`空间 [${spc.displayName}] 星标更改为 ${spc.pinned ? '★' : '☆'} (纯视觉标记，排序不变)`, "success");
+      render();
+    }
+
+    // Toggle Star Action
+    function toggleProjectStar(projectId, event) {
+      event.stopPropagation();
+      const prj = projects.find(p => p.id === projectId);
+      prj.pinned = !prj.pinned;
+      saveState();
+      log(`点击星标 - 项目 [${prj.displayName}]: 星标状态 = ${prj.pinned ? '★' : '☆'}，位置绝对保持不变，无跳动`, "success");
+      render();
+    }
+
+    function toggleSpaceStar(projectId, spaceId, event) {
+      event.stopPropagation();
+      const prj = projects.find(p => p.id === projectId);
+      const spc = prj.spaces.find(s => s.id === spaceId);
+      spc.pinned = !spc.pinned;
+      saveState();
+      log(`点击星标 - 空间 [${spc.displayName}]: 星标状态 = ${spc.pinned ? '★' : '☆'}，空间顺序不受影响`, "success");
+      render();
+    }
+
+    // Search and Filtering
+    const searchInput = document.getElementById('search-input');
+    const searchWarn = document.getElementById('search-warn');
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      if (searchQuery) {
+        searchWarn.style.display = 'block';
+      } else {
+        searchWarn.style.display = 'none';
+      }
+      render();
+    });
+
+    // Drag-and-drop state
+    let draggedProjectId = null;
+    let draggedSpaceId = null;
+
+    // Rendering functions
+    function render() {
+      const isSearchActive = !!searchQuery;
+      
+      // Filter projects
+      let filteredProjects = projects;
+      if (isSearchActive) {
+        filteredProjects = projects.filter(p => {
+          const matchPrj = p.displayName.toLowerCase().includes(searchQuery) || p.rootPath.toLowerCase().includes(searchQuery);
+          const matchSpc = p.spaces.some(s => s.displayName.toLowerCase().includes(searchQuery) || s.path.toLowerCase().includes(searchQuery));
+          return matchPrj || matchSpc;
+        });
+      }
+
+      // Render Left Pane
+      const projectListEl = document.getElementById('project-list');
+      projectListEl.innerHTML = '';
+      
+      if (filteredProjects.length === 0) {
+        projectListEl.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-dim); font-size: 11px;">无匹配项目</div>`;
+      } else {
+        filteredProjects.forEach((prj, idx) => {
+          const isActive = prj.id === selectedProjectId;
+          const card = document.createElement('div');
+          card.className = `card ${isActive ? 'active' : ''}`;
+          card.draggable = !isSearchActive;
+          card.setAttribute('data-id', prj.id);
+          card.setAttribute('data-index', idx);
+          
+          card.addEventListener('click', () => {
+            selectedProjectId = prj.id;
+            saveState();
+            render();
+          });
+
+          card.addEventListener('contextmenu', (e) => {
+            showContextMenu(e, 'project', prj.id);
+          });
+
+          // Drag Events for Projects
+          if (!isSearchActive) {
+            card.addEventListener('dragstart', (e) => {
+              draggedProjectId = prj.id;
+              card.classList.add('dragging');
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', prj.id);
+            });
+
+            card.addEventListener('dragend', () => {
+              card.classList.remove('dragging');
+              draggedProjectId = null;
+              document.querySelectorAll('.card').forEach(c => {
+                c.classList.remove('dragover');
+                c.classList.remove('dragover-below');
+              });
+            });
+
+            card.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              if (draggedProjectId === null || draggedProjectId === prj.id) return;
+              const rect = card.getBoundingClientRect();
+              const midpoint = rect.top + rect.height / 2;
+              if (e.clientY < midpoint) {
+                card.classList.add('dragover');
+                card.classList.remove('dragover-below');
+              } else {
+                card.classList.add('dragover-below');
+                card.classList.remove('dragover');
+              }
+            });
+
+            card.addEventListener('dragleave', () => {
+              card.classList.remove('dragover');
+              card.classList.remove('dragover-below');
+            });
+
+            card.addEventListener('drop', (e) => {
+              e.preventDefault();
+              if (draggedProjectId === null || draggedProjectId === prj.id) return;
+              
+              const fromIndex = projects.findIndex(p => p.id === draggedProjectId);
+              const toIndex = projects.findIndex(p => p.id === prj.id);
+              
+              const rect = card.getBoundingClientRect();
+              const midpoint = rect.top + rect.height / 2;
+              let targetIndex = toIndex;
+              if (e.clientY >= midpoint && fromIndex > toIndex) {
+                targetIndex += 1;
+              } else if (e.clientY < midpoint && fromIndex < toIndex) {
+                targetIndex -= 1;
+              }
+
+              // Reorder
+              const [dragged] = projects.splice(fromIndex, 1);
+              projects.splice(targetIndex, 0, dragged);
+              
+              saveState();
+              log(`项目拖拽重排: [${dragged.displayName}] 拖动到第 ${targetIndex + 1} 位.`, "info");
+              log(`API 调用模拟: PATCH /api/projects, Body: { orderedProjectIds: [${projects.map(p=>`"${p.id}"`).join(', ')}] }`, "success");
+              render();
+            });
+          }
+
+          card.innerHTML = `
+            <div class="item-header">
+              ${!isSearchActive ? '<span class="drag-handle" title="拖拽排序">⋮⋮</span>' : '<span class="drag-handle disabled" title="搜索状态下禁用拖拽">⋮⋮</span>'}
+              <button class="star-btn ${prj.pinned ? 'starred' : ''}" title="${prj.pinned ? '取消星标' : '星标'}" onclick="toggleProjectStar('${prj.id}', event)">
+                ${prj.pinned ? '★' : '☆'}
+              </button>
+              <span class="item-name" title="${prj.displayName}">${prj.displayName}</span>
+              <span class="item-badge">${prj.spaces.length} space${prj.spaces.length > 1 ? 's' : ''}</span>
+            </div>
+            <div class="item-path" title="${prj.rootPath}">${prj.rootPath}</div>
+          `;
+          projectListEl.appendChild(card);
+        });
+      }
+
+      // Selected project info
+      const activePrj = projects.find(p => p.id === selectedProjectId) || projects[0];
+      const rightHeader = document.getElementById('right-header');
+      rightHeader.innerHTML = `
+        <div class="project-title">${activePrj.displayName}</div>
+        <div class="project-path">${activePrj.rootPath}</div>
+        <div class="project-desc">双击或回车切换工作区。⋮⋮ 拖拽排序非主空间。主空间（main）永远固定在第一位。</div>
+      `;
+
+      // Render Right Pane (Spaces)
+      const spaceListEl = document.getElementById('space-list');
+      spaceListEl.innerHTML = '';
+
+      let filteredSpaces = activePrj.spaces;
+      if (isSearchActive) {
+        filteredSpaces = activePrj.spaces.filter(s => s.displayName.toLowerCase().includes(searchQuery) || s.path.toLowerCase().includes(searchQuery));
+      }
+
+      // Note: Main space is always first. Non-main spaces are draggable.
+      // Sort main space first, then remaining spaces in their relative orders.
+      const mainSpace = filteredSpaces.find(s => s.kind === 'main');
+      const nonMainSpaces = filteredSpaces.filter(s => s.kind !== 'main');
+
+      const orderedSpacesToShow = mainSpace ? [mainSpace, ...nonMainSpaces] : nonMainSpaces;
+
+      if (orderedSpacesToShow.length === 0) {
+        spaceListEl.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-dim); font-size: 11px;">无匹配空间</div>`;
+      } else {
+        orderedSpacesToShow.forEach((space, idx) => {
+          const isMain = space.kind === 'main';
+          const canDrag = !isSearchActive && !isMain;
+          const spaceItem = document.createElement('div');
+          spaceItem.className = `space-item ${idx === 0 && activePrj.id === selectedProjectId ? 'active' : ''}`;
+          spaceItem.draggable = canDrag;
+          spaceItem.setAttribute('data-id', space.id);
+
+          spaceItem.addEventListener('click', () => {
+            log(`已选择空间: [${space.displayName}] (${space.path}) - 模拟执行工作区切换并关闭弹窗`, "success");
+          });
+
+          spaceItem.addEventListener('contextmenu', (e) => {
+            showContextMenu(e, 'space', activePrj.id, space.id);
+          });
+
+          // Drag Events for Spaces (Non-main only)
+          if (canDrag) {
+            spaceItem.addEventListener('dragstart', (e) => {
+              draggedSpaceId = space.id;
+              spaceItem.classList.add('dragging');
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', space.id);
+            });
+
+            spaceItem.addEventListener('dragend', () => {
+              spaceItem.classList.remove('dragging');
+              draggedSpaceId = null;
+              document.querySelectorAll('.space-item').forEach(s => {
+                s.classList.remove('dragover');
+                s.classList.remove('dragover-below');
+              });
+            });
+
+            spaceItem.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              if (draggedSpaceId === null || draggedSpaceId === space.id) return;
+              
+              // Cannot drop on main space
+              if (space.kind === 'main') return;
+
+              const rect = spaceItem.getBoundingClientRect();
+              const midpoint = rect.top + rect.height / 2;
+              if (e.clientY < midpoint) {
+                spaceItem.classList.add('dragover');
+                spaceItem.classList.remove('dragover-below');
+              } else {
+                spaceItem.classList.add('dragover-below');
+                spaceItem.classList.remove('dragover');
+              }
+            });
+
+            spaceItem.addEventListener('dragleave', () => {
+              spaceItem.classList.remove('dragover');
+              spaceItem.classList.remove('dragover-below');
+            });
+
+            spaceItem.addEventListener('drop', (e) => {
+              e.preventDefault();
+              if (draggedSpaceId === null || draggedSpaceId === space.id) return;
+              
+              const fromIndex = activePrj.spaces.findIndex(s => s.id === draggedSpaceId);
+              const toIndex = activePrj.spaces.findIndex(s => s.id === space.id);
+              
+              const rect = spaceItem.getBoundingClientRect();
+              const midpoint = rect.top + rect.height / 2;
+              let targetIndex = toIndex;
+              if (e.clientY >= midpoint && fromIndex > toIndex) {
+                targetIndex += 1;
+              } else if (e.clientY < midpoint && fromIndex < toIndex) {
+                targetIndex -= 1;
+              }
+
+              // Keep main first
+              if (targetIndex === 0) targetIndex = 1;
+
+              // Reorder
+              const [dragged] = activePrj.spaces.splice(fromIndex, 1);
+              activePrj.spaces.splice(targetIndex, 0, dragged);
+              
+              saveState();
+              log(`空间拖拽重排: [${dragged.displayName}] 拖动到第 ${targetIndex} 位.`, "info");
+              
+              const nonMainIds = activePrj.spaces.filter(s => s.kind !== 'main').map(s => s.id);
+              log(`API 调用模拟: PATCH /api/projects/${activePrj.id}/spaces, Body: { orderedSpaceIds: [${nonMainIds.map(id=>`"${id}"`).join(', ')}] }`, "success");
+              render();
+            });
+          }
+
+          spaceItem.innerHTML = `
+            <div class="item-header">
+              ${isMain ? '' : !isSearchActive ? '<span class="drag-handle" title="拖拽排序">⋮⋮</span>' : '<span class="drag-handle disabled" title="搜索状态下禁用拖拽">⋮⋮</span>'}
+              <button class="star-btn ${space.pinned ? 'starred' : ''}" title="${space.pinned ? '取消星标' : '星标'}" onclick="toggleSpaceStar('${activePrj.id}', '${space.id}', event)">
+                ${space.pinned ? '★' : '☆'}
+              </button>
+              <span class="item-badge" style="background:${isMain ? 'rgba(37,99,235,0.1)' : 'var(--bg-panel)'}; color:${isMain ? 'var(--accent)' : 'var(--text-muted)'}">${isMain ? 'Main' : 'WT'}</span>
+              <span class="item-name" title="${space.displayName}">${space.displayName}</span>
+              ${space.branch ? `<span class="item-badge" style="font-family:var(--font-mono)">${space.branch}</span>` : ''}
+            </div>
+            <div class="item-path" title="${space.path}">${space.path}</div>
+          `;
+          spaceListEl.appendChild(spaceItem);
+        });
+      }
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

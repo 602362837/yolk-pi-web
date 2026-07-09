@@ -982,3 +982,15 @@ span.linenumber {
   color: var(--text-dim);
   pointer-events: none;
 }
+
+/* ProjectSpaceSwitchDialog: responsive single-column fallback */
+@media (max-width: 720px) {
+  .project-switch-dialog-body {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(180px, 0.8fr) minmax(240px, 1fr) !important;
+  }
+  .project-switch-dialog-body > div:first-child {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+}

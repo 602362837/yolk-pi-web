@@ -1,0 +1,1776 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YPI Project Space Switch Dialog - Interactive Prototype</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg-subtle: rgba(0, 0, 0, 0.03);
+      --danger: #dc2626;
+      --success: #16a34a;
+      --warning: #ea580c;
+      --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+      --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .app-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      height: 100%;
+    }
+
+    /* Sidebar Styles */
+    .sidebar {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .switch-button {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: 7px;
+      padding: 6px 10px;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .switch-button:hover {
+      background: var(--bg-hover);
+      border-color: var(--text-dim);
+    }
+
+    .switch-button .icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .switch-text {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .switch-title {
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+
+    .switch-subtitle {
+      margin-top: 1px;
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+
+    .chevron {
+      color: var(--text-dim);
+      flex: 0 0 auto;
+      font-size: 10px;
+    }
+
+    .sidebar-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-action {
+      height: 32px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex: 1;
+      transition: all 0.12s;
+    }
+
+    .btn-action:hover:not(:disabled) {
+      background: var(--bg-selected);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .btn-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      color: var(--text-dim);
+    }
+
+    .sessions-list {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .sessions-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      padding: 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .session-row {
+      height: 34px;
+      border-radius: 7px;
+      padding: 7px 9px;
+      margin-bottom: 5px;
+      background: transparent;
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: background 0.15s;
+    }
+
+    .session-row:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .session-row.active {
+      background: var(--bg-selected);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Main Area Styles */
+    .main-workspace {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    .welcome-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .welcome-card h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .welcome-card p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .control-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .control-panel h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 800;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .control-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--bg-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-card-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .btn {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      color: #ffffff;
+    }
+
+    /* Modal Overlay & Dialog Styles */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+      backdrop-filter: blur(2px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      width: min(920px, calc(100vw - 32px));
+      height: min(640px, calc(100vh - 32px));
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      transform: scale(0.97);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .overlay.open .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin: 0;
+    }
+
+    .modal-desc {
+      margin-top: 3px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .close-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: all 0.15s;
+    }
+
+    .close-btn:hover {
+      background: var(--bg-selected);
+      color: var(--text);
+    }
+
+    .modal-body {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+    }
+
+    /* Modal Panes */
+    .pane {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .project-pane {
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .pane-toolbar {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .toolbar-actions::-webkit-scrollbar {
+      height: 2px;
+    }
+
+    .btn-mini {
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .btn-mini:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    .btn-mini.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .pane-scroll {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 8px;
+      flex: 1;
+    }
+
+    /* Cards */
+    .project-card {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 10px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      display: grid;
+      gap: 4px;
+      margin-bottom: 4px;
+      transition: all 0.15s;
+    }
+
+    .project-card:hover {
+      background: var(--bg-hover);
+    }
+
+    .project-card.active {
+      background: var(--bg-selected);
+      border-color: rgba(37, 99, 235, 0.2);
+    }
+
+    .card-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .card-name {
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .card-path {
+      color: var(--text-muted);
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      font-family: var(--font-mono);
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }
+
+    .badge-count {
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .badge-star {
+      background: rgba(234, 179, 8, 0.15);
+      color: #ca8a04;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+
+    .badge-accent {
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--accent);
+      border: 1px solid rgba(37, 99, 235, 0.2);
+    }
+
+    .badge-danger {
+      background: rgba(220, 38, 38, 0.08);
+      color: var(--danger);
+      border: 1px solid rgba(220, 38, 38, 0.2);
+    }
+
+    /* Space Pane Styles */
+    .space-pane {
+      background: var(--bg);
+    }
+
+    .selected-project-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-subtle);
+    }
+
+    .selected-project-header .card-name {
+      font-size: 14px;
+    }
+
+    .selected-project-header .card-path {
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .selected-project-header .header-hint {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .space-list {
+      padding: 12px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .space-card {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 10px 12px;
+      display: grid;
+      gap: 4px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .space-card:hover:not(.disabled) {
+      border-color: var(--accent);
+      background: var(--bg-subtle);
+    }
+
+    .space-card.active {
+      border-color: var(--accent);
+      background: var(--bg-selected);
+    }
+
+    .space-card.disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: var(--bg-panel);
+    }
+
+    .space-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .space-check {
+      color: var(--accent);
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .space-name {
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .space-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Forms Inside Space Pane */
+    .form-container {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--bg-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .form-header {
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-field label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .form-input-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .form-input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    .form-btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .form-error {
+      font-size: 10px;
+      color: var(--danger);
+      background: rgba(220, 38, 38, 0.05);
+      border: 1px solid rgba(220, 38, 38, 0.15);
+      padding: 6px 8px;
+      border-radius: 4px;
+    }
+
+    /* Empty Onboarding State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px 16px;
+      flex: 1;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+      color: var(--accent);
+      opacity: 0.8;
+    }
+
+    .empty-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .empty-desc {
+      font-size: 11px;
+      max-width: 320px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .empty-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      max-width: 220px;
+    }
+
+    /* Footer Styles */
+    .modal-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 10px;
+      color: var(--text-dim);
+      background: var(--bg);
+    }
+
+    .footer-tip strong {
+      color: var(--text-muted);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--success);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 2000;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 760px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        display: none;
+      }
+      .modal-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(180px, 0.8fr) minmax(240px, 1fr);
+      }
+      .project-pane {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <button class="switch-button" id="sidebar-switch-btn" aria-haspopup="dialog" aria-label="切换项目空间">
+          <span class="icon">π</span>
+          <span class="switch-text">
+            <span class="switch-title" id="sb-title">pi-agnet-web</span>
+            <span class="switch-subtitle" id="sb-subtitle">主空间 · branch:main</span>
+          </span>
+          <span class="chevron">▼</span>
+        </button>
+        <div class="sidebar-actions">
+          <button class="btn-action" id="sb-new-btn">＋ New</button>
+          <button class="btn-action" id="sb-wt-btn">WorkTree</button>
+          <button class="btn-action" onclick="alert('模拟刷新成功')">⟳</button>
+        </div>
+      </div>
+
+      <div class="sessions-list">
+        <div class="sessions-header">Active Sessions</div>
+        <div class="session-row active">重构左侧项目切换为弹窗分层选择并优化多项目显示</div>
+        <div class="session-row">优化 YPI Studio 计划审批书预览与产物去重</div>
+        <div class="session-row">Browser Share bridge review</div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Preview -->
+    <main class="main-workspace">
+      <div class="welcome-card">
+        <h1>YPI Studio UI Prototype Review</h1>
+        <p>这是<strong>“重构左侧项目切换为弹窗分层选择并优化多项目显示”</strong>的交互原型。你可以点击左侧侧边栏顶部的项目名称按钮来打开弹窗，或者使用下方的控制面板测试各种状态和边界情况。</p>
+      </div>
+
+      <!-- Prototype Control Panel -->
+      <section class="control-panel">
+        <h3>
+          <span>Prototype Controller (原型控制面板)</span>
+          <span class="badge badge-accent">Interactive</span>
+        </h3>
+        <div class="control-grid">
+          <!-- State Config -->
+          <div class="control-card">
+            <span class="control-card-title">数据状态</span>
+            <button class="btn btn-primary" onclick="openDialog()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              打开切换弹窗
+            </button>
+            <button class="btn" onclick="toggleTheme()">
+              <span id="theme-btn-text">切换深色模式</span>
+            </button>
+          </div>
+
+          <div class="control-card">
+            <span class="control-card-title">项目数量模拟</span>
+            <button class="btn" id="ctrl-projects-normal" onclick="switchToNormalProjects()">
+              默认项目 (4个)
+            </button>
+            <button class="btn" id="ctrl-projects-many" onclick="switchToManyProjects()">
+              大量项目 (50+个)
+            </button>
+            <button class="btn" id="ctrl-projects-empty" onclick="switchToEmptyRegistry()">
+              空环境 (0个)
+            </button>
+          </div>
+
+          <div class="control-card">
+            <span class="control-card-title">快速表单预览</span>
+            <button class="btn" onclick="openAddForm('path')">直接打开 Add Path 表单</button>
+            <button class="btn" onclick="openAddForm('git')">直接打开 Git Clone 表单</button>
+            <button class="btn" onclick="resetState()">重置所有数据</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal Overlay -->
+  <div class="overlay" id="modal-overlay" onclick="handleBackdropClick(event)">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title" id="switch-dialog">
+      <!-- Modal Header -->
+      <header class="modal-header">
+        <div>
+          <h2 id="dialog-title" class="modal-title">切换项目空间</h2>
+          <div class="modal-desc">项目列表来自 Project Registry，不扫描历史会话。选择项目空间后将立即切换当前工作区。</div>
+        </div>
+        <button class="close-btn" aria-label="关闭弹窗" onclick="closeDialog()">×</button>
+      </header>
+
+      <!-- Modal Body -->
+      <div class="modal-body">
+        <!-- Left Pane: Projects -->
+        <div class="pane project-pane">
+          <div class="pane-toolbar">
+            <input 
+              type="text" 
+              class="search-input" 
+              placeholder="搜索项目或空间..." 
+              id="proj-search" 
+              oninput="handleSearch(this.value)"
+              aria-label="搜索项目或空间"
+            />
+            <div class="toolbar-actions">
+              <button class="btn-mini" onclick="simulateFolderPicker()">Add project folder…</button>
+              <button class="btn-mini" id="tb-btn-path" onclick="toggleForm('path')">Add path…</button>
+              <button class="btn-mini" id="tb-btn-git" onclick="toggleForm('git')">From Git…</button>
+            </div>
+          </div>
+          
+          <div class="pane-scroll" id="project-list" aria-label="项目列表">
+            <!-- Dynamic project items -->
+          </div>
+        </div>
+
+        <!-- Right Pane: Spaces or Forms -->
+        <div class="pane space-pane" id="space-pane-content">
+          <!-- Dynamic details based on selection/state -->
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <footer class="modal-footer">
+        <div class="footer-tip">
+          <strong>提示：</strong> 支持 <code>Esc</code> 键关闭。项目很多时左右区域独立滚动，搜索时保持分层结构。
+        </div>
+        <div class="modal-footer-actions">
+          <button class="btn-mini" onclick="simulateDefaultCwd()">Use default directory</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <!-- Toast Toast -->
+  <div class="toast" id="toast-notify">成功切换工作区！</div>
+
+  <!-- Scripts -->
+  <script>
+    // Mock Data State
+    const initialProjects = [
+      {
+        id: "p1",
+        name: "pi-agnet-web",
+        rootPath: "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+        pinned: true,
+        spaces: [
+          { id: "s1", name: "主空间", kind: "main", branch: "main", path: "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web" },
+          { id: "s2", name: "feature/project-switch-dialog", kind: "worktree", branch: "feature/project-switch-dialog", base: "main", path: "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.worktrees/project-switch-dialog" },
+          { id: "s3", name: "old-experiment", kind: "worktree", branch: "old-experiment", base: "main", path: "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.worktrees/old-experiment", missing: true }
+        ]
+      },
+      {
+        id: "p2",
+        name: "ypi-browser-share-extension",
+        rootPath: "/Users/demo/Projects/ypi-browser-share-extension",
+        pinned: false,
+        spaces: [
+          { id: "s4", name: "主空间", kind: "main", branch: "main", path: "/Users/demo/Projects/ypi-browser-share-extension" },
+          { id: "s5", name: "feature/extension-v2", kind: "worktree", branch: "feature/extension-v2", base: "main", path: "/Users/demo/Projects/ypi-browser-share-extension/.worktrees/extension-v2" }
+        ]
+      },
+      {
+        id: "p3",
+        name: "navi-platform-with-a-very-long-repository-name",
+        rootPath: "/Users/demo/IdeaProjects/navi",
+        pinned: false,
+        spaces: [
+          { id: "s6", name: "主空间", kind: "main", branch: "master", path: "/Users/demo/IdeaProjects/navi" },
+          { id: "s7", name: "dev-branch", kind: "worktree", branch: "dev-branch", base: "master", path: "/Users/demo/IdeaProjects/navi/.worktrees/dev-branch" }
+        ]
+      },
+      {
+        id: "p4",
+        name: "docs-site",
+        rootPath: "/Users/demo/work/docs-site",
+        pinned: false,
+        spaces: [
+          { id: "s8", name: "主空间", kind: "main", branch: "main", path: "/Users/demo/work/docs-site" }
+        ]
+      }
+    ];
+
+    let projects = JSON.parse(JSON.stringify(initialProjects));
+    
+    // Active workspace configuration
+    let activeProjectId = "p1";
+    let activeSpaceId = "s1";
+    
+    // Dialog Selection State
+    let pendingProjectId = "p1";
+    let activeForm = null; // 'path' or 'git'
+    let searchQuery = "";
+    
+    // Form Inputs & Error states (temporary in prototype)
+    let formInputs = {
+      path: "",
+      gitParent: "/Users/demo/GitProjects",
+      gitRemote: ""
+    };
+    let formErrors = {
+      path: null,
+      git: null
+    };
+    let isCloning = false;
+
+    // Initialize UI
+    window.addEventListener("DOMContentLoaded", () => {
+      renderAll();
+      setupKeyboard();
+    });
+
+    function setupKeyboard() {
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          const overlay = document.getElementById("modal-overlay");
+          if (overlay.classList.contains("open")) {
+            if (isCloning) {
+              alert("克隆正在进行，不能关闭弹窗。");
+              return;
+            }
+            closeDialog();
+          }
+        }
+      });
+    }
+
+    // Toggle overlay visibility
+    function openDialog() {
+      // Preset dialog pending state to match active workspace
+      pendingProjectId = activeProjectId;
+      activeForm = null;
+      searchQuery = "";
+      document.getElementById("proj-search").value = "";
+      
+      const overlay = document.getElementById("modal-overlay");
+      overlay.classList.add("open");
+      
+      // Auto-focus search input
+      setTimeout(() => {
+        document.getElementById("proj-search").focus();
+      }, 50);
+      
+      renderAll();
+    }
+
+    function closeDialog() {
+      const overlay = document.getElementById("modal-overlay");
+      overlay.classList.remove("open");
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target.id === "modal-overlay") {
+        if (isCloning) {
+          alert("克隆正在进行，不能关闭弹窗。");
+          return;
+        }
+        closeDialog();
+      }
+    }
+
+    // Toggle color theme
+    function toggleTheme() {
+      const isDark = document.body.classList.toggle("dark");
+      document.getElementById("theme-btn-text").textContent = isDark ? "切换浅色模式" : "切换深色模式";
+    }
+
+    // Swapping Mock datasets
+    function switchToNormalProjects() {
+      projects = JSON.parse(JSON.stringify(initialProjects));
+      activeProjectId = "p1";
+      activeSpaceId = "s1";
+      pendingProjectId = "p1";
+      renderAll();
+      showToast("模拟默认项目已加载");
+    }
+
+    function switchToManyProjects() {
+      // Generate 50+ projects
+      const generated = [];
+      // Include original pinned one
+      generated.push(JSON.parse(JSON.stringify(initialProjects[0])));
+      
+      for (let i = 1; i <= 55; i++) {
+        generated.push({
+          id: `gen-${i}`,
+          name: `project-repository-${i}`,
+          rootPath: `/Users/demo/Dev/project-repository-${i}`,
+          pinned: i <= 2, // pin first two for demo
+          spaces: [
+            { id: `gen-s-main-${i}`, name: "主空间", kind: "main", branch: "main", path: `/Users/demo/Dev/project-repository-${i}` },
+            { id: `gen-s-wt1-${i}`, name: "feature/task-work", kind: "worktree", branch: `feature/task-work-${i}`, base: "main", path: `/Users/demo/Dev/project-repository-${i}/.worktrees/task-work` },
+            { id: `gen-s-wt2-${i}`, name: `hotfix-patch-${i}`, kind: "worktree", branch: `hotfix-patch-${i}`, base: "main", path: `/Users/demo/Dev/project-repository-${i}/.worktrees/hotfix-patch`, missing: i % 7 === 0 }
+          ]
+        });
+      }
+      
+      projects = generated;
+      activeProjectId = "p1";
+      activeSpaceId = "s1";
+      pendingProjectId = "p1";
+      renderAll();
+      showToast("模拟 50+ 项目加载完毕");
+    }
+
+    function switchToEmptyRegistry() {
+      projects = [];
+      activeProjectId = null;
+      activeSpaceId = null;
+      pendingProjectId = null;
+      renderAll();
+      showToast("已清空项目列表（进入 onboarding 状态）");
+    }
+
+    function resetState() {
+      projects = JSON.parse(JSON.stringify(initialProjects));
+      activeProjectId = "p1";
+      activeSpaceId = "s1";
+      pendingProjectId = "p1";
+      activeForm = null;
+      searchQuery = "";
+      document.getElementById("proj-search").value = "";
+      formInputs = {
+        path: "",
+        gitParent: "/Users/demo/GitProjects",
+        gitRemote: ""
+      };
+      formErrors = {
+        path: null,
+        git: null
+      };
+      isCloning = false;
+      renderAll();
+      showToast("原型数据已重置");
+    }
+
+    // Toggle Forms
+    function toggleForm(formType) {
+      if (activeForm === formType) {
+        activeForm = null;
+      } else {
+        activeForm = formType;
+      }
+      renderAll();
+    }
+
+    function openAddForm(formType) {
+      openDialog();
+      activeForm = formType;
+      renderAll();
+    }
+
+    // Search Logic
+    function handleSearch(val) {
+      searchQuery = val.trim().toLowerCase();
+      renderAll();
+    }
+
+    // Get filtered list of projects based on query
+    function getFilteredProjects() {
+      if (!searchQuery) return projects;
+
+      return projects.filter(p => {
+        const matchesProjName = p.name.toLowerCase().includes(searchQuery);
+        const matchesProjPath = p.rootPath.toLowerCase().includes(searchQuery);
+        const matchesSpaces = p.spaces.some(s => 
+          s.name.toLowerCase().includes(searchQuery) || 
+          s.path.toLowerCase().includes(searchQuery) ||
+          (s.branch && s.branch.toLowerCase().includes(searchQuery))
+        );
+
+        return matchesProjName || matchesProjPath || matchesSpaces;
+      });
+    }
+
+    // Main render router
+    function renderAll() {
+      renderSidebar();
+      renderProjectList();
+      renderRightPane();
+    }
+
+    // Render left sidebar header switcher
+    function renderSidebar() {
+      const activeProj = projects.find(p => p.id === activeProjectId);
+      const activeSpace = activeProj ? activeProj.spaces.find(s => s.id === activeSpaceId) : null;
+      
+      const titleBtn = document.getElementById("sidebar-switch-btn");
+      const titleSpan = document.getElementById("sb-title");
+      const subtitleSpan = document.getElementById("sb-subtitle");
+      const newBtn = document.getElementById("sb-new-btn");
+      const wtBtn = document.getElementById("sb-wt-btn");
+
+      if (activeProj && activeSpace) {
+        titleSpan.textContent = activeProj.name;
+        
+        let subText = `空间：${activeSpace.name}`;
+        if (activeSpace.branch) {
+          subText += ` · 分支：${activeSpace.branch}`;
+        }
+        subtitleSpan.textContent = subText;
+        subtitleSpan.title = activeSpace.path;
+        
+        newBtn.disabled = activeSpace.missing;
+        wtBtn.disabled = false;
+        
+        newBtn.onclick = () => {
+          if (activeSpace.missing) return;
+          alert(`在工作空间 [${activeProj.name}] (${activeSpace.name}) 中创建新会话`);
+        };
+        wtBtn.onclick = () => {
+          alert(`从当前路径 ${activeSpace.path} 创建新 WorkTree`);
+        };
+      } else {
+        titleSpan.textContent = "选择项目空间";
+        subtitleSpan.textContent = "尚未添加项目";
+        subtitleSpan.title = "";
+        
+        newBtn.disabled = true;
+        wtBtn.disabled = true;
+      }
+      
+      // Wire switch button click
+      titleBtn.onclick = (e) => {
+        e.stopPropagation();
+        openDialog();
+      };
+    }
+
+    // Render Dialog left projects list
+    function renderProjectList() {
+      const listContainer = document.getElementById("project-list");
+      listContainer.innerHTML = "";
+
+      const filtered = getFilteredProjects();
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `
+          <div style="padding: 20px 12px; color: var(--text-dim); font-size: 11px; text-align: center;">
+            无匹配的项目
+          </div>
+        `;
+        return;
+      }
+
+      // Sort: pinned first, then alphabetical/original
+      const sorted = [...filtered].sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      sorted.forEach(proj => {
+        const card = document.createElement("button");
+        card.className = `project-card ${proj.id === pendingProjectId ? "active" : ""}`;
+        card.onclick = () => {
+          pendingProjectId = proj.id;
+          activeForm = null; // close form when selecting a project
+          renderAll();
+        };
+
+        const starBadge = proj.pinned ? `<span class="badge badge-star">★</span>` : "";
+        const spaceCount = proj.spaces.length;
+        const countBadge = `<span class="badge badge-count">${spaceCount} space${spaceCount > 1 ? "s" : ""}</span>`;
+
+        card.innerHTML = `
+          <div class="card-line">
+            ${starBadge}
+            <span class="card-name" title="${proj.name}">${proj.name}</span>
+            ${countBadge}
+          </div>
+          <div class="card-path" title="${proj.rootPath}">${proj.rootPath}</div>
+        `;
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    // Render Dialog right space pane / onboarding / forms
+    function renderRightPane() {
+      const pane = document.getElementById("space-pane-content");
+      pane.innerHTML = "";
+
+      // Active form state overrides regular project display
+      if (activeForm === 'path') {
+        renderPathForm(pane);
+        updateActiveMiniButtons();
+        return;
+      }
+      if (activeForm === 'git') {
+        renderGitCloneForm(pane);
+        updateActiveMiniButtons();
+        return;
+      }
+
+      updateActiveMiniButtons();
+
+      // Zero projects / onboarding state
+      if (projects.length === 0) {
+        renderOnboardingState(pane);
+        return;
+      }
+
+      // Get pending selected project
+      const proj = projects.find(p => p.id === pendingProjectId);
+      if (!proj) {
+        // Fallback: select first project if pending is invalid
+        if (projects.length > 0) {
+          pendingProjectId = projects[0].id;
+          renderRightPane();
+        }
+        return;
+      }
+
+      // Header info for chosen project
+      const header = document.createElement("div");
+      header.className = "selected-project-header";
+      
+      const pinToggleText = proj.pinned ? "★ 取消置顶项目" : "☆ 置顶项目";
+      
+      header.innerHTML = `
+        <div class="card-line" style="justify-content: space-between;">
+          <span class="card-name" style="font-weight: 800;">${proj.name}</span>
+          <button class="btn-mini" onclick="togglePinProject('${proj.id}')">${pinToggleText}</button>
+        </div>
+        <div class="card-path">${proj.rootPath}</div>
+        <div class="header-hint">点击可用空间立即切换分支/目录。缺失路径保持禁用。</div>
+      `;
+      pane.appendChild(header);
+
+      // Spaces list
+      const list = document.createElement("div");
+      list.className = "space-list";
+
+      // Filter spaces based on search query if applicable
+      let spacesToRender = proj.spaces;
+      if (searchQuery) {
+        spacesToRender = proj.spaces.filter(s => 
+          s.name.toLowerCase().includes(searchQuery) || 
+          s.path.toLowerCase().includes(searchQuery) ||
+          (s.branch && s.branch.toLowerCase().includes(searchQuery))
+        );
+      }
+
+      if (spacesToRender.length === 0) {
+        list.innerHTML = `
+          <div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">
+            当前项目下无匹配空间
+          </div>
+        `;
+        pane.appendChild(list);
+        return;
+      }
+
+      spacesToRender.forEach(space => {
+        const isCurrent = proj.id === activeProjectId && space.id === activeSpaceId;
+        const card = document.createElement("button");
+        card.className = `space-card ${isCurrent ? "active" : ""} ${space.missing ? "disabled" : ""}`;
+        
+        if (space.missing) {
+          card.disabled = true;
+          card.title = `路径不存在: ${space.path}`;
+        } else {
+          card.onclick = () => {
+            selectSpace(proj.id, space.id);
+          };
+          card.title = `切换工作区到: ${space.path}`;
+        }
+
+        const isWt = space.kind === "worktree";
+        const kindBadge = isWt 
+          ? `<span class="badge badge-accent">WT</span>` 
+          : `<span class="badge" style="background:var(--bg-panel);color:var(--text-muted)">Main</span>`;
+
+        const checkMark = isCurrent ? `<span class="space-check">✓</span>` : "";
+        const missingBadge = space.missing ? `<span class="badge badge-danger">路径缺失</span>` : "";
+
+        let metaText = `分支: ${space.branch || 'unknown'}`;
+        if (isWt && space.base) {
+          metaText += ` · 基准: ${space.base}`;
+        }
+        metaText += ` · ${space.path}`;
+
+        card.innerHTML = `
+          <div class="space-title-row">
+            ${checkMark}
+            ${kindBadge}
+            <span class="space-name">${space.name}</span>
+            ${missingBadge}
+          </div>
+          <div class="space-meta" title="${metaText}">${metaText}</div>
+        `;
+        list.appendChild(card);
+      });
+
+      pane.appendChild(list);
+    }
+
+    function updateActiveMiniButtons() {
+      const btnPath = document.getElementById("tb-btn-path");
+      const btnGit = document.getElementById("tb-btn-git");
+      
+      if (btnPath && btnGit) {
+        if (activeForm === 'path') {
+          btnPath.classList.add("active");
+          btnGit.classList.remove("active");
+        } else if (activeForm === 'git') {
+          btnPath.classList.remove("active");
+          btnGit.classList.add("active");
+        } else {
+          btnPath.classList.remove("active");
+          btnGit.classList.remove("active");
+        }
+      }
+    }
+
+    // Switch selection action
+    function selectSpace(projId, spaceId) {
+      activeProjectId = projId;
+      activeSpaceId = spaceId;
+      
+      const proj = projects.find(p => p.id === projId);
+      const space = proj.spaces.find(s => s.id === spaceId);
+      
+      showToast(`已切换工作区: ${proj.name} → ${space.name}`);
+      closeDialog();
+      renderAll();
+    }
+
+    // Pin Toggle
+    function togglePinProject(id) {
+      const proj = projects.find(p => p.id === id);
+      if (proj) {
+        proj.pinned = !proj.pinned;
+        renderAll();
+      }
+    }
+
+    // Render forms
+    function renderPathForm(container) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "space-list";
+      
+      const errHtml = formErrors.path ? `<div class="form-error">${formErrors.path}</div>` : "";
+
+      wrapper.innerHTML = `
+        <div class="form-container">
+          <div class="form-header">
+            <span>Add project path (手动注册目录)</span>
+            <button class="btn-mini" onclick="toggleForm('path')">返回</button>
+          </div>
+          ${errHtml}
+          <div class="form-field">
+            <label for="input-path">项目文件夹绝对路径</label>
+            <input 
+              type="text" 
+              class="form-input" 
+              id="input-path" 
+              placeholder="/Users/username/Workspace/project-name"
+              value="${formInputs.path}"
+              oninput="formInputs.path = this.value"
+            />
+          </div>
+          <div style="font-size:10px; color:var(--text-muted); line-height:1.4">
+            后端会验证此文件夹是否为合法目录，并在 Project Registry 中注册为顶层项目。
+          </div>
+          <div class="form-btn-row">
+            <button class="btn btn-primary" onclick="submitPathForm()">添加项目</button>
+            <button class="btn" onclick="toggleForm('path')">取消</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(wrapper);
+      
+      // Auto-focus input
+      setTimeout(() => document.getElementById("input-path").focus(), 50);
+    }
+
+    function renderGitCloneForm(container) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "space-list";
+      
+      const errHtml = formErrors.git ? `<div class="form-error">${formErrors.git}</div>` : "";
+      const cloneText = isCloning ? "Cloning..." : "Clone and add";
+      const disableAttr = isCloning ? "disabled" : "";
+
+      wrapper.innerHTML = `
+        <div class="form-container">
+          <div class="form-header">
+            <span>Add project from Git (从 Git 仓库克隆)</span>
+            <button class="btn-mini" onclick="toggleForm('git')" ${disableAttr}>返回</button>
+          </div>
+          ${errHtml}
+          <div class="form-field">
+            <label for="input-git-parent">Local Parent Directory (本地父目录)</label>
+            <div class="form-input-group">
+              <input 
+                type="text" 
+                class="form-input" 
+                id="input-git-parent" 
+                placeholder="/Users/username/Workspace"
+                value="${formInputs.gitParent}"
+                oninput="formInputs.gitParent = this.value"
+                ${disableAttr}
+              />
+              <button class="btn" onclick="alert('模拟选择父目录')" ${disableAttr}>Pick</button>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="input-git-remote">Remote Repository URL</label>
+            <input 
+              type="text" 
+              class="form-input" 
+              id="input-git-remote" 
+              placeholder="git@github.com:username/repository.git"
+              value="${formInputs.gitRemote}"
+              oninput="formInputs.gitRemote = this.value"
+              ${disableAttr}
+            />
+          </div>
+          <div style="font-size:10px; color:var(--text-muted); line-height:1.4">
+            后端将在父目录下执行 <code>git clone</code>，并在克隆成功后自动注册该项目。
+          </div>
+          <div class="form-btn-row">
+            <button class="btn btn-primary" id="btn-git-submit" onclick="submitGitCloneForm()" ${disableAttr}>
+              ${isCloning ? '<span style="display:inline-block;animation:spin 1s linear infinite">↻</span>' : ''}
+              ${cloneText}
+            </button>
+            <button class="btn" onclick="toggleForm('git')" ${disableAttr}>取消</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(wrapper);
+      
+      // Auto-focus input
+      setTimeout(() => document.getElementById("input-git-remote").focus(), 50);
+    }
+
+    // Submit Actions
+    function submitPathForm() {
+      const val = formInputs.path.trim();
+      if (!val) {
+        formErrors.path = "请输入文件夹路径。";
+        renderRightPane();
+        return;
+      }
+      
+      // Simulating backend registry validation
+      if (!val.startsWith("/") && !val.startsWith("~")) {
+        formErrors.path = "不合法的路径格式，必须为绝对路径或包含 ~ 家目录。";
+        renderRightPane();
+        return;
+      }
+
+      // Add to projects list
+      const projName = val.split("/").pop() || "new-project";
+      const newProj = {
+        id: `custom-${Date.now()}`,
+        name: projName,
+        rootPath: val,
+        pinned: false,
+        spaces: [
+          { id: `custom-s-${Date.now()}`, name: "主空间", kind: "main", branch: "main", path: val }
+        ]
+      };
+      
+      projects.push(newProj);
+      activeProjectId = newProj.id;
+      activeSpaceId = newProj.spaces[0].id;
+      
+      showToast(`成功添加并切换至新项目: ${projName}`);
+      formInputs.path = "";
+      formErrors.path = null;
+      activeForm = null;
+      closeDialog();
+      renderAll();
+    }
+
+    function submitGitCloneForm() {
+      const parent = formInputs.gitParent.trim();
+      const remote = formInputs.gitRemote.trim();
+      
+      if (!parent || !remote) {
+        formErrors.git = "本地父目录与 Git 仓库 URL 均不能为空。";
+        renderRightPane();
+        return;
+      }
+      
+      // Start fake loading state
+      isCloning = true;
+      formErrors.git = null;
+      renderRightPane();
+      
+      setTimeout(() => {
+        isCloning = false;
+        
+        // Extract repo name
+        let repoName = "cloned-project";
+        const parts = remote.split("/");
+        if (parts.length > 0) {
+          const last = parts[parts.length - 1];
+          repoName = last.replace(".git", "");
+        }
+        
+        const clonePath = `${parent}/${repoName}`;
+        const newProj = {
+          id: `clone-${Date.now()}`,
+          name: repoName,
+          rootPath: clonePath,
+          pinned: false,
+          spaces: [
+            { id: `clone-s-${Date.now()}`, name: "主空间", kind: "main", branch: "main", path: clonePath }
+          ]
+        };
+
+        projects.push(newProj);
+        activeProjectId = newProj.id;
+        activeSpaceId = newProj.spaces[0].id;
+
+        showToast(`仓库克隆成功并已切换工作区: ${repoName}`);
+        formInputs.gitRemote = "";
+        formErrors.git = null;
+        activeForm = null;
+        closeDialog();
+        renderAll();
+      }, 1500); // 1.5s delay simulation
+    }
+
+    // Direct mini buttons simulations
+    function simulateFolderPicker() {
+      alert("调用系统级原生文件夹选择器...\n(模拟选择路径为: /Users/demo/Dev/chosen-directory-folder)");
+      
+      const dirPath = "/Users/demo/Dev/chosen-directory-folder";
+      const projName = "chosen-directory-folder";
+      
+      const newProj = {
+        id: `pick-${Date.now()}`,
+        name: projName,
+        rootPath: dirPath,
+        pinned: false,
+        spaces: [
+          { id: `pick-s-${Date.now()}`, name: "主空间", kind: "main", branch: "main", path: dirPath }
+        ]
+      };
+
+      projects.push(newProj);
+      activeProjectId = newProj.id;
+      activeSpaceId = newProj.spaces[0].id;
+      
+      showToast(`导入文件夹成功！已切换当前工作区至: ${projName}`);
+      closeDialog();
+      renderAll();
+    }
+
+    function simulateDefaultCwd() {
+      const defaultPath = "/Users/demo/agent-default-directory";
+      const projName = "agent-default-directory";
+      
+      const alreadyExists = projects.some(p => p.rootPath === defaultPath);
+      if (alreadyExists) {
+        const found = projects.find(p => p.rootPath === defaultPath);
+        activeProjectId = found.id;
+        activeSpaceId = found.spaces[0].id;
+        showToast("已切换到默认目录");
+      } else {
+        const newProj = {
+          id: `default-${Date.now()}`,
+          name: projName,
+          rootPath: defaultPath,
+          pinned: false,
+          spaces: [
+            { id: `default-s-${Date.now()}`, name: "主空间", kind: "main", branch: "main", path: defaultPath }
+          ]
+        };
+        projects.push(newProj);
+        activeProjectId = newProj.id;
+        activeSpaceId = newProj.spaces[0].id;
+        showToast("已创建并切换到默认工作目录");
+      }
+      
+      closeDialog();
+      renderAll();
+    }
+
+    // Render Onboarding
+    function renderOnboardingState(container) {
+      const onboarding = document.createElement("div");
+      onboarding.className = "empty-state";
+      onboarding.innerHTML = `
+        <div class="empty-icon">📁</div>
+        <div class="empty-title">尚未注册工作项目</div>
+        <div class="empty-desc">
+          新环境或清空项目配置后会显示此引导。Yolk Pi 不会主动扫描历史 session 乱建项目，需要你导入第一个文件夹、指定路径或从远程克隆。
+        </div>
+        <div class="empty-actions">
+          <button class="btn btn-primary" onclick="simulateFolderPicker()">
+            Add project folder…
+          </button>
+          <button class="btn" onclick="toggleForm('path')">
+            Add project path…
+          </button>
+          <button class="btn" onclick="toggleForm('git')">
+            Add project from Git…
+          </button>
+          <button class="btn" onclick="simulateDefaultCwd()">
+            Use default directory
+          </button>
+        </div>
+      `;
+      container.appendChild(onboarding);
+    }
+
+    // Toast logic
+    function showToast(msg) {
+      const toast = document.getElementById("toast-notify");
+      toast.textContent = msg;
+      toast.classList.add("show");
+      
+      setTimeout(() => {
+        toast.classList.remove("show");
+      }, 3000);
+    }
+  </script>
+
+  <!-- Keyframe animation for spinner -->
+  <style>
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+</body>
+</html>
