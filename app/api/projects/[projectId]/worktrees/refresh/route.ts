@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ProjectRegistryError, syncProjectWorktreeSpaces } from "@/lib/project-registry";
+import { ProjectRegistryError, syncMissingWorktreeSpaces, syncProjectWorktreeSpaces } from "@/lib/project-registry";
+import { invalidateAllowedRootsCache } from "@/lib/allowed-roots";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,8 +18,25 @@ function errorResponse(error: unknown) {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { projectId } = await context.params;
-    const result = await syncProjectWorktreeSpaces(decodeURIComponent(projectId));
-    return NextResponse.json(result);
+    const decodedProjectId = decodeURIComponent(projectId);
+    const result = await syncProjectWorktreeSpaces(decodedProjectId);
+
+    // Passive missing-only sync after full git refresh to catch CLI removals
+    let missingSync: { archivedSpaces: typeof result.archivedMissing } | undefined;
+    try {
+      const syncResult = await syncMissingWorktreeSpaces({ projectId: decodedProjectId, reason: "passive_git_sync" });
+      if (syncResult.archivedSpaces.length > 0) {
+        missingSync = { archivedSpaces: syncResult.archivedSpaces.map((s) => s.id) };
+      }
+    } catch {
+      // missing-only is best-effort; full refresh result is authoritative
+    }
+
+    if (result.archivedMissing.length > 0 || missingSync?.archivedSpaces.length) {
+      invalidateAllowedRootsCache();
+    }
+
+    return NextResponse.json({ ...result, ...(missingSync ? { missingSync } : {}) });
   } catch (error) {
     return errorResponse(error);
   }

@@ -4,6 +4,8 @@ import { dirname, isAbsolute, normalize, resolve } from "path";
 import { homedir } from "os";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type {
+  ArchiveWorktreeSpacesOptions,
+  ArchiveWorktreeSpacesResult,
   CreateProjectInput,
   PiWebProjectRecord,
   PiWebProjectRegistryFile,
@@ -14,6 +16,7 @@ import type {
   ProjectPathInfo,
   ProjectSpaceId,
   SpacePatchInput,
+  SyncMissingWorktreeSpacesOptions,
 } from "./project-registry-types";
 import { discoverGitRoot, listGitWorktrees, type WorktreeRecord } from "./git-worktree";
 
@@ -354,30 +357,173 @@ export async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: strin
   return { project, space: result.space, created: result.created };
 }
 
-export async function markWorktreeSpaceArchivedByPath(worktreePath: string): Promise<PiWebProjectSpaceRecord[]> {
-  const pathInfo = await canonicalizeProjectPath(worktreePath);
+function buildPathMatchKeys(pathInfo: ProjectPathInfo): Set<string> {
+  const keys = new Set<string>([pathInfo.pathKey, pathInfo.displayPath]);
+  if (pathInfo.realPath) keys.add(pathInfo.realPath);
+  return keys;
+}
+
+function buildSpacePathKeys(space: PiWebProjectSpaceRecord): Set<string> {
+  const keys = new Set<string>([space.pathKey, space.path]);
+  if (space.realPath) keys.add(space.realPath);
+  return keys;
+}
+
+/**
+ * Archive worktree spaces matching any of the provided paths.
+ *
+ * For each input path, derives canonical pathKey / displayPath / realPath via
+ * {@link canonicalizeProjectPath} and matches against worktree spaces
+ * (`space.kind === "worktree"`) using pathKey as the primary key with
+ * displayPath and realPath as fallbacks.  Matched spaces are soft-archived
+ * (`archived: true, missing: true`) with additive audit metadata — not hard
+ * deleted from the registry.
+ *
+ * @param paths - One or more path aliases (e.g. cwd, status.cwd, repoRoot).
+ * @param options.reason - Audit label stored in `metadata.archivedReason`.
+ * @param options.missing - Whether to set `missing: true`, defaults `true`.
+ * @returns Summary of archived spaces and paths that matched nothing.
+ */
+export async function archiveWorktreeSpacesByPaths(
+  paths: string[],
+  options?: ArchiveWorktreeSpacesOptions,
+): Promise<ArchiveWorktreeSpacesResult> {
   const registry = await readProjectRegistry();
-  const updated: PiWebProjectSpaceRecord[] = [];
+  const reason = options?.reason || "api_archive";
+  const markMissing = options?.missing !== false;
+  const timestamp = nowIso();
+  const archivedSpaces: PiWebProjectSpaceRecord[] = [];
+
+  // Resolve every input path into canonical forms for matching
+  interface Candidate {
+    inputPath: string;
+    pathInfo: ProjectPathInfo;
+    matchKeys: Set<string>;
+  }
+  const candidates: Candidate[] = [];
+  for (const p of paths) {
+    const trimmed = p.trim();
+    if (!trimmed) continue;
+    const pathInfo = await canonicalizeProjectPath(trimmed);
+    candidates.push({ inputPath: trimmed, pathInfo, matchKeys: buildPathMatchKeys(pathInfo) });
+  }
+
+  if (candidates.length === 0) {
+    return { archivedSpaces: [], unmatchedPaths: [] };
+  }
+
+  const matchedInputPaths = new Set<string>();
+  const modifiedProjectIds = new Set<string>();
 
   for (const project of registry.projects) {
     let projectChanged = false;
     for (const [spaceId, space] of Object.entries(project.spaces)) {
-      if (space.kind !== "worktree" || space.pathKey !== pathInfo.pathKey) continue;
+      if (space.kind !== "worktree") continue;
+      if (space.archived && space.missing) continue; // already soft-archived
+
+      const spaceKeys = buildSpacePathKeys(space);
+
+      // Find which input-path candidates match this space
+      const matchedCandidates = candidates.filter((c) => {
+        for (const mk of c.matchKeys) {
+          if (spaceKeys.has(mk)) return true;
+        }
+        return false;
+      });
+
+      if (matchedCandidates.length === 0) continue;
+
       const archivedSpace: PiWebProjectSpaceRecord = {
         ...space,
         archived: true,
-        missing: true,
-        updatedAt: nowIso(),
+        missing: markMissing || space.missing || undefined,
+        updatedAt: timestamp,
+        metadata: {
+          ...space.metadata,
+          archivedReason: reason,
+          archivedAt: timestamp,
+          lastKnownPath: space.path,
+        },
       };
       project.spaces[spaceId as ProjectSpaceId] = archivedSpace;
-      updated.push(archivedSpace);
+      archivedSpaces.push(archivedSpace);
       projectChanged = true;
+
+      for (const c of matchedCandidates) {
+        matchedInputPaths.add(c.inputPath);
+      }
     }
-    if (projectChanged) project.updatedAt = nowIso();
+    if (projectChanged) {
+      project.updatedAt = timestamp;
+      modifiedProjectIds.add(project.id);
+    }
   }
 
-  if (updated.length > 0) await writeRegistry(registry);
-  return updated;
+  const unmatchedPaths = candidates
+    .filter((c) => !matchedInputPaths.has(c.inputPath))
+    .map((c) => c.inputPath);
+
+  if (modifiedProjectIds.size > 0) {
+    await writeRegistry(registry);
+  }
+
+  return { archivedSpaces, unmatchedPaths };
+}
+
+/**
+ * Passive missing-only sync for worktree spaces whose directories no longer
+ * exist on the filesystem.
+ *
+ * Scans non-archived projects for non-archived worktree spaces, checks each
+ * space&apos;s path existence via {@link canonicalizeProjectPath} (which resolves
+ * realpath), and soft-archives (`archived: true, missing: true`) any space
+ * whose path is no longer present.  No git commands are executed.
+ *
+ * Designed as a lightweight companion to the heavier
+ * {@link syncProjectWorktreeSpaces} full refresh.  Suitable for passive
+ * triggers such as project-list loads or Sidebar refreshes.
+ *
+ * Internally delegates to {@link archiveWorktreeSpacesByPaths} so that
+ * the same canonical matching and audit metadata are applied.
+ *
+ * @param options.projectId - Optional single-project scope.
+ * @param options.reason    - Audit label, defaults to `"passive_missing"`.
+ */
+export async function syncMissingWorktreeSpaces(
+  options?: SyncMissingWorktreeSpacesOptions,
+): Promise<ArchiveWorktreeSpacesResult> {
+  const registry = await readProjectRegistry();
+  const reason = options?.reason || "passive_missing";
+  const projectIdFilter = options?.projectId;
+
+  // Collect every non-archived worktree space whose filesystem path is gone
+  const missingPaths: string[] = [];
+
+  for (const project of registry.projects) {
+    if (project.archived) continue;
+    if (projectIdFilter && project.id !== projectIdFilter) continue;
+
+    for (const space of Object.values(project.spaces)) {
+      if (space.kind !== "worktree") continue;
+      if (space.archived) continue;
+
+      const pathInfo = await canonicalizeProjectPath(space.path);
+      if (pathInfo.missing) {
+        missingPaths.push(space.path);
+      }
+    }
+  }
+
+  if (missingPaths.length === 0) {
+    return { archivedSpaces: [], unmatchedPaths: [] };
+  }
+
+  return archiveWorktreeSpacesByPaths(missingPaths, { reason });
+}
+
+export async function markWorktreeSpaceArchivedByPath(worktreePath: string): Promise<PiWebProjectSpaceRecord[]> {
+  const result = await archiveWorktreeSpacesByPaths([worktreePath], { reason: "api_archive" });
+  return result.archivedSpaces;
 }
 
 export async function getProject(projectId: string): Promise<PiWebProjectRecord> {

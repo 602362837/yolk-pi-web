@@ -3,8 +3,8 @@ import { createGitWorktree, getWorktreeStatus, removeGitWorktree, WorktreeUserEr
 import { readPiWebConfig } from "@/lib/pi-web-config";
 import { destroyRpcSessionsForCwd } from "@/lib/rpc-manager";
 import { deleteSessionsForCwd } from "@/lib/session-reader";
-import { registerAllowedRoot } from "@/lib/allowed-roots";
-import { markWorktreeSpaceArchivedByPath, syncRegisteredProjectWorktreeSpace } from "@/lib/project-registry";
+import { invalidateAllowedRootsCache, registerAllowedRoot } from "@/lib/allowed-roots";
+import { archiveWorktreeSpacesByPaths, syncRegisteredProjectWorktreeSpace } from "@/lib/project-registry";
 
 export const dynamic = "force-dynamic";
 
@@ -75,9 +75,26 @@ export async function DELETE(req: NextRequest) {
       ...cleanupAliases.flatMap((alias) => destroyRpcSessionsForCwd(alias)),
     ])];
     const result = await removeGitWorktree(cwd, { force, destroyedSessionIds });
-    const archivedSpaces = await markWorktreeSpaceArchivedByPath(cwd);
-    const deletedSessions = await deleteSessionsForCwd(cwd, cleanupAliases);
-    return NextResponse.json({ ...result, archivedSpaces, deletedSessionIds: deletedSessions.map((session) => session.id) });
+    const aliases = [cwd, ...cleanupAliases];
+    const archiveResult = await archiveWorktreeSpacesByPaths(aliases, { reason: "api_delete" });
+    invalidateAllowedRootsCache();
+
+    let deletedSessionIds: string[] = [];
+    let sessionWarning: string | undefined;
+    try {
+      const deletedSessions = await deleteSessionsForCwd(cwd, cleanupAliases);
+      deletedSessionIds = deletedSessions.map((session) => session.id);
+    } catch (err) {
+      sessionWarning = `Session cleanup warning: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
+    return NextResponse.json({
+      ...result,
+      archivedSpaces: archiveResult.archivedSpaces,
+      deletedSessionIds,
+      ...(archiveResult.unmatchedPaths.length > 0 ? { unmatchedPaths: archiveResult.unmatchedPaths } : {}),
+      ...(sessionWarning ? { warning: sessionWarning } : {}),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = error instanceof WorktreeUserError ? 400 : 500;

@@ -101,6 +101,16 @@ export async function getAllowedRoots(): Promise<Set<string>> {
   return promise;
 }
 
+/**
+ * Invalidate the in-memory allowed-roots cache so the next
+ * {@link getAllowedRoots} call rebuilds the set from scratch.
+ * Call this after your code removes or archives worktree spaces
+ * so stale paths do not remain authorized for the TTL window.
+ */
+export function invalidateAllowedRootsCache(): void {
+  globalThis.__piAllowedRootsCache = undefined;
+}
+
 export function isPathAllowed(target: string, allowedRoots: Set<string>): boolean {
   for (const root of allowedRoots) {
     const useWindowsRules = isWindowsAbsolutePath(target) || isWindowsAbsolutePath(root);

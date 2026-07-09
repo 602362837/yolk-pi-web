@@ -554,7 +554,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const loadProjects = useCallback(async (showLoading = false) => {
     try {
       if (showLoading) setLoading(true);
-      const res = await fetch("/api/projects");
+      const res = await fetch("/api/projects?sync=missing");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { projects?: PiWebProjectRecord[]; error?: string };
       if (data.error) throw new Error(data.error);
@@ -1143,20 +1143,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }, [projects, selectedProjectId, selectedSpaceId]);
 
-  const applyWorktreeFallback = useCallback((removedCwd: string, fallbackCwd?: string) => {
-    setEphemeralWorktrees((prev) => {
-      const next = { ...prev };
-      delete next[removedCwd];
-      return next;
-    });
-    setRemovedWorktreeCwds((prev) => prev.includes(removedCwd) ? prev : [...prev, removedCwd]);
-    if (selectedCwd === removedCwd) {
-      setSelectedCwd(fallbackCwd ?? null);
-    }
-    setExplorerKey((k) => k + 1);
-    void loadSessions(false);
-  }, [loadSessions, selectedCwd]);
-
   const confirmWorktreeAction = useCallback(async () => {
     if (!worktreeAction || worktreeAction.busy) return;
     setWorktreeAction((prev) => prev ? { ...prev, busy: true, error: null, dirtySummary: undefined } : prev);
@@ -1171,7 +1157,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           ? JSON.stringify({ cwd: worktreeAction.cwd, confirmedRisk: true })
           : undefined,
       });
-      const data = await res.json().catch(() => ({})) as WorktreeActionResponse & { dirtySummary?: string | string[] };
+      const data = await res.json().catch(() => ({})) as WorktreeActionResponse & { dirtySummary?: string | string[]; archivedSpaces?: PiWebProjectSpaceRecord[] };
       if (!res.ok || data.error) {
         const dirtySummary = data.status?.dirtySummary ?? (Array.isArray(data.dirtySummary) ? data.dirtySummary : typeof data.dirtySummary === "string" ? data.dirtySummary.split(/\r?\n/).filter(Boolean) : undefined);
         setWorktreeAction((prev) => prev ? {
@@ -1182,15 +1168,87 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         } : prev);
         return;
       }
-      applyWorktreeFallback(worktreeAction.cwd, data.fallbackCwd);
+
+      const removedCwd = worktreeAction.cwd;
+      const archivedSpacesArr = data.archivedSpaces ?? [];
+
+      // 1. Optimistically merge archived spaces into local projects so the
+      //    sidebar immediately hides the worktree space before loadProjects.
+      if (archivedSpacesArr.length > 0) {
+        setProjects((prev) => {
+          const byKey = new Map<string, PiWebProjectSpaceRecord>();
+          for (const s of archivedSpacesArr) {
+            byKey.set(`${s.projectId}:${s.id}`, s);
+          }
+          return prev.map((project) => {
+            let changed = false;
+            const updatedSpaces = { ...project.spaces };
+            for (const [, archivedSpace] of byKey) {
+              if (archivedSpace.projectId === project.id && updatedSpaces[archivedSpace.id]) {
+                updatedSpaces[archivedSpace.id] = archivedSpace;
+                changed = true;
+              }
+            }
+            return changed ? { ...project, spaces: updatedSpaces } : project;
+          });
+        });
+      }
+
+      // 2. Clean ephemeral worktrees and removed cwds.
+      setEphemeralWorktrees((prev) => {
+        const next = { ...prev };
+        delete next[removedCwd];
+        return next;
+      });
+      setRemovedWorktreeCwds((prev) => prev.includes(removedCwd) ? prev : [...prev, removedCwd]);
+
+      // 3. Handle selected-space fallback when the current worktree space
+      //    was archived/deleted. Prefer main space, then any active space
+      //    within the same project, then the API fallbackCwd.
+      if (selectedCwd === removedCwd) {
+        const archivedSpace = archivedSpacesArr.find((s) => s.path === removedCwd);
+        if (archivedSpace) {
+          const project = projects.find((p) => p.id === archivedSpace.projectId);
+          if (project) {
+            const updatedProjectSpaces = { ...project.spaces };
+            for (const s of archivedSpacesArr) {
+              if (s.projectId === project.id) updatedProjectSpaces[s.id] = s;
+            }
+            const activeSpaces = Object.values(updatedProjectSpaces).filter((s) => !s.archived);
+            const fallback = activeSpaces.find((s) => s.id === "main" && !s.missing) ?? activeSpaces.find((s) => !s.missing) ?? activeSpaces[0];
+            if (fallback) {
+              setSelectedProjectId(project.id);
+              setSelectedSpaceId(fallback.id);
+              setSelectedCwd(fallback.path);
+            } else {
+              setSelectedCwd(data.fallbackCwd ?? null);
+            }
+          } else {
+            setSelectedCwd(data.fallbackCwd ?? null);
+          }
+        } else {
+          setSelectedCwd(data.fallbackCwd ?? null);
+        }
+      }
+
+      // 4. Refresh explorer and sessions for the (possibly new) current space.
+      setExplorerKey((k) => k + 1);
+      void loadSessions(false);
+
+      // 5. Notify parent about deleted session files.
       for (const sessionId of data.deletedSessionIds ?? []) {
         onSessionDeleted?.(sessionId);
       }
+
+      // 6. Background-refresh projects so the authoritative registry state
+      //    eventually converges with the optimistic update above.
+      void loadProjects(false);
+
       setWorktreeAction(null);
     } catch (e) {
       setWorktreeAction((prev) => prev ? { ...prev, busy: false, error: e instanceof Error ? e.message : String(e) } : prev);
     }
-  }, [applyWorktreeFallback, onSessionDeleted, worktreeAction]);
+  }, [onSessionDeleted, worktreeAction, selectedCwd, projects, loadProjects, loadSessions]);
 
   const activeProjects = sortProjectsForSidebar(projects);
   const selectedProjectSpace = findProjectSpace(projects, selectedProjectId, selectedSpaceId);

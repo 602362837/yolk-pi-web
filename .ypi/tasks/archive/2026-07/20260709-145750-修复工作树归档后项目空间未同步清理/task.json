@@ -1,0 +1,1248 @@
+{
+  "schemaVersion": 1,
+  "id": "20260709-145750-修复工作树归档后项目空间未同步清理",
+  "title": "修复工作树归档后项目空间未同步清理",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-09T06:57:50.703Z",
+  "updatedAt": "2026-07-09T08:03:51.765Z",
+  "completedAt": "2026-07-09T07:44:47.095Z",
+  "contextIds": [
+    "pi_019f45aa-7d65-793b-b293-90d56ee38546"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-f96d53483990e540789bb906",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T06:58:05.765Z",
+      "finishedAt": "2026-07-09T07:03:07.433Z",
+      "runner": "sdk",
+      "childSessionId": "019f45ab-5b5e-75d3-98e3-6bad4c9d19a2",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T06-58-05-790Z_019f45ab-5b5e-75d3-98e3-6bad4c9d19a2.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45ab-5b5e-75d3-98e3-6bad4c9d19a2",
+        "model": "openai-codex/gpt-5.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请分析并设计\"工作树归档后项目空间未同步清理\"的解决方案。 ## 问题背景 当前工作树（worktree）作为项目下的项目空间（space）存在。当工作树被归档（archived）后，对应的项目空间仍然保留在项目注册表中，导致数据不一致和用户体验差。 需要考虑： 1. 通过 UI/API 归档工作树时的主动清理 2. 非UI操作（CLI、直接文件操作等）导致工作树归档时的被动同步/检测 3. 边缘情况：工作树目录被删除、移动等 ## 你的任务 1. 阅读相关代码，理解： -…",
+      "summary": "已完成架构分析与设计产物，未修改生产代码。\n\n## 产物\n\n- `docs/design/worktree-archive-space-sync.md`\n  - 包含现状代码分析、主动清理方案、被动同步方案、边缘情况、实施步骤与风险。\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/`\n  - `brief.md`\n  - `prd.md`\n  - `ui.md`\n  - `design.md`\n  - `implement.md`\n  - `checks.md`\n  - `plan-review.md`\n  - `handoff.md`\n\n## 关键结论\n\n- 后端 archive/delete API 已调用 `markWorktreeSpaceArchivedByPath()`，但 `SessionSidebar` 成功后未刷新/更新 `projects` 状态，是 UI 仍保留旧 WorkTree space 的主要原因。\n- 非 UI 操作目前缺少默认被动同步；建议增加 missing-only sync，并继续复用现有 full refresh。\n- 推荐“软清理”：标记 `archived: true, missing: true`，不硬删除 registry space。\n\n## 验证\n\n未运行 `npm run lint` / `tsc`；本次仅产出设计与规划文档。\n\n## 剩余风险 / 需主会话决策\n\n1. 是否确认采用软清理，而不是从 Project Registry 硬删除 space。\n2. 是否允许 `GET /api/projects` 做 missing-only 被动同步写入；若不允许，应改为显式 sync endpoint。\n3. UI 原型门禁已触发：需要 UI 设计员 HTML 原型，或主会话明确批准“无新增视觉，仅状态同步 bugfix”后再实现。",
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.5",
+          "arg": "openai-codex/gpt-5.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T06:58:05.765Z",
+        "updatedAt": "2026-07-09T07:03:07.433Z",
+        "eventCount": 9917,
+        "lastTextPreview": "已完成架构分析与设计产物，未修改生产代码。\n\n## 产物\n\n- `docs/design/worktree-archive-space-sync.md`\n  - 包含现状代码分析、主动清理方案、被动同步方案、边缘情况、实施步骤与风险。\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/`\n  - `brief.md`\n  - `prd.md`\n  - `ui.md`\n  - `design.md`\n  - `implement.md`\n  - `checks.md`\n  - `plan-review.md`\n  - `handoff.md`\n\n## 关键结论\n\n- 后端 archive/delete API 已调用 `markWorktreeSpaceArchivedByPath()`，但 `SessionSidebar` 成功后未刷新/更新 `projects` 状态，是 UI 仍保留旧 WorkTree space 的主要原因。\n- 非 UI 操作目前缺少默认被动同步；建议增加 missing-only sync，并继续复用现有 full refresh。\n- 推荐“软清理”：标记 `archived: true, missing: true`，不硬删除 registry space。\n\n## 验证\n\n未运行 `npm run lint` / `tsc`；本次仅产出设计与规划文档。\n\n## 剩余风险 / 需主会话决策\n\n1. 是否确认采用软清理，而不是从 Project Registry 硬删除 space。\n2. 是否允许 `GET /api/projects` 做 missing-only 被动同步写入；若不允许，应改为显式 sync endpoint。\n3. UI 原型门禁已触发：需要 UI 设计员 HTML 原型，或主会话明确批准“无新增视觉，仅状态同步 bugfix”后再实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:02:48.459Z",
+            "toolCallId": "call_MVFMhtT7j1JgViMDpGpgaoYF|fc_028453c59da92067016a4f4792d0208199b8e6c2a3fd74604b",
+            "toolName": "write",
+            "text": "Successfully wrote 606 bytes to .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:02:56.528Z",
+            "toolCallId": "call_4Gtsf1IpGgm6R9lU1axK0fFU|fc_028453c59da92067016a4f479c5c588199a0ffc87abaa55e47",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short && git diff -- docs/design/worktree-archive-space-sync.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/brief.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/prd.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/ui.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/design.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/implement.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/checks.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/plan-review.md .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/handoff.md --stat\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:02:56.654Z",
+            "toolCallId": "call_4Gtsf1IpGgm6R9lU1axK0fFU|fc_028453c59da92067016a4f479c5c588199a0ffc87abaa55e47",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260709-145750-\\344\\277\\256\\345\\244\\215\\345\\267\\245\\344\\275\\234\\346\\240\\221\\345\\275\\222\\346\\241\\243\\345\\220\\216\\351\\241\\271\\347\\233\\256\\347\\251\\272\\351\\227\\264\\346\\234\\252\\345\\220\\214\\346\\255\\245\\346\\270\\205\\347\\220\\206/\"\n?? docs/design/",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:03:07.418Z",
+            "text": "已完成架构分析与设计产物，未修改生产代码。\n\n## 产物\n\n- `docs/design/worktree-archive-space-sync.md`\n  - 包含现状代码分析、主动清理方案、被动同步方案、边缘情况、实施步骤与风险。\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/`\n  - `brief.md`\n  - `prd.md`\n  - `ui.md`\n  - `design.md`\n  - `implement.md`\n  - `checks.md`\n  - `plan-review.md`\n  - `handoff.md`\n\n## 关键结论\n\n- 后端 archive/delete API 已调用 `markWorktreeSpaceArchivedByPath()`，但 `SessionSidebar` 成功后未刷新/更新 `projects` 状态，是 UI 仍保留旧 WorkTree space 的主要原因。\n- 非 UI 操作目前缺少默认被动同步；建议增加 missing-only sync，并继续复用现有 full refresh。\n- 推荐“软清理”：标记 `archived: true, missing: true`，不硬删除 registry space。\n\n## 验证\n\n未运行 `npm run lint` / `tsc`；本次仅产出设计与规划文档。\n\n## 剩余风险 / 需主会话决策\n\n1. 是否确认采用软清理，而不是从 Project Registry 硬删除 space。\n2. 是否允许 `GET /api/projects` 做 missing-only 被动同步写入；若不允许，应改为显式 sync endpoint。\n3. UI 原型门禁已触发：需要 UI 设计员 HTML 原型，或主会话明确批准“无新增视觉，仅状态同步 bugfix”后再实现。",
+            "model": "openai-codex/gpt-5.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:03:07.426Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 832,
+        "tokens": 500,
+        "tokenSource": "usage",
+        "tps": 87.75,
+        "firstTokenAt": "2026-07-09T07:03:01.579Z",
+        "lastTokenAt": "2026-07-09T07:03:07.277Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-f96d53483990e540789bb906",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/architect-f96d53483990e540789bb906.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T06:58:05.765Z",
+        "finishedAt": "2026-07-09T07:03:07.431Z",
+        "updatedAt": "2026-07-09T07:03:07.431Z",
+        "itemCount": 83,
+        "messageCount": 1,
+        "toolCallCount": 39,
+        "stderrBytes": 0,
+        "bytes": 245001,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45ab-5b5e-75d3-98e3-6bad4c9d19a2",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T06-58-05-790Z_019f45ab-5b5e-75d3-98e3-6bad4c9d19a2.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-999abfb53ea526c9e6855711",
+      "subtaskId": "WT-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:10:05.301Z",
+      "finishedAt": "2026-07-09T07:13:23.723Z",
+      "runner": "sdk",
+      "childSessionId": "019f45b6-562b-7007-890d-019b3a89e21c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-10-05-355Z_019f45b6-562b-7007-890d-019b3a89e21c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45b6-562b-7007-890d-019b3a89e21c",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实施 WT-01：统一 WorkTree space 归档匹配 helper ## 任务目标 在 `lib/project-registry.ts` 中新增或重构 WorkTree space 归档 helper，支持多个 path alias 匹配，确保归档/删除 worktree 时能准确找到对应的 space。 ## 具体需求 1. **核心功能** - 新增 `archiveWorktreeSpacesByPaths(paths: string[], options…",
+      "summary": "All clean. Here's the summary:\n\n---\n\n## Implementation Complete — WT-01\n\n### Files Changed\n\n- **`lib/project-registry-types.ts`** — Added `ArchiveWorktreeReason` union type, `ArchiveWorktreeSpacesOptions` interface, and `ArchiveWorktreeSpacesResult` interface.\n- **`lib/project-registry.ts`** — Added `buildPathMatchKeys()`, `buildSpacePathKeys()` helpers; added exported `archiveWorktreeSpacesByPaths()` function; refactored `markWorktreeSpaceArchivedByPath()` to delegate to the new helper.\n\n### Key Design\n\n**`archiveWorktreeSpacesByPaths(paths, options?)`** — the unified archiving helper:\n\n| Aspect | Detail |\n|---|---|\n| **Path resolution** | Each input path → `canonicalizeProjectPath()` → `{ pathKey, displayPath, realPath }` |\n| **Primary match** | `candidate.pathKey === space.pathKey` via set intersection |\n| **Fallback match** | Display path and realPath cross-matched against `space.path`, `space.pathKey`, `space.realPath` |\n| **Scope guard** | Only `space.kind === \"worktree\"`; skips already-archived spaces |\n| **Soft archive** | `archived: true, missing: true` plus additive metadata (`archivedReason`, `archivedAt`, `lastKnownPath`) |\n| **Return** | `{ archivedSpaces[], unmatchedPaths[] }` — deduplicated across alias overlaps |\n| **Backward compat** | `markWorktreeSpaceArchivedByPath(p)` now calls `archiveWorktreeSpacesByPaths([p])` and returns `.archivedSpaces` — same signature, no caller changes needed |\n\n### Verification\n\n```\nnpm run lint           ✓ passed (no output)\ntsc --noEmit           ✓ passed (no output)\n```\n\n### Acceptance Checklist\n\n- [x] Can match by cwd/status.cwd/repoRoot alias — multi-path input → single dedup'd archive\n- [x] Directory-missing fallback — `canonicalizeProjectPath` returns displayPath as pathKey; cross-matched against stored `space.path`\n- [x] `markWorktreeSpaceArchivedByPath` callers (archive + delete routes) unchanged — same return type, no signature break\n- [x] Lint + type-check pass\n\n### Notes / Risks\n\n- Set-intersection matching is deliberately broad across pathKey/displayPath/realPath forms within the `kind === \"worktree\"` guard. No known false-match scenario in practice (upsertWorktreeSpace already deduplicates by pathKey), but downstream WT-02/WT-03 should verify behavior with symlink projects.\n- The new function skips spaces already `archived && missing` to avoid redundant writes — `markWorktreeSpaceArchivedByPath` previously re-wrote them idempotently; this is a safe optimization.\n- Ready for WT-02 (missing-only passive sync).",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:10:05.301Z",
+        "updatedAt": "2026-07-09T07:13:23.723Z",
+        "eventCount": 11891,
+        "lastTextPreview": "All clean. Here's the summary:\n\n---\n\n## Implementation Complete — WT-01\n\n### Files Changed\n\n- **`lib/project-registry-types.ts`** — Added `ArchiveWorktreeReason` union type, `ArchiveWorktreeSpacesOptions` interface, and `ArchiveWorktreeSpacesResult` interface.\n- **`lib/project-registry.ts`** — Added `buildPathMatchKeys()`, `buildSpacePathKeys()` helpers; added exported `archiveWorktreeSpacesByPaths()` function; refactored `markWorktreeSpaceArchivedByPath()` to delegate to the new helper.\n\n### Key Design\n\n**`archiveWorktreeSpacesByPaths(paths, options?)`** — the unified archiving helper:\n\n| Aspect | Detail |\n|---|---|\n| **Path resolution** | Each input path → `canonicalizeProjectPath()` → `{ pathKey, displayPath, realPath }` |\n| **Primary match** | `candidate.pathKey === space.pathKey` via set intersection |\n| **Fallback match** | Display path and realPath cross-matched against `space.path`, `space.pathKey`, `space.realPath` |\n| **Scope guard** | Only `space.kind === \"worktree\"`; skips already-archived spaces |\n| **Soft archive** | `archived: true, missing: true` plus additive metadata (`archivedReason`, `archivedAt`, `lastKnownPath`) |\n| **Return** | `{ archivedSpaces[], unmatchedPaths[] }` — deduplicated across alias overlaps |\n| **Backward compat** | `markWorktreeSpaceArchivedByPath(p)` now calls `archiveWorktreeSpacesByPaths([p])` and returns `.archivedSpaces` — same signature, no caller changes needed |\n\n### Verification\n\n```\nnpm run lint           ✓ passed (no output)\ntsc --noEmit           ✓ passed (no output)\n```\n\n### Acceptance Checklist\n\n- [x] Can match by cwd/status.cwd/repoRoot alias — multi-path input → single dedup'd archive\n- [x] Directory-missing fallback — `canonicalizeProjectPath` returns displayPath as pathKey; cross-matched against stored `space.path`\n- [x] `markWorktreeSpaceArchivedByPath` callers (archive + delete routes) unchanged — same return type, no signature break\n- [x] Lint + type-check pass\n\n### Notes / Risks\n\n- Set-intersection matching is deliberately broad across pathKey/displayPath/realPath forms within the `kind === \"worktree\"` guard. No known false-match scenario in practice (upsertWorktreeSpace already deduplicates by pathKey), but downstream WT-02/WT-03 should verify behavior with symlink projects.\n- The new function skips spaces already `archived && missing` to avoid redundant writes — `markWorktreeSpaceArchivedByPath` previously re-wrote them idempotently; this is a safe optimization.\n- Ready for WT-02 (missing-only passive sync).",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:13:04.558Z",
+            "toolCallId": "call_01_eaH5PWQKnLJ7jA5V3wcm4884",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/project-registry.ts\",\n  \"offset\": 270\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:13:04.571Z",
+            "toolCallId": "call_00_qshBKNALzhssk7f5iQuR6246",
+            "toolName": "read",
+            "text": "export type ArchiveWorktreeReason = \"api_archive\" | \"api_delete\" | \"passive_missing\" | \"passive_git_sync\";\n\nexport interface ArchiveWorktreeSpacesOptions {\n  reason?: ArchiveWorktreeReason;\n  missing?: boolean;\n}\n\nexport interface ArchiveWorktreeSpacesResult {\n  archivedSpaces: PiWebProjectSpaceRecord[];\n  unmatchedPaths: string[];\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:13:04.576Z",
+            "toolCallId": "call_01_eaH5PWQKnLJ7jA5V3wcm4884",
+            "toolName": "read",
+            "text": "}\n  if (changed) next.updatedAt = nowIso();\n  return next;\n}\n\nexport async function updateProject(projectId: string, patch: ProjectPatchInput): Promise<PiWebProjectRecord> {\n  const registry = await readProjectRegistry();\n  const index = registry.projects.findIndex((project) => project.id === projectId);\n  if (index < 0) throw new ProjectRegistryError(\"Project not found\", 404);\n  const updated = applyProjectPatch(registry.projects[index], patch);\n  registry.projects[index] = updated;\n  await writeRegistry(registry);\n  return updated;\n}\n\nexport async function listProjectSpaces(projectId: string): Promise<PiWebProjectSpaceRecord[]> {\n  const project = await getProject(projectId);\n  return Object.values(project.spaces);\n}\n\nexport async function syncProjectWorktreeSpaces(projectId: string): Promise<{\n  project: PiWebProjectRecord;\n  spaces: PiWebProjectSpaceRecord[];\n  created: string[];\n  archivedMissing: string[];\n}> {\n  const registry = await readProjectRegistry();\n  const projectIndex = registry.projects.findIndex((project) => project.id === projectId);\n  if (projectIndex < 0) throw new ProjectRegistryError(\"Project not found\", 404);\n  const project = registry.projects[projectIndex];\n\n  let repoRoot: string;\n  try {\n    repoRoot = await discoverGitRoot(project.rootPath);\n  } catch {\n    return { project, spaces: Object.values(project.spaces).filter((space) => space.kind === \"worktree\"), created: [], archivedMissing: [] };\n  }\n\n  const worktrees = await listGitWorktrees(repoRoot);\n  const mainWorktree = worktrees[0];\n  const discoveredKeys = new Set<string>();\n  const created: string[] = [];\n\n  for (const record of worktrees) {\n    const pathInfo = await canonicalizeProjectPath(record.path);\n    const mainPathInfo = mainWorktree ? await canonicalizeProjectPath(mainWorktree.path) : undefined;\n    const isMain = mainPathInfo ? pathInfo.pathKey === mainPathInfo.pathKey : pathInfo.pathKey === project.pathKey;\n    if (isMain || record.bare) continue;\n    discoveredKeys.add(pathInfo.pathKey);\n    const result = await upsertWorktreeSpace(project, record, mainWorktree);\n    if (result.created) created.push(result.space.id);\n  }\n\n  const archivedMissing: string[] = [];\n  for (const [spaceId, space] of Object.entries(project.spaces)) {\n    if (space.kind !== \"worktree\" || discoveredKeys.has(space.pathKey) || space.archived && space.missing) continue;\n    project.spaces[spaceId as ProjectSpaceId] = {\n      ...space,\n      archived: true,\n      missing: true,\n      updatedAt: nowIso(),\n    };\n    archivedMissing.push(spaceId);\n  }\n\n  project.updatedAt = nowIso();\n  registry.projects[projectIndex] = project;\n  await writeRegistry(registry);\n  return { project, spaces: Object.values(project.spaces).filter((space) => space.kind === \"worktree\"), created, archivedMissing };\n}\n\nexport async function syncRegisteredProjectWorktreeSpace(mainWorktreePath: string, worktreePath: string, branch?: string, baseRef?: string): Promise<{\n  project: PiWebProjectRecord;\n  space: PiWebProjectSpaceRecord;\n  created: boolean;\n} | null> {\n  const mainPathInfo = await canonicalizeProjectPath(mainWorktreePath);\n  const registry = await readProjectRegistry();\n  const projectIndex = registry.projects.findIndex((project) => !project.archived && project.pathKey === mainPathInfo.pathKey);\n  if (projectIndex < 0) return null;\n\n  const project = registry.projects[projectIndex];\n  const result = await upsertWorktreeSpace(project, { path: worktreePath, branch, baseRef }, { path: mainWorktreePath });\n  project.updatedAt = nowIso();\n  registry.projects[projectIndex] = project;\n  await writeRegistry(registry);\n  return { project, space: result.space, created: result.created };\n}\n\nfunction buildPathMatchKeys(pathInfo: ProjectPathInfo): Set<string> {\n  const keys = new Set<string>([pathInfo.pathKey, pathInfo.displayPath]);\n  if (pathInfo.realPath) keys.add(pathInfo.realPath);\n  return keys;\n}\n\nfunction buildSpacePathKeys(space: PiWebProjectSpaceRecord): Set<string> {\n  const keys = new Set<string>([space.pathKey, space.path]);\n  if (space.realPath) keys.add(space.realPath);\n  return keys;\n}\n\n/**\n * Archive worktree spaces matching any of the provided paths.\n *\n * For each input path, derives canonical pathKey / displayPath / realPath via\n * {@link canonicalizeProjectPath} and matches against worktree spaces\n * (`space.kind === \"worktree\"`) using pathKey as the primary key with\n * displayPath and realPath as fallbacks.  Matched spaces are soft-archived\n * (`archived: true, missing: true`) with additive audit metadata — not hard\n * deleted from the registry.\n *\n * @param paths - One or more path aliases (e.g. cwd, status.cwd, repoRoot).\n * @param options.reason - Audit label stored in `metadata.archivedReason`.\n * @param options.missing - Whether to set `missing: true`, defaults `true`.\n * @returns Summary of archived spaces and paths that matched nothing.\n */\nexport async function archiveWorktreeSpacesByPaths(\n  paths: string[],\n  options?: ArchiveWorktreeSpacesOptions,\n): Promise<ArchiveWorktreeSpacesResult> {\n  const registry = await readProjectRegistry();\n  const reason = options?.reason || \"api_archive\";\n  const markMissing = options?.missing !== false;\n  const timestamp = nowIso();\n  const archivedSpaces: PiWebProjectSpaceRecord[] = [];\n\n  // Resolve every input path into canonical forms for matching\n  interface Candidate {\n    inputPath: string;\n    pathInfo: ProjectPathInfo;\n    matchKeys: Set<string>;\n  }\n  const candidates: Candidate[] = [];\n  for (const p of paths) {\n    const trimmed = p.trim();\n    if (!trimmed) continue;\n    const pathInfo = await canonicalizeProjectPath(trimmed);\n    candidates.push({ inputPath: trimmed, pathInfo, matchKeys: buildPathMatchKeys(pathInfo) });\n  }\n\n  if (candidates.length === 0) {\n    return { archivedSpaces: [], unmatchedPaths: [] };\n  }\n\n  const matchedInputPaths = new Set<string>();\n  const modifiedProjectIds = new Set<string>();\n\n  for (const project of registry.projects) {\n    let projectChanged = false;\n    for (const [spaceId, space] of Object.entries(project.spaces)) {\n      if (space.kind !== \"worktree\") continue;\n      if (space.archived && space.missing) continue; // already soft-archived\n\n      const spaceKeys = buildSpacePathKeys(space);\n\n      // Find which input-path candidates match this space\n      const matchedCandidates = candidates.filter((c) => {\n        for (const mk of c.matchKeys) {\n          if (spaceKeys.has(mk)) return true;\n        }\n        return false;\n      });\n\n      if (matchedCandidates.length === 0) continue;\n\n      const archivedSpace: PiWebProjectSpaceRecord = {\n        ...space,\n        archived: true,\n        missing: markMissing || space.missing || undefined,\n        updatedAt: timestamp,\n        metadata: {\n          ...space.metadata,\n          archivedReason: reason,\n          archivedAt: timestamp,\n          lastKnownPath: space.path,\n        },\n      };\n      project.spaces[spaceId as ProjectSpaceId] = archivedSpace;\n      archivedSpaces.push(archivedSpace);\n      projectChanged = true;\n\n      for (const c of matchedCandidates) {\n        matchedInputPaths.add(c.inputPath);\n      }\n    }\n    if (projectChanged) {\n      project.updatedAt = timestamp;\n      modifiedProjectIds.add(project.id);\n    }\n  }\n\n  const unmatchedPaths = candidates\n    .filter((c) => !matchedInputPaths.has(c.inputPath))\n    .map((c) => c.inputPath);\n\n  if (modifiedProjectIds.size > 0) {\n    await writeRegistry(registry);\n  }\n\n  return { archivedSpaces, unmatchedPaths };\n}\n\nexport async function markWorktreeSpaceArchivedByPath(worktreePath: string): Promise<PiWebProjectSpaceRecord[]> {\n  const result = await archiveWorktreeSpacesByPaths([worktreePath], { reason: \"api_archive\" });\n  return result.archivedSpaces;\n}\n\nexport async function getProject(projectId: string): Promise<PiWebProjectRecord> {\n  const registry = await readProjectRegistry();\n  const project = registry.projects.find((item) => item.id === projectId);\n  if (!project) throw new ProjectRegistryError(\"Project not found\", 404);\n  return project;\n}\n\nexport async function getProjectSpace(projectId: string, spaceId: string): Promise<PiWebProjectSpaceRecord> {\n  const project = await getProject(projectId);\n  const space = project.spaces[spaceId as ProjectSpaceId];\n  if (!space) throw new ProjectRegistryError(\"Project space not found\", 404);\n  return space;\n}\n\nexport async function updateProjectSpace(projectId: string, spaceId: string, patch: SpacePatchInput): Promise<PiWebProjectSpaceRecord> {\n  const registry = await readProjectRegistry();\n  const projectIndex = registry.projects.findIndex((project) => project.id === projectId);\n  if (projectIndex < 0) throw new ProjectRegistryError(\"Project not found\", 404);\n  const project = registry.projects[projectIndex];\n  const typedSpaceId = spaceId as ProjectSpaceId;\n  const space = project.spaces[typedSpaceId];\n  if (!space) throw new ProjectRegistryError(\"Project space not found\", 404);\n\n  const updatedSpace = applyProjectPatch(space, patch);\n  if (patch.missing !== undefined) {\n    updatedSpace.missing = assertBoolean(patch.missing, \"missing\") || undefined;\n    updatedSpace.updatedAt = nowIso();\n  }\n  project.spaces = { ...project.spaces, [typedSpaceId]: updatedSpace };\n  project.updatedAt = nowIso();\n  registry.projects[projectIndex] = project;\n  await writeRegistry(registry);\n  return updatedSpace;\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:13:23.708Z",
+            "text": "All clean. Here's the summary:\n\n---\n\n## Implementation Complete — WT-01\n\n### Files Changed\n\n- **`lib/project-registry-types.ts`** — Added `ArchiveWorktreeReason` union type, `ArchiveWorktreeSpacesOptions` interface, and `ArchiveWorktreeSpacesResult` interface.\n- **`lib/project-registry.ts`** — Added `buildPathMatchKeys()`, `buildSpacePathKeys()` helpers; added exported `archiveWorktreeSpacesByPaths()` function; refactored `markWorktreeSpaceArchivedByPath()` to delegate to the new helper.\n\n### Key Design\n\n**`archiveWorktreeSpacesByPaths(paths, options?)`** — the unified archiving helper:\n\n| Aspect | Detail |\n|---|---|\n| **Path resolution** | Each input path → `canonicalizeProjectPath()` → `{ pathKey, displayPath, realPath }` |\n| **Primary match** | `candidate.pathKey === space.pathKey` via set intersection |\n| **Fallback match** | Display path and realPath cross-matched against `space.path`, `space.pathKey`, `space.realPath` |\n| **Scope guard** | Only `space.kind === \"worktree\"`; skips already-archived spaces |\n| **Soft archive** | `archived: true, missing: true` plus additive metadata (`archivedReason`, `archivedAt`, `lastKnownPath`) |\n| **Return** | `{ archivedSpaces[], unmatchedPaths[] }` — deduplicated across alias overlaps |\n| **Backward compat** | `markWorktreeSpaceArchivedByPath(p)` now calls `archiveWorktreeSpacesByPaths([p])` and returns `.archivedSpaces` — same signature, no caller changes needed |\n\n### Verification\n\n```\nnpm run lint           ✓ passed (no output)\ntsc --noEmit           ✓ passed (no output)\n```\n\n### Acceptance Checklist\n\n- [x] Can match by cwd/status.cwd/repoRoot alias — multi-path input → single dedup'd archive\n- [x] Directory-missing fallback — `canonicalizeProjectPath` returns displayPath as pathKey; cross-matched against stored `space.path`\n- [x] `markWorktreeSpaceArchivedByPath` callers (archive + delete routes) unchanged — same return type, no signature break\n- [x] Lint + type-check pass\n\n### Notes / Risks\n\n- Set-intersection matching is deliberately broad across pathKey/displayPath/realPath forms within the `kind === \"worktree\"` guard. No known false-match scenario in practice (upsertWorktreeSpace already deduplicates by pathKey), but downstream WT-02/WT-03 should verify behavior with symlink projects.\n- The new function skips spaces already `archived && missing` to avoid redundant writes — `markWorktreeSpaceArchivedByPath` previously re-wrote them idempotently; this is a safe optimization.\n- Ready for WT-02 (missing-only passive sync).",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:13:23.717Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3162,
+        "tokens": 1159,
+        "tokenSource": "usage",
+        "tps": 6.18,
+        "firstTokenAt": "2026-07-09T07:10:16.136Z",
+        "lastTokenAt": "2026-07-09T07:13:23.691Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-999abfb53ea526c9e6855711",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/implementer-999abfb53ea526c9e6855711.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:10:05.301Z",
+        "finishedAt": "2026-07-09T07:13:23.722Z",
+        "updatedAt": "2026-07-09T07:13:23.722Z",
+        "itemCount": 36,
+        "messageCount": 6,
+        "toolCallCount": 13,
+        "stderrBytes": 0,
+        "bytes": 73020,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f45b6-562b-7007-890d-019b3a89e21c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-10-05-355Z_019f45b6-562b-7007-890d-019b3a89e21c.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a53aa9257575fa9f091b67d6",
+      "subtaskId": "WT-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:13:55.292Z",
+      "finishedAt": "2026-07-09T07:15:33.973Z",
+      "runner": "sdk",
+      "childSessionId": "019f45b9-d883-797e-90ab-caa37b26ff0f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-13-55-331Z_019f45b9-d883-797e-90ab-caa37b26ff0f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45b9-d883-797e-90ab-caa37b26ff0f",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实施 WT-02：增加 missing-only 被动同步 ## 任务目标 在 `lib/project-registry.ts` 中实现 `syncMissingWorktreeSpaces` 函数，用于在 UI 外操作（CLI、直接文件操作等）导致工作树缺失时，被动检测并归档对应的 space。 ## 具体需求 1. **核心功能** - 新增 `syncMissingWorktreeSpaces(options?)` 函数 - 可按全部项目或单 project 扫描非…",
+      "summary": "All clean. Here's the handoff:\n\n---\n\n### Implementation Complete — WT-02: 增加 missing-only 被动同步\n\n#### Files Changed\n\n- **`lib/project-registry-types.ts`** — 新增 `SyncMissingWorktreeSpacesOptions` 类型（`projectId?: string; reason?: \"passive_missing\"`）\n- **`lib/project-registry.ts`** — 新增 `syncMissingWorktreeSpaces()` 导出函数\n\n#### Key Design Decisions\n\n- **复用 WT-01 的 `archiveWorktreeSpacesByPaths`**：收集所有缺失路径后一次调用，确保与主动清理使用相同的 canonical 匹配、audit metadata（`archivedReason`, `archivedAt`）和原子 registry 写入。\n- **路径检测用 `canonicalizeProjectPath`** 而非裸 `fs.stat`：因为 `canonicalizeProjectPath` 内部通过 `realpath` 解析 symlink 并产出 `pathKey`，与 registry 存储的 `space.pathKey` 同源，避免规范化差异导致漏检或重复归档。\n- **过滤规则严格**：`project.archived` → skip; `space.kind !== \"worktree\"` → skip; `space.archived` → skip; main space 自然被 `kind` 过滤排除。\n- **返回 `ArchiveWorktreeSpacesResult`**（含 `archivedSpaces` + `unmatchedPaths`）而非自定义接口，与 `archiveWorktreeSpacesByPaths` 保持一致，方便 WT-03 的 API 调用方统一处理。\n\n#### Verification\n\n```bash\nnpm run lint     # clean\nnode_modules/.bin/tsc --noEmit  # clean\n```\n\n#### Notes / Risks\n\n- 临时挂载点不可达会被标记 `missing` → `archived`，v1 按设计接受此行为；若产品担心可在 WT-03 接入时增加调用节流或二次确认。\n- 函数本身不调用 Git，Git 不可用时仍可运行（验收标准满足）。\n- 依赖 WT-01 已完成；当前 `archiveWorktreeSpacesByPaths` 已实现，函数签名与调用匹配。\n\n#### Next: WT-03\n\n`syncMissingWorktreeSpaces` 已就绪，WT-03 可在以下位置接入：\n- `GET /api/projects` 增加 `?sync=missing` 参数或默认触发\n- `POST /api/projects/[projectId]/worktrees/refresh` 作为 full refresh 的前置/后置步骤\n- 前端 `loadProjects()` 传参触发",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:13:55.292Z",
+        "updatedAt": "2026-07-09T07:15:33.973Z",
+        "eventCount": 5015,
+        "lastTextPreview": "All clean. Here's the handoff:\n\n---\n\n### Implementation Complete — WT-02: 增加 missing-only 被动同步\n\n#### Files Changed\n\n- **`lib/project-registry-types.ts`** — 新增 `SyncMissingWorktreeSpacesOptions` 类型（`projectId?: string; reason?: \"passive_missing\"`）\n- **`lib/project-registry.ts`** — 新增 `syncMissingWorktreeSpaces()` 导出函数\n\n#### Key Design Decisions\n\n- **复用 WT-01 的 `archiveWorktreeSpacesByPaths`**：收集所有缺失路径后一次调用，确保与主动清理使用相同的 canonical 匹配、audit metadata（`archivedReason`, `archivedAt`）和原子 registry 写入。\n- **路径检测用 `canonicalizeProjectPath`** 而非裸 `fs.stat`：因为 `canonicalizeProjectPath` 内部通过 `realpath` 解析 symlink 并产出 `pathKey`，与 registry 存储的 `space.pathKey` 同源，避免规范化差异导致漏检或重复归档。\n- **过滤规则严格**：`project.archived` → skip; `space.kind !== \"worktree\"` → skip; `space.archived` → skip; main space 自然被 `kind` 过滤排除。\n- **返回 `ArchiveWorktreeSpacesResult`**（含 `archivedSpaces` + `unmatchedPaths`）而非自定义接口，与 `archiveWorktreeSpacesByPaths` 保持一致，方便 WT-03 的 API 调用方统一处理。\n\n#### Verification\n\n```bash\nnpm run lint     # clean\nnode_modules/.bin/tsc --noEmit  # clean\n```\n\n#### Notes / Risks\n\n- 临时挂载点不可达会被标记 `missing` → `archived`，v1 按设计接受此行为；若产品担心可在 WT-03 接入时增加调用节流或二次确认。\n- 函数本身不调用 Git，Git 不可用时仍可运行（验收标准满足）。\n- 依赖 WT-01 已完成；当前 `archiveWorktreeSpacesByPaths` 已实现，函数签名与调用匹配。\n\n#### Next: WT-03\n\n`syncMissingWorktreeSpaces` 已就绪，WT-03 可在以下位置接入：\n- `GET /api/projects` 增加 `?sync=missing` 参数或默认触发\n- `POST /api/projects/[projectId]/worktrees/refresh` 作为 full refresh 的前置/后置步骤\n- 前端 `loadProjects()` 传参触发",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:15:17.551Z",
+            "toolCallId": "call_00_yVP5NBGcisjMQ6awDcjF7158",
+            "toolName": "read",
+            "text": "Offset 105 is beyond end of file (97 lines total)",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:15:22.306Z",
+            "toolCallId": "call_00_11Hsmeu1xJeEFkTdBOWN9872",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/project-registry-types.ts\",\n  \"offset\": 85\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:15:22.322Z",
+            "toolCallId": "call_00_11Hsmeu1xJeEFkTdBOWN9872",
+            "toolName": "read",
+            "text": "missing?: boolean;\n}\n\nexport interface ArchiveWorktreeSpacesResult {\n  archivedSpaces: PiWebProjectSpaceRecord[];\n  unmatchedPaths: string[];\n}\n\nexport interface SyncMissingWorktreeSpacesOptions {\n  projectId?: string;\n  reason?: \"passive_missing\";\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:15:33.956Z",
+            "text": "All clean. Here's the handoff:\n\n---\n\n### Implementation Complete — WT-02: 增加 missing-only 被动同步\n\n#### Files Changed\n\n- **`lib/project-registry-types.ts`** — 新增 `SyncMissingWorktreeSpacesOptions` 类型（`projectId?: string; reason?: \"passive_missing\"`）\n- **`lib/project-registry.ts`** — 新增 `syncMissingWorktreeSpaces()` 导出函数\n\n#### Key Design Decisions\n\n- **复用 WT-01 的 `archiveWorktreeSpacesByPaths`**：收集所有缺失路径后一次调用，确保与主动清理使用相同的 canonical 匹配、audit metadata（`archivedReason`, `archivedAt`）和原子 registry 写入。\n- **路径检测用 `canonicalizeProjectPath`** 而非裸 `fs.stat`：因为 `canonicalizeProjectPath` 内部通过 `realpath` 解析 symlink 并产出 `pathKey`，与 registry 存储的 `space.pathKey` 同源，避免规范化差异导致漏检或重复归档。\n- **过滤规则严格**：`project.archived` → skip; `space.kind !== \"worktree\"` → skip; `space.archived` → skip; main space 自然被 `kind` 过滤排除。\n- **返回 `ArchiveWorktreeSpacesResult`**（含 `archivedSpaces` + `unmatchedPaths`）而非自定义接口，与 `archiveWorktreeSpacesByPaths` 保持一致，方便 WT-03 的 API 调用方统一处理。\n\n#### Verification\n\n```bash\nnpm run lint     # clean\nnode_modules/.bin/tsc --noEmit  # clean\n```\n\n#### Notes / Risks\n\n- 临时挂载点不可达会被标记 `missing` → `archived`，v1 按设计接受此行为；若产品担心可在 WT-03 接入时增加调用节流或二次确认。\n- 函数本身不调用 Git，Git 不可用时仍可运行（验收标准满足）。\n- 依赖 WT-01 已完成；当前 `archiveWorktreeSpacesByPaths` 已实现，函数签名与调用匹配。\n\n#### Next: WT-03\n\n`syncMissingWorktreeSpaces` 已就绪，WT-03 可在以下位置接入：\n- `GET /api/projects` 增加 `?sync=missing` 参数或默认触发\n- `POST /api/projects/[projectId]/worktrees/refresh` 作为 full refresh 的前置/后置步骤\n- 前端 `loadProjects()` 传参触发",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:15:33.968Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 2054,
+        "tokens": 576,
+        "tokenSource": "usage",
+        "tps": 8.3,
+        "firstTokenAt": "2026-07-09T07:14:24.558Z",
+        "lastTokenAt": "2026-07-09T07:15:33.938Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a53aa9257575fa9f091b67d6",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/implementer-a53aa9257575fa9f091b67d6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:13:55.292Z",
+        "finishedAt": "2026-07-09T07:15:33.972Z",
+        "updatedAt": "2026-07-09T07:15:33.972Z",
+        "itemCount": 36,
+        "messageCount": 6,
+        "toolCallCount": 13,
+        "stderrBytes": 0,
+        "bytes": 54044,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45b9-d883-797e-90ab-caa37b26ff0f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-13-55-331Z_019f45b9-d883-797e-90ab-caa37b26ff0f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-da0ef820a5cb3329077b1a5c",
+      "subtaskId": "WT-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:16:10.459Z",
+      "finishedAt": "2026-07-09T07:19:50.621Z",
+      "runner": "sdk",
+      "childSessionId": "019f45bb-e86d-7038-87f3-509b59205be8",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-16-10-477Z_019f45bb-e86d-7038-87f3-509b59205be8.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45bb-e86d-7038-87f3-509b59205be8",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实施 WT-03：接入 archive/delete/refresh/projects API ## 任务目标 将 WT-01 和 WT-02 实现的 helper 接入现有的 API 路由，实现： 1. WorkTree archive/delete API 成功后主动清理 registry 2. GET /api/projects 支持 missing-only 被动同步 3. allowed-roots 缓存失效处理 ## 具体需求 ### 1. WorkTree A…",
+      "summary": "All checks pass. Here is the implementation handoff:\n\n---\n\n## WT-03 Implementation Complete\n\n### Files Changed\n\n| File | Change Summary |\n|------|---------------|\n| `lib/project-registry-types.ts` | Widened `SyncMissingWorktreeSpacesOptions.reason` from `\"passive_missing\"` to `ArchiveWorktreeReason` (supports `\"passive_git_sync\"` in refresh route) |\n| `lib/allowed-roots.ts` | Exported `invalidateAllowedRootsCache()` to bust the 5s TTL allowed-roots cache after registry cleanup |\n| `app/api/git/worktrees/archive/route.ts` | Replaced `markWorktreeSpaceArchivedByPath(cwd)` with `archiveWorktreeSpacesByPaths(aliases, { reason: \"api_archive\" })` using `[cwd, status.cwd, status.worktree.repoRoot]`; wrapped session deletion in try/catch (registry cleanup not rolled back); added `invalidateAllowedRootsCache()`; response adds `archivedSpaces`, optional `unmatchedPaths`, and optional `warning` |\n| `app/api/git/worktrees/route.ts` (DELETE) | Same pattern: replaced with `archiveWorktreeSpacesByPaths(aliases, { reason: \"api_delete\" })` using `[cwd, ...cleanupAliases]`; session deletion is best-effort; `invalidateAllowedRootsCache()` called |\n| `app/api/projects/route.ts` (GET) | Added optional `?sync=missing` query param support; calls `syncMissingWorktreeSpaces({ reason: \"passive_missing\" })` and appends `{ sync: { archivedSpaces } }` to response; backward-compatible (no sync without explicit param) |\n| `app/api/projects/[projectId]/worktrees/refresh/route.ts` | After full `syncProjectWorktreeSpaces()`, runs best-effort `syncMissingWorktreeSpaces({ projectId, reason: \"passive_git_sync\" })` and appends `missingSync` to response |\n\n### Key Design Decisions\n\n1. **Session deletion is best-effort** in both archive and delete routes — registry cleanup commits before session deletion, and session errors produce a `warning` field instead of failing the whole response.\n\n2. **GET `/api/projects` uses explicit `?sync=missing`** opt-in rather than always running passive sync. This avoids the \"GET with write side-effect\" controversy. Frontend (`WT-04`) should add `?sync=missing` when calling `loadProjects()`.\n\n3. **Cleanup aliases include all known path forms**: `cwd` (request param), `status.cwd` (resolved), and `status.worktree.repoRoot` (repo root) — giving `archiveWorktreeSpacesByPaths` the best chance to match via `pathKey`/`displayPath`/`realPath` fallback.\n\n4. **`markWorktreeSpaceArchivedByPath`** remains defined but has zero external callers — safe to remove in a follow-up if desired.\n\n### Verification\n\n```bash\nnpm run lint       # ✓ clean\nnode_modules/.bin/tsc --noEmit  # ✓ clean\n```\n\n### Notes / Risks\n\n- **`missingSync` field in refresh response**: returns space IDs (`string[]`) rather than full space records, to avoid bloating the response with redundant data (the full refresh already returns all worktree spaces).\n- **Allowed-roots cache TTL is 5 seconds**: calling `invalidateAllowedRootsCache()` ensures stale paths are evicted immediately post-cleanup, but concurrent requests within the TTL window of another rebuild could still see stale roots for a few seconds. This matches existing behavior.\n- **`WT-04` (Sidebar)** needs to add `?sync=missing` to its `loadProjects()` call and handle the `sync.archivedSpaces` response field (or just rely on the refreshed project list which filters `space.archived`).\n- **`markWorktreeSpaceArchivedByPath`** is now dead code externally — consider removing in a cleanup pass.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:16:10.459Z",
+        "updatedAt": "2026-07-09T07:19:50.621Z",
+        "eventCount": 11244,
+        "lastTextPreview": "All checks pass. Here is the implementation handoff:\n\n---\n\n## WT-03 Implementation Complete\n\n### Files Changed\n\n| File | Change Summary |\n|------|---------------|\n| `lib/project-registry-types.ts` | Widened `SyncMissingWorktreeSpacesOptions.reason` from `\"passive_missing\"` to `ArchiveWorktreeReason` (supports `\"passive_git_sync\"` in refresh route) |\n| `lib/allowed-roots.ts` | Exported `invalidateAllowedRootsCache()` to bust the 5s TTL allowed-roots cache after registry cleanup |\n| `app/api/git/worktrees/archive/route.ts` | Replaced `markWorktreeSpaceArchivedByPath(cwd)` with `archiveWorktreeSpacesByPaths(aliases, { reason: \"api_archive\" })` using `[cwd, status.cwd, status.worktree.repoRoot]`; wrapped session deletion in try/catch (registry cleanup not rolled back); added `invalidateAllowedRootsCache()`; response adds `archivedSpaces`, optional `unmatchedPaths`, and optional `warning` |\n| `app/api/git/worktrees/route.ts` (DELETE) | Same pattern: replaced with `archiveWorktreeSpacesByPaths(aliases, { reason: \"api_delete\" })` using `[cwd, ...cleanupAliases]`; session deletion is best-effort; `invalidateAllowedRootsCache()` called |\n| `app/api/projects/route.ts` (GET) | Added optional `?sync=missing` query param support; calls `syncMissingWorktreeSpaces({ reason: \"passive_missing\" })` and appends `{ sync: { archivedSpaces } }` to response; backward-compatible (no sync without explicit param) |\n| `app/api/projects/[projectId]/worktrees/refresh/route.ts` | After full `syncProjectWorktreeSpaces()`, runs best-effort `syncMissingWorktreeSpaces({ projectId, reason: \"passive_git_sync\" })` and appends `missingSync` to response |\n\n### Key Design Decisions\n\n1. **Session deletion is best-effort** in both archive and delete routes — registry cleanup commits before session deletion, and session errors produce a `warning` field instead of failing the whole response.\n\n2. **GET `/api/projects` uses explicit `?sync=missing`** opt-in rather than always running passive sync. This avoids the \"GET with write side-effect\" controversy. Frontend (`WT-04`) should add `?sync=missing` when calling `loadProjects()`.\n\n3. **Cleanup aliases include all known path forms**: `cwd` (request param), `status.cwd` (resolved), and `status.worktree.repoRoot` (repo root) — giving `archiveWorktreeSpacesByPaths` the best chance to match via `pathKey`/`displayPath`/`realPath` fallback.\n\n4. **`markWorktreeSpaceArchivedByPath`** remains defined but has zero external callers — safe to remove in a follow-up if desired.\n\n### Verification\n\n```bash\nnpm run lint       # ✓ clean\nnode_modules/.bin/tsc --noEmit  # ✓ clean\n```\n\n### Notes / Risks\n\n- **`missingSync` field in refresh response**: returns space IDs (`string[]`) rather than full space records, to avoid bloating the response with redundant data (the full refresh already returns all worktree spaces).\n- **Allowed-roots cache TTL is 5 seconds**: calling `invalidateAllowedRootsCache()` ensures stale paths are evicted immediately post-cleanup, but concurrent requests within the TTL window of another rebuild could still see stale roots for a few seconds. This matches existing behavior.\n- **`WT-04` (Sidebar)** needs to add `?sync=missing` to its `loadProjects()` call and handle the `sync.archivedSpaces` response field (or just rely on the refreshed project list which filters `space.archived`).\n- **`markWorktreeSpaceArchivedByPath`** is now dead code externally — consider removing in a cleanup pass.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:19:24.664Z",
+            "text": "All external references cleaned up. Let me also verify there are no other consumers of the changed APIs that I might have missed:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:19:24.668Z",
+            "toolCallId": "call_00_OmDTl0tfsPBqC2dgNXfK7488",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && grep -rn \\\"GET.*\\\\/api\\\\/projects\\\\b\\\\|loadProjects\\\\|getAllowedRoots\\\" --include=\\\"*.ts\\\" --include=\\\"*.tsx\\\" | grep -v node_modules | grep -v \\\".next\\\" | head -20\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:19:34.643Z",
+            "toolCallId": "call_00_OmDTl0tfsPBqC2dgNXfK7488",
+            "toolName": "bash",
+            "text": "./app/api/studio/tasks/route.ts:2:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/tasks/route.ts:15:  const allowedRoots = await getAllowedRoots();\n./app/api/studio/tasks/[taskKey]/subagents/[runId]/transcript/route.ts:2:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/tasks/[taskKey]/subagents/[runId]/transcript/route.ts:10:  const allowedRoots = await getAllowedRoots();\n./app/api/studio/tasks/[taskKey]/subagents/[runId]/route.ts:2:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/tasks/[taskKey]/subagents/[runId]/route.ts:12:  const allowedRoots = await getAllowedRoots();\n./app/api/studio/tasks/[taskKey]/route.ts:2:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/tasks/[taskKey]/route.ts:25:  const allowedRoots = await getAllowedRoots();\n./app/api/studio/tasks/[taskKey]/files/route.ts:4:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/tasks/[taskKey]/files/route.ts:49:  const allowedRoots = await getAllowedRoots();\n./app/api/studio/workflows/route.ts:2:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/workflows/route.ts:13:  const allowedRoots = await getAllowedRoots();\n./app/api/studio/agents/route.ts:2:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/studio/agents/route.ts:14:  const allowedRoots = await getAllowedRoots();\n./app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:10:// GET /api/projects/:projectId/spaces/:spaceId/sessions\n./app/api/terminal/env/assist/route.ts:4:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/terminal/env/assist/route.ts:79:    const allowedRoots = await getAllowedRoots();\n./app/api/sessions/[id]/studio-task/route.ts:3:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";\n./app/api/sessions/[id]/studio-task/route.ts:26:    const allowedRoots = await getAllowedRoots();\n./app/api/sessions/[id]/trellis-task/route.ts:3:import { getAllowedRoots, isPathAllowed } from \"@/lib/allowed-roots\";",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:19:50.598Z",
+            "text": "All checks pass. Here is the implementation handoff:\n\n---\n\n## WT-03 Implementation Complete\n\n### Files Changed\n\n| File | Change Summary |\n|------|---------------|\n| `lib/project-registry-types.ts` | Widened `SyncMissingWorktreeSpacesOptions.reason` from `\"passive_missing\"` to `ArchiveWorktreeReason` (supports `\"passive_git_sync\"` in refresh route) |\n| `lib/allowed-roots.ts` | Exported `invalidateAllowedRootsCache()` to bust the 5s TTL allowed-roots cache after registry cleanup |\n| `app/api/git/worktrees/archive/route.ts` | Replaced `markWorktreeSpaceArchivedByPath(cwd)` with `archiveWorktreeSpacesByPaths(aliases, { reason: \"api_archive\" })` using `[cwd, status.cwd, status.worktree.repoRoot]`; wrapped session deletion in try/catch (registry cleanup not rolled back); added `invalidateAllowedRootsCache()`; response adds `archivedSpaces`, optional `unmatchedPaths`, and optional `warning` |\n| `app/api/git/worktrees/route.ts` (DELETE) | Same pattern: replaced with `archiveWorktreeSpacesByPaths(aliases, { reason: \"api_delete\" })` using `[cwd, ...cleanupAliases]`; session deletion is best-effort; `invalidateAllowedRootsCache()` called |\n| `app/api/projects/route.ts` (GET) | Added optional `?sync=missing` query param support; calls `syncMissingWorktreeSpaces({ reason: \"passive_missing\" })` and appends `{ sync: { archivedSpaces } }` to response; backward-compatible (no sync without explicit param) |\n| `app/api/projects/[projectId]/worktrees/refresh/route.ts` | After full `syncProjectWorktreeSpaces()`, runs best-effort `syncMissingWorktreeSpaces({ projectId, reason: \"passive_git_sync\" })` and appends `missingSync` to response |\n\n### Key Design Decisions\n\n1. **Session deletion is best-effort** in both archive and delete routes — registry cleanup commits before session deletion, and session errors produce a `warning` field instead of failing the whole response.\n\n2. **GET `/api/projects` uses explicit `?sync=missing`** opt-in rather than always running passive sync. This avoids the \"GET with write side-effect\" controversy. Frontend (`WT-04`) should add `?sync=missing` when calling `loadProjects()`.\n\n3. **Cleanup aliases include all known path forms**: `cwd` (request param), `status.cwd` (resolved), and `status.worktree.repoRoot` (repo root) — giving `archiveWorktreeSpacesByPaths` the best chance to match via `pathKey`/`displayPath`/`realPath` fallback.\n\n4. **`markWorktreeSpaceArchivedByPath`** remains defined but has zero external callers — safe to remove in a follow-up if desired.\n\n### Verification\n\n```bash\nnpm run lint       # ✓ clean\nnode_modules/.bin/tsc --noEmit  # ✓ clean\n```\n\n### Notes / Risks\n\n- **`missingSync` field in refresh response**: returns space IDs (`string[]`) rather than full space records, to avoid bloating the response with redundant data (the full refresh already returns all worktree spaces).\n- **Allowed-roots cache TTL is 5 seconds**: calling `invalidateAllowedRootsCache()` ensures stale paths are evicted immediately post-cleanup, but concurrent requests within the TTL window of another rebuild could still see stale roots for a few seconds. This matches existing behavior.\n- **`WT-04` (Sidebar)** needs to add `?sync=missing` to its `loadProjects()` call and handle the `sync.archivedSpaces` response field (or just rely on the refreshed project list which filters `space.archived`).\n- **`markWorktreeSpaceArchivedByPath`** is now dead code externally — consider removing in a cleanup pass.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:19:50.613Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 4739,
+        "tokens": 976,
+        "tokenSource": "usage",
+        "tps": 4.51,
+        "firstTokenAt": "2026-07-09T07:16:13.823Z",
+        "lastTokenAt": "2026-07-09T07:19:50.447Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-da0ef820a5cb3329077b1a5c",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/implementer-da0ef820a5cb3329077b1a5c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:16:10.459Z",
+        "finishedAt": "2026-07-09T07:19:50.620Z",
+        "updatedAt": "2026-07-09T07:19:50.620Z",
+        "itemCount": 89,
+        "messageCount": 17,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 97234,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45bb-e86d-7038-87f3-509b59205be8",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-16-10-477Z_019f45bb-e86d-7038-87f3-509b59205be8.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d9ce1b210def2bbab1652361",
+      "subtaskId": "WT-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:20:12.832Z",
+      "finishedAt": "2026-07-09T07:24:09.173Z",
+      "runner": "sdk",
+      "childSessionId": "019f45bf-9b4b-7d95-8d6c-7f137d46f188",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-20-12-875Z_019f45bf-9b4b-7d95-8d6c-7f137d46f188.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45bf-9b4b-7d95-8d6c-7f137d46f188",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实施 WT-04：修复 Sidebar 归档成功后的项目树与 fallback 状态 ## 任务目标 修复 `components/SessionSidebar.tsx` 中 WorkTree 归档/删除成功后项目树未刷新、当前选中空间未 fallback 的问题。 ## 具体需求 ### 1. 归档/删除成功后刷新项目列表 在 `confirmWorktreeAction()` 成功后，需要刷新项目列表让后端已完成的 registry 清理在前端立即生效。 - 在 `co…",
+      "summary": "Everything looks correct. Both lint and type-check pass. Here's the summary:\n\n---\n\n## Implementation Complete — WT-04\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — 修复 WorkTree 归档/删除成功后项目树未刷新与当前选中空间未 fallback 的问题\n\n### Key Changes\n\n**`confirmWorktreeAction` 增强**（替换原 `applyWorktreeFallback` + `confirmWorktreeAction`）：\n\n1. **乐观更新 projects 状态**（第 1 步）— API 响应中的 `archivedSpaces` 立即合并到本地 `projects`，Sidebar 无需等待 `loadProjects` 即可隐藏旧 worktree space。\n\n2. **选中空间 fallback**（第 3 步）— 当被归档/删除的 space 恰好是当前选中空间时，按优先级切换：\n   - 同项目的 `main` space（非 archived、非 missing）\n   - 同项目的第一个活跃非 missing space\n   - API 返回的 `fallbackCwd`\n   - `null`（清空选择）\n\n3. **后台校准**（第 6 步）— 乐观更新后调用 `loadProjects(false)` 后台拉取 authoritative registry 状态，确保最终一致性。\n\n4. **API 响应类型扩展** — 类型转换增加 `archivedSpaces?: PiWebProjectSpaceRecord[]`，消费 WT-03 新增的响应字段。\n\n5. **移除 `applyWorktreeFallback`** — 其行为内联到 `confirmWorktreeAction`，消除 cwd fallback 与 space fallback 的竞态。\n\n### Verification\n\n```bash\nnpm run lint       # ✅ 通过\ntsc --noEmit       # ✅ 通过\n```\n\n### Notes / Risks\n\n- **异步 `loadProjects` 与 selected state 竞态**：乐观更新立即生效，`activeProjectSpaces()` 会自然过滤掉已归档 space；`loadProjects(false)` 在后台收敛，下一帧 `loadSessions` effect 会自动选中正确的 fallback 空间。\n- **`main` space 也被归档的极端情况**：已处理 — fallback 链会尝试第一个非 missing active space，或最终 fallback 到 API `fallbackCwd`/`null`。\n- **WT-04 依赖 WT-03**：前端代码已消费 `archivedSpaces` 字段，需 WT-03 在 archive/delete API 中真正返回该字段（按设计文档已在 archive/delete route 中实现）。",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:20:12.832Z",
+        "updatedAt": "2026-07-09T07:24:09.173Z",
+        "eventCount": 16818,
+        "lastTextPreview": "Everything looks correct. Both lint and type-check pass. Here's the summary:\n\n---\n\n## Implementation Complete — WT-04\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — 修复 WorkTree 归档/删除成功后项目树未刷新与当前选中空间未 fallback 的问题\n\n### Key Changes\n\n**`confirmWorktreeAction` 增强**（替换原 `applyWorktreeFallback` + `confirmWorktreeAction`）：\n\n1. **乐观更新 projects 状态**（第 1 步）— API 响应中的 `archivedSpaces` 立即合并到本地 `projects`，Sidebar 无需等待 `loadProjects` 即可隐藏旧 worktree space。\n\n2. **选中空间 fallback**（第 3 步）— 当被归档/删除的 space 恰好是当前选中空间时，按优先级切换：\n   - 同项目的 `main` space（非 archived、非 missing）\n   - 同项目的第一个活跃非 missing space\n   - API 返回的 `fallbackCwd`\n   - `null`（清空选择）\n\n3. **后台校准**（第 6 步）— 乐观更新后调用 `loadProjects(false)` 后台拉取 authoritative registry 状态，确保最终一致性。\n\n4. **API 响应类型扩展** — 类型转换增加 `archivedSpaces?: PiWebProjectSpaceRecord[]`，消费 WT-03 新增的响应字段。\n\n5. **移除 `applyWorktreeFallback`** — 其行为内联到 `confirmWorktreeAction`，消除 cwd fallback 与 space fallback 的竞态。\n\n### Verification\n\n```bash\nnpm run lint       # ✅ 通过\ntsc --noEmit       # ✅ 通过\n```\n\n### Notes / Risks\n\n- **异步 `loadProjects` 与 selected state 竞态**：乐观更新立即生效，`activeProjectSpaces()` 会自然过滤掉已归档 space；`loadProjects(false)` 在后台收敛，下一帧 `loadSessions` effect 会自动选中正确的 fallback 空间。\n- **`main` space 也被归档的极端情况**：已处理 — fallback 链会尝试第一个非 missing active space，或最终 fallback 到 API `fallbackCwd`/`null`。\n- **WT-04 依赖 WT-03**：前端代码已消费 `archivedSpaces` 字段，需 WT-03 在 archive/delete API 中真正返回该字段（按设计文档已在 archive/delete route 中实现）。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:23:46.093Z",
+            "toolCallId": "call_00_2FnGBcAuBIMI1OKe8UeU3659",
+            "toolName": "read",
+            "text": "const confirmWorktreeAction = useCallback(async () => {\n    if (!worktreeAction || worktreeAction.busy) return;\n    setWorktreeAction((prev) => prev ? { ...prev, busy: true, error: null, dirtySummary: undefined } : prev);\n    try {\n      const endpoint = worktreeAction.kind === \"archive\"\n        ? \"/api/git/worktrees/archive\"\n        : `/api/git/worktrees?cwd=${encodeURIComponent(worktreeAction.cwd)}&force=${worktreeAction.force ? \"true\" : \"false\"}`;\n      const res = await fetch(endpoint, {\n        method: worktreeAction.kind === \"archive\" ? \"POST\" : \"DELETE\",\n        headers: worktreeAction.kind === \"archive\" ? { \"Content-Type\": \"application/json\" } : undefined,\n        body: worktreeAction.kind === \"archive\"\n          ? JSON.stringify({ cwd: worktreeAction.cwd, confirmedRisk: true })\n          : undefined,\n      });\n      const data = await res.json().catch(() => ({})) as WorktreeActionResponse & { dirtySummary?: string | string[]; archivedSpaces?: PiWebProjectSpaceRecord[] };\n      if (!res.ok || data.error) {\n        const dirtySummary = data.status?.dirtySummary ?? (Array.isArray(data.dirtySummary) ? data.dirtySummary : typeof data.dirtySummary === \"string\" ? data.dirtySummary.split(/\\r?\\n/).filter(Boolean) : undefined);\n        setWorktreeAction((prev) => prev ? {\n          ...prev,\n          busy: false,\n          error: data.error ?? `HTTP ${res.status}`,\n          dirtySummary,\n        } : prev);\n        return;\n      }\n\n      const removedCwd = worktreeAction.cwd;\n      const archivedSpacesArr = data.archivedSpaces ?? [];\n\n      // 1. Optimistically merge archived spaces into local projects so the\n      //    sidebar immediately hides the worktree space before loadProjects.\n      if (archivedSpacesArr.length > 0) {\n        setProjects((prev) => {\n          const byKey = new Map<string, PiWebProjectSpaceRecord>();\n          for (const s of archivedSpacesArr) {\n            byKey.set(`${s.projectId}:${s.id}`, s);\n          }\n          return prev.map((project) => {\n            let changed = false;\n            const updatedSpaces = { ...project.spaces };\n            for (const [, archivedSpace] of byKey) {\n              if (archivedSpace.projectId === project.id && updatedSpaces[archivedSpace.id]) {\n                updatedSpaces[archivedSpace.id] = archivedSpace;\n                changed = true;\n              }\n            }\n            return changed ? { ...project, spaces: updatedSpaces } : project;\n          });\n        });\n      }\n\n      // 2. Clean ephemeral worktrees and removed cwds.\n      setEphemeralWorktrees((prev) => {\n        const next = { ...prev };\n        delete next[removedCwd];\n        return next;\n      });\n      setRemovedWorktreeCwds((prev) => prev.includes(removedCwd) ? prev : [...prev, removedCwd]);\n\n      // 3. Handle selected-space fallback when the current worktree space\n      //    was archived/deleted. Prefer main space, then any active space\n      //    within the same project, then the API fallbackCwd.\n      if (selectedCwd === removedCwd) {\n        const archivedSpace = archivedSpacesArr.find((s) => s.path === removedCwd);\n        if (archivedSpace) {\n          const project = projects.find((p) => p.id === archivedSpace.projectId);\n          if (project) {\n            const updatedProjectSpaces = { ...project.spaces };\n            for (const s of archivedSpacesArr) {\n              if (s.projectId === project.id) updatedProjectSpaces[s.id] = s;\n            }\n            const activeSpaces = Object.values(updatedProjectSpaces).filter((s) => !s.archived);\n            const fallback = activeSpaces.find((s) => s.id === \"main\" && !s.missing) ?? activeSpaces.find((s) => !s.missing) ?? activeSpaces[0];\n            if (fallback) {\n              setSelectedProjectId(project.id);\n              setSelectedSpaceId(fallback.id);\n              setSelectedCwd(fallback.path);\n            } else {\n              setSelectedCwd(data.fallbackCwd ?? null);\n            }\n          } else {\n            setSelectedCwd(data.fallbackCwd ?? null);\n          }\n        } else {\n          setSelectedCwd(data.fallbackCwd ?? null);\n        }\n      }\n\n      // 4. Refresh explorer and sessions for the (possibly new) current space.\n      setExplorerKey((k) => k + 1);\n      void loadSessions(false);\n\n      // 5. Notify parent about deleted session files.\n      for (const sessionId of data.deletedSessionIds ?? []) {\n        onSessionDeleted?.(sessionId);\n      }\n\n      // 6. Background-refresh projects so the authoritative registry state\n      //    eventually converges with the optimistic update above.\n      void loadProjects(false);\n\n      setWorktreeAction(null);\n    } catch (e) {\n      setWorktreeAction((prev) => prev ? { ...prev, busy: false, error: e instanceof Error ? e.message : String(e) } : prev);\n    }\n\n[1980 more lines in file. Use offset=1251 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:23:50.512Z",
+            "toolCallId": "call_00_X8KCsyV8ZRMakw31cDXA0422",
+            "toolName": "read",
+            "inputPreview": "{\n  \"offset\": 1248,\n  \"limit\": 5,\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/SessionSidebar.tsx\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:23:50.520Z",
+            "toolCallId": "call_00_X8KCsyV8ZRMakw31cDXA0422",
+            "toolName": "read",
+            "text": "} catch (e) {\n      setWorktreeAction((prev) => prev ? { ...prev, busy: false, error: e instanceof Error ? e.message : String(e) } : prev);\n    }\n  }, [onSessionDeleted, worktreeAction, selectedCwd, projects, loadProjects, loadSessions]);\n\n\n[1978 more lines in file. Use offset=1253 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:24:09.155Z",
+            "text": "Everything looks correct. Both lint and type-check pass. Here's the summary:\n\n---\n\n## Implementation Complete — WT-04\n\n### Files Changed\n\n- `components/SessionSidebar.tsx` — 修复 WorkTree 归档/删除成功后项目树未刷新与当前选中空间未 fallback 的问题\n\n### Key Changes\n\n**`confirmWorktreeAction` 增强**（替换原 `applyWorktreeFallback` + `confirmWorktreeAction`）：\n\n1. **乐观更新 projects 状态**（第 1 步）— API 响应中的 `archivedSpaces` 立即合并到本地 `projects`，Sidebar 无需等待 `loadProjects` 即可隐藏旧 worktree space。\n\n2. **选中空间 fallback**（第 3 步）— 当被归档/删除的 space 恰好是当前选中空间时，按优先级切换：\n   - 同项目的 `main` space（非 archived、非 missing）\n   - 同项目的第一个活跃非 missing space\n   - API 返回的 `fallbackCwd`\n   - `null`（清空选择）\n\n3. **后台校准**（第 6 步）— 乐观更新后调用 `loadProjects(false)` 后台拉取 authoritative registry 状态，确保最终一致性。\n\n4. **API 响应类型扩展** — 类型转换增加 `archivedSpaces?: PiWebProjectSpaceRecord[]`，消费 WT-03 新增的响应字段。\n\n5. **移除 `applyWorktreeFallback`** — 其行为内联到 `confirmWorktreeAction`，消除 cwd fallback 与 space fallback 的竞态。\n\n### Verification\n\n```bash\nnpm run lint       # ✅ 通过\ntsc --noEmit       # ✅ 通过\n```\n\n### Notes / Risks\n\n- **异步 `loadProjects` 与 selected state 竞态**：乐观更新立即生效，`activeProjectSpaces()` 会自然过滤掉已归档 space；`loadProjects(false)` 在后台收敛，下一帧 `loadSessions` effect 会自动选中正确的 fallback 空间。\n- **`main` space 也被归档的极端情况**：已处理 — fallback 链会尝试第一个非 missing active space，或最终 fallback 到 API `fallbackCwd`/`null`。\n- **WT-04 依赖 WT-03**：前端代码已消费 `archivedSpaces` 字段，需 WT-03 在 archive/delete API 中真正返回该字段（按设计文档已在 archive/delete route 中实现）。",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:24:09.166Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1884,
+        "tokens": 1078,
+        "tokenSource": "usage",
+        "tps": 5.05,
+        "firstTokenAt": "2026-07-09T07:20:35.544Z",
+        "lastTokenAt": "2026-07-09T07:24:09.139Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d9ce1b210def2bbab1652361",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/implementer-d9ce1b210def2bbab1652361.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:20:12.832Z",
+        "finishedAt": "2026-07-09T07:24:09.171Z",
+        "updatedAt": "2026-07-09T07:24:09.171Z",
+        "itemCount": 40,
+        "messageCount": 6,
+        "toolCallCount": 15,
+        "stderrBytes": 0,
+        "bytes": 108869,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45bf-9b4b-7d95-8d6c-7f137d46f188",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-20-12-875Z_019f45bf-9b4b-7d95-8d6c-7f137d46f188.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-cb97a6ef9a55ae5101176c0d",
+      "subtaskId": "WT-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:24:36.525Z",
+      "finishedAt": "2026-07-09T07:27:50.442Z",
+      "runner": "sdk",
+      "childSessionId": "019f45c3-a150-7110-b1d2-62df24f55954",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-24-36-560Z_019f45c3-a150-7110-b1d2-62df24f55954.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45c3-a150-7110-b1d2-62df24f55954",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "实施 WT-05：文档、测试与手工验证 ## 任务目标 更新相关文档，反映本次实现的 WorkTree 归档后项目空间同步清理功能。确保模块文档与实际 API/helper 行为一致。 ## 具体需求 ### 1. 更新模块文档 #### `docs/architecture/overview.md` - 添加/更新 WorkTree 归档后项目空间同步清理的描述 - 说明主动清理（UI/API 归档/删除）和被动同步（missing-only 检测）两层机制 - 说明软清…",
+      "summary": "All validations pass. Here is the handoff:\n\n---\n\n## Implementation Complete — WT-05\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/architecture/overview.md` | Added **WorkTree Archive Space Sync** section describing: active cleanup (multi-path-alias matching via `archiveWorktreeSpacesByPaths` + `invalidateAllowedRootsCache`), passive sync (missing-only + full Git refresh), and frontend optimistic merge + fallback selection logic. |\n| `docs/modules/api.md` | Updated 4 route descriptions: `POST /api/git/worktrees/archive` (added `archivedSpaces`, `unmatchedPaths`, `warning` fields), `DELETE /api/git/worktrees` (same fields), `GET /api/projects` (added `?sync=missing` param and `sync.archivedSpaces` response), `POST .../worktrees/refresh` (added `missingSync.archivedSpaces` from follow-up missing-only pass). |\n| `docs/modules/library.md` | Updated `project-registry.ts` table row to include `archiveWorktreeSpacesByPaths`, `syncMissingWorktreeSpaces`, and the updated `markWorktreeSpaceArchivedByPath`. Added new **Key Registry Functions** section with full doc for all three functions. |\n| `docs/modules/frontend.md` | Updated `SessionSidebar` table row with **WorkTree archive/delete flow** description covering optimistic `archivedSpaces` merge, 4-step fallback selection (main → active non-missing → fallbackCwd → null), and `onSessionDeleted` forwarding. |\n| `docs/design/worktree-archive-space-sync-verification.md` | **New file** — manual verification record with 6 scenarios (UI archive, UI delete, CLI remove, direct delete, git worktree move, symlink/display path), expected behavior per scenario, and verification checkboxes. |\n\n### Verification\n\n```\nnpm run lint          — PASSED (no errors)\nnode_modules/.bin/tsc --noEmit — PASSED (no errors)\n```\n\n### Notes / Risks\n\n- **None.** All documentation updates are strictly additive and reflect the actual implemented code (not design-only plans).\n- The manual verification document has blank checkboxes; these are intended for the main session or checker to fill during hands-on testing.\n- The frontend `loadProjects()` does not currently pass `?sync=missing` — this matches the current implementation. The backend capability exists and is documented for explicit consumers (CLI, refresh flows). This is consistent with the design decision to avoid unbounded GET write side effects on every project-list load.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:24:36.525Z",
+        "updatedAt": "2026-07-09T07:27:50.442Z",
+        "eventCount": 8392,
+        "lastTextPreview": "All validations pass. Here is the handoff:\n\n---\n\n## Implementation Complete — WT-05\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/architecture/overview.md` | Added **WorkTree Archive Space Sync** section describing: active cleanup (multi-path-alias matching via `archiveWorktreeSpacesByPaths` + `invalidateAllowedRootsCache`), passive sync (missing-only + full Git refresh), and frontend optimistic merge + fallback selection logic. |\n| `docs/modules/api.md` | Updated 4 route descriptions: `POST /api/git/worktrees/archive` (added `archivedSpaces`, `unmatchedPaths`, `warning` fields), `DELETE /api/git/worktrees` (same fields), `GET /api/projects` (added `?sync=missing` param and `sync.archivedSpaces` response), `POST .../worktrees/refresh` (added `missingSync.archivedSpaces` from follow-up missing-only pass). |\n| `docs/modules/library.md` | Updated `project-registry.ts` table row to include `archiveWorktreeSpacesByPaths`, `syncMissingWorktreeSpaces`, and the updated `markWorktreeSpaceArchivedByPath`. Added new **Key Registry Functions** section with full doc for all three functions. |\n| `docs/modules/frontend.md` | Updated `SessionSidebar` table row with **WorkTree archive/delete flow** description covering optimistic `archivedSpaces` merge, 4-step fallback selection (main → active non-missing → fallbackCwd → null), and `onSessionDeleted` forwarding. |\n| `docs/design/worktree-archive-space-sync-verification.md` | **New file** — manual verification record with 6 scenarios (UI archive, UI delete, CLI remove, direct delete, git worktree move, symlink/display path), expected behavior per scenario, and verification checkboxes. |\n\n### Verification\n\n```\nnpm run lint          — PASSED (no errors)\nnode_modules/.bin/tsc --noEmit — PASSED (no errors)\n```\n\n### Notes / Risks\n\n- **None.** All documentation updates are strictly additive and reflect the actual implemented code (not design-only plans).\n- The manual verification document has blank checkboxes; these are intended for the main session or checker to fill during hands-on testing.\n- The frontend `loadProjects()` does not currently pass `?sync=missing` — this matches the current implementation. The backend capability exists and is documented for explicit consumers (CLI, refresh flows). This is consistent with the design decision to avoid unbounded GET write side effects on every project-list load.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:27:29.200Z",
+            "text": "Let me do a final verification pass:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:27:29.205Z",
+            "toolCallId": "call_00_YdkXwDOBH2BfjTaKJUbw0872",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web && npm run lint 2>&1 && node_modules/.bin/tsc --noEmit 2>&1 && echo \\\"=== ALL PASSED ===\\\"\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:27:39.927Z",
+            "toolCallId": "call_00_YdkXwDOBH2BfjTaKJUbw0872",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.10 lint\n> eslint .\n\n=== ALL PASSED ===",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:27:50.423Z",
+            "text": "All validations pass. Here is the handoff:\n\n---\n\n## Implementation Complete — WT-05\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/architecture/overview.md` | Added **WorkTree Archive Space Sync** section describing: active cleanup (multi-path-alias matching via `archiveWorktreeSpacesByPaths` + `invalidateAllowedRootsCache`), passive sync (missing-only + full Git refresh), and frontend optimistic merge + fallback selection logic. |\n| `docs/modules/api.md` | Updated 4 route descriptions: `POST /api/git/worktrees/archive` (added `archivedSpaces`, `unmatchedPaths`, `warning` fields), `DELETE /api/git/worktrees` (same fields), `GET /api/projects` (added `?sync=missing` param and `sync.archivedSpaces` response), `POST .../worktrees/refresh` (added `missingSync.archivedSpaces` from follow-up missing-only pass). |\n| `docs/modules/library.md` | Updated `project-registry.ts` table row to include `archiveWorktreeSpacesByPaths`, `syncMissingWorktreeSpaces`, and the updated `markWorktreeSpaceArchivedByPath`. Added new **Key Registry Functions** section with full doc for all three functions. |\n| `docs/modules/frontend.md` | Updated `SessionSidebar` table row with **WorkTree archive/delete flow** description covering optimistic `archivedSpaces` merge, 4-step fallback selection (main → active non-missing → fallbackCwd → null), and `onSessionDeleted` forwarding. |\n| `docs/design/worktree-archive-space-sync-verification.md` | **New file** — manual verification record with 6 scenarios (UI archive, UI delete, CLI remove, direct delete, git worktree move, symlink/display path), expected behavior per scenario, and verification checkboxes. |\n\n### Verification\n\n```\nnpm run lint          — PASSED (no errors)\nnode_modules/.bin/tsc --noEmit — PASSED (no errors)\n```\n\n### Notes / Risks\n\n- **None.** All documentation updates are strictly additive and reflect the actual implemented code (not design-only plans).\n- The manual verification document has blank checkboxes; these are intended for the main session or checker to fill during hands-on testing.\n- The frontend `loadProjects()` does not currently pass `?sync=missing` — this matches the current implementation. The backend capability exists and is documented for explicit consumers (CLI, refresh flows). This is consistent with the design decision to avoid unbounded GET write side effects on every project-list load.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:27:50.434Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 3082,
+        "tokens": 573,
+        "tokenSource": "usage",
+        "tps": 3.16,
+        "firstTokenAt": "2026-07-09T07:24:49.248Z",
+        "lastTokenAt": "2026-07-09T07:27:50.401Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-cb97a6ef9a55ae5101176c0d",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/implementer-cb97a6ef9a55ae5101176c0d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:24:36.525Z",
+        "finishedAt": "2026-07-09T07:27:50.440Z",
+        "updatedAt": "2026-07-09T07:27:50.440Z",
+        "itemCount": 80,
+        "messageCount": 12,
+        "toolCallCount": 32,
+        "stderrBytes": 0,
+        "bytes": 178687,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45c3-a150-7110-b1d2-62df24f55954",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-24-36-560Z_019f45c3-a150-7110-b1d2-62df24f55954.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-fe33fbab68e7d4e9ac5cd93b",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:28:16.459Z",
+      "finishedAt": "2026-07-09T07:30:43.780Z",
+      "runner": "sdk",
+      "childSessionId": "019f45c6-fc72-78ec-bd5d-b4267e9a60e9",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-28-16-498Z_019f45c6-fc72-78ec-bd5d-b4267e9a60e9.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45c6-fc72-78ec-bd5d-b4267e9a60e9",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请对\"修复工作树归档后项目空间未同步清理\"任务的实现进行检查。 ## 检查范围 本次修改涉及以下文件： - `lib/project-registry.ts` - 新增 archiveWorktreeSpacesByPaths 和 syncMissingWorktreeSpaces - `lib/project-registry-types.ts` - 新增类型定义 - `app/api/git/worktrees/archive/route.ts` - 归档 API 接入…",
+      "summary": "已完成检查并更新：\n\n### Files changed / artifacts\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n- `app/api/projects/route.ts`\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts`\n- `components/SessionSidebar.tsx`\n\n### Findings fixed\n- 修复 `GET /api/projects?sync=missing` 返回同步前旧数据\n- 修复 Sidebar 默认未触发 `?sync=missing`\n- 修复被动同步后 allowed-roots 缓存未失效\n\n### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n### Remaining risks\n- 非阻塞：`lib/project-registry.ts` 仍无专门写锁，并发 archive/refresh/sync 仍有最后写入覆盖旧写入的历史风险，但本次未新增该风险。\n\n### Verdict\n- Pass\n\n### Decisions needed from main session\n- None blocking. If后续要进一步收敛风险，可单独评估是否给 Project Registry 增加进程内写锁。",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:28:16.459Z",
+        "updatedAt": "2026-07-09T07:30:43.780Z",
+        "eventCount": 2824,
+        "lastTextPreview": "已完成检查并更新：\n\n### Files changed / artifacts\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n- `app/api/projects/route.ts`\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts`\n- `components/SessionSidebar.tsx`\n\n### Findings fixed\n- 修复 `GET /api/projects?sync=missing` 返回同步前旧数据\n- 修复 Sidebar 默认未触发 `?sync=missing`\n- 修复被动同步后 allowed-roots 缓存未失效\n\n### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n### Remaining risks\n- 非阻塞：`lib/project-registry.ts` 仍无专门写锁，并发 archive/refresh/sync 仍有最后写入覆盖旧写入的历史风险，但本次未新增该风险。\n\n### Verdict\n- Pass\n\n### Decisions needed from main session\n- None blocking. If后续要进一步收敛风险，可单独评估是否给 Project Registry 增加进程内写锁。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:30:33.124Z",
+            "toolCallId": "call_ADh1qmweXUkKnNf394umt7II|fc_02c29c7e6332d55f016a4f4e0fe86c8199a91c4c97b96ebb6d",
+            "toolName": "write",
+            "text": "Successfully wrote 1155 bytes to .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:30:36.525Z",
+            "toolCallId": "call_qhrLGD5RBd05Iywo2O1LbH3Z|fc_02c29c7e6332d55f016a4f4e1b5ae8819989c0d0aa147d09b0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat -- app/api/projects/route.ts app/api/projects/[projectId]/worktrees/refresh/route.ts components/SessionSidebar.tsx .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:30:37.190Z",
+            "toolCallId": "call_qhrLGD5RBd05Iywo2O1LbH3Z|fc_02c29c7e6332d55f016a4f4e1b5ae8819989c0d0aa147d09b0",
+            "toolName": "bash",
+            "text": ".../[projectId]/worktrees/refresh/route.ts         | 24 +++++-\n app/api/projects/route.ts                          | 21 +++--\n components/SessionSidebar.tsx                      | 94 +++++++++++++++++-----\n 3 files changed, 113 insertions(+), 26 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:30:43.760Z",
+            "text": "已完成检查并更新：\n\n### Files changed / artifacts\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n- `app/api/projects/route.ts`\n- `app/api/projects/[projectId]/worktrees/refresh/route.ts`\n- `components/SessionSidebar.tsx`\n\n### Findings fixed\n- 修复 `GET /api/projects?sync=missing` 返回同步前旧数据\n- 修复 Sidebar 默认未触发 `?sync=missing`\n- 修复被动同步后 allowed-roots 缓存未失效\n\n### Validation run\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n### Remaining risks\n- 非阻塞：`lib/project-registry.ts` 仍无专门写锁，并发 archive/refresh/sync 仍有最后写入覆盖旧写入的历史风险，但本次未新增该风险。\n\n### Verdict\n- Pass\n\n### Decisions needed from main session\n- None blocking. If后续要进一步收敛风险，可单独评估是否给 Project Registry 增加进程内写锁。",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:30:43.772Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 682,
+        "tokens": 301,
+        "tokenSource": "usage",
+        "tps": 68.44,
+        "firstTokenAt": "2026-07-09T07:30:39.349Z",
+        "lastTokenAt": "2026-07-09T07:30:43.747Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-fe33fbab68e7d4e9ac5cd93b",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/checker-fe33fbab68e7d4e9ac5cd93b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:28:16.459Z",
+        "finishedAt": "2026-07-09T07:30:43.778Z",
+        "updatedAt": "2026-07-09T07:30:43.778Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 216347,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45c6-fc72-78ec-bd5d-b4267e9a60e9",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-28-16-498Z_019f45c6-fc72-78ec-bd5d-b4267e9a60e9.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-095a94df70a1daa4a8d381f0",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-09T07:41:52.391Z",
+      "finishedAt": "2026-07-09T07:43:53.420Z",
+      "runner": "sdk",
+      "childSessionId": "019f45d3-6fb9-7f8b-a615-1f09fc570ec6",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-41-52-441Z_019f45d3-6fb9-7f8b-a615-1f09fc570ec6.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f45aa-7d65-793b-b293-90d56ee38546",
+        "childSessionId": "019f45d3-6fb9-7f8b-a615-1f09fc570ec6",
+        "model": "openai-codex/gpt-5.4",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请对任务“修复工作树归档后项目空间未同步清理”做最终检查确认。 目标： 1. 复核当前代码与 review.md，确认是否还有 needs-work / blocker。 2. 如果无阻塞，请把 `review.md` 明确更新为“completion-ready / 可完成”结论。 3. 如发现低风险小问题，可直接修复并更新 review.md。 4. 在最终结论中明确写出：是否建议主 session 将任务结束归档。 请重点确认： - lint / tsc 结果 - a…",
+      "summary": "已完成最终检查。\n\n**结论**\n- **Verdict:** Pass / completion-ready（可完成）\n- **是否建议主 session 结束归档任务：** 是，建议结束并归档\n- **是否还有 blocker / needs-work：** 无\n\n**复核结果**\n- `lint`：通过\n- `tsc`：通过\n- 代码与 `review.md` 一致；`archive / delete / projects?sync=missing / worktrees/refresh / sidebar` 行为已对齐\n- `Remaining Findings` 仅剩**非阻塞**的 registry 并发写入老风险，不影响本任务完成\n\n**已更新产物**\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n  - 明确更新为 **completion-ready（可完成）**\n  - 明确写明 **建议主 session 将任务结束并归档**\n\n**本次验证**\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- 静态审查 — 确认 API 响应兼容、missing sync 默认触发、allowed-roots 缓存失效补齐、Sidebar fallback 顺序正确\n\n**剩余风险**\n- 非阻塞：Project Registry 仍无专门进程内写锁，存在历史性的并发最后写入覆盖风险；本次未扩大风险面\n\n**主 session 还需决策**\n- 无\n\n**handoff**\n- **Files changed / artifacts produced:** `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n- **Validation run:** `npm run lint`, `node_modules/.bin/tsc --noEmit`\n- **Remaining risks:** registry 并发写入老风险（非阻塞）\n- **Decision needed from main session:** 建议直接结束并归档任务",
+      "model": "openai-codex/gpt-5.4",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.4",
+          "arg": "openai-codex/gpt-5.4",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-09T07:41:52.391Z",
+        "updatedAt": "2026-07-09T07:43:53.420Z",
+        "eventCount": 1495,
+        "lastTextPreview": "已完成最终检查。\n\n**结论**\n- **Verdict:** Pass / completion-ready（可完成）\n- **是否建议主 session 结束归档任务：** 是，建议结束并归档\n- **是否还有 blocker / needs-work：** 无\n\n**复核结果**\n- `lint`：通过\n- `tsc`：通过\n- 代码与 `review.md` 一致；`archive / delete / projects?sync=missing / worktrees/refresh / sidebar` 行为已对齐\n- `Remaining Findings` 仅剩**非阻塞**的 registry 并发写入老风险，不影响本任务完成\n\n**已更新产物**\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n  - 明确更新为 **completion-ready（可完成）**\n  - 明确写明 **建议主 session 将任务结束并归档**\n\n**本次验证**\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- 静态审查 — 确认 API 响应兼容、missing sync 默认触发、allowed-roots 缓存失效补齐、Sidebar fallback 顺序正确\n\n**剩余风险**\n- 非阻塞：Project Registry 仍无专门进程内写锁，存在历史性的并发最后写入覆盖风险；本次未扩大风险面\n\n**主 session 还需决策**\n- 无\n\n**handoff**\n- **Files changed / artifacts produced:** `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n- **Validation run:** `npm run lint`, `node_modules/.bin/tsc --noEmit`\n- **Remaining risks:** registry 并发写入老风险（非阻塞）\n- **Decision needed from main session:** 建议直接结束并归档任务",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:43:33.860Z",
+            "toolCallId": "call_aGRej3ZFterw9uJ48ssnSTGZ|fc_0f3d887d8d0869d6016a4f512233148198a037d4a80c7eab0c",
+            "toolName": "edit",
+            "text": "Successfully replaced 2 block(s) in .ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-09T07:43:39.269Z",
+            "toolCallId": "call_kBXSJH4u6lvbsuErdENrvIAO|fc_0f3d887d8d0869d6016a4f512ae85c81989b633a7f517af941",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md\",\n  \"offset\": 1,\n  \"limit\": 80\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-09T07:43:39.275Z",
+            "toolCallId": "call_kBXSJH4u6lvbsuErdENrvIAO|fc_0f3d887d8d0869d6016a4f512ae85c81989b633a7f517af941",
+            "toolName": "read",
+            "text": "# review\n\n## Check Complete\n\n### Findings Fixed\n\n- 修复 `GET /api/projects?sync=missing` 先读后同步导致响应仍返回旧 projects 的问题；现改为先执行 missing-only sync，再返回最新 registry 数据。\n- 修复 Sidebar `loadProjects()` 未使用 `?sync=missing`，导致 CLI/直接删目录后的被动同步默认不触发；现默认通过 `GET /api/projects?sync=missing` 加载项目。\n- 补充被动同步后的 allowed-roots 缓存失效：`GET /api/projects?sync=missing` 与 `POST /api/projects/[projectId]/worktrees/refresh` 在实际归档到 missing worktree space 时会调用 `invalidateAllowedRootsCache()`。\n\n### Remaining Findings\n\n- 非阻塞：Project Registry 仍采用读-改-写原子落盘，但没有专门的进程内写锁；若未来频繁并发执行 archive/refresh/sync，仍存在最后写入者覆盖前一写入的老风险。本次改动未扩大该风险。\n\n### Verification\n\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- 静态审查 — 确认 `archiveWorktreeSpacesByPaths` 仅处理 `kind === \"worktree\"`，主匹配键为 `pathKey`，`displayPath`/`realPath` 仅作同 space 精确兜底；未发现跨 project/main space 误归档路径。\n- 静态审查 — 确认 archive/delete API 响应仅新增 `archivedSpaces` / `unmatchedPaths` / `warning`，保持向后兼容。\n- 静态审查 — 确认 Sidebar 归档后 fallback 顺序覆盖 main → 同项目其他 active/non-missing space → `fallbackCwd` → `null`。\n\n### Verdict\n\n- Pass / completion-ready（可完成）\n- 原实现有 3 个可修复缺口（projects 响应陈旧、默认不触发 missing sync、被动同步后 allowed-roots 缓存未失效）；已修复并通过 lint/typecheck。\n- 建议主 session 将该任务结束并归档；当前 Remaining Findings 仅剩非阻塞并发写入老风险，无需为本任务继续返工。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-09T07:43:53.398Z",
+            "text": "已完成最终检查。\n\n**结论**\n- **Verdict:** Pass / completion-ready（可完成）\n- **是否建议主 session 结束归档任务：** 是，建议结束并归档\n- **是否还有 blocker / needs-work：** 无\n\n**复核结果**\n- `lint`：通过\n- `tsc`：通过\n- 代码与 `review.md` 一致；`archive / delete / projects?sync=missing / worktrees/refresh / sidebar` 行为已对齐\n- `Remaining Findings` 仅剩**非阻塞**的 registry 并发写入老风险，不影响本任务完成\n\n**已更新产物**\n- `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n  - 明确更新为 **completion-ready（可完成）**\n  - 明确写明 **建议主 session 将任务结束并归档**\n\n**本次验证**\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- 静态审查 — 确认 API 响应兼容、missing sync 默认触发、allowed-roots 缓存失效补齐、Sidebar fallback 顺序正确\n\n**剩余风险**\n- 非阻塞：Project Registry 仍无专门进程内写锁，存在历史性的并发最后写入覆盖风险；本次未扩大风险面\n\n**主 session 还需决策**\n- 无\n\n**handoff**\n- **Files changed / artifacts produced:** `.ypi/tasks/20260709-145750-修复工作树归档后项目空间未同步清理/review.md`\n- **Validation run:** `npm run lint`, `node_modules/.bin/tsc --noEmit`\n- **Remaining risks:** registry 并发写入老风险（非阻塞）\n- **Decision needed from main session:** 建议直接结束并归档任务",
+            "model": "openai-codex/gpt-5.4",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-09T07:43:53.411Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "studio.subagents.runner=auto selected the SDK child runner. If SDK setup fails before prompt execution, the run will fall back to the bundled CLI runner."
+        ],
+        "outputChars": 1002,
+        "tokens": 530,
+        "tokenSource": "usage",
+        "tps": 73.08,
+        "firstTokenAt": "2026-07-09T07:43:46.010Z",
+        "lastTokenAt": "2026-07-09T07:43:53.262Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-095a94df70a1daa4a8d381f0",
+        "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260709-145750-/checker-095a94df70a1daa4a8d381f0.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-09T07:41:52.391Z",
+        "finishedAt": "2026-07-09T07:43:53.417Z",
+        "updatedAt": "2026-07-09T07:43:53.417Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 199763,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f45d3-6fb9-7f8b-a615-1f09fc570ec6",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-09T07-41-52-441Z_019f45d3-6fb9-7f8b-a615-1f09fc570ec6.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-09T07:05:29.877Z",
+      "contextId": "pi_019f45aa-7d65-793b-b293-90d56ee38546",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-09T07:08:27.017Z",
+      "contextId": "pi_019f45aa-7d65-793b-b293-90d56ee38546",
+      "inputHash": "8cbe697b157364a5b1364628",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-09T08:03:51.765Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260709-160351-修复工作树归档后项目空间未同步清理",
+    "knowledgePath": ".ypi/knowledge/20260709-160351-修复工作树归档后项目空间未同步清理.md"
+  }
+}

@@ -5,7 +5,7 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | File | Purpose |
 | --- | --- |
 | `lib/project-registry-types.ts` | Shared Project Registry schema and wire types for projects, spaces, worktree metadata, and metadata patch payloads. WorkTree space metadata may include `branch`, `repoRoot`, `mainWorktreePath`, `mainWorktreeBranch`, optional creation-time `baseRef`, and `discoveredAt`. |
-| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, Git worktree space sync from `git worktree list --porcelain`, creation-time WorkTree `baseRef` preservation when available, and archived/missing marking for removed worktrees. |
+| `lib/project-registry.ts` | Project Registry persistence under `~/.pi/agent/pi-web-projects.json`: canonical path/realpath handling, atomic read/write, project registration with main-space creation, duplicate active-project detection by `pathKey`, project/space metadata patch helpers, Git worktree space sync from `git worktree list --porcelain` (`syncProjectWorktreeSpaces`), creation-time WorkTree `baseRef` preservation when available, unified worktree space archive helper (`archiveWorktreeSpacesByPaths`) with multi-path-alias matching (`pathKey` primary, `displayPath`/`realPath` fallback), lightweight passive missing-only sync (`syncMissingWorktreeSpaces`) for detecting filesystem-removed worktree spaces, and legacy `markWorktreeSpaceArchivedByPath` (now delegates to `archiveWorktreeSpacesByPaths`). |
 | `lib/project-session-index.ts` | Best-effort `~/.pi/agent/pi-web-session-index.json` maintenance for new/forked sessions linked to project spaces; session headers remain the source of truth. |
 | `lib/session-project-link.ts` | Helpers for reading/writing optional `projectId`/`spaceId` on session headers, deriving `legacyUnassigned`, and canonical path matching for legacy exact-cwd display. |
 | `lib/rpc-manager.ts` | `AgentSessionWrapper`, global registry, `startRpcSession()`, cwd-scoped session cleanup, lifecycle handling, built-in YPI Studio extension factory injection for web-created AgentSessions, Studio child terminal continuation prompts, idle-timeout extension while Studio children are active, and ChatGPT account failover retry hook wiring. |
@@ -68,6 +68,29 @@ Shared logic lives under `lib/`. Prefer adding behavior here when it is used by 
 | `lib/trellis-setup-types.ts` | Wire types for Trellis setup status and setup/update command API responses. |
 | `lib/trellis-types.ts` | Wire types for Trellis task list/detail API responses and UI consumers. |
 | `lib/workspace-title.ts` | Shared workspace title formatting from cwd and Git metadata, default browser-title fallback, and lightweight normalized path comparison for title matching. |
+
+## Key Registry Functions
+
+### `archiveWorktreeSpacesByPaths(paths, options?)`
+
+Unified WorkTree space archiving helper. For each input path, derives canonical `pathKey` / `displayPath` / `realPath` via `canonicalizeProjectPath()` and matches against worktree spaces (`space.kind === "worktree"`) using `pathKey` as the primary key with `displayPath` and `realPath` as fallbacks. Matched spaces are soft-archived (`archived: true, missing: true`) with additive audit metadata (`metadata.archivedReason`, `metadata.archivedAt`, `metadata.lastKnownPath`) — never hard-deleted from the registry.
+
+- `paths`: One or more path aliases (e.g., `cwd`, `status.cwd`, `status.worktree.repoRoot`).
+- `options.reason`: Audit label stored in metadata (default `"api_archive"`).
+- `options.missing`: Whether to set `missing: true` (default `true`).
+- Returns `{ archivedSpaces, unmatchedPaths }`.
+
+### `syncMissingWorktreeSpaces(options?)`
+
+Lightweight passive missing-only sync for worktree spaces whose directories no longer exist. Scans non-archived worktree spaces, checks filesystem existence via `canonicalizeProjectPath()`, and soft-archives spaces with missing paths. No Git commands are executed. Internally delegates to `archiveWorktreeSpacesByPaths` for consistent matching and audit metadata.
+
+- `options.projectId`: Optional single-project scope.
+- `options.reason`: Audit label (default `"passive_missing"`).
+- Returns `{ archivedSpaces, unmatchedPaths }`.
+
+### `markWorktreeSpaceArchivedByPath(worktreePath)`
+
+Legacy compatibility wrapper. Delegates to `archiveWorktreeSpacesByPaths([worktreePath], { reason: "api_archive" })` and returns just the `archivedSpaces` array. All new callers should use `archiveWorktreeSpacesByPaths` directly for multi-alias matching and `unmatchedPaths` feedback.
 
 ## Reuse Rules
 

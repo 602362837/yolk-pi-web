@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { archiveGitWorktree, getWorktreeStatus, MainWorktreeDirtyError, WorktreeUserError } from "@/lib/git-worktree";
 import { destroyRpcSessionsForCwd } from "@/lib/rpc-manager";
 import { deleteSessionsForCwd } from "@/lib/session-reader";
-import { markWorktreeSpaceArchivedByPath } from "@/lib/project-registry";
+import { archiveWorktreeSpacesByPaths } from "@/lib/project-registry";
+import { invalidateAllowedRootsCache } from "@/lib/allowed-roots";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,26 @@ export async function POST(req: Request) {
         ...cleanupAliases.flatMap((alias) => destroyRpcSessionsForCwd(alias)),
       ])],
     });
-    const archivedSpaces = await markWorktreeSpaceArchivedByPath(cwd);
-    const deletedSessions = await deleteSessionsForCwd(cwd, cleanupAliases);
-    return NextResponse.json({ ...result, archivedSpaces, deletedSessionIds: deletedSessions.map((session) => session.id) });
+    const aliases = [cwd, ...cleanupAliases];
+    const archiveResult = await archiveWorktreeSpacesByPaths(aliases, { reason: "api_archive" });
+    invalidateAllowedRootsCache();
+
+    let deletedSessionIds: string[] = [];
+    let sessionWarning: string | undefined;
+    try {
+      const deletedSessions = await deleteSessionsForCwd(cwd, cleanupAliases);
+      deletedSessionIds = deletedSessions.map((session) => session.id);
+    } catch (err) {
+      sessionWarning = `Session cleanup warning: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
+    return NextResponse.json({
+      ...result,
+      archivedSpaces: archiveResult.archivedSpaces,
+      deletedSessionIds,
+      ...(archiveResult.unmatchedPaths.length > 0 ? { unmatchedPaths: archiveResult.unmatchedPaths } : {}),
+      ...(sessionWarning ? { warning: sessionWarning } : {}),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof MainWorktreeDirtyError) {

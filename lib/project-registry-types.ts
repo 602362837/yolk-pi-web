@@ -77,3 +77,20 @@ export interface CreateProjectInput extends ProjectPatchInput {
   path?: unknown;
   rootPath?: unknown;
 }
+
+export type ArchiveWorktreeReason = "api_archive" | "api_delete" | "passive_missing" | "passive_git_sync";
+
+export interface ArchiveWorktreeSpacesOptions {
+  reason?: ArchiveWorktreeReason;
+  missing?: boolean;
+}
+
+export interface ArchiveWorktreeSpacesResult {
+  archivedSpaces: PiWebProjectSpaceRecord[];
+  unmatchedPaths: string[];
+}
+
+export interface SyncMissingWorktreeSpacesOptions {
+  projectId?: string;
+  reason?: ArchiveWorktreeReason;
+}

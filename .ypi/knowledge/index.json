@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-09T06:38:05.479Z",
+  "updatedAt": "2026-07-09T08:03:51.765Z",
   "entries": [
+    {
+      "id": "20260709-160351-修复工作树归档后项目空间未同步清理",
+      "title": "修复工作树归档后项目空间未同步清理",
+      "taskId": "20260709-145750-修复工作树归档后项目空间未同步清理",
+      "taskKey": "archived:2026-07:20260709-145750-修复工作树归档后项目空间未同步清理",
+      "workflowId": "feature-dev",
+      "summary": "已完成并归档：修复 WorkTree 归档/删除后 Project Registry 中 worktree space 未同步清理的问题。可复用结论：对 worktree space 采用软清理（`archived: true, missing: true`）而非硬删除，以保留历史 session 与空间元数据；统一后端 `archiveWorktreeSpacesByPaths`，以 `pathKey` 为主、`displayPath/realPath` 为兜底，仅匹配 `kind=worktree`，支持 archive/delete 时多路径别名清理；新增 `syncMissingWorktreeSpaces` 作为 non-UI 场景的 missing-only 被动同步，并在 `GET /api/projects?sync=missing` 与 worktree refresh 中触发，归档到 missing 时同时失效 allowed-roots 缓存；前端 Sidebar 在归档/删除成功后必须刷新 projects，并按 main → 同项目其他 active/non-missing space → fallbackCwd → null 做选中空间回退。Checker 额外修复了 projects 响应先读后同步导致返回陈旧数据的问题。剩余仅有非阻塞的 registry 并发写入老风险。",
+      "tags": [
+        "feature-dev",
+        "worktree",
+        "project-space",
+        "registry-sync",
+        "sidebar",
+        "passive-sync",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260709-145750-修复工作树归档后项目空间未同步清理",
+      "knowledgePath": ".ypi/knowledge/20260709-160351-修复工作树归档后项目空间未同步清理.md",
+      "createdAt": "2026-07-09T08:03:51.765Z",
+      "archivedAt": "2026-07-09T08:03:51.765Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260709-143805-修复-ypic-cli-无响应并改进底部输入区与模型提示",
       "title": "修复 ypic CLI 无响应并改进底部输入区与模型提示",

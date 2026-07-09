@@ -99,6 +99,23 @@ Path matching uses `canonicalizeProjectPath()` from `lib/project-registry.ts`: e
 
 `pi-web-session-index.json` is a best-effort performance sidecar for newly linked/forked sessions. Session JSONL headers remain the source of truth for project-space linkage.
 
+### WorkTree Archive Space Sync
+
+When a Git WorkTree is archived or deleted (via UI/API, CLI, or direct filesystem operations), the corresponding Project Registry worktree space must be synchronized so the Sidebar no longer shows a stale, now-invalid workspace. The strategy uses two complementary layers:
+
+**1. Active cleanup (UI/API-initiated)**
+
+`archiveGitWorktree()` (archive) and `removeGitWorktree()` (delete) call `archiveWorktreeSpacesByPaths()` with multiple path aliases (`cwd`, `status.cwd`, `status.worktree.repoRoot`) to reliably match the worktree space. Matching uses `pathKey` as the primary key with `displayPath` and `realPath` as fallbacks. Matched spaces are soft-archived: `archived: true`, `missing: true`, with additive audit metadata (`archivedReason`, `archivedAt`, `lastKnownPath`) — never hard-deleted from the registry. After archiving, `invalidateAllowedRootsCache()` is called so the file API does not retain authorization for the removed WorkTree path.
+
+**2. Passive sync (external changes)**
+
+- **Missing-only sync** (`syncMissingWorktreeSpaces`): Scans non-archived worktree spaces across all (or a single) projects, checks filesystem existence via `canonicalizeProjectPath()`, and soft-archives spaces whose directories no longer exist. No Git commands are executed. Suitable for lightweight triggers such as project-list loads or Sidebar refreshes.
+- **Full Git refresh** (`syncProjectWorktreeSpaces`): Runs `git worktree list --porcelain` to discover current worktrees, upserts discovered spaces (un-archiving previously-archived ones if the path reappears), and archives spaces not found by Git. After the full refresh, a best-effort missing-only pass catches CLI removals that the Git porcelain may not reflect.
+
+**Frontend integration**
+
+`SessionSidebar.confirmWorktreeAction()` optimistically merges the API response's `archivedSpaces` into local project state so the worktree space disappears immediately, then refreshes projects in the background. If the currently-selected space was the archived one, fallback preference: (1) `main` space of the same project, (2) any other active non-missing space, (3) API-provided `fallbackCwd`, (4) null.
+
 ## Project Invariants
 
 ### AgentSession lifecycle

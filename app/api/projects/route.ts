@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
-import { listProjects, ProjectRegistryError, registerProject, syncProjectWorktreeSpaces } from "@/lib/project-registry";
-import type { CreateProjectInput } from "@/lib/project-registry-types";
+import { NextRequest, NextResponse } from "next/server";
+import { listProjects, ProjectRegistryError, registerProject, syncMissingWorktreeSpaces, syncProjectWorktreeSpaces } from "@/lib/project-registry";
+import type { CreateProjectInput, PiWebProjectSpaceRecord } from "@/lib/project-registry-types";
+import { invalidateAllowedRootsCache } from "@/lib/allowed-roots";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,10 +12,20 @@ function errorResponse(error: unknown) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Optional passive missing-only sync: enabled via ?sync=missing
+    let sync: { archivedSpaces: PiWebProjectSpaceRecord[] } | undefined;
+    if (req.nextUrl.searchParams.get("sync") === "missing") {
+      const syncResult = await syncMissingWorktreeSpaces({ reason: "passive_missing" });
+      if (syncResult.archivedSpaces.length > 0) {
+        invalidateAllowedRootsCache();
+      }
+      sync = { archivedSpaces: syncResult.archivedSpaces };
+    }
+
     const projects = await listProjects();
-    return NextResponse.json({ projects });
+    return NextResponse.json({ projects, ...(sync ? { sync } : {}) });
   } catch (error) {
     return errorResponse(error);
   }
