@@ -38,6 +38,41 @@ Terminal ypic
 
 `ypic` never self-starts a server: the health endpoint (`GET /api/cli/health`) returns stable identification metadata only (`ok`, `app`, `version`, `pid`, `capabilities`) so the CLI can distinguish a reusable ypi server from another service occupying the same port, and it never exposes env, tokens, user paths, or secrets. When the current directory is not already a known project/space, `ypic` registers it through the existing Project Registry API (idempotent by canonical `pathKey`, reusing `fs.realpath`) so the Web/Studio side treats the directory as a normal project space; chat still works even if registration is skipped, since pi binds sessions by `cwd`. Sessions created through this flow still go through `createConfiguredEmptyAgentSession()` and `startRpcSession()`, so the single-wrapper invariant, YPI Studio / Browser Share extension injection, tool-call normalization, file-change sidecars, usage accounting, and the Studio approval gate all remain identical to Web-created sessions. No new session storage format is introduced. `ypic` is a thin HTTP/SSE client over `bin/ypic.js` (CommonJS, Node built-ins only) and must not import project TypeScript (`lib/**`) so the npm-published package can execute it directly; the shared server-startup helper lives in `bin/server-runner.js`.
 
+#### CLI rendering abstraction: `TerminalFrame` / `PlainFrame`
+
+`ypic` decouples output rendering and input handling via two frame abstractions
+that share a common `write`/`writeLine`/`info`/`setStatusDot`/`setStatusText`/
+`setModelText`/`setInputHint`/`setPrompt` interface, selected at startup by
+`createFrame()`:
+
+- **`TerminalFrame`** (TTY mode, `frame.kind === "tty"`): Only enabled when
+  `stdout.isTTY`, `stdin.isTTY`, `NO_COLOR` is unset, and `YPIC_PLAIN` is
+  unset. Uses the terminal's alternate screen buffer (`\x1b[?1049h`/`\x1b[?1049l`).
+  The visible area is split into:
+  - **History rows** (`rows - 3`): A scrolling ring buffer of completed lines
+    plus a streaming partial line, rendering assistant deltas, tool-call
+    markers, and Studio summaries.
+  - **Separator row** (`rows - 2`): A gray full-width `─` line.
+  - **Status row** (`rows - 1`): Left side shows a colored dot (`●`) and
+    status (idle/RUNNING/ERROR) plus optional context text; right side shows
+    the current `provider/modelId · thinking` string.
+  - **Input row** (`rows`): A green `> ` prompt plus raw keyboard input
+    (basic line editing: backspace, enter, Ctrl-C/D, printable characters).
+  Redraws are throttled to ~60 Hz; terminal resize triggers an immediate full
+  redraw. SIGINT increments a counter: first Ctrl-C aborts a running agent
+  turn; a second Ctrl-C within 1.5 s quits.
+
+- **`PlainFrame`** (fallback, `frame.kind === "plain"`): Activated when TTY
+  conditions aren't met (pipes, CI, `NO_COLOR`, `YPIC_PLAIN=1`). Thin wrapper
+  around a user-supplied `readline` interface. `write`/`writeLine` go directly
+  to `stdout`; `info` writes `[YPIC:info]`-prefixed messages to `stderr`.
+  Status/model/hint setter methods are no-ops, so no ANSI sequences are ever
+  emitted. Input is handled by `readline`'s standard `line`/`SIGINT` events.
+
+Both frames expose a `modelText` setter so the main loop can update the visible
+model after `/model` switches or agent state resolution; the TTY frame redraws
+the status row, while the plain frame is a no-op.
+
 
 ## Key Boundaries
 

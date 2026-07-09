@@ -80,15 +80,64 @@ through the Project Registry API when it is not already a known project/space
 `GET /api/agent/[id]/events`, and `POST /api/agent/[id]`. No new session format
 is introduced.
 
-In-session commands: `/help`, `/config` (or `/open`) to open the Web page in a
-browser, `/oweb` to open the current session’s fixed Web URL, `/status`,
-`/abort`, `/steer <text>`, `/follow <text>`, and `/quit`. Regular `/studio-*`
-slash commands are forwarded as chat prompts so the existing YPI Studio
-extension handles them; the CLI shows compact task/run status and the
+#### Startup display
+
+In TTY mode, the startup banner shows the YPI CLI identity, current working
+directory (`cwd`), ypi server URL and version, session id, current
+model/thinking level, and hints for `/help`, `/model`, `/config`, `/oweb`,
+and `/quit`.
+
+#### `/model` command
+
+| Command | Action |
+| --- | --- |
+| `/model` | Show help and current model/thinking. |
+| `/model current` | Display current provider, model id, thinking level, and supported thinking range. |
+| `/model list [provider]` | List all available models (optionally filtered by provider); current model marked `*`. |
+| `/model <provider>/<modelId>` | Switch to the specified model (agent must be idle). |
+| `/model <provider>/<modelId> <thinking>` | Switch model and set thinking level in one command. |
+| `/model thinking <level>` | Set thinking level only (`off`/`auto`/`low`/`medium`/`high`/`xhigh`). |
+
+Switching a model sends `set_model` and `set_thinking_level` commands via
+`POST /api/agent/[id]`, updating server-side session state. The Web UI sees the
+same change when opening the session. Model switching is blocked while the agent
+is running (`/abort` first).
+
+#### TTY bottom input area and status bar
+
+When `stdout.isTTY`, `stdin.isTTY`, `NO_COLOR` is unset, and `YPIC_PLAIN` is
+unset, `ypic` uses the terminal's alternate screen buffer to render a persistent
+bottom-bar UI:
+
+- **History area**: Upper region scrolls assistant output, tool-call lines, and
+  Studio summaries.
+- **Separator**: A gray horizontal rule splits history from the bottom control
+  rows.
+- **Status bar**: Left side shows an idle / RUNNING / ERROR dot with status
+  text; right side shows the current model and thinking level.
+- **Input line**: Pinned at the bottom with a green `> ` prompt. When the agent
+  is running, a dim placeholder reminds "Enter to steer, Ctrl-C to abort".
+
+The frame redraws automatically on terminal resize.
+
+In-session commands: `/help`, `/model`, `/config` (or `/open`) to open the Web
+page in a browser, `/oweb` to open the current session's fixed Web URL,
+`/status`, `/abort`, `/steer <text>`, `/follow <text>`, and `/quit`. Regular
+`/studio-*` slash commands are forwarded as chat prompts so the existing YPI
+Studio extension handles them; the CLI shows compact task/run status and the
 `plan-review.md` path, but full task details, artifacts, and member config stay
 in the Web Studio panel. Studio approval is never auto-granted by the CLI. On
 exit, `ypic` prints a `--resume <sessionId>` command plus the fixed Web URL for
 the current session.
+
+#### Plain fallback
+
+When `stdout` or `stdin` is not a TTY, or `NO_COLOR` / `YPIC_PLAIN` is set,
+`ypic` falls back to a plain readline REPL: output writes directly to `stdout`,
+status messages use `[YPIC:info]` on `stderr`, and no ANSI escape sequences are
+emitted — safe for pipes, CI logs, and non-TTY environments. With a positional
+message in non-TTY mode, `ypic` sends the message and exits automatically after
+`agent_end`, making it suitable for script/pipe use.
 
 
 ## Data and Configuration

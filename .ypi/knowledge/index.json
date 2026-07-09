@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-09T03:57:29.342Z",
+  "updatedAt": "2026-07-09T06:38:05.479Z",
   "entries": [
+    {
+      "id": "20260709-143805-修复-ypic-cli-无响应并改进底部输入区与模型提示",
+      "title": "修复 ypic CLI 无响应并改进底部输入区与模型提示",
+      "taskId": "20260709-125955-修复-ypic-cli-无响应并改进底部输入区与模型提示",
+      "taskKey": "archived:2026-07:20260709-125955-修复-ypic-cli-无响应并改进底部输入区与模型提示",
+      "workflowId": "feature-dev",
+      "summary": "修复 ypic CLI 无响应并改进底部输入区与模型提示。关键可复用结论：(1) CLI 终端 UI 改造采用 TerminalFrame/PlainFrame 双 Frame 抽象，TTY 底部固定输入区+状态栏，PlainFrame 的 start() 需 onClose 回调防非 TTY positional 提前退出；(2) SSE connected gate + 发送前即时 visible state 解决\"输入无响应\"体验问题；(3) SDK runner runtime_lost 后通过 JSONL transcript 确认代码完整性 → 重置 subtask 为 ready → 重新 dispatch implementer 补 handoff，不要强制标 done；(4) 所有 /model 切换路径必须在 agent running 时拒绝；(5) UI 原型获批后必须同步更新 ui.md 和 plan-review.md 的审批状态，否则 checker 会 blocker。",
+      "tags": [
+        "feature-dev",
+        "cli",
+        "ypic",
+        "terminal-ui",
+        "sse-reliability",
+        "model-command",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260709-125955-修复-ypic-cli-无响应并改进底部输入区与模型提示",
+      "knowledgePath": ".ypi/knowledge/20260709-143805-修复-ypic-cli-无响应并改进底部输入区与模型提示.md",
+      "createdAt": "2026-07-09T06:38:05.479Z",
+      "archivedAt": "2026-07-09T06:38:05.479Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260709-115729-设计-opencode-go-额度不足自动账号轮换与并发安全方案",
       "title": "设计 opencode go 额度不足自动账号轮换与并发安全方案",

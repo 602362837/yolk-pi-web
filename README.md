@@ -51,6 +51,38 @@ ypic --resume <sid>    # 直接恢复指定 session
 ypic --port 8080       # 指定 ypi server 端口
 ```
 
+启动提示：
+
+启动后在 TTY 模式下显示 YPI CLI 身份 banner、当前工作目录（cwd）、ypi server 地址与版本号、session id、当前模型与 thinking 等级、以及 `/help` `/model` `/config` `/oweb` `/quit` 等核心命令提示。若模型未配置，会提示使用 `/config` 打开 Web 设置页。
+
+`/model` 命令：
+
+| 命令 | 用途 |
+| --- | --- |
+| `/model` | 显示帮助和当前模型/thinking。 |
+| `/model current` | 显示当前 provider/model/thinking 等级和支持的 thinking 范围。 |
+| `/model list [provider]` | 列出所有可用模型（可按 provider 过滤）；当前生效模型标注 `*`。 |
+| `/model <provider>/<modelId>` | 直接切换到指定模型（agent idle 时）。 |
+| `/model <provider>/<modelId> <thinking>` | 切换模型并同时设置 thinking 等级。 |
+| `/model thinking <level>` | 仅切换 thinking 等级（`off`/`auto`/`low`/`medium`/`high`/`xhigh`）。 |
+
+切换后会通过 `set_model` / `set_thinking_level` 写入服务端 session 状态，Web 端打开同一 session 可看到相同变化。agent 正在运行时禁止切换模型，会提示先 `/abort`。
+
+TTY 底部固定输入区与状态栏：
+
+在支持 ANSI 的终端（`stdout.isTTY && !NO_COLOR && !YPIC_PLAIN`）中，`ypic` 使用 alternate screen buffer 渲染：
+
+- **历史输出区**：上方可滚动区域显示 assistant 输出、tool call、Studio 摘要等。
+- **分隔线**：灰色横线将输出区与底部三行 UI 分开。
+- **状态栏**：左侧显示 idle/RUNNING/ERROR 状态圆点和文本；右侧显示当前模型和 thinking 等级。
+- **输入行**：固定在底部，绿色 `> ` 提示符；运行时显示灰色 placeholder 提示“Enter to steer, Ctrl-C to abort”。
+- 窗口 resize 时自动重绘。
+
+降级与兼容：
+
+- 设置 `YPIC_PLAIN=1` 或 `NO_COLOR`，或 stdout/stdin 非 TTY（管道、CI、脚本）时，自动降级为 plain readline 模式：输出直接写入 stdout，状态信息通过 `[YPIC:info]` 写入 stderr，不产生任何 ANSI escape 序列。
+- 非 TTY 下 `ypic "message"` 发送首条消息后，在 `agent_end` 后自动退出，适合脚本/管道使用。
+
 定位与限制：
 
 - `ypic` 不替代 `ypi`，也不在终端重做 Web 工作台。模型、账号、Studio 成员策略、Web Terminal 等复杂配置请用 `/config` 打开 Web 页面完成。
