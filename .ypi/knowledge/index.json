@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-09T02:20:51.777Z",
+  "updatedAt": "2026-07-09T03:57:29.342Z",
   "entries": [
+    {
+      "id": "20260709-115729-设计-opencode-go-额度不足自动账号轮换与并发安全方案",
+      "title": "设计 opencode go 额度不足自动账号轮换与并发安全方案",
+      "taskId": "20260709-102717-设计-opencode-go-额度不足自动账号轮换与并发安全方案",
+      "taskKey": "archived:2026-07:20260709-102717-设计-opencode-go-额度不足自动账号轮换与并发安全方案",
+      "workflowId": "feature-dev",
+      "summary": "为 opencode-go 多账号实现了默认关闭的自动账号轮换方案，并完成实现、测试、UI 与文档。核心可复用结论：1）未发现可靠公开 quota/balance 查询 API，v1 应采用纯被动 failover；2）仅对明确 quota/billing exhausted 与明确 Invalid/Missing API key 等 account_unusable 错误触发，普通 429/network/5xx 不切号；3）account_unusable 应持久禁用账号，并要求手动 Enable 后才能再次使用；4）并发下需进程级锁 + 锁内 active-changed guard + activate 前 double-check，避免 A→B 后另一个会话再 B→C 级联；5）disabled 账号不得参与候选也不得激活；6）UI 需明确全局 active key 副作用，并提供 Enable/Disable、策略说明与轻量 Chat 提示。",
+      "tags": [
+        "feature-dev",
+        "opencode-go",
+        "multi-account",
+        "quota-failover",
+        "concurrency",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260709-102717-设计-opencode-go-额度不足自动账号轮换与并发安全方案",
+      "knowledgePath": ".ypi/knowledge/20260709-115729-设计-opencode-go-额度不足自动账号轮换与并发安全方案.md",
+      "createdAt": "2026-07-09T03:57:29.342Z",
+      "archivedAt": "2026-07-09T03:57:29.342Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260709-102051-设计-ypic-cli-入口并规划与现有-ypi-web-studio-的集成方案",
       "title": "设计 ypic CLI 入口并规划与现有 ypi/web/Studio 的集成方案",

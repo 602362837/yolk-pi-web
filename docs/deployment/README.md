@@ -104,14 +104,43 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent-data ypi
 | `sessions/` | Session JSONL files, grouped by encoded workspace path. |
 | `models.json` | Model provider/model configuration. |
 | `settings.json` | pi settings, including default model. |
-| `pi-web.json` | Web UI settings, including Yolk Pi chat defaults, WorkTree defaults, YPI Studio member policies and subagent runner rollout (`studio.subagents.runner`), Usage scope, Web Terminal settings, ChatGPT panel/auto-refresh settings, and Trellis settings. |
+| `pi-web.json` | Web UI settings, including Yolk Pi chat defaults, WorkTree defaults, YPI Studio member policies and subagent runner rollout (`studio.subagents.runner`), Usage scope, Web Terminal settings, ChatGPT panel/auto-refresh settings, default-off OpenCode Go auto-failover settings (`opencodeGo.autoFailover`), and Trellis settings. |
 | `chatgpt-usage-refresh.lock` | Backend ChatGPT usage auto-refresh lock file; stale locks can be repaired from the ChatGPT panel fault handler. |
+| `auth-api-key-accounts/` | Managed API-key account storage for multi-account providers (v1: `opencode-go/`). Contains per-provider `accounts.json` (metadata with active account, disabled state, masked previews) and per-account `<accountId>.json` secret files (mode 0600). Old metadata without `disabled` fields is treated as enabled — no migration required. |
 
 Session path format:
 
 ```text
 ~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl
 ```
+
+## OpenCode Go Auto Failover (default-off)
+
+The `opencodeGo.autoFailover` feature is **disabled by default**. When enabled, it automatically switches the global active managed API-key account on quota/billing errors or permanent `Invalid/Missing API key` errors. It does not trigger on transient 429/rate-limit, network errors, or 5xx.
+
+### Deployment checklist
+
+- **No startup migration**: Existing managed account metadata (created before this feature) treats missing `disabled` as enabled. No data migration, no downtime, and no manual intervention required.
+- **Data path**: Managed account metadata and secrets live under `~/.pi/agent/auth-api-key-accounts/opencode-go/`. The feature never writes plaintext API keys to metadata; only masked previews and SHA-256 fingerprints are stored there.
+- **Single-process safe**: The failover lock is process-level (`globalThis.__piOpencodeGoFailover`). Single-process deployments (default `next start`, `ypi`) are fully safe. Multi-process deployments (PM2 cluster mode, load-balanced instances) may experience cross-process race conditions; see `docs/operations/troubleshooting.md` for mitigation.
+
+### Rollback
+
+Disable the feature without data changes or restarts:
+1. **Settings UI**: Open Settings → OpenCode Go managed API keys → turn off **OpenCode Go auto failover**.
+2. **Config file**: Set `opencodeGo.autoFailover.enabled` to `false` in `~/.pi/agent/pi-web.json`.
+
+The change takes effect for the next agent turn. Disabling does not affect existing account metadata, active account selection, or the ability to manually enable/disable accounts.
+
+### Recovering auto-disabled accounts
+
+Accounts disabled by the system (`disabledBy: "system"`, `autoDisabledReason: "account_unusable"`) can be recovered:
+1. Go to Settings → Models → OpenCode Go.
+2. **Edit** the disabled account to replace the broken API key with a valid one.
+3. Click **Enable** to restore eligibility (does not auto-activate).
+4. Click **Activate** to make it the active account if desired.
+
+Full recovery steps are covered in `docs/operations/troubleshooting.md`.
 
 ## Local Development
 

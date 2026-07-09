@@ -134,6 +134,15 @@ export type AgentRuntimeStatus =
   | "running_tools"
   | "waiting_for_studio_children";
 
+/** Lightweight, display-safe failover notice for the chat input area. */
+export interface OpencodeGoFailoverNotice {
+  status: string;
+  reason?: "quota_exhausted" | "account_unusable";
+  message: string;
+  /** When true, guidance about re-enabling a disabled account in Settings should be shown. */
+  showEnableGuidance: boolean;
+}
+
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_tools"; tools: { id: string; name: string }[] }
@@ -332,6 +341,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [toolProgressById, setToolProgressById] = useState<Record<string, ToolExecutionProgress>>({});
   const [precreatedSessionId, setPrecreatedSessionId] = useState<string | null>(null);
   const [sessionUsageRollup, setSessionUsageRollup] = useState<{ sessionId: string; rollup: UsageSessionRollupResult } | null>(null);
+  const [opencodeGoFailoverNotice, setOpencodeGoFailoverNotice] = useState<OpencodeGoFailoverNotice | null>(null);
+  const opencodeGoFailoverNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
@@ -656,6 +667,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setAgentPhase({ kind: "waiting_model" });
         setSubagentRuns([]);
         setToolProgressById({});
+        setOpencodeGoFailoverNotice(null);
+        if (opencodeGoFailoverNoticeTimerRef.current) {
+          clearTimeout(opencodeGoFailoverNoticeTimerRef.current);
+          opencodeGoFailoverNoticeTimerRef.current = null;
+        }
         dispatch({ type: "start" });
         break;
       case "agent_end": {
@@ -818,6 +834,48 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               : `ChatGPT 账号自动切换：${String(event.status)}`,
         });
         break;
+      case "opencode_go_account_failover": {
+        const ogStatus = String(event.status ?? "");
+        const ogReason = event.reason === "quota_exhausted" || event.reason === "account_unusable"
+          ? event.reason as "quota_exhausted" | "account_unusable"
+          : undefined;
+        const ogMessage = typeof event.message === "string" && event.message.trim()
+          ? event.message.trim()
+          : undefined;
+        const isAccountUnusable = ogReason === "account_unusable" || ogStatus === "disabled_account";
+        const isSwitched = ogStatus === "switched";
+        const isAlreadySwitched = ogStatus === "already_switched_by_other_session";
+        const isNoUsable = ogStatus === "no_usable_account" || ogStatus === "retry_budget_exhausted";
+        const isFailed = ogStatus === "failed" || ogStatus === "no_active_account";
+
+        let message = ogMessage ?? "OpenCode Go account failover.";
+        // Enrich with guidance for account_unusable
+        if (isAccountUnusable) {
+          message = ogMessage ?? "OpenCode Go account disabled due to invalid API key. Switched to another account.";
+        } else if (isSwitched) {
+          message = ogMessage ?? "OpenCode Go account switched. Retrying…";
+        } else if (isAlreadySwitched) {
+          message = ogMessage ?? "Another session already switched OpenCode Go account. Retrying with current active account…";
+        } else if (isNoUsable) {
+          message = ogMessage ?? "No enabled OpenCode Go account is available.";
+        } else if (isFailed) {
+          message = ogMessage ?? "OpenCode Go account failover failed.";
+        }
+
+        setOpencodeGoFailoverNotice({
+          status: ogStatus,
+          reason: ogReason,
+          message,
+          showEnableGuidance: isAccountUnusable,
+        });
+
+        // Auto-dismiss after 12s so the notice doesn't linger forever
+        if (opencodeGoFailoverNoticeTimerRef.current) clearTimeout(opencodeGoFailoverNoticeTimerRef.current);
+        opencodeGoFailoverNoticeTimerRef.current = setTimeout(() => {
+          setOpencodeGoFailoverNotice(null);
+        }, 12_000);
+        break;
+      }
       case "auto_retry_start":
         setRetryInfo({ attempt: event.attempt as number, maxAttempts: event.maxAttempts as number, errorMessage: event.errorMessage as string | undefined });
         break;
@@ -840,6 +898,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
     }
   }, [loadSession, onAgentEnd]);
+
+  // Cleanup failover notice timer on unmount
+  useEffect(() => {
+    return () => {
+      if (opencodeGoFailoverNoticeTimerRef.current) {
+        clearTimeout(opencodeGoFailoverNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
@@ -1243,7 +1311,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
-    agentPhase, subagentRuns, toolProgressById,
+    agentPhase, subagentRuns, toolProgressById, opencodeGoFailoverNotice,
     isNew, precreatedSessionId, effectiveSessionId,
     // Refs
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,

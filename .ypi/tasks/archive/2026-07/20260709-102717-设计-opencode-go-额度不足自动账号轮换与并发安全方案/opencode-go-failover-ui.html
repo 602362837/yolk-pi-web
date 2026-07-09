@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenCode Go 自动账号轮换与状态管理原型</title>
+  <style>
+    :root {
+      --bg: #0b0d13;
+      --bg-panel: #141722;
+      --bg-subtle: #1c2030;
+      --border: #262b3d;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #fbbf24;
+      --accent-hover: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .header-title h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .header-title p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .interactive-badge {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--green);
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* Main Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Settings Toggle Row */
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .setting-info {
+      flex: 1;
+      padding-right: 16px;
+    }
+
+    .setting-label {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .setting-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+      background-color: var(--border);
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: #fff;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .toggle-switch.active {
+      background-color: var(--accent);
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(24px);
+    }
+
+    /* Strategy Callout */
+    .callout {
+      background: rgba(251, 191, 36, 0.04);
+      border: 1px dashed rgba(251, 191, 36, 0.3);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+    }
+
+    .callout-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .callout ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Account Cards */
+    .accounts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .account-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      transition: border-color 0.2s, background-color 0.2s;
+      position: relative;
+    }
+
+    .account-card.active {
+      border-color: rgba(59, 130, 246, 0.6);
+      background: rgba(59, 130, 246, 0.03);
+    }
+
+    .account-card.disabled {
+      opacity: 0.65;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .account-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .account-info-left {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .account-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .account-name {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 13.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .pill.pill-active {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .pill.pill-enabled {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--blue);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .pill.pill-disabled {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .account-key-preview {
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+      display: inline-block;
+    }
+
+    .account-time {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .account-description {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .disabled-reason {
+      margin-top: 8px;
+      padding: 6px 10px;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: #f87171;
+    }
+
+    /* Actions */
+    .account-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 10px;
+    }
+
+    .btn {
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      color: var(--accent);
+      border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: rgba(251, 191, 36, 0.1);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-danger {
+      color: var(--red);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    /* Chat Notices Log */
+    .chat-log {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-bubble {
+      background: #111420;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+      position: relative;
+    }
+
+    .chat-sender {
+      font-size: 11px;
+      font-weight: 750;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .chat-text {
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .chat-text b {
+      color: var(--text);
+    }
+
+    .notice-switched {
+      border-left: 3px solid var(--blue);
+      background: rgba(59, 130, 246, 0.03);
+    }
+
+    .notice-disabled {
+      border-left: 3px solid var(--red);
+      background: rgba(239, 68, 68, 0.03);
+    }
+
+    .notice-warn {
+      border-left: 3px solid var(--accent);
+      background: rgba(251, 191, 36, 0.03);
+    }
+
+    .notice-error {
+      border-left: 3px solid var(--red);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    /* Simulation Control Center */
+    .sim-card {
+      margin-top: 24px;
+      background: rgba(30, 41, 59, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .sim-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btn-sim {
+      padding: 8px 12px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 500;
+      border-radius: 6px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+    }
+
+    .btn-sim:hover {
+      background: var(--border);
+      border-color: var(--text-muted);
+    }
+
+    .btn-sim span {
+      font-size: 16px;
+    }
+
+    /* Modal Backdrop and Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+
+    .modal-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 480px;
+      max-width: 90%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      transform: translateY(-20px);
+      transition: transform 0.25s;
+      overflow: hidden;
+    }
+
+    .modal-backdrop.show .modal {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 16px;
+    }
+
+    .modal-body p {
+      margin: 0 0 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .select-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .modal-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-title">
+        <h1>OpenCode Go 账号轮换交互式原型</h1>
+        <p>此原型展示自动账号切换设置、账号禁用/启用逻辑以及并发冲突场景的 Chat 提示与反馈。</p>
+      </div>
+      <span class="interactive-badge">交互式演示</span>
+    </header>
+
+    <div class="grid">
+      <!-- Left Panel: Settings & Accounts -->
+      <div class="left-col" style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Settings Panel -->
+        <div class="panel">
+          <h2 class="panel-title">
+            设置 → 账号与提供商
+          </h2>
+          
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">
+                OpenCode Go 自动账号切换 (Auto Failover)
+              </div>
+              <div class="setting-desc">
+                当当前激活账号发生额度耗尽、欠费，或者 API Key 永久失效被标记不可用时，系统自动在后台锁内切换至下一个可用的托管账号，并在当前会话重新发起当前请求 turn。
+              </div>
+            </div>
+            <div class="toggle-switch" id="failover-toggle" onclick="toggleFailover()"></div>
+          </div>
+
+          <div class="callout">
+            <div class="callout-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              自动轮换策略安全边界
+            </div>
+            <ul>
+              <li><strong>精准匹配：</strong>仅支持额度不足（Usage Limit Exceeded、Balance Out of Budget 等）或账号失效（Invalid/Missing API Key）的错误。</li>
+              <li><strong>非切换错误：</strong>普通的并发限流 (429 Rate Limit)、网络超时 (Timeout) 或服务器 502/503 错误不会切换账号，依然交由系统默认重试或报错输出。</li>
+              <li><strong>全局影响：</strong>账号切换是全局行为，切换后新建的并发请求及后续 turn 均会使用新激活账号。</li>
+              <li><strong>防级联控制：</strong>每一轮 turn 中每个会话最多允许重试 1 次且仅切号 1 次，防止由于全部 Key 不可用导致的无限轮刷。</li>
+            </ul>
+          </div>
+
+          <h2 class="panel-title" style="margin-top: 24px;">托管的 API Key 账号列表</h2>
+          
+          <div class="accounts-list" id="accounts-container">
+            <!-- Rendered by JavaScript dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Logs & Simulation -->
+      <div class="right-col" style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Chat Logs/SSE Notices Panel -->
+        <div class="panel">
+          <h2 class="panel-title">
+            聊天会话 & 系统事件流预览
+            <span style="font-size: 11px; font-weight: normal; color: var(--text-dim);">实时模拟</span>
+          </h2>
+          <div class="chat-log" id="chat-log-container">
+            <div class="chat-bubble" style="border-left: 3px solid var(--border)">
+              <div class="chat-sender">系统引导</div>
+              <div class="chat-text">此侧显示在后台轮换发生时，用户在前端聊天框（Chat Window）内能够看到的提示与状态。所有的提示<b>不会泄露 plaintext API Key</b>，仅使用脱敏 preview 或自定义 Display Name。</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulation Controller -->
+        <div class="panel sim-card">
+          <h2 class="panel-title" style="margin-bottom: 8px;">状态模拟中心</h2>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">点击以下预设按钮，触发各种后台错误发生时的账号状态转移与 SSE 通信表现：</p>
+          
+          <div class="sim-buttons">
+            <button class="btn-sim" onclick="simulateQuotaError()">
+              <span>⚠️</span>
+              <div>
+                <strong>模拟额度不足</strong>
+                <div style="font-size:10px; color: var(--text-dim); margin-top: 2px;">触发临时 cooldown 切换</div>
+              </div>
+            </button>
+            <button class="btn-sim" onclick="simulateUnusableError()">
+              <span>❌</span>
+              <div>
+                <strong>模拟 API Key 失效</strong>
+                <div style="font-size:10px; color: var(--text-dim); margin-top: 2px;">自动标记禁用并切换</div>
+              </div>
+            </button>
+            <button class="btn-sim" onclick="simulateConcurrentConflict()">
+              <span>🔄</span>
+              <div>
+                <strong>模拟并发锁竞争</strong>
+                <div style="font-size:10px; color: var(--text-dim); margin-top: 2px;">Session 2 重试当前 Key</div>
+              </div>
+            </button>
+            <button class="btn-sim" onclick="simulateNoCandidates()">
+              <span>🛑</span>
+              <div>
+                <strong>模拟无候选 Key</strong>
+                <div style="font-size:10px; color: var(--text-dim); margin-top: 2px;">全部失效或被禁用时报错</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for disabling active account -->
+  <div class="modal-backdrop" id="disable-active-modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">确定禁用当前激活账号吗？</h3>
+        <button class="modal-close" onclick="closeDisableModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p>您请求禁用当前正在使用的活动账号 <strong><span id="modal-target-account-name"></span></strong>。由于该账号已被设定为全局 active，禁用后系统将无法继续通过此 Key 发起请求。</p>
+        <p>为保证系统可用性，请在下方选择一个替代的 API Key 进行激活；或者确认将其置空（后续请求将提示无可用 Key）。</p>
+        
+        <div class="form-group">
+          <label class="form-label" for="replacement-select">选择替代的活动账号</label>
+          <select class="select-input" id="replacement-select">
+            <!-- Populated by JavaScript -->
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeDisableModal()">取消</button>
+        <button class="btn btn-danger" onclick="confirmDisableActive()">禁用并激活替代 Key</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    let autoFailoverEnabled = false;
+    
+    // In-memory accounts database
+    let accounts = [
+      {
+        accountId: "work-key",
+        displayName: "工作默认 Key",
+        maskedKeyPreview: "sk-••••9A2F",
+        active: true,
+        disabled: false,
+        disabledReason: null,
+        lastActivatedAt: "10 分钟前",
+        description: "日常开发主力账号，挂载在公司开发专线额度下。"
+      },
+      {
+        accountId: "backup-key",
+        displayName: "备用救援 Key",
+        maskedKeyPreview: "sk-••••F31C",
+        active: false,
+        disabled: false,
+        disabledReason: null,
+        lastActivatedAt: "1 小时前",
+        description: "个人充值备用，限额已设定最大 monthly 额度。"
+      },
+      {
+        accountId: "old-key",
+        displayName: "测试废弃 Key",
+        maskedKeyPreview: "sk-••••8E02",
+        active: false,
+        disabled: true,
+        disabledReason: "Account unusable: Invalid API key (系统于 10:22 自动标记禁用)",
+        lastActivatedAt: "昨天",
+        description: "用于测试 sandbox 环境的临过期 Key。"
+      }
+    ];
+
+    let pendingDisableId = null;
+
+    // Render helper
+    function renderAccounts() {
+      const container = document.getElementById("accounts-container");
+      container.innerHTML = "";
+
+      accounts.forEach(account => {
+        const card = document.createElement("div");
+        card.className = `account-card ${account.active ? 'active' : ''} ${account.disabled ? 'disabled' : ''}`;
+        
+        // Compute tags
+        let tagsHtml = "";
+        if (account.active) {
+          tagsHtml += `<span class="pill pill-active">ACTIVE</span>`;
+        } else if (account.disabled) {
+          tagsHtml += `<span class="pill pill-disabled">DISABLED</span>`;
+        } else {
+          tagsHtml += `<span class="pill pill-enabled">ENABLED</span>`;
+        }
+
+        // Action buttons rules
+        let actionBtnHtml = "";
+        if (account.active) {
+          // Active account can only be disabled (which triggers active replacement logic)
+          actionBtnHtml += `<button class="btn btn-danger" onclick="handleDisableClick('${account.accountId}')">禁用该 Key</button>`;
+        } else if (account.disabled) {
+          // Disabled accounts can be enabled, but cannot be activated directly
+          actionBtnHtml += `<button class="btn" disabled title="请先启用该账号">激活</button>`;
+          actionBtnHtml += `<button class="btn btn-primary" onclick="enableAccount('${account.accountId}')">启用</button>`;
+        } else {
+          // Enabled accounts can be activated or disabled
+          actionBtnHtml += `<button class="btn btn-primary" onclick="activateAccount('${account.accountId}')">激活</button>`;
+          actionBtnHtml += `<button class="btn btn-danger" onclick="disableAccount('${account.accountId}')">禁用</button>`;
+        }
+
+        card.innerHTML = `
+          <div class="account-header">
+            <div class="account-info-left">
+              <div class="account-name-row">
+                <span class="account-name">${account.displayName}</span>
+                ${tagsHtml}
+              </div>
+              <span class="account-key-preview">${account.maskedKeyPreview}</span>
+            </div>
+            <div class="account-time">${account.lastActivatedAt ? '上次激活: ' + account.lastActivatedAt : ''}</div>
+          </div>
+          ${account.description ? `<div class="account-description">${account.description}</div>` : ''}
+          ${account.disabled && account.disabledReason ? `<div class="disabled-reason">原因: ${account.disabledReason}</div>` : ''}
+          <div class="account-actions">
+            ${actionBtnHtml}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Toggle failover switch
+    function toggleFailover() {
+      autoFailoverEnabled = !autoFailoverEnabled;
+      const toggle = document.getElementById("failover-toggle");
+      if (autoFailoverEnabled) {
+        toggle.classList.add("active");
+        addChatLog("系统通知", "自动切换已开启。如果当前活动 Key 发生限额耗尽或认证失效，系统将尝试无缝切换。", "notice-warn");
+      } else {
+        toggle.classList.remove("active");
+        addChatLog("系统通知", "自动切换已关闭。任何额度不足或 Key 失效问题将直接报错中止当前的 turn。", "notice-warn");
+      }
+    }
+
+    // Logging helpers
+    function addChatLog(sender, text, customClass = "") {
+      const container = document.getElementById("chat-log-container");
+      const bubble = document.createElement("div");
+      bubble.className = `chat-bubble ${customClass}`;
+      bubble.innerHTML = `
+        <div class="chat-sender">${sender}</div>
+        <div class="chat-text">${text}</div>
+      `;
+      container.appendChild(bubble);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Active Account Disabling Modal Flow
+    function handleDisableClick(accountId) {
+      const account = accounts.find(a => a.accountId === accountId);
+      if (!account) return;
+
+      pendingDisableId = accountId;
+      document.getElementById("modal-target-account-name").innerText = account.displayName;
+      
+      // Populate replacements dropdown with enabled accounts
+      const select = document.getElementById("replacement-select");
+      select.innerHTML = "";
+      
+      const candidates = accounts.filter(a => a.accountId !== accountId && !a.disabled);
+      
+      candidates.forEach(cand => {
+        const opt = document.createElement("option");
+        opt.value = cand.accountId;
+        opt.innerText = `${cand.displayName} (${cand.maskedKeyPreview})`;
+        select.appendChild(opt);
+      });
+
+      // Also allow putting active key to none (clear active mirror)
+      const optNone = document.createElement("option");
+      optNone.value = "_none";
+      optNone.innerText = "清空活动账号 (后续请求将因为没有 Active Key 而失败)";
+      select.appendChild(optNone);
+
+      document.getElementById("disable-active-modal-backdrop").classList.add("show");
+    }
+
+    function closeDisableModal() {
+      document.getElementById("disable-active-modal-backdrop").classList.remove("show");
+      pendingDisableId = null;
+    }
+
+    function confirmDisableActive() {
+      if (!pendingDisableId) return;
+
+      const target = accounts.find(a => a.accountId === pendingDisableId);
+      const replacementId = document.getElementById("replacement-select").value;
+
+      if (target) {
+        target.disabled = true;
+        target.disabledReason = "Manually disabled (由用户手动禁用)";
+        target.active = false;
+        
+        if (replacementId !== "_none") {
+          const replacement = accounts.find(a => a.accountId === replacementId);
+          if (replacement) {
+            replacement.active = true;
+            replacement.lastActivatedAt = "刚刚";
+            addChatLog("系统通知", `已手动禁用活动账号 <b>${target.displayName}</b>，并激活备用账号 <b>${replacement.displayName}</b>。`, "notice-switched");
+          }
+        } else {
+          addChatLog("系统通知", `已禁用活动账号 <b>${target.displayName}</b>。当前全局 Active Key 已置空！`, "notice-error");
+        }
+      }
+
+      closeDisableModal();
+      renderAccounts();
+    }
+
+    // Standard disable
+    function disableAccount(accountId) {
+      const account = accounts.find(a => a.accountId === accountId);
+      if (!account) return;
+
+      account.disabled = true;
+      account.disabledReason = "Manually disabled (由用户手动禁用)";
+      addChatLog("系统通知", `已禁用账号 <b>${account.displayName}</b>。该账号不再参与后台自动切换候选。`, "notice-disabled");
+      renderAccounts();
+    }
+
+    // Enable account
+    function enableAccount(accountId) {
+      const account = accounts.find(a => a.accountId === accountId);
+      if (!account) return;
+
+      account.disabled = false;
+      account.disabledReason = null;
+      addChatLog("系统通知", `账号 <b>${account.displayName}</b> 已重新启用，可被激活或参与自动切换。`, "notice-switched");
+      renderAccounts();
+    }
+
+    // Manually activate
+    function activateAccount(accountId) {
+      const account = accounts.find(a => a.accountId === accountId);
+      if (account.disabled) return; // Prevent
+
+      accounts.forEach(a => a.active = false);
+      account.active = true;
+      account.lastActivatedAt = "刚刚";
+      addChatLog("系统通知", `成功手动激活账号 <b>${account.displayName}</b>。全局 RPC 及后继会话连接已刷新。`, "notice-switched");
+      renderAccounts();
+    }
+
+    // --- Simulated Failure Event Handlers ---
+
+    // 1. Quota exhausted
+    function simulateQuotaError() {
+      // Find active key
+      const active = accounts.find(a => a.active);
+      if (!active) {
+        addChatLog("错误警告", "当前无 Active 账号，请先激活或启用一个 Key！", "notice-error");
+        return;
+      }
+
+      addChatLog("OpenCode Go 错误", `请求使用 <b>${active.displayName}</b> 失败: <code>402 Payment Required - Monthly usage limit reached</code>`);
+
+      if (!autoFailoverEnabled) {
+        addChatLog("系统终断", "自动账号切换未开启，已停止并上报余额用量不足错误。", "notice-error");
+        return;
+      }
+
+      // Check if there is an enabled candidate
+      const candidate = accounts.find(a => !a.active && !a.disabled);
+      if (!candidate) {
+        addChatLog("系统通知", "自动切换已开启，但列表里未找到其他可用的启用账号作为候选。", "notice-error");
+        return;
+      }
+
+      // Perform passive failover (cooldown only, do not disable the trigger)
+      const oldName = active.displayName;
+      active.active = false;
+      candidate.active = true;
+      candidate.lastActivatedAt = "刚刚 (自动切换)";
+
+      // Log notices
+      addChatLog("事件通知", `<b>账号额度耗尽:</b> 账号 [${oldName}] 已进入冷却窗口(cooldown)。正在自动重试并切换至 [${candidate.displayName}]…`, "notice-switched");
+      addChatLog("会话重试", `自动重试成功！已切换活动账号并恢复当前会话服务。`, "notice-switched");
+
+      renderAccounts();
+    }
+
+    // 2. Unusable API Key (e.g. invalid key)
+    function simulateUnusableError() {
+      const active = accounts.find(a => a.active);
+      if (!active) {
+        addChatLog("错误警告", "当前无 Active 账号，请先激活一个 Key！", "notice-error");
+        return;
+      }
+
+      addChatLog("OpenCode Go 错误", `请求使用 <b>${active.displayName}</b> 失败: <code>401 AuthError - Invalid API key</code>`);
+
+      if (!autoFailoverEnabled) {
+        addChatLog("系统终断", "自动账号切换未开启，系统返回认证失败错误。请检查您的 Key 配置。", "notice-error");
+        return;
+      }
+
+      // Active is permanently unusable - must disable it immediately in global lock
+      const oldName = active.displayName;
+      active.active = false;
+      active.disabled = true;
+      active.disabledReason = "Account unusable: Invalid API key (系统于刚刚自动标记禁用)";
+
+      // Check for replacements
+      const candidate = accounts.find(a => !a.disabled);
+      if (!candidate) {
+        addChatLog("自动禁用", `<b>永久无效账号:</b> 托管 Key [${oldName}] 损坏。已<b>自动持久禁用该账号</b>防止恶性循环。`, "notice-disabled");
+        addChatLog("系统终止", `没有找到任何其他 Enabled 的备用账号，重试已终止。`, "notice-error");
+        renderAccounts();
+        return;
+      }
+
+      // Failover to candidate
+      candidate.active = true;
+      candidate.lastActivatedAt = "刚刚 (故障切换)";
+
+      addChatLog("故障自愈", `<b>永久无效账号:</b> 托管 Key [${oldName}] 损坏，已被系统<b>自动持久禁用</b>以排除候选。正在切换至备选 [${candidate.displayName}] 并自动重试…`, "notice-disabled");
+      addChatLog("会话重试", `使用备用账号 <b>${candidate.displayName}</b> 的重试已成功完成！`, "notice-switched");
+
+      renderAccounts();
+    }
+
+    // 3. Concurrent Switch Conflict
+    function simulateConcurrentConflict() {
+      const active = accounts.find(a => a.active);
+      if (!active) {
+        addChatLog("错误警告", "当前无 Active 账号，请先激活一个 Key！", "notice-error");
+        return;
+      }
+
+      if (!autoFailoverEnabled) {
+        addChatLog("错误提示", "开启 OpenCode Go 自动切换后才能查看并发防级联模拟。", "notice-warn");
+        return;
+      }
+
+      // Simulate: Session 1 and Session 2 both fail using "Work Key"
+      // Session 1 grabs the mutex lock first, marks Work Key as exhausted, and switches to Backup Key.
+      // Session 2 is waiting for the lock. Once Session 1 finishes, Session 2 enters the lock.
+      // Session 2 detects that the active account has ALREADY been changed from Work Key to Backup Key.
+      // Session 2 should NOT switch Backup Key -> Old Key (级联切换). It should simply retry using the new active Backup Key!
+      
+      const candidate = accounts.find(a => !a.active && !a.disabled);
+      if (!candidate) {
+        addChatLog("并发提示", "请确保除了当前 active 外还有另一个可用账号参与切换。", "notice-warn");
+        return;
+      }
+
+      const oldName = active.displayName;
+
+      addChatLog("并发会话 1", `由于 <b>${oldName}</b> 余额耗尽而失败。进入全局锁，执行切换 ${oldName} → ${candidate.displayName} 并重试。`);
+      addChatLog("并发会话 2", `同时因 <b>${oldName}</b> 余额耗尽而失败。等待锁释放…`);
+
+      // Switch occurs
+      active.active = false;
+      candidate.active = true;
+      candidate.lastActivatedAt = "刚刚 (并发自愈)";
+
+      addChatLog("并发事件(会话 1)", `成功将活动账号切换至 <b>${candidate.displayName}</b>，会话 1 重试成功。`, "notice-switched");
+      
+      // Session 2 enters lock
+      addChatLog("并发事件(会话 2)", `会话 2 获得锁。检测到活动账号已被会话 1 切换为 <b>${candidate.displayName}</b>。<b>不进行级联切号</b>，直接重试当前账号。`, "notice-warn");
+      addChatLog("并发会话 2", `使用当前最新的活动账号 <b>${candidate.displayName}</b> 重试成功。`);
+
+      renderAccounts();
+    }
+
+    // 4. No Candidates Left
+    function simulateNoCandidates() {
+      // Disable all other accounts except the active one
+      accounts.forEach(a => {
+        if (!a.active) {
+          a.disabled = true;
+          a.disabledReason = "Manually disabled (由模拟中心禁用以配合测试)";
+        }
+      });
+
+      const active = accounts.find(a => a.active);
+      if (!active) {
+        renderAccounts();
+        addChatLog("错误警告", "当前无 Active 账号，请先激活或启用一个 Key！", "notice-error");
+        return;
+      }
+
+      renderAccounts();
+      addChatLog("系统事件", "已将除活动账号以外的所有账号置为禁用状态以满足测试边界条件。");
+
+      // Now trigger error
+      addChatLog("OpenCode Go 错误", `使用 <b>${active.displayName}</b> 失败: <code>402 Payment Required - available balance insufficient</code>`);
+
+      if (!autoFailoverEnabled) {
+        addChatLog("系统终断", "自动账号切换未开启，流程中止并报错。", "notice-error");
+        return;
+      }
+
+      // Try failover but no enabled candidates exist
+      addChatLog("事件通知", `<b>账号额度耗尽:</b> 尝试从托管列表寻找可用候选…`, "notice-warn");
+      addChatLog("事件通知", `<b>没有可用的候选账号:</b> 列表中的其他 ${accounts.length - 1} 个账号均处于禁用或无效状态。`, "notice-error");
+      addChatLog("系统中止", `失败重试预算已耗尽。当前 turn 中止，请前往设置重新启用或关联新 Key。`, "notice-error");
+    }
+
+    // Init
+    renderAccounts();
+  </script>
+</body>
+</html>

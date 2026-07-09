@@ -5,6 +5,7 @@ import type { SlashCommandEntry } from "@/app/api/commands/route";
 import type { AttachedFile } from "@/lib/types";
 import { encodeFilePathForApi, getFileName, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 import { buildTrellisTaskResumePrompt, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
+import type { OpencodeGoFailoverNotice } from "@/hooks/useAgentSession";
 import { ModelSelect, type ModelSelectOption } from "./ModelSelect";
 import { SelectDropdown, type SelectDropdownOption } from "./SelectDropdown";
 import { BrowserShareControl } from "./BrowserShareControl";
@@ -46,6 +47,7 @@ interface Props {
   availableThinkingLevels?: string[] | null;
   thinkingLevelMap?: Record<string, string | null> | null;
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
+  opencodeGoFailoverNotice?: OpencodeGoFailoverNotice | null;
   soundEnabled?: boolean;
   onSoundToggle?: () => void;
   autoScrollEnabled?: boolean;
@@ -400,6 +402,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
+  opencodeGoFailoverNotice,
   soundEnabled, onSoundToggle,
   autoScrollEnabled, onAutoScrollToggle,
 }: Props, ref) {
@@ -1151,6 +1154,29 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               <path d="M3 3v5h5" />
             </svg>
             Retrying ({retryInfo.attempt}/{retryInfo.maxAttempts})…{retryInfo.errorMessage && <span style={{ opacity: 0.7, marginLeft: 4 }}>— {retryInfo.errorMessage}</span>}
+          </div>
+        )}
+        {/* OpenCode Go failover notice */}
+        {opencodeGoFailoverNotice && (
+          <div style={{
+            marginBottom: 8, padding: "6px 10px",
+            background: "rgba(37,99,235,0.06)", border: "1px solid rgba(37,99,235,0.2)",
+            borderRadius: 6, fontSize: 12, color: "var(--text)",
+            display: "flex", flexDirection: "column", gap: 4,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.75 }}>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>{opencodeGoFailoverNotice.message}</span>
+            </div>
+            {opencodeGoFailoverNotice.showEnableGuidance && (
+              <div style={{ paddingLeft: 17, color: "var(--text-muted)", fontSize: 11 }}>
+                如需重新启用此账号，请前往 Models → OpenCode Go 账号管理。
+              </div>
+            )}
           </div>
         )}
         {/* Image previews */}

@@ -1984,6 +1984,11 @@ interface ApiKeyAccountEntry {
   description: string;
   maskedKeyPreview: string;
   active: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+  disabledBy?: string;
+  autoDisabledReason?: string;
+  enabledAt?: string;
   createdAt: string;
   updatedAt: string;
   lastActivatedAt: string | null;
@@ -2043,6 +2048,15 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   const [deleteConfirm, setDeleteConfirm] = useState<ApiKeyAccountEntry | null>(null);
   const [deleteDeleting, setDeleteDeleting] = useState(false);
 
+  // Enable/disable states
+  const [disablingId, setDisablingId] = useState<string | null>(null);
+  const [enablingId, setEnablingId] = useState<string | null>(null);
+
+  // Disable confirmation
+  const [disableConfirm, setDisableConfirm] = useState<ApiKeyAccountEntry | null>(null);
+  const [disableSaving, setDisableSaving] = useState(false);
+  const [disableReplacementId, setDisableReplacementId] = useState<string | null>(null);
+
   // Success toast
   const [toast, setToast] = useState<string | null>(null);
 
@@ -2056,6 +2070,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     setRevealingId(null);
     setRevealedKeys(new Map());
     setCopiedId(null);
+    setDisablingId(null);
+    setEnablingId(null);
+    setDisableConfirm(null);
+    setDisableSaving(false);
+    setDisableReplacementId(null);
     setAddOpen(false);
     setAddDisplayName("");
     setAddDescription("");
@@ -2174,6 +2193,73 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setActivatingId(null);
     }
   }, [provider.id, onRefresh, showToast]);
+
+  // Enable
+  const handleEnable = useCallback(async (accountId: string) => {
+    setEnablingId(accountId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "enable" }),
+        },
+      );
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      showToast("Account enabled");
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to enable account");
+    } finally {
+      setEnablingId(null);
+    }
+  }, [provider.id, onRefresh, showToast]);
+
+  // Open disable confirmation
+  const openDisableConfirm = useCallback((account: ApiKeyAccountEntry) => {
+    setDisableConfirm(account);
+    setDisableReplacementId(null);
+    setDisableSaving(false);
+  }, []);
+
+  // Confirm disable
+  const handleDisableConfirm = useCallback(async () => {
+    if (!disableConfirm) return;
+    setDisableSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = { action: "disable", disabledBy: "user" };
+      if (disableConfirm.active) {
+        if (disableReplacementId) {
+          body.replacementAccountId = disableReplacementId;
+        } else {
+          body.clearActive = true;
+        }
+      }
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(disableConfirm.accountId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setDisableConfirm(null);
+      showToast(disableConfirm.active ? "Account disabled and active key updated" : "Account disabled");
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to disable account");
+    } finally {
+      setDisableSaving(false);
+    }
+  }, [provider.id, disableConfirm, disableReplacementId, onRefresh, showToast]);
 
   // Add
   const handleAdd = useCallback(async () => {
@@ -2389,29 +2475,37 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
             const isRevealing = revealingId === account.accountId;
             const isCopied = copiedId === account.accountId;
             const isActive = account.active;
+            const isDisabled = account.disabled === true;
+            const isBusy = activatingId === account.accountId || disablingId === account.accountId || enablingId === account.accountId || deletingId === account.accountId;
 
             return (
               <div
                 key={account.accountId}
                 style={{
-                  background: isActive ? "rgba(96,165,250,0.04)" : "var(--bg-panel)",
-                  border: `1px solid ${isActive ? "rgba(96,165,250,0.45)" : "var(--border)"}`,
+                  background: isActive ? "rgba(96,165,250,0.04)" : isDisabled ? "rgba(239,68,68,0.03)" : "var(--bg-panel)",
+                  border: `1px solid ${isActive ? "rgba(96,165,250,0.45)" : isDisabled ? "rgba(239,68,68,0.25)" : "var(--border)"}`,
                   borderRadius: 6,
                   padding: "12px 14px",
                   display: "flex",
                   flexDirection: "column",
                   gap: 8,
+                  opacity: isDisabled ? 0.85 : 1,
                 }}
               >
                 {/* Row 1: display name + badges */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {account.displayName}
                     </span>
                     {isActive && (
                       <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(74,222,128,0.15)", color: "#4ade80", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(74,222,128,0.3)", flexShrink: 0 }}>
                         ACTIVE
+                      </span>
+                    )}
+                    {isDisabled && (
+                      <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(239,68,68,0.12)", color: "#f87171", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(239,68,68,0.3)", flexShrink: 0 }}>
+                        DISABLED
                       </span>
                     )}
                     {account.importedFromLegacyAt && (
@@ -2429,6 +2523,14 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                 {account.description && (
                   <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
                     {account.description}
+                  </div>
+                )}
+
+                {/* Row 2.5: disabled reason */}
+                {isDisabled && account.disabledReason && (
+                  <div style={{ fontSize: 11, color: "#f87171", lineHeight: 1.4, padding: "6px 10px", background: "rgba(239,68,68,0.06)", borderRadius: 5, border: "1px solid rgba(239,68,68,0.15)" }}>
+                    {account.disabledReason}
+                    {account.disabledBy === "system" && <span style={{ color: "var(--text-dim)", marginLeft: 6 }}>（系统自动禁用）</span>}
                   </div>
                 )}
 
@@ -2457,13 +2559,52 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                     <span style={{ ...actionBtnBase, color: "#4ade80", borderColor: "rgba(74,222,128,0.3)", cursor: "default" }}>
                       Active
                     </span>
+                  ) : isDisabled ? (
+                    <button
+                      disabled={true}
+                      title={account.disabledReason || "Account is disabled. Enable it first before activating."}
+                      style={{ ...actionBtnBase, color: "var(--text-dim)", cursor: "not-allowed", opacity: 0.5 }}
+                    >
+                      Activate
+                    </button>
                   ) : (
                     <button
                       onClick={() => handleActivate(account.accountId)}
-                      disabled={activatingId === account.accountId}
-                      style={{ ...actionBtnBase, color: activatingId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingId === account.accountId ? "not-allowed" : "pointer" }}
+                      disabled={isBusy}
+                      style={{ ...actionBtnBase, color: isBusy ? "var(--text-dim)" : "var(--accent)", cursor: isBusy ? "not-allowed" : "pointer" }}
                     >
                       {activatingId === account.accountId ? "Activating…" : "Activate"}
+                    </button>
+                  )}
+
+                  {/* Enable / Disable */}
+                  {isDisabled ? (
+                    <button
+                      onClick={() => handleEnable(account.accountId)}
+                      disabled={isBusy}
+                      style={{
+                        ...actionBtnBase,
+                        color: isBusy ? "var(--text-dim)" : "#4ade80",
+                        borderColor: isBusy ? "var(--border)" : "rgba(74,222,128,0.3)",
+                        cursor: isBusy ? "not-allowed" : "pointer",
+                      }}
+                      title="Re-enable this account so it can be activated or used for failover"
+                    >
+                      {enablingId === account.accountId ? "Enabling…" : "Enable"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => openDisableConfirm(account)}
+                      disabled={isBusy}
+                      style={{
+                        ...actionBtnBase,
+                        color: isBusy ? "var(--text-dim)" : "#f59e0b",
+                        borderColor: isBusy ? "var(--border)" : "rgba(245,158,11,0.3)",
+                        cursor: isBusy ? "not-allowed" : "pointer",
+                      }}
+                      title={isActive ? "Disable this account — you will need to select a replacement or confirm clearing the active key" : "Disable this account to exclude it from failover and activation"}
+                    >
+                      Disable
                     </button>
                   )}
 
@@ -2503,12 +2644,12 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
 
                   <button
                     onClick={() => handleCopy(account.accountId)}
-                    disabled={isRevealing}
+                    disabled={isRevealing || isBusy}
                     style={{
                       ...actionBtnBase,
                       color: isCopied ? "#4ade80" : "var(--text-muted)",
                       borderColor: isCopied ? "rgba(74,222,128,0.3)" : "var(--border)",
-                      cursor: isRevealing ? "not-allowed" : "pointer",
+                      cursor: isRevealing || isBusy ? "not-allowed" : "pointer",
                       display: "inline-flex", alignItems: "center", gap: 4,
                     }}
                     title="Copy API key"
@@ -2533,16 +2674,16 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
 
                   <button
                     onClick={() => openEdit(account)}
-                    disabled={activatingId === account.accountId || deletingId === account.accountId}
-                    style={{ ...actionBtnBase, color: "var(--text-muted)", cursor: activatingId || deletingId ? "not-allowed" : "pointer" }}
+                    disabled={isBusy}
+                    style={{ ...actionBtnBase, color: "var(--text-muted)", cursor: isBusy ? "not-allowed" : "pointer" }}
                   >
                     Edit
                   </button>
 
                   <button
                     onClick={() => openDeleteConfirm(account)}
-                    disabled={activatingId === account.accountId || deletingId === account.accountId}
-                    style={{ ...actionBtnBase, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)", cursor: activatingId || deletingId ? "not-allowed" : "pointer" }}
+                    disabled={isBusy}
+                    style={{ ...actionBtnBase, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)", cursor: isBusy ? "not-allowed" : "pointer" }}
                   >
                     Delete
                   </button>
@@ -2724,6 +2865,135 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           </div>
         </div>
       )}
+
+      {/* Disable confirmation dialog */}
+      {disableConfirm && (() => {
+        const isDisablingActive = disableConfirm.active;
+        const enabledCandidates = accounts.filter(
+          (a) => a.accountId !== disableConfirm.accountId && !a.disabled,
+        );
+        const hasCandidates = enabledCandidates.length > 0;
+
+        return (
+          <div
+            className="pi-modal-overlay"
+            style={{ position: "fixed", inset: 0, zIndex: 1210, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={(e) => { if (e.target === e.currentTarget && !disableSaving) setDisableConfirm(null); }}
+          >
+            <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+              <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                  {isDisablingActive ? "禁用当前激活账号" : "禁用账号"}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  {isDisablingActive ? (
+                    <>
+                      你正在禁用当前激活的 OpenCode Go 账号 <strong style={{ color: "var(--text)" }}>{disableConfirm.displayName}</strong>。
+                      禁用后该账号不再参与 failover，也不能被激活。
+                    </>
+                  ) : (
+                    <>
+                      确定要禁用 &ldquo;{disableConfirm.displayName}&rdquo;？
+                      禁用后该账号不会参与自动 failover，也不能被激活，直到重新 Enable。
+                    </>
+                  )}
+                </div>
+
+                {/* Active account disable: replacement selection */}
+                {isDisablingActive && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {hasCandidates ? (
+                      <>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>
+                          选择一个替代账号激活，或清空 active key：
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflowY: "auto" }}>
+                          {enabledCandidates.map((candidate) => (
+                            <label
+                              key={candidate.accountId}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                padding: "8px 10px", borderRadius: 6,
+                                border: `1px solid ${disableReplacementId === candidate.accountId ? "rgba(96,165,250,0.45)" : "var(--border)"}`,
+                                background: disableReplacementId === candidate.accountId ? "rgba(96,165,250,0.06)" : "var(--bg-panel)",
+                                cursor: "pointer", fontSize: 12,
+                              }}
+                              onClick={() => setDisableReplacementId(candidate.accountId)}
+                            >
+                              <input
+                                type="radio"
+                                name="disableReplacement"
+                                checked={disableReplacementId === candidate.accountId}
+                                onChange={() => setDisableReplacementId(candidate.accountId)}
+                                style={{ accentColor: "var(--accent)" }}
+                              />
+                              <span style={{ color: "var(--text)", fontWeight: 600 }}>{candidate.displayName}</span>
+                              <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{candidate.maskedKeyPreview}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <label
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "8px 10px", borderRadius: 6,
+                            border: `1px solid ${disableReplacementId === null ? "rgba(239,68,68,0.35)" : "var(--border)"}`,
+                            background: disableReplacementId === null ? "rgba(239,68,68,0.04)" : "var(--bg-panel)",
+                            cursor: "pointer", fontSize: 12,
+                          }}
+                          onClick={() => setDisableReplacementId(null)}
+                        >
+                          <input
+                            type="radio"
+                            name="disableReplacement"
+                            checked={disableReplacementId === null}
+                            onChange={() => setDisableReplacementId(null)}
+                            style={{ accentColor: "var(--accent)" }}
+                          />
+                          <span style={{ color: "#f87171", fontWeight: 600 }}>清空 active key</span>
+                          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>（后续没有可用 managed key 时将无法调用）</span>
+                        </label>
+                      </>
+                    ) : (
+                      <div style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 11, color: "#f87171", lineHeight: 1.5 }}>
+                        没有其他 enabled 账号可用。禁用后 <strong>active key 将被清空</strong>，后续无法使用 managed key 进行模型调用。确定要继续吗？
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={disableSaving}
+                  onClick={() => setDisableConfirm(null)}
+                  style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: disableSaving ? "not-allowed" : "pointer", fontSize: 12 }}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={disableSaving}
+                  onClick={handleDisableConfirm}
+                  style={{
+                    padding: "6px 14px",
+                    background: disableSaving ? "var(--bg-panel)" : isDisablingActive && disableReplacementId === null && !hasCandidates ? "#ef4444" : "#f59e0b",
+                    border: "none", borderRadius: 6,
+                    color: "#fff",
+                    cursor: disableSaving ? "not-allowed" : "pointer",
+                    fontSize: 12, fontWeight: 700,
+                  }}
+                >
+                  {disableSaving
+                    ? "禁用中…"
+                    : isDisablingActive && disableReplacementId === null
+                      ? "禁用并清空 active"
+                      : "确认禁用"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

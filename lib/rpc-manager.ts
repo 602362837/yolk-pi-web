@@ -16,6 +16,7 @@ import {
   type YpiStudioChildRunContinuationPayload,
 } from "./ypi-studio-subagent-runtime";
 import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
+import { attemptOpencodeGoAccountFailover, getActiveOpencodeGoAccountId, type OpencodeGoFailoverTurnBudget } from "./opencode-go-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
 // ============================================================================
@@ -116,6 +117,7 @@ export class AgentSessionWrapper {
 
   constructor(public readonly inner: AgentSessionLike, public readonly cwd: string) {
     this.patchChatGptAccountFailover();
+    this.patchOpencodeGoAccountFailover();
   }
 
   get sessionId(): string {
@@ -140,6 +142,7 @@ export class AgentSessionWrapper {
       _runAgentPrompt?: (...args: unknown[]) => Promise<void>;
       _lastAssistantMessage?: unknown;
       _piWebChatGptFailoverPatched?: boolean;
+      _piWebOpencodeGoFailoverPatched?: boolean;
     };
     const innerAny = inner as unknown as {
       agent?: { state?: { messages?: unknown[] } };
@@ -194,6 +197,119 @@ export class AgentSessionWrapper {
         budget.attempts = 0;
         budget.switches = 0;
       }
+      return false;
+    };
+  }
+
+  private patchOpencodeGoAccountFailover(): void {
+    const inner = this.inner as AgentSessionLike & {
+      _handlePostAgentRun?: () => Promise<boolean>;
+      _runAgentPrompt?: (...args: unknown[]) => Promise<void>;
+      _lastAssistantMessage?: unknown;
+      _piWebChatGptFailoverPatched?: boolean;
+      _piWebOpencodeGoFailoverPatched?: boolean;
+    };
+    const innerAny = inner as unknown as {
+      agent?: { state?: { messages?: unknown[] } };
+      model?: { provider?: string };
+    };
+    if (inner._piWebOpencodeGoFailoverPatched || typeof inner._handlePostAgentRun !== "function") return;
+    inner._piWebOpencodeGoFailoverPatched = true;
+
+    // Wrap the current _handlePostAgentRun (which already includes the ChatGPT
+    // failover patch if it was applied).  The chain is:
+    //   opencode-go → chatgpt → original pi SDK
+    const originalPostRun = inner._handlePostAgentRun.bind(inner);
+    const originalRunAgentPrompt =
+      typeof inner._runAgentPrompt === "function"
+        ? inner._runAgentPrompt.bind(inner)
+        : null;
+
+    const budget: OpencodeGoFailoverTurnBudget = {
+      attempts: 0,
+      switches: 0,
+      attemptedAccountIds: [],
+    };
+    let runTriggerAccountId: string | null = null;
+
+    // Capture the active opencode-go account before each run so the failover
+    // can later compare against "the account the failing request was bound to".
+    if (originalRunAgentPrompt) {
+      inner._runAgentPrompt = async (...args: unknown[]) => {
+        runTriggerAccountId =
+          innerAny.model?.provider === "opencode-go"
+            ? await getActiveOpencodeGoAccountId().catch(() => null)
+            : null;
+        try {
+          await originalRunAgentPrompt(...args);
+        } finally {
+          runTriggerAccountId = null;
+        }
+      };
+    }
+
+    inner._handlePostAgentRun = async () => {
+      // Capture the assistant message before the inner chain clears it.
+      const assistantMessage = inner._lastAssistantMessage as
+        | { role?: string; stopReason?: string }
+        | undefined;
+
+      const shouldContinue = await originalPostRun();
+      if (shouldContinue) return true;
+
+      // Native retry / compaction / ChatGPT failover already returned false.
+      // Only try opencode-go failover when we have an explicit error.
+      if (
+        assistantMessage?.role === "assistant" &&
+        assistantMessage.stopReason === "error"
+      ) {
+        const result = await attemptOpencodeGoAccountFailover({
+          provider: innerAny.model?.provider,
+          message: assistantMessage,
+          budget,
+          reloadAuthState: reloadRpcAuthState,
+          triggerAccountId: runTriggerAccountId,
+        });
+
+        // Emit events for actionable statuses; skip trivial ones so the
+        // UI doesn't get flooded for every non-opencode-go / non-eligible error.
+        if (
+          result.status !== "not_opencode_go" &&
+          result.status !== "not_eligible" &&
+          result.status !== "disabled"
+        ) {
+          this.emitEvent({
+            type: "opencode_go_account_failover",
+            sessionId: this.sessionId,
+            ...result,
+          });
+        }
+
+        if (result.retry) {
+          // Remove the failed assistant message from agent state so pi retries
+          // the same turn with the new active account.
+          const messages = innerAny.agent?.state?.messages;
+          if (
+            Array.isArray(messages) &&
+            messages[messages.length - 1] === assistantMessage &&
+            innerAny.agent?.state
+          ) {
+            innerAny.agent.state.messages = messages.slice(0, -1);
+          }
+          return true;
+        }
+      }
+
+      // Successful turn (non-error stopReason): reset the per-turn budget.
+      if (
+        assistantMessage?.stopReason &&
+        assistantMessage.stopReason !== "error"
+      ) {
+        budget.attempts = 0;
+        budget.switches = 0;
+        budget.attemptedAccountIds = [];
+      }
+
       return false;
     };
   }

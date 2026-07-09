@@ -11,6 +11,7 @@ import type {
   PiWebChatGptConfig,
   PiWebConfig,
   PiWebEditorConfig,
+  PiWebOpencodeGoConfig,
   PiWebSubagentAgentConfig,
   PiWebSubagentDifficultyTier,
   PiWebSubagentModelRef,
@@ -83,7 +84,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "editor" | "trellis";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "opencodeGo" | "editor" | "trellis";
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -470,6 +471,11 @@ function chatGptConfigsEqual(a: PiWebChatGptConfig | null, b: PiWebChatGptConfig
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function opencodeGoConfigsEqual(a: PiWebOpencodeGoConfig | null, b: PiWebOpencodeGoConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function editorConfigsEqual(a: PiWebEditorConfig | null, b: PiWebEditorConfig | null): boolean {
   if (!a || !b) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);
@@ -517,6 +523,8 @@ export function SettingsConfig({
   const [terminalEnvAssistLoading, setTerminalEnvAssistLoading] = useState(false);
   const [chatgpt, setChatgpt] = useState<PiWebChatGptConfig | null>(null);
   const [savedChatgpt, setSavedChatgpt] = useState<PiWebChatGptConfig | null>(null);
+  const [opencodeGo, setOpencodeGo] = useState<PiWebOpencodeGoConfig | null>(null);
+  const [savedOpencodeGo, setSavedOpencodeGo] = useState<PiWebOpencodeGoConfig | null>(null);
   const [editor, setEditor] = useState<PiWebEditorConfig | null>(null);
   const [savedEditor, setSavedEditor] = useState<PiWebEditorConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -534,8 +542,8 @@ export function SettingsConfig({
 
 
   const dirty = useMemo(
-    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !editorConfigsEqual(editor, savedEditor),
-    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, editor, savedEditor],
+    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !editorConfigsEqual(editor, savedEditor),
+    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, editor, savedEditor],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -561,6 +569,8 @@ export function SettingsConfig({
       setSavedTerminal(data.config.terminal);
       setChatgpt(data.config.chatgpt);
       setSavedChatgpt(data.config.chatgpt);
+      setOpencodeGo(data.config.opencodeGo);
+      setSavedOpencodeGo(data.config.opencodeGo);
       setEditor(data.config.editor);
       setSavedEditor(data.config.editor);
       setConfigPath(data.path);
@@ -697,6 +707,11 @@ export function SettingsConfig({
 
   const updateChatgpt = useCallback((patch: Partial<PiWebChatGptConfig>) => {
     setChatgpt((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateOpencodeGo = useCallback((patch: Partial<PiWebOpencodeGoConfig>) => {
+    setOpencodeGo((prev) => prev ? { ...prev, ...patch } : prev);
     setNotice(null);
   }, []);
 
@@ -883,6 +898,8 @@ export function SettingsConfig({
     setSavedTerminal(config.terminal);
     setChatgpt(config.chatgpt);
     setSavedChatgpt(config.chatgpt);
+    setOpencodeGo(config.opencodeGo);
+    setSavedOpencodeGo(config.opencodeGo);
     setEditor(config.editor);
     setSavedEditor(config.editor);
     setConfigPath(path);
@@ -891,7 +908,7 @@ export function SettingsConfig({
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor) return false;
+    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -899,7 +916,7 @@ export function SettingsConfig({
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, editor }),
+        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, editor }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -912,10 +929,10 @@ export function SettingsConfig({
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, editor]);
+  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, editor]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -927,6 +944,7 @@ export function SettingsConfig({
     setUsage(defaults.usage);
     setTerminal(defaults.terminal);
     setChatgpt(defaults.chatgpt);
+    setOpencodeGo(defaults.opencodeGo);
     setEditor(defaults.editor);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
@@ -1061,6 +1079,7 @@ export function SettingsConfig({
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
             {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
             {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量与自动切换")}
+            {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
             {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
           </div>
@@ -1068,7 +1087,7 @@ export function SettingsConfig({
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && editor ? (
+            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && editor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -1495,6 +1514,26 @@ export function SettingsConfig({
                       文件锁过期判断跟随配置：锁超过约 2 × 总刷新间隔未更新时，启动器会把它视为 stale 并尝试接管。
                     </div>
                   </div>
+                ) : section === "opencodeGo" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>OpenCode Go</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制 OpenCode Go（Zen Go）托管 API Key 多账号的自动切换行为。账号的 Enable/Disable 管理在 Models → OpenCode Go 账号列表中操作。
+                        保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="额度不足/账号不可用时自动切换"
+                      description="默认关闭。开启后仅对 opencode-go 生效：遇到明确额度/余额/月度限制或账号永久不可用（Invalid/Missing API key）时，会在进程锁内切换到其他已启用（enabled）账号并安全重试一次。普通 429/rate limit、网络错误、5xx 不触发切换。切换是全局 active key 变更，影响所有 live session。每 turn 默认最多 1 次 retry / 1 次实际切号。账号永久不可用时会被自动标记为 disabled，需在 Models 中手动 Enable 后才能再次使用。"
+                      checked={opencodeGo.autoFailover.enabled}
+                      onChange={(enabled) => updateOpencodeGo({ autoFailover: { ...opencodeGo.autoFailover, enabled } })}
+                    />
+                    <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
+                      只有 enabled 账号才会参与 failover。disabled 账号不会作为候选，也不能被激活。被自动禁用的账号可在 Models 中 Enable 恢复，但不会自动重新激活。
+                    </div>
+                  </div>
                 ) : section === "editor" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
@@ -1898,8 +1937,8 @@ export function SettingsConfig({
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>

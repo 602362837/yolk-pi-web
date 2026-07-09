@@ -120,6 +120,18 @@ export interface PiWebChatGptAutoFailoverConfig {
   minSwitchIntervalMs: number;
 }
 
+export interface PiWebOpencodeGoAutoFailoverConfig {
+  enabled: boolean;
+  maxAttemptsPerTurn: number;
+  maxAccountSwitchesPerTurn: number;
+  exhaustedCooldownMs: number;
+  minSwitchIntervalMs: number;
+}
+
+export interface PiWebOpencodeGoConfig {
+  autoFailover: PiWebOpencodeGoAutoFailoverConfig;
+}
+
 export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "cmd" | "powershell" | "pwsh" | "custom";
 
 export interface PiWebTerminalConfig {
@@ -169,6 +181,7 @@ export interface PiWebConfig {
   usage: PiWebUsageConfig;
   terminal: PiWebTerminalConfig;
   chatgpt: PiWebChatGptConfig;
+  opencodeGo: PiWebOpencodeGoConfig;
   editor: PiWebEditorConfig;
 }
 
@@ -180,6 +193,7 @@ export interface PiWebConfigPatch {
   usage?: unknown;
   terminal?: unknown;
   chatgpt?: unknown;
+  opencodeGo?: unknown;
   editor?: unknown;
 }
 
@@ -263,6 +277,15 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     refreshAccountIntervalSeconds: 20,
     refreshAccountSaltMinSeconds: 0,
     refreshAccountSaltMaxSeconds: 15,
+  },
+  opencodeGo: {
+    autoFailover: {
+      enabled: false,
+      maxAttemptsPerTurn: 1,
+      maxAccountSwitchesPerTurn: 1,
+      exhaustedCooldownMs: 30 * 60 * 1000,
+      minSwitchIntervalMs: 10 * 1000,
+    },
   },
   editor: {
     kind: "monaco",
@@ -656,6 +679,17 @@ function readChatGptAutoFailoverConfig(value: unknown, fallback: PiWebChatGptAut
   };
 }
 
+function readOpencodeGoAutoFailoverConfig(value: unknown, fallback: PiWebOpencodeGoAutoFailoverConfig): PiWebOpencodeGoAutoFailoverConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    maxAttemptsPerTurn: readInteger(root.maxAttemptsPerTurn, fallback.maxAttemptsPerTurn),
+    maxAccountSwitchesPerTurn: readInteger(root.maxAccountSwitchesPerTurn, fallback.maxAccountSwitchesPerTurn),
+    exhaustedCooldownMs: readInteger(root.exhaustedCooldownMs, fallback.exhaustedCooldownMs),
+    minSwitchIntervalMs: readInteger(root.minSwitchIntervalMs, fallback.minSwitchIntervalMs),
+  };
+}
+
 function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const defaults = DEFAULT_PI_WEB_CONFIG;
   const root = isRecord(raw) ? raw : {};
@@ -666,6 +700,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const usage = isRecord(root.usage) ? root.usage : {};
   const terminal = isRecord(root.terminal) ? root.terminal : {};
   const chatgpt = isRecord(root.chatgpt) ? root.chatgpt : {};
+  const opencodeGo = isRecord(root.opencodeGo) ? root.opencodeGo : {};
   const editor = isRecord(root.editor) ? root.editor : {};
   const editorShortcuts = isRecord(editor.shortcuts) ? editor.shortcuts : {};
   const terminalEnv: Record<string, string> = {};
@@ -709,6 +744,9 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       refreshAccountIntervalSeconds: readInteger(chatgpt.refreshAccountIntervalSeconds, defaults.chatgpt.refreshAccountIntervalSeconds),
       refreshAccountSaltMinSeconds: readInteger(chatgpt.refreshAccountSaltMinSeconds, defaults.chatgpt.refreshAccountSaltMinSeconds),
       refreshAccountSaltMaxSeconds: readInteger(chatgpt.refreshAccountSaltMaxSeconds, defaults.chatgpt.refreshAccountSaltMaxSeconds),
+    },
+    opencodeGo: {
+      autoFailover: readOpencodeGoAutoFailoverConfig(opencodeGo.autoFailover, defaults.opencodeGo.autoFailover),
     },
     editor: {
       kind: editor.kind === "monaco" ? "monaco" : defaults.editor.kind,
@@ -1199,6 +1237,27 @@ export function validatePiWebChatGptConfig(value: unknown): PiWebChatGptConfig {
   };
 }
 
+function validateOpencodeGoAutoFailoverConfig(value: unknown): PiWebOpencodeGoAutoFailoverConfig {
+  if (value === undefined) return DEFAULT_PI_WEB_CONFIG.opencodeGo.autoFailover;
+  if (!isRecord(value)) throw new PiWebConfigValidationError("opencodeGo.autoFailover must be an object");
+  return {
+    enabled: requireBoolean(value.enabled, "opencodeGo.autoFailover.enabled"),
+    maxAttemptsPerTurn: requireIntegerInRange(value.maxAttemptsPerTurn, "opencodeGo.autoFailover.maxAttemptsPerTurn", 0, 3),
+    maxAccountSwitchesPerTurn: requireIntegerInRange(value.maxAccountSwitchesPerTurn, "opencodeGo.autoFailover.maxAccountSwitchesPerTurn", 0, 3),
+    exhaustedCooldownMs: requireIntegerInRange(value.exhaustedCooldownMs, "opencodeGo.autoFailover.exhaustedCooldownMs", 0, 24 * 60 * 60 * 1000),
+    minSwitchIntervalMs: requireIntegerInRange(value.minSwitchIntervalMs, "opencodeGo.autoFailover.minSwitchIntervalMs", 0, 60 * 60 * 1000),
+  };
+}
+
+export function validatePiWebOpencodeGoConfig(value: unknown): PiWebOpencodeGoConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("opencodeGo config must be an object");
+  }
+  return {
+    autoFailover: validateOpencodeGoAutoFailoverConfig(value.autoFailover),
+  };
+}
+
 export function validatePiWebEditorConfig(value: unknown): PiWebEditorConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("editor config must be an object");
@@ -1257,8 +1316,9 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasUsage = Object.prototype.hasOwnProperty.call(patch, "usage");
   const hasTerminal = Object.prototype.hasOwnProperty.call(patch, "terminal");
   const hasChatGpt = Object.prototype.hasOwnProperty.call(patch, "chatgpt");
+  const hasOpencodeGo = Object.prototype.hasOwnProperty.call(patch, "opencodeGo");
   const hasEditor = Object.prototype.hasOwnProperty.call(patch, "editor");
-  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasEditor) {
+  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasEditor) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
@@ -1283,6 +1343,13 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
       ? chatGptPatch.autoFailover
       : currentConfig.chatgpt.autoFailover,
   } : chatGptPatch) : undefined;
+  const normalizedOpencodeGo = hasOpencodeGo ? validatePiWebOpencodeGoConfig(isRecord(patch.opencodeGo) ? {
+    ...currentConfig.opencodeGo,
+    ...patch.opencodeGo,
+    autoFailover: Object.prototype.hasOwnProperty.call(patch.opencodeGo, "autoFailover")
+      ? (patch.opencodeGo as Record<string, unknown>).autoFailover
+      : currentConfig.opencodeGo.autoFailover,
+  } : patch.opencodeGo) : undefined;
   const normalizedEditor = hasEditor ? validatePiWebEditorConfig(patch.editor) : undefined;
   const nextRaw: Record<string, unknown> = { ...raw };
 
@@ -1339,6 +1406,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.chatgpt = {
       ...previousChatGpt,
       ...normalizedChatGpt,
+    };
+  }
+
+  if (normalizedOpencodeGo) {
+    const previousOpencodeGo = isRecord(raw.opencodeGo) ? raw.opencodeGo : {};
+    nextRaw.opencodeGo = {
+      ...previousOpencodeGo,
+      ...normalizedOpencodeGo,
     };
   }
 

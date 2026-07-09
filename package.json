@@ -43,6 +43,8 @@
     "test:studio-sdk-runner": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-sdk-runner.mjs",
     "test:ypic-cli": "node scripts/test-ypic-cli.mjs",
     "test:terminal-ssh": "node scripts/test-terminal-ssh-config.mjs",
+    "test:opencode-go-failover-detect": "npx tsx lib/opencode-go-account-failover.test.ts",
+    "test:opencode-go-failover-behavior": "node scripts/test-opencode-go-failover-behavior.mjs",
     "test:usage-rollup": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-usage-stats-rollup.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
     "release:patch": "npm version patch && npm publish --access public",

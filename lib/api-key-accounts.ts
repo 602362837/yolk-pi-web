@@ -51,6 +51,20 @@ export interface ApiKeyAccountMetadata {
   updatedAt: string;
   lastActivatedAt: string;
   importedFromLegacyAt: string | null;
+  /** Whether the account is disabled. Only enabled accounts can be activated or selected for failover. */
+  disabled?: boolean;
+  /** ISO timestamp of when the account was last disabled. */
+  disabledAt?: string;
+  /** Human-readable reason the account is disabled (e.g. "Account unusable: Invalid API key"). */
+  disabledReason?: string;
+  /** Who or what disabled the account. */
+  disabledBy?: "user" | "system";
+  /** Machine-readable reason for automatic disabling (e.g. "account_unusable"). */
+  autoDisabledReason?: "account_unusable" | "manual";
+  /** ISO timestamp of when the account was last re-enabled. */
+  enabledAt?: string;
+  /** Who or what enabled the account. */
+  enabledBy?: "user" | "system";
 }
 
 interface ApiKeyAccountStoreMetadata {
@@ -66,6 +80,11 @@ export interface ApiKeyAccountSummary {
   description: string;
   maskedKeyPreview: string;
   active: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+  disabledBy?: string;
+  autoDisabledReason?: string;
+  enabledAt?: string;
   createdAt: string;
   updatedAt: string;
   lastActivatedAt: string | null;
@@ -83,6 +102,19 @@ export interface ApiKeyAccountsList {
 export interface ApiKeyAccountRevealResult {
   accountId: string;
   apiKey: string;
+}
+
+export interface ApiKeyAccountDisableOptions {
+  /** Human-readable reason for disabling (e.g. "Manually disabled", "Account unusable: Invalid API key"). */
+  reason?: string;
+  /** Who is disabling the account. */
+  disabledBy?: "user" | "system";
+  /** If the account is active, a replacement account id to switch to. */
+  replacementAccountId?: string;
+  /** If the account is active and no replacement is available, explicitly clear the active mirror. */
+  clearActive?: boolean;
+  /** Machine-readable reason for automatic disable (set by failover controller). */
+  autoDisabledReason?: "account_unusable" | "manual";
 }
 
 export interface CreateApiKeyAccountInput {
@@ -109,6 +141,13 @@ export class ApiKeyAccountStoreError extends Error {
   ) {
     super(message);
     this.name = "ApiKeyAccountStoreError";
+  }
+}
+
+export class ApiKeyAccountDisabledError extends ApiKeyAccountStoreError {
+  constructor(message = "Account is disabled and cannot be activated. Enable it first.") {
+    super(message, 409);
+    this.name = "ApiKeyAccountDisabledError";
   }
 }
 
@@ -236,6 +275,13 @@ function normalizeAccountEntry(value: unknown): ApiKeyAccountMetadata | null {
     importedFromLegacyAt: typeof value.importedFromLegacyAt === "string" && value.importedFromLegacyAt.trim()
       ? value.importedFromLegacyAt
       : null,
+    disabled: typeof value.disabled === "boolean" ? value.disabled : undefined,
+    disabledAt: typeof value.disabledAt === "string" ? value.disabledAt : undefined,
+    disabledReason: typeof value.disabledReason === "string" ? value.disabledReason : undefined,
+    disabledBy: value.disabledBy === "user" || value.disabledBy === "system" ? value.disabledBy : undefined,
+    autoDisabledReason: value.autoDisabledReason === "account_unusable" || value.autoDisabledReason === "manual" ? value.autoDisabledReason : undefined,
+    enabledAt: typeof value.enabledAt === "string" ? value.enabledAt : undefined,
+    enabledBy: value.enabledBy === "user" || value.enabledBy === "system" ? value.enabledBy : undefined,
   };
 }
 
@@ -282,6 +328,11 @@ function accountSummary(
     description: entry.description,
     maskedKeyPreview: entry.maskedKeyPreview,
     active: metadata.activeAccountId === entry.accountId,
+    disabled: entry.disabled === true ? true : undefined,
+    disabledReason: entry.disabledReason,
+    disabledBy: entry.disabledBy,
+    autoDisabledReason: entry.autoDisabledReason,
+    enabledAt: entry.enabledAt,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
     lastActivatedAt: entry.lastActivatedAt || null,
@@ -693,6 +744,16 @@ export async function activateApiKeyAccount(
 
   const metadata = await readMetadata(provider);
 
+  // Reject disabled accounts
+  const targetEntry = metadata.accounts.find((a) => a.accountId === normalizedId);
+  if (targetEntry?.disabled) {
+    throw new ApiKeyAccountDisabledError(
+      targetEntry.disabledReason
+        ? `Account is disabled: ${targetEntry.disabledReason}. Enable it first.`
+        : undefined,
+    );
+  }
+
   // No-op if already active
   if (metadata.activeAccountId === normalizedId) {
     return listApiKeyAccounts(provider);
@@ -792,4 +853,194 @@ export async function getApiKeyProviderSummary(
     activeAccountId: metadata.activeAccountId,
     activeAccountDisplayName,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Enable / disable helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the current active account id for a provider, or null if no account
+ * is active or the provider is not managed.
+ */
+export async function getActiveApiKeyAccountId(provider: string): Promise<string | null> {
+  if (!isManagedApiKeyProvider(provider)) return null;
+  const metadata = await readMetadata(provider);
+  return metadata.activeAccountId;
+}
+
+/**
+ * Disable an API key account.
+ *
+ * - Non-active accounts are disabled immediately.
+ * - Disabling the active account requires either `replacementAccountId`
+ *   (to switch to another account) or `clearActive` (to clear the active
+ *   mirror).  If neither is provided and the account is active, a 409 error
+ *   is thrown.
+ * - After disabling, the account cannot be activated or used for failover
+ *   until `enableApiKeyAccount` is called.
+ */
+export async function disableApiKeyAccount(
+  provider: string,
+  accountId: string,
+  options: ApiKeyAccountDisableOptions = {},
+): Promise<ApiKeyAccountsList> {
+  assertManagedProvider(provider);
+  const normalizedId = accountId.trim();
+  if (!normalizedId) throw new ApiKeyAccountStoreError("accountId is required", 400);
+
+  // Ensure the account exists
+  if (!(await pathExists(secretPath(provider, normalizedId)))) {
+    throw new ApiKeyAccountStoreError("Account not found", 404);
+  }
+
+  const metadata = await readMetadata(provider);
+  const entry = metadata.accounts.find((a) => a.accountId === normalizedId);
+  if (!entry) throw new ApiKeyAccountStoreError("Account metadata not found", 404);
+
+  // Already disabled — treat as no-op
+  if (entry.disabled) {
+    return listApiKeyAccounts(provider);
+  }
+
+  const now = new Date().toISOString();
+  const isActive = metadata.activeAccountId === normalizedId;
+
+  // Handle active-account disable constraints
+  if (isActive) {
+    if (options.replacementAccountId) {
+      const replacementId = options.replacementAccountId.trim();
+      // Validate replacement exists, is not disabled, and is not the same
+      if (replacementId === normalizedId) {
+        throw new ApiKeyAccountStoreError("Cannot replace active account with itself", 400);
+      }
+      const replacement = metadata.accounts.find((a) => a.accountId === replacementId);
+      if (!replacement) {
+        throw new ApiKeyAccountStoreError("Replacement account not found", 404);
+      }
+      if (replacement.disabled) {
+        throw new ApiKeyAccountStoreError(
+          "Replacement account is disabled. Enable it first.",
+          409,
+        );
+      }
+      // Activate the replacement first
+      await mirrorActiveCredential(provider, {
+        type: "set",
+        credential: { type: "api_key", key: (await revealApiKeyAccountInternal(provider, replacementId)).apiKey },
+      });
+    } else if (options.clearActive) {
+      // Explicitly clear the active mirror
+      await mirrorActiveCredential(provider, { type: "clear" });
+    } else {
+      throw new ApiKeyAccountStoreError(
+        "Cannot disable the active account without a replacement or explicit clearActive. " +
+        "Provide a replacementAccountId or set clearActive to true.",
+        409,
+      );
+    }
+  }
+
+  // Update metadata: set disabled fields and clear activeAccountId if needed
+  const nextActiveId = isActive ? (options.replacementAccountId?.trim() ?? null) : metadata.activeAccountId;
+
+  const accounts = metadata.accounts.map((a) =>
+    a.accountId === normalizedId
+      ? {
+          ...a,
+          updatedAt: now,
+          disabled: true,
+          disabledAt: now,
+          disabledReason: options.reason || (options.disabledBy === "system" ? "Disabled" : "Manually disabled"),
+          disabledBy: options.disabledBy || "user",
+          autoDisabledReason: options.autoDisabledReason,
+          // Remove enable-related tracking fields since we're now disabled
+          enabledAt: undefined,
+          enabledBy: undefined,
+        }
+      : a,
+  );
+
+  await writeMetadata(provider, {
+    version: 1,
+    provider,
+    activeAccountId: nextActiveId,
+    accounts,
+  });
+
+  return listApiKeyAccounts(provider);
+}
+
+/**
+ * Re-enable a previously disabled API key account.
+ *
+ * This only restores the account's eligibility to be activated or used for
+ * failover; it does NOT automatically activate the account.  The caller
+ * must call `activateApiKeyAccount` separately if they want to make it
+ * active.
+ */
+export async function enableApiKeyAccount(
+  provider: string,
+  accountId: string,
+): Promise<ApiKeyAccountsList> {
+  assertManagedProvider(provider);
+  const normalizedId = accountId.trim();
+  if (!normalizedId) throw new ApiKeyAccountStoreError("accountId is required", 400);
+
+  // Ensure the account exists
+  if (!(await pathExists(secretPath(provider, normalizedId)))) {
+    throw new ApiKeyAccountStoreError("Account not found", 404);
+  }
+
+  const metadata = await readMetadata(provider);
+  const entry = metadata.accounts.find((a) => a.accountId === normalizedId);
+  if (!entry) throw new ApiKeyAccountStoreError("Account metadata not found", 404);
+
+  // Already enabled — treat as no-op
+  if (!entry.disabled) {
+    return listApiKeyAccounts(provider);
+  }
+
+  const now = new Date().toISOString();
+
+  const accounts = metadata.accounts.map((a) =>
+    a.accountId === normalizedId
+      ? {
+          ...a,
+          updatedAt: now,
+          disabled: false,
+          disabledAt: undefined,
+          disabledReason: undefined,
+          disabledBy: undefined,
+          autoDisabledReason: undefined,
+          enabledAt: now,
+          enabledBy: "user" as const,
+        }
+      : a,
+  );
+
+  await writeMetadata(provider, {
+    version: 1,
+    provider,
+    activeAccountId: metadata.activeAccountId,
+    accounts,
+  });
+
+  return listApiKeyAccounts(provider);
+}
+
+/**
+ * Internal helper to reveal an account's plaintext key without the public
+ * `revealApiKeyAccount` error wrapping, used by `disableApiKeyAccount` when
+ * activating a replacement.
+ */
+async function revealApiKeyAccountInternal(
+  provider: string,
+  accountId: string,
+): Promise<{ accountId: string; apiKey: string }> {
+  const secret = await readJsonFile(secretPath(provider, accountId), "API key account secret");
+  if (!secret || !isRecord(secret) || typeof secret.key !== "string") {
+    throw new ApiKeyAccountStoreError("Account secret is invalid", 500);
+  }
+  return { accountId, apiKey: secret.key };
 }

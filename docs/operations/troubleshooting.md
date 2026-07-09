@@ -27,6 +27,61 @@ Use `scripts/start-pi-web-proxy.sh` or `scripts/start-pi-web-proxy.ps1` when pro
 - Stale SSH temp dirs are named `ypi-terminal-ssh-*` under the OS temp directory and are swept on server startup if older than 24h. If a crashed dev server leaves files behind, confirm they use that prefix before manually deleting them.
 - Run `node scripts/test-terminal-ssh-config.mjs` for dry-run checks covering config defaults, redaction boundaries, HostKeyAlias generation, ProxyCommand gates, proxy command secret handling, and temp cleanup assumptions.
 
+## ## OpenCode Go Auto Failover & Account Recovery
+
+The optional OpenCode Go auto-failover feature (`opencodeGo.autoFailover` in `~/.pi/agent/pi-web.json`) automatically switches the globally active managed API-key account when a request fails with a quota/billing error or a permanent `Invalid/Missing API key` error. It does **not** trigger on transient 429/rate-limit, network errors, or 5xx.
+
+### Symptoms when failover triggers
+
+- A chat message fails with a quota-exhausted or API-key error, then the agent **retries automatically** with a different account.
+- A lightweight notice appears in the chat: "OpenCode Go account switched … Retrying…" or "OpenCode Go account disabled … Switching…"
+- In Settings → Models → OpenCode Go, an account may show as **DISABLED** with reason `Account unusable: Invalid API key` (auto-disabled by the system).
+- The `active` badge moves to a different account in the managed-account list.
+
+### Rollback: disable auto failover
+
+**Method 1 — Settings UI (recommended):**
+1. Open Settings → OpenCode Go managed API keys.
+2. Turn off the **OpenCode Go auto failover** toggle.
+3. The change is saved immediately to `pi-web.json` and takes effect for new turns without a server restart.
+
+**Method 2 — Config file:**
+1. Edit `~/.pi/agent/pi-web.json`.
+2. Set `opencodeGo.autoFailover.enabled` to `false`.
+3. If the server is running, the next agent turn picks up the change; no restart is required.
+
+After disabling, the feature stops all automatic switching. Manually choosing which account is active (via the Activate button in Settings) continues to work as before.
+
+### Recovering an auto-disabled account
+
+When an account is permanently unusable (invalid/missing API key), the failover system **persistently disables** it so it won't be retried. Recovery steps:
+
+1. **Fix the key**: In Settings → Models → OpenCode Go, click **Edit** on the disabled account, replace the API key with a valid one, and save.
+2. **Re-enable**: Click **Enable** on the account. This restores the account's eligibility to be activated or participate in failover; it does **not** automatically make it active.
+3. **Activate** (optional): Click **Activate** to make this account the globally active one.
+
+> The Enable action clears all `disabled*` metadata fields and records `enabledAt` / `enabledBy: "user"`. After enabling, the account is treated identically to a never-disabled account.
+
+### Verifying account state from the filesystem
+
+Managed account metadata lives at `~/.pi/agent/auth-api-key-accounts/opencode-go/`:
+- `accounts.json` — metadata for all accounts, including `disabled`, `disabledReason`, `disabledBy`, `autoDisabledReason`, `enabledAt`, `enabledBy`.
+- `<accountId>.json` (mode 0600) — per-account secret; never inspect this file casually.
+
+A disabled account has `disabled: true` in `accounts.json`. An enabled account either has `disabled: false` or the field is absent (old metadata defaults to enabled).
+
+### No migration required
+
+Old managed account metadata (created before this feature) does **not** have `disabled` fields. The code treats missing `disabled` as **enabled** — no startup migration, no data-loss risk, and no manual intervention needed for existing accounts.
+
+### Multi-process caveat
+
+The failover lock is **process-level** (`globalThis.__piOpencodeGoFailover`). In single-process deployments (default `next start`, `ypi`) this is sufficient. If you run multiple Node processes behind a load balancer or use PM2 in `cluster` mode, concurrent quota failures across processes can still cause multiple activations. Mitigation:
+- The per-turn budget (`maxAccountSwitchesPerTurn=1`) and cooldown still limit damage.
+- Disable auto failover if cross-process race conditions become a practical issue.
+- A future v2 may add file-system or external locking for multi-process deployments.
+
+
 ## YPI Studio DAG and Async Runs
 
 - `studio.subagents.runner` in `~/.pi/agent/pi-web.json` controls new Studio subagent runs: `auto` (default rollout), `sdk` (force SDK and fail instead of using CLI if unavailable), or `cli` (legacy rollback). The runner is read when a new run starts; already running CLI children are not migrated or interrupted by config changes.

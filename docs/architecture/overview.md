@@ -184,3 +184,36 @@ YPI Studio SDK child sessions append optional `studioChild` metadata to the head
 `studioChild.status` is best-effort display/audit metadata. Studio task state, subagent run terminal status, approval gates, and implementation subtask progress remain authoritative in `.ypi/tasks/<task-id>/task.json`, so old tasks and sessions that omit `studioChild`, `runner`, or `childSessionId` require no migration.
 
 `entryIds[]` in `SessionContext` is parallel to `messages[]` and maps displayed messages back to `.jsonl` entry ids for fork and `navigate_tree` commands.
+
+### OpenCode Go managed API-key account failover
+
+An optional, default-off auto-failover mechanism for `opencode-go` managed API-key accounts. When enabled in `pi-web.json` (`opencodeGo.autoFailover.enabled`), the `AgentSessionWrapper` in `lib/rpc-manager.ts` patches the agent lifecycle to detect quota-exhausted or account-unusable errors and switch the globally active account once per turn.
+
+**Error classification** (in `lib/opencode-go-account-failover.ts`):
+- `quota_exhausted`: matched by conservative allowlist regex against `GoUsageLimitError`, `FreeUsageLimitError`, `Monthly usage limit reached`, `available balance`, `insufficient_quota`, `out of budget`, `quota exceeded`, `billing`, and 402 with credits/balance/quota hints. The trigger account enters a process-level cooldown (`exhaustedCooldownMs`, default 30 min).
+- `account_unusable`: matched against `AuthError Invalid API key`, `AuthError Missing API key`, and 401/403 with unauthorized/forbidden/invalid-key/missing-key body text. The trigger account is **persistently disabled** inside the process-level lock (metadata `disabled=true`, `disabledBy="system"`, `autoDisabledReason="account_unusable"`), removing it from future failover candidates until a user manually re-enables it in Settings.
+- Not eligible: transient 429/rate-limit, network errors, 5xx, timeouts, stream-end, context overflow, content filter — these never trigger a switch.
+
+**No reliable quota API**: OpenCode Zen Go does not expose a public, API-key-authorized quota/balance/usage endpoint. v1 is strictly passive failover and never makes proactive quota queries. If a future public quota API becomes available, `lib/opencode-go-account-failover.ts` can integrate a quota cache without changing the error-driven failover path.
+
+**Managed account enable/disable semantics** (in `lib/api-key-accounts.ts`):
+- `disabled` accounts are additive metadata fields (`disabled`, `disabledAt`, `disabledReason`, `disabledBy`, `autoDisabledReason`, `enabledAt`, `enabledBy`). Old accounts without `disabled` are treated as enabled.
+- Disabled accounts cannot be activated (`activateApiKeyAccount` throws `ApiKeyAccountDisabledError`) and are skipped in failover candidate selection.
+- `enableApiKeyAccount` restores eligibility but does not auto-activate.
+- Disabling an active account requires a replacement account id or explicit `clearActive`; the operation must never leave a disabled account as the active mirror.
+
+**Concurrency model** (process-level):
+- `globalThis.__piOpencodeGoFailover` holds a process-level mutex (`withFailoverLock`), a cooldown map (`exhaustedUntil`), and a `lastSwitchAt` timestamp.
+- Each agent turn captures the active account id before the model request (`runTriggerAccountId`). After the native pi retry/compaction chain and the ChatGPT failover patch return, the opencode-go patch inspects the failed assistant message.
+- Inside the lock: if `account_unusable`, persist-disable the trigger; if `quota_exhausted`, mark cooldown. Then check if `activeAfterLock !== triggerAccountId` (another session already switched) — if so, retry without switching (no A→B→C cascade).
+- Before `activateApiKeyAccount(nextAccountId)`, double-check `activeBeforeActivate` — if changed, retry without switching (TOCTOU guard).
+- Candidate selection skips active, trigger, attempted, disabled, cooldown accounts, and traverses the list circularly from the trigger's position.
+- Default per-turn budget: `maxAttemptsPerTurn=1`, `maxAccountSwitchesPerTurn=1`.
+- On success, the failed assistant message is removed from agent state so pi retries the same turn with the new active key. A structured `opencode_go_account_failover` SSE event is emitted to the frontend.
+
+**Frontend feedback**:
+- Settings → OpenCode Go toggle (`opencodeGo.autoFailover.enabled`) with strategy description and disabled-account guidance.
+- Models → OpenCode Go account list shows disabled state, reason, Enable/Disable actions, and blocks activation of disabled accounts.
+- `useAgentSession.ts` handles `opencode_go_account_failover` SSE events and surfaces lightweight notices (auto-dismissing after 12s) through `ChatInput`. Notices never include plaintext API keys.
+
+**Rollback**: Disable `opencodeGo.autoFailover` in Settings. Old account metadata defaults to enabled; no migration required. Persistently disabled accounts may be manually re-enabled.

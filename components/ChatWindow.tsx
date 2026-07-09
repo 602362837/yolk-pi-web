@@ -172,7 +172,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, displayModel: displayModelValue, sessionStats,
-    agentPhase, toolProgressById,
+    agentPhase, toolProgressById, opencodeGoFailoverNotice,
     isNew, effectiveSessionId, ensureBrowserShareSession,
     messagesEndRef, scrollContainerRef,
     lastUserMsgRef,
@@ -451,6 +451,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
       availableThinkingLevels={availableThinkingLevels}
       thinkingLevelMap={currentThinkingLevelMap}
       retryInfo={retryInfo}
+      opencodeGoFailoverNotice={opencodeGoFailoverNotice}
       soundEnabled={soundEnabled}
       onSoundToggle={onSoundToggle}
       autoScrollEnabled={autoScrollEnabled}
