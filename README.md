@@ -97,6 +97,20 @@ npx @alan-zhao/yolk-pi-web@latest --port 8080
 PROXY_URL=http://127.0.0.1:7897 SOCKS_PROXY_URL=socks5://127.0.0.1:7897 ypi
 ```
 
+### 环境变量与 Node 内存限制
+
+通过 `npm install -g` 全局安装的 `ypi` 在部分终端/系统中可能不会自动继承当前 shell 的环境变量。如果遇到代理不生效或 Node 内存不足导致 OOM，建议在启动命令前显式设置环境变量：
+
+```bash
+# 同时设置代理和增大 Node 堆内存
+NODE_OPTIONS="--max-old-space-size=4096" PROXY_URL=http://127.0.0.1:7897 SOCKS_PROXY_URL=socks5://127.0.0.1:7897 ypi
+```
+
+- `NODE_OPTIONS="--max-old-space-size=4096"`：将 Node.js V8 堆内存上限提高到 4096 MB（默认约 1.5 GB）。如果长会话或大项目导致内存不足，可适当调大。
+- `PROXY_URL` / `SOCKS_PROXY_URL`：设置 HTTP 和 SOCKS5 代理地址，确保 ypi 及其子进程能访问外部网络。
+
+如果已在 `~/.bashrc` 或 `~/.zshrc` 中 export 了这些变量，通常无需每次手动指定；但若使用 `npx` 启动或遇到环境变量丢失，显式写在命令前更可靠。
+
 ## 数据与配置
 
 默认读取 `~/.pi/agent/`。如需使用其他数据目录：
