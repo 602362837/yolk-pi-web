@@ -1,7 +1,37 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-08T08:09:20.048Z",
+  "updatedAt": "2026-07-09T02:13:21.361Z",
   "entries": [
+    {
+      "id": "20260709-101321-为-opencode-go-提供商设计多账号-api-key-管理与激活能力",
+      "title": "为 opencode go 提供商设计多账号 API Key 管理与激活能力",
+      "taskId": "20260709-085311-为-opencode-go-提供商设计多账号-api-key-管理与激活能力",
+      "taskKey": "archived:2026-07:20260709-085311-为-opencode-go-提供商设计多账号-api-key-管理与激活能力",
+      "workflowId": "feature-dev",
+      "summary": "完成并归档：为 opencode-go 提供商实现多账号 API Key 管理与激活能力。关键可复用结论：对上游 `AuthStorage`/`ModelRegistry` 仍保持“一 provider 一当前凭证”契约时，新增多账号能力的低风险方案是应用侧自管账号池，并将 active key 镜像回 `auth.json`；多账号元数据与单账号 secret 分文件存储，列表/summary 只返回脱敏预览，单账号 reveal 接口返回明文且必须 `no-store`；legacy 单 key 通过指纹幂等导入，不触碰 provider summary 路径；旧 `DELETE /api/auth/api-key/[provider]` 在 managed 模式下应返回受控 409，避免误删全部账号；前端只对 `authMode=managed_accounts` 的 provider 切换为多账号 UI，Description 适合使用多行文本并在展示时保留换行。",
+      "tags": [
+        "feature-dev",
+        "provider-config",
+        "opencode-go",
+        "api-key-accounts",
+        "knowledge",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260709-085311-为-opencode-go-提供商设计多账号-api-key-管理与激活能力",
+      "knowledgePath": ".ypi/knowledge/20260709-101321-为-opencode-go-提供商设计多账号-api-key-管理与激活能力.md",
+      "createdAt": "2026-07-09T02:13:21.361Z",
+      "archivedAt": "2026-07-09T02:13:21.361Z",
+      "sourceArtifacts": [
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260708-160920-修复-chat-顶部与统计中的子任务计费汇总显示错误",
       "title": "修复 Chat 顶部与统计中的子任务计费汇总显示错误",

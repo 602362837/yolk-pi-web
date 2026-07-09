@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>OpenCode Zen Go 多账号 API Key 管理原型</title>
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    }
+    
+    body {
+      background-color: #121212;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 760px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      padding: 24px;
+      box-sizing: border-box;
+      margin-bottom: 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      display: inline-block;
+    }
+
+    .status-dot.active {
+      background: #4ade80;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+    }
+
+    .status-text.active {
+      color: #4ade80;
+    }
+
+    .description-para {
+      margin: 0 0 20px 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Notification/Banner box */
+    .banner {
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.25);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .banner.error {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .banner-icon {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .banner-text {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .banner-text strong {
+      color: var(--text);
+    }
+
+    /* Table/List view */
+    .account-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .account-row {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .account-row.active {
+      border-color: rgba(96, 165, 250, 0.5);
+      background: rgba(96, 165, 250, 0.02);
+    }
+
+    .account-row:hover {
+      background: var(--bg-hover);
+    }
+
+    .row-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .name-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .display-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .active-badge {
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ade80;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(74, 222, 128, 0.3);
+      letter-spacing: 0.5px;
+    }
+
+    .legacy-badge {
+      font-size: 10px;
+      font-weight: 500;
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .actions-section {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .row-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .key-preview-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-selected);
+      padding: 6px 10px;
+      border-radius: 4px;
+      align-self: flex-start;
+      margin-top: 2px;
+    }
+
+    .key-text {
+      letter-spacing: 0.5px;
+    }
+
+    .key-text.revealed {
+      color: var(--text);
+    }
+
+    .description-text {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 0;
+    }
+
+    .timestamp-text {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin: 0;
+    }
+
+    /* Form Styles */
+    .form-panel {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .form-title {
+      font-weight: 600;
+      font-size: 13px;
+      margin: 0 0 4px 0;
+      color: var(--text);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 12px;
+      width: 100%;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    .form-input.mono {
+      font-family: var(--font-mono);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      margin-top: 4px;
+    }
+
+    .checkbox-label input {
+      margin: 0;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    /* Buttons */
+    button {
+      font-family: inherit;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 6px 12px;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: #f87171;
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      padding: 5px 12px;
+    }
+
+    .btn-danger:hover {
+      background: rgba(248, 113, 113, 0.1);
+      border-color: rgba(248, 113, 113, 0.5);
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border-radius: 4px;
+    }
+
+    .btn-icon:hover {
+      background: var(--bg-selected);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-text {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      padding: 4px 8px;
+    }
+
+    .btn-text:hover {
+      text-decoration: underline;
+    }
+
+    /* Modal / Dialog backdrop simulation */
+    .dialog-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      margin-top: 20px;
+    }
+
+    /* Selector switches for state simulation */
+    .state-selector-bar {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px dashed #3a3a3a;
+    }
+
+    .state-selector-bar span {
+      font-size: 11px;
+      color: var(--text-dim);
+      align-self: center;
+      margin-right: 8px;
+      font-weight: 600;
+    }
+
+    .state-btn {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #bbb;
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 4px;
+    }
+
+    .state-btn:hover {
+      background: #333;
+      color: #fff;
+    }
+
+    .state-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Confirmation Modal overlay simulation */
+    .confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .confirm-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .confirm-modal {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 400px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .confirm-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+    }
+
+    .confirm-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin: 0 0 20px 0;
+    }
+
+    .confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 200;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast-success-icon {
+      color: #4ade80;
+    }
+
+    .toast-text {
+      font-size: 12px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Simulation Control Bar -->
+  <div class="state-selector-bar">
+    <span>切换原型状态仿真:</span>
+    <button class="state-btn active" onclick="setViewState('default')">常规多账号</button>
+    <button class="state-btn" onclick="setViewState('empty')">空配置状态</button>
+    <button class="state-btn" onclick="setViewState('legacy')">旧单Key已导入</button>
+    <button class="state-btn" onclick="setViewState('error')">错误提示状态</button>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-area">
+        <div class="icon-wrapper">
+          <!-- OpenCode Icon SVG -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+          </svg>
+        </div>
+        <h2 class="title">OpenCode Zen Go 多账号 API Key 管理</h2>
+      </div>
+      <div class="status-badge" id="provider-status">
+        <span class="status-dot active"></span>
+        <span class="status-text active">configured</span>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <p class="description-para">
+      你可以为此提供商配置并保存多个 API Key。当前激活的 Key 将实时镜像写入底层全局配置，并驱动运行时请求。
+    </p>
+
+    <!-- Error Banner Area -->
+    <div id="error-banner" class="banner error" style="display: none;">
+      <div class="banner-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="banner-text">
+        <strong>操作失败：</strong> <span id="error-message">获取账号明文失败。API 响应返回状态 500 Internal Server Error，请稍后重试。</span>
+      </div>
+    </div>
+
+    <!-- Import Legacy Banner Area -->
+    <div id="legacy-banner" class="banner" style="display: none;">
+      <div class="banner-icon" style="color: #f59e0b;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+      </div>
+      <div class="banner-text">
+        <strong>自动迁移提示：</strong> 检测到你在旧版中配置过单 API Key，系统已自动将其导入为 <strong>"已导入旧 key"</strong> 账号并维持激活状态。你可以在下方对其重命名或添加备注。
+      </div>
+    </div>
+
+    <!-- Account List Area -->
+    <div class="account-list" id="account-list-container">
+      <!-- Accounts will be generated dynamically by JS -->
+    </div>
+
+    <!-- Add Account Action -->
+    <div id="add-action-bar">
+      <button class="btn-secondary" onclick="showAddForm()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        添加 API Key 账号
+      </button>
+    </div>
+
+    <!-- Add/Edit Form Panel -->
+    <div class="form-panel" id="account-form" style="display: none;">
+      <div class="form-title" id="form-title-text">添加 API Key 账号</div>
+      
+      <div class="form-group">
+        <label class="form-label" for="form-display-name">显示名称</label>
+        <input type="text" id="form-display-name" class="form-input" placeholder="例如：主开发账号、生产备用 key">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="form-description">描述 / 备注 (可选)</label>
+        <input type="text" id="form-description" class="form-input" placeholder="可简述该 Key 的配额限制、归属部门或用途">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="form-api-key" id="form-key-label">API Key</label>
+        <input type="password" id="form-api-key" class="form-input mono" placeholder="op_zen_..." autocomplete="off">
+      </div>
+
+      <div class="form-group" id="form-activate-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="form-activate-checkbox" checked>
+          保存后立即激活并设为生效 Key
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="closeForm()">取消</button>
+        <button class="btn-primary" onclick="saveForm()" id="form-submit-btn">保存并生效</button>
+      </div>
+    </div>
+
+    <!-- Footer Area / General Actions -->
+    <div class="dialog-footer">
+      <button class="btn-secondary" onclick="simulateModalClose()">关闭设置</button>
+      <button class="btn-danger" id="disconnect-all-btn" onclick="confirmDisconnectAll()" style="display: inline-flex;">断开此提供商</button>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog Overlay -->
+  <div class="confirm-overlay" id="confirm-dialog">
+    <div class="confirm-modal">
+      <h3 class="confirm-title" id="confirm-title">确认删除</h3>
+      <p class="confirm-text" id="confirm-body">你确定要删除这个账号吗？</p>
+      <div class="confirm-actions">
+        <button class="btn-secondary" onclick="closeConfirm()">取消</button>
+        <button class="btn-primary" id="confirm-yes-btn" onclick="executeConfirm()">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <svg class="toast-success-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span class="toast-text" id="toast-message">API Key 复制成功</span>
+  </div>
+
+  <script>
+    // In-memory accounts state to simulate the mock logic
+    let mockAccounts = [];
+    let currentView = 'default'; // 'default', 'empty', 'legacy', 'error'
+    
+    // Track form state
+    let isEditing = false;
+    let editTargetId = null;
+
+    // Track active confirm payload
+    let confirmAction = null; 
+
+    // Raw dataset mocks
+    const defaultAccounts = [
+      {
+        accountId: "ak_opc_001",
+        displayName: "主要开发 Key",
+        description: "日常单元测试和模型评测使用",
+        maskedKeyPreview: "op_zen_****_9f2d",
+        realKey: "op_zen_live_secret_key_prod_9f2d",
+        active: true,
+        createdAt: "2026-07-01T09:00:00.000Z",
+        updatedAt: "2026-07-09T08:53:00.000Z",
+        lastActivatedAt: "2026-07-09T08:53:00.000Z",
+        importedFromLegacyAt: null
+      },
+      {
+        accountId: "ak_opc_002",
+        displayName: "备用个人配额",
+        description: "超出团队主账号速率限流时临时切换",
+        maskedKeyPreview: "op_zen_****_e4bb",
+        realKey: "op_zen_personal_fallback_e4bb",
+        active: false,
+        createdAt: "2026-07-05T14:20:00.000Z",
+        updatedAt: "2026-07-05T14:20:00.000Z",
+        lastActivatedAt: "2026-07-05T14:21:00.000Z",
+        importedFromLegacyAt: null
+      }
+    ];
+
+    const legacyAccount = [
+      {
+        accountId: "ak_opc_legacy",
+        displayName: "已导入旧 key",
+        description: "从旧单 API Key 配置文件中自动导入",
+        maskedKeyPreview: "op_zen_****_a199",
+        realKey: "op_zen_legacy_key_from_auth_json_a199",
+        active: true,
+        createdAt: "2026-07-09T08:53:11.000Z",
+        updatedAt: "2026-07-09T08:53:11.000Z",
+        lastActivatedAt: "2026-07-09T08:53:11.000Z",
+        importedFromLegacyAt: "2026-07-09T08:53:11.000Z"
+      }
+    ];
+
+    // State machine view controller
+    function setViewState(state) {
+      currentView = state;
+      document.querySelectorAll('.state-btn').forEach(btn => btn.classList.remove('active'));
+      
+      const targetBtn = Array.from(document.querySelectorAll('.state-btn')).find(btn => {
+        if (state === 'default') return btn.innerText.includes('常规');
+        if (state === 'empty') return btn.innerText.includes('空配置');
+        if (state === 'legacy') return btn.innerText.includes('旧单Key');
+        if (state === 'error') return btn.innerText.includes('错误提示');
+        return false;
+      });
+      if (targetBtn) targetBtn.classList.add('active');
+
+      closeForm();
+      document.getElementById('error-banner').style.display = 'none';
+      document.getElementById('legacy-banner').style.display = 'none';
+
+      if (state === 'default') {
+        mockAccounts = JSON.parse(JSON.stringify(defaultAccounts));
+        updateStatus(true);
+      } else if (state === 'empty') {
+        mockAccounts = [];
+        updateStatus(false);
+      } else if (state === 'legacy') {
+        mockAccounts = JSON.parse(JSON.stringify(legacyAccount));
+        document.getElementById('legacy-banner').style.display = 'flex';
+        updateStatus(true);
+      } else if (state === 'error') {
+        mockAccounts = JSON.parse(JSON.stringify(defaultAccounts));
+        document.getElementById('error-banner').style.display = 'flex';
+        updateStatus(true);
+      }
+      
+      renderList();
+    }
+
+    function updateStatus(isConfigured) {
+      const dot = document.querySelector('.status-dot');
+      const text = document.querySelector('.status-text');
+      const discBtn = document.getElementById('disconnect-all-btn');
+
+      if (isConfigured) {
+        dot.className = "status-dot active";
+        text.className = "status-text active";
+        text.innerText = "configured";
+        discBtn.style.display = "inline-flex";
+      } else {
+        dot.className = "status-dot";
+        text.className = "status-text";
+        text.innerText = "not configured";
+        discBtn.style.display = "none";
+      }
+    }
+
+    // List rendering
+    function renderList() {
+      const container = document.getElementById('account-list-container');
+      container.innerHTML = '';
+
+      if (mockAccounts.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 32px 16px; border: 1px dashed var(--border); border-radius: 6px; color: var(--text-dim);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px; opacity: 0.6;">
+              <key cx="12" cy="12" r="10"></key>
+              <path d="M16 8h-6a2 2 0 100 4h6a2 2 0 100 4h-6"></path>
+            </svg>
+            <p style="margin: 0; font-size: 13px; color: var(--text-muted);">暂无配置的 API Key 账号</p>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--text-dim);">添加第一条 API Key 后将自动设为生效状态</p>
+          </div>
+        `;
+        return;
+      }
+
+      mockAccounts.forEach(account => {
+        const row = document.createElement('div');
+        row.className = `account-row ${account.active ? 'active' : ''}`;
+        row.id = `row-${account.accountId}`;
+
+        const isRevealed = account.revealed === true;
+        const keyDisplay = isRevealed ? account.realKey : account.maskedKeyPreview;
+
+        row.innerHTML = `
+          <div class="row-header">
+            <div class="name-section">
+              <span class="display-name">${escapeHtml(account.displayName)}</span>
+              ${account.active ? '<span class="active-badge">ACTIVE</span>' : ''}
+              ${account.importedFromLegacyAt ? '<span class="legacy-badge">已导入</span>' : ''}
+            </div>
+            <div class="actions-section">
+              ${!account.active ? `
+                <button class="btn-text" onclick="activateAccount('${account.accountId}')" style="font-size: 11px;">激活</button>
+              ` : ''}
+              <button class="btn-icon" onclick="toggleReveal('${account.accountId}')" title="${isRevealed ? '隐藏 API Key' : '显示 API Key'}">
+                ${isRevealed ? `
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                ` : `
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                `}
+              </button>
+              ${isRevealed ? `
+                <button class="btn-icon" onclick="copyToClipboard('${account.realKey}')" title="复制明文">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+              ` : ''}
+              <button class="btn-icon" onclick="showEditForm('${account.accountId}')" title="编辑账号">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="btn-icon" onclick="confirmDelete('${account.accountId}')" title="删除账号" style="color: #ef4444;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="row-body">
+            <p class="description-text">${account.description ? escapeHtml(account.description) : '<em style="color: var(--text-dim);">无描述信息</em>'}</p>
+            <div class="key-preview-area">
+              <span class="key-text ${isRevealed ? 'revealed' : ''}">${keyDisplay}</span>
+            </div>
+            <p class="timestamp-text">最近激活: ${account.lastActivatedAt ? formatTime(account.lastActivatedAt) : '从未激活'}</p>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    // Interaction handlers
+    function toggleReveal(id) {
+      const idx = mockAccounts.findIndex(a => a.accountId === id);
+      if (idx !== -1) {
+        mockAccounts[idx].revealed = !mockAccounts[idx].revealed;
+        renderList();
+      }
+    }
+
+    function activateAccount(id) {
+      mockAccounts.forEach(a => {
+        if (a.accountId === id) {
+          a.active = true;
+          a.lastActivatedAt = new Date().toISOString();
+        } else {
+          a.active = false;
+        }
+      });
+      showToast("激活成功，对应凭证已镜像到全局配置");
+      updateStatus(true);
+      renderList();
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("明文 API Key 已复制到剪贴板");
+      }).catch(err => {
+        showToast("复制失败，请手动选择复制");
+      });
+    }
+
+    function showToast(message) {
+      const t = document.getElementById('toast');
+      document.getElementById('toast-message').innerText = message;
+      t.classList.add('show');
+      setTimeout(() => {
+        t.classList.remove('show');
+      }, 2500);
+    }
+
+    // Modal Confirmation Controller
+    function showConfirm(title, body, onConfirm) {
+      document.getElementById('confirm-title').innerText = title;
+      document.getElementById('confirm-body').innerHTML = body;
+      confirmAction = onConfirm;
+      document.getElementById('confirm-dialog').classList.add('show');
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirm-dialog').classList.remove('show');
+      confirmAction = null;
+    }
+
+    function executeConfirm() {
+      if (confirmAction) {
+        confirmAction();
+      }
+      closeConfirm();
+    }
+
+    // Delete actions
+    function confirmDelete(id) {
+      const target = mockAccounts.find(a => a.accountId === id);
+      if (!target) return;
+
+      if (target.active) {
+        const remaining = mockAccounts.filter(a => a.accountId !== id);
+        if (remaining.length > 0) {
+          const fallback = remaining[0]; // Simple mockup fallback target selection
+          showConfirm(
+            "确认删除激活账号", 
+            `你正在删除当前<strong>生效中(Active)</strong>的账号 "${escapeHtml(target.displayName)}”。<br><br>删除后，系统会自动激活并切回备用账号 “<strong>${escapeHtml(fallback.displayName)}</strong>” 作为运行时凭证。你确定要继续吗？`,
+            () => executeDelete(id, fallback.accountId)
+          );
+        } else {
+          showConfirm(
+            "确认删除唯一账号", 
+            `你正在删除该提供商的<strong>最后一条</strong> API Key 账号。<br><br>删除后，提供商将退回到<strong>“未配置(not configured)”</strong>状态，系统运行时无法再使用其相关模型。你确定要删除吗？`,
+            () => executeDelete(id, null)
+          );
+        }
+      } else {
+        showConfirm(
+          "确认删除账号", 
+          `你确定要删除账号 “<strong>${escapeHtml(target.displayName)}</strong>” 吗？此操作不可撤销。`,
+          () => executeDelete(id, null)
+        );
+      }
+    }
+
+    function executeDelete(id, fallbackId) {
+      mockAccounts = mockAccounts.filter(a => a.accountId !== id);
+      if (fallbackId) {
+        mockAccounts.forEach(a => {
+          if (a.accountId === fallbackId) {
+            a.active = true;
+            a.lastActivatedAt = new Date().toISOString();
+          }
+        });
+        showToast("账号已删除，已自动切换到备用 Key");
+        updateStatus(true);
+      } else if (mockAccounts.length === 0) {
+        showToast("所有账号已清空，提供商连接已断开");
+        updateStatus(false);
+      } else {
+        showToast("账号删除成功");
+      }
+      renderList();
+    }
+
+    function confirmDisconnectAll() {
+      showConfirm(
+        "确认断开提供商", 
+        `<span style="color: #ef4444; font-weight: 600;">警告：该操作是危险操作！</span><br><br>这将清空保存的<strong>所有 ${mockAccounts.length} 条 API Key 账号记录</strong>并断开该提供商。<br><br>如果后续需要重新使用，需要重新输入明文 Key，确认清空并断开吗？`,
+        () => {
+          mockAccounts = [];
+          showToast("已清空全部账号，连接已断开");
+          updateStatus(false);
+          renderList();
+        }
+      );
+    }
+
+    // Add / Edit Form Actions
+    function showAddForm() {
+      isEditing = false;
+      editTargetId = null;
+      document.getElementById('form-title-text').innerText = "添加 API Key 账号";
+      document.getElementById('form-submit-btn').innerText = "保存并生效";
+      
+      document.getElementById('form-display-name').value = '';
+      document.getElementById('form-description').value = '';
+      
+      const keyInput = document.getElementById('form-api-key');
+      keyInput.value = '';
+      keyInput.placeholder = "op_zen_...";
+      document.getElementById('form-key-label').innerText = "API Key";
+      
+      document.getElementById('form-activate-group').style.display = 'block';
+      document.getElementById('form-activate-checkbox').checked = true;
+
+      document.getElementById('add-action-bar').style.display = 'none';
+      document.getElementById('account-form').style.display = 'flex';
+      
+      document.getElementById('form-display-name').focus();
+    }
+
+    function showEditForm(id) {
+      const target = mockAccounts.find(a => a.accountId === id);
+      if (!target) return;
+
+      isEditing = true;
+      editTargetId = id;
+      document.getElementById('form-title-text').innerText = `编辑账号: ${target.displayName}`;
+      document.getElementById('form-submit-btn').innerText = "保存修改";
+
+      document.getElementById('form-display-name').value = target.displayName;
+      document.getElementById('form-description').value = target.description || '';
+      
+      const keyInput = document.getElementById('form-api-key');
+      keyInput.value = '';
+      keyInput.placeholder = "输入新 Key 以替换旧凭证 (不修改请留空)";
+      document.getElementById('form-key-label').innerText = "替换 API Key (可选)";
+
+      document.getElementById('form-activate-group').style.display = 'none';
+
+      document.getElementById('add-action-bar').style.display = 'none';
+      document.getElementById('account-form').style.display = 'flex';
+      
+      document.getElementById('form-display-name').focus();
+    }
+
+    function closeForm() {
+      document.getElementById('account-form').style.display = 'none';
+      document.getElementById('add-action-bar').style.display = 'block';
+      isEditing = false;
+      editTargetId = null;
+    }
+
+    function saveForm() {
+      const displayName = document.getElementById('form-display-name').value.trim();
+      const description = document.getElementById('form-description').value.trim();
+      const apiKey = document.getElementById('form-api-key').value.trim();
+      const shouldActivate = document.getElementById('form-activate-checkbox').checked;
+
+      if (!displayName) {
+        alert("请输入显示名称！");
+        return;
+      }
+
+      if (!isEditing && !apiKey) {
+        alert("请输入 API Key 凭证！");
+        return;
+      }
+
+      if (isEditing) {
+        // Edit existing account mock logic
+        const idx = mockAccounts.findIndex(a => a.accountId === editTargetId);
+        if (idx !== -1) {
+          mockAccounts[idx].displayName = displayName;
+          mockAccounts[idx].description = description;
+          mockAccounts[idx].updatedAt = new Date().toISOString();
+          
+          if (apiKey) {
+            mockAccounts[idx].realKey = apiKey;
+            mockAccounts[idx].maskedKeyPreview = maskKey(apiKey);
+            if (mockAccounts[idx].active) {
+              showToast("账号信息修改成功，生效 Key 已实时同步");
+            } else {
+              showToast("账号信息修改成功");
+            }
+          } else {
+            showToast("账号信息修改成功");
+          }
+        }
+      } else {
+        // Create new account mock logic
+        const newId = "ak_opc_" + Math.random().toString(36).substring(2, 9);
+        const newAccount = {
+          accountId: newId,
+          displayName: displayName,
+          description: description,
+          maskedKeyPreview: maskKey(apiKey),
+          realKey: apiKey,
+          active: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastActivatedAt: null,
+          importedFromLegacyAt: null
+        };
+
+        if (shouldActivate || mockAccounts.length === 0) {
+          mockAccounts.forEach(a => a.active = false);
+          newAccount.active = true;
+          newAccount.lastActivatedAt = new Date().toISOString();
+          showToast("账号添加并激活成功");
+          updateStatus(true);
+        } else {
+          showToast("账号已成功添加至备用池");
+        }
+
+        mockAccounts.push(newAccount);
+      }
+
+      closeForm();
+      renderList();
+    }
+
+    // Helper utilities
+    function maskKey(key) {
+      if (key.length <= 8) return "****";
+      const start = key.substring(0, 7);
+      const end = key.substring(key.length - 4);
+      return `${start}_****_${end}`;
+    }
+
+    function escapeHtml(string) {
+      return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatTime(isoString) {
+      const date = new Date(isoString);
+      return date.toLocaleString('zh-CN', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit', 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false 
+      });
+    }
+
+    function simulateModalClose() {
+      alert("点击了『关闭设置』按钮（在真实界面下这会关闭 ModelsConfig 弹出面板）。");
+    }
+
+    // Bootstrapping view on page load
+    setViewState('default');
+  </script>
+</body>
+</html>

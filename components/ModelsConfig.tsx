@@ -130,6 +130,9 @@ interface ApiKeyProvider {
   configured: boolean;
   source?: string;
   modelCount: number;
+  authMode?: "managed_accounts" | "single";
+  accountCount?: number;
+  activeAccountDisplayName?: string | null;
 }
 
 
@@ -232,6 +235,18 @@ const inputStyle = {
 function TextInput({ value, onChange, placeholder, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean }) {
   return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
     style={{ ...inputStyle, fontFamily: mono ? "var(--font-mono)" : "inherit" }} />;
+}
+
+function TextAreaInput({ value, onChange, placeholder, rows = 4, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; rows?: number; mono?: boolean }) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      style={{ ...inputStyle, resize: "vertical", minHeight: rows * 20, fontFamily: mono ? "var(--font-mono)" : "inherit" }}
+    />
+  );
 }
 
 function SecretTextInput({
@@ -1961,7 +1976,759 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   );
 }
 
-// ── API Key detail ────────────────────────────────────────────────────────────
+// ── API Key managed accounts types ───────────────────────────────────────────
+
+interface ApiKeyAccountEntry {
+  accountId: string;
+  displayName: string;
+  description: string;
+  maskedKeyPreview: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastActivatedAt: string | null;
+  importedFromLegacyAt: string | null;
+}
+
+interface ApiKeyAccountsResponse {
+  provider: string;
+  authMode: "managed_accounts" | "single";
+  activeAccountId: string | null;
+  accountCount: number;
+  accounts: ApiKeyAccountEntry[];
+}
+
+interface ApiKeyRevealResponse {
+  accountId: string;
+  apiKey: string;
+}
+
+// ── API Key managed accounts detail ───────────────────────────────────────────
+
+function formatAccountTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRefresh: () => void }) {
+  const [accounts, setAccounts] = useState<ApiKeyAccountEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Per-account action states
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [revealingId, setRevealingId] = useState<string | null>(null);
+  const [revealedKeys, setRevealedKeys] = useState<Map<string, string>>(new Map());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Add form
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDisplayName, setAddDisplayName] = useState("");
+  const [addDescription, setAddDescription] = useState("");
+  const [addApiKey, setAddApiKey] = useState("");
+  const [addActivate, setAddActivate] = useState(true);
+  const [addSaving, setAddSaving] = useState(false);
+
+  // Edit dialog
+  const [editAccount, setEditAccount] = useState<ApiKeyAccountEntry | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editApiKey, setEditApiKey] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<ApiKeyAccountEntry | null>(null);
+  const [deleteDeleting, setDeleteDeleting] = useState(false);
+
+  // Success toast
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Reset all state when provider changes
+  useEffect(() => {
+    setAccounts([]);
+    setLoading(false);
+    setError(null);
+    setActivatingId(null);
+    setDeletingId(null);
+    setRevealingId(null);
+    setRevealedKeys(new Map());
+    setCopiedId(null);
+    setAddOpen(false);
+    setAddDisplayName("");
+    setAddDescription("");
+    setAddApiKey("");
+    setAddActivate(true);
+    setAddSaving(false);
+    setEditAccount(null);
+    setDeleteConfirm(null);
+    setDeleteDeleting(false);
+    setToast(null);
+  }, [provider.id]);
+
+  const loadAccounts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts`);
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load accounts");
+    } finally {
+      setLoading(false);
+    }
+  }, [provider.id]);
+
+  useEffect(() => {
+    void loadAccounts();
+  }, [loadAccounts]);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  // Reveal
+  const handleReveal = useCallback(async (accountId: string) => {
+    if (revealedKeys.has(accountId)) {
+      // Hide
+      const next = new Map(revealedKeys);
+      next.delete(accountId);
+      setRevealedKeys(next);
+      return;
+    }
+    setRevealingId(accountId);
+    try {
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/reveal`,
+        { method: "POST" },
+      );
+      const data = await res.json() as ApiKeyRevealResponse & { error?: string };
+      if (!res.ok || !data.apiKey) throw new Error(data.error ?? "Reveal failed");
+      const next = new Map(revealedKeys);
+      next.set(accountId, data.apiKey);
+      setRevealedKeys(next);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Reveal failed");
+    } finally {
+      setRevealingId(null);
+    }
+  }, [provider.id, revealedKeys, showToast]);
+
+  // Copy
+  const handleCopy = useCallback(async (accountId: string) => {
+    let key = revealedKeys.get(accountId);
+    if (!key) {
+      // Reveal first then copy
+      setRevealingId(accountId);
+      try {
+        const res = await fetch(
+          `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/reveal`,
+          { method: "POST" },
+        );
+        const data = await res.json() as ApiKeyRevealResponse & { error?: string };
+        if (!res.ok || !data.apiKey) throw new Error(data.error ?? "Reveal failed");
+        key = data.apiKey;
+        const next = new Map(revealedKeys);
+        next.set(accountId, data.apiKey);
+        setRevealedKeys(next);
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Copy failed");
+        setRevealingId(null);
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopiedId(accountId);
+      setTimeout(() => setCopiedId(null), 2000);
+      showToast("API key copied to clipboard");
+    } catch {
+      showToast("Failed to copy to clipboard");
+    } finally {
+      setRevealingId(null);
+    }
+  }, [provider.id, revealedKeys, showToast]);
+
+  // Activate
+  const handleActivate = useCallback(async (accountId: string) => {
+    setActivatingId(accountId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/activate`,
+        { method: "POST" },
+      );
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      showToast("Account activated");
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to activate account");
+    } finally {
+      setActivatingId(null);
+    }
+  }, [provider.id, onRefresh, showToast]);
+
+  // Add
+  const handleAdd = useCallback(async () => {
+    if (!addApiKey.trim()) return;
+    setAddSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            displayName: addDisplayName.trim() || "Unnamed account",
+            description: addDescription.trim(),
+            apiKey: addApiKey.trim(),
+            activate: addActivate,
+          }),
+        },
+      );
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setAddOpen(false);
+      setAddDisplayName("");
+      setAddDescription("");
+      setAddApiKey("");
+      setAddActivate(true);
+      showToast("Account added" + (addActivate ? " and activated" : ""));
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add account");
+    } finally {
+      setAddSaving(false);
+    }
+  }, [provider.id, addDisplayName, addDescription, addApiKey, addActivate, onRefresh, showToast]);
+
+  // Edit
+  const openEdit = useCallback((account: ApiKeyAccountEntry) => {
+    setEditAccount(account);
+    setEditDisplayName(account.displayName);
+    setEditDescription(account.description);
+    setEditApiKey("");
+    setEditError(null);
+  }, []);
+
+  const handleEditSave = useCallback(async () => {
+    if (!editAccount) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const body: Record<string, string> = {
+        displayName: editDisplayName.trim() || "Unnamed account",
+        description: editDescription.trim(),
+      };
+      if (editApiKey.trim()) {
+        body.apiKey = editApiKey.trim();
+      }
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(editAccount.accountId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      setEditAccount(null);
+      // Clear revealed key if key was replaced
+      if (editApiKey.trim()) {
+        const next = new Map(revealedKeys);
+        next.delete(editAccount.accountId);
+        setRevealedKeys(next);
+      }
+      showToast("Account updated");
+      if (editApiKey.trim()) onRefresh();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Failed to update account");
+    } finally {
+      setEditSaving(false);
+    }
+  }, [provider.id, editAccount, editDisplayName, editDescription, editApiKey, revealedKeys, onRefresh, showToast]);
+
+  // Delete
+  const openDeleteConfirm = useCallback((account: ApiKeyAccountEntry) => {
+    setDeleteConfirm(account);
+    setDeleteDeleting(false);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteConfirm) return;
+    setDeleteDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(deleteConfirm.accountId)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAccounts(data.accounts ?? []);
+      // Clear revealed key
+      const next = new Map(revealedKeys);
+      next.delete(deleteConfirm.accountId);
+      setRevealedKeys(next);
+      setDeleteConfirm(null);
+      showToast("Account deleted");
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete account");
+      setDeleteConfirm(null);
+    } finally {
+      setDeleteDeleting(false);
+    }
+  }, [provider.id, deleteConfirm, revealedKeys, onRefresh, showToast]);
+
+  const hasLegacyImport = accounts.some((a) => a.importedFromLegacyAt);
+  const isConfigured = accounts.length > 0 && accounts.some((a) => a.active);
+  const activeAccount = accounts.find((a) => a.active);
+
+  // Compute fallback message for delete confirmation
+  const deleteFallbackName = (() => {
+    if (!deleteConfirm || !deleteConfirm.active) return null;
+    const others = accounts.filter((a) => a.accountId !== deleteConfirm.accountId);
+    if (others.length === 0) return null;
+    const sorted = [...others].sort((a, b) => {
+      const aTime = a.lastActivatedAt ?? a.updatedAt;
+      const bTime = b.lastActivatedAt ?? b.updatedAt;
+      return bTime.localeCompare(aTime);
+    });
+    return sorted[0].displayName;
+  })();
+
+  // ── Resolve button style helpers ──
+  const actionBtnBase: React.CSSProperties = {
+    padding: "4px 9px",
+    background: "none",
+    border: "1px solid var(--border)",
+    borderRadius: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <SectionTitle>API Key Accounts</SectionTitle>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: isConfigured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
+          <span style={{ fontSize: 11, color: isConfigured ? "#4ade80" : "var(--text-dim)" }}>
+            {isConfigured ? "configured" : "not configured"}
+          </span>
+        </div>
+      </div>
+
+      {/* Description */}
+      <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+        {activeAccount
+          ? `Active account: ${activeAccount.displayName}. You can save multiple API keys and switch between them.`
+          : accounts.length > 0
+            ? `${accounts.length} account${accounts.length !== 1 ? "s" : ""} saved but none active.`
+            : `Add your ${provider.displayName} API key${provider.modelCount > 0 ? ` to enable ${provider.modelCount} model${provider.modelCount !== 1 ? "s" : ""}` : ""}.`}
+      </p>
+
+      {/* Error banner */}
+      {error && (
+        <div style={{ padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 6, fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Legacy import banner */}
+      {hasLegacyImport && (
+        <div style={{ padding: "10px 14px", background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: "var(--text-muted)", display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#60a5fa", flexShrink: 0, marginTop: 1 }}>
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <span>Your previous API key has been imported. You can rename it or add additional keys below.</span>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 1300,
+          padding: "10px 18px", background: "#16a34a", color: "#fff", borderRadius: 8,
+          fontSize: 13, fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+          animation: "toast-in 0.25s ease",
+        }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Account list */}
+      {loading ? (
+        <div style={{ padding: "20px 0", textAlign: "center", fontSize: 12, color: "var(--text-dim)" }}>Loading accounts…</div>
+      ) : accounts.length === 0 && !error ? (
+        <div style={{
+          padding: "28px 16px", textAlign: "center", border: "1px dashed var(--border)",
+          borderRadius: 8, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.6,
+        }}>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>No API keys saved</div>
+          <div>Add your first {provider.displayName} API key to get started.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {accounts.map((account) => {
+            const isRevealed = revealedKeys.has(account.accountId);
+            const isRevealing = revealingId === account.accountId;
+            const isCopied = copiedId === account.accountId;
+            const isActive = account.active;
+
+            return (
+              <div
+                key={account.accountId}
+                style={{
+                  background: isActive ? "rgba(96,165,250,0.04)" : "var(--bg-panel)",
+                  border: `1px solid ${isActive ? "rgba(96,165,250,0.45)" : "var(--border)"}`,
+                  borderRadius: 6,
+                  padding: "12px 14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                {/* Row 1: display name + badges */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {account.displayName}
+                    </span>
+                    {isActive && (
+                      <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(74,222,128,0.15)", color: "#4ade80", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(74,222,128,0.3)", flexShrink: 0 }}>
+                        ACTIVE
+                      </span>
+                    )}
+                    {account.importedFromLegacyAt && (
+                      <span style={{ fontSize: 10, fontWeight: 500, background: "rgba(245,158,11,0.15)", color: "#f59e0b", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(245,158,11,0.3)", flexShrink: 0 }}>
+                        Imported
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 10, color: "var(--text-dim)", flexShrink: 0, whiteSpace: "nowrap" }}>
+                    {formatAccountTime(account.lastActivatedAt)}
+                  </span>
+                </div>
+
+                {/* Row 2: description */}
+                {account.description && (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
+                    {account.description}
+                  </div>
+                )}
+
+                {/* Row 3: masked key + reveal area */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <code style={{
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono)",
+                    color: isRevealed ? "#fbbf24" : "var(--text-dim)",
+                    background: "var(--bg)",
+                    padding: "3px 8px",
+                    borderRadius: 4,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    minWidth: 0,
+                  }}>
+                    {isRevealed ? revealedKeys.get(account.accountId) : account.maskedKeyPreview}
+                  </code>
+                </div>
+
+                {/* Row 4: actions */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {isActive ? (
+                    <span style={{ ...actionBtnBase, color: "#4ade80", borderColor: "rgba(74,222,128,0.3)", cursor: "default" }}>
+                      Active
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleActivate(account.accountId)}
+                      disabled={activatingId === account.accountId}
+                      style={{ ...actionBtnBase, color: activatingId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingId === account.accountId ? "not-allowed" : "pointer" }}
+                    >
+                      {activatingId === account.accountId ? "Activating…" : "Activate"}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => handleReveal(account.accountId)}
+                    disabled={isRevealing}
+                    style={{
+                      ...actionBtnBase,
+                      color: isRevealing ? "var(--text-dim)" : (isRevealed ? "#f59e0b" : "var(--text-muted)"),
+                      cursor: isRevealing ? "not-allowed" : "pointer",
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                    }}
+                    title={isRevealed ? "Hide API key" : "Show API key"}
+                  >
+                    {isRevealing ? (
+                      "Loading…"
+                    ) : isRevealed ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12a18.45 18.45 0 0 1 5.06-6.94" />
+                          <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                          <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
+                          <path d="M1 1l22 22" />
+                        </svg>
+                        Hide
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Show
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => handleCopy(account.accountId)}
+                    disabled={isRevealing}
+                    style={{
+                      ...actionBtnBase,
+                      color: isCopied ? "#4ade80" : "var(--text-muted)",
+                      borderColor: isCopied ? "rgba(74,222,128,0.3)" : "var(--border)",
+                      cursor: isRevealing ? "not-allowed" : "pointer",
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                    }}
+                    title="Copy API key"
+                  >
+                    {isCopied ? (
+                      <>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        Copy
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => openEdit(account)}
+                    disabled={activatingId === account.accountId || deletingId === account.accountId}
+                    style={{ ...actionBtnBase, color: "var(--text-muted)", cursor: activatingId || deletingId ? "not-allowed" : "pointer" }}
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() => openDeleteConfirm(account)}
+                    disabled={activatingId === account.accountId || deletingId === account.accountId}
+                    style={{ ...actionBtnBase, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)", cursor: activatingId || deletingId ? "not-allowed" : "pointer" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add account section */}
+      {!addOpen ? (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setAddOpen(true)}
+            style={{
+              padding: "7px 16px",
+              background: "var(--accent)",
+              border: "none",
+              borderRadius: 5,
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            + Add API Key
+          </button>
+          {isConfigured && (
+            <button
+              onClick={() => openDeleteConfirm(activeAccount!)}
+              disabled={!activeAccount}
+              style={{
+                padding: "7px 14px",
+                background: "none",
+                border: "1px solid rgba(239,68,68,0.3)",
+                borderRadius: 5,
+                color: "#ef4444",
+                cursor: activeAccount ? "pointer" : "not-allowed",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              Disconnect
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 16, background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Add API Key</div>
+
+          <Field label="Display name">
+            <TextInput value={addDisplayName} onChange={setAddDisplayName} placeholder="e.g. Team account" />
+          </Field>
+
+          <Field label="Description (optional)">
+            <TextAreaInput value={addDescription} onChange={setAddDescription} placeholder="Notes about this key…" rows={5} />
+          </Field>
+
+          <Field label="API Key">
+            <SecretTextInput
+              value={addApiKey}
+              onChange={setAddApiKey}
+              placeholder="op_zen_…"
+              mono
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </Field>
+
+          <Check
+            label="Save and activate as current key"
+            checked={addActivate}
+            onChange={setAddActivate}
+          />
+
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button
+              onClick={() => { setAddOpen(false); setAddApiKey(""); setAddDisplayName(""); setAddDescription(""); }}
+              disabled={addSaving}
+              style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: addSaving ? "not-allowed" : "pointer", fontSize: 12 }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAdd}
+              disabled={addSaving || !addApiKey.trim()}
+              style={{
+                padding: "6px 16px",
+                background: addSaving || !addApiKey.trim() ? "var(--bg-panel)" : "var(--accent)",
+                border: "none", borderRadius: 5,
+                color: addSaving || !addApiKey.trim() ? "var(--text-dim)" : "#fff",
+                cursor: addSaving || !addApiKey.trim() ? "not-allowed" : "pointer",
+                fontSize: 12, fontWeight: 600,
+              }}
+            >
+              {addSaving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit dialog */}
+      {editAccount && (
+        <div
+          className="pi-modal-overlay"
+          style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={(e) => { if (e.target === e.currentTarget && !editSaving) setEditAccount(null); }}
+        >
+          <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+            <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Edit Account</div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{editAccount.displayName}</div>
+              </div>
+              <button type="button" disabled={editSaving} onClick={() => setEditAccount(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+            </div>
+            <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+              <Field label="Display name">
+                <TextInput value={editDisplayName} onChange={setEditDisplayName} placeholder="Account name" />
+              </Field>
+              <Field label="Description">
+                <TextAreaInput value={editDescription} onChange={setEditDescription} placeholder="Notes…" rows={5} />
+              </Field>
+              <Field label="Replace API Key (leave empty to keep current)">
+                <SecretTextInput
+                  value={editApiKey}
+                  onChange={setEditApiKey}
+                  placeholder="Enter new key to replace…"
+                  mono
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </Field>
+              {editError && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{editError}</div>}
+            </div>
+            <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" disabled={editSaving} onClick={() => setEditAccount(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12 }}>Cancel</button>
+              <button type="button" disabled={editSaving} onClick={handleEditSave} style={{ padding: "6px 14px", background: editSaving ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: editSaving ? "var(--text-dim)" : "#fff", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{editSaving ? "Saving…" : "Save"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      {deleteConfirm && (
+        <div
+          className="pi-modal-overlay"
+          style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={(e) => { if (e.target === e.currentTarget && !deleteDeleting) setDeleteConfirm(null); }}
+        >
+          <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 440, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+            <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Delete account?</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                {deleteConfirm.active && deleteFallbackName && accounts.length > 2 ? (
+                  <>
+                    This is the currently <strong style={{ color: "#4ade80" }}>active</strong> account.
+                    After deletion, the system will automatically activate <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> as the new active account.
+                  </>
+                ) : deleteConfirm.active && accounts.length === 2 ? (
+                  <>
+                    This is the currently <strong style={{ color: "#4ade80" }}>active</strong> account.
+                    After deletion, <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> will be activated automatically.
+                  </>
+                ) : deleteConfirm.active && accounts.length === 1 ? (
+                  <>
+                    This is the last saved account. Deleting it will <strong style={{ color: "#ef4444" }}>disconnect</strong> the {provider.displayName} provider.
+                  </>
+                ) : (
+                  <>Delete &ldquo;{deleteConfirm.displayName}&rdquo;?</>
+                )}
+              </div>
+            </div>
+            <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" disabled={deleteDeleting} onClick={() => setDeleteConfirm(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12 }}>Cancel</button>
+              <button type="button" disabled={deleteDeleting} onClick={handleDeleteConfirm} style={{ padding: "6px 14px", background: deleteDeleting ? "var(--bg-panel)" : "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{deleteDeleting ? "Deleting…" : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── API Key detail (single-key legacy) ───────────────────────────────────────
 
 /**
  * 格式化余额查询的相对更新时间。
@@ -2574,6 +3341,9 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     if (selection.type === "apikey") {
       const p = apiKeyProviders.find((p) => p.id === selection.providerId);
       if (!p) return null;
+      if (p.authMode === "managed_accounts") {
+        return <ApiKeyAccountsDetail key={p.id} provider={p} onRefresh={loadApiKeyProviders} />;
+      }
       return <ApiKeyDetail key={p.id} provider={p} onRefresh={loadApiKeyProviders} />;
     }
     if (selection.type === "provider") {
