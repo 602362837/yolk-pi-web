@@ -158,6 +158,60 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent-data ypi
 | `settings.json` | pi agent 设置，包括默认模型。 |
 | `pi-web.json` | Web UI 设置，例如蛋黄𝝅聊天默认值、WorkTree、Usage、Web Terminal、ChatGPT 面板和 Trellis 设置。 |
 
+### `models.json`：模型覆盖与补充
+
+YPI / pi 的可用模型列表 = **SDK 内置模型** + `~/.pi/agent/models.json` 中的**自定义/覆盖配置**。
+
+- Web UI 的 `/api/models` 每次请求都会重新读取模型注册表，因此修改 `models.json` 后通常**无需重启服务**。
+- 对**内置 provider**（如 `openai-codex`、`openai`、`anthropic`）可在 `models.json` 中：
+  - 追加新的 `models`
+  - 用同 `provider + id` 覆盖内置模型定义
+  - 用 `modelOverrides` 只改某些字段（如 headers / baseUrl / thinking 映射）
+- 对**非内置 provider**，通常至少需要提供 `baseUrl`、`api` 和 `models`。
+
+示例：给 `openai-codex` 补充一个 SDK 尚未内置的新模型：
+
+```json
+{
+  "providers": {
+    "openai-codex": {
+      "models": [
+        {
+          "id": "gpt-5.6-sol",
+          "name": "GPT-5.6 Sol",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "xhigh": "xhigh"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+如果想只覆盖内置模型的个别字段，也可以使用：
+
+```json
+{
+  "providers": {
+    "openai-codex": {
+      "modelOverrides": {
+        "gpt-5.5": {
+          "headers": {
+            "x-example": "1"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+其中 `openai-codex` 对应 UI 中显示的 **ChatGPT Plus/Pro** provider。
+
 会话文件路径格式：
 
 ```text
