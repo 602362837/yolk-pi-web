@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>项目切换体验优化 UI 原型 - 空间信息整合至预览区</title>
+  <style>
+    /* CSS Variables matching app/globals.css style */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f9fafb;
+      --bg-subtle: rgba(0,0,0,0.03);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace;
+    }
+
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --assistant-bg: #1a1a1a;
+      --tool-bg: #1f2937;
+      --bg-subtle: rgba(255,255,255,0.04);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top control panel just for the prototype review experience */
+    .prototype-controls {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 1000;
+      font-size: 12px;
+      border-bottom: 1px solid #313244;
+      flex-shrink: 0;
+    }
+    .prototype-btn {
+      background: #45475a;
+      color: #cdd6f4;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: background 0.15s;
+    }
+    .prototype-btn:hover {
+      background: #585b70;
+    }
+    .prototype-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+    .prototype-badge {
+      background: #f9e2af;
+      color: #11111b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 10px;
+    }
+
+    /* App Main Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar: Session List + File Explorer */
+    .sidebar {
+      width: 260px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s;
+    }
+    .sidebar-header {
+      padding: 10px 12px;
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-btn {
+      flex: 1;
+      height: 28px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .sidebar-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    .sidebar-list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .sidebar-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+      padding: 4px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .session-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      gap: 8px;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 12px;
+      transition: background 0.1s;
+    }
+    .session-item:hover {
+      background: var(--bg-hover);
+    }
+    .session-item.active {
+      background: var(--bg-selected);
+      border-left: 3px solid var(--accent);
+      padding-left: 9px;
+    }
+    .session-icon {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .session-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-time {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* File Browser in Sidebar */
+    .sidebar-file-browser {
+      border-top: 1px solid var(--border);
+      height: 180px;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    .browser-header {
+      padding: 6px 12px;
+      background: var(--bg-panel);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .browser-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .browser-item {
+      padding: 3px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .browser-item:hover {
+      color: var(--text);
+    }
+
+    /* Middle Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    .chat-header {
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      background: var(--bg);
+      justify-content: space-between;
+    }
+    .chat-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .message {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: var(--user-bg);
+      border: 1px solid var(--border);
+    }
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--assistant-bg);
+      border: 1px solid var(--border);
+    }
+    .chat-input-container {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chat-input-wrapper {
+      display: flex;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      resize: none;
+      font-family: inherit;
+      outline: none;
+      font-size: 13px;
+    }
+
+    /* Right Preview Area / Panel Container */
+    .right-panel-container {
+      width: 420px;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s, opacity 0.15s;
+    }
+    .right-panel-container.closed {
+      width: 0 !important;
+      opacity: 0;
+      border-left: none;
+      pointer-events: none;
+    }
+
+    /* --- NEW DESIGN: Space Info Bar in Right Panel --- */
+    .space-info-bar {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: max-height 0.2s cubic-bezier(0.4, 0, 0.2, 1), padding 0.2s;
+      max-height: 100px;
+      overflow: visible;
+    }
+    .space-info-bar.collapsed {
+      max-height: 0;
+      padding: 0;
+      border-bottom: none;
+      overflow: hidden;
+    }
+
+    .space-info-header {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      gap: 8px;
+      position: relative;
+    }
+
+    .space-switch-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      min-width: 0;
+      flex: 1;
+      text-align: left;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .space-switch-trigger:hover {
+      background: var(--bg-selected);
+      border-color: var(--border);
+    }
+    .space-logo {
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      font-weight: bold;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .space-meta {
+      min-width: 0;
+      flex: 1;
+    }
+    .space-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .space-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .space-subtitle {
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    /* WT Badge */
+    .wt-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.1);
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      color: var(--accent);
+      font-size: 9px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    html.dark .wt-badge {
+      background: rgba(96, 165, 250, 0.15);
+      border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    /* Action buttons in Space Info Bar */
+    .space-info-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .action-icon-btn {
+      width: 26px;
+      height: 26px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+    .action-icon-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    .action-icon-btn.active {
+      background: var(--bg-selected);
+      color: var(--accent);
+    }
+
+    /* Workspace Menu Dropdown */
+    .workspace-dropdown {
+      position: absolute;
+      top: 40px;
+      right: 44px;
+      width: 180px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      z-index: 500;
+      padding: 4px 0;
+      display: none;
+    }
+    .workspace-dropdown.open {
+      display: block;
+    }
+    .workspace-dropdown-item {
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .workspace-dropdown-item:hover {
+      background: var(--bg-hover);
+    }
+    .workspace-dropdown-item.danger {
+      color: #ef4444;
+    }
+    .workspace-dropdown-item.danger:hover {
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .dropdown-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    /* Preview content area */
+    .preview-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Preview area top tab strip (files / studio / trellis) */
+    .preview-tab-strip {
+      height: 36px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .preview-tabs {
+      display: flex;
+      gap: 16px;
+    }
+    .preview-tab {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--text-muted);
+      cursor: pointer;
+      position: relative;
+      padding: 9px 0;
+    }
+    .preview-tab.active {
+      color: var(--text);
+    }
+    .preview-tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+    }
+
+    .preview-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .preview-placeholder {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      gap: 8px;
+    }
+
+    /* Expand Space Info floating button when collapsed */
+    .expand-info-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .expand-info-banner.visible {
+      display: flex;
+    }
+    .expand-info-btn {
+      border: none;
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* Right Panel Strip Toggles (Absolute bottom-right floating strip matching AppShell) */
+    .toggle-strip {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 600;
+      display: flex;
+    }
+    .toggle-strip-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-panel);
+      border: none;
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .toggle-strip-btn:hover {
+      color: var(--text);
+    }
+    .toggle-strip-btn.active {
+      color: var(--accent);
+      background: var(--bg);
+    }
+
+    /* Project Space Switch Dialog Mockup */
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .dialog-overlay.open {
+      display: flex;
+    }
+    .dialog-content {
+      width: 480px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dialog-header {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dialog-close {
+      cursor: pointer;
+      color: var(--text-dim);
+      border: none;
+      background: transparent;
+    }
+    .dialog-search {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text);
+      border-radius: 6px;
+      outline: none;
+    }
+    .dialog-project-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .dialog-project-title {
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .dialog-space-option {
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dialog-space-option:hover {
+      background: var(--bg-hover);
+    }
+    .dialog-space-option.selected {
+      background: var(--bg-selected);
+      font-weight: 600;
+    }
+
+    /* Tooltip */
+    .custom-tooltip {
+      position: absolute;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      z-index: 1100;
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      max-width: 250px;
+      display: none;
+      white-space: pre-line;
+      line-height: 1.4;
+      border: 1px solid #313244;
+    }
+
+    /* Tooltip styles */
+    .tooltip-active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PROTOTYPE CONTROLS (Only for review purposes) -->
+  <div class="prototype-controls">
+    <span class="prototype-badge">UI 设计原型</span>
+    <span>场景模拟:</span>
+    <button class="prototype-btn active" onclick="switchContext('normal')">A. 标准项目</button>
+    <button class="prototype-btn" onclick="switchContext('worktree')">B. WorkTree 空间</button>
+    <button class="prototype-btn" onclick="switchContext('missing')">C. 路径缺失项目</button>
+    <button class="prototype-btn" onclick="switchContext('long')">D. 长项目名省略</button>
+    
+    <span style="margin-left: auto;">主题:</span>
+    <button class="prototype-btn" onclick="toggleTheme()">切换明/暗主题</button>
+
+    <span>预览区状态:</span>
+    <button class="prototype-btn" id="ctrl-panel-state" onclick="toggleRightPanel()">折叠预览面板</button>
+  </div>
+
+  <div class="app-container">
+
+    <!-- LEFT SIDEBAR: Session list & File Explorer (Thin/Clean sidebar) -->
+    <div class="sidebar" id="app-sidebar">
+      <div class="sidebar-header">
+        <button class="sidebar-btn" onclick="alert('新建会话')">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <line x1="6" y1="1" x2="6" y2="11" />
+            <line x1="1" y1="6" x2="11" y2="6" />
+          </svg>
+          新建会话
+        </button>
+        <button class="sidebar-btn" style="flex: 0 0 28px;" title="刷新列表" onclick="alert('刷新成功')">
+          ⟳
+        </button>
+      </div>
+
+      <div class="sidebar-list-container">
+        <div class="sidebar-section-title">会话列表</div>
+        <div class="session-item active">
+          <span class="session-icon">💬</span>
+          <span class="session-name">优化项目切换体验设计</span>
+          <span class="session-time">10m ago</span>
+        </div>
+        <div class="session-item">
+          <span class="session-icon">💬</span>
+          <span class="session-name">Trellis 面板多端适配</span>
+          <span class="session-time">2h ago</span>
+        </div>
+        <div class="session-item">
+          <span class="session-icon">💬</span>
+          <span class="session-name">修复 Worktree 状态同步</span>
+          <span class="session-time">Yesterday</span>
+        </div>
+      </div>
+
+      <!-- File Browser in Sidebar -->
+      <div class="sidebar-file-browser">
+        <div class="browser-header">
+          <span>文件浏览器</span>
+          <span>📁</span>
+        </div>
+        <div class="browser-tree">
+          <div class="browser-item">▶ components</div>
+          <div class="browser-item">▶ hooks</div>
+          <div class="browser-item">▼ .ypi</div>
+          <div class="browser-item" style="padding-left: 12px;">▼ tasks</div>
+          <div class="browser-item" style="padding-left: 24px; color: var(--text);">📄 ui-prototype.html</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIDDLE CHAT AREA -->
+    <div class="chat-area">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <span style="font-weight: bold;">💬 Chat Window</span>
+          <span style="color: var(--text-dim); font-size: 11px;"># 优化项目切换体验设计</span>
+        </div>
+        <div class="chat-header-right">
+          <span style="color: var(--text-muted); font-size: 11px;">Tokens: 3.4k/8k</span>
+        </div>
+      </div>
+
+      <div class="chat-messages">
+        <div class="message assistant">
+          你好！我是蛋黄派 Studio UI 设计员。已将当前空间的信息和 Workspace actions 菜单全部移入右侧预览区顶部，使左侧边栏保持极度干净，专注于 Session 和文件浏览。您可以点击右侧面板顶部的 <strong>"⌘ 蛋黄派 Web"</strong> 切换空间，或点击右上角三点使用 Workspace actions。
+        </div>
+        <div class="message user">
+          非常清晰。右侧顶部的空间信息条可以折叠收起吗？
+        </div>
+        <div class="message assistant">
+          是的，可以通过点击右侧最右侧的折叠按钮（向上箭头）收起整个空间信息条，使预览内容占据 100% 的高度。收起后会在预览区头部下方显示一个轻量级面包屑导航并提供“展开空间信息”快捷入口。
+        </div>
+      </div>
+
+      <div class="chat-input-container">
+        <div class="chat-input-wrapper">
+          <textarea class="chat-input" placeholder="输入消息以继续..." rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL CONTAINER (PREVIEW / FILES / STUDIO / TRELLIS) -->
+    <div class="right-panel-container" id="right-panel">
+      
+      <!-- Collapsed banner showing when the space info is folded -->
+      <div class="expand-info-banner" id="expand-banner">
+        <span>📍 空间: <strong id="banner-space-name">main</strong> (蛋黄派 Web)</span>
+        <button class="expand-info-btn" onclick="toggleSpaceInfoCollapse(false)">展开空间信息 ▾</button>
+      </div>
+
+      <!-- NEW DESIGN: Collapsible Space Info Bar -->
+      <div class="space-info-bar" id="space-info-bar">
+        <div class="space-info-header">
+          
+          <!-- Trigger Button to open Switch Dialog -->
+          <button class="space-switch-trigger" id="space-trigger-btn" onclick="openSwitchDialog()">
+            <span class="space-logo">⌘</span>
+            <span class="space-meta">
+              <span class="space-title" id="display-project-name">蛋黄派 Web UI</span>
+              <span class="space-subtitle" id="display-space-subtitle">空间：main · 分支：feature-ui-optimize</span>
+            </span>
+            <span class="wt-badge" id="display-wt-badge" style="display: none;">WT: main</span>
+            
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style="margin-left: auto; flex-shrink: 0;">
+              <polyline points="2 3.5 5 6.5 8 3.5" />
+            </svg>
+          </button>
+
+          <!-- Action buttons and Collapse trigger -->
+          <div class="space-info-actions">
+            <!-- Workspace actions button (Three-dots menu) -->
+            <button class="action-icon-btn" id="workspace-menu-btn" onclick="toggleWorkspaceMenu()" title="Workspace actions">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" />
+              </svg>
+            </button>
+
+            <!-- Collapse Button (arrow up) -->
+            <button class="action-icon-btn" onclick="toggleSpaceInfoCollapse(true)" title="折叠空间信息">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Workspace Actions Dropdown Menu -->
+          <div class="workspace-dropdown" id="workspace-dropdown">
+            <div class="workspace-dropdown-item" onclick="mockAction('编辑项目元数据')">
+              ✏️ 编辑项目元数据…
+            </div>
+            <div class="workspace-dropdown-item" onclick="mockAction('编辑空间元数据')">
+              ✏️ 编辑空间元数据…
+            </div>
+            <div class="workspace-dropdown-item" id="star-project-item" onclick="mockAction('星标项目')">
+              ⭐ 星标项目
+            </div>
+            <div class="workspace-dropdown-item" id="star-space-item" onclick="mockAction('星标空间')">
+              ⭐ 星标空间
+            </div>
+            <div class="dropdown-separator"></div>
+            <div class="workspace-dropdown-item" onclick="mockAction('归档所有会话')">
+              📦 归档所有会话
+            </div>
+            <div class="dropdown-separator"></div>
+            <div class="workspace-dropdown-item danger" onclick="mockAction('归档当前空间')">
+              🗄️ 归档当前空间
+            </div>
+            <div class="workspace-dropdown-item danger" onclick="mockAction('归档项目')">
+              📁 归档项目
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Preview Content Area -->
+      <div class="preview-content">
+        <div class="preview-tab-strip">
+          <div class="preview-tabs">
+            <div class="preview-tab active" onclick="switchPreviewMode('files')">预览 (Files)</div>
+            <div class="preview-tab" onclick="switchPreviewMode('studio')">工作室 (Studio)</div>
+            <div class="preview-tab" onclick="switchPreviewMode('trellis')">Trellis</div>
+          </div>
+        </div>
+
+        <div class="preview-body">
+          <div id="preview-files-content" style="height: 100%;">
+            <div style="font-family: var(--font-mono); font-size: 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow-x: auto; height: 100%;">
+              <span style="color: #008000;">// Previewing: ui-prototype.html</span><br>
+              &lt;<span style="color: #000080;">div</span> <span style="color: #ff0000;">className</span>=<span style="color: #0000ff;">"space-info-bar"</span>&gt;<br>
+              &nbsp;&nbsp;&lt;<span style="color: #000080;">div</span> <span style="color: #ff0000;">className</span>=<span style="color: #0000ff;">"space-info-header"</span>&gt;<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;<span style="color: #000080;">button</span> <span style="color: #ff0000;">onClick</span>=<span style="color: #0000ff;">{openSwitchDialog}</span>&gt;<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&lt;/<span style="color: #000080;">button</span>&gt;<br>
+              &nbsp;&nbsp;&lt;/<span style="color: #000080;">div</span>&gt;<br>
+              &lt;/<span style="color: #000080;">div</span>&gt;
+            </div>
+          </div>
+
+          <div id="preview-studio-content" style="display: none; height: 100%;">
+            <div class="preview-placeholder">
+              <span style="font-size: 24px;">💼</span>
+              <strong>Studio Panel</strong>
+              <span style="font-size: 11px;">YPI Studio Member settings & task progression.</span>
+            </div>
+          </div>
+
+          <div id="preview-trellis-content" style="display: none; height: 100%;">
+            <div class="preview-placeholder">
+              <span style="font-size: 24px;">🌿</span>
+              <strong>Trellis Tasks Panel</strong>
+              <span style="font-size: 11px;">Initialize development environment and coordinate execution.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FLOATING SIDEBAR TOGGLES (Matching layout bar) -->
+  <div class="toggle-strip">
+    <button class="toggle-strip-btn active" id="toggle-panel-btn" onclick="toggleRightPanel()" title="显示/隐藏 预览面板">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- SWITCH SPACE DIALOG MOCKUP -->
+  <div class="dialog-overlay" id="switch-dialog" onclick="closeSwitchDialog()">
+    <div class="dialog-content" onclick="event.stopPropagation()">
+      <div class="dialog-header">
+        <span>切换项目或空间</span>
+        <button class="dialog-close" onclick="closeSwitchDialog()">✕</button>
+      </div>
+      <input type="text" class="dialog-search" placeholder="搜索项目、空间或路径...">
+      
+      <div style="overflow-y: auto; max-height: 280px; margin-top: 8px;">
+        <!-- Project 1 -->
+        <div class="dialog-project-item">
+          <div class="dialog-project-title">
+            <span>⭐ 蛋黄派 Web UI</span>
+            <span style="font-size: 10px; color: var(--text-dim);">/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web</span>
+          </div>
+          <div class="dialog-space-option selected" onclick="selectSpace('normal')">
+            <span>📍 main (默认空间)</span>
+            <span style="font-size: 10px; color: var(--text-muted);">分支: feature-ui-optimize</span>
+          </div>
+          <div class="dialog-space-option" onclick="selectSpace('worktree')">
+            <span>🌿 WT: main (工作树)</span>
+            <span class="wt-badge">WT: main</span>
+          </div>
+        </div>
+
+        <!-- Project 2 -->
+        <div class="dialog-project-item">
+          <div class="dialog-project-title">
+            <span>📁 cloudflare-deploy-tool</span>
+            <span style="font-size: 10px; color: var(--text-dim);">~/.pi/agent/cloudflare-deploy</span>
+          </div>
+          <div class="dialog-space-option" onclick="selectSpace('missing')">
+            <span>📍 default (路径缺失)</span>
+            <span style="color: #dc2626; font-size: 10px;">⚠️ 路径缺失</span>
+          </div>
+        </div>
+
+        <!-- Project 3 -->
+        <div class="dialog-project-item">
+          <div class="dialog-project-title">
+            <span>⭐ long-project-name-overflowing-the-container-visuals</span>
+            <span style="font-size: 10px; color: var(--text-dim);">/Volumes/01/Projects/long-name-repo</span>
+          </div>
+          <div class="dialog-space-option" onclick="selectSpace('long')">
+            <span>📍 main</span>
+            <span style="font-size: 10px; color: var(--text-muted);">分支: dev</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hover Tooltip Element -->
+  <div class="custom-tooltip" id="tooltip"></div>
+
+  <!-- INTERACTIVITY JAVASCRIPT -->
+  <script>
+    // Theme Management
+    function toggleTheme() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    // Toggle entire Right Panel (Closed / Open states)
+    function toggleRightPanel() {
+      const panel = document.getElementById('right-panel');
+      const btn = document.getElementById('toggle-panel-btn');
+      const ctrlBtn = document.getElementById('ctrl-panel-state');
+      
+      if (panel.classList.contains('closed')) {
+        panel.classList.remove('closed');
+        btn.classList.add('active');
+        ctrlBtn.textContent = '折叠预览面板';
+        ctrlBtn.classList.add('active');
+      } else {
+        panel.classList.add('closed');
+        btn.classList.remove('active');
+        ctrlBtn.textContent = '展开预览面板';
+        ctrlBtn.classList.remove('active');
+      }
+    }
+
+    // Fold / Unfold the Space Info Bar inside the Right Panel
+    function toggleSpaceInfoCollapse(collapse) {
+      const infoBar = document.getElementById('space-info-bar');
+      const expandBanner = document.getElementById('expand-banner');
+      
+      if (collapse) {
+        infoBar.classList.add('collapsed');
+        expandBanner.classList.add('visible');
+      } else {
+        infoBar.classList.remove('collapsed');
+        expandBanner.classList.remove('visible');
+      }
+      closeWorkspaceMenu();
+    }
+
+    // Workspace actions Menu Dropdown
+    function toggleWorkspaceMenu() {
+      const dropdown = document.getElementById('workspace-dropdown');
+      const btn = document.getElementById('workspace-menu-btn');
+      
+      if (dropdown.classList.contains('open')) {
+        dropdown.classList.remove('open');
+        btn.classList.remove('active');
+      } else {
+        dropdown.classList.add('open');
+        btn.classList.add('active');
+      }
+    }
+    
+    function closeWorkspaceMenu() {
+      const dropdown = document.getElementById('workspace-dropdown');
+      const btn = document.getElementById('workspace-menu-btn');
+      dropdown.classList.remove('open');
+      btn.classList.remove('active');
+    }
+
+    // Modal Switch Dialog
+    function openSwitchDialog() {
+      document.getElementById('switch-dialog').classList.add('open');
+      closeWorkspaceMenu();
+    }
+    function closeSwitchDialog() {
+      document.getElementById('switch-dialog').classList.remove('open');
+    }
+
+    // Mock Contexts Data
+    const contexts = {
+      normal: {
+        title: '蛋黄派 Web UI',
+        subtitle: '空间：main · 分支：feature-ui-optimize',
+        tooltip: '项目路径: /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web\n空间: main\n分支: feature-ui-optimize\nWorkTree: 否',
+        wtBadge: false,
+        bannerText: 'main (蛋黄派 Web UI)'
+      },
+      worktree: {
+        title: '蛋黄派 Web UI',
+        subtitle: '空间：WT: main · WorkTree：main · 基准：main',
+        tooltip: '项目路径: /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/worktrees/main\n空间: WT: main\n分支: main\nWorkTree: 是\n基准: main',
+        wtBadge: 'WT: main',
+        bannerText: 'WT: main (蛋黄派 Web UI)'
+      },
+      missing: {
+        title: 'cloudflare-deploy-tool',
+        subtitle: '空间：default · ⚠️ 路径缺失',
+        tooltip: '项目路径: ~/.pi/agent/cloudflare-deploy (路径缺失)\n空间: default\nWorkTree: 否',
+        wtBadge: false,
+        bannerText: 'default (cloudflare-deploy-tool · 路径缺失)'
+      },
+      long: {
+        title: 'long-project-name-overflowing-the-container-visuals-long-long-long-long-name',
+        subtitle: '空间：main · 分支：dev-environment-setup-validation',
+        tooltip: '项目路径: /Volumes/01/Projects/long-name-repo\n空间: main\n分支: dev-environment-setup-validation',
+        wtBadge: false,
+        bannerText: 'main (long-project-name...)'
+      }
+    };
+
+    let activeContextKey = 'normal';
+
+    function switchContext(key) {
+      activeContextKey = key;
+      const ctx = contexts[key];
+      
+      // Update UI title and subtitle
+      document.getElementById('display-project-name').textContent = ctx.title;
+      document.getElementById('display-space-subtitle').textContent = ctx.subtitle;
+      document.getElementById('banner-space-name').textContent = ctx.bannerText;
+
+      // Update active control button
+      document.querySelectorAll('.prototype-controls .prototype-btn').forEach(btn => {
+        if (btn.textContent.includes(key === 'normal' ? 'A.' : key === 'worktree' ? 'B.' : key === 'missing' ? 'C.' : 'D.')) {
+          btn.classList.add('active');
+        } else if (!btn.textContent.includes('主题') && !btn.textContent.includes('面板')) {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Update WT Badge
+      const wtBadge = document.getElementById('display-wt-badge');
+      if (ctx.wtBadge) {
+        wtBadge.textContent = ctx.wtBadge;
+        wtBadge.style.display = 'inline-flex';
+      } else {
+        wtBadge.style.display = 'none';
+      }
+
+      // Dialog option highlight matching
+      document.querySelectorAll('.dialog-space-option').forEach(opt => {
+        opt.classList.remove('selected');
+      });
+
+      // Close dialog if open
+      closeSwitchDialog();
+    }
+
+    function selectSpace(key) {
+      switchContext(key);
+    }
+
+    function mockAction(name) {
+      alert(`已触发 Action: ${name}`);
+      closeWorkspaceMenu();
+    }
+
+    // Preview Mode tabs switcher
+    function switchPreviewMode(mode) {
+      document.querySelectorAll('.preview-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.textContent.toLowerCase().includes(mode)) {
+          tab.classList.add('active');
+        }
+      });
+
+      document.getElementById('preview-files-content').style.display = mode === 'files' ? 'block' : 'none';
+      document.getElementById('preview-studio-content').style.display = mode === 'studio' ? 'block' : 'none';
+      document.getElementById('preview-trellis-content').style.display = mode === 'trellis' ? 'block' : 'none';
+    }
+
+    // Setup Custom Tooltip behavior for long project name and details hover
+    const triggerBtn = document.getElementById('space-trigger-btn');
+    const tooltip = document.getElementById('tooltip');
+
+    triggerBtn.addEventListener('mousemove', (e) => {
+      const ctx = contexts[activeContextKey];
+      tooltip.textContent = ctx.tooltip;
+      tooltip.classList.add('tooltip-active');
+      
+      // Position tooltip near the cursor
+      tooltip.style.left = `${e.clientX + 15}px`;
+      tooltip.style.top = `${e.clientY + 15}px`;
+    });
+
+    triggerBtn.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('tooltip-active');
+    });
+
+    // Close workspace actions dropdown on clicking outside
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('workspace-dropdown');
+      const menuBtn = document.getElementById('workspace-menu-btn');
+      if (!dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+        closeWorkspaceMenu();
+      }
+    });
+
+  </script>
+</body>
+</html>

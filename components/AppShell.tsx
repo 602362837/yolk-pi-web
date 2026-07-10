@@ -6,6 +6,7 @@ import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSide
 import { ChatWindow } from "./ChatWindow";
 import type { SessionUsageTopbarStats } from "@/hooks/useAgentSession";
 import { FileViewer } from "./FileViewer";
+import { FileExplorer } from "./FileExplorer";
 import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
@@ -21,12 +22,12 @@ import { BranchNavigator } from "./BranchNavigator";
 import { GitPanel } from "./GitPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import { getRelativeFilePath } from "@/lib/file-paths";
-import { formatWorkspaceTitle, sameWorkspacePathForTitle } from "@/lib/workspace-title";
+import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
 import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
-import type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTaskLinkResult } from "@/lib/ypi-studio-types";
+import type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTasksLinkResult } from "@/lib/ypi-studio-types";
 import { trellisTaskDetailToChatContext, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import type { ChatInputHandle } from "./ChatInput";
 
@@ -44,6 +45,58 @@ function getInitialSidebarWidth(): number {
   const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
   if (!Number.isFinite(stored)) return DEFAULT_SIDEBAR_WIDTH;
   return clampNumber(stored, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+}
+
+// ── Preview panel FileExplorer state ──
+const MIN_EXPLORER_HEIGHT = 120;
+const MIN_PREVIEW_HEIGHT = 120;
+const EXPLORER_HEIGHT_LEGACY_KEY = "pi-web-sidebar-explorer-height";
+const EXPLORER_HEIGHT_STORAGE_KEY = "pi-web-preview-explorer-height";
+const EXPLORER_OPEN_STORAGE_KEY = "pi-web-preview-explorer-open";
+
+// ── Right panel width ──
+const RIGHT_PANEL_MIN_WIDTH = 300;
+const RIGHT_PANEL_MAX_WIDTH_FACTOR = 0.65;
+const RIGHT_PANEL_WIDTH_STORAGE_KEY = "pi-web:right-panel-width";
+
+function clampRightPanelWidth(width: number, viewportWidth: number): number {
+  if (viewportWidth <= 0) return RIGHT_PANEL_MIN_WIDTH;
+  const maxWidth = Math.max(RIGHT_PANEL_MIN_WIDTH, Math.floor(viewportWidth * RIGHT_PANEL_MAX_WIDTH_FACTOR));
+  return clampNumber(width, RIGHT_PANEL_MIN_WIDTH, maxWidth);
+}
+
+function getInitialRightPanelWidth(): number {
+  if (typeof window === "undefined") return RIGHT_PANEL_MIN_WIDTH;
+  try {
+    const stored = Number(window.localStorage.getItem(RIGHT_PANEL_WIDTH_STORAGE_KEY));
+    if (Number.isFinite(stored) && stored >= RIGHT_PANEL_MIN_WIDTH) {
+      return clampRightPanelWidth(stored, window.innerWidth);
+    }
+  } catch { /* ignore */ }
+  const defaultWidth = Math.round(window.innerWidth * 0.42);
+  return clampRightPanelWidth(defaultWidth, window.innerWidth);
+}
+
+function getInitialExplorerHeight(): number | null {
+  if (typeof window === "undefined") return null;
+  // Migrate from legacy sidebar explorer key once
+  const legacy = Number(window.localStorage.getItem(EXPLORER_HEIGHT_LEGACY_KEY));
+  if (Number.isFinite(legacy) && legacy > 0) {
+    const clamped = Math.max(MIN_EXPLORER_HEIGHT, legacy);
+    window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(clamped)));
+    window.localStorage.removeItem(EXPLORER_HEIGHT_LEGACY_KEY);
+    return clamped;
+  }
+  const stored = Number(window.localStorage.getItem(EXPLORER_HEIGHT_STORAGE_KEY));
+  if (!Number.isFinite(stored)) return null;
+  return Math.max(MIN_EXPLORER_HEIGHT, stored);
+}
+
+function getInitialExplorerOpen(): boolean {
+  if (typeof window === "undefined") return true;
+  const stored = window.localStorage.getItem(EXPLORER_OPEN_STORAGE_KEY);
+  if (stored === null) return true;
+  return stored !== "false";
 }
 
 function studioContextIdForSession(sessionId: string | null | undefined): string | null {
@@ -131,6 +184,16 @@ export function AppShell() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
+  // ── Preview panel FileExplorer state ──
+  const [explorerOpen, setExplorerOpen] = useState(getInitialExplorerOpen);
+  const [explorerKey, setExplorerKey] = useState(0);
+  const [explorerHeight, setExplorerHeight] = useState<number | null>(getInitialExplorerHeight);
+  const [explorerResizing, setExplorerResizing] = useState(false);
+  const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
+  const explorerSectionRef = useRef<HTMLDivElement>(null);
+  const explorerRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewContentRef = useRef<HTMLDivElement>(null);
+
   const [modelsConfigOpen, setModelsConfigOpen] = useState(false);
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
@@ -169,6 +232,20 @@ export function AppShell() {
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
+  useEffect(() => {
+    if (explorerHeight === null) return;
+    window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(explorerHeight)));
+  }, [explorerHeight]);
+
+  useEffect(() => {
+    window.localStorage.setItem(EXPLORER_OPEN_STORAGE_KEY, String(explorerOpen));
+  }, [explorerOpen]);
+
+  // When explorerRefreshKey bumps (agent end, etc.), bump the internal explorer key
+  useEffect(() => {
+    setExplorerKey((k) => k + 1);
+  }, [explorerRefreshKey]);
+
   const handleSidebarResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!sidebarOpen) return;
     event.preventDefault();
@@ -200,6 +277,44 @@ export function AppShell() {
     window.addEventListener("pointerup", finishResize);
     window.addEventListener("pointercancel", finishResize);
   }, [sidebarOpen, sidebarWidth]);
+
+  // ── Preview panel FileExplorer resize ──
+  const handleExplorerResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!explorerOpen) return;
+    const explorerEl = explorerSectionRef.current;
+    const previewContentEl = previewContentRef.current;
+    if (!explorerEl || !previewContentEl) return;
+
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = explorerEl.getBoundingClientRect().height;
+    const previewContentHeight = previewContentEl.getBoundingClientRect().height;
+    const maxHeight = Math.max(MIN_EXPLORER_HEIGHT, startHeight + previewContentHeight - MIN_PREVIEW_HEIGHT);
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    setExplorerResizing(true);
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const nextHeight = clampNumber(startHeight + (moveEvent.clientY - startY), MIN_EXPLORER_HEIGHT, maxHeight);
+      setExplorerHeight(nextHeight);
+    };
+
+    const finishResize = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", finishResize);
+      window.removeEventListener("pointercancel", finishResize);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      setExplorerResizing(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", finishResize);
+    window.addEventListener("pointercancel", finishResize);
+  }, [explorerOpen]);
 
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
@@ -270,11 +385,64 @@ export function AppShell() {
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelMode, setRightPanelMode] = useState<"files" | "studio" | "trellis">("files");
+  const [rightPanelWidth, setRightPanelWidth] = useState(getInitialRightPanelWidth);
+  const [rightPanelResizing, setRightPanelResizing] = useState(false);
+
+  // Persist right panel width
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(rightPanelWidth));
+    } catch { /* ignore */ }
+  }, [rightPanelWidth]);
+
+  // Clamp right panel width on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setRightPanelWidth((prev) => clampRightPanelWidth(prev, window.innerWidth));
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // ── Right panel width resize (desktop only) ──
+  const handleRightPanelResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!rightPanelOpen) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = rightPanelWidth;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    setRightPanelResizing(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      // Dragging left (decreasing clientX) → wider panel
+      const nextWidth = clampRightPanelWidth(startWidth - (moveEvent.clientX - startX), window.innerWidth);
+      setRightPanelWidth(nextWidth);
+    };
+
+    const finishResize = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", finishResize);
+      window.removeEventListener("pointercancel", finishResize);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      setRightPanelResizing(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", finishResize);
+    window.addEventListener("pointercancel", finishResize);
+  }, [rightPanelOpen, rightPanelWidth]);
+
   const [focusedTrellisTaskKey, setFocusedTrellisTaskKey] = useState<string | null>(null);
   const [trellisSessionTask, setTrellisSessionTask] = useState<TrellisSessionTaskLinkResult | null>(null);
   const [trellisSessionTaskRefreshKey, setTrellisSessionTaskRefreshKey] = useState(0);
   const [focusedStudioTaskKey, setFocusedStudioTaskKey] = useState<string | null>(null);
-  const [studioSessionTask, setStudioSessionTask] = useState<YpiStudioSessionTaskLinkResult | null>(null);
+  const [studioSessionTask, setStudioSessionTask] = useState<YpiStudioSessionTasksLinkResult | null>(null);
   const [studioSessionTaskRefreshKey, setStudioSessionTaskRefreshKey] = useState(0);
   const [studioLiveOverlays, setStudioLiveOverlays] = useState<YpiStudioLiveRunOverlay[]>([]);
   const [chatAgentRunning, setChatAgentRunning] = useState(false);
@@ -301,6 +469,47 @@ export function AppShell() {
     chatInputRef.current?.addFileReference(relativePath, selection);
   }, [activeCwd]);
 
+  // Reset all session/UI state when the active project-space changes.
+  // This replaces the previous cwd-string-based reset in handleCwdChange,
+  // which could be masked by selectedCwdProp from an old session.
+  const resetOnSpaceSwitch = useCallback((context: ProjectSpaceSelectionContext) => {
+    setSelectedSession(null);
+    setNewSessionCwd(context.cwd);
+    setNewSessionProjectContext({ projectId: context.projectId, spaceId: context.spaceId });
+    setSessionKey((k) => k + 1);
+    setBranchTree([]);
+    setBranchActiveLeafId(null);
+    setSystemPrompt(null);
+    setActiveTopPanel(null);
+    setGitRefreshKey((k) => k + 1);
+    setGitDirty(false);
+    setFileTabs([]);
+    setActiveFileTabId(null);
+    if (rightPanelModeRef.current === "files") setRightPanelOpen(false);
+    router.replace("/", { scroll: false });
+  }, [router]);
+
+  // Refs to read latest values inside the active-space reset effect without
+  // adding them as deps (the effect should only fire on activeProjectContext).
+  const selectedSessionRef = useRef(selectedSession);
+  selectedSessionRef.current = selectedSession;
+  const newSessionProjectContextRef = useRef(newSessionProjectContext);
+  newSessionProjectContextRef.current = newSessionProjectContext;
+  const rightPanelModeRef = useRef(rightPanelMode);
+  rightPanelModeRef.current = rightPanelMode;
+
+  // Active-space reset effect: when activeProjectContext changes to a new
+  // space that doesn't match the current session, trigger resetOnSpaceSwitch.
+  // Gated on initialSessionRestored to avoid resetting during URL restore.
+  useEffect(() => {
+    if (!activeProjectContext || !initialSessionRestored) return;
+    const currentSession = selectedSessionRef.current;
+    const currentNewSessionCtx = newSessionProjectContextRef.current;
+    if (spaceContextMatchesSession(activeProjectContext, currentSession, currentNewSessionCtx)) return;
+    resetOnSpaceSwitch(activeProjectContext);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps intentionally only [activeProjectContext]
+  }, [activeProjectContext]);
+
   const handleCwdChange = useCallback((cwd: string | null) => {
     if (cwd !== activeCwd) {
       setFileTabs([]);
@@ -311,27 +520,8 @@ export function AppShell() {
     // Keep an already-open terminal pinned to the cwd captured when it was opened;
     // terminal processes are ephemeral and should not be silently killed or retargeted
     // just because the selected chat/workspace changed.
-    // Skip if cwd is null (initial mount) or during the initial URL restore.
     if (!cwd || suppressCwdBumpRef.current) return;
-    // Close any session that belongs to a different cwd — it no longer
-    // matches the selected project directory.
-    setSelectedSession((prev) => {
-      if (prev && prev.cwd !== cwd) return null;
-      return prev;
-    });
-    setNewSessionCwd((prev) => {
-      if (prev && prev !== cwd) return null;
-      return prev;
-    });
-    setSessionKey((k) => k + 1);
-    setBranchTree([]);
-    setBranchActiveLeafId(null);
-    setSystemPrompt(null);
-    setActiveTopPanel(null);
-    setGitRefreshKey((k) => k + 1);
-    setGitDirty(false);
-    router.replace("/", { scroll: false });
-  }, [activeCwd, rightPanelMode, router]);
+  }, [activeCwd, rightPanelMode]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
     setNewSessionCwd(null);
@@ -526,9 +716,10 @@ export function AppShell() {
       if (branchActiveLeafId) params.set("leafId", branchActiveLeafId);
       const suffix = params.toString() ? `?${params.toString()}` : "";
       const res = await fetch(`/api/sessions/${encodeURIComponent(selectedSession.id)}/studio-task${suffix}`, { signal });
-      const data = await res.json() as YpiStudioSessionTaskLinkResult & { error?: string };
+      const data = await res.json() as YpiStudioSessionTasksLinkResult & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setStudioSessionTask(data.task ? data : null);
+      // Accept response if it has at least the primary task or non-empty tasks array
+      setStudioSessionTask(data.task || data.tasks?.length ? data : null);
     } catch (error) {
       if ((error as { name?: string }).name !== "AbortError") setStudioSessionTask(null);
     }
@@ -548,24 +739,42 @@ export function AppShell() {
     return () => controller.abort();
   }, [loadStudioSessionTask, studioSessionTaskRefreshKey]);
 
-  const studioSessionTaskKey = studioSessionTask?.task?.key ?? null;
-  const studioRuntimeStatus = studioSessionTask?.task?.implementationProjection?.sessionRuntime?.status;
+  // Multi-task derived state: collect all bound tasks from the API response.
+  const studioSessionTasks = studioSessionTask?.tasks ?? [];
+  const studioBoundTaskKeys = new Set(studioSessionTasks.map((c) => c.task.key));
+  const studioPrimaryTaskKey = studioSessionTask?.primaryTaskKey ?? studioSessionTask?.task?.key ?? null;
+  const studioSessionTaskKey = studioPrimaryTaskKey;
+
+  // Session runtime status from the primary task (for polling / display signals).
+  const studioPrimaryRuntimeStatus = studioSessionTask?.task?.implementationProjection?.sessionRuntime?.status;
+
+  // Aggregate active runs across all bound tasks, plus live overlays matching bound tasks.
   const studioActiveRunCount =
-    (studioSessionTask?.task?.subagents.filter((run) => run.status === "running" || run.status === "queued" || run.status === "waiting_for_user").length ?? 0)
-    + studioLiveOverlays.filter((overlay) => overlay.running || overlay.status === "running" || overlay.status === "queued" || overlay.status === "waiting_for_user").length
-    + (studioSessionTask?.task?.implementationProjection?.statusCounts.running ?? 0)
-    + (studioSessionTask?.task?.implementationProjection?.statusCounts.queued ?? 0);
+    studioSessionTasks.reduce((sum, c) => sum + c.task.subagents.filter((run) => run.status === "running" || run.status === "queued" || run.status === "waiting_for_user").length, 0)
+    + studioLiveOverlays.filter((overlay) => {
+      if (!overlay.running && overlay.status !== "running" && overlay.status !== "queued" && overlay.status !== "waiting_for_user") return false;
+      // Only count overlays that match a bound task (or have no taskKey — older tool results)
+      if (!overlay.taskKey) return true;
+      return studioBoundTaskKeys.has(overlay.taskKey);
+    }).length
+    + studioSessionTasks.reduce((sum, c) => sum + (c.task.implementationProjection?.statusCounts.running ?? 0) + (c.task.implementationProjection?.statusCounts.queued ?? 0), 0);
   const studioHasActiveRuns = studioActiveRunCount > 0;
-  const studioNeedsAttention = studioRuntimeStatus === "needs_user";
-  const studioWaitingForChildren = studioRuntimeStatus === "waiting_for_studio_children";
+
+  // Needs-attention signals: check any bound task (not just primary).
+  const studioNeedsAttention =
+    studioSessionTasks.some((c) => c.task.implementationProjection?.sessionRuntime?.status === "needs_user") ||
+    studioPrimaryRuntimeStatus === "needs_user";
+  const studioWaitingForChildren =
+    studioSessionTasks.some((c) => c.task.implementationProjection?.sessionRuntime?.status === "waiting_for_studio_children") ||
+    studioPrimaryRuntimeStatus === "waiting_for_studio_children";
 
   useEffect(() => {
     if (!selectedSession || selectedSession.archived) return;
-    if (!studioSessionTaskKey && !chatAgentRunning) return;
+    if (!studioSessionTaskKey && studioSessionTasks.length === 0 && !chatAgentRunning) return;
     const intervalMs = studioHasActiveRuns || chatAgentRunning || studioWaitingForChildren || studioNeedsAttention ? 4000 : 20000;
     const interval = window.setInterval(() => setStudioSessionTaskRefreshKey((key) => key + 1), intervalMs);
     return () => window.clearInterval(interval);
-  }, [chatAgentRunning, selectedSession, studioHasActiveRuns, studioNeedsAttention, studioSessionTaskKey, studioWaitingForChildren]);
+  }, [chatAgentRunning, selectedSession, studioHasActiveRuns, studioNeedsAttention, studioSessionTaskKey, studioSessionTasks.length, studioWaitingForChildren]);
 
   useEffect(() => () => {
     if (studioToolRefreshTimerRef.current !== null) window.clearTimeout(studioToolRefreshTimerRef.current);
@@ -601,9 +810,10 @@ export function AppShell() {
     }
   }, []);
 
-  const handleOpenStudioSessionTask = useCallback(() => {
-    if (!studioSessionTask?.task) return;
-    setFocusedStudioTaskKey(studioSessionTask.task.key);
+  const handleOpenStudioSessionTask = useCallback((taskKey?: string) => {
+    const key = taskKey ?? studioSessionTask?.primaryTaskKey ?? studioSessionTask?.task?.key;
+    if (!key) return;
+    setFocusedStudioTaskKey(key);
     setRightPanelMode("studio");
     setRightPanelOpen(true);
   }, [studioSessionTask]);
@@ -736,9 +946,6 @@ export function AppShell() {
         onSessionDeleted={handleSessionDeleted}
         selectedCwd={selectedSession?.cwd ?? newSessionCwd ?? null}
         onCwdChange={handleCwdChange}
-        onOpenFile={handleOpenFile}
-        explorerRefreshKey={explorerRefreshKey}
-        onAtMention={handleAtMention}
         trellisEnabled={trellisEnabled}
         terminalEnabled={terminalEnabled}
         onOpenTerminalCommand={handleOpenTerminalCommand}
@@ -1384,8 +1591,13 @@ export function AppShell() {
           {showChat && trellisSessionTask?.task && !(rightPanelOpen && rightPanelMode === "trellis" && focusedTrellisTaskKey === trellisSessionTask.task.key) && (
             <TrellisSessionWidget task={trellisSessionTask.task} onClick={handleOpenTrellisSessionTask} />
           )}
-          {showChat && studioSessionTask?.task && !(rightPanelOpen && rightPanelMode === "studio" && focusedStudioTaskKey === studioSessionTask.task.key) && (
-            <YpiStudioSessionWidget task={studioSessionTask.task} liveOverlays={studioLiveOverlays} onClick={handleOpenStudioSessionTask} />
+          {showChat && studioSessionTasks.length > 0 && (
+            <YpiStudioSessionWidget
+              tasks={studioSessionTasks}
+              liveOverlays={studioLiveOverlays.filter((overlay) => !overlay.taskKey || studioBoundTaskKeys.has(overlay.taskKey))}
+              onOpenTask={(taskKey) => handleOpenStudioSessionTask(taskKey)}
+              primaryTaskKey={studioPrimaryTaskKey ?? undefined}
+            />
           )}
           </div>
           {terminalOpen && terminalEnabled && terminalDockCwd && (
@@ -1407,16 +1619,142 @@ export function AppShell() {
 
       {/* Right panel: file viewer, Studio, or Trellis — always mounted, width animated via CSS */}
       <div
-        className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}`}
+        className={`right-panel-container${rightPanelOpen ? " right-panel-open" : " right-panel-closed"}${rightPanelResizing ? " right-panel-resizing" : ""}`}
         style={{
           display: "flex",
           flexDirection: "column",
           borderLeft: "1px solid var(--border)",
           background: "var(--bg)",
-        }}
+          position: "relative",
+          "--right-panel-width": `${rightPanelWidth}px`,
+          "--right-panel-min-width": `${RIGHT_PANEL_MIN_WIDTH}px`,
+        } as CSSProperties}
       >
+        {/* Desktop resize handle on left edge */}
+        {rightPanelOpen && (
+          <div
+            className="right-panel-resize-handle"
+            onPointerDown={handleRightPanelResizePointerDown}
+            title="Resize panel"
+            aria-label="Resize panel"
+            role="separator"
+            aria-orientation="vertical"
+          />
+        )}
         {rightPanelMode === "files" ? (
           <>
+            {/* File Explorer — project space file browser */}
+            {rightPanelOpen && (() => {
+              const explorerCwd = activeCwd ?? activeProjectContext?.cwd ?? null;
+              if (!explorerCwd) return null;
+              return (
+                <div
+                  ref={explorerSectionRef}
+                  style={{
+                    borderBottom: explorerOpen ? "1px solid var(--border)" : "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: explorerOpen ? (explorerHeight === null ? "0 1 40%" : `0 1 ${explorerHeight}px`) : "0 0 auto",
+                    minHeight: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                    <button
+                      onClick={() => setExplorerOpen((v) => !v)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        flex: 1,
+                        padding: "6px 10px",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        textAlign: "left",
+                      }}
+                    >
+                      <svg
+                        width="9" height="9" viewBox="0 0 10 10" fill="none"
+                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transform: explorerOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}
+                      >
+                        <polyline points="3 2 7 5 3 8" />
+                      </svg>
+                      项目空间信息
+                    </button>
+                    <button
+                      onClick={() => {
+                        setExplorerKey((k) => k + 1);
+                        setExplorerRefreshDone(true);
+                        if (explorerRefreshTimerRef.current) clearTimeout(explorerRefreshTimerRef.current);
+                        explorerRefreshTimerRef.current = setTimeout(() => setExplorerRefreshDone(false), 2000);
+                      }}
+                      title="刷新项目空间信息"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        width: 26, height: 26, padding: 0, marginRight: 6,
+                        background: explorerRefreshDone ? "rgba(74,222,128,0.18)" : "none",
+                        border: "none",
+                        color: explorerRefreshDone ? "#4ade80" : "var(--text-dim)",
+                        cursor: "pointer",
+                        borderRadius: 5,
+                        flexShrink: 0,
+                        transition: "color 0.3s, background 0.3s",
+                      }}
+                      onMouseEnter={(e) => { if (explorerRefreshDone) return; e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
+                      onMouseLeave={(e) => { if (explorerRefreshDone) return; e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
+                    >
+                      {explorerRefreshDone ? (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                          <path d="M3 3v5h5" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {explorerOpen && (
+                    <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+                      <FileExplorer
+                        cwd={explorerCwd}
+                        onOpenFile={handleOpenFile}
+                        refreshKey={explorerKey}
+                        onAtMention={handleAtMention}
+                      />
+                    </div>
+                  )}
+                  {/* Resize handle at bottom of explorer */}
+                  {explorerOpen && (
+                    <div
+                      onPointerDown={handleExplorerResizePointerDown}
+                      title="Resize explorer"
+                      aria-label="Resize explorer"
+                      role="separator"
+                      aria-orientation="horizontal"
+                      style={{
+                        height: 7,
+                        borderTop: "1px solid var(--border)",
+                        background: explorerResizing ? "rgba(37,99,235,0.08)" : "transparent",
+                        cursor: "row-resize",
+                        flexShrink: 0,
+                        touchAction: "none",
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })()}
+            {/* Preview content (TabBar + FileViewer) — measured for explorer resize */}
+            <div ref={previewContentRef} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
             {/* Right panel tab bar */}
             <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
               <div style={{ flex: 1, overflow: "hidden" }}>
@@ -1438,6 +1776,7 @@ export function AppShell() {
                   没有打开文件
                 </div>
               )}
+            </div>
             </div>
           </>
         ) : rightPanelMode === "studio" ? (

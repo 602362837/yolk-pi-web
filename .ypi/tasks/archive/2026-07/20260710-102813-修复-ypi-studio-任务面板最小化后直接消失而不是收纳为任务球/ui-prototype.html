@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>YPI Studio 任务面板收纳与交互设计原型 - 独立纯内联版</title>
+  <style>
+    /* ========================================== */
+    /* 全局变量与基础样式 */
+    /* ========================================== */
+    :root {
+      --bg-body: #f3f4f6;
+      --bg-card: #ffffff;
+      --bg-panel: #f9fafb;
+      --bg-hover: #f3f4f6;
+      --border: #e5e7eb;
+      --text: #111827;
+      --text-muted: #4b5563;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-glow: rgba(37, 99, 235, 0.2);
+      
+      --color-success: #10b981;
+      --color-success-bg: rgba(16, 185, 129, 0.1);
+      --color-warning: #f59e0b;
+      --color-warning-bg: rgba(245, 158, 11, 0.1);
+      --color-danger: #ef4444;
+      --color-danger-bg: rgba(239, 68, 68, 0.1);
+      --color-running: #2563eb;
+      --color-running-bg: rgba(37, 99, 235, 0.1);
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-full: 9999px;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+      
+      --transition-fast: 0.15s ease-out;
+      --transition-normal: 0.25s ease-out;
+    }
+
+    html.dark {
+      --bg-body: #09090b;
+      --bg-card: #18181b;
+      --bg-panel: #202024;
+      --bg-hover: #27272a;
+      --border: #27272a;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --accent: #60a5fa;
+      --accent-glow: rgba(96, 165, 250, 0.35);
+      
+      --color-success: #34d399;
+      --color-success-bg: rgba(52, 211, 153, 0.15);
+      --color-warning: #fbbf24;
+      --color-warning-bg: rgba(251, 191, 36, 0.15);
+      --color-danger: #f87171;
+      --color-danger-bg: rgba(248, 113, 113, 0.15);
+      --color-running: #60a5fa;
+      --color-running-bg: rgba(96, 165, 250, 0.15);
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: row;
+      gap: 24px;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    @media (max-width: 1024px) {
+      body {
+        flex-direction: column;
+      }
+    }
+
+    button, select, input {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    /* ========================================== */
+    /* 动效关键帧 */
+    /* ========================================== */
+    @keyframes halo-breath {
+      0%, 100% {
+        box-shadow: 0 0 0 0px var(--accent-glow), var(--shadow-xl);
+      }
+      50% {
+        box-shadow: 0 0 0 8px var(--accent-glow), var(--shadow-xl);
+      }
+    }
+
+    @keyframes attention-pulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0px rgba(245, 158, 11, 0.7);
+      }
+      70% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 12px rgba(245, 158, 11, 0);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0px rgba(245, 158, 11, 0);
+      }
+    }
+
+    .animate-halo-running {
+      animation: halo-breath 2.4s infinite ease-in-out;
+    }
+
+    .animate-pulse-attention {
+      animation: attention-pulse 1.2s ease-out 2;
+    }
+
+    /* ========================================== */
+    /* 无障碍减弱动效 */
+    /* ========================================== */
+    .reduced-motion-active .animate-halo-running,
+    .reduced-motion-active .animate-pulse-attention,
+    .reduced-motion-active *,
+    @media (prefers-reduced-motion: reduce) {
+      .animate-halo-running,
+      .animate-pulse-attention {
+        animation: none !important;
+      }
+      * {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+
+    /* ========================================== */
+    /* 控制面板样式 */
+    /* ========================================== */
+    .control-panel {
+      width: 320px;
+      flex-shrink: 0;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      shadow: var(--shadow-md);
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+    }
+
+    @media (max-width: 1024px) {
+      .control-panel {
+        width: 100%;
+        max-height: none;
+      }
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .panel-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .divider {
+      height: 1px;
+      background-color: var(--border);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-cols: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background-color: var(--bg-card);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-align: center;
+    }
+
+    .btn:hover {
+      background-color: var(--bg-hover);
+    }
+
+    .btn.active {
+      border-color: var(--accent);
+      background-color: rgba(37, 99, 235, 0.08);
+      color: var(--accent);
+    }
+    
+    html.dark .btn.active {
+      background-color: rgba(96, 165, 250, 0.12);
+    }
+
+    .select-input {
+      width: 100%;
+      padding: 8px;
+      font-size: 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background-color: var(--bg-panel);
+      outline: none;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .info-box {
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      background-color: var(--bg-panel);
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent);
+    }
+
+    .toast {
+      padding: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      background-color: rgba(37, 99, 235, 0.1);
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      border-radius: var(--radius-sm);
+      color: var(--accent);
+      display: none;
+    }
+
+    /* ========================================== */
+    /* 模拟工作区样式 */
+    /* ========================================== */
+    .workspace-viewport {
+      flex: 1;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      height: 720px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .browser-header {
+      background-color: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .browser-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: var(--radius-full);
+    }
+
+    .browser-address {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      width: 50%;
+      text-align: center;
+    }
+
+    .workspace-body {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      background-color: var(--bg-body);
+    }
+
+    /* 编辑器模拟主视图 */
+    .editor-mock {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      user-select: none;
+      color: var(--text-dim);
+    }
+
+    .editor-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      opacity: 0.6;
+    }
+
+    .chat-mock-input {
+      width: 100%;
+      max-width: 480px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chat-mock-field {
+      flex: 1;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    /* ========================================== */
+    /* 右侧 Studio Drawer 模拟 */
+    /* ========================================== */
+    .studio-drawer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 320px;
+      background-color: var(--bg-card);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow-xl);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform var(--transition-normal);
+    }
+
+    .studio-drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: var(--bg-panel);
+    }
+
+    .drawer-title {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .drawer-close:hover {
+      color: var(--text);
+    }
+
+    .drawer-content {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .drawer-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .focused-card {
+      padding: 12px;
+      background-color: var(--color-running-bg);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      border-radius: var(--radius-md);
+    }
+
+    .focused-title {
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    /* ========================================== */
+    /* YPI Studio Widget (展开面板) */
+    /* ========================================== */
+    .studio-widget-panel {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 350px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--accent);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-xl);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      transition: opacity var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .widget-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: grab;
+    }
+
+    .widget-header:active {
+      cursor: grabbing;
+    }
+
+    .widget-header-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-collapse {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background-color: var(--bg-card);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-collapse:hover {
+      background-color: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .widget-task-list {
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    /* 滚动条美化 */
+    .widget-task-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .widget-task-list::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: var(--radius-full);
+    }
+
+    /* 任务卡片样式 */
+    .task-card {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background-color var(--transition-fast);
+    }
+
+    .task-card:hover {
+      background-color: var(--bg-hover);
+    }
+
+    .task-card.active-reading {
+      background-color: rgba(37, 99, 235, 0.06);
+    }
+    
+    html.dark .task-card.active-reading {
+      background-color: rgba(96, 165, 250, 0.08);
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      padding-right: 32px; /* 避开右上角 Detail 按钮 */
+    }
+
+    .card-icon-badge {
+      background-color: rgba(37, 99, 235, 0.1);
+      color: var(--accent);
+      padding: 1px 4px;
+      border-radius: var(--radius-sm);
+      font-size: 9px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.4;
+      margin-bottom: 8px;
+      padding-right: 32px; /* 避开右上角 Detail 按钮 */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* 毛玻璃 Detail 按钮 */
+    .glass-detail-btn {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-full);
+      background-color: rgba(229, 231, 235, 0.3);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(229, 231, 235, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      cursor: pointer;
+      z-index: 10;
+      transition: all var(--transition-fast);
+      box-shadow: var(--shadow-sm);
+    }
+
+    html.dark .glass-detail-btn {
+      background-color: rgba(39, 39, 42, 0.4);
+      border-color: rgba(63, 63, 70, 0.3);
+    }
+
+    .glass-detail-btn:hover {
+      background-color: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+      transform: scale(1.08);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .glass-detail-btn:active {
+      transform: scale(0.95);
+    }
+
+    .glass-detail-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke-width: 3px;
+    }
+
+    /* ========================================== */
+    /* 站点连线式进度条 (Workflow Timeline) */
+    /* ========================================== */
+    .workflow-timeline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      margin: 10px 0 8px 0;
+      padding: 0 4px;
+    }
+
+    /* 背景连线 */
+    .workflow-timeline::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 8px;
+      right: 8px;
+      height: 2px;
+      background-color: var(--border);
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+
+    /* 激活部分的进度线 */
+    .timeline-progress-line {
+      position: absolute;
+      top: 50%;
+      left: 8px;
+      height: 2px;
+      background-color: var(--accent);
+      z-index: 2;
+      transform: translateY(-50%);
+      transition: width var(--transition-normal);
+    }
+
+    .timeline-node {
+      width: 14px;
+      height: 14px;
+      border-radius: var(--radius-full);
+      background-color: var(--bg-card);
+      border: 2px solid var(--border);
+      z-index: 3;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition-fast);
+    }
+
+    /* 站点提示文字（悬浮提示） */
+    .timeline-node::after {
+      content: attr(data-node-name);
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.85);
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--text-dim);
+      white-space: nowrap;
+      transition: all var(--transition-fast);
+      pointer-events: none;
+    }
+
+    /* 节点已完成状态 */
+    .timeline-node.done {
+      border-color: var(--color-success);
+      background-color: var(--color-success);
+    }
+    
+    .timeline-node.done::after {
+      color: var(--color-success);
+      font-weight: 800;
+    }
+
+    .timeline-node.done-check {
+      width: 14px;
+      height: 14px;
+    }
+    
+    /* 节点当前运行状态 */
+    .timeline-node.running {
+      border-color: var(--accent);
+      background-color: var(--bg-card);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+
+    .timeline-node.running::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: var(--radius-full);
+      background-color: var(--accent);
+    }
+
+    .timeline-node.running::after {
+      color: var(--accent);
+      font-weight: 800;
+      transform: translateX(-50%) scale(1);
+    }
+
+    /* 节点等待状态（Needs User / Attention） */
+    .timeline-node.attention {
+      border-color: var(--color-warning);
+      background-color: var(--bg-card);
+      box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+    }
+
+    .timeline-node.attention::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: var(--radius-full);
+      background-color: var(--color-warning);
+    }
+
+    .timeline-node.attention::after {
+      color: var(--color-warning);
+      font-weight: 800;
+      transform: translateX(-50%) scale(1);
+    }
+
+    /* 节点挂起状态（Failed / Blocked） */
+    .timeline-node.failed {
+      border-color: var(--color-danger);
+      background-color: var(--color-danger);
+    }
+
+    .timeline-node.failed::after {
+      color: var(--color-danger);
+      font-weight: 800;
+    }
+
+    .widget-footer {
+      padding: 10px;
+      background-color: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    /* ========================================== */
+    /* YPI Studio Widget (收纳任务球) */
+    /* ========================================== */
+    .studio-widget-ball {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background-color: var(--accent);
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: var(--shadow-xl);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      font-weight: 900;
+      font-size: 15px;
+      transition: opacity var(--transition-fast), transform 0.1s;
+      user-select: none;
+    }
+
+    html.dark .studio-widget-ball {
+      border-color: #27272a;
+    }
+
+    .studio-widget-ball:active {
+      cursor: grabbing;
+    }
+
+    .ball-badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      background-color: var(--color-danger);
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 800;
+      border-radius: var(--radius-full);
+      padding: 2px 5px;
+      border: 1.5px solid #ffffff;
+      box-shadow: var(--shadow-sm);
+      line-height: 1;
+    }
+
+    html.dark .ball-badge {
+      border-color: #27272a;
+    }
+
+    /* ========================================== */
+    /* 移动端模拟 UI */
+    /* ========================================== */
+    .mobile-bottom-trigger {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 120;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 800;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .mobile-trigger-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-full);
+      background-color: var(--accent);
+    }
+
+    .mobile-bottom-sheet-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      display: none;
+      align-items: flex-end;
+    }
+
+    .mobile-bottom-sheet {
+      width: 100%;
+      background-color: var(--bg-card);
+      border-top-left-radius: var(--radius-lg);
+      border-top-right-radius: var(--radius-lg);
+      box-shadow: var(--shadow-xl);
+      display: flex;
+      flex-direction: column;
+      max-height: 70%;
+      transform: translateY(100%);
+      transition: transform var(--transition-normal);
+    }
+
+    .mobile-bottom-sheet-overlay.open {
+      display: flex;
+    }
+
+    .mobile-bottom-sheet-overlay.open .mobile-bottom-sheet {
+      transform: translateY(0);
+    }
+
+    .sheet-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: var(--bg-panel);
+    }
+
+    .sheet-title {
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .sheet-close {
+      padding: 4px 10px;
+      font-size: 10px;
+      border: 1px solid var(--border);
+      background-color: var(--bg-card);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+
+    .sheet-content {
+      overflow-y: auto;
+      padding-bottom: 24px;
+    }
+
+    /* ========================================== */
+    /* 帮助样式类 */
+    /* ========================================== */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================== -->
+  <!-- 左侧控制面板 -->
+  <!-- ========================================== -->
+  <div class="control-panel">
+    <div>
+      <span class="panel-title">YPI Studio UI 原型</span>
+      <p class="panel-subtitle">离线全自包含版：任务收纳防消失、详情点击分责、站点连线进度展现。</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 模式调节 -->
+    <div class="control-group">
+      <span class="control-label">任务数量状态</span>
+      <div class="grid-2">
+        <button id="btn-single-task" class="btn active" onclick="setTaskCount('single')">单任务</button>
+        <button id="btn-multi-task" class="btn" onclick="setTaskCount('multi')">多任务 (3个)</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">任务展示形态 ( 演示 )</span>
+      <div class="grid-2">
+        <button id="btn-widget-expand" class="btn active" onclick="setWidgetPresentation('expanded')">展开面板</button>
+        <button id="btn-widget-collapse" class="btn" onclick="setWidgetPresentation('collapsed')">收纳为球</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">右侧 Studio Drawer 状态</span>
+      <button id="btn-drawer-status" class="btn" style="text-align: left;" onclick="toggleDrawerState()">
+        状态：<strong id="label-drawer-status" style="color: var(--color-danger)">已关闭</strong>
+      </button>
+      
+      <!-- Focus 避让模拟器 -->
+      <div id="drawer-focus-area" class="hidden" style="margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--border);">
+        <span class="control-label" style="font-size: 9px;">当前聚焦绑定任务 ( isDimmed 效果 )</span>
+        <div class="grid-2" style="margin-top: 4px;">
+          <button id="btn-focus-yes" class="btn active" onclick="setFocusBound(true)">命中 (避让)</button>
+          <button id="btn-focus-no" class="btn" onclick="setFocusBound(false)">未命中</button>
+        </div>
+        <p style="font-size: 9px; color: var(--color-warning); margin-top: 4px;">
+          * 旧版在此状态下直接 return null (球和面板均消失)；新版只做轻度不透明度弱化避让，球/面板依然可交互。
+        </p>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">任务球紧急状态动画</span>
+      <select id="select-urgency" class="select-input" onchange="setUrgency(this.value)">
+        <option value="running">running (蓝色 - 柔和呼吸 Halo)</option>
+        <option value="needs_user">needs_user (橙色 - 有限 Pulse 强调)</option>
+        <option value="failed">failed (红色 - 静止强调)</option>
+        <option value="idle">idle (灰色 - 静止)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">演示设备视图</span>
+      <div class="grid-2">
+        <button id="btn-device-desktop" class="btn active" onclick="setDeviceView('desktop')">桌面端</button>
+        <button id="btn-device-mobile" class="btn" onclick="setDeviceView('mobile')">移动端 (模拟)</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">偏好与可访问性</span>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chk-reduced-motion" onchange="setReducedMotion(this.checked)">
+        <span>无障碍 (禁用非必要动效)</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chk-dark-mode" checked onchange="setDarkMode(this.checked)">
+        <span>深色模式</span>
+      </label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="control-group">
+      <div id="toast-notify" class="toast">轻提示区域</div>
+      <div class="info-box">
+        <strong>UI 门禁验证点提示：</strong><br/>
+        1. <strong>卡片本体点击分责：</strong>点击卡片空白处或文本进入卡片阅读态，不会打开右侧 Drawer；只有点击右上角毛玻璃 <code>Detail</code> 圆形按钮（含有指向右的箭头）才会拉出右侧 Drawer 并聚焦任务。<br/>
+        2. <strong>站点连线式进度：</strong>卡片中间直接渲染 Workflow 各个节点的拓扑连线，当前进行的步骤会亮起（例如 UI 设计阶段、实现阶段等），进度一目了然。<br/>
+        3. <strong>收纳球保护：</strong>在展开面板点 “➖” 收纳。当右侧抽屉打开并聚焦本任务时，球/面板仅变淡避让，禁止消失！
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 右侧模拟浏览器工作区 -->
+  <!-- ========================================== -->
+  <div class="workspace-viewport" id="viewport-container">
+    
+    <!-- 模拟浏览器顶部栏 -->
+    <div class="browser-header">
+      <div class="browser-dots">
+        <span class="browser-dot" style="background-color: var(--color-danger)"></span>
+        <span class="browser-dot" style="background-color: var(--color-warning)"></span>
+        <span class="browser-dot" style="background-color: var(--color-success)"></span>
+      </div>
+      <div class="browser-address">localhost:30141/session/mock-session-ypi</div>
+      <div style="width: 26px;"></div>
+    </div>
+
+    <!-- 工作区主体 -->
+    <div class="workspace-body" id="workspace-container">
+      
+      <!-- 主内容区：模拟 Chat 对话 -->
+      <div class="editor-mock">
+        <div class="editor-icon">💬</div>
+        <div style="font-weight: 700; font-size: 13px;">Pi 聊天与编辑器主工作区</div>
+        <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
+          （Studio 面板以绝对定位悬浮在该工作区之上）
+        </div>
+        
+        <div class="chat-mock-input">
+          <input type="text" class="chat-mock-field" placeholder="向 Pi 发起指令，例如：检查任务计划并推进..." disabled>
+          <button class="btn" style="padding: 6px 12px; font-size: 11px; opacity: 0.5; cursor: not-allowed;">发送</button>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- 渲染组件：YPI Studio 展开面板 (Desktop) -->
+      <!-- ========================================== -->
+      <div id="desktop-widget-panel" class="studio-widget-panel">
+        <!-- Header - Grab handle -->
+        <div class="widget-header" id="desktop-panel-header">
+          <span class="widget-header-title">
+            <span style="color: var(--accent);">⚡</span> YPI Studio (<span id="desktop-task-count">1</span>)
+          </span>
+          <button class="btn-collapse" onclick="collapseWidget()" title="收纳为悬浮任务球">➖</button>
+        </div>
+
+        <!-- 任务列表容器 -->
+        <div class="widget-task-list" id="desktop-task-list">
+          <!-- JS 动态注入 -->
+        </div>
+
+        <!-- Footer -->
+        <div class="widget-footer">
+          当前会话共绑定 <span id="desktop-footer-count">1</span> 个活动任务
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- 渲染组件：YPI Studio 收纳任务球 (Desktop) -->
+      <!-- ========================================== -->
+      <div id="desktop-widget-ball" class="studio-widget-ball" onclick="expandWidget()">
+        <span>工</span>
+        <span class="ball-badge" id="desktop-ball-badge">1</span>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- 渲染组件：移动端模拟唤起条 (Mobile Trigger) -->
+      <!-- ========================================== -->
+      <div id="mobile-widget-trigger" class="mobile-bottom-trigger hidden" onclick="openMobileBottomSheet(true)">
+        <span class="mobile-trigger-dot"></span>
+        <span id="mobile-trigger-text">工 Studio (1) · 修复任务面板...</span>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- 渲染组件：移动端半屏 Bottom Sheet -->
+      <!-- ========================================== -->
+      <div id="mobile-sheet-overlay" class="mobile-bottom-sheet-overlay" onclick="openMobileBottomSheet(false)">
+        <div class="mobile-bottom-sheet" onclick="event.stopPropagation()">
+          <div class="sheet-header">
+            <span class="sheet-title">YPI Studio 绑定任务 (<span id="mobile-sheet-count">1</span>)</span>
+            <button class="sheet-close" onclick="openMobileBottomSheet(false)">关闭</button>
+          </div>
+          <div class="sheet-content" id="mobile-task-list">
+            <!-- JS 动态注入 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- 右侧抽屉 Drawer 详情模拟 -->
+      <!-- ========================================== -->
+      <div id="right-studio-drawer" class="studio-drawer">
+        <div class="drawer-header">
+          <div class="drawer-title">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--accent);"></span>
+            <span>YPI Studio 任务详情</span>
+          </div>
+          <button class="drawer-close" onclick="closeDrawer()">关闭 ✕</button>
+        </div>
+        <div class="drawer-content">
+          <div class="focused-card">
+            <span class="drawer-section-title" style="color: var(--accent);">当前聚焦任务</span>
+            <div class="focused-title" id="drawer-task-title">任务标题</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
+              ID: <span id="drawer-task-id">20260710-102813</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span class="drawer-section-title">实施计划审批书 (Plan Review)</span>
+            <div style="padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11px; background-color: var(--bg-panel); display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between;">
+                <span>Trellis 状态：</span>
+                <strong style="color: var(--color-success);">awaiting_approval</strong>
+              </div>
+              <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: var(--radius-full); overflow: hidden;">
+                <div style="width: 75%; height: 100%; background-color: var(--color-success);"></div>
+              </div>
+              <p style="color: var(--text-muted); font-size: 10px; line-height: 1.4;">
+                实施计划实施员已提交，当前正在由 Checker 进行 UI 视觉回归门禁检查。
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span class="drawer-section-title">Studio 团队分工与进度</span>
+            <div style="font-size: 11px; line-height: 2;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border);">
+                <span>UI 设计员</span>
+                <span style="color: var(--color-success); font-weight: 800;">✓ 已交付原型</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border);">
+                <span>实现员</span>
+                <span style="color: var(--accent); font-weight: 800;">● 正在实现</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>检查员</span>
+                <span style="color: var(--text-dim);">○ 等待检查</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 模拟数据与交互控制逻辑 -->
+  <!-- ========================================== -->
+  <script>
+    // 模拟数据
+    const mockTasks = [
+      {
+        id: "20260710-102813",
+        key: "task-1",
+        title: "修复 YPI Studio 任务面板最小化后直接消失",
+        status: "running",
+        statusLabel: "正在开发",
+        progress: 10,
+        member: "UI 设计员",
+        workflow: "功能开发",
+        urgency: "running",
+        // 站点连线数据：nodes代表流程节点，currentIdx代表当前所处节点的索引
+        nodes: [
+          { name: "Brief", status: "done" },
+          { name: "Design", status: "done" },
+          { name: "Implement", status: "running" },
+          { name: "Checks", status: "pending" },
+          { name: "Review", status: "pending" }
+        ]
+      },
+      {
+        id: "20260709-170836",
+        key: "task-2",
+        title: "项目切换弹窗操作收敛与星标机制",
+        status: "waiting_for_user",
+        statusLabel: "等待确认",
+        progress: 65,
+        member: "架构师",
+        workflow: "架构设计",
+        urgency: "needs_user",
+        nodes: [
+          { name: "Brief", status: "done" },
+          { name: "Design", status: "done" },
+          { name: "Implement", status: "done" },
+          { name: "Checks", status: "attention" },
+          { name: "Review", status: "pending" }
+        ]
+      },
+      {
+        id: "20260709-145750",
+        key: "task-3",
+        title: "修复工作树归档后项目空间未同步清理",
+        status: "failed",
+        statusLabel: "执行失败",
+        progress: 40,
+        member: "实现员",
+        workflow: "故障修复",
+        urgency: "failed",
+        nodes: [
+          { name: "Brief", status: "done" },
+          { name: "Design", status: "done" },
+          { name: "Implement", status: "failed" },
+          { name: "Checks", status: "pending" },
+          { name: "Review", status: "pending" }
+        ]
+      }
+    ];
+
+    // 全局状态管理
+    const state = {
+      taskCountMode: "single", // "single" | "multi"
+      presentation: "expanded", // "expanded" | "collapsed"
+      drawerOpen: false,
+      focusedTaskKey: "task-1",
+      focusedBoundTask: true, // 当前聚焦的任务是否命中 Studio 列表
+      urgency: "running", // running, needs_user, failed, idle
+      deviceView: "desktop", // desktop, mobile
+      reducedMotion: false,
+      darkMode: true,
+      lastReadTaskKey: null // 正在阅读的卡片 key
+    };
+
+    // 拖动参数记录
+    const dragData = {
+      isDragging: false,
+      startX: 0,
+      startY: 0,
+      initialLeft: 0,
+      initialTop: 0,
+      draggedDistance: 0,
+      activeElement: null
+    };
+
+    const DRAG_THRESHOLD = 5; // 拖动阈值（像素）
+
+    // 页面初始化
+    window.addEventListener("DOMContentLoaded", () => {
+      // 注册桌面拖动
+      initDrag(document.getElementById("desktop-panel-header"), document.getElementById("desktop-widget-panel"));
+      initDrag(document.getElementById("desktop-widget-ball"), document.getElementById("desktop-widget-ball"));
+      
+      // 默认给 widget 定位
+      const panel = document.getElementById("desktop-widget-panel");
+      panel.style.left = "auto";
+      panel.style.top = "24px";
+      panel.style.right = "24px";
+
+      const ball = document.getElementById("desktop-widget-ball");
+      ball.style.left = "auto";
+      ball.style.top = "24px";
+      ball.style.right = "24px";
+
+      render();
+    });
+
+    // 渲染总入口
+    function render() {
+      const activeTasks = getActiveTasks();
+      const currentCount = activeTasks.length;
+
+      // 1. 更新数量展示
+      document.getElementById("desktop-task-count").innerText = currentCount;
+      document.getElementById("desktop-footer-count").innerText = currentCount;
+      document.getElementById("desktop-ball-badge").innerText = currentCount;
+      document.getElementById("mobile-sheet-count").innerText = currentCount;
+
+      // 2. 根据状态决定紧急度表现 (多任务自动取最高紧急度)
+      const computedUrgency = state.taskCountMode === "multi" ? getHighestUrgency(activeTasks) : state.urgency;
+      updateBallVisual(computedUrgency);
+
+      // 3. 处理设备视图与展开/收纳状态
+      const panel = document.getElementById("desktop-widget-panel");
+      const ball = document.getElementById("desktop-widget-ball");
+      const trigger = document.getElementById("mobile-widget-trigger");
+      const sheetOverlay = document.getElementById("mobile-sheet-overlay");
+
+      if (state.deviceView === "desktop") {
+        trigger.classList.add("hidden");
+        sheetOverlay.classList.remove("open");
+
+        if (state.presentation === "expanded") {
+          panel.classList.remove("hidden");
+          ball.classList.add("hidden");
+        } else {
+          panel.classList.add("hidden");
+          ball.classList.remove("hidden");
+        }
+
+        // Drawer Focus 弱化/避让逻辑 (禁止 return null，只改不透明度和边框样式)
+        const isDimmed = state.drawerOpen && state.focusedBoundTask;
+        if (isDimmed) {
+          panel.style.opacity = "0.5";
+          panel.style.transform = "scale(0.98)";
+          panel.style.borderStyle = "dashed";
+          panel.style.borderColor = "var(--accent)";
+          
+          ball.style.opacity = "0.6";
+        } else {
+          panel.style.opacity = "1";
+          panel.style.transform = "scale(1)";
+          panel.style.borderStyle = "solid";
+          panel.style.borderColor = "var(--border)";
+          
+          ball.style.opacity = "1";
+        }
+      } else {
+        // 移动端模拟
+        panel.classList.add("hidden");
+        ball.classList.add("hidden");
+        trigger.classList.remove("hidden");
+
+        // 触发器文本更新
+        const primary = activeTasks[0];
+        document.getElementById("mobile-trigger-text").innerText = `工 Studio (${currentCount}) · ${primary.title.slice(0, 8)}...`;
+      }
+
+      // 4. 渲染任务卡片列表
+      renderTaskList(document.getElementById("desktop-task-list"), activeTasks, false);
+      renderTaskList(document.getElementById("mobile-task-list"), activeTasks, true);
+
+      // 5. 更新控制面板各高亮按钮
+      updateControlButtons();
+
+      // 6. 更新右侧 Drawer 内容
+      const drawer = document.getElementById("right-studio-drawer");
+      if (state.drawerOpen) {
+        drawer.classList.add("open");
+        const fTask = mockTasks.find(t => t.key === state.focusedTaskKey) || mockTasks[0];
+        document.getElementById("drawer-task-title").innerText = fTask.title;
+        document.getElementById("drawer-task-id").innerText = fTask.id;
+        document.getElementById("label-drawer-status").innerText = "已打开";
+        document.getElementById("label-drawer-status").style.color = "var(--color-success)";
+      } else {
+        drawer.classList.remove("open");
+        document.getElementById("label-drawer-status").innerText = "已关闭";
+        document.getElementById("label-drawer-status").style.color = "var(--color-danger)";
+      }
+    }
+
+    // 渲染任务卡片具体实现
+    function renderTaskList(container, tasks, isMobile) {
+      container.innerHTML = "";
+      tasks.forEach(task => {
+        const card = document.createElement("div");
+        
+        let cardClass = "task-card";
+        if (state.lastReadTaskKey === task.key) {
+          cardClass += " active-reading";
+        }
+        card.className = cardClass;
+        
+        // 【关键设计】卡片本体点击：进入阅读态高亮，绝不触发 Drawer 详情拉出
+        card.onclick = (e) => {
+          state.lastReadTaskKey = task.key;
+          showToast(`已选中阅读：《${task.title.slice(0, 10)}...》，此处卡片仅读，点击右上 Detail 圆形按钮才能查看详情`);
+          render();
+        };
+
+        // 状态文字颜色
+        let statusColor = "var(--text-dim)";
+        if (task.status === "running") statusColor = "var(--accent)";
+        else if (task.status === "waiting_for_user") statusColor = "var(--color-warning)";
+        else if (task.status === "failed") statusColor = "var(--color-danger)";
+
+        // 计算站点连线的进度宽度
+        const totalNodes = task.nodes.length;
+        let lastDoneOrRunningIdx = -1;
+        task.nodes.forEach((node, i) => {
+          if (node.status === "done" || node.status === "running" || node.status === "attention" || node.status === "failed") {
+            lastDoneOrRunningIdx = i;
+          }
+        });
+        const progressPercentage = totalNodes > 1 ? (lastDoneOrRunningIdx / (totalNodes - 1)) * 100 : 0;
+
+        card.innerHTML = `
+          <!-- 卡片顶部 Meta -->
+          <div class="card-meta">
+            <span class="card-icon-badge">工</span>
+            <span>Studio · ${task.workflow}</span>
+            <span style="margin-left: auto; font-weight: 800; color: var(--text);">${task.progress}%</span>
+          </div>
+
+          <!-- 标题 (为右上角 Detail 预留 32px 空间防止冲突) -->
+          <div class="card-title" title="${task.title}">
+            ${task.title}
+          </div>
+
+          <!-- ========================================== -->
+          <!-- 【站点连线式进度表达】 (Workflow Nodes Timeline) -->
+          <!-- ========================================== -->
+          <div class="workflow-timeline">
+            <div class="timeline-progress-line" style="width: ${progressPercentage}%"></div>
+            ${task.nodes.map(node => {
+              let nodeClass = "timeline-node";
+              if (node.status === "done") nodeClass += " done";
+              else if (node.status === "running") nodeClass += " running";
+              else if (node.status === "attention") nodeClass += " attention";
+              else if (node.status === "failed") nodeClass += " failed";
+              
+              return `<div class="${nodeClass}" data-node-name="${node.name}"></div>`;
+            }).join('')}
+          </div>
+
+          <!-- 卡片底部 Meta -->
+          <div class="card-footer" style="margin-top: 18px;">
+            <span style="color: ${statusColor}; font-weight: 800;">${task.statusLabel}</span>
+            <span>·</span>
+            <span>${task.member}</span>
+          </div>
+
+          <!-- 右上角毛玻璃圆形 Detail 按钮 -->
+          <button class="glass-detail-btn" title="查看《${task.title}》任务详情" onclick="onDetailBtnClick(event, '${task.key}')">
+            <!-- 右向箭头图标 -->
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"></path>
+            </svg>
+          </button>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    // Detail 按钮专属点击事件
+    function onDetailBtnClick(event, taskKey) {
+      event.stopPropagation(); // 阻止冒泡给 card.onclick
+      event.preventDefault();
+
+      state.focusedTaskKey = taskKey;
+      state.focusedBoundTask = true;
+      state.drawerOpen = true;
+
+      // 移动端如果点击了 Detail，我们先关闭底栏抽屉，然后提示并在侧边栏展示
+      if (state.deviceView === "mobile") {
+        openMobileBottomSheet(false);
+      }
+
+      showToast(`⚡ 成功点击 Detail：打开右侧 Studio Drawer 详情并聚焦 ${taskKey}`);
+      render();
+    }
+
+    // 更新任务球视觉与动效
+    function updateBallVisual(urgency) {
+      const ball = document.getElementById("desktop-widget-ball");
+      let bg = "var(--accent)";
+      let glow = "var(--accent-glow)";
+      let animationClass = "";
+
+      if (urgency === "needs_user") {
+        bg = "var(--color-warning)";
+        glow = "rgba(245, 158, 11, 0.4)";
+        if (!state.reducedMotion) animationClass = "animate-pulse-attention";
+      } else if (urgency === "failed") {
+        bg = "var(--color-danger)";
+        glow = "rgba(239, 68, 68, 0.4)";
+      } else if (urgency === "running") {
+        bg = "var(--accent)";
+        glow = "var(--accent-glow)";
+        if (!state.reducedMotion) animationClass = "animate-halo-running";
+      }
+
+      ball.style.backgroundColor = bg;
+      ball.style.boxShadow = `0 4px 20px ${glow}`;
+      
+      // 保持球的拖拽类名与尺寸
+      ball.className = `studio-widget-ball ${animationClass}`;
+    }
+
+    // 数据过滤
+    function getActiveTasks() {
+      if (state.taskCountMode === "single") {
+        return [mockTasks[0]];
+      }
+      return mockTasks;
+    }
+
+    // 获最高紧急度
+    function getHighestUrgency(tasks) {
+      if (tasks.some(t => t.urgency === "needs_user")) return "needs_user";
+      if (tasks.some(t => t.urgency === "failed")) return "failed";
+      if (tasks.some(t => t.urgency === "running")) return "running";
+      return "idle";
+    }
+
+    // ========================================== */
+    // 交互操作命令
+    // ========================================== */
+    function setTaskCount(mode) {
+      state.taskCountMode = mode;
+      render();
+      showToast(`任务列表切换为：${mode === 'single' ? '单任务' : '多任务 (3个)'}`);
+    }
+
+    function setWidgetPresentation(pres) {
+      state.presentation = pres;
+      render();
+      showToast(`任务面板展示形态切换为：${pres === 'expanded' ? '展开面板' : '收纳任务球'}`);
+    }
+
+    function collapseWidget() {
+      setWidgetPresentation("collapsed");
+    }
+
+    function expandWidget() {
+      // 如果发生明显拖动，不触发展开
+      if (dragData.draggedDistance > DRAG_THRESHOLD) return;
+      setWidgetPresentation("expanded");
+    }
+
+    function toggleDrawerState() {
+      state.drawerOpen = !state.drawerOpen;
+      render();
+    }
+
+    function closeDrawer() {
+      state.drawerOpen = false;
+      render();
+    }
+
+    function setFocusBound(val) {
+      state.focusedBoundTask = val;
+      if (val) {
+        state.focusedTaskKey = "task-1";
+      } else {
+        state.focusedTaskKey = "task-external-unknown";
+      }
+      render();
+    }
+
+    function setUrgency(val) {
+      state.urgency = val;
+      render();
+    }
+
+    function setDeviceView(view) {
+      state.deviceView = view;
+      const viewport = document.getElementById("viewport-container");
+      if (view === "mobile") {
+        viewport.style.width = "375px";
+        viewport.style.margin = "0 auto";
+      } else {
+        viewport.style.width = "100%";
+        viewport.style.margin = "0";
+      }
+      render();
+      showToast(`设备视图切换为：${view === 'desktop' ? '桌面端' : '移动端'}`);
+    }
+
+    function setReducedMotion(val) {
+      state.reducedMotion = val;
+      if (val) {
+        document.body.classList.add("reduced-motion-active");
+      } else {
+        document.body.classList.remove("reduced-motion-active");
+      }
+      render();
+      showToast(`无障碍减弱动效：${val ? '开启' : '关闭'}`);
+    }
+
+    function setDarkMode(val) {
+      state.darkMode = val;
+      if (val) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+      showToast(`深色模式：${val ? '开启' : '关闭'}`);
+    }
+
+    function openMobileBottomSheet(open) {
+      const overlay = document.getElementById("mobile-sheet-overlay");
+      if (open) {
+        overlay.classList.add("open");
+      } else {
+        overlay.classList.remove("open");
+      }
+    }
+
+    // ========================================== */
+    // 拖动逻辑封装
+    // ========================================== */
+    function initDrag(handle, target) {
+      handle.addEventListener("pointerdown", (e) => {
+        if (state.deviceView !== "desktop") return;
+        // 避开任何按钮操作
+        if (e.target.closest("button")) return;
+
+        dragData.isDragging = true;
+        dragData.startX = e.clientX;
+        dragData.startY = e.clientY;
+        dragData.draggedDistance = 0;
+        dragData.activeElement = target;
+
+        const rect = target.getBoundingClientRect();
+        const parentRect = document.getElementById("workspace-container").getBoundingClientRect();
+
+        dragData.initialLeft = rect.left - parentRect.left;
+        dragData.initialTop = rect.top - parentRect.top;
+
+        target.style.transition = "none";
+        handle.setPointerCapture(e.pointerId);
+      });
+
+      handle.addEventListener("pointermove", (e) => {
+        if (!dragData.isDragging || dragData.activeElement !== target) return;
+
+        const dx = e.clientX - dragData.startX;
+        const dy = e.clientY - dragData.startY;
+        dragData.draggedDistance = Math.hypot(dx, dy);
+
+        let left = dragData.initialLeft + dx;
+        let top = dragData.initialTop + dy;
+
+        const parentRect = document.getElementById("workspace-container").getBoundingClientRect();
+        const maxLeft = parentRect.width - target.offsetWidth - 16;
+        const maxTop = parentRect.height - target.offsetHeight - 16;
+
+        left = Math.min(Math.max(16, left), maxLeft);
+        top = Math.min(Math.max(16, top), maxTop);
+
+        target.style.left = `${left}px`;
+        target.style.top = `${top}px`;
+        target.style.right = "auto";
+      });
+
+      handle.addEventListener("pointerup", (e) => {
+        if (!dragData.isDragging) return;
+        handle.releasePointerCapture(e.pointerId);
+        target.style.transition = "opacity var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast)";
+        dragData.isDragging = false;
+        dragData.activeElement = null;
+      });
+    }
+
+    // 控制面板按钮高亮状态同步
+    function updateControlButtons() {
+      // 任务数量
+      document.getElementById("btn-single-task").className = `btn ${state.taskCountMode === 'single' ? 'active' : ''}`;
+      document.getElementById("btn-multi-task").className = `btn ${state.taskCountMode === 'multi' ? 'active' : ''}`;
+
+      // 展示形态
+      document.getElementById("btn-widget-expand").className = `btn ${state.presentation === 'expanded' ? 'active' : ''}`;
+      document.getElementById("btn-widget-collapse").className = `btn ${state.presentation === 'collapsed' ? 'active' : ''}`;
+
+      // 设备视图
+      document.getElementById("btn-device-desktop").className = `btn ${state.deviceView === 'desktop' ? 'active' : ''}`;
+      document.getElementById("btn-device-mobile").className = `btn ${state.deviceView === 'mobile' ? 'active' : ''}`;
+
+      // 避让命中
+      document.getElementById("btn-focus-yes").className = `btn ${state.focusedBoundTask ? 'active' : ''}`;
+      document.getElementById("btn-focus-no").className = `btn ${!state.focusedBoundTask ? 'active' : ''}`;
+
+      // 抽屉联动设置的显示
+      const focusArea = document.getElementById("drawer-focus-area");
+      if (state.drawerOpen) {
+        focusArea.classList.remove("hidden");
+      } else {
+        focusArea.classList.add("hidden");
+      }
+    }
+
+    // 吐司提示
+    let toastTimer;
+    function showToast(msg) {
+      const toast = document.getElementById("toast-notify");
+      toast.innerText = msg;
+      toast.style.display = "block";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.style.display = "none";
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

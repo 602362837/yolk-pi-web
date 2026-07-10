@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>项目切换体验优化 UI 原型 v2 - FileExplorer 整合至预览区</title>
+  <style>
+    /* CSS Variables matching app/globals.css style */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f9fafb;
+      --bg-subtle: rgba(0,0,0,0.03);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace;
+    }
+
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --assistant-bg: #1a1a1a;
+      --tool-bg: #1f2937;
+      --bg-subtle: rgba(255,255,255,0.04);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top control panel just for the prototype review experience */
+    .prototype-controls {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 1000;
+      font-size: 12px;
+      border-bottom: 1px solid #313244;
+      flex-shrink: 0;
+    }
+    .prototype-btn {
+      background: #45475a;
+      color: #cdd6f4;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: background 0.15s;
+    }
+    .prototype-btn:hover {
+      background: #585b70;
+    }
+    .prototype-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+    .prototype-badge {
+      background: #a6e3a1;
+      color: #11111b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 10px;
+    }
+
+    /* App Main Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar: Space Switch Header (unmoved!) + Session List (skeleton support) */
+    .sidebar {
+      width: 280px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s;
+    }
+    
+    /* Unchanged top selection area from AppShell/SessionSidebar header */
+    .sidebar-project-header {
+      padding: 12px 10px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .space-switch-btn {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: 7px;
+      padding: 6px 10px;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .space-switch-btn:hover {
+      background: var(--bg-hover);
+    }
+    .space-switch-logo {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      font-weight: 700;
+      fontSize: 13px;
+    }
+    .space-switch-meta {
+      min-width: 0;
+      flex: 1;
+    }
+    .space-switch-title {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .space-switch-subtitle {
+      display: block;
+      margin-top: 1px;
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .sidebar-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      height: 32px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 500;
+      flex-shrink: 0;
+      transition: background 0.12s, color 0.12s;
+    }
+    .sidebar-btn:hover {
+      background: var(--bg-selected);
+      color: var(--accent);
+    }
+    .sidebar-btn.action-new {
+      padding-left: 10px;
+      padding-right: 12px;
+      flex: 1;
+    }
+    .sidebar-btn.action-wt {
+      padding-left: 9px;
+      padding-right: 10px;
+    }
+    .sidebar-btn.action-refresh {
+      width: 32px;
+    }
+    .sidebar-btn.action-menu {
+      width: 32px;
+    }
+
+    /* Session List Container */
+    .sidebar-list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .sidebar-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+      padding: 4px 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .session-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      gap: 8px;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 12px;
+      transition: background 0.1s;
+    }
+    .session-item:hover {
+      background: var(--bg-hover);
+    }
+    .session-item.active {
+      background: var(--bg-selected);
+      border-left: 3px solid var(--accent);
+      padding-left: 9px;
+    }
+    .session-icon {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .session-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-time {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* P2 Skeleton Rows (Disable list interaction) */
+    .skeleton-container {
+      padding: 0 10px;
+      pointer-events: none;
+      user-select: none;
+    }
+    .skeleton-row {
+      height: 32px;
+      background: var(--bg-subtle);
+      border-radius: 6px;
+      margin: 8px 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .skeleton-row::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      animation: skeleton-shimmer 1.5s infinite;
+      transform: translateX(-100%);
+    }
+    @keyframes skeleton-shimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    /* Sidebar Footer (Trellis Info and bulk archive only. NO FILEEXPLORER!) */
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 10px;
+      background: var(--bg-panel);
+      flex-shrink: 0;
+    }
+    .trellis-prompt {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(37,99,235,0.24);
+      background: rgba(37,99,235,0.06);
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .trellis-prompt-title {
+      color: var(--text);
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .trellis-prompt-btn {
+      width: 100%;
+      margin-top: 6px;
+      background: var(--accent);
+      border: none;
+      color: white;
+      padding: 4px 0;
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    /* Middle Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    .chat-header {
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      background: var(--bg);
+      justify-content: space-between;
+    }
+    .chat-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .message {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: var(--user-bg);
+      border: 1px solid var(--border);
+    }
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--assistant-bg);
+      border: 1px solid var(--border);
+    }
+    .chat-input-container {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chat-input-wrapper {
+      display: flex;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      resize: none;
+      font-family: inherit;
+      outline: none;
+      font-size: 13px;
+    }
+
+    /* Right Preview Area / Panel Container */
+    .right-panel-container {
+      width: 440px;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.2s, opacity 0.15s;
+    }
+    .right-panel-container.closed {
+      width: 0 !important;
+      opacity: 0;
+      border-left: none;
+      pointer-events: none;
+    }
+
+    /* --- NEW P3 DESIGN: File Explorer inside right panel atop TabBar (files mode only) --- */
+    .preview-explorer-container {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      transition: flex-basis 0.2s;
+    }
+    
+    .preview-explorer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 32px;
+      background: var(--bg-panel);
+      padding: 0 10px;
+      flex-shrink: 0;
+    }
+    
+    .preview-explorer-title-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+    }
+    .preview-explorer-title-btn:hover {
+      color: var(--text);
+    }
+    
+    .preview-explorer-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .preview-explorer-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      border-radius: 4px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .preview-explorer-btn:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+    
+    /* File Tree Demo area */
+    .preview-explorer-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+    .tree-node {
+      padding: 3px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .tree-node:hover {
+      color: var(--text);
+    }
+    
+    /* Resizer at the bottom of FileExplorer inside Right Panel */
+    .preview-explorer-resizer {
+      height: 5px;
+      cursor: row-resize;
+      background: transparent;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .preview-explorer-resizer:hover {
+      background: rgba(37,99,235,0.15);
+    }
+
+    /* Tab Bar row (existing files tab strip) */
+    .preview-tab-strip {
+      height: 36px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .preview-tabs {
+      display: flex;
+      gap: 16px;
+    }
+    .preview-tab {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--text-muted);
+      cursor: pointer;
+      position: relative;
+      padding: 9px 0;
+    }
+    .preview-tab.active {
+      color: var(--text);
+    }
+    .preview-tab.active::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+    }
+
+    /* Preview content area */
+    .preview-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .preview-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .preview-placeholder {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      gap: 8px;
+    }
+
+    /* Right Panel Strip Toggles (Floating panel switcher) */
+    .toggle-strip {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 600;
+      display: flex;
+    }
+    .toggle-strip-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-panel);
+      border: none;
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .toggle-strip-btn:hover {
+      color: var(--text);
+    }
+    .toggle-strip-btn.active {
+      color: var(--accent);
+      background: var(--bg);
+    }
+
+    /* Project Space Switch Dialog Mockup (Triggers from sidebar header) */
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .dialog-overlay.open {
+      display: flex;
+    }
+    .dialog-content {
+      width: 480px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dialog-header {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dialog-close {
+      cursor: pointer;
+      color: var(--text-dim);
+      border: none;
+      background: transparent;
+    }
+    .dialog-search {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text);
+      border-radius: 6px;
+      outline: none;
+    }
+    .dialog-project-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .dialog-project-title {
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .dialog-space-option {
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dialog-space-option:hover {
+      background: var(--bg-hover);
+    }
+    .dialog-space-option.selected {
+      background: var(--bg-selected);
+      font-weight: 600;
+    }
+
+    /* Workspace menu inside sidebar */
+    .session-sidebar-floating-menu {
+      position: absolute;
+      left: 10px;
+      top: 96px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 500;
+      min-width: 190px;
+      padding: 4px 0;
+      display: none;
+    }
+    .session-sidebar-floating-menu.open {
+      display: block;
+    }
+
+    /* Tooltip */
+    .custom-tooltip {
+      position: absolute;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      z-index: 1100;
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      max-width: 250px;
+      display: none;
+      white-space: pre-line;
+      line-height: 1.4;
+      border: 1px solid #313244;
+    }
+    .tooltip-active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PROTOTYPE CONTROLS -->
+  <div class="prototype-controls">
+    <span class="prototype-badge">UI 原型 v2 (已修正)</span>
+    <span>场景/数据模拟:</span>
+    <button class="prototype-btn active" onclick="switchContext('normal')">A. 蛋黄派 Web (默认)</button>
+    <button class="prototype-btn" onclick="switchContext('worktree')">B. WT: main (工作树)</button>
+    <button class="prototype-btn" onclick="switchContext('missing')">C. default (路径缺失)</button>
+    <button class="prototype-btn" onclick="switchContext('long')">D. 长项目名省略</button>
+    
+    <span style="margin-left: 12px;">P2 列表加载:</span>
+    <button class="prototype-btn" id="btn-toggle-skeleton" onclick="toggleSessionListLoading()">开启 Skeleton 占位</button>
+
+    <span style="margin-left: auto;">主题:</span>
+    <button class="prototype-btn" onclick="toggleTheme()">切换明/暗主题</button>
+
+    <span>预览面板:</span>
+    <button class="prototype-btn active" id="ctrl-panel-state" onclick="toggleRightPanel()">显示预览面板</button>
+  </div>
+
+  <div class="app-container">
+
+    <!-- LEFT SIDEBAR: Space Switch Header (unmoved) + Session List -->
+    <div class="sidebar" id="app-sidebar">
+      
+      <!-- Unmoved Space switch trigger at the top of the sidebar -->
+      <div class="sidebar-project-header">
+        <button class="space-switch-btn" id="sidebar-space-trigger" onclick="openSwitchDialog()">
+          <span class="space-switch-logo">⌘</span>
+          <span class="space-switch-meta">
+            <span class="space-switch-title" id="display-project-name">蛋黄派 Web UI</span>
+            <span class="space-switch-subtitle" id="display-space-subtitle">空间：main · 分支：feature-ui-optimize</span>
+          </span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style="flex-shrink: 0;">
+            <polyline points="2 3.5 5 6.5 8 3.5" />
+          </svg>
+        </button>
+
+        <div class="sidebar-actions">
+          <button class="sidebar-btn action-new" onclick="alert('新建会话')">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="6" y1="1" x2="6" y2="11" /><line x1="1" y1="6" x2="11" y2="6" />
+            </svg>
+            New
+          </button>
+          <button class="sidebar-btn action-wt" id="wt-btn" onclick="alert('WorkTree 创建面板')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6" cy="18" r="3" /><circle cx="18" cy="6" r="3" />
+              <path d="M6 15V9a3 3 0 0 1 3-3h6" /><path d="M9 18h6a3 3 0 0 0 3-3V9" />
+            </svg>
+            WT
+          </button>
+          <button class="sidebar-btn action-refresh" onclick="simulateRefreshList()" title="手动刷新">
+            ⟳
+          </button>
+          <button class="sidebar-btn action-menu" onclick="toggleSidebarMenu()" title="Workspace actions">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Workspace Actions Floating Menu -->
+      <div class="session-sidebar-floating-menu" id="sidebar-workspace-menu">
+        <div style="padding: 6px 12px; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">Workspace Actions</div>
+        <div style="height: 1px; background: var(--border); margin: 4px 0;"></div>
+        <div class="session-item" onclick="mockAction('编辑项目元数据')">✏️ 编辑项目元数据…</div>
+        <div class="session-item" onclick="mockAction('编辑空间元数据')">✏️ 编辑空间元数据…</div>
+        <div class="session-item" onclick="mockAction('归档所有会话')">📦 归档所有会话</div>
+        <div style="height: 1px; background: var(--border); margin: 4px 0;"></div>
+        <div class="session-item" style="color: #ef4444;" onclick="mockAction('归档当前空间')">🗄️ 归档当前空间</div>
+      </div>
+
+      <!-- Session List with skeleton overlay -->
+      <div class="sidebar-list-container">
+        
+        <!-- Normal Session List -->
+        <div id="normal-session-list">
+          <div class="sidebar-section-title">会话列表</div>
+          <div class="session-item active" onclick="selectSession('session-1')">
+            <span class="session-icon">💬</span>
+            <span class="session-name">优化项目切换体验设计</span>
+            <span class="session-time">10m ago</span>
+          </div>
+          <div class="session-item" onclick="selectSession('session-2')">
+            <span class="session-icon">💬</span>
+            <span class="session-name">Trellis 面板多端适配</span>
+            <span class="session-time">2h ago</span>
+          </div>
+          <div class="session-item" onclick="selectSession('session-3')">
+            <span class="session-icon">💬</span>
+            <span class="session-name">修复 WorkTree 状态同步</span>
+            <span class="session-time">Yesterday</span>
+          </div>
+        </div>
+
+        <!-- Skeleton Loader (P2 Loading State) -->
+        <div id="skeleton-session-list" class="skeleton-container" style="display: none;">
+          <div class="sidebar-section-title">正在载入会话...</div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer (NO FileExplorer, only Trellis setup and list status) -->
+      <div class="sidebar-footer">
+        <div class="trellis-prompt">
+          <div class="trellis-prompt-title">🌿 Trellis 状态</div>
+          <span>开发环境完备，未开启本地 Task</span>
+          <button class="trellis-prompt-btn" onclick="alert('已在新终端填入 trellis task')">开启 Trellis Task</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIDDLE CHAT AREA -->
+    <div class="chat-area">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <span style="font-weight: bold;">💬 Chat Window</span>
+          <span style="color: var(--text-dim); font-size: 11px;" id="chat-session-subtitle"># 优化项目切换体验设计</span>
+        </div>
+        <div class="chat-header-right">
+          <span style="color: var(--text-muted); font-size: 11px;">Studio Mode</span>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chat-messages-box">
+        <div class="message assistant">
+          你好！我是 UI 设计员。我们正在对<strong>项目空间切换与 FileExplorer 整合</strong>进行原型确认：
+          <br><br>
+          1. <strong>侧边栏顶部 (Space switch)</strong> 保持原位未改动，切换操作均在左上角触发。<br>
+          2. <strong>侧边栏底部 (FileExplorer)</strong> 已彻底移出，为 Session 列表腾出空间。<br>
+          3. <strong>FileExplorer 迁到了右侧预览面板顶部</strong> (仅 Files 模式显示)，支持独立折叠和刷新，并且下方保持 fileTabs 与文件阅读体验。
+        </div>
+        <div class="message user">
+          非常不错！试一下右侧 FileExplorer 的折叠。
+        </div>
+      </div>
+
+      <div class="chat-input-container">
+        <div class="chat-input-wrapper">
+          <textarea class="chat-input" placeholder="按 Enter 发送，或点击上方切换项目演示..." rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL CONTAINER (PREVIEW / FILES / STUDIO / TRELLIS) -->
+    <div class="right-panel-container" id="right-panel">
+      
+      <!-- P3 NEW BLOCK: File Explorer inside right panel (only shown in Files mode) -->
+      <div class="preview-explorer-container" id="preview-explorer">
+        <!-- Title row -->
+        <div class="preview-explorer-header">
+          <button class="preview-explorer-title-btn" onclick="toggleExplorerCollapse()">
+            <!-- Rotate arrow based on open state -->
+            <svg id="explorer-arrow-svg" width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style="transform: rotate(90deg); transition: transform 0.15s;">
+              <polyline points="3 2 7 5 3 8" />
+            </svg>
+            项目空间文件
+          </button>
+          
+          <div class="preview-explorer-actions">
+            <!-- Refresh button with 2s green-check success feedback -->
+            <button class="preview-explorer-btn" id="explorer-refresh-btn" onclick="triggerExplorerRefresh()" title="刷新空间信息">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
+              </svg>
+            </button>
+            <button class="preview-explorer-btn" onclick="toggleExplorerCollapse()" title="折叠/展开">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- File tree demo (hidden when collapsed) -->
+        <div class="preview-explorer-tree" id="preview-explorer-tree-content" style="height: 160px;">
+          <div class="tree-node">▶ components</div>
+          <div class="tree-node">▶ hooks</div>
+          <div class="tree-node">▼ .ypi</div>
+          <div class="tree-node" style="padding-left: 12px;">▼ tasks</div>
+          <div class="tree-node" style="padding-left: 24px; color: var(--text);">📄 ui-prototype-v2.html</div>
+          <div class="tree-node" style="padding-left: 24px;">📄 prd.md</div>
+          <div class="tree-node" style="padding-left: 24px;">📄 design.md</div>
+        </div>
+
+        <!-- Resizer drag handle -->
+        <div class="preview-explorer-resizer" title="Drag to resize explorer / preview viewer height"></div>
+      </div>
+
+      <!-- Preview Content Area (TabBar + Content view) -->
+      <div class="preview-content">
+        <div class="preview-tab-strip">
+          <div class="preview-tabs">
+            <div class="preview-tab active" onclick="switchPreviewMode('files')">预览 (Files)</div>
+            <div class="preview-tab" onclick="switchPreviewMode('studio')">工作室 (Studio)</div>
+            <div class="preview-tab" onclick="switchPreviewMode('trellis')">Trellis</div>
+          </div>
+        </div>
+
+        <div class="preview-body" id="preview-viewport">
+          <div id="preview-files-content" style="height: 100%;">
+            <div style="font-family: var(--font-mono); font-size: 11px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; height: 100%; overflow-y: auto;">
+              <span style="color: #008000;">// Previewing: ui-prototype-v2.html</span><br>
+              &lt;<span style="color: #000080;">div</span> <span style="color: #ff0000;">className</span>=<span style="color: #0000ff;">"preview-explorer-container"</span>&gt;<br>
+              &nbsp;&nbsp;&lt;<span style="color: #000080;">div</span> <span style="color: #ff0000;">className</span>=<span style="color: #0000ff;">"preview-explorer-header"</span>&gt;<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;...<br>
+              &nbsp;&nbsp;&lt;/<span style="color: #000080;">div</span>&gt;<br>
+              &nbsp;&nbsp;{explorerOpen && &lt;<span style="color: #000080;">FileExplorer</span> cwd={explorerCwd} /&gt;}<br>
+              &lt;/<span style="color: #000080;">div</span>&gt;
+            </div>
+          </div>
+
+          <div id="preview-studio-content" style="display: none; height: 100%;">
+            <div class="preview-placeholder">
+              <span style="font-size: 24px;">💼</span>
+              <strong>Studio Panel</strong>
+              <span style="font-size: 11px;">YPI Studio Member settings & task progression.</span>
+            </div>
+          </div>
+
+          <div id="preview-trellis-content" style="display: none; height: 100%;">
+            <div class="preview-placeholder">
+              <span style="font-size: 24px;">🌿</span>
+              <strong>Trellis Tasks Panel</strong>
+              <span style="font-size: 11px;">Initialize development environment and coordinate execution.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FLOATING PREVIEW SWITCH TOGGLE -->
+  <div class="toggle-strip">
+    <button class="toggle-strip-btn active" id="toggle-panel-btn" onclick="toggleRightPanel()" title="显示/隐藏 预览面板">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- SWITCH SPACE DIALOG (Triggers from sidebar space button) -->
+  <div class="dialog-overlay" id="switch-dialog" onclick="closeSwitchDialog()">
+    <div class="dialog-content" onclick="event.stopPropagation()">
+      <div class="dialog-header">
+        <span>切换项目或空间</span>
+        <button class="dialog-close" onclick="closeSwitchDialog()">✕</button>
+      </div>
+      <input type="text" class="dialog-search" placeholder="搜索项目、空间或路径...">
+      
+      <div style="overflow-y: auto; max-height: 280px; margin-top: 8px;">
+        <!-- Project 1 -->
+        <div class="dialog-project-item">
+          <div class="dialog-project-title">
+            <span>⭐ 蛋黄派 Web UI</span>
+            <span style="font-size: 10px; color: var(--text-dim);">/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web</span>
+          </div>
+          <div class="dialog-space-option selected" onclick="selectSpace('normal')">
+            <span>📍 main (默认空间)</span>
+            <span style="font-size: 10px; color: var(--text-muted);">分支: feature-ui-optimize</span>
+          </div>
+          <div class="dialog-space-option" onclick="selectSpace('worktree')">
+            <span>🌿 WT: main (工作树)</span>
+            <span style="color: var(--accent); font-size: 10px; font-weight: bold;">WT: main</span>
+          </div>
+        </div>
+
+        <!-- Project 2 -->
+        <div class="dialog-project-item">
+          <div class="dialog-project-title">
+            <span>📁 cloudflare-deploy-tool</span>
+            <span style="font-size: 10px; color: var(--text-dim);">~/.pi/agent/cloudflare-deploy</span>
+          </div>
+          <div class="dialog-space-option" onclick="selectSpace('missing')">
+            <span>📍 default (路径缺失)</span>
+            <span style="color: #dc2626; font-size: 10px;">⚠️ 路径缺失</span>
+          </div>
+        </div>
+
+        <!-- Project 3 -->
+        <div class="dialog-project-item">
+          <div class="dialog-project-title">
+            <span>⭐ long-project-name-overflowing-the-container-visuals</span>
+            <span style="font-size: 10px; color: var(--text-dim);">/Volumes/01/Projects/long-name-repo</span>
+          </div>
+          <div class="dialog-space-option" onclick="selectSpace('long')">
+            <span>📍 main</span>
+            <span style="font-size: 10px; color: var(--text-muted);">分支: dev</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hover Tooltip Element -->
+  <div class="custom-tooltip" id="tooltip"></div>
+
+  <!-- INTERACTIVITY JAVASCRIPT -->
+  <script>
+    let isThemeDark = false;
+    let isExplorerOpen = true;
+    let isRightPanelOpen = true;
+    let isListLoading = false;
+    let sidebarMenuOpen = false;
+
+    // Theme Management
+    function toggleTheme() {
+      isThemeDark = !isThemeDark;
+      if (isThemeDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+
+    // Toggle entire Right Panel
+    function toggleRightPanel() {
+      const panel = document.getElementById('right-panel');
+      const btn = document.getElementById('toggle-panel-btn');
+      const ctrlBtn = document.getElementById('ctrl-panel-state');
+      
+      isRightPanelOpen = !isRightPanelOpen;
+      if (isRightPanelOpen) {
+        panel.classList.remove('closed');
+        btn.classList.add('active');
+        ctrlBtn.textContent = '隐藏预览面板';
+        ctrlBtn.classList.add('active');
+      } else {
+        panel.classList.add('closed');
+        btn.classList.remove('active');
+        ctrlBtn.textContent = '显示预览面板';
+        ctrlBtn.classList.remove('active');
+      }
+    }
+
+    // P2 Loading Simulator: Skeleton Toggle
+    function toggleSessionListLoading() {
+      const list = document.getElementById('normal-session-list');
+      const skeleton = document.getElementById('skeleton-session-list');
+      const toggleBtn = document.getElementById('btn-toggle-skeleton');
+
+      isListLoading = !isListLoading;
+      if (isListLoading) {
+        list.style.display = 'none';
+        skeleton.style.display = 'block';
+        toggleBtn.textContent = '关闭 Skeleton 占位';
+        toggleBtn.classList.add('active');
+      } else {
+        list.style.display = 'block';
+        skeleton.style.display = 'none';
+        toggleBtn.textContent = '开启 Skeleton 占位';
+        toggleBtn.classList.remove('active');
+      }
+    }
+
+    // Simulate sidebar list refreshing
+    function simulateRefreshList() {
+      toggleSessionListLoading();
+      setTimeout(() => {
+        toggleSessionListLoading();
+      }, 1200);
+    }
+
+    // Fold / Unfold the File Explorer atop preview area (P3-3)
+    function toggleExplorerCollapse() {
+      const explorer = document.getElementById('preview-explorer');
+      const tree = document.getElementById('preview-explorer-tree-content');
+      const arrow = document.getElementById('explorer-arrow-svg');
+      
+      isExplorerOpen = !isExplorerOpen;
+      if (isExplorerOpen) {
+        tree.style.display = 'block';
+        arrow.style.transform = 'rotate(90deg)';
+        explorer.style.flexBasis = 'auto';
+      } else {
+        tree.style.display = 'none';
+        arrow.style.transform = 'none';
+        explorer.style.flexBasis = '32px'; // Height of header row only
+      }
+    }
+
+    // Refresh Button 2s check feedback (P3-5)
+    function triggerExplorerRefresh() {
+      const btn = document.getElementById('explorer-refresh-btn');
+      btn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      `;
+      btn.style.background = 'rgba(74,222,128,0.18)';
+      
+      setTimeout(() => {
+        btn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
+          </svg>
+        `;
+        btn.style.background = 'transparent';
+      }, 2000);
+    }
+
+    // Workspace actions Menu inside sidebar
+    function toggleSidebarMenu() {
+      sidebarMenuOpen = !sidebarMenuOpen;
+      const menu = document.getElementById('sidebar-workspace-menu');
+      if (sidebarMenuOpen) {
+        menu.classList.add('open');
+      } else {
+        menu.classList.remove('open');
+      }
+    }
+
+    // Modal Switch Dialog
+    function openSwitchDialog() {
+      document.getElementById('switch-dialog').classList.add('open');
+    }
+    function closeSwitchDialog() {
+      document.getElementById('switch-dialog').classList.remove('open');
+    }
+
+    // Mock Contexts Data
+    const contexts = {
+      normal: {
+        title: '蛋黄派 Web UI',
+        subtitle: '空间：main · 分支：feature-ui-optimize',
+        tooltip: '项目路径: /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web\n空间: main\n分支: feature-ui-optimize\nWorkTree: 否',
+        wtBadge: false
+      },
+      worktree: {
+        title: '蛋黄派 Web UI',
+        subtitle: '空间：WT: main · WorkTree：main',
+        tooltip: '项目路径: /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/worktrees/main\n空间: WT: main\n分支: main\nWorkTree: 是\n基准: main',
+        wtBadge: 'WT: main'
+      },
+      missing: {
+        title: 'cloudflare-deploy-tool',
+        subtitle: '空间：default · ⚠️ 路径缺失',
+        tooltip: '项目路径: ~/.pi/agent/cloudflare-deploy (已丢失/未挂载)\n空间: default\nWorkTree: 否',
+        wtBadge: false
+      },
+      long: {
+        title: 'long-project-name-overflowing-the-container-visuals-long-long-long-long-name',
+        subtitle: '空间：main · 分支：dev-environment-setup-validation-and-regression',
+        tooltip: '项目路径: /Volumes/01/Projects/long-name-repo\n空间: main\n分支: dev-environment-setup-validation',
+        wtBadge: false
+      }
+    };
+
+    let activeContextKey = 'normal';
+
+    function switchContext(key) {
+      activeContextKey = key;
+      const ctx = contexts[key];
+      
+      // Update UI title and subtitle
+      document.getElementById('display-project-name').textContent = ctx.title;
+      document.getElementById('display-space-subtitle').textContent = ctx.subtitle;
+
+      // Update active control button
+      document.querySelectorAll('.prototype-controls .prototype-btn').forEach(btn => {
+        if (btn.textContent.includes(key === 'normal' ? 'A.' : key === 'worktree' ? 'B.' : key === 'missing' ? 'C.' : 'D.')) {
+          btn.classList.add('active');
+        } else if (!btn.textContent.includes('主题') && !btn.textContent.includes('面板') && !btn.textContent.includes('Skeleton')) {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Dialog option highlight matching
+      document.querySelectorAll('.dialog-space-option').forEach(opt => {
+        opt.classList.remove('selected');
+      });
+
+      // Simulates P1 - Session reset & Right panel closes, list shimmers
+      const chatBox = document.getElementById('chat-messages-box');
+      const chatSubtitle = document.getElementById('chat-session-subtitle');
+      
+      // Reset Chat to empty state
+      chatSubtitle.textContent = `# (空会话 - ${ctx.title})`;
+      chatBox.innerHTML = `
+        <div class="message assistant" style="border-style: dashed; opacity: 0.85;">
+          🌿 <strong>新空间已加载</strong>
+          <br>
+          当前会话已被干净重置，URL 上的旧会话标识已清空。您可以开始在此空间下的新会话发送首条 Prompts。
+        </div>
+      `;
+
+      // Auto close right panel as per P1-1 requirements, but keep visual prototype review easy to understand
+      alert(`P1 触发：已切换到新空间。\n- 清空当前 session 并清空 URL params\n- 聊天区已进入空会话状态\n- (实际系统内此时将自动关闭右面板，此处为原型演示保持开启)`);
+
+      // Close dialog
+      closeSwitchDialog();
+    }
+
+    function selectSpace(key) {
+      switchContext(key);
+    }
+
+    function mockAction(name) {
+      alert(`已触发 Action: ${name}`);
+      const menu = document.getElementById('sidebar-workspace-menu');
+      menu.classList.remove('open');
+      sidebarMenuOpen = false;
+    }
+
+    // Preview Mode tabs switcher (P3 Explorer only shows in 'files' mode)
+    function switchPreviewMode(mode) {
+      document.querySelectorAll('.preview-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.textContent.toLowerCase().includes(mode)) {
+          tab.classList.add('active');
+        }
+      });
+
+      document.getElementById('preview-files-content').style.display = mode === 'files' ? 'block' : 'none';
+      document.getElementById('preview-studio-content').style.display = mode === 'studio' ? 'block' : 'none';
+      document.getElementById('preview-trellis-content').style.display = mode === 'trellis' ? 'block' : 'none';
+
+      // Hide Explorer top panel in studio/trellis modes!
+      const explorerPanel = document.getElementById('preview-explorer');
+      explorerPanel.style.display = mode === 'files' ? 'flex' : 'none';
+    }
+
+    // Setup Custom Tooltip behavior for long project name and details hover
+    const triggerBtn = document.getElementById('sidebar-space-trigger');
+    const tooltip = document.getElementById('tooltip');
+
+    triggerBtn.addEventListener('mousemove', (e) => {
+      const ctx = contexts[activeContextKey];
+      tooltip.textContent = ctx.tooltip;
+      tooltip.classList.add('tooltip-active');
+      tooltip.style.left = `${e.clientX + 15}px`;
+      tooltip.style.top = `${e.clientY + 15}px`;
+    });
+
+    triggerBtn.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('tooltip-active');
+    });
+
+    // Close workspace actions dropdown on clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('sidebar-workspace-menu');
+      const menuBtn = document.querySelector('.action-menu');
+      if (menu && menuBtn && !menu.contains(e.target) && !menuBtn.contains(e.target)) {
+        menu.classList.remove('open');
+        sidebarMenuOpen = false;
+      }
+    });
+
+    function selectSession(id) {
+      if (isListLoading) return; // Prevent selection during loading
+      
+      const chatBox = document.getElementById('chat-messages-box');
+      const chatSubtitle = document.getElementById('chat-session-subtitle');
+      
+      document.querySelectorAll('.session-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      event.currentTarget.classList.add('active');
+
+      if (id === 'session-1') {
+        chatSubtitle.textContent = '# 优化项目切换体验设计';
+        chatBox.innerHTML = `
+          <div class="message assistant">优化项目切换体验设计会话已被载入。</div>
+        `;
+      } else if (id === 'session-2') {
+        chatSubtitle.textContent = '# Trellis 面板多端适配';
+        chatBox.innerHTML = `
+          <div class="message assistant">正在预览 Trellis 面板多端适配会话。</div>
+        `;
+      }
+    }
+
+  </script>
+</body>
+</html>

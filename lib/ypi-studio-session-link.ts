@@ -5,8 +5,9 @@ import { readYpiStudioSubagentTranscriptPreview } from "./ypi-studio-transcripts
 import { orderYpiStudioWorkflowStates } from "./ypi-studio-workflow-flow";
 import { readYpiStudioWorkflow } from "./ypi-studio-workflows";
 import type {
-  YpiStudioSessionTaskLinkResult,
+  YpiStudioSessionTaskLinkCandidate,
   YpiStudioSessionTaskLinkSource,
+  YpiStudioSessionTasksLinkResult,
   YpiStudioTaskDetail,
   YpiStudioTaskSummary,
   YpiStudioTaskWidgetProjection,
@@ -32,8 +33,7 @@ interface CandidateEvidence {
   cwd?: string;
 }
 
-type ResolvedSummary = { task: YpiStudioTaskSummary; source: YpiStudioSessionTaskLinkSource };
-type UnresolvedLink = Extract<YpiStudioSessionTaskLinkResult, { task: null }>;
+
 
 interface TaskIndex {
   tasks: YpiStudioTaskSummary[];
@@ -119,38 +119,12 @@ function matchCandidate(candidate: string, index: TaskIndex): YpiStudioTaskSumma
   return index.byId.get(value) ?? null;
 }
 
-function resolveUnique(evidence: CandidateEvidence[], index: TaskIndex): ResolvedSummary | UnresolvedLink | null {
-  if (evidence.length === 0) return null;
-  const matches: Array<{ task: YpiStudioTaskSummary; source: YpiStudioSessionTaskLinkSource; order: number }> = [];
-  for (const item of evidence) {
-    const matched = matchCandidate(item.candidate, index);
-    if (matched === "ambiguous") return { task: null, reason: "ambiguous" };
-    if (matched) matches.push({ task: matched, source: item.source, order: item.order });
-  }
-  if (matches.length === 0) return { task: null, reason: "task-not-found" };
-  const keys = new Set(matches.map((match) => match.task.key));
-  if (keys.size > 1) return { task: null, reason: "ambiguous" };
-  return matches.sort((a, b) => b.order - a.order)[0];
-}
-
-function collectRuntimeEvidence(cwd: string, sessionId: string, sessionFilePath: string): CandidateEvidence[] {
-  const evidence: CandidateEvidence[] = [];
-  exactRuntimeKeys(sessionId, sessionFilePath).forEach((key, index) => {
+function resolveRuntimeTaskId(cwd: string, sessionId: string, sessionFilePath: string): string | null {
+  for (const key of exactRuntimeKeys(sessionId, sessionFilePath)) {
     const candidate = getYpiStudioTaskIdForContext(cwd, key);
-    if (candidate) evidence.push({ candidate, source: "session-runtime", order: index, structured: true });
-  });
-  return evidence;
-}
-
-function collectContextEvidence(tasks: YpiStudioTaskSummary[], sessionId: string, sessionFilePath: string): CandidateEvidence[] {
-  const exact = new Set(exactRuntimeKeys(sessionId, sessionFilePath));
-  const evidence: CandidateEvidence[] = [];
-  tasks.forEach((task, index) => {
-    if (task.contextIds.some((contextId) => exact.has(contextId) && !contextId.startsWith("pi_process_"))) {
-      evidence.push({ candidate: task.key, source: "task-context", order: index, structured: true });
-    }
-  });
-  return evidence;
+    if (candidate) return candidate;
+  }
+  return null;
 }
 
 function messageTexts(message: AgentMessage): string[] {
@@ -212,21 +186,7 @@ function collectTranscriptEvidence(entries: SessionEntry[], cwd: string): Candid
   return evidence.filter((item) => !item.cwd || canonicalCwd(item.cwd) === canonicalCwd(cwd));
 }
 
-function resolveTranscript(evidence: CandidateEvidence[], index: TaskIndex): ResolvedSummary | UnresolvedLink | null {
-  const structured = evidence.filter((item) => item.structured).sort((a, b) => b.order - a.order);
-  if (structured.length > 0) {
-    const latest = structured[0];
-    const matched = matchCandidate(latest.candidate, index);
-    if (matched === "ambiguous") return { task: null, reason: "ambiguous" };
-    if (!matched) return { task: null, reason: "task-not-found" };
-    return { task: matched, source: latest.source };
-  }
-  return resolveUnique(evidence.filter((item) => !item.structured), index);
-}
 
-function sameResolved(a: ResolvedSummary, b: ResolvedSummary): boolean {
-  return a.task.key === b.task.key;
-}
 
 function clip(value: string | undefined, max = 500): string | undefined {
   if (!value) return undefined;
@@ -320,6 +280,23 @@ function stepStatus(stateIndex: number, currentIndex: number, state: YpiStudioWo
   return state.id === detail.status ? "active" : state.progress < detail.progress.percent ? "done" : "pending";
 }
 
+function widgetArtifactEvidence(detail: YpiStudioTaskDetail): Pick<YpiStudioTaskWidgetProjection["artifacts"], "available" | "completed"> {
+  // `progress.completedArtifacts` intentionally describes only the current workflow
+  // state. The task drawer, however, lists the complete task artifact registry.
+  // Keep the compact widget on that same evidence set so an implementing task does
+  // not appear to have only its current state's handoff artifact.
+  const available = Object.keys(detail.documents);
+  const artifactKeyFor = (value: string) => detail.documents[value]
+    ? value
+    : Object.entries(detail.artifacts).find(([, fileName]) => fileName === value)?.[0] ?? value;
+  const completed = new Set(detail.progress.completedArtifacts.map(artifactKeyFor));
+  for (const [artifact, document] of Object.entries(detail.documents)) {
+    const content = document.content.trim();
+    if (content.length > 0 && !/\bTBD\b|待填写|YPI Studio workflow/i.test(content)) completed.add(artifact);
+  }
+  return { available, completed: [...completed] };
+}
+
 function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioTaskWidgetProjection | null {
   const detail = getYpiStudioTaskDetail(cwd, summary.key);
   if (!detail) return null;
@@ -363,7 +340,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
     artifacts: {
       required: detail.progress.requiredArtifacts,
       optional: detail.progress.optionalArtifacts,
-      completed: detail.progress.completedArtifacts,
+      ...widgetArtifactEvidence(detail),
       missing: detail.progress.missingArtifacts,
     },
     steps,
@@ -374,36 +351,154 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
   };
 }
 
-function finishResolved(cwd: string, resolved: ResolvedSummary): YpiStudioSessionTaskLinkResult {
-  const projection = buildProjection(cwd, resolved.task);
-  return projection ? { task: projection, source: resolved.source, confidence: "high" } : { task: null, reason: "task-not-found" };
+/** Priority for sorting bound candidates: lower number = higher priority. */
+const STATUS_SORT_PRIORITY: Record<string, number> = {
+  needs_user: 0,
+  blocked: 1,
+  failed: 1,
+  implementing: 2,
+  checking: 2,
+  awaiting_approval: 3,
+  changes_requested: 3,
+  planning: 4,
+  intake: 5,
+  ready: 6,
+  completed: 7,
+  archived: 8,
+  cancelled: 8,
+};
+
+function candidateSortKey(summary: YpiStudioTaskSummary, isRuntimeCurrent: boolean): number {
+  const statusPri = STATUS_SORT_PRIORITY[summary.status] ?? 6;
+  const runtimeBonus = isRuntimeCurrent ? 0 : 1;
+  const archivedPenalty = summary.archived ? 200 : 0;
+  return statusPri * 10 + runtimeBonus + archivedPenalty;
 }
 
-export function resolveYpiStudioTaskForSession(options: ResolveOptions): YpiStudioSessionTaskLinkResult {
+function buildCandidate(
+  cwd: string,
+  summary: YpiStudioTaskSummary,
+  isCurrent: boolean,
+  isPrimary: boolean,
+  lastEvidenceOrder?: number,
+): YpiStudioSessionTaskLinkCandidate | null {
+  const projection = buildProjection(cwd, summary);
+  if (!projection) return null;
+  const sources: YpiStudioSessionTaskLinkSource[] = ["task-context"];
+  if (isCurrent) sources.push("session-runtime");
+  return {
+    task: projection,
+    sources,
+    confidence: "high",
+    relationship: "bound-context",
+    current: isCurrent,
+    primary: isPrimary,
+    lastEvidenceOrder,
+  };
+}
+
+export function resolveYpiStudioTaskForSession(options: ResolveOptions): YpiStudioSessionTasksLinkResult {
   const tasksResponse = listYpiStudioTasks(options.cwd, { scope: "all" });
   const index = buildTaskIndex(tasksResponse.tasks);
+  const exactKeys = new Set(exactRuntimeKeys(options.sessionId, options.sessionFilePath));
+
+  // 1. Find all bound candidates: tasks whose contextIds contain an exact session context key.
+  const boundSummaries: YpiStudioTaskSummary[] = [];
+  for (const task of index.tasks) {
+    if (task.contextIds.some((cid) => exactKeys.has(cid) && !cid.startsWith("pi_process_"))) {
+      boundSummaries.push(task);
+    }
+  }
+
+  // 2. Runtime pointer evidence — only marks bound tasks as current.
+  const runtimeTaskId = resolveRuntimeTaskId(options.cwd, options.sessionId, options.sessionFilePath);
+  const runtimeCurrentSummary = runtimeTaskId
+    ? boundSummaries.find((t) => t.key === runtimeTaskId || t.id === runtimeTaskId) ?? null
+    : null;
+
+  // 3. Transcript evidence — for diagnostics and lastEvidenceOrder only.
   const scopedEntries = branchEntries(options.entries, options.leafId);
+  const transcriptEvidence = collectTranscriptEvidence(scopedEntries, options.cwd);
+  const transcriptObservedKeys: string[] = [];
+  const transcriptOrderByKey = new Map<string, number>();
+  for (const ev of transcriptEvidence) {
+    const matched = matchCandidate(ev.candidate, index);
+    if (matched && matched !== "ambiguous") {
+      if (!transcriptObservedKeys.includes(matched.key)) {
+        transcriptObservedKeys.push(matched.key);
+      }
+      const existingOrder = transcriptOrderByKey.get(matched.key);
+      if (existingOrder === undefined || ev.order > existingOrder) {
+        transcriptOrderByKey.set(matched.key, ev.order);
+      }
+    }
+  }
 
-  const runtimeResolved = resolveUnique(collectRuntimeEvidence(options.cwd, options.sessionId, options.sessionFilePath), index);
-  const contextResolved = resolveUnique(collectContextEvidence(index.tasks, options.sessionId, options.sessionFilePath), index);
-  const exactTaskNotFound = runtimeResolved?.task === null && runtimeResolved.reason === "task-not-found"
-    ? runtimeResolved
-    : contextResolved?.task === null && contextResolved.reason === "task-not-found"
-      ? contextResolved
-      : null;
-  const exactResolved = runtimeResolved?.task && contextResolved?.task
-    ? sameResolved(runtimeResolved, contextResolved) ? runtimeResolved : { task: null, reason: "ambiguous" as const }
-    : runtimeResolved?.task ? runtimeResolved : contextResolved;
+  // 4. Build diagnostics.
+  const diagnostics: YpiStudioSessionTasksLinkResult["diagnostics"] = {};
+  const runtimeUnboundTaskKey =
+    runtimeTaskId && !boundSummaries.some((t) => t.key === runtimeTaskId || t.id === runtimeTaskId)
+      ? runtimeTaskId
+      : undefined;
+  const observedUnboundTaskKeys = transcriptObservedKeys.filter(
+    (key) => !boundSummaries.some((t) => t.key === key),
+  );
+  if (observedUnboundTaskKeys.length > 0) diagnostics.observedUnboundTaskKeys = observedUnboundTaskKeys;
+  if (runtimeUnboundTaskKey) diagnostics.runtimeUnboundTaskKey = runtimeUnboundTaskKey;
+  if (transcriptObservedKeys.length > 0) diagnostics.transcriptObservedTaskKeys = transcriptObservedKeys;
 
-  if (exactResolved?.task === null) return exactResolved;
+  // 5. No bound candidates.
+  if (boundSummaries.length === 0) {
+    const result: YpiStudioSessionTasksLinkResult = {
+      task: null,
+      tasks: [],
+      reason: tasksResponse.exists ? (tasksResponse.tasks.length > 0 ? "task-not-found" : "no-evidence") : "no-evidence",
+    };
+    if (Object.keys(diagnostics).length > 0) result.diagnostics = diagnostics;
+    const warnings: string[] = [];
+    if (runtimeUnboundTaskKey) warnings.push("runtime-points-to-unbound-task");
+    if (observedUnboundTaskKeys.length > 0) warnings.push("transcript-mentions-unbound-tasks");
+    if (warnings.length > 0) result.warnings = warnings;
+    return result;
+  }
 
-  const transcriptResolved = resolveTranscript(collectTranscriptEvidence(scopedEntries, options.cwd), index);
-  if (transcriptResolved?.task === null) return transcriptResolved;
-  if (exactResolved?.task && transcriptResolved?.task && !sameResolved(exactResolved, transcriptResolved)) return { task: null, reason: "ambiguous" };
+  // 6. Sort bound candidates.
+  boundSummaries.sort((a, b) => {
+    const aCurrent = runtimeCurrentSummary ? a.key === runtimeCurrentSummary.key : false;
+    const bCurrent = runtimeCurrentSummary ? b.key === runtimeCurrentSummary.key : false;
+    const aKey = candidateSortKey(a, aCurrent);
+    const bKey = candidateSortKey(b, bCurrent);
+    if (aKey !== bKey) return aKey - bKey;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
 
-  const resolved = exactResolved?.task ? exactResolved : transcriptResolved;
-  if (resolved?.task) return finishResolved(options.cwd, resolved);
-  if (exactTaskNotFound) return exactTaskNotFound;
-  if (!tasksResponse.exists) return { task: null, reason: "no-evidence" };
-  return { task: null, reason: "no-evidence" };
+  // 7. Build candidate projections.
+  const candidates: YpiStudioSessionTaskLinkCandidate[] = [];
+  for (let index = 0; index < boundSummaries.length; index++) {
+    const summary = boundSummaries[index];
+    const isCurrent = runtimeCurrentSummary ? summary.key === runtimeCurrentSummary.key : false;
+    const isPrimary = index === 0;
+    const lastEvidenceOrder = transcriptOrderByKey.get(summary.key);
+    const candidate = buildCandidate(options.cwd, summary, isCurrent, isPrimary, lastEvidenceOrder);
+    if (candidate) candidates.push(candidate);
+  }
+
+  if (candidates.length === 0) {
+    return { task: null, tasks: [], reason: "task-not-found" };
+  }
+
+  const primary = candidates[0];
+  const warnings: string[] = [];
+  if (candidates.length > 1) warnings.push("multiple-bound-tasks");
+  if (runtimeUnboundTaskKey) warnings.push("runtime-points-to-unbound-task");
+  if (observedUnboundTaskKeys.length > 0) warnings.push("transcript-mentions-unbound-tasks");
+
+  const result: YpiStudioSessionTasksLinkResult = {
+    task: primary.task,
+    tasks: candidates,
+    primaryTaskKey: primary.task.key,
+    warnings: warnings.length > 0 ? warnings : undefined,
+  };
+  if (Object.keys(diagnostics).length > 0) result.diagnostics = diagnostics;
+  return result;
 }

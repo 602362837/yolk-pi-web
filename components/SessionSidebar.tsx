@@ -8,7 +8,7 @@ import { displayProjectName, displaySpaceName, activeProjectSpaces, sortProjects
 import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
 import { displayTitleForSession } from "@/lib/session-title";
 import { Checkbox } from "./Checkbox";
-import { FileExplorer } from "./FileExplorer";
+
 import { ProjectSpaceSwitchDialog } from "./ProjectSpaceSwitchDialog";
 
 export interface ProjectSpaceSelectionContext {
@@ -30,9 +30,6 @@ interface Props {
   onSessionDeleted?: (sessionId: string) => void;
   selectedCwd?: string | null;
   onCwdChange?: (cwd: string | null) => void;
-  onOpenFile?: (filePath: string, fileName: string) => void;
-  explorerRefreshKey?: number;
-  onAtMention?: (relativePath: string) => void;
   trellisEnabled?: boolean;
   terminalEnabled?: boolean;
   onOpenTerminalCommand?: (cwd: string, command: string) => void;
@@ -68,19 +65,6 @@ function makeTempSessionId(): string {
 }
 
 const MIN_SESSION_LIST_HEIGHT = 80;
-const MIN_EXPLORER_HEIGHT = 120;
-const EXPLORER_HEIGHT_STORAGE_KEY = "pi-web-sidebar-explorer-height";
-
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getInitialExplorerHeight(): number | null {
-  if (typeof window === "undefined") return null;
-  const stored = Number(window.localStorage.getItem(EXPLORER_HEIGHT_STORAGE_KEY));
-  if (!Number.isFinite(stored)) return null;
-  return Math.max(MIN_EXPLORER_HEIGHT, stored);
-}
 
 function formatWorktreeTooltip(worktree: WorktreeInfo): string {
   const branch = worktree.branch || "未知分支";
@@ -333,7 +317,7 @@ function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
   return roots;
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onProjectSpaceChange, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention, trellisEnabled = false, terminalEnabled = false, onOpenTerminalCommand }: Props) {
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onProjectSpaceChange, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, trellisEnabled = false, terminalEnabled = false, onOpenTerminalCommand }: Props) {
   const [projects, setProjects] = useState<PiWebProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
@@ -358,13 +342,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [selectedForArchive, setSelectedForArchive] = useState<Set<string>>(new Set());
   const [archiveAllConfirming, setArchiveAllConfirming] = useState(false);
   const [archiveAllBusy, setArchiveAllBusy] = useState(false);
-  const [explorerOpen, setExplorerOpen] = useState(true);
-  const [explorerKey, setExplorerKey] = useState(0);
-  const [explorerHeight, setExplorerHeight] = useState<number | null>(getInitialExplorerHeight);
-  const [explorerResizing, setExplorerResizing] = useState(false);
   const [projectsRefreshDone, setProjectsRefreshDone] = useState(false);
   const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
-  const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const [creatingWorktree, setCreatingWorktree] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
   const [, setEphemeralWorktrees] = useState<Record<string, WorktreeInfo>>({});
@@ -383,52 +362,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [archivedExpanded, setArchivedExpanded] = useState(false);
   const [trellisSetupStatus, setTrellisSetupStatus] = useState<TrellisSetupStatus | null>(null);
   const [trellisStatusRefreshKey, setTrellisStatusRefreshKey] = useState(0);
+  const [sessionsSwitching, setSessionsSwitching] = useState(false);
+  const loadSessionsTokenRef = useRef(0);
+  const prevSpaceKeyRef = useRef<string | null>(null);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const explorerRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionListRef = useRef<HTMLDivElement>(null);
-  const explorerSectionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (explorerHeight === null) return;
-    window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(explorerHeight)));
-  }, [explorerHeight]);
-
-  const handleExplorerResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!explorerOpen) return;
-    const explorerEl = explorerSectionRef.current;
-    const sessionListEl = sessionListRef.current;
-    if (!explorerEl || !sessionListEl) return;
-
-    event.preventDefault();
-    const startY = event.clientY;
-    const startHeight = explorerEl.getBoundingClientRect().height;
-    const sessionListHeight = sessionListEl.getBoundingClientRect().height;
-    const maxHeight = Math.max(MIN_EXPLORER_HEIGHT, startHeight + sessionListHeight - MIN_SESSION_LIST_HEIGHT);
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-
-    setExplorerResizing(true);
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const nextHeight = clampNumber(startHeight - (moveEvent.clientY - startY), MIN_EXPLORER_HEIGHT, maxHeight);
-      setExplorerHeight(nextHeight);
-    };
-
-    const finishResize = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", finishResize);
-      window.removeEventListener("pointercancel", finishResize);
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-      setExplorerResizing(false);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", finishResize);
-    window.addEventListener("pointercancel", finishResize);
-  }, [explorerOpen]);
 
   const loadProjects = useCallback(async (showLoading = false) => {
     try {
@@ -452,17 +390,31 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, []);
 
   const loadSessions = useCallback(async (showLoading = false) => {
+    const token = ++loadSessionsTokenRef.current;
     const selected = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
     if (!selected) {
-      setAllSessions([]);
+      if (token === loadSessionsTokenRef.current) {
+        setAllSessions([]);
+        setSessionsSwitching(false);
+      }
       return;
     }
     try {
-      if (showLoading) setLoading(true);
+      if (showLoading) {
+        if (token === loadSessionsTokenRef.current) {
+          setSessionsSwitching(true);
+          setLoading(true);
+          setAllSessions([]);
+          setSelectedForArchive(new Set());
+          setArchivedExpanded(false);
+          setArchivedSessions([]);
+        }
+      }
       const res = await fetch(`/api/projects/${encodeURIComponent(selected.project.id)}/spaces/${encodeURIComponent(selected.space.id)}/sessions`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { sessions?: SessionInfo[]; archivedCounts?: Record<string, number>; error?: string };
       if (data.error) throw new Error(data.error);
+      if (token !== loadSessionsTokenRef.current) return;
       setAllSessions(data.sessions ?? []);
       setArchivedCwds([]);
       setArchivedCounts(data.archivedCounts ?? {});
@@ -473,9 +425,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         sessionRefreshTimerRef.current = setTimeout(() => setSessionRefreshDone(false), 2000);
       }
     } catch (e) {
+      if (token !== loadSessionsTokenRef.current) return;
       setError(String(e));
     } finally {
-      if (showLoading) setLoading(false);
+      if (token === loadSessionsTokenRef.current) {
+        if (showLoading) setLoading(false);
+        setSessionsSwitching(false);
+      }
     }
   }, [projects, selectedProjectId, selectedSpaceId]);
 
@@ -594,17 +550,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, [loadProjects, refreshKey]);
 
   useEffect(() => {
-    void loadSessions(false);
-  }, [loadSessions]);
+    const spaceKey = `${selectedProjectId ?? ""}/${selectedSpaceId ?? ""}`;
+    const isSpaceChange = prevSpaceKeyRef.current !== null && prevSpaceKeyRef.current !== spaceKey;
+    prevSpaceKeyRef.current = spaceKey;
+    void loadSessions(isSpaceChange);
+  }, [loadSessions, selectedProjectId, selectedSpaceId]);
 
   useEffect(() => {
     if (!archivedExpanded || !selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) return;
     void loadArchivedSessions(selectedCwd);
   }, [archivedExpanded, selectedCwd, archivedCounts, loadArchivedSessions]);
-
-  useEffect(() => {
-    if (explorerRefreshKey !== undefined) setExplorerKey((k) => k + 1);
-  }, [explorerRefreshKey]);
 
   useEffect(() => {
     fetch("/api/home").then((r) => r.json()).then((d: { home?: string }) => {
@@ -955,7 +910,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       setCustomPathValue("");
       setCustomPathError(null);
       onNewSession?.(makeTempSessionId(), data.cwd, linkedProjectId, linkedSpaceId);
-      setExplorerKey((k) => k + 1);
     } catch (e) {
       setWorktreeError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1189,8 +1143,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         }
       }
 
-      // 4. Refresh explorer and sessions for the (possibly new) current space.
-      setExplorerKey((k) => k + 1);
+      // 4. Refresh sessions for the (possibly new) current space.
       void loadSessions(false);
 
       // 5. Notify parent about deleted session files.
@@ -1949,28 +1902,44 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       )}
 
       {/* Session list */}
-      <div ref={sessionListRef} style={{ flex: explorerOpen && (selectedCwdProp || selectedCwd) ? "1 1 0" : "1 1 auto", overflowY: "auto", padding: "0", minHeight: MIN_SESSION_LIST_HEIGHT }}>
-        {loading && (
-          <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
-            Loading...
-          </div>
-        )}
-        {error && (
+      <div ref={sessionListRef} style={{ flex: "1 1 auto", overflowY: "auto", padding: "0", minHeight: MIN_SESSION_LIST_HEIGHT }}>
+        {error && !sessionsSwitching && (
           <div style={{ padding: "12px 14px", color: "#f87171", fontSize: 12 }}>
             {error}
           </div>
         )}
-        {!loading && !error && activeProjects.length === 0 && (
+        {sessionsSwitching && (
+          <div style={{ padding: "4px 8px", pointerEvents: "none" }} aria-busy="true">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 6px", borderRadius: 8, marginBottom: 2 }}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: 5, background: "var(--border)", flexShrink: 0,
+                  animation: "pulse 1.5s ease-in-out infinite", animationDelay: `${i * 0.1}s`,
+                }} />
+                <div style={{
+                  flex: 1, height: 14, borderRadius: 4, background: "var(--border)",
+                  animation: "pulse 1.5s ease-in-out infinite", animationDelay: `${i * 0.1}s`,
+                }} />
+              </div>
+            ))}
+          </div>
+        )}
+        {!sessionsSwitching && loading && (
+          <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
+            Loading...
+          </div>
+        )}
+        {!sessionsSwitching && !loading && !error && activeProjects.length === 0 && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
             No registered projects yet. Add a project path from the selector above to start.
           </div>
         )}
-        {!loading && !error && activeProjects.length > 0 && filteredSessions.length === 0 && (!selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) && (
+        {!sessionsSwitching && !loading && !error && activeProjects.length > 0 && filteredSessions.length === 0 && (!selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             No sessions found in this space
           </div>
         )}
-        {sessionTree.map((node) => (
+        {!sessionsSwitching && sessionTree.map((node) => (
           <SessionTreeItem
             key={node.session.id}
             node={node}
@@ -2096,111 +2065,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         )}
       </div>
 
-      {/* File Explorer section */}
-      {(selectedCwdProp || selectedCwd) && (
-        <div
-          ref={explorerSectionRef}
-          style={{
-            borderTop: explorerOpen ? "none" : "1px solid var(--border)",
-            display: "flex",
-            flexDirection: "column",
-            flex: explorerOpen ? (explorerHeight === null ? "1 1 0" : `0 1 ${explorerHeight}px`) : "0 0 auto",
-            minHeight: 0,
-            overflow: "hidden",
-          }}
-        >
-          {explorerOpen && (
-            <div
-              onPointerDown={handleExplorerResizePointerDown}
-              title="Resize sessions and explorer"
-              aria-label="Resize sessions and explorer"
-              role="separator"
-              aria-orientation="horizontal"
-              style={{
-                height: 7,
-                borderTop: "1px solid var(--border)",
-                background: explorerResizing ? "rgba(37,99,235,0.08)" : "transparent",
-                cursor: "row-resize",
-                flexShrink: 0,
-                touchAction: "none",
-              }}
-            />
-          )}
-          <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <button
-              onClick={() => setExplorerOpen((v) => !v)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                flex: 1,
-                padding: "6px 10px",
-                background: "none",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                textAlign: "left",
-              }}
-            >
-              <svg
-                width="9" height="9" viewBox="0 0 10 10" fill="none"
-                stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                style={{ transform: explorerOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}
-              >
-                <polyline points="3 2 7 5 3 8" />
-              </svg>
-              项目空间信息
-            </button>
-            <button
-              onClick={() => {
-                setExplorerKey((k) => k + 1);
-                setExplorerRefreshDone(true);
-                if (explorerRefreshTimerRef.current) clearTimeout(explorerRefreshTimerRef.current);
-                explorerRefreshTimerRef.current = setTimeout(() => setExplorerRefreshDone(false), 2000);
-              }}
-              title="刷新项目空间信息"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 26, height: 26, padding: 0, marginRight: 6,
-                background: explorerRefreshDone ? "rgba(74,222,128,0.18)" : "none",
-                border: "none",
-                color: explorerRefreshDone ? "#4ade80" : "var(--text-dim)",
-                cursor: "pointer",
-                borderRadius: 5,
-                flexShrink: 0,
-                transition: "color 0.3s, background 0.3s",
-              }}
-              onMouseEnter={(e) => { if (explorerRefreshDone) return; e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-              onMouseLeave={(e) => { if (explorerRefreshDone) return; e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
-            >
-              {explorerRefreshDone ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {explorerOpen && (
-            <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
-              <FileExplorer
-                cwd={selectedCwdProp ?? selectedCwd!}
-                onOpenFile={onOpenFile ?? (() => {})}
-                refreshKey={explorerKey}
-                onAtMention={onAtMention}
-              />
-            </div>
-          )}
-        </div>
-      )}
+
     </div>
   );
 }

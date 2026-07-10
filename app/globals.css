@@ -520,18 +520,40 @@ span.linenumber {
     flex-shrink: 0;
   }
   .right-panel-container.right-panel-open {
-    width: 42%;
-    min-width: 300px;
+    width: var(--right-panel-width, 42%);
+    min-width: var(--right-panel-min-width, 300px);
   }
   .right-panel-container.right-panel-closed {
     width: 0;
     min-width: 0;
     border-left: none !important;
   }
+  .right-panel-container.right-panel-resizing {
+    transition: none;
+  }
   /* keep inner content at fixed width so it doesn't reflow during animation */
-  .right-panel-container > * {
-    width: 42vw;
-    min-width: 300px;
+  .right-panel-container > :not(.right-panel-resize-handle) {
+    width: var(--right-panel-width, 42vw);
+    min-width: var(--right-panel-min-width, 300px);
+  }
+  /* Right panel desktop resize handle */
+  .right-panel-resize-handle {
+    position: absolute;
+    top: 0;
+    left: -4px;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+    z-index: 25;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .right-panel-resize-handle:hover {
+    background: rgba(37, 99, 235, 0.08);
+  }
+  .right-panel-container.right-panel-resizing .right-panel-resize-handle {
+    background: rgba(37, 99, 235, 0.12);
   }
 }
 
@@ -622,6 +644,9 @@ span.linenumber {
     transform: translateX(100%);
     opacity: 0;
     pointer-events: none;
+  }
+  .right-panel-resize-handle {
+    display: none !important;
   }
 
   .chat-empty-header {
@@ -939,12 +964,265 @@ span.linenumber {
   }
 }
 
-@keyframes ypi-studio-widget-flow-dash {
-  to { background-position: 24px 0; }
+/* YPI Studio session widget: read-only cards, explicit detail action, and evidence-based workflow rail. */
+.ypi-studio-task-card {
+  min-width: 0;
 }
 
-@keyframes ypi-studio-widget-svg-flow {
-  to { stroke-dashoffset: -28; }
+.ypi-studio-task-detail-button {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-panel) 70%, transparent);
+  color: var(--text-muted);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 28%, transparent), 0 2px 8px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.ypi-studio-task-detail-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
+  color: var(--accent);
+}
+
+.ypi-studio-task-detail-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ypi-studio-workflow-rail {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  margin: 1px 0 7px;
+}
+
+.ypi-studio-workflow-rail-segment {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.ypi-studio-workflow-rail-segment:last-child {
+  flex: 0 1 auto;
+}
+
+.ypi-studio-workflow-rail-station {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ypi-studio-workflow-rail-node {
+  position: relative;
+  width: 13px;
+  height: 13px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--text-dim);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ypi-studio-workflow-rail-node.is-done { border-color: #16a34a; background: #16a34a; color: white; }
+.ypi-studio-workflow-rail-node.is-current { border-color: var(--accent); background: var(--accent); color: white; }
+.ypi-studio-workflow-rail-node.is-attention { border-color: #d97706; background: #f59e0b; color: #1f2937; }
+.ypi-studio-workflow-rail-node.is-failed { border-color: #dc2626; background: #dc2626; color: white; }
+.ypi-studio-workflow-rail-node.is-blocked { border-color: #b45309; background: #b45309; color: white; }
+
+.ypi-studio-workflow-rail-node.is-halo::after {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid color-mix(in srgb, var(--accent) 74%, transparent);
+  border-radius: inherit;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  animation: ypi-studio-workflow-rail-halo 2s ease-in-out infinite;
+}
+
+.ypi-studio-workflow-rail-label {
+  max-width: 42px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ypi-studio-workflow-rail-line {
+  position: relative;
+  height: 1px;
+  flex: 1 1 auto;
+  min-width: 4px;
+  margin: 6px 3px 0;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.ypi-studio-workflow-rail-line.is-done { background: #16a34a; }
+.ypi-studio-workflow-rail-line.is-current { background: color-mix(in srgb, var(--accent) 52%, var(--border)); }
+.ypi-studio-workflow-rail-line.is-attention { background: #f59e0b; }
+.ypi-studio-workflow-rail-line.is-failed { background: #dc2626; }
+.ypi-studio-workflow-rail-line.is-blocked { background: #b45309; }
+
+.ypi-studio-workflow-rail-line.is-flowing {
+  height: 2px;
+  margin-top: 5px;
+}
+
+.ypi-studio-workflow-rail-line.is-flowing::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 20%, color-mix(in srgb, white 78%, var(--accent)) 50%, transparent 80%);
+  background-size: 200% 100%;
+  content: "";
+  animation: ypi-studio-workflow-rail-shimmer 2.8s linear infinite;
+}
+
+/* The panel shell keeps drag positioning; only rail presentation freezes while it moves. */
+.ypi-studio-widget-panel-visual.is-dragging .ypi-studio-workflow-rail-node.is-halo::after,
+.ypi-studio-widget-panel-visual.is-dragging .ypi-studio-workflow-rail-line.is-flowing::after {
+  animation-play-state: paused;
+}
+
+/* Motion stays in visual children: the draggable shells only own position and drag scale. */
+.ypi-studio-widget-ball-shell {
+  border-radius: 50%;
+  transition: transform 180ms ease-out;
+}
+
+.ypi-studio-widget-ball-shell.is-dragging {
+  transition: none;
+}
+
+.ypi-studio-widget-ball-visual {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  color: white;
+  font-size: 16px;
+  font-weight: 900;
+  animation: ypi-studio-widget-enter 180ms ease-out both;
+}
+
+.ypi-studio-widget-ball-visual::before,
+.ypi-studio-widget-ball-visual::after {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.ypi-studio-widget-ball-visual.is-running::before {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  animation: ypi-studio-widget-running-halo 2.4s ease-in-out infinite;
+}
+
+.ypi-studio-widget-ball-visual.is-attention::after {
+  border-color: currentColor;
+  animation: ypi-studio-widget-attention-ring 800ms ease-out 2;
+}
+
+.ypi-studio-widget-ball-visual.is-dragging,
+.ypi-studio-widget-ball-visual.is-dragging::before,
+.ypi-studio-widget-ball-visual.is-dragging::after {
+  animation: none;
+}
+
+.ypi-studio-widget-ball-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+  transform: translateY(13px);
+}
+
+.ypi-studio-widget-ball-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  padding: 2px 6px;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ypi-studio-widget-ball-visual.is-needs_user .ypi-studio-widget-ball-count { background: #dc2626; }
+
+.ypi-studio-widget-panel-visual {
+  display: flex;
+  max-height: min(70vh, 600px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+  color: var(--text);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+  animation: ypi-studio-widget-enter 180ms ease-out both;
+}
+
+.ypi-studio-widget-panel-visual.is-dragging {
+  opacity: 0.72;
+  animation: none;
+  user-select: none;
+}
+
+@keyframes ypi-studio-workflow-rail-halo {
+  0%, 100% { opacity: 0.28; transform: scale(0.92); }
+  50% { opacity: 0.8; transform: scale(1.12); }
+}
+
+@keyframes ypi-studio-workflow-rail-shimmer {
+  from { background-position: -100% 0; }
+  to { background-position: 100% 0; }
+}
+
+@keyframes ypi-studio-widget-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ypi-studio-widget-running-halo {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.72; }
+}
+
+@keyframes ypi-studio-widget-attention-ring {
+  0% { opacity: 0.85; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(1.18); }
 }
 
 @keyframes ypi-studio-widget-pulse {
@@ -952,27 +1230,33 @@ span.linenumber {
   50% { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0); }
 }
 
-.ypi-studio-widget-line-active {
-  background: linear-gradient(90deg, var(--accent), #22c55e, var(--accent)) !important;
-  background-size: 24px 2px !important;
-  animation: ypi-studio-widget-flow-dash 1.2s linear infinite;
-}
-
-.ypi-studio-widget-flow-path {
-  stroke-dasharray: 10 7;
-  animation: ypi-studio-widget-svg-flow 1.4s linear infinite;
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 45%, transparent));
-}
-
+/* Runtime notices are finite too; task state and text remain after the ring stops. */
 .ypi-studio-widget-pulse {
-  animation: ypi-studio-widget-pulse 1.5s ease-in-out infinite;
+  animation: ypi-studio-widget-pulse 750ms ease-in-out 2;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ypi-studio-widget-line-active,
-  .ypi-studio-widget-flow-path,
-  .ypi-studio-widget-pulse {
+  .ypi-studio-widget-ball-shell,
+  .ypi-studio-widget-ball-visual,
+  .ypi-studio-widget-ball-visual::before,
+  .ypi-studio-widget-ball-visual::after,
+  .ypi-studio-widget-panel-visual,
+  .ypi-studio-widget-pulse,
+  .ypi-studio-workflow-rail-node.is-halo::after,
+  .ypi-studio-workflow-rail-line.is-flowing::after {
     animation: none !important;
+    transition: none !important;
+  }
+
+  .ypi-studio-workflow-rail-node.is-halo::after {
+    opacity: 0.42;
+    transform: none;
+  }
+
+  /* Reduced motion removes the shimmer layer instead of freezing a bright
+     gradient over the static state-colored line. */
+  .ypi-studio-workflow-rail-line.is-flowing::after {
+    display: none;
   }
 }
 

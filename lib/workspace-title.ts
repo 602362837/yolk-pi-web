@@ -1,4 +1,4 @@
-import type { GitInfo } from "./types";
+import type { GitInfo, SessionInfo } from "./types";
 
 export const WORKSPACE_TITLE_FALLBACK = "yolk pi web";
 
@@ -72,4 +72,24 @@ export function formatWorkspaceSubtitle(cwd: string | null | undefined, git?: Gi
   }
 
   return `branch · ${git.branch}`;
+}
+
+/**
+ * Compare a project-space selection context against the current session or
+ * new-session project context. Only compares projectId+spaceId, never cwd
+ * strings, to avoid pathKey/symlink ambiguity.
+ */
+export function spaceContextMatchesSession(
+  context: { projectId: string; spaceId: string } | null,
+  session: SessionInfo | null,
+  newSessionCtx: { projectId: string; spaceId: string } | null,
+): boolean {
+  if (!context) return false;
+  if (session?.projectId && session.spaceId) {
+    return session.projectId === context.projectId && session.spaceId === context.spaceId;
+  }
+  if (newSessionCtx) {
+    return newSessionCtx.projectId === context.projectId && newSessionCtx.spaceId === context.spaceId;
+  }
+  return false;
 }

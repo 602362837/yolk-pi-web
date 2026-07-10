@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YPI Studio Widget & Workspace Resize Prototype</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f9fafb;
+      --bg-subtle: rgba(0,0,0,0.03);
+      --font-mono: ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
+      
+      /* Dynamic prototype variables */
+      --right-panel-width: 42%;
+      --explorer-height: 220px;
+    }
+
+    /* Dark Mode variables */
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --assistant-bg: #1a1a1a;
+      --tool-bg: #1f2937;
+      --bg-subtle: rgba(255,255,255,0.04);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app-root {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Sidebar simulation */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-header {
+      padding: 12px 10px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar-item {
+      padding: 8px 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar-item.active {
+      background: var(--bg-selected);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Chat Area */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      position: relative;
+      min-width: 0;
+    }
+    .chat-header {
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-weight: 600;
+      background: var(--bg-panel);
+      color: var(--text-muted);
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .message {
+      max-width: 600px;
+      margin: 12px auto;
+      padding: 12px 16px;
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+    .message.user {
+      background: var(--user-bg);
+      align-self: flex-end;
+    }
+    .message.assistant {
+      background: var(--assistant-bg);
+      border: 1px solid var(--border);
+    }
+
+    /* Floating Studio Widgets */
+    /* Container for stacking multiple widgets */
+    .floating-container {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+      pointer-events: none;
+      max-width: 380px;
+    }
+    .floating-container * {
+      pointer-events: auto;
+    }
+
+    /* Task Card Stack Widget */
+    .studio-widget-stack {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-top: 3px solid var(--accent);
+      transition: all 0.2s ease-in-out;
+    }
+
+    .widget-header {
+      padding: 10px 12px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .widget-header-title {
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .widget-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .widget-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 2px 4px;
+      font-size: 11px;
+      border-radius: 4px;
+    }
+    .widget-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .widget-body {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Stacked card representation (B: Card Stack) */
+    .task-card-item {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .task-card-item:last-child {
+      border-bottom: none;
+    }
+    .task-card-item:hover {
+      background: var(--bg-hover);
+    }
+    .task-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .task-title {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .task-status-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .status-running { background: rgba(37,99,235,0.1); color: var(--accent); }
+    .status-needs-user { background: rgba(245,158,11,0.1); color: #d97706; border: 1px solid rgba(245,158,11,0.2); }
+    .status-failed { background: rgba(239,68,68,0.1); color: #dc2626; }
+    .status-done { background: rgba(34,197,94,0.1); color: #16a34a; }
+
+    .task-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .task-relation-tag {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: var(--bg-selected);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .subtasks-progress {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Stacking indicator if multiple tasks */
+    .stack-indicator {
+      text-align: center;
+      padding: 4px;
+      background: var(--bg-panel);
+      font-size: 10px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Floating Ball (Collapsed State) */
+    .collapsed-floating-ball {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s, background-color 0.2s;
+    }
+    .collapsed-floating-ball:hover {
+      background: var(--accent-hover);
+      transform: scale(1.05);
+    }
+    .collapsed-floating-ball .badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      background: #ef4444;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 2px 6px;
+      border: 2px solid var(--bg);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .collapsed-floating-ball.pulse-needs-user {
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+      animation: pulse 1.6s infinite;
+      background: #f59e0b;
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+      }
+      70% {
+        transform: scale(1.03);
+        box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+      }
+    }
+
+    /* Right Panel Container */
+    .right-panel-container {
+      width: var(--right-panel-width);
+      min-width: 300px;
+      max-width: 80%;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border);
+      background: var(--bg);
+      position: relative;
+      flex-shrink: 0;
+      transition: width 0s; /* Instant dragging */
+    }
+
+    /* Resize Handle for right panel */
+    .right-panel-resize-handle {
+      position: absolute;
+      left: -4px;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      cursor: col-resize;
+      z-index: 100;
+      background: transparent;
+      transition: background 0.15s;
+    }
+    .right-panel-resize-handle:hover, .right-panel-resize-handle.active {
+      background: rgba(37, 99, 235, 0.4);
+    }
+
+    /* Explorer and Preview vertical layout */
+    .explorer-section {
+      display: flex;
+      flex-direction: column;
+      height: var(--explorer-height);
+      min-height: 100px;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+      position: relative;
+    }
+    .explorer-header {
+      height: 32px;
+      background: var(--bg-panel);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .explorer-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      background: var(--bg);
+    }
+
+    /* File tree list style */
+    .file-tree-item {
+      padding: 4px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .file-tree-item:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Vertical Resize Handle for File Explorer */
+    .explorer-resize-handle {
+      height: 8px;
+      border-bottom: 1px solid var(--border);
+      cursor: row-resize;
+      background: var(--bg-panel);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .explorer-resize-handle:hover, .explorer-resize-handle.active {
+      background: rgba(37, 99, 235, 0.15);
+    }
+    .explorer-resize-handle::after {
+      content: "";
+      width: 24px;
+      height: 2px;
+      background: var(--text-dim);
+      border-radius: 1px;
+    }
+
+    .preview-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      min-height: 120px;
+    }
+    .preview-header {
+      height: 36px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-weight: 600;
+    }
+    .preview-content {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+      background: var(--bg);
+    }
+
+    /* Top Strip buttons for layout simulation */
+    .layout-toggle-strip {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: flex;
+      z-index: 600;
+    }
+    .layout-toggle-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-panel);
+      border: none;
+      border-left: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-weight: bold;
+    }
+    .layout-toggle-btn:hover {
+      color: var(--accent);
+    }
+    .layout-toggle-btn.active {
+      color: var(--accent);
+      background: var(--bg);
+    }
+
+    /* Floating Panel info & settings */
+    .controls-panel {
+      padding: 12px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    select, button.action-btn {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    select:hover, button.action-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Interactive state overlay indicator */
+    .drag-hint-toast {
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      z-index: 1000;
+      pointer-events: none;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    /* Mobile Sheet Simulation Overlay */
+    .mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 900;
+    }
+    .mobile-bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      padding: 16px;
+      max-height: 60vh;
+      overflow-y: auto;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    }
+    .mobile-sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+
+    /* Responsive styling for simulated device size options */
+    .device-wrapper {
+      display: flex;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+    .device-wrapper.mobile-mode {
+      justify-content: center;
+      align-items: center;
+      background: #555;
+      padding: 20px;
+    }
+    .device-wrapper.mobile-mode .app-root {
+      width: 375px;
+      height: 667px;
+      border: 8px solid #333;
+      border-radius: 24px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      background: var(--bg);
+    }
+    .device-wrapper.mobile-mode .right-panel-container {
+      display: none; /* In mobile mode in AppShell, right panel takes full screen or toggle overlay. We will show mobile-sheet for widgets. */
+    }
+    .device-wrapper.mobile-mode .floating-container {
+      bottom: 12px;
+      right: 12px;
+      left: 12px;
+      align-items: center;
+      width: auto;
+      max-width: none;
+    }
+    .device-wrapper.mobile-mode .studio-widget-stack {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Controller Strip for Prototype Testing -->
+  <div class="controls-panel">
+    <div class="control-group">
+      <strong>视图模式:</strong>
+      <select id="view-mode-select">
+        <option value="desktop">桌面端 (Desktop)</option>
+        <option value="mobile">移动端 (Mobile - Bottom Sheet)</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <strong>主题:</strong>
+      <button class="action-btn" id="theme-toggle">切换 Dark/Light</button>
+    </div>
+    <div class="control-group">
+      <strong>任务列表数量:</strong>
+      <select id="tasks-count-select">
+        <option value="1">1个绑定任务 (单卡片)</option>
+        <option value="2">2个绑定任务 (堆叠/折叠)</option>
+        <option value="3" selected>3个绑定任务 (堆叠卡片, 需用户处理优先)</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <strong>状态控制:</strong>
+      <button class="action-btn" id="collapse-widgets-btn">收纳为悬浮球</button>
+      <button class="action-btn" id="reset-layout-btn">恢复默认尺寸</button>
+    </div>
+    <div style="margin-left: auto; font-size: 11px; color: var(--text-muted);">
+      * 拖拽左侧/底部边缘或分隔条，体验 resize 方向和反馈。
+    </div>
+  </div>
+
+  <div class="device-wrapper" id="device-wrap">
+    <div class="app-root">
+      
+      <!-- 1. Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div style="width:20px; height:20px; border-radius:4px; background:var(--accent); display:grid; place-items:center; color:white; font-size:11px; font-weight:bold;">⌘</div>
+          <span>Yolk Pi Web</span>
+        </div>
+        <div class="sidebar-item active">
+          <span>💬</span>
+          <span>当前 Chat 会话</span>
+        </div>
+        <div class="sidebar-item">
+          <span>📁</span>
+          <span>项目文件</span>
+        </div>
+        <div class="sidebar-item">
+          <span>🛠️</span>
+          <span>任务管理器</span>
+        </div>
+        <div style="margin-top: auto; padding: 12px; font-size: 11px; color: var(--text-dim); line-height: 1.4;">
+          当前会话: <strong>pi_session_9a2b</strong><br>
+          仅绑定此 session 的任务在右侧悬浮展现。
+        </div>
+      </div>
+
+      <!-- 2. Main Chat Area -->
+      <div class="chat-container">
+        <div class="chat-header">
+          <span>Session: pi_session_9a2b (开发多任务悬浮窗与面板收纳)</span>
+        </div>
+        <div class="chat-messages">
+          <div class="message user">
+            请修正预览区拖拽方向并支持右侧抽屉宽度调整与任务面板收纳悬浮球。
+          </div>
+          <div class="message assistant">
+            好的，我已经为您安排了 UI 设计员。我们现在来分析一下相关的修改点：
+            <br><br>
+            1. <strong>预览区垂直拖拽方向修正</strong>：之前的逻辑是向下拖反而减少高度，我们将逻辑纠正为：鼠标向下移动 -> 高度增加。
+            <br>
+            2. <strong>右侧工作区面板宽度可调整</strong>：在左侧边缘增加了 <code>col-resize</code> 拖拽条，并会记忆在本地 <code>localStorage</code> 中。
+            <br>
+            3. <strong>Studio 多任务关联与悬浮卡片堆叠</strong>：当同一个会话绑定多个 Task 时，卡片将以堆叠列表呈现，优先将“需要用户处理”或“正在运行”的任务置顶。
+            <br>
+            4. <strong>任务卡片收纳悬浮球</strong>：点击关闭会收纳为悬浮球，支持未处理任务 badge 数量提示，避免遮挡聊天区。
+          </div>
+        </div>
+
+        <!-- Floating Studio Widgets Area inside Chat Container -->
+        <div class="floating-container" id="floating-widget-area">
+          
+          <!-- Widget State A: Stacked Cards (Visible by default) -->
+          <div class="studio-widget-stack" id="widget-stack">
+            <div class="widget-header">
+              <div class="widget-header-title">
+                <span>⚡ YPI Studio (3)</span>
+              </div>
+              <div class="widget-actions">
+                <button class="widget-btn" id="widget-min-btn" title="收纳为悬浮球">➖</button>
+              </div>
+            </div>
+            <div class="widget-body" id="widget-list-body">
+              <!-- Task Card 1 (Needs User) -->
+              <div class="task-card-item" onclick="focusTask('task-102')">
+                <div class="task-card-header">
+                  <div class="task-title">#102 修正预览区拖拽方向与宽度调整</div>
+                  <span class="task-status-badge status-needs-user">需要用户处理</span>
+                </div>
+                <div class="task-meta">
+                  <span class="task-relation-tag">当前运行</span>
+                  <span>更新于 2 分钟前</span>
+                </div>
+                <div class="subtasks-progress">
+                  运行中: ui-designer | 步骤: 计划审批 (3/7)
+                </div>
+              </div>
+
+              <!-- Task Card 2 (Running) -->
+              <div class="task-card-item" onclick="focusTask('task-101')">
+                <div class="task-card-header">
+                  <div class="task-title">#101 修复 browser-share 插件 debugger 作用域</div>
+                  <span class="task-status-badge status-running">正在运行</span>
+                </div>
+                <div class="task-meta">
+                  <span class="task-relation-tag">已绑定</span>
+                  <span>更新于 10 分钟前</span>
+                </div>
+                <div class="subtasks-progress">
+                  运行中: coder-agent | 步骤: 单元测试 (5/9)
+                </div>
+              </div>
+
+              <!-- Task Card 3 (Done) -->
+              <div class="task-card-item" onclick="focusTask('task-99')">
+                <div class="task-card-header">
+                  <div class="task-title">#99 重构左侧项目切换为弹窗分层选择</div>
+                  <span class="task-status-badge status-done">已完成</span>
+                </div>
+                <div class="task-meta">
+                  <span class="task-relation-tag">已绑定</span>
+                  <span>更新于 1 小时前</span>
+                </div>
+                <div class="subtasks-progress">
+                  已全部通过验收
+                </div>
+              </div>
+            </div>
+            
+            <div class="stack-indicator" id="stack-count-label">
+              共绑定 3 个任务 · 仅展示绑定当前会话的 Task
+            </div>
+          </div>
+
+          <!-- Widget State B: Collapsed Floating Ball (Hidden by default) -->
+          <div class="collapsed-floating-ball pulse-needs-user" id="floating-ball" style="display: none;">
+            <span>工</span>
+            <div class="badge" id="ball-badge-count">3</div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- 3. Right Side Panel (Preview & Explorer) -->
+      <div class="right-panel-container" id="right-panel">
+        
+        <!-- Left boundary Resize Handle (Col Resize) -->
+        <div class="right-panel-resize-handle" id="panel-width-handle" title="拖动调整面板宽度"></div>
+        
+        <!-- Tab panel and explorer -->
+        <!-- Top Tab bar and tools toggle simulation -->
+        <div class="preview-header" style="justify-content: space-between;">
+          <span style="font-weight: bold; color: var(--accent);">预览 & 工作区</span>
+          <div style="display: flex; gap: 8px; font-size: 11px; color: var(--text-muted);">
+            <span>宽度: <strong id="panel-width-display">42%</strong></span>
+          </div>
+        </div>
+
+        <!-- 3.1 File Explorer Section (Vertical Resize inside right panel) -->
+        <div class="explorer-section" id="explorer-section">
+          <div class="explorer-header">
+            <span>项目空间信息 (文件树)</span>
+          </div>
+          <div class="explorer-content">
+            <div class="file-tree-item">📁 components/</div>
+            <div class="file-tree-item" style="padding-left: 18px;">📄 AppShell.tsx</div>
+            <div class="file-tree-item" style="padding-left: 18px; background: var(--bg-selected); font-weight: 600;">📄 YpiStudioSessionWidget.tsx</div>
+            <div class="file-tree-item">📁 app/</div>
+            <div class="file-tree-item" style="padding-left: 18px;">📄 globals.css</div>
+            <div class="file-tree-item">📁 lib/</div>
+            <div class="file-tree-item" style="padding-left: 18px;">📄 ypi-studio-session-link.ts</div>
+          </div>
+          
+          <!-- Bottom Vertical Resize Handle for Explorer -->
+          <div class="explorer-resize-handle" id="explorer-height-handle" title="上下拖动调整高度 (向下拖动增加高度)"></div>
+        </div>
+
+        <!-- 3.2 File Viewer / Preview Section -->
+        <div class="preview-section">
+          <div class="preview-header">
+            <span>代码预览: YpiStudioSessionWidget.tsx</span>
+          </div>
+          <div class="preview-content" id="preview-text">
+// YpiStudioSessionWidget.tsx
+// 模拟代码预览区域...
+
+export function YpiStudioSessionWidget({ tasks, onClick }) {
+  // 支持多任务卡片堆叠/收纳为悬浮球
+  // 仅在绑定当前会话的 task 列表上渲染
+  return (
+    &lt;div className="floating-widgets"&gt;
+      {/* 堆叠卡片 */}
+    &lt;/div&gt;
+  );
+}
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Sheet Simulation -->
+  <div class="mobile-overlay" id="mobile-sheet-overlay">
+    <div class="mobile-bottom-sheet">
+      <div class="mobile-sheet-handle"></div>
+      <h3 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+        <span>YPI Studio 关联任务 (3)</span>
+        <button class="action-btn" style="font-size: 11px;" id="close-mobile-sheet">关闭</button>
+      </h3>
+      <div id="mobile-tasks-container">
+        <!-- Will be filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Hint -->
+  <div class="drag-hint-toast" id="toast-hint">宽度已保存</div>
+
+  <script>
+    // State Variables
+    let isResizingWidth = false;
+    let isResizingHeight = false;
+    let viewMode = 'desktop';
+    let isCollapsed = false;
+    let tasksCount = 3;
+
+    // Element selection
+    const deviceWrap = document.getElementById('device-wrap');
+    const rightPanel = document.getElementById('right-panel');
+    const panelWidthHandle = document.getElementById('panel-width-handle');
+    const panelWidthDisplay = document.getElementById('panel-width-display');
+    
+    const explorerSection = document.getElementById('explorer-section');
+    const explorerHeightHandle = document.getElementById('explorer-height-handle');
+    
+    const widgetStack = document.getElementById('widget-stack');
+    const floatingBall = document.getElementById('floating-ball');
+    const widgetMinBtn = document.getElementById('widget-min-btn');
+    const ballBadgeCount = document.getElementById('ball-badge-count');
+    
+    const viewModeSelect = document.getElementById('view-mode-select');
+    const themeToggle = document.getElementById('theme-toggle');
+    const tasksCountSelect = document.getElementById('tasks-count-select');
+    const collapseWidgetsBtn = document.getElementById('collapse-widgets-btn');
+    const resetLayoutBtn = document.getElementById('reset-layout-btn');
+    
+    const mobileSheetOverlay = document.getElementById('mobile-sheet-overlay');
+    const closeMobileSheet = document.getElementById('close-mobile-sheet');
+    const mobileTasksContainer = document.getElementById('mobile-tasks-container');
+
+    const toastHint = document.getElementById('toast-hint');
+
+    function showToast(text) {
+      toastHint.innerText = text;
+      toastHint.style.opacity = '1';
+      setTimeout(() => {
+        toastHint.style.opacity = '0';
+      }, 1200);
+    }
+
+    // ─── Width Drag Resize (Right Panel) ───
+    panelWidthHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isResizingWidth = true;
+      panelWidthHandle.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isResizingWidth) return;
+      
+      const appRect = document.querySelector('.app-root').getBoundingClientRect();
+      const relativeX = appRect.right - e.clientX;
+      const widthPercent = (relativeX / appRect.width) * 100;
+      
+      // Clamp width between 20% and 80%
+      const clampedPercent = Math.min(80, Math.max(20, widthPercent));
+      
+      rightPanel.style.width = clampedPercent + '%';
+      panelWidthDisplay.innerText = Math.round(clampedPercent) + '%';
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isResizingWidth) {
+        isResizingWidth = false;
+        panelWidthHandle.classList.remove('active');
+        document.body.style.cursor = 'default';
+        showToast("宽度设置已保存 (本地持久化)");
+      }
+      if (isResizingHeight) {
+        isResizingHeight = false;
+        explorerHeightHandle.classList.remove('active');
+        document.body.style.cursor = 'default';
+        showToast("文件树高度设置已保存");
+      }
+    });
+
+    // ─── Height Drag Resize (File Explorer) ───
+    // Fix: 向下拖拽应当增加上方区域（File Explorer）的高度
+    explorerHeightHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isResizingHeight = true;
+      explorerHeightHandle.classList.add('active');
+      document.body.style.cursor = 'row-resize';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isResizingHeight) return;
+      
+      const explorerRect = explorerSection.getBoundingClientRect();
+      const startY = explorerRect.top;
+      // New height is mouse y minus start y (so dragging downwards increases the height value)
+      const nextHeight = e.clientY - startY;
+      
+      // Clamp height between 100px and 500px
+      const clampedHeight = Math.min(500, Math.max(100, nextHeight));
+      
+      explorerSection.style.height = clampedHeight + 'px';
+      document.documentElement.style.setProperty('--explorer-height', clampedHeight + 'px');
+    });
+
+    // ─── Widget States & Collapsing ───
+    function setCollapsed(collapsed) {
+      isCollapsed = collapsed;
+      if (viewMode === 'mobile') {
+        if (collapsed) {
+          mobileSheetOverlay.style.display = 'none';
+        } else {
+          renderMobileTasks();
+          mobileSheetOverlay.style.display = 'block';
+        }
+        return;
+      }
+      
+      if (collapsed) {
+        widgetStack.style.display = 'none';
+        floatingBall.style.display = 'flex';
+        collapseWidgetsBtn.innerText = "展开任务卡片";
+      } else {
+        widgetStack.style.display = 'flex';
+        floatingBall.style.display = 'none';
+        collapseWidgetsBtn.innerText = "收纳为悬浮球";
+      }
+    }
+
+    widgetMinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setCollapsed(true);
+    });
+
+    floatingBall.addEventListener('click', () => {
+      setCollapsed(false);
+    });
+
+    collapseWidgetsBtn.addEventListener('click', () => {
+      setCollapsed(!isCollapsed);
+    });
+
+    // ─── View Mode Switcher ───
+    viewModeSelect.addEventListener('change', (e) => {
+      viewMode = e.target.value;
+      if (viewMode === 'mobile') {
+        deviceWrap.classList.add('mobile-mode');
+        // Hide desktop widget list in mobile
+        widgetStack.style.display = 'none';
+        // Show ball widget inside mobile if collapsed, or pop sheet
+        floatingBall.style.display = 'flex'; 
+        ballBadgeCount.innerText = tasksCount;
+        setCollapsed(true); // default to collapsed ball in mobile
+      } else {
+        deviceWrap.classList.remove('mobile-mode');
+        mobileSheetOverlay.style.display = 'none';
+        setCollapsed(isCollapsed);
+      }
+    });
+
+    // ─── Tasks Mock Data and Rendering ───
+    const allMockTasks = [
+      {
+        id: 'task-102',
+        title: '#102 修正预览区拖拽方向与宽度调整',
+        status: 'needs-user',
+        statusText: '需要用户处理',
+        relation: '当前运行',
+        time: '更新于 2 分钟前',
+        progress: '运行中: ui-designer | 步骤: 计划审批 (3/7)'
+      },
+      {
+        id: 'task-101',
+        title: '#101 修复 browser-share 插件 debugger 作用域',
+        status: 'running',
+        statusText: '正在运行',
+        relation: '已绑定',
+        time: '更新于 10 分钟前',
+        progress: '运行中: coder-agent | 步骤: 单元测试 (5/9)'
+      },
+      {
+        id: 'task-99',
+        title: '#99 重构左侧项目切换为弹窗分层选择',
+        status: 'done',
+        statusText: '已完成',
+        relation: '已绑定',
+        time: '更新于 1 小时前',
+        progress: '已全部通过验收'
+      }
+    ];
+
+    function renderTasks() {
+      const activeTasks = allMockTasks.slice(0, tasksCount);
+      
+      // Render Desktop widget body
+      const widgetBody = document.getElementById('widget-list-body');
+      widgetBody.innerHTML = '';
+      
+      activeTasks.forEach(task => {
+        const item = document.createElement('div');
+        item.className = 'task-card-item';
+        item.onclick = () => focusTask(task.id);
+        
+        let badgeClass = 'status-running';
+        if (task.status === 'needs-user') badgeClass = 'status-needs-user';
+        if (task.status === 'done') badgeClass = 'status-done';
+        if (task.status === 'failed') badgeClass = 'status-failed';
+        
+        item.innerHTML = `
+          <div class="task-card-header">
+            <div class="task-title">${task.title}</div>
+            <span class="task-status-badge ${badgeClass}">${task.statusText}</span>
+          </div>
+          <div class="task-meta">
+            <span class="task-relation-tag">${task.relation}</span>
+            <span>${task.time}</span>
+          </div>
+          <div class="subtasks-progress">
+            ${task.progress}
+          </div>
+        `;
+        widgetBody.appendChild(item);
+      });
+
+      // Update counters
+      document.querySelector('.widget-header-title span').innerText = `⚡ YPI Studio (${tasksCount})`;
+      document.getElementById('stack-count-label').innerText = `共绑定 ${tasksCount} 个任务 · 仅展示绑定当前会话的 Task`;
+      ballBadgeCount.innerText = tasksCount;
+      
+      // Pulse animation if there is a needs-user task in the list
+      const hasNeedsUser = activeTasks.some(t => t.status === 'needs-user');
+      if (hasNeedsUser) {
+        floatingBall.className = 'collapsed-floating-ball pulse-needs-user';
+      } else {
+        floatingBall.className = 'collapsed-floating-ball';
+      }
+    }
+
+    function renderMobileTasks() {
+      const activeTasks = allMockTasks.slice(0, tasksCount);
+      mobileTasksContainer.innerHTML = '';
+      
+      activeTasks.forEach(task => {
+        const item = document.createElement('div');
+        item.className = 'task-card-item';
+        item.style.border = '1px solid var(--border)';
+        item.style.borderRadius = '8px';
+        item.style.marginBottom = '8px';
+        item.onclick = () => {
+          focusTask(task.id);
+          mobileSheetOverlay.style.display = 'none';
+        };
+        
+        let badgeClass = 'status-running';
+        if (task.status === 'needs-user') badgeClass = 'status-needs-user';
+        if (task.status === 'done') badgeClass = 'status-done';
+        
+        item.innerHTML = `
+          <div class="task-card-header">
+            <div class="task-title">${task.title}</div>
+            <span class="task-status-badge ${badgeClass}">${task.statusText}</span>
+          </div>
+          <div class="task-meta">
+            <span class="task-relation-tag">${task.relation}</span>
+            <span>${task.time}</span>
+          </div>
+          <div class="subtasks-progress" style="margin-top: 6px;">
+            ${task.progress}
+          </div>
+        `;
+        mobileTasksContainer.appendChild(item);
+      });
+    }
+
+    tasksCountSelect.addEventListener('change', (e) => {
+      tasksCount = parseInt(e.target.value);
+      renderTasks();
+    });
+
+    // ─── Action Functions ───
+    function focusTask(taskId) {
+      showToast(`已在右侧工作室面板中聚焦并滚动到任务: ${taskId}`);
+      
+      // Update code preview area to show mock focus feedback
+      const previewText = document.getElementById('preview-text');
+      previewText.innerHTML = `// [Focused Studio Task Details: ${taskId}]\n` +
+        `// 模拟 Studio Drawer 针对 ${taskId} 的展示及审批交互...\n\n` +
+        `Task ID: ${taskId}\n` +
+        `Status: ${allMockTasks.find(t => t.id === taskId).statusText}\n` +
+        `CWD Context: /Volumes/01/.../pi-agent-web\n` +
+        `Associated Session ID: pi_session_9a2b\n` +
+        `-----------------------------------------\n` +
+        `[Approval Actions]\n` +
+        `- Approve Implementation Plan\n` +
+        `- View subagent timelines\n` +
+        `- Trigger manual resume / cancel`;
+    }
+
+    // Toggle Theme
+    themeToggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+
+    // Reset Layout Sizes
+    resetLayoutBtn.addEventListener('click', () => {
+      rightPanel.style.width = '42%';
+      panelWidthDisplay.innerText = '42%';
+      explorerSection.style.height = '220px';
+      document.documentElement.style.setProperty('--explorer-height', '220px');
+      showToast("布局尺寸已恢复默认");
+    });
+
+    // Mobile sheet controls
+    floatingBall.addEventListener('click', () => {
+      if (viewMode === 'mobile') {
+        setCollapsed(false);
+      }
+    });
+    closeMobileSheet.addEventListener('click', () => {
+      setCollapsed(true);
+    });
+    mobileSheetOverlay.addEventListener('click', (e) => {
+      if (e.target === mobileSheetOverlay) {
+        setCollapsed(true);
+      }
+    });
+
+    // Initial run
+    renderTasks();
+  </script>
+</body>
+</html>

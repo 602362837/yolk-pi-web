@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>YPI Studio 任务卡片进度轨道流动动效原型</title>
+  <style>
+    /* CSS 变量模拟 */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f8fafc;
+      --bg-hover: #f1f5f9;
+      --bg-selected: #e2e8f0;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --shadow-color: rgba(15, 23, 42, 0.08);
+      --halo-color: rgba(37, 99, 235, 0.25);
+    }
+
+    /* 暗色模式模拟 */
+    body.dark {
+      --bg: #0f172a;
+      --bg-panel: #1e293b;
+      --bg-hover: #334155;
+      --bg-selected: #475569;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #cbd5e1;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --shadow-color: rgba(0, 0, 0, 0.35);
+      --halo-color: rgba(59, 130, 246, 0.3);
+    }
+
+    body {
+      margin: 0;
+      padding: 30px;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-badge {
+      background: var(--accent);
+      color: white;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 500;
+    }
+
+    .controls-bar {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--text-dim);
+    }
+    .btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 32px;
+      margin-bottom: 16px;
+      color: var(--text);
+      border-left: 4px solid var(--accent);
+      padding-left: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: normal;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+
+    /* 模拟 YPI Studio Card */
+    .ypi-studio-card {
+      width: 360px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 4px 16px var(--shadow-color);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .ypi-studio-card:hover {
+      border-color: var(--text-dim);
+    }
+
+    .ypi-studio-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .ypi-studio-card-title {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 230px;
+    }
+
+    .ypi-studio-card-status {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-weight: 600;
+    }
+
+    .ypi-studio-card-status.active {
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--accent);
+    }
+    body.dark .ypi-studio-card-status.active {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent);
+    }
+
+    .ypi-studio-card-status.idle {
+      background: rgba(107, 114, 128, 0.1);
+      color: var(--text-muted);
+    }
+
+    /* 进度图连线与节点基础样式 */
+    .ypi-studio-workflow-rail {
+      display: flex;
+      align-items: flex-start;
+      width: 100%;
+      min-width: 0;
+      margin: 8px 0 12px;
+    }
+
+    .ypi-studio-workflow-rail-segment {
+      display: flex;
+      flex: 1 1 0;
+      min-width: 0;
+      align-items: flex-start;
+    }
+
+    .ypi-studio-workflow-rail-segment:last-child {
+      flex: 0 1 auto;
+    }
+
+    .ypi-studio-workflow-rail-station {
+      display: grid;
+      justify-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    /* 节点样式 */
+    .ypi-studio-workflow-rail-node {
+      width: 14px;
+      height: 14px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid var(--text-dim);
+      border-radius: 999px;
+      background: var(--bg);
+      color: var(--text-dim);
+      font-size: 9px;
+      font-weight: 900;
+      line-height: 1;
+      position: relative;
+      z-index: 2;
+    }
+
+    .ypi-studio-workflow-rail-node.is-done {
+      border-color: #16a34a;
+      background: #16a34a;
+      color: white;
+    }
+
+    .ypi-studio-workflow-rail-node.is-current {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    /* 核心增强 1：进行中节点的呼吸光圈效果 (halo) - 显眼肉眼可见 */
+    .ypi-studio-workflow-rail-node.is-current::before {
+      content: "";
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      border: 2px solid var(--accent);
+      border-radius: 999px;
+      opacity: 0;
+      animation: ypi-halo-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+      z-index: 1;
+    }
+
+    @keyframes ypi-halo-pulse {
+      0% {
+        transform: scale(0.85);
+        opacity: 0.95;
+      }
+      50% {
+        opacity: 0.5;
+      }
+      100% {
+        transform: scale(1.6);
+        opacity: 0;
+      }
+    }
+
+    .ypi-studio-workflow-rail-node.is-attention {
+      border-color: #d97706;
+      background: #f59e0b;
+      color: #1f2937;
+    }
+
+    .ypi-studio-workflow-rail-node.is-failed {
+      border-color: #dc2626;
+      background: #dc2626;
+      color: white;
+    }
+
+    .ypi-studio-workflow-rail-node.is-blocked {
+      border-color: #b45309;
+      background: #b45309;
+      color: white;
+    }
+
+    .ypi-studio-workflow-rail-label {
+      max-width: 46px;
+      overflow: hidden;
+      color: var(--text-dim);
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.1;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* 连线样式 */
+    .ypi-studio-workflow-rail-line {
+      height: 1px;
+      flex: 1 1 auto;
+      min-width: 4px;
+      margin: 7px 2px 0;
+      background: var(--border);
+      position: relative;
+      overflow: hidden;
+      z-index: 1;
+      transition: all 0.3s ease;
+    }
+
+    .ypi-studio-workflow-rail-line.is-done {
+      background: #16a34a;
+    }
+
+    .ypi-studio-workflow-rail-line.is-current {
+      background: color-mix(in srgb, var(--accent) 52%, var(--border));
+    }
+
+    .ypi-studio-workflow-rail-line.is-attention {
+      background: #f59e0b;
+    }
+
+    .ypi-studio-workflow-rail-line.is-failed {
+      background: #dc2626;
+    }
+
+    .ypi-studio-workflow-rail-line.is-blocked {
+      background: #b45309;
+    }
+
+    /* 核心增强 2：进行中出站线的流动效果 (shimmer) - 显眼肉眼可见 */
+    .ypi-studio-workflow-rail-line.is-flowing {
+      height: 2px;
+      margin-top: 6px;
+      background: var(--accent);
+      box-shadow: 0 0 4px var(--halo-color);
+    }
+
+    .ypi-studio-workflow-rail-line.is-flowing::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.95) 40%,
+        #ffffff 50%,
+        rgba(255, 255, 255, 0.95) 60%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      animation: ypi-line-flow 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    body.dark .ypi-studio-workflow-rail-line.is-flowing::after {
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.6) 40%,
+        #ffffff 50%,
+        rgba(255, 255, 255, 0.6) 60%,
+        rgba(255, 255, 255, 0) 100%
+      );
+    }
+
+    @keyframes ypi-line-flow {
+      0% {
+        transform: translateX(-100%);
+      }
+      100% {
+        transform: translateX(100%);
+      }
+    }
+
+    /* 模拟拖拽中暂停动画的祖先样式 */
+    .ypi-studio-card.is-dragging .ypi-studio-workflow-rail-node.is-current::before,
+    .ypi-studio-card.is-dragging .ypi-studio-workflow-rail-line.is-flowing::after {
+      animation-play-state: paused !important;
+    }
+
+    /* 模拟 prefers-reduced-motion: reduce 时的表现 */
+    .reduced-motion-active .ypi-studio-workflow-rail-node.is-current::before,
+    body.reduced-motion-active .ypi-studio-workflow-rail-node.is-current::before {
+      animation: none !important;
+      opacity: 0.5 !important;
+      transform: scale(1.25) !important;
+      border-width: 1.5px !important;
+    }
+
+    .reduced-motion-active .ypi-studio-workflow-rail-line.is-flowing::after,
+    body.reduced-motion-active .ypi-studio-workflow-rail-line.is-flowing::after {
+      animation: none !important;
+      display: none !important;
+    }
+
+    .reduced-motion-active .ypi-studio-workflow-rail-line.is-flowing,
+    body.reduced-motion-active .ypi-studio-workflow-rail-line.is-flowing {
+      height: 1px !important;
+      margin-top: 7px !important;
+      box-shadow: none !important;
+      background: color-mix(in srgb, var(--accent) 52%, var(--border)) !important;
+    }
+
+    /* Card 底部交互区 */
+    .ypi-studio-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .ypi-studio-card-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .ypi-studio-detail-btn {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .ypi-studio-detail-btn:hover {
+      background: rgba(37, 99, 235, 0.05);
+    }
+
+    /* 拖拽区域演示 */
+    .drag-sandbox {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-hover);
+      cursor: grab;
+      position: relative;
+    }
+    .drag-sandbox:active {
+      cursor: grabbing;
+    }
+    .drag-indicator {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* 堆叠多任务样式 */
+    .stacked-container {
+      position: relative;
+      height: 180px;
+      margin-bottom: 20px;
+    }
+
+    .stacked-card-bg {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 360px;
+      height: 130px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      opacity: 0.6;
+      z-index: 1;
+      transform: scale(0.97);
+    }
+
+    .stacked-card-main {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+    }
+
+    /* 移动端 Bottom Sheet 视图样式 */
+    .mobile-frame {
+      width: 375px;
+      height: 250px;
+      border: 6px solid #334155;
+      border-radius: 24px;
+      background: #020617;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .mobile-content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.2);
+    }
+
+    .mobile-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+
+    .doc-notes {
+      font-size: 13px;
+      background: var(--bg-panel);
+      padding: 14px 18px;
+      border-radius: 8px;
+      border-left: 4px solid var(--accent);
+      margin-top: 16px;
+      margin-bottom: 24px;
+    }
+    .doc-notes ul {
+      margin: 6px 0 0 0;
+      padding-left: 20px;
+    }
+    .doc-notes li {
+      margin-bottom: 4px;
+    }
+
+    /* Highlight class for emphasizing active changes */
+    .pulse-highlight {
+      background: rgba(245, 158, 11, 0.15) !important;
+      border-color: #f59e0b !important;
+    }
+    .badge-highlight {
+      background: #f59e0b;
+      color: #0f172a;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        YPI Studio 轨道流动效果与呼吸光圈原型
+        <span class="header-badge">UI 原型验证版</span>
+      </h1>
+      <div class="controls-bar">
+        <button class="btn" id="theme-toggle">🌗 切换暗色模式</button>
+        <button class="btn" id="motion-toggle">🏃 切换减少动态 (Reduced Motion)</button>
+      </div>
+    </header>
+
+    <div class="doc-notes">
+      <strong>💡 原型重点演示说明：</strong>
+      <ul>
+        <li><span class="badge-highlight">当前节点光圈 (Halo)</span>：进行中节点外部新增 2px 蓝色光环，自 0.85 缩放到 1.6 倍，呈现 2 秒周期的呼吸脉冲。</li>
+        <li><span class="badge-highlight">出站连线流动 (Shimmer)</span>：进行中出站连线加粗至 2px 且呈微弱发光状。伪元素使用高对比度白色渐变，以 1.8 秒周期由左向右单向流动，表示任务向后推进。</li>
+        <li><span class="badge-highlight">系统静态降级</span>：点击上方“切换减少动态”按钮可模拟 <code>prefers-reduced-motion: reduce</code> 降级：动画完全冻结，当前节点保留静态放大半透明环，连线恢复为 1px 静态状态颜色，杜绝屏闪与眩晕。</li>
+        <li><span class="badge-highlight">拖拽时暂停</span>：可在下方“拖拽模拟沙盒”中按住并拖动卡片，观察到拖动期间内所有流动与呼吸动画自动暂停（<code>animation-play-state: paused</code>），松开后自动恢复。</li>
+      </ul>
+    </div>
+
+    <!-- 1. 活动运行态 -->
+    <div class="section-title">
+      <span>1. 活动运行态演示 (Active Flowing States)</span>
+      <span class="section-desc">当前节点带呼吸脉冲，出站连线单向流动</span>
+    </div>
+    <div class="grid">
+      <!-- Brief 活动 -->
+      <div class="ypi-studio-card">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1235: 轨道流动视觉方案设计</span>
+          <span class="ypi-studio-card-status active">进行中 (Brief)</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-current">•</span>
+              <span class="ypi-studio-workflow-rail-label">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-current is-flowing"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">intake 阶段 · brief.md 已就绪</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+
+      <!-- Implement 活动 -->
+      <div class="ypi-studio-card">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1236: 编写 CSS Shimmer 特效与降级</span>
+          <span class="ypi-studio-card-status active">进行中 (Implement)</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-current">•</span>
+              <span class="ypi-studio-workflow-rail-label">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-current is-flowing"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">运行中 (ui-designer) · 45 t/s</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 静止对照组 -->
+    <div class="section-title">
+      <span>2. 静态/异常对照演示 (Static Reference States)</span>
+      <span class="section-desc">等待审批、需要关注、失败、阻塞、已完成及末站均保持完全静止</span>
+    </div>
+    <div class="grid">
+      <!-- 异常对照 -->
+      <div class="ypi-studio-card">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1237: 单元测试校验未通过</span>
+          <span class="ypi-studio-card-status idle" style="color:#ef4444; background:rgba(239,68,68,0.1)">已失败</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-failed">!</span>
+              <span class="ypi-studio-workflow-rail-label">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-failed"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">检查失败 · 无任何循环动画</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+
+      <!-- 等待审批对照 -->
+      <div class="ypi-studio-card">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1238: 视觉方案等待架构师审批</span>
+          <span class="ypi-studio-card-status idle" style="color:#d97706; background:rgba(217,119,6,0.1)">等待审批</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-attention">?</span>
+              <span class="ypi-studio-workflow-rail-label">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-attention"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+              <span class="ypi-studio-workflow-rail-label">Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">需要关注 · 静止无动效</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+
+      <!-- 末站 Review 活动状态 -->
+      <div class="ypi-studio-card">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1239: 交付成果与 Review 终审</span>
+          <span class="ypi-studio-card-status active">进行中 (Review)</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <!-- 末站有呼吸光圈，但因无出站连线，连线完全静止 -->
+              <span class="ypi-studio-workflow-rail-node is-current">•</span>
+              <span class="ypi-studio-workflow-rail-label">Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">末站活动：节点脉冲，连线静止</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+
+      <!-- 已完成状态 -->
+      <div class="ypi-studio-card">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1240: 悬浮窗完成归档</span>
+          <span class="ypi-studio-card-status idle" style="color:#16a34a; background:rgba(22,163,74,0.1)">已完成</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-station">
+              <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+              <span class="ypi-studio-workflow-rail-label">Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">全部已完成 · 完全静止</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 特殊场景演示 -->
+    <div class="section-title">
+      <span>3. 性能优化与交互演示 (Performance & Interaction Controls)</span>
+      <span class="section-desc">测试拖拽挂起与降低动态时的静态降级</span>
+    </div>
+    <div class="grid">
+      <!-- 拖拽挂起沙盒 -->
+      <div class="drag-sandbox" id="drag-zone">
+        <div class="drag-indicator">⬇️ 鼠标按住并在下方框内拖拽此卡片 ⬇️</div>
+        
+        <div class="ypi-studio-card" id="draggable-card" style="cursor: grab;">
+          <div class="ypi-studio-card-header">
+            <span class="ypi-studio-card-title">任务 1241: 拖拽中的卡片</span>
+            <span class="ypi-studio-card-status active" id="drag-status-text">进行中 (可拖拽)</span>
+          </div>
+          <div class="ypi-studio-workflow-rail">
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+                <span class="ypi-studio-workflow-rail-label">Brief</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-done"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-current">•</span>
+                <span class="ypi-studio-workflow-rail-label">Design</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-current is-flowing"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                <span class="ypi-studio-workflow-rail-label">Implement</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                <span class="ypi-studio-workflow-rail-label">Checks</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                <span class="ypi-studio-workflow-rail-label">Review</span>
+              </div>
+            </div>
+          </div>
+          <div class="ypi-studio-card-footer">
+            <span class="ypi-studio-card-meta" id="drag-tip">按住卡片以暂停动画</span>
+            <button class="ypi-studio-detail-btn" onclick="event.stopPropagation()">详情</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 静态降级对照 -->
+      <div class="ypi-studio-card reduced-motion-active">
+        <div class="ypi-studio-card-header">
+          <span class="ypi-studio-card-title">任务 1242: 系统减少动态偏好</span>
+          <span class="ypi-studio-card-status active">进行中 (静态降级)</span>
+        </div>
+        <div class="ypi-studio-workflow-rail">
+          <div class="ypi-studio-workflow-rail-segment">
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+                <span class="ypi-studio-workflow-rail-label">Brief</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-done"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <!-- 光圈保持静态环 -->
+                <span class="ypi-studio-workflow-rail-node is-current">•</span>
+                <span class="ypi-studio-workflow-rail-label">Design</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-current is-flowing"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                <span class="ypi-studio-workflow-rail-label">Implement</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                <span class="ypi-studio-workflow-rail-label">Checks</span>
+              </div>
+              <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+            </div>
+            <div class="ypi-studio-workflow-rail-segment">
+              <div class="ypi-studio-workflow-rail-station">
+                <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                <span class="ypi-studio-workflow-rail-label">Review</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ypi-studio-card-footer">
+          <span class="ypi-studio-card-meta">常态化对比 (无闪烁/纯静态)</span>
+          <button class="ypi-studio-detail-btn">详情</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 堆叠与移动端适配 -->
+    <div class="section-title">
+      <span>4. 堆叠多任务与移动端自适应表现 (Multi-task Stacking & Mobile Adaptive)</span>
+      <span class="section-desc">校验窄视图与卡片堆叠下样式独立</span>
+    </div>
+    <div style="display: flex; gap: 40px; flex-wrap: wrap;">
+      <!-- 两张卡堆叠 -->
+      <div>
+        <div style="font-size: 11px; margin-bottom: 8px; color: var(--text-dim);">双任务卡片层叠视图 (各自渲染互不干扰)</div>
+        <div class="stacked-container">
+          <div class="stacked-card-bg"></div>
+          <div class="ypi-studio-card stacked-card-main">
+            <div class="ypi-studio-card-header">
+              <span class="ypi-studio-card-title">任务 1243 (前端): 实现响应式 bottom sheet</span>
+              <span class="ypi-studio-card-status active">进行中 (Design)</span>
+            </div>
+            <div class="ypi-studio-workflow-rail">
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+                  <span class="ypi-studio-workflow-rail-label">Brief</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-done"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-current">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Design</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-current is-flowing"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Implement</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Checks</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Review</span>
+                </div>
+              </div>
+            </div>
+            <div class="ypi-studio-card-footer">
+              <span class="ypi-studio-card-meta">2 个任务中的第 1 个</span>
+              <button class="ypi-studio-detail-btn">详情</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 移动端 Bottom Sheet -->
+      <div>
+        <div style="font-size: 11px; margin-bottom: 8px; color: var(--text-dim);">移动端 Bottom Sheet 表现 (窄轨道自适应不溢出)</div>
+        <div class="mobile-frame">
+          <div class="mobile-content">
+            <div class="mobile-handle"></div>
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">任务 1244 (移动端)</div>
+            <div class="ypi-studio-workflow-rail" style="margin-bottom: 12px;">
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+                  <span class="ypi-studio-workflow-rail-label">Brief</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-done"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-done">✓</span>
+                  <span class="ypi-studio-workflow-rail-label">Design</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-done"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-current">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Implement</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-current is-flowing"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Checks</span>
+                </div>
+                <span class="ypi-studio-workflow-rail-line is-unknown"></span>
+              </div>
+              <div class="ypi-studio-workflow-rail-segment">
+                <div class="ypi-studio-workflow-rail-station">
+                  <span class="ypi-studio-workflow-rail-node is-unknown">•</span>
+                  <span class="ypi-studio-workflow-rail-label">Review</span>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size: 10px; color: var(--text-dim);">已自适应 343px 宽度轨道</span>
+              <button class="ypi-studio-detail-btn">详情</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 暗色模式切换
+    const themeBtn = document.getElementById('theme-toggle');
+    themeBtn.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+    });
+
+    // 减少动态全局切换
+    const motionBtn = document.getElementById('motion-toggle');
+    motionBtn.addEventListener('click', () => {
+      const active = document.body.classList.toggle('reduced-motion-active');
+      motionBtn.classList.toggle('active', active);
+      motionBtn.innerHTML = active ? '🚶 已开启系统减少动态' : '🏃 切换减少动态 (Reduced Motion)';
+    });
+
+    // 拖拽挂起动效交互模拟
+    const dragCard = document.getElementById('draggable-card');
+    const dragStatus = document.getElementById('drag-status-text');
+    const dragTip = document.getElementById('drag-tip');
+    
+    let isDragging = false;
+    let startX, startY;
+    let cardX = 0, cardY = 0;
+
+    dragCard.addEventListener('mousedown', (e) => {
+      // 排除按钮点击
+      if (e.target.tagName.toLowerCase() === 'button') return;
+      
+      isDragging = true;
+      dragCard.classList.add('is-dragging');
+      dragCard.style.cursor = 'grabbing';
+      dragStatus.innerHTML = '进行中 (拖拽悬停 - 动画已挂起)';
+      dragStatus.style.color = '#f59e0b';
+      dragTip.innerHTML = '🔴 动效已自动暂停!';
+      dragTip.style.color = '#ef4444';
+      
+      startX = e.clientX - cardX;
+      startY = e.clientY - cardY;
+      
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      cardX = e.clientX - startX;
+      cardY = e.clientY - startY;
+      
+      // 限制在沙盒范围内移动
+      cardX = Math.max(-50, Math.min(50, cardX));
+      cardY = Math.max(-20, Math.min(20, cardY));
+      
+      dragCard.style.transform = `translate(${cardX}px, ${cardY}px)`;
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      dragCard.classList.remove('is-dragging');
+      dragCard.style.cursor = 'grab';
+      dragStatus.innerHTML = '进行中 (已释放 - 动画恢复)';
+      dragStatus.style.color = '';
+      dragTip.innerHTML = '按住卡片以暂停动画';
+      dragTip.style.color = '';
+      
+      // 缓慢弹回原位
+      dragCard.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+      dragCard.style.transform = 'translate(0px, 0px)';
+      cardX = 0;
+      cardY = 0;
+      
+      setTimeout(() => {
+        dragCard.style.transition = '';
+      }, 300);
+    });
+  </script>
+</body>
+</html>

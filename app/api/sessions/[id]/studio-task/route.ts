@@ -5,6 +5,7 @@ import { resolveSessionPath } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
 import { resolveYpiStudioTaskForSession } from "@/lib/ypi-studio-session-link";
 import { YpiStudioTaskSecurityError } from "@/lib/ypi-studio-tasks";
+import type { YpiStudioSessionTasksLinkResult } from "@/lib/ypi-studio-types";
 import type { SessionEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +33,11 @@ export async function GET(
       return NextResponse.json({ error: "Invalid leafId" }, { status: 400 });
     }
 
-    const result = resolveYpiStudioTaskForSession({ cwd, sessionId: id, sessionFilePath: filePath, entries, leafId });
-    if (result.task && !result.task.archived && result.task.status === "implementing") {
-      const projection = result.task.implementationProjection;
+    const result: YpiStudioSessionTasksLinkResult = resolveYpiStudioTaskForSession({ cwd, sessionId: id, sessionFilePath: filePath, entries, leafId });
+    // Autocontinue only for the primary implementing task to avoid multi-task accidental dispatch.
+    const primaryTask = result.task;
+    if (primaryTask && !primaryTask.archived && primaryTask.status === "implementing") {
+      const projection = primaryTask.implementationProjection;
       const counts = projection?.statusCounts;
       const activeCount = (counts?.running ?? 0) + (counts?.queued ?? 0);
       const readyCount = counts?.ready ?? 0;
@@ -42,11 +45,11 @@ export async function GET(
       if (readyCount > 0 && availableSlots > 0) {
         getRpcSession(id)?.send({
           type: "studio_autocontinue",
-          taskId: result.task.id,
+          taskId: primaryTask.id,
           readySubtaskCount: readyCount,
           availableSlots,
-          stateKey: `${result.task.updatedAt}:${activeCount}:${readyCount}:${availableSlots}:${projection?.nextSubtaskIds?.join(",") ?? ""}`,
-          reason: "studio-task poll observed ready subtasks with free concurrency slots",
+          stateKey: `${primaryTask.updatedAt}:${activeCount}:${readyCount}:${availableSlots}:${projection?.nextSubtaskIds?.join(",") ?? ""}`,
+          reason: "studio-task poll observed ready subtasks with free concurrency slots (primary task only)",
         }).catch(() => {});
       }
     }

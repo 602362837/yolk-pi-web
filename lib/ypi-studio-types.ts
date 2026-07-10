@@ -770,7 +770,10 @@ export interface YpiStudioTaskWidgetProjection {
   artifacts: {
     required: string[];
     optional: string[];
+    /** Meaningful artifacts across the task's complete artifact registry, not just the active workflow state. */
     completed: string[];
+    /** Existing artifact files, including intentionally incomplete placeholders. */
+    available: string[];
     missing: string[];
   };
   steps: YpiStudioTaskWidgetStep[];
@@ -780,9 +783,37 @@ export interface YpiStudioTaskWidgetProjection {
   implementationProjection?: Pick<YpiStudioImplementationProjection, "maxConcurrency" | "statusCounts" | "activeSubtaskIds" | "queuedSubtaskIds" | "nextSubtaskIds" | "nonTerminalSubtasks" | "compactTimeline" | "sessionRuntime">;
 }
 
+/** @deprecated Replaced by YpiStudioSessionTasksLinkResult with multi-task support. Keep for backward reference. */
 export type YpiStudioSessionTaskLinkResult =
   | { task: YpiStudioTaskWidgetProjection; source: YpiStudioSessionTaskLinkSource; confidence: "high"; warnings?: string[] }
   | { task: null; reason: YpiStudioSessionTaskLinkReason; warnings?: string[] };
+
+export type YpiStudioSessionTaskLinkRelationship = "bound-context";
+
+export interface YpiStudioSessionTaskLinkCandidate {
+  task: YpiStudioTaskWidgetProjection;
+  sources: YpiStudioSessionTaskLinkSource[];
+  confidence: "high";
+  relationship: YpiStudioSessionTaskLinkRelationship;
+  current: boolean;
+  primary: boolean;
+  lastEvidenceOrder?: number;
+  warnings?: string[];
+}
+
+/** Multi-task session link result with backward-compatible `task` (primary) field. */
+export interface YpiStudioSessionTasksLinkResult {
+  task: YpiStudioTaskWidgetProjection | null;
+  tasks: YpiStudioSessionTaskLinkCandidate[];
+  primaryTaskKey?: string;
+  reason?: YpiStudioSessionTaskLinkReason;
+  warnings?: string[];
+  diagnostics?: {
+    observedUnboundTaskKeys?: string[];
+    runtimeUnboundTaskKey?: string;
+    transcriptObservedTaskKeys?: string[];
+  };
+}
 
 export interface YpiStudioLiveRunOverlay {
   toolCallId: string;
