@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
-import { access, chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { access, chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AuthStorage, getAgentDir, type OAuthCredential } from "@earendil-works/pi-coding-agent";
 import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
-import { convertOAuthAccountCredential, type OAuthAccountImportMode } from "@/lib/oauth-account-converters";
+import { convertOAuthAccountCredentialWithWarnings, type OAuthAccountImportMode, type OAuthAccountImportWarning } from "@/lib/oauth-account-converters";
 
 export const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
 
@@ -53,7 +53,10 @@ export interface OAuthAccountQuotaCache {
 }
 
 interface OAuthAccountMetadataEntry {
+  /** Stable saved-account storage id; v1 entries use the legacy real account id. */
   accountId: string;
+  /** Real ChatGPT account id retained for diagnostics and outbound OpenAI requests. */
+  chatgptAccountId?: string;
   label?: string;
   extraInfo?: string;
   quotaCache?: OAuthAccountQuotaCache;
@@ -64,7 +67,7 @@ interface OAuthAccountMetadataEntry {
 }
 
 interface OAuthAccountStoreMetadata {
-  version: 1;
+  version: 1 | 2;
   activeAccountId?: string;
   accounts: OAuthAccountMetadataEntry[];
 }
@@ -88,9 +91,16 @@ export interface OAuthAccountsList {
   accounts: OAuthAccountSummary[];
 }
 
+export interface OAuthAccountImportResult extends OAuthAccountsList {
+  /** Non-blocking conversion risks. Never contains credential material. */
+  warnings: OAuthAccountImportWarning[];
+}
+
 interface SaveAccountOptions {
   markActive?: boolean;
   recordActivation?: boolean;
+  /** Preserve the path of an existing saved account, including legacy v1 paths. */
+  storageId?: string;
 }
 
 export class OAuthAccountStoreError extends Error {
@@ -221,6 +231,7 @@ function normalizeAccountEntry(value: unknown): OAuthAccountMetadataEntry | null
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
+  if (typeof value.chatgptAccountId === "string" && value.chatgptAccountId.trim()) entry.chatgptAccountId = value.chatgptAccountId.trim();
   if (typeof value.label === "string" && value.label.trim()) entry.label = value.label.trim();
   if (typeof value.extraInfo === "string" && value.extraInfo.trim()) entry.extraInfo = value.extraInfo.trim();
   const quotaCache = normalizeQuotaCache(value.quotaCache);
@@ -240,7 +251,8 @@ function normalizeMetadata(value: unknown): OAuthAccountStoreMetadata {
     ? value.activeAccountId
     : undefined;
 
-  return { version: 1, activeAccountId, accounts };
+  const version = value.version === 2 ? 2 : 1;
+  return { version, activeAccountId, accounts };
 }
 
 async function readMetadata(provider: string): Promise<OAuthAccountStoreMetadata> {
@@ -384,29 +396,61 @@ function normalizeCredentialAccountId(credential: StoredOpenAICodexCredential): 
   return { ...credential, accountId: deriveAccountId(credential) };
 }
 
+function createStorageId(): string {
+  try {
+    return `acct_${randomUUID()}`;
+  } catch {
+    return `acct_${Date.now().toString(36)}_${createHash("sha256").update(`${Math.random()}-${process.pid}`).digest("hex").slice(0, 20)}`;
+  }
+}
+
+async function allocateStorageId(provider: string): Promise<string> {
+  for (;;) {
+    const storageId = createStorageId();
+    if (!(await pathExists(credentialPath(provider, storageId)))) return storageId;
+  }
+}
+
+function normalizeStorageId(value: string | undefined): string | undefined {
+  const storageId = value?.trim();
+  return storageId || undefined;
+}
+
+/** The property is non-enumerable so it is never written to Pi's OAuth credential format. */
+function withStorageId(credential: NormalizedOpenAICodexCredential, storageId: string): NormalizedOpenAICodexCredential {
+  Object.defineProperty(credential, "storageId", { value: storageId, enumerable: false });
+  return credential;
+}
+
+function credentialStorageId(credential: NormalizedOpenAICodexCredential): string | undefined {
+  const candidate = (credential as NormalizedOpenAICodexCredential & { storageId?: unknown }).storageId;
+  return typeof candidate === "string" ? normalizeStorageId(candidate) : undefined;
+}
+
 function upsertMetadataAccount(
   metadata: OAuthAccountStoreMetadata,
-  accountId: string,
+  storageId: string,
+  chatgptAccountId: string,
   options: SaveAccountOptions,
 ): OAuthAccountStoreMetadata {
   const now = new Date().toISOString();
-  const existing = metadata.accounts.find((entry) => entry.accountId === accountId);
+  const existing = metadata.accounts.find((entry) => entry.accountId === storageId);
   const nextEntry: OAuthAccountMetadataEntry = existing
-    ? { ...existing, updatedAt: now }
-    : { accountId, createdAt: now, updatedAt: now };
+    ? { ...existing, chatgptAccountId, updatedAt: now }
+    : { accountId: storageId, chatgptAccountId, createdAt: now, updatedAt: now };
 
   if (options.markActive && (options.recordActivation || !nextEntry.lastActivatedAt)) {
     nextEntry.lastActivatedAt = now;
   }
 
   const accounts = existing
-    ? metadata.accounts.map((entry) => entry.accountId === accountId ? nextEntry : entry)
+    ? metadata.accounts.map((entry) => entry.accountId === storageId ? nextEntry : entry)
     : [...metadata.accounts, nextEntry];
 
   return {
-    version: 1,
+    version: 2,
     accounts,
-    activeAccountId: options.markActive ? accountId : metadata.activeAccountId,
+    activeAccountId: options.markActive ? storageId : metadata.activeAccountId,
   };
 }
 
@@ -416,13 +460,15 @@ function maskAccountId(accountId: string): string {
 }
 
 function accountSummary(metadata: OAuthAccountStoreMetadata, entry: OAuthAccountMetadataEntry): OAuthAccountSummary {
-  const maskedAccountId = maskAccountId(entry.accountId);
+  const realAccountId = entry.chatgptAccountId ?? entry.accountId;
+  const maskedAccountId = maskAccountId(realAccountId);
   return {
+    // Public API field remains named accountId for route compatibility, but is the storage id.
     accountId: entry.accountId,
     label: entry.label,
     extraInfo: entry.extraInfo,
     quotaCache: entry.quotaCache,
-    displayName: entry.label ?? entry.accountId,
+    displayName: entry.label ?? maskedAccountId,
     maskedAccountId,
     active: metadata.activeAccountId === entry.accountId,
     createdAt: entry.createdAt,
@@ -479,22 +525,29 @@ async function clearActiveAccount(provider: string): Promise<void> {
   await writeMetadata(provider, { ...metadata, activeAccountId: undefined });
 }
 
-export async function readOAuthAccountCredential(provider: string, accountId: string): Promise<NormalizedOpenAICodexCredential> {
-  if (!accountId.trim()) throw new OAuthAccountStoreError("accountId is required", 400);
+export async function readOAuthAccountCredential(provider: string, storageId: string): Promise<NormalizedOpenAICodexCredential> {
+  if (!storageId.trim()) throw new OAuthAccountStoreError("accountId is required", 400);
 
-  const credential = await readJsonFile(credentialPath(provider, accountId), "OAuth account credential");
+  const credential = await readJsonFile(credentialPath(provider, storageId), "OAuth account credential");
   if (!credential) throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
   if (!isStoredOpenAICodexCredential(credential)) {
     throw new OAuthAccountStoreError("Saved OAuth account credential is invalid", 500);
   }
-  return normalizeCredentialAccountId(credential);
+  // `accountId` remains the real ChatGPT id used by Pi/OpenAI, never the storage id.
+  return withStorageId(normalizeCredentialAccountId(credential), storageId);
 }
 
 export async function getOAuthAccountAccessToken(provider: string, credential: NormalizedOpenAICodexCredential): Promise<string | undefined> {
   assertSupportedProvider(provider);
+  if (Date.now() >= credential.expires && !credential.refresh.trim()) {
+    throw new Error("OAuth access token expired and no refresh token is available. Please re-import the credential or log in again.");
+  }
   const result = await getOAuthApiKey(OPENAI_CODEX_PROVIDER_ID, { [OPENAI_CODEX_PROVIDER_ID]: credential });
   if (!result?.apiKey) return undefined;
-  await saveOAuthAccountCredential(provider, { type: "oauth", ...result.newCredentials, accountId: credential.accountId }).catch(() => {});
+  // Refreshes must overwrite the credential's originating saved-account path.
+  await saveOAuthAccountCredential(provider, { type: "oauth", ...result.newCredentials, accountId: credential.accountId }, {
+    storageId: credentialStorageId(credential),
+  }).catch(() => {});
   return result.apiKey;
 }
 
@@ -509,13 +562,14 @@ export async function saveOAuthAccountCredential(
   }
 
   const normalizedCredential = normalizeCredentialAccountId(credential);
-  const accountId = normalizedCredential.accountId;
-  await writeJsonFile(provider, credentialPath(provider, accountId), normalizedCredential);
+  const storageId = normalizeStorageId(options.storageId) ?? await allocateStorageId(provider);
+  // Deliberately serialize only the Pi-compatible credential; storage identity stays in path/metadata.
+  await writeJsonFile(provider, credentialPath(provider, storageId), normalizedCredential);
 
-  const metadata = upsertMetadataAccount(await readMetadata(provider), accountId, options);
+  const metadata = upsertMetadataAccount(await readMetadata(provider), storageId, normalizedCredential.accountId, options);
   await writeMetadata(provider, metadata);
 
-  const entry = metadata.accounts.find((account) => account.accountId === accountId);
+  const entry = metadata.accounts.find((account) => account.accountId === storageId);
   if (!entry) throw new OAuthAccountStoreError("Saved OAuth account metadata is invalid", 500);
   return accountSummary(metadata, entry);
 }
@@ -531,31 +585,62 @@ export async function syncActiveOAuthAccountCredential(
     return null;
   }
 
-  return saveOAuthAccountCredential(provider, credential, { markActive: true });
+  // AuthStorage deliberately holds a plain Pi credential and therefore has no storage id.
+  // The active metadata pointer is authoritative for an existing managed account.
+  const metadata = await readMetadata(provider);
+  const activeStorageId = metadata.activeAccountId && await pathExists(credentialPath(provider, metadata.activeAccountId))
+    ? metadata.activeAccountId
+    : undefined;
+  return saveOAuthAccountCredential(provider, credential, { markActive: true, storageId: activeStorageId });
 }
 
 export async function importOAuthAccountCredential(
   provider: string,
   mode: OAuthAccountImportMode,
   credential: unknown,
-): Promise<OAuthAccountsList> {
+): Promise<OAuthAccountImportResult> {
   assertSupportedProvider(provider);
 
   let rawCredentials: Record<string, unknown>[];
+  let warnings: OAuthAccountImportWarning[];
   try {
-    rawCredentials = convertOAuthAccountCredential(mode, credential);
+    const converted = convertOAuthAccountCredentialWithWarnings(mode, credential);
+    rawCredentials = converted.credentials;
+    warnings = converted.warnings;
   } catch (error) {
     throw new OAuthAccountStoreError(error instanceof Error ? error.message : "Invalid OAuth account credential", 400);
   }
 
-  for (let index = 0; index < rawCredentials.length; index += 1) {
-    const rawCredential = rawCredentials[index];
+  // Validate every item before allocating paths or creating any files.
+  const normalizedCredentials = rawCredentials.map((rawCredential, index) => {
     if (!isStoredOpenAICodexCredential(rawCredential)) {
       throw new OAuthAccountStoreError(`Expected OAuth credential JSON with type, access, refresh, and expires at account ${index + 1}`, 400);
     }
-    await saveOAuthAccountCredential(provider, rawCredential);
+    return normalizeCredentialAccountId(rawCredential);
+  });
+
+  const storageIds = await Promise.all(normalizedCredentials.map(() => allocateStorageId(provider)));
+  const writtenPaths: string[] = [];
+  try {
+    // All storage ids are newly allocated, so even identical imports and credentials with a
+    // shared real ChatGPT account id remain independent saved-account entries.
+    for (let index = 0; index < normalizedCredentials.length; index += 1) {
+      const path = credentialPath(provider, storageIds[index]);
+      await writeJsonFile(provider, path, normalizedCredentials[index]);
+      writtenPaths.push(path);
+    }
+
+    let metadata = await readMetadata(provider);
+    for (let index = 0; index < normalizedCredentials.length; index += 1) {
+      metadata = upsertMetadataAccount(metadata, storageIds[index], normalizedCredentials[index].accountId, {});
+    }
+    await writeMetadata(provider, metadata);
+  } catch (error) {
+    await Promise.all(writtenPaths.map((path) => unlink(path).catch(() => {})));
+    throw new OAuthAccountStoreError(error instanceof Error ? error.message : "Failed to save OAuth account credentials", 500);
   }
-  return listOAuthAccounts(provider);
+
+  return { ...await listOAuthAccounts(provider), warnings };
 }
 
 export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {
@@ -582,7 +667,7 @@ export async function listOAuthAccounts(provider: string): Promise<OAuthAccounts
     : undefined;
   if (activeAccountId !== metadata.activeAccountId) changed = true;
 
-  const nextMetadata = { version: 1 as const, activeAccountId, accounts: backfilled.accounts };
+  const nextMetadata: OAuthAccountStoreMetadata = { version: metadata.version, activeAccountId, accounts: backfilled.accounts };
   if (changed) await writeMetadata(provider, nextMetadata);
 
   return {
@@ -692,7 +777,11 @@ export async function activateOAuthAccount(provider: string, accountId: string):
   if (authStorage.drainErrors().length > 0) {
     throw new OAuthAccountStoreError("Failed to update active OAuth credential", 500);
   }
-  await saveOAuthAccountCredential(provider, credential, { markActive: true, recordActivation: true });
+  await saveOAuthAccountCredential(provider, credential, {
+    markActive: true,
+    recordActivation: true,
+    storageId: normalizedAccountId,
+  });
 
   return listOAuthAccounts(provider);
 }

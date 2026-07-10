@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AuthStorage } from "@earendil-works/pi-coding-agent";
-import { extractOpenAICodexAccountId, getOAuthAccountAccessToken, readOAuthAccountCredential, syncActiveOAuthAccountCredential, updateOAuthAccountQuotaCache } from "@/lib/oauth-accounts";
+import { extractOpenAICodexAccountId, getOAuthAccountAccessToken, listOAuthAccounts, readOAuthAccountCredential, syncActiveOAuthAccountCredential, updateOAuthAccountQuotaCache } from "@/lib/oauth-accounts";
 
 export type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
 
@@ -73,7 +73,10 @@ interface CodexResetCreditsParseResult {
 
 interface ResolvedActiveCredential {
   accessToken: string;
-  accountId: string | null;
+  /** Opaque saved-account id for cache writes and other store operations. */
+  storageId: string | null;
+  /** Real ChatGPT account id used only for outbound OpenAI headers. */
+  chatgptAccountId: string | null;
 }
 
 const OPENAI_CODEX_PROVIDER = "openai-codex";
@@ -362,9 +365,9 @@ async function queryOpenAICodexQuota(accessToken: string, accountId: string | nu
  * @param provider OAuth provider 标识，目前仅支持 openai-codex。
  * @returns 标准订阅额度结果。
  */
-async function cacheAccountQuota(provider: string, accountId: string | null, quota: SubscriptionQuota): Promise<void> {
-  if (!accountId) return;
-  await updateOAuthAccountQuotaCache(provider, accountId, {
+async function cacheAccountQuota(provider: string, storageId: string | null, quota: SubscriptionQuota): Promise<void> {
+  if (!storageId) return;
+  await updateOAuthAccountQuotaCache(provider, storageId, {
     success: quota.success,
     tiers: quota.tiers,
     error: quota.error,
@@ -381,6 +384,9 @@ async function resolveActiveOpenAICodexCredential(provider: string): Promise<Res
   const authStorage = AuthStorage.create();
   const storedCredential = authStorage.get(provider) as StoredOAuthCredential | undefined;
   if (storedCredential?.type !== "oauth") return quotaNotFound(provider);
+  if (Date.now() >= storedCredential.expires && !storedCredential.refresh.trim()) {
+    return quotaError(provider, "expired", "OAuth access token expired and no refresh token is available. Please re-import the credential or log in again.");
+  }
 
   let accessToken: string | undefined;
   try {
@@ -394,9 +400,12 @@ async function resolveActiveOpenAICodexCredential(provider: string): Promise<Res
 
   await syncActiveOAuthAccountCredential(provider, authStorage).catch(() => {});
   const refreshedCredential = authStorage.get(provider) as StoredOAuthCredential | undefined;
-  const accountId = refreshedCredential?.accountId ?? storedCredential.accountId ?? extractOpenAICodexAccountId(accessToken);
+  // The active entry is the saved-account identity. The credential account id remains
+  // the real ChatGPT id and must never be used as a metadata/cache key.
+  const activeStorageId = (await listOAuthAccounts(provider)).activeAccountId;
+  const chatgptAccountId = refreshedCredential?.accountId ?? storedCredential.accountId ?? extractOpenAICodexAccountId(accessToken);
 
-  return { accessToken, accountId };
+  return { accessToken, storageId: activeStorageId, chatgptAccountId };
 }
 
 function isSubscriptionQuota(value: ResolvedActiveCredential | SubscriptionQuota): value is SubscriptionQuota {
@@ -408,13 +417,13 @@ export async function getOAuthProviderSubscriptionQuota(provider: string): Promi
   if (isSubscriptionQuota(resolved)) return resolved;
 
   try {
-    const quota = await queryOpenAICodexQuota(resolved.accessToken, resolved.accountId);
-    await cacheAccountQuota(provider, resolved.accountId, quota);
+    const quota = await queryOpenAICodexQuota(resolved.accessToken, resolved.chatgptAccountId);
+    await cacheAccountQuota(provider, resolved.storageId, quota);
     return quota;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const quota = quotaError(provider, "valid", `Network error: ${message}`);
-    await cacheAccountQuota(provider, resolved.accountId, quota);
+    await cacheAccountQuota(provider, resolved.storageId, quota);
     return quota;
   }
 }
@@ -436,24 +445,24 @@ export async function getOAuthAccountSubscriptionQuota(provider: string, account
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const quota = quotaError(provider, "expired", message);
-    await cacheAccountQuota(provider, credential.accountId, quota);
+    await cacheAccountQuota(provider, accountId, quota);
     return quota;
   }
 
   if (!accessToken) {
     const quota = quotaError(provider, "expired", "OAuth token unavailable. Please re-login.");
-    await cacheAccountQuota(provider, credential.accountId, quota);
+    await cacheAccountQuota(provider, accountId, quota);
     return quota;
   }
 
   try {
     const quota = await queryOpenAICodexQuota(accessToken, credential.accountId);
-    await cacheAccountQuota(provider, credential.accountId, quota);
+    await cacheAccountQuota(provider, accountId, quota);
     return quota;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const quota = quotaError(provider, "valid", `Network error: ${message}`);
-    await cacheAccountQuota(provider, credential.accountId, quota);
+    await cacheAccountQuota(provider, accountId, quota);
     return quota;
   }
 }
@@ -464,10 +473,10 @@ export async function consumeOAuthProviderResetCredit(provider: string): Promise
 
   let consumed = false;
   try {
-    await consumeOpenAICodexResetCredit(resolved.accessToken, resolved.accountId);
+    await consumeOpenAICodexResetCredit(resolved.accessToken, resolved.chatgptAccountId);
     consumed = true;
-    const quota = await queryOpenAICodexQuota(resolved.accessToken, resolved.accountId);
-    await cacheAccountQuota(provider, resolved.accountId, quota);
+    const quota = await queryOpenAICodexQuota(resolved.accessToken, resolved.chatgptAccountId);
+    await cacheAccountQuota(provider, resolved.storageId, quota);
     return quota;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -501,7 +510,7 @@ export async function consumeOAuthAccountResetCredit(provider: string, accountId
     await consumeOpenAICodexResetCredit(accessToken, credential.accountId);
     consumed = true;
     const quota = await queryOpenAICodexQuota(accessToken, credential.accountId);
-    await cacheAccountQuota(provider, credential.accountId, quota);
+    await cacheAccountQuota(provider, accountId, quota);
     return quota;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

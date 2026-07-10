@@ -2,6 +2,17 @@ export type OAuthAccountImportMode = "raw" | "cpa" | "sub2api";
 export type ConvertibleAccountImportMode = Exclude<OAuthAccountImportMode, "raw">;
 export type OAuthAccountCredentialImport = Record<string, unknown> | Record<string, unknown>[];
 
+export interface OAuthAccountImportWarning {
+  code: "missing_refresh_token";
+  message: string;
+  accountIndex: number;
+}
+
+export interface OAuthAccountCredentialConversion {
+  credentials: Record<string, unknown>[];
+  warnings: OAuthAccountImportWarning[];
+}
+
 export interface AccountJsonConverter {
   mode: ConvertibleAccountImportMode;
   label: string;
@@ -123,20 +134,21 @@ function assignOptionalStringFieldFromSources(raw: Record<string, unknown>, targ
   if (value) raw[targetKey] = value;
 }
 
-export function convertCpaCredentialToRaw(credential: unknown): Record<string, unknown> {
+function convertCpaCredential(credential: unknown, accountIndex: number): { raw: Record<string, unknown>; warning?: OAuthAccountImportWarning } {
   if (!isJsonRecord(credential)) throw new Error("CPA JSON 必须是对象");
 
   const access = firstNonEmptyString(credential.access_token, credential.accessToken);
   const refresh = firstNonEmptyString(credential.refresh_token, credential.refreshToken);
   const expires = normalizeExpiresMs(credential.expired ?? credential.expires ?? credential.expires_at ?? credential.expiresAt);
   if (!access) throw new Error("CPA JSON 缺少 access_token");
-  if (!refresh) throw new Error("CPA JSON 缺少 refresh_token");
   if (expires === undefined) throw new Error("CPA JSON 缺少有效的 expired/expires 时间");
 
   const raw: Record<string, unknown> = {
     type: "oauth",
     access,
-    refresh,
+    // Pi's OAuth credential schema requires a string. An empty string explicitly records
+    // that this otherwise usable credential cannot be refreshed after it expires.
+    refresh: refresh ?? "",
     expires,
   };
 
@@ -151,7 +163,29 @@ export function convertCpaCredentialToRaw(credential: unknown): Record<string, u
     ["chatgpt_plan_type", "chatgpt_plan_type"],
   ]);
 
-  return raw;
+  return {
+    raw,
+    warning: refresh ? undefined : {
+      code: "missing_refresh_token",
+      message: "未提供 refresh token。此账号可在当前 access token 有效期间导入和使用；access token 过期后无法自动刷新，请重新导入或使用 Codex 授权登录。",
+      accountIndex,
+    },
+  };
+}
+
+export function convertCpaCredentialToRaw(credential: unknown): Record<string, unknown> {
+  return convertCpaCredential(credential, 0).raw;
+}
+
+function convertCpaCredentialImport(credential: unknown): OAuthAccountCredentialConversion {
+  const sourceCredentials = Array.isArray(credential) ? credential : [credential];
+  if (sourceCredentials.length === 0) throw new Error("CPA JSON 账号数组不能为空");
+
+  const converted = sourceCredentials.map((item, index) => convertCpaCredential(item, index));
+  return {
+    credentials: converted.map((item) => item.raw),
+    warnings: converted.flatMap((item) => item.warning ? [item.warning] : []),
+  };
 }
 
 function convertSub2apiAccountToRaw(account: unknown, index?: number): Record<string, unknown> {
@@ -201,7 +235,10 @@ export const ACCOUNT_JSON_CONVERTERS: Record<ConvertibleAccountImportMode, Accou
     mode: "cpa",
     label: "CPA 格式",
     sourcePlaceholder: CPA_ACCOUNT_JSON_EXAMPLE,
-    convert: convertCpaCredentialToRaw,
+    convert: (credential) => {
+      const converted = convertCpaCredentialImport(credential).credentials;
+      return converted.length === 1 ? converted[0] : converted;
+    },
   },
   sub2api: {
     mode: "sub2api",
@@ -211,7 +248,16 @@ export const ACCOUNT_JSON_CONVERTERS: Record<ConvertibleAccountImportMode, Accou
   },
 };
 
+export function convertOAuthAccountCredentialWithWarnings(mode: OAuthAccountImportMode, credential: unknown): OAuthAccountCredentialConversion {
+  if (mode === "raw") return { credentials: normalizeRawOAuthCredentialImport(credential), warnings: [] };
+  if (mode === "cpa") {
+    const converted = convertCpaCredentialImport(credential);
+    return { credentials: normalizeRawOAuthCredentialImport(converted.credentials), warnings: converted.warnings };
+  }
+  return { credentials: normalizeRawOAuthCredentialImport(ACCOUNT_JSON_CONVERTERS[mode].convert(credential)), warnings: [] };
+}
+
+/** Compatibility helper for callers that only need the normalized credential objects. */
 export function convertOAuthAccountCredential(mode: OAuthAccountImportMode, credential: unknown): Record<string, unknown>[] {
-  if (mode === "raw") return normalizeRawOAuthCredentialImport(credential);
-  return normalizeRawOAuthCredentialImport(ACCOUNT_JSON_CONVERTERS[mode].convert(credential));
+  return convertOAuthAccountCredentialWithWarnings(mode, credential).credentials;
 }

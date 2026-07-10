@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { DeepSeekBalanceResult } from "@/lib/deepseek-balance";
-import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, validateRawOAuthCredentialImport, type OAuthAccountImportMode } from "@/lib/oauth-account-converters";
+import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, convertOAuthAccountCredentialWithWarnings, validateRawOAuthCredentialImport, type OAuthAccountImportMode, type OAuthAccountImportWarning } from "@/lib/oauth-account-converters";
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay } from "@/lib/quota-display";
 import { ChatGptWarmupDialog } from "./ChatGptWarmupDialog";
 import { SelectDropdown } from "./SelectDropdown";
@@ -1186,7 +1186,8 @@ function AddAccountDialog({
   const [convertedJsonText, setConvertedJsonText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [validationMessage, setValidationMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [conversionWarnings, setConversionWarnings] = useState<OAuthAccountImportWarning[]>([]);
+  const [validationMessage, setValidationMessage] = useState<{ type: "success" | "warning" | "error"; text: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const converter = mode === "raw" ? undefined : ACCOUNT_JSON_CONVERTERS[mode];
   const finalJsonText = converter ? convertedJsonText : jsonText;
@@ -1213,13 +1214,18 @@ function AddAccountDialog({
       setValidationMessage({ type: "error", text: validationError });
       return null;
     }
-    setValidationMessage({ type: "success", text: Array.isArray(credential) ? `验证通过：最终 JSON 可以保存 ${credential.length} 个账号。` : "验证通过：最终 JSON 可以保存为账号。" });
+    if (conversionWarnings.length > 0) {
+      setValidationMessage({ type: "warning", text: conversionWarnings[0].message });
+    } else {
+      setValidationMessage({ type: "success", text: Array.isArray(credential) ? `验证通过：最终 JSON 可以保存 ${credential.length} 个账号。` : "验证通过：最终 JSON 可以保存为账号。" });
+    }
     return credential;
-  }, [parseFinalCredential]);
+  }, [conversionWarnings, parseFinalCredential]);
 
   const convertSourceJson = useCallback(() => {
     if (!converter) return;
     setError(null);
+    setConversionWarnings([]);
     setValidationMessage(null);
 
     let source: unknown;
@@ -1231,13 +1237,17 @@ function AddAccountDialog({
     }
 
     try {
-      const converted = converter.convert(source);
-      setConvertedJsonText(JSON.stringify(converted, null, 2));
-      setValidationMessage({ type: "success", text: "转换完成，请检查下方最终 JSON 后保存。" });
+      const converted = convertOAuthAccountCredentialWithWarnings(mode, source);
+      const finalCredential = converted.credentials.length === 1 ? converted.credentials[0] : converted.credentials;
+      setConvertedJsonText(JSON.stringify(finalCredential, null, 2));
+      setConversionWarnings(converted.warnings);
+      setValidationMessage(converted.warnings.length > 0
+        ? { type: "warning", text: converted.warnings[0].message }
+        : { type: "success", text: "转换完成，请检查下方最终 JSON 后保存。" });
     } catch (convertError) {
       setError(convertError instanceof Error ? convertError.message : "转换失败");
     }
-  }, [converter, jsonText]);
+  }, [converter, jsonText, mode]);
 
   const submitRawJson = useCallback(async () => {
     if (submitting) return;
@@ -1272,6 +1282,7 @@ function AddAccountDialog({
           if (disabled) return;
           setMode(value);
           setError(null);
+          setConversionWarnings([]);
           setValidationMessage(null);
         }}
         style={{
@@ -1325,12 +1336,17 @@ function AddAccountDialog({
             <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 14 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  请粘贴原始 credential 对象，或由 CPA/SUB2API 转换得到的 credential 数组。必填字段为 <code style={{ fontFamily: "var(--font-mono)" }}>type</code>、<code style={{ fontFamily: "var(--font-mono)" }}>access</code>、<code style={{ fontFamily: "var(--font-mono)" }}>refresh</code> 和 <code style={{ fontFamily: "var(--font-mono)" }}>expires</code>。账号会被保存，但不会自动切换为当前激活账号。
+                  请粘贴原始 credential 对象，或由 CPA/SUB2API 转换得到的 credential 数组。{mode === "cpa" ? <>CPA 至少需要有效的 <code style={{ fontFamily: "var(--font-mono)" }}>access_token</code> 和过期时间；<code style={{ fontFamily: "var(--font-mono)" }}>refresh_token</code> 可省略，但过期后无法自动刷新。</> : <>必填字段为 <code style={{ fontFamily: "var(--font-mono)" }}>type</code>、<code style={{ fontFamily: "var(--font-mono)" }}>access</code>、<code style={{ fontFamily: "var(--font-mono)" }}>refresh</code> 和 <code style={{ fontFamily: "var(--font-mono)" }}>expires</code>。</>}账号会被保存，但不会自动切换为当前激活账号。
                 </div>
                 <pre style={{ margin: 0, padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11, lineHeight: 1.5, overflow: "auto", fontFamily: "var(--font-mono)" }}>{RAW_ACCOUNT_JSON_EXAMPLE}</pre>
                 <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
                   如果省略 <code style={{ fontFamily: "var(--font-mono)" }}>accountId</code>，yolk pi web 会尝试从 access token 中解析，失败时使用稳定 fallback。账号显示名会按邮箱、手机号、accountId 的顺序自动补全。
                 </div>
+                {mode === "cpa" && (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5, padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8 }}>
+                    多账号支持：每条 CPA 凭据都会独立保存，即使真实 ChatGPT account id 相同也不会覆盖已有账号。
+                  </div>
+                )}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
@@ -1344,7 +1360,7 @@ function AddAccountDialog({
                     <textarea
                       ref={textareaRef}
                       value={jsonText}
-                      onChange={(e) => { setJsonText(e.target.value); setError(null); setValidationMessage(null); }}
+                      onChange={(e) => { setJsonText(e.target.value); setError(null); setConversionWarnings([]); setValidationMessage(null); }}
                       placeholder={converter.sourcePlaceholder}
                       spellCheck={false}
                       style={{ minHeight: 150, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
@@ -1355,7 +1371,7 @@ function AddAccountDialog({
                     </div>
                     <textarea
                       value={convertedJsonText}
-                      onChange={(e) => { setConvertedJsonText(e.target.value); setError(null); setValidationMessage(null); }}
+                      onChange={(e) => { setConvertedJsonText(e.target.value); setError(null); setConversionWarnings([]); setValidationMessage(null); }}
                       placeholder={RAW_ACCOUNT_JSON_EXAMPLE}
                       spellCheck={false}
                       style={{ minHeight: 150, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
@@ -1365,14 +1381,23 @@ function AddAccountDialog({
                   <textarea
                     ref={textareaRef}
                     value={jsonText}
-                    onChange={(e) => { setJsonText(e.target.value); setError(null); setValidationMessage(null); }}
+                    onChange={(e) => { setJsonText(e.target.value); setError(null); setConversionWarnings([]); setValidationMessage(null); }}
                     placeholder={RAW_ACCOUNT_JSON_EXAMPLE}
                     spellCheck={false}
                     style={{ minHeight: 260, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box", lineHeight: 1.5 }}
                   />
                 )}
-                {error && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{error}</div>}
-                {validationMessage && <div style={{ fontSize: 12, color: validationMessage.type === "success" ? "#34d399" : "#f87171", lineHeight: 1.5 }}>{validationMessage.text}</div>}
+                {error && <div role="alert" aria-live="assertive" style={{ display: "flex", gap: 8, padding: "10px 12px", background: "rgba(248,113,113,0.15)", border: "1px solid #f87171", borderRadius: 6, fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>转换失败：{error}</div>}
+                {validationMessage && (
+                  <div
+                    role={validationMessage.type === "error" ? "alert" : "status"}
+                    aria-live={validationMessage.type === "error" ? "assertive" : "polite"}
+                    style={{ display: "flex", gap: 8, padding: "10px 12px", background: validationMessage.type === "warning" ? "rgba(245,158,11,0.12)" : validationMessage.type === "success" ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)", border: `1px solid ${validationMessage.type === "warning" ? "rgba(245,158,11,0.45)" : validationMessage.type === "success" ? "#34d399" : "#f87171"}`, borderRadius: 6, fontSize: 12, color: validationMessage.type === "warning" ? "#f59e0b" : validationMessage.type === "success" ? "#34d399" : "#f87171", lineHeight: 1.5 }}
+                  >
+                    <span aria-hidden="true">{validationMessage.type === "warning" ? "⚠" : validationMessage.type === "success" ? "✓" : "!"}</span>
+                    <span>{validationMessage.text}</span>
+                  </div>
+                )}
               </div>
             </div>
 
