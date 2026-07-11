@@ -2150,21 +2150,29 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           transcript: writer ? { ...writer.ref } : undefined,
         };
         const taskAfterInitialRun = recordYpiStudioSubagentRun(root, taskId, runningRun);
-        const persistRunSnapshot = (run: YpiStudioTaskSubagentRun): void => {
+        let runStartMetadataChecked = false;
+        const persistRunStartMetadata = (run: YpiStudioTaskSubagentRun): void => {
+          if (runStartMetadataChecked) return;
+          runStartMetadataChecked = true;
+          if (!run.childSessionId && !run.childSessionFile) return;
           const latestTask = getYpiStudioTaskDetail(root, taskId);
           const existing = latestTask?.subagents.find((item) => item.id === run.id);
+          if (!existing || existing.status !== "running") return;
+          const gainedChildSessionRef = !existing.childSessionId && !!run.childSessionId
+            || !existing.childSessionFile && !!run.childSessionFile;
+          if (!gainedChildSessionRef) return;
           const mergedWarnings = Array.from(new Set([
-            ...(existing?.progress?.warnings ?? []),
+            ...(existing.progress?.warnings ?? []),
             ...persistentRunWarnings,
             ...(run.progress?.warnings ?? []),
           ])).slice(-12);
           recordYpiStudioSubagentRun(root, taskId, {
             ...existing,
-            ...run,
-            prompt: run.prompt ?? existing?.prompt ?? runningRun.prompt,
-            summary: run.summary ?? existing?.summary ?? runningRun.summary,
-            transcript: run.transcript ?? existing?.transcript ?? runningRun.transcript,
-            progress: run.progress ? { ...run.progress, warnings: mergedWarnings.length ? mergedWarnings : undefined } : run.progress,
+            childSessionId: run.childSessionId ?? existing.childSessionId,
+            childSessionFile: run.childSessionFile ?? existing.childSessionFile,
+            requestAffinity: run.requestAffinity ?? existing.requestAffinity,
+            transcript: run.transcript ?? existing.transcript,
+            progress: existing.progress ? { ...existing.progress, warnings: mergedWarnings.length ? mergedWarnings : undefined } : existing.progress,
           });
         };
         const persistSdkRunnerFailure = (error: unknown): void => {
@@ -2195,9 +2203,12 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             },
             transcript,
           };
-          persistRunSnapshot(failedRun);
+          recordYpiStudioSubagentRun(root, taskId, failedRun);
           updateYpiStudioChildRun(runId, { status: "failed", progress: failedRun.progress, result: { output: message, status: "failed", transcript, warnings: Array.from(persistentRunWarnings), progress: failedRun.progress!, terminationReason, runner: "sdk" } });
           unregisterYpiStudioChildRun(runId);
+        };
+        const persistTerminalRun = (run: YpiStudioTaskSubagentRun): void => {
+          if (mode === "async") recordYpiStudioSubagentRun(root, taskId, run);
         };
         const asyncStartRun = compactSubagentRunForAsyncStart(projectSubagentRun(root, taskId, runningRun, { includeTranscriptPreview: false }));
         const asyncStartWaitHint = { tool: "ypi_studio_wait", taskId, taskKey: taskAfterInitialRun.key, runId, runIds: [runId], until: "child_terminal", recommended: true };
@@ -2220,8 +2231,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             signal,
             onUpdate: childOnUpdate,
             persistence: {
-              onProgress: persistRunSnapshot,
-              onFinal: (run) => { persistRunSnapshot(run); },
+              onProgress: persistRunStartMetadata,
+              onFinal: persistTerminalRun,
             },
           }).catch((error) => {
             const isPreflight = error && typeof error === "object" && (error as { preflight?: boolean }).preflight === true;
@@ -2237,7 +2248,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
               try { appendYpiStudioSubagentTranscriptItem(writer, { kind: "status", at: new Date().toISOString(), text: fallbackSummary }); } catch {}
             }
             const fallbackRun: YpiStudioTaskSubagentRun = { ...runningRun, runner: "cli", summary: `SDK child runner preflight failed; falling back to CLI child process. ${oneLine(fallbackWarning, 500)}`, progress: runningRun.progress ? { ...runningRun.progress, warnings: Array.from(persistentRunWarnings).slice(-12), lastTextPreview: "SDK preflight failed; CLI fallback starting." } : undefined };
-            persistRunSnapshot(fallbackRun);
+            persistRunStartMetadata(fallbackRun);
             return runChildPi(
               root,
               childPrompt,
@@ -2247,8 +2258,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
               signal,
               childOnUpdate,
               {
-                onProgress: persistRunSnapshot,
-                onFinal: (run) => { persistRunSnapshot(run); },
+                onProgress: persistRunStartMetadata,
+                onFinal: persistTerminalRun,
               },
             );
           })
@@ -2261,8 +2272,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             signal,
             childOnUpdate,
             {
-              onProgress: persistRunSnapshot,
-              onFinal: (run) => { persistRunSnapshot(run); },
+              onProgress: persistRunStartMetadata,
+              onFinal: persistTerminalRun,
             },
           );
         if (runnerSelection.runner === "sdk" && !getYpiStudioChildRun(runId)) {

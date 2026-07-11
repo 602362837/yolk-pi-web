@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { SessionEntry, AgentMessage, ToolResultMessage, AssistantMessage, ToolCallContent } from "./types";
 import { getYpiStudioTaskDetail, getYpiStudioTaskIdForContext, listYpiStudioTasks } from "./ypi-studio-tasks";
 import { readYpiStudioSubagentTranscriptPreview } from "./ypi-studio-transcripts";
+import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import { orderYpiStudioWorkflowStates } from "./ypi-studio-workflow-flow";
 import { readYpiStudioWorkflow } from "./ypi-studio-workflows";
 import type {
@@ -206,6 +207,8 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
     .slice(0, Math.max(0, 5 - activeRuns.length));
   const runs = [...activeRuns.sort((a, b) => b.startedAt.localeCompare(a.startedAt)), ...recentRuns];
   return runs.map((run) => {
+    const handle = getYpiStudioChildRun(run.id);
+    const progress = handle?.progress ?? run.progress;
     let lastItemsPreview: YpiStudioSubagentTranscriptItem[] = [];
     const warnings: string[] = [];
     if (run.transcript) {
@@ -221,7 +224,7 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
       id: run.id,
       member: run.member,
       subtaskId: run.subtaskId,
-      status: normalizeRunStatus(run.status),
+      status: normalizeRunStatus(handle?.status === "runtime_lost" ? run.status : handle?.status ?? run.status),
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
       summary: clip(run.summary),
@@ -230,10 +233,10 @@ function buildSubagents(cwd: string, detail: YpiStudioTaskDetail): YpiStudioTask
       thinking: run.thinking,
       modelSource: run.modelSource,
       thinkingSource: run.thinkingSource,
-      phase: run.progress?.phase,
-      tokens: run.progress?.tokens,
-      tps: run.progress?.tps,
-      currentTool: run.progress?.currentTool,
+      phase: progress?.phase,
+      tokens: progress?.tokens,
+      tps: progress?.tps,
+      currentTool: progress?.currentTool,
       policy: run.policy,
       transcriptMeta: run.transcript,
       lastItemsPreview,
