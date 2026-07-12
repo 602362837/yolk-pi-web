@@ -1097,6 +1097,11 @@ span.linenumber {
   animation: ypi-studio-workflow-rail-shimmer 2.8s linear infinite;
 }
 
+.ypi-studio-widget-improvement {
+  /* Bounded improvement summary; status text is announced via aria-live on the element. */
+  container-type: inline-size;
+}
+
 /* The panel shell keeps drag positioning; only rail presentation freezes while it moves. */
 .ypi-studio-widget-panel-visual.is-dragging .ypi-studio-workflow-rail-node.is-halo::after,
 .ypi-studio-widget-panel-visual.is-dragging .ypi-studio-workflow-rail-line.is-flowing::after {

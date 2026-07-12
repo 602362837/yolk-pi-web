@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YPI Studio Approval Revision & Improvement Twin - UI Prototype</title>
+  <style>
+    :root {
+      --bg-primary: #1e1e2e;
+      --bg-secondary: #252538;
+      --bg-tertiary: #303046;
+      --text-primary: #cdd6f4;
+      --text-muted: #a6adc8;
+      --text-dim: #7f849c;
+      --border-color: #313244;
+      --accent-color: #89b4fa;
+      --accent-hover: #b4befe;
+      --success-color: #a6e3a1;
+      --warning-color: #f9e2af;
+      --error-color: #f38ba8;
+      --info-color: #74c7ec;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body.light {
+      --bg-primary: #f9f9fc;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f1f1f6;
+      --text-primary: #1e1e2e;
+      --text-muted: #585b70;
+      --text-dim: #9090a0;
+      --border-color: #e2e2e9;
+      --accent-color: #1e66f5;
+      --accent-hover: #209fb5;
+      --success-color: #40a02b;
+      --warning-color: #df8e1d;
+      --error-color: #d20f39;
+      --info-color: #04a5e5;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 14px;
+      line-height: 1.5;
+      transition: background-color 0.2s, color 0.2s;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .theme-toggle {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    main {
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Sidebar: Simulated Task State Selector */
+    .sidebar {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      height: fit-content;
+    }
+
+    .sidebar h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .state-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .state-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      border: 1px solid transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .state-item:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    .state-item.active {
+      background-color: var(--bg-tertiary);
+      border-color: var(--accent-color);
+    }
+
+    .state-title {
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .state-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Right Content Area: Simulated YpiStudioPanel Detail Page */
+    .panel-container {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 600px;
+    }
+
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      background-color: var(--bg-secondary);
+    }
+
+    .task-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+
+    .badge.planning { background-color: rgba(121, 131, 237, 0.15); color: #89b4fa; border: 1px solid rgba(121, 131, 237, 0.3); }
+    .badge.awaiting { background-color: rgba(249, 226, 175, 0.15); color: var(--warning-color); border: 1px solid rgba(249, 226, 175, 0.3); }
+    .badge.acceptance { background-color: rgba(116, 199, 236, 0.15); color: var(--info-color); border: 1px solid rgba(116, 199, 236, 0.3); }
+    .badge.completed { background-color: rgba(166, 227, 161, 0.15); color: var(--success-color); border: 1px solid rgba(166, 227, 161, 0.3); }
+    .badge.running { background-color: rgba(137, 180, 250, 0.15); color: var(--accent-color); border: 1px solid rgba(137, 180, 250, 0.3); }
+
+    .task-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    /* Tabs block */
+    .tabs-header {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      background-color: var(--bg-secondary);
+      padding: 0 12px;
+    }
+
+    .tab-btn {
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-color);
+      border-bottom-color: var(--accent-color);
+    }
+
+    .tab-btn .count-badge {
+      font-size: 11px;
+      background-color: var(--bg-tertiary);
+      color: var(--text-muted);
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    .panel-body {
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Custom Notice Alert Boxes */
+    .notice {
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .notice.info {
+      background-color: rgba(116, 199, 236, 0.08);
+      border-color: rgba(116, 199, 236, 0.2);
+      color: var(--text-primary);
+    }
+
+    .notice.warning {
+      background-color: rgba(249, 226, 175, 0.08);
+      border-color: rgba(249, 226, 175, 0.25);
+      color: var(--text-primary);
+    }
+
+    .notice.error {
+      background-color: rgba(243, 139, 168, 0.08);
+      border-color: rgba(243, 139, 168, 0.25);
+      color: var(--text-primary);
+    }
+
+    .notice.success {
+      background-color: rgba(166, 227, 161, 0.08);
+      border-color: rgba(166, 227, 161, 0.25);
+      color: var(--text-primary);
+    }
+
+    .notice-header {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Subagent status line */
+    .run-status-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--text-dim);
+      border-top-color: var(--accent-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Version / Approval Info Section */
+    .approval-section {
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-tertiary);
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    .revision-badge {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    /* Files & Artifacts List */
+    .artifacts-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .artifact-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: border-color 0.2s;
+    }
+
+    .artifact-card:hover {
+      border-color: var(--accent-color);
+    }
+
+    .artifact-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .artifact-icon {
+      font-size: 16px;
+    }
+
+    .artifact-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .artifact-type {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-left: 6px;
+    }
+
+    .artifact-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-link {
+      color: var(--accent-color);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Sandbox Preview Container */
+    .sandbox-preview {
+      margin-top: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      background-color: var(--bg-secondary);
+    }
+
+    .sandbox-header {
+      background-color: var(--bg-tertiary);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .sandbox-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--success-color);
+      font-weight: 600;
+    }
+
+    .sandbox-indicator::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background-color: var(--success-color);
+      border-radius: 50%;
+    }
+
+    .sandbox-content {
+      height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: var(--text-muted);
+      gap: 10px;
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .sandbox-browser-mock {
+      border: 1px dashed var(--border-color);
+      padding: 12px;
+      border-radius: 6px;
+      width: 80%;
+      font-family: monospace;
+      font-size: 11px;
+      background-color: var(--bg-secondary);
+    }
+
+    /* Actions area */
+    .action-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-color);
+      color: #1e1e2e;
+    }
+
+    .btn-primary:not(:disabled):hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-tertiary);
+      border-color: var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border-color);
+    }
+
+    .btn-danger {
+      background-color: rgba(243, 139, 168, 0.15);
+      border-color: var(--error-color);
+      color: var(--error-color);
+    }
+
+    .btn-danger:hover {
+      background-color: rgba(243, 139, 168, 0.25);
+    }
+
+    /* Twin Improvement List Section */
+    .twin-improvements-section {
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-secondary);
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .twin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .twin-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .twin-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .twin-item {
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background-color: var(--bg-tertiary);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .twin-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .twin-item-name {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .twin-item-meta {
+      display: flex;
+      font-size: 12px;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    .twin-progress-bar {
+      height: 4px;
+      background-color: var(--border-color);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+      position: relative;
+    }
+
+    .twin-progress-fill {
+      height: 100%;
+      background-color: var(--accent-color);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    .twin-progress-fill.success {
+      background-color: var(--success-color);
+    }
+
+    .twin-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    /* Modal dialog mock */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 500px;
+      max-width: 90%;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      background-color: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .modal-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .form-input, .form-textarea {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .form-input:focus, .form-textarea:focus {
+      border-color: var(--accent-color);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      height: 80px;
+    }
+
+    .modal-footer {
+      padding: 12px 20px;
+      background-color: var(--bg-tertiary);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .badge-icon {
+      font-size: 10px;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>
+      <span>🎯</span> YPI Studio 设计审批与孪生流程原型图
+    </h1>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="切换明暗主题">
+      <span id="theme-icon">🌙</span> <span id="theme-text">深色模式</span>
+    </button>
+  </header>
+
+  <main>
+    <!-- Left state switcher -->
+    <section class="sidebar">
+      <h2>状态模拟器</h2>
+      <ul class="state-list">
+        <li class="state-item active" onclick="switchState('planning-pending')" id="btn-planning-pending">
+          <div class="state-title">
+            <span>1. Planning (无原型)</span>
+            <span class="badge planning">planning</span>
+          </div>
+          <div class="state-desc">UI gate required，等待设计员完成 run 与 HTML。</div>
+        </li>
+        <li class="state-item" onclick="switchState('planning-ready')" id="btn-planning-ready">
+          <div class="state-title">
+            <span>2. Planning (原型已出)</span>
+            <span class="badge planning">planning</span>
+          </div>
+          <div class="state-desc">ui-designer 运行成功，原型就绪可请求审批。</div>
+        </li>
+        <li class="state-item" onclick="switchState('awaiting-r1')" id="btn-awaiting-r1">
+          <div class="state-title">
+            <span>3. Awaiting Approval (R1)</span>
+            <span class="badge awaiting">awaiting</span>
+          </div>
+          <div class="state-desc">R1 待用户评审，含 6 个 artifact 链接与 HTML 预览。</div>
+        </li>
+        <li class="state-item" onclick="switchState('awaiting-revise')" id="btn-awaiting-revise">
+          <div class="state-title">
+            <span>4. 计划变动 (Revise)</span>
+            <span class="badge awaiting">awaiting</span>
+          </div>
+          <div class="state-desc">用户修改计划，原 grant 失效，升至 R2 重新审批。</div>
+        </li>
+        <li class="state-item" onclick="switchState('acceptance-no-twins')" id="btn-acceptance-no-twins">
+          <div class="state-title">
+            <span>5. 验收开始 (无子任务)</span>
+            <span class="badge acceptance">acceptance</span>
+          </div>
+          <div class="state-desc">主任务进入 user_acceptance，用户可创建改进子任务。</div>
+        </li>
+        <li class="state-item" onclick="switchState('acceptance-with-twins')" id="btn-acceptance-with-twins">
+          <div class="state-title">
+            <span>6. 验收阻塞 (子任务处理中)</span>
+            <span class="badge awaiting">blocked</span>
+          </div>
+          <div class="state-desc">有未完成的改进子任务，主任务状态标为等待并阻塞。</div>
+        </li>
+        <li class="state-item" onclick="switchState('review-ready-twins')" id="btn-review-ready-twins">
+          <div class="state-title">
+            <span>7. 改进完成 (回 review)</span>
+            <span class="badge planning">review</span>
+          </div>
+          <div class="state-desc">所有改进完成，主任务自动回到 review，需重新验收。</div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Right workspace panel -->
+    <section class="panel-container">
+      <div class="panel-header">
+        <div class="task-meta">
+          <span id="task-scope-label" class="badge running">active task</span>
+          <span id="task-status-badge" class="badge planning">planning</span>
+          <span style="color: var(--text-dim);">Key: 20260711-185646</span>
+        </div>
+        <div class="task-title" id="task-title-text">完善 YPI Studio 设计审批同步与改进孪生流程</div>
+      </div>
+
+      <!-- Tab view mock -->
+      <div class="tabs-header">
+        <button class="tab-btn active" id="tab-btn-approval" onclick="switchTab('approval')">计划审批书</button>
+        <button class="tab-btn" id="tab-btn-overview" onclick="switchTab('overview')">任务概览</button>
+        <button class="tab-btn" id="tab-btn-implementation" onclick="switchTab('implementation')">实现进度</button>
+        <button class="tab-btn" id="tab-btn-artifacts" onclick="switchTab('artifacts')">产物归档 <span class="count-badge" id="artifact-count">6</span></button>
+      </div>
+
+      <div class="panel-body" id="panel-content">
+        <!-- Content will be rendered by state machine js below -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Create Twin Improvement Modal Dialog Mock -->
+  <div class="modal-backdrop" id="improvement-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">创建关联改进孪生子任务</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="twin-title">改进任务标题</label>
+          <input type="text" id="twin-title" class="form-input" value="改进：">
+        </div>
+        <div class="form-group">
+          <label for="twin-assignee">默认改进分析师 (improver)</label>
+          <input type="text" id="twin-assignee" class="form-input" value="improver (改进师)" disabled>
+        </div>
+        <div class="form-group">
+          <label for="twin-desc">问题描述与验收要求</label>
+          <textarea id="twin-desc" class="form-textarea" placeholder="请详细说明用户验收时提出的修改要求..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeImprovementModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitImprovementModal()">确定创建</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentTheme = 'dark';
+    let currentState = 'planning-pending';
+    let currentTab = 'approval';
+
+    // Mock data structures
+    const mockTasks = {
+      improvements: [
+        { id: '101', title: '改进：优化审批变动提示的暗色高亮对比度', status: 'implementing', progress: 40, assignee: 'improver' },
+        { id: '102', title: '改进：处理 child cancelled 时的阻断恢复判定', status: 'checking', progress: 85, assignee: 'improver' }
+      ]
+    };
+
+    function toggleTheme() {
+      const body = document.body;
+      const themeIcon = document.getElementById('theme-icon');
+      const themeText = document.getElementById('theme-text');
+      if (currentTheme === 'dark') {
+        body.classList.add('light');
+        themeIcon.textContent = '☀️';
+        themeText.textContent = '浅色模式';
+        currentTheme = 'light';
+      } else {
+        body.classList.remove('light');
+        themeIcon.textContent = '🌙';
+        themeText.textContent = '深色模式';
+        currentTheme = 'dark';
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`tab-btn-${tab}`).classList.add('active');
+      renderContent();
+    }
+
+    function switchState(state) {
+      currentState = state;
+      document.querySelectorAll('.state-item').forEach(item => item.classList.remove('active'));
+      document.getElementById(`btn-${state}`).classList.add('active');
+      
+      // Sync main task status badge
+      const badge = document.getElementById('task-status-badge');
+      const scopeBadge = document.getElementById('task-scope-label');
+      scopeBadge.className = 'badge running';
+      scopeBadge.textContent = 'active task';
+
+      if (state === 'planning-pending' || state === 'planning-ready') {
+        badge.className = 'badge planning';
+        badge.textContent = 'planning';
+      } else if (state === 'awaiting-r1' || state === 'awaiting-revise') {
+        badge.className = 'badge awaiting';
+        badge.textContent = 'awaiting_approval';
+      } else if (state === 'acceptance-no-twins') {
+        badge.className = 'badge acceptance';
+        badge.textContent = 'user_acceptance';
+      } else if (state === 'acceptance-with-twins') {
+        badge.className = 'badge awaiting';
+        badge.textContent = 'waiting_improvements';
+        scopeBadge.className = 'badge running btn-danger';
+        scopeBadge.textContent = 'blocked';
+      } else if (state === 'review-ready-twins') {
+        badge.className = 'badge planning';
+        badge.textContent = 'review';
+      }
+      renderContent();
+    }
+
+    function openImprovementModal() {
+      document.getElementById('twin-title').value = "改进：对 " + document.getElementById('task-title-text').textContent.substring(0, 15) + "... 进行修正";
+      document.getElementById('twin-desc').value = "";
+      document.getElementById('improvement-modal').style.display = 'flex';
+    }
+
+    function closeImprovementModal() {
+      document.getElementById('improvement-modal').style.display = 'none';
+    }
+
+    function submitImprovementModal() {
+      const title = document.getElementById('twin-title').value;
+      const desc = document.getElementById('twin-desc').value;
+      if (!title) return alert('标题不能为空');
+      
+      // Push mock item
+      mockTasks.improvements.push({
+        id: (100 + mockTasks.improvements.length + 1).toString(),
+        title: title,
+        status: 'planning',
+        progress: 10,
+        assignee: 'improver'
+      });
+      
+      closeImprovementModal();
+      switchState('acceptance-with-twins');
+    }
+
+    function removeImprovement(id) {
+      mockTasks.improvements = mockTasks.improvements.filter(x => x.id !== id);
+      if (mockTasks.improvements.length === 0) {
+        switchState('review-ready-twins');
+      } else {
+        renderContent();
+      }
+    }
+
+    function finishAllImprovements() {
+      mockTasks.improvements = mockTasks.improvements.map(x => {
+        x.status = 'completed';
+        x.progress = 100;
+        return x;
+      });
+      switchState('review-ready-twins');
+    }
+
+    function renderContent() {
+      const container = document.getElementById('panel-content');
+      
+      if (currentTab !== 'approval') {
+        container.innerHTML = `
+          <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+            <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+            <p><strong>[原型演示限制]</strong> 本 HTML 专门用于展示主会话审批 revision、UI 门禁及改进孪生子任务交互。</p>
+            <p style="font-size:12px; margin-top: 8px; color: var(--text-dim);">请点击顶部的“计划审批书”Tab 浏览核心 UI 交互。</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+
+      if (currentState === 'planning-pending') {
+        html += `
+          <div class="notice error">
+            <div class="notice-header">⚠️ UI 影响标识：REQUIRED (门禁激活)</div>
+            <div class="run-status-line">
+              <span class="spinner"></span>
+              <span>正在委派 <strong>ui-designer (UI 设计员)</strong> 进行原型与状态设计...</span>
+            </div>
+            <p style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">
+              系统检测到本任务已触发 UI 门禁。在成功产出 HTML 原型前，<strong>Awaiting Approval 审批入口与 Implementing 实施按钮已锁定</strong>。
+            </p>
+          </div>
+
+          <div class="approval-section">
+            <div class="section-title">
+              <span>计划草稿评审</span>
+              <span class="revision-badge">Revision 1 (Draft)</span>
+            </div>
+            <div style="color: var(--text-dim); text-align: center; padding: 24px;">
+              等待 UI 设计员上传 studio-approval-improvement-prototype.html...
+            </div>
+          </div>
+        `;
+      } else if (currentState === 'planning-ready') {
+        html += `
+          <div class="notice success">
+            <div class="notice-header">✅ UI 原型检查已通过</div>
+            <div class="run-status-line">
+              <span><strong>ui-designer</strong> 已成功运行并将原型保存至本地任务路径：</span>
+            </div>
+            <code style="font-size:12px; display:block; padding:6px; background: var(--bg-primary); border-radius:4px; margin-top:4px;">
+              studio-approval-improvement-prototype.html
+            </code>
+          </div>
+
+          <div class="approval-section">
+            <div class="section-title">
+              <span>计划审批书 (R1)</span>
+              <span class="revision-badge">Revision 1</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px;">请仔细确认以下完整计划和原型。确认无误后可在会话中发送“批准”启动实现。</p>
+            
+            <div class="artifacts-grid" style="margin-top: 10px;">
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">📄</span>
+                  <span class="artifact-name">plan-review.md</span>
+                  <span class="artifact-type">计划审批入口</span>
+                </div>
+                <div class="artifact-actions"><span class="btn-link">查看</span></div>
+              </div>
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">🎨</span>
+                  <span class="artifact-name">ui.md</span>
+                  <span class="artifact-type">UI 设计与门禁说明</span>
+                </div>
+                <div class="artifact-actions"><span class="btn-link">查看</span></div>
+              </div>
+              <div class="artifact-card" style="border-color: var(--success-color);">
+                <div class="artifact-info">
+                  <span class="artifact-icon">🌐</span>
+                  <span class="artifact-name" style="color: var(--success-color);">studio-approval-improvement-prototype.html</span>
+                  <span class="artifact-type" style="color: var(--success-color);">HTML 原型文件</span>
+                </div>
+                <div class="artifact-actions"><span class="btn-link" style="color: var(--success-color);">预览原型</span></div>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button class="btn btn-secondary">返回修改 (Planning)</button>
+              <button class="btn btn-primary" onclick="switchState('awaiting-r1')">请求用户审批 (Awaiting Approval)</button>
+            </div>
+          </div>
+        `;
+      } else if (currentState === 'awaiting-r1') {
+        html += `
+          <div class="notice info">
+            <div class="notice-header">💡 等待用户确认 (Revision 1)</div>
+            <p style="font-size: 13px; color: var(--text-muted);">
+              本计划已发至主会话等待审批。当前版本已固化，普通产物编辑将在此阶段触发审批重建并撤销任何临时 Grant，保障安全性。
+            </p>
+          </div>
+
+          <div class="approval-section">
+            <div class="section-title">
+              <span>审批书内容与安全预览</span>
+              <span class="revision-badge" style="color: var(--info-color);">Revision 1</span>
+            </div>
+
+            <div class="artifacts-grid">
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">📄</span>
+                  <span class="artifact-name">plan-review.md</span>
+                </div>
+                <span class="btn-link">查看</span>
+              </div>
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">🎨</span>
+                  <span class="artifact-name">ui.md</span>
+                </div>
+                <span class="btn-link">查看</span>
+              </div>
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">🌐</span>
+                  <span class="artifact-name">studio-approval-improvement-prototype.html</span>
+                </div>
+                <span class="btn-link" style="font-weight: bold; color: var(--accent-color);">沙箱安全预览</span>
+              </div>
+            </div>
+
+            <!-- Sandboxed preview mock -->
+            <div class="sandbox-preview">
+              <div class="sandbox-header">
+                <span>预览容器: studio-approval-improvement-prototype.html</span>
+                <span class="sandbox-indicator">Sandbox 活跃 (CSP 限制)</span>
+              </div>
+              <div class="sandbox-content">
+                <div class="sandbox-browser-mock">
+                  http://localhost:30141/api/studio/tasks/20260711-185646/preview/html
+                </div>
+                <p style="font-size:13px; margin-top:8px;">[此处安全加载并渲染 UI 设计员交付的原型 HTML]</p>
+                <div style="font-size:11px; color: var(--text-dim);">不可越权逃逸，绝对路径及符号链接已禁用</div>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button class="btn btn-secondary" onclick="switchState('awaiting-revise')">模拟用户提出修改</button>
+              <button class="btn btn-primary" style="opacity: 0.6;" disabled>等待用户会话批准后开始实现...</button>
+            </div>
+          </div>
+        `;
+      } else if (currentState === 'awaiting-revise') {
+        html += `
+          <div class="notice warning">
+            <div class="notice-header">⚠️ 旧审批已失效：计划已被原子修订 (Revision 2)</div>
+            <p style="font-size: 13px; color: var(--text-muted);">
+              用户刚才在主会话中对技术设计 (design.md) 提出了调整意见。系统通过原子修订操作重新打包计划材料：
+            </p>
+            <ul style="margin-left: 20px; font-size:12px; color: var(--text-muted); margin-top: 4px;">
+              <li>前一版本 (Revision 1) 的 User Approval Grant 已被自动清除。</li>
+              <li>所有受影响的文档及 <code>plan-review.md</code> 统一更新。</li>
+              <li>版本提升至 <strong>Revision 2</strong>，要求重新请求审批，防止实现员误按陈旧计划实施。</li>
+            </ul>
+          </div>
+
+          <div class="approval-section">
+            <div class="section-title">
+              <span>新审批书草稿 (R2)</span>
+              <span class="revision-badge" style="color: var(--warning-color); border-color: var(--warning-color);">Revision 2</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">
+              变动说明: 调整了改进子任务的 disposal 终态语义与状态机恢复逻辑
+            </div>
+
+            <div class="artifacts-grid">
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">📄</span>
+                  <span class="artifact-name">plan-review.md</span>
+                  <span class="artifact-type">已更新 R2</span>
+                </div>
+                <span class="btn-link">查看</span>
+              </div>
+              <div class="artifact-card">
+                <div class="artifact-info">
+                  <span class="artifact-icon">💻</span>
+                  <span class="artifact-name">design.md</span>
+                  <span class="artifact-type">已更新 R2</span>
+                </div>
+                <span class="btn-link">查看</span>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button class="btn btn-secondary" onclick="switchState('awaiting-r1')">回退 R1 演示</button>
+              <button class="btn btn-primary" onclick="switchState('acceptance-no-twins')">用户通过 R2 审批并完成实现 (演示跳转验收)</button>
+            </div>
+          </div>
+        `;
+      } else if (currentState === 'acceptance-no-twins') {
+        html += `
+          <div class="notice info">
+            <div class="notice-header">🏁 任务处于用户验收阶段 (User Acceptance)</div>
+            <p style="font-size: 13px; color: var(--text-muted);">
+              主任务开发与自动化检查已全部完成。现由用户进行界面和功能审查。
+            </p>
+          </div>
+
+          <div class="twin-improvements-section">
+            <div class="twin-header">
+              <span class="twin-title">🛠️ 关联改进孪生子任务</span>
+              <button class="btn btn-primary" style="padding: 4px 10px; font-size:12px;" onclick="openImprovementModal()">+ 新建改进子任务</button>
+            </div>
+            <p style="font-size: 12px; color: var(--text-dim);">
+              在验收阶段发现的问题/体验不足时，用户可以直接创建关联改进任务，以独立生命周期闭环，而不会在主任务中杂乱修改开发范围。
+            </p>
+            <div style="text-align: center; color: var(--text-dim); padding: 24px; border: 1px dashed var(--border-color); border-radius:6px;">
+              当前暂无关联的改进任务。主任务允许直接确认验收完成。
+            </div>
+            
+            <div class="action-row">
+              <button class="btn btn-secondary" onclick="switchState('awaiting-revise')">回到审批阶段模拟</button>
+              <button class="btn btn-primary" onclick="alert('恭喜，主任务验收通过，进入 completed 终态！')">确认验收并归档</button>
+            </div>
+          </div>
+        `;
+      } else if (currentState === 'acceptance-with-twins') {
+        html += `
+          <div class="notice error">
+            <div class="notice-header">🛑 验收阻塞：有未终态的改进孪生任务</div>
+            <p style="font-size: 13px; color: var(--text-muted);">
+              已关联创建 ${mockTasks.improvements.length} 个改进子任务。<strong>只要有任意子任务未完成，主任务便强制维持等待阻塞，拒绝归档/完成。</strong>
+            </p>
+          </div>
+
+          <div class="twin-improvements-section">
+            <div class="twin-header">
+              <span class="twin-title">🛠️ 关联改进孪生子任务 (${mockTasks.improvements.length})</span>
+              <button class="btn btn-primary" style="padding: 4px 10px; font-size:12px;" onclick="openImprovementModal()">+ 新建改进子任务</button>
+            </div>
+
+            <div class="twin-list">
+              ${mockTasks.improvements.map(item => `
+                <div class="twin-item">
+                  <div class="twin-item-header">
+                    <span class="twin-item-name">
+                      <span style="font-size:14px;">🔧</span> ${item.title}
+                    </span>
+                    <span class="badge ${item.status === 'completed' ? 'completed' : 'running'}">${item.status}</span>
+                  </div>
+                  <div class="twin-item-meta">
+                    <span>处理人: <strong>${item.assignee}</strong></span>
+                    <span>进度: ${item.progress}%</span>
+                    <span>ID: ${item.id}</span>
+                  </div>
+                  <div class="twin-progress-bar">
+                    <div class="twin-progress-fill ${item.status === 'completed' ? 'success' : ''}" style="width: ${item.progress}%"></div>
+                  </div>
+                  <div class="twin-actions">
+                    <span class="btn-link" style="color: var(--error-color);" onclick="removeImprovement('${item.id}')">删除/取消</span>
+                    <span class="btn-link" style="color: var(--success-color);" onclick="item.status='completed'; item.progress=100; renderContent();">模拟此任务完成</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="action-row" style="margin-top: 12px; display: flex; justify-content: space-between;">
+              <button class="btn btn-secondary" onclick="finishAllImprovements()">💡 一键完成所有改进</button>
+              <button class="btn btn-primary" style="opacity: 0.5; cursor: not-allowed;" disabled>等待所有改进子任务验收通过后才可归档...</button>
+            </div>
+          </div>
+        `;
+      } else if (currentState === 'review-ready-twins') {
+        html += `
+          <div class="notice success">
+            <div class="notice-header">🎉 关联改进全部完成！</div>
+            <p style="font-size: 13px; color: var(--text-muted);">
+              所有关联改进子任务均已走完 improver → implementer → checker → user acceptance 闭环并确认。
+              <strong>主任务已自动恢复至 review 状态，准备就绪。</strong>
+            </p>
+          </div>
+
+          <div class="twin-improvements-section">
+            <div class="twin-header">
+              <span class="twin-title">🛠️ 关联改进孪生子任务 (全部完成)</span>
+            </div>
+
+            <div class="twin-list" style="opacity: 0.7;">
+              <div class="twin-item" style="border-color: var(--success-color);">
+                <div class="twin-item-header">
+                  <span><strong>改进：优化审批变动提示的暗色高亮对比度</strong></span>
+                  <span class="badge completed">completed</span>
+                </div>
+                <div class="twin-item-meta">
+                  <span>完成人: improver</span>
+                  <span>进度: 100%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="notice info" style="margin-top: 12px;">
+              <div class="notice-header">💡 主会话操作提示：需要二次验收</div>
+              <p style="font-size:12px; color: var(--text-muted);">
+                所有改进均已合入。系统要求主会话汇总本次改动并重新通知用户进行二次验收，确保系统稳定性，之后即可完成主任务。
+              </p>
+            </div>
+
+            <div class="action-row">
+              <button class="btn btn-secondary" onclick="switchState('acceptance-no-twins')">重置演示</button>
+              <button class="btn btn-primary" onclick="alert('二次验收通过！主任务已归档。')">二次验收通过：归档主任务</button>
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    // Initial render
+    switchState('planning-pending');
+  </script>
+</body>
+</html>

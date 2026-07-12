@@ -4,17 +4,33 @@ import { canonicalizeCwd } from "@/lib/cwd";
 import {
   archiveYpiStudioTask,
   bindYpiStudioTaskToContext,
+  claimYpiStudioImprovementSubtask,
   claimYpiStudioImplementationSubtask,
+  createYpiStudioImprovement,
   getYpiStudioTaskDetail,
+  isYpiStudioImprovementApprovalBody,
+  isYpiStudioImprovementArtifactUpdateBody,
+  isYpiStudioImprovementCreateBody,
+  isYpiStudioImprovementDispositionBody,
+  isYpiStudioImprovementPlanUpdateBody,
+  isYpiStudioImprovementSubtaskClaimBody,
+  isYpiStudioImprovementRevisionBody,
+  isYpiStudioImprovementTransitionBody,
   isYpiStudioTaskArchiveBody,
   isYpiStudioTaskImplementationPlanUpdateBody,
   isYpiStudioTaskImplementationSubtaskClaimBody,
   isYpiStudioTaskImplementationSubtaskUpdateBody,
   isYpiStudioTaskArtifactUpdateBody,
   isYpiStudioTaskTransitionBody,
+  recordYpiStudioImprovementApproval,
+  resolveYpiStudioImprovementDisposition,
+  reviseYpiStudioImprovementPlan,
+  transitionYpiStudioImprovement,
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
   updateYpiStudioImplementationSubtask,
+  updateYpiStudioImprovementArtifact,
+  updateYpiStudioImprovementPlan,
   updateYpiStudioTaskArtifact,
   YpiStudioTaskSecurityError,
 } from "@/lib/ypi-studio-tasks";
@@ -100,6 +116,10 @@ export async function PATCH(
       const task = claimYpiStudioImplementationSubtask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
     }
+    if (isYpiStudioImprovementSubtaskClaimBody(body)) {
+      const task = claimYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
     if (isYpiStudioTaskImplementationSubtaskUpdateBody(body)) {
       const task = updateYpiStudioImplementationSubtask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
@@ -107,6 +127,34 @@ export async function PATCH(
     if (isYpiStudioTaskArchiveBody(body)) {
       const result = archiveYpiStudioTask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json(result);
+    }
+    if (isYpiStudioImprovementCreateBody(body)) {
+      const task = createYpiStudioImprovement(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementTransitionBody(body)) {
+      const task = transitionYpiStudioImprovement(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementDispositionBody(body)) {
+      const task = resolveYpiStudioImprovementDisposition(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementArtifactUpdateBody(body)) {
+      const task = updateYpiStudioImprovementArtifact(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementPlanUpdateBody(body)) {
+      const task = updateYpiStudioImprovementPlan(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementApprovalBody(body)) {
+      const task = recordYpiStudioImprovementApproval(authorizedCwd, taskKey, body.improvementId, body.contextId, body.inputText);
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementRevisionBody(body)) {
+      const task = reviseYpiStudioImprovementPlan(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
     }
 
     return NextResponse.json({ error: "Unsupported task patch body" }, { status: 400 });

@@ -87,7 +87,7 @@ export interface PiWebTrellisConfig {
   subagents: PiWebTrellisSubagentsConfig;
 }
 
-export type PiWebStudioMemberId = "architect" | "ui-designer" | "implementer" | "checker" | string;
+export type PiWebStudioMemberId = "architect" | "improver" | "ui-designer" | "implementer" | "checker" | string;
 
 export type PiWebStudioSubagentRunner = "auto" | "sdk" | "cli";
 
@@ -212,7 +212,7 @@ export class PiWebConfigValidationError extends Error {
   }
 }
 
-export const PI_WEB_STUDIO_DEFAULT_MEMBERS = ["architect", "ui-designer", "implementer", "checker"] as const;
+export const PI_WEB_STUDIO_DEFAULT_MEMBERS = ["architect", "improver", "ui-designer", "implementer", "checker"] as const;
 
 const DEFAULT_STUDIO_POLICY: PiWebSubagentRunPolicy = {
   model: { mode: "followMain" },

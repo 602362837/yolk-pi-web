@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { resolveYpiStudioMemberPolicy } from "../lib/ypi-studio-policy.ts";
-import { DEFAULT_PI_WEB_CONFIG, validatePiWebStudioConfig } from "../lib/pi-web-config.ts";
+import { DEFAULT_PI_WEB_CONFIG, PI_WEB_STUDIO_DEFAULT_MEMBERS, validatePiWebStudioConfig } from "../lib/pi-web-config.ts";
 
 const policy = (model, thinking = "inherit") => ({ model, thinking });
 const configResult = (studio, extra = {}) => ({
@@ -92,6 +92,67 @@ const baseStudio = {
   assert.equal(validatePiWebStudioConfig({ members: {}, subagents: { runner: "sdk" } }).subagents.runner, "sdk");
   assert.equal(validatePiWebStudioConfig({ members: {}, subagents: { runner: "cli" } }).subagents.runner, "cli");
   assert.throws(() => validatePiWebStudioConfig({ members: {}, subagents: { runner: "bad" } }), /studio\.subagents\.runner must be auto, sdk, or cli/);
+}
+
+// --- Improver default member and policy chain ---
+
+{
+  // improver is a default member, ordered after architect and before ui-designer
+  assert.deepEqual([...PI_WEB_STUDIO_DEFAULT_MEMBERS], ["architect", "improver", "ui-designer", "implementer", "checker"]);
+  assert.ok(DEFAULT_PI_WEB_CONFIG.studio.members.improver, "default config includes improver member policy");
+  assert.equal(DEFAULT_PI_WEB_CONFIG.studio.members.improver.model.mode, "followMain");
+  assert.equal(DEFAULT_PI_WEB_CONFIG.studio.members.improver.thinking, "inherit");
+}
+
+{
+  // improver with no per-member config falls through to defaultPolicy (followMain) -> main model
+  const resolved = resolveYpiStudioMemberPolicy({
+    input: { member: "improver" },
+    configResult: configResult({ ...baseStudio, members: { architect: baseStudio.members.architect } }),
+    main: { model: { provider: "anthropic", id: "claude-opus" }, thinking: "high" },
+  });
+  assert.equal(resolved.member, "improver");
+  assert.equal(resolved.modelArg, "anthropic/claude-opus");
+  assert.equal(resolved.modelSource, "followMain");
+  assert.equal(resolved.thinkingArg, "high");
+  assert.equal(resolved.thinkingSource, "followMain");
+  // No member-policy normalization/precedence warning expected for a clean improver lookup.
+  const codes = resolved.diagnostics.warnings?.map((warning) => warning.code) ?? [];
+  assert.ok(!codes.includes("member_id_normalized"), "improver id is already canonical");
+}
+
+{
+  // improver explicit member config (model + thinking) wins over defaultPolicy
+  const resolved = resolveYpiStudioMemberPolicy({
+    input: { member: "Improver", thinking: "medium" },
+    configResult: configResult({
+      ...baseStudio,
+      members: { ...baseStudio.members, improver: policy({ mode: "specific", provider: "openai", modelId: "gpt-5" }, "low") },
+    }),
+    main: { model: { provider: "main", id: "model" }, thinking: "high" },
+  });
+  assert.equal(resolved.member, "improver");
+  assert.equal(resolved.modelArg, "openai/gpt-5");
+  assert.equal(resolved.modelSource, "memberConfig");
+  assert.equal(resolved.thinkingArg, "medium");
+  assert.equal(resolved.thinkingSource, "toolInput");
+  assert.ok(resolved.diagnostics.warnings?.some((warning) => warning.code === "member_id_normalized"));
+}
+
+{
+  // improver tool-input model overrides the member config and is preferred
+  const resolved = resolveYpiStudioMemberPolicy({
+    input: { member: "improver", model: "google/gemini-2.5-pro", thinking: "xhigh" },
+    configResult: configResult({
+      ...baseStudio,
+      members: { ...baseStudio.members, improver: policy({ mode: "specific", provider: "openai", modelId: "gpt-5" }, "low") },
+    }),
+    main: {},
+  });
+  assert.equal(resolved.modelArg, "google/gemini-2.5-pro");
+  assert.equal(resolved.modelSource, "toolInput");
+  assert.equal(resolved.thinkingArg, "xhigh");
+  assert.equal(resolved.thinkingSource, "toolInput");
 }
 
 console.log("ypi-studio policy resolver tests passed");

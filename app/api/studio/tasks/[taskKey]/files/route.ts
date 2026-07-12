@@ -5,6 +5,7 @@ import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { canonicalizeCwd } from "@/lib/cwd";
 import {
   resolveYpiStudioTaskRelativeFile,
+  resolveYpiStudioImprovementRelativeFile,
   YpiStudioTaskSecurityError,
 } from "@/lib/ypi-studio-tasks";
 
@@ -92,6 +93,7 @@ export async function GET(
     const cwd = request.nextUrl.searchParams.get("cwd");
     const relativePath = request.nextUrl.searchParams.get("path");
     const mode = request.nextUrl.searchParams.get("mode") ?? "meta";
+    const improvementId = request.nextUrl.searchParams.get("improvementId") ?? undefined;
     if (!cwd) return NextResponse.json({ error: "Missing cwd parameter" }, { status: 400 });
     if (!relativePath) return NextResponse.json({ error: "Missing path parameter" }, { status: 400 });
     if (mode !== "meta" && mode !== "read" && mode !== "preview") {
@@ -104,7 +106,9 @@ export async function GET(
     const authorizedCwd = await resolveAuthorizedCwd(cwd);
     if (authorizedCwd instanceof NextResponse) return authorizedCwd;
 
-    const resolved = resolveYpiStudioTaskRelativeFile(authorizedCwd, taskKey, relativePath);
+    const resolved = improvementId
+      ? resolveYpiStudioImprovementRelativeFile(authorizedCwd, taskKey, improvementId, relativePath)
+      : resolveYpiStudioTaskRelativeFile(authorizedCwd, taskKey, relativePath);
     const mime = getTextMime(resolved.realPath);
 
     if (mode === "meta") {

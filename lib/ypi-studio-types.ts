@@ -54,7 +54,7 @@ export interface YpiStudioAgentsInitResponse {
   agents: YpiStudioAgentsResponse;
 }
 
-export type YpiStudioWorkflowOwner = "main" | "architect" | "ui-designer" | "implementer" | "checker" | string;
+export type YpiStudioWorkflowOwner = "main" | "architect" | "improver" | "ui-designer" | "implementer" | "checker" | string;
 
 export interface YpiStudioWorkflowTriggers {
   slash?: string[];
@@ -162,7 +162,7 @@ export type YpiStudioTaskStatus =
 
 export type YpiStudioTaskScope = "active" | "archived" | "all";
 
-export type YpiStudioTaskEventType = "created" | "transition" | "artifact" | "subagent" | "note" | "archive";
+export type YpiStudioTaskEventType = "created" | "transition" | "artifact" | "subagent" | "note" | "archive" | "improvement";
 
 export interface YpiStudioTaskEvent {
   type: YpiStudioTaskEventType;
@@ -488,6 +488,8 @@ export interface YpiStudioImplementationSummary {
 export interface YpiStudioTaskSubagentRun {
   id: string;
   subtaskId?: string;
+  /** Improvement instance scope this run belongs to. Omitted runs belong to the main task DAG. */
+  improvementId?: string;
   member: string;
   status: YpiStudioSubagentRunStatus;
   startedAt: string;
@@ -538,6 +540,65 @@ export interface YpiStudioApprovalGrant {
 export interface YpiStudioTaskMeta extends Record<string, unknown> {
   approvalGate?: YpiStudioApprovalGate;
   approvalGrant?: YpiStudioApprovalGrant;
+  planRevision?: number;
+}
+
+export type YpiStudioImprovementStatus =
+  | "analysis"
+  | "waiting_clarification"
+  | "waiting_prototype"
+  | "waiting_plan_approval"
+  | "implementing"
+  | "checking"
+  | "waiting_user_acceptance"
+  | "accepted"
+  | "cancelled"
+  | "failed"
+  | "accepted_not_doing";
+
+export type YpiStudioImprovementDisposition = "accepted" | "cancelled" | "failed" | "accepted_not_doing";
+
+export type YpiStudioImprovementApprovalMode = "standalone" | "inherit";
+
+export interface YpiStudioImprovementInstance {
+  id: string;
+  displayId: string;
+  title: string;
+  feedback: string;
+  status: YpiStudioImprovementStatus;
+  phase?: string;
+  owner: YpiStudioWorkflowOwner;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+  approvalMode?: YpiStudioImprovementApprovalMode;
+  approval?: {
+    revision?: number;
+    approvedAt?: string;
+    contextId?: string;
+    inputHash?: string;
+  };
+  acceptance?: {
+    acceptedAt?: string;
+    contextId?: string;
+    disposition?: string;
+    reason?: string;
+  };
+  disposition?: YpiStudioImprovementDisposition;
+  disposedAt?: string;
+  disposedBy?: string;
+  disposedReason?: string;
+  artifacts?: Record<string, string>;
+  implementationPlan?: YpiStudioImplementationPlan;
+  implementationProgress?: YpiStudioImplementationProgress;
+  runIds?: string[];
+  attempts?: number;
+}
+
+export interface YpiStudioImprovement {
+  schemaVersion: 1;
+  parentStatus: "none" | "waiting_for_improvements" | "review_ready";
+  instances: YpiStudioImprovementInstance[];
 }
 
 export interface YpiStudioTaskRecord {
@@ -557,6 +618,7 @@ export interface YpiStudioTaskRecord {
   meta: YpiStudioTaskMeta;
   implementationPlan?: YpiStudioImplementationPlan;
   implementationProgress?: YpiStudioImplementationProgress;
+  improvements?: YpiStudioImprovement;
 }
 
 export interface YpiStudioTaskSummary {
@@ -689,6 +751,7 @@ export interface YpiStudioTaskDetail extends YpiStudioTaskSummary {
   implementationPlan?: YpiStudioImplementationPlan;
   implementationProgress?: YpiStudioImplementationProgress;
   implementationProjection?: YpiStudioImplementationProjection;
+  improvements?: YpiStudioImprovement;
 }
 
 export interface YpiStudioTasksResponse {
@@ -781,6 +844,22 @@ export interface YpiStudioTaskWidgetProjection {
   events?: YpiStudioTaskWidgetEvent[];
   implementation?: YpiStudioImplementationSummary;
   implementationProjection?: Pick<YpiStudioImplementationProjection, "maxConcurrency" | "statusCounts" | "activeSubtaskIds" | "queuedSubtaskIds" | "nextSubtaskIds" | "nonTerminalSubtasks" | "compactTimeline" | "sessionRuntime">;
+  /** Bounded improvement summary — never includes full feedback text. */
+  improvements?: {
+    parentStatus: "none" | "waiting_for_improvements" | "review_ready";
+    total: number;
+    unresolved: number;
+    blocker?: string;
+    nextAction?: string;
+    instances: Array<{
+      id: string;
+      displayId: string;
+      title: string;
+      status: string;
+      owner: string;
+      updatedAt: string;
+    }>;
+  };
 }
 
 /** @deprecated Replaced by YpiStudioSessionTasksLinkResult with multi-task support. Keep for backward reference. */
@@ -870,6 +949,51 @@ export interface YpiStudioTaskArchiveBody {
   allowFallbackKnowledge?: boolean;
 }
 
+export interface YpiStudioImprovementCreateBody {
+  cwd: string;
+  action: "create_improvement";
+  title: string;
+  feedback: string;
+  contextId?: string;
+  owner?: string;
+}
+
+export interface YpiStudioImprovementTransitionBody {
+  cwd: string;
+  action: "transition_improvement";
+  improvementId: string;
+  to: YpiStudioImprovementStatus;
+  contextId?: string;
+  reason?: string;
+}
+
+export interface YpiStudioImprovementDispositionBody {
+  cwd: string;
+  action: "resolve_improvement_disposition";
+  improvementId: string;
+  disposition: YpiStudioImprovementDisposition;
+  reason?: string;
+  contextId?: string;
+}
+
+export interface YpiStudioImprovementArtifactUpdateBody {
+  cwd: string;
+  artifact: string;
+  content: string;
+  improvementId: string;
+  contextId?: string;
+}
+
+export interface YpiStudioImprovementPlanUpdateBody {
+  cwd: string;
+  action: "update_improvement_plan";
+  improvementId: string;
+  /** If true, forces plan update even when the improvement status would normally block it. */
+  override?: boolean;
+  implementationPlan?: YpiStudioImplementationPlan | Record<string, unknown>;
+  contextId?: string;
+}
+
 export interface YpiStudioTaskArchiveResult {
   task: YpiStudioTaskDetail;
   knowledge: YpiStudioKnowledgeEntry;
@@ -893,6 +1017,22 @@ export interface YpiStudioTaskImplementationPlanUpdateBody {
 export interface YpiStudioTaskImplementationSubtaskClaimBody {
   cwd: string;
   action: "claim_implementation_subtask";
+  subtaskId?: string;
+  subtaskIds?: string[];
+  limit?: number;
+  runId?: string;
+  runIds?: string[];
+  status?: "queued" | "running";
+  message?: string;
+  contextId?: string;
+}
+
+/** Scoped claim for an improvement instance DAG. Requires `improvementId`; subtasks are resolved against
+ *  `instance.implementationPlan` / `instance.implementationProgress`, never the main task plan. */
+export interface YpiStudioImprovementSubtaskClaimBody {
+  cwd: string;
+  action: "claim_improvement_subtask";
+  improvementId: string;
   subtaskId?: string;
   subtaskIds?: string[];
   limit?: number;

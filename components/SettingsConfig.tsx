@@ -88,12 +88,17 @@ type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
-const STUDIO_MEMBER_NAMES = ["architect", "ui-designer", "implementer", "checker"] as const;
+const STUDIO_MEMBER_NAMES = ["architect", "improver", "ui-designer", "implementer", "checker"] as const;
 const STUDIO_MEMBER_LABELS: Record<(typeof STUDIO_MEMBER_NAMES)[number], string> = {
   architect: "架构师",
+  improver: "改进师",
   "ui-designer": "UI 设计员",
   implementer: "实现员",
   checker: "检查员",
+};
+
+const STUDIO_MEMBER_DESCRIPTIONS: Partial<Record<(typeof STUDIO_MEMBER_NAMES)[number], string>> = {
+  improver: "改进师在用户验收反馈后负责把问题收敛成可批准的改进计划；不直接实现代码。",
 };
 const SUBAGENT_AGENT_NAMES = ["trellis-design", "trellis-implement", "trellis-check", "trellis-research"];
 const SUBAGENT_THINKING_OPTIONS: SubagentThinkingOption[] = ["inherit", "off", "minimal", "low", "medium", "high", "xhigh"];
@@ -1230,6 +1235,9 @@ export function SettingsConfig({
                             </div>
                             <ModelPolicySelect value={policy.model} onChange={(model) => updateStudioMemberPolicy(member, { model })} models={modelList} />
                             <ThinkingSelect value={policy.thinking} onChange={(thinking) => updateStudioMemberPolicy(member, { thinking })} />
+                            {STUDIO_MEMBER_DESCRIPTIONS[member] && (
+                              <div style={{ gridColumn: "1 / -1", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5, marginTop: -2 }}>{STUDIO_MEMBER_DESCRIPTIONS[member]}</div>
+                            )}
                           </div>
                         );
                       })}

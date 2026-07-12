@@ -10,20 +10,30 @@ import { readPiWebConfigForApi, type PiWebStudioSubagentRunner } from "./pi-web-
 import { resolveYpiStudioMemberPolicy, type ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import {
   archiveYpiStudioTask,
+  claimYpiStudioImprovementSubtask,
   claimYpiStudioImplementationSubtask,
+  createYpiStudioImprovement,
   createYpiStudioTask,
   getCurrentYpiStudioTaskDetail,
   getNextYpiStudioImplementationSubtask,
   getYpiStudioKnowledgeContextForPrompt,
   getYpiStudioTaskContextForPrompt,
   getYpiStudioTaskDetail,
+  implementationCounts,
   listYpiStudioTasks,
+  recordYpiStudioImprovementApproval,
   recordYpiStudioSubagentRun,
   recordYpiStudioUserApproval,
+  reconcileYpiStudioImprovements,
   reconcileYpiStudioRuntimeLostSubagentRun,
+  resolveYpiStudioImprovementDisposition,
+  reviseYpiStudioImprovementPlan,
+  transitionYpiStudioImprovement,
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
   updateYpiStudioImplementationSubtask,
+  updateYpiStudioImprovementArtifact,
+  updateYpiStudioImprovementPlan,
   updateYpiStudioTaskArtifact,
 } from "./ypi-studio-tasks";
 import { initializeYpiStudioWorkflows, readYpiStudioWorkflow } from "./ypi-studio-workflows";
@@ -37,7 +47,7 @@ import {
 } from "./ypi-studio-transcripts";
 import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import { runYpiStudioSdkChildSession } from "./ypi-studio-child-session-runner";
-import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskDetail, YpiStudioTaskEvent, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
+import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioImprovementDisposition, YpiStudioImprovementStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskDetail, YpiStudioTaskEvent, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
 type TextContent = { type: "text"; text: string };
@@ -58,7 +68,8 @@ interface PiExtensionContext {
   ui?: { notify?: (msg: string, type?: "info" | "warning" | "error") => void };
 }
 interface StudioTaskToolInput {
-  action?: "init_workflows" | "create" | "current" | "get" | "transition" | "update_artifact" | "archive" | "update_implementation_plan" | "implementation_next" | "claim_implementation_subtask" | "update_implementation_subtask";
+  action?: "init_workflows" | "create" | "current" | "get" | "transition" | "update_artifact" | "archive" | "update_implementation_plan" | "implementation_next" | "claim_implementation_subtask" | "claim_improvement_subtask" | "update_implementation_subtask"
+    | "create_improvement" | "get_improvement" | "transition_improvement" | "resolve_improvement_disposition" | "update_improvement_artifact" | "update_improvement_plan" | "record_improvement_approval" | "revise_improvement_plan" | "reconcile_improvements";
   title?: string;
   workflowId?: string;
   taskId?: string;
@@ -87,6 +98,12 @@ interface StudioTaskToolInput {
   localReview?: { status?: YpiStudioImplementationLocalReviewStatus; runId?: string; summary?: string };
   detail?: "compact" | "full";
   includeFullDetail?: boolean;
+  // Improvement-specific fields
+  improvementId?: string;
+  feedback?: string;
+  owner?: string;
+  inputText?: string;
+  artifactUpdates?: Record<string, unknown>;
 }
 interface StudioSubagentInput {
   /** Omitted action/mode preserves the existing synchronous delegation behavior. */
@@ -98,6 +115,7 @@ interface StudioSubagentInput {
   model?: string;
   thinking?: string;
   subtaskId?: string;
+  improvementId?: string;
   runId?: string;
   runIds?: string[];
   cancelReason?: string;
@@ -254,6 +272,32 @@ function hasRecordedApprovalGrant(task: { meta?: unknown }, key: string | null):
   return Number.isFinite(approvedMs) && Number.isFinite(enteredMs) ? approvedMs > enteredMs : true;
 }
 
+function buildImprovementStateInjection(task: YpiStudioTaskDetail): string {
+  const improvements = task.improvements;
+  if (!improvements?.instances?.length) return "";
+  const unresolved = improvements.instances.filter((inst) =>
+    !["accepted", "accepted_not_doing"].includes(inst.status)
+  );
+  const lines: string[] = [];
+  lines.push(`Improvements: ${unresolved.length} unresolved of ${improvements.instances.length} total.`);
+  for (const inst of improvements.instances) {
+    const resolved = !["accepted", "accepted_not_doing"].includes(inst.status) ? "unresolved" : "resolved";
+    lines.push(`- ${inst.displayId} "${inst.title}": ${inst.status} (owner: ${inst.owner}, ${resolved})`);
+  }
+  if (unresolved.length > 0) {
+    const first = unresolved[0];
+    lines.push("Improvement workflow: dispatch improver for analysis; then plan approval; then implementer/checker; then user acceptance. Only after all improvements are resolved can the main task return to review and request re-acceptance.");
+    if (first.status === "analysis") {
+      lines.push(`Next improvement action: dispatch improver via ypi_studio_subagent(member=improver) to analyze ${first.displayId} and produce a plan.`);
+    } else if (first.status === "waiting_plan_approval") {
+      lines.push(`Next improvement action: ask the user to review and approve ${first.displayId} plan. Use ypi_studio_task(action=record_improvement_approval) after explicit user approval, then transition to implementing.`);
+    } else if (first.status === "implementing" || first.status === "checking") {
+      lines.push(`Next improvement action for ${first.displayId}: inspect ready instance subtasks with ypi_studio_task(action=implementation_next, improvementId=${first.id}, limit=<available slots>), claim them with ypi_studio_task(action=claim_improvement_subtask, improvementId=${first.id}, subtaskId=<id>, status=running), then start one async ${first.owner} per claimed subtaskId with ypi_studio_subagent(action=start, mode=async, member=${first.owner}, improvementId=${first.id}, subtaskId=<claimed id>). While the main task waits for improvements, do NOT claim or start main-plan subtasks. Call ypi_studio_wait(runIds=<started run ids>) to await results; action=poll or action=collect with runId remains available.`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function buildStudioState(root: string, key: string | null, query = ""): string {
   const current = key ? getCurrentYpiStudioTaskDetail(root, key) : null;
   if (!current) {
@@ -293,6 +337,8 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     current.status === "planning" ? PLAN_REVIEW_PROMPT : "",
     current.status === "planning" ? "When planning/design artifacts are complete, write plan-review.md with links to the review artifacts, save implementationPlan with ypi_studio_task(action=update_implementation_plan), transition only to awaiting_approval, and then stop this turn to ask the user for confirmation; do not dispatch implementer in the same turn." : "",
     current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: fill available concurrency slots, not just one. First inspect ready work with ypi_studio_task(action=implementation_next, limit=<available slots>). Then claim ready subtask(s) up to maxConcurrency with ypi_studio_task(action=claim_implementation_subtask, limit=<available slots>, status=running) or explicit subtaskIds, and start one ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<claimed id>) per claimed subtask. Each implementer run handles exactly one subtaskId, but a single orchestration turn should launch multiple async runs when multiple ready subtasks and free slots exist. After launching async run(s), call ypi_studio_wait(runIds=<started run ids>) so this main chat waits for terminal results and continues from the tool result. Do not delegate the whole implementation at once." : "",
+    current.status === "waiting_for_improvements" ? buildImprovementStateInjection(current) : "",
+    current.status === "review" && current.improvements?.parentStatus === "review_ready" && current.improvements.instances.length > 0 ? "All improvements have been resolved. The main task is back in review — ask the user to re-accept the main task before completing it." : "",
     current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
     current.status === "awaiting_approval" && !approvalGranted ? "Current task is awaiting approval: direct the user to review plan-review.md, summarize the plan/artifacts, and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
     state?.requiresUserApproval && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
@@ -332,7 +378,7 @@ function isFullTaskDetailRequested(input: StudioTaskToolInput): boolean {
 function isTaskEvent(value: unknown): value is YpiStudioTaskEvent {
   if (!isObj(value)) return false;
   const type = value.type;
-  return (type === "created" || type === "transition" || type === "artifact" || type === "subagent" || type === "note" || type === "archive") && typeof value.at === "string" && typeof value.taskId === "string";
+  return (type === "created" || type === "transition" || type === "artifact" || type === "subagent" || type === "note" || type === "archive" || type === "improvement") && typeof value.at === "string" && typeof value.taskId === "string";
 }
 
 function countNonEmptyJsonlLines(filePath: string): number {
@@ -439,6 +485,7 @@ function summarizeStudioSubagentRun(run: YpiStudioTaskSubagentRun): Record<strin
     id: run.id,
     member: run.member,
     subtaskId: run.subtaskId,
+    improvementId: run.improvementId,
     status: run.status,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
@@ -456,6 +503,17 @@ function summarizeStudioSubagentRun(run: YpiStudioTaskSubagentRun): Record<strin
 
 function buildNextStudioTaskAction(task: YpiStudioTaskDetail): string {
   const summary = task.implementation;
+  if (task.status === "waiting_for_improvements") {
+    const unresolved = task.improvements?.instances?.filter((inst) =>
+      !["accepted", "accepted_not_doing"].includes(inst.status)
+    ) ?? [];
+    if (unresolved.length > 0) {
+      const first = unresolved[0];
+      const displayIds = unresolved.map((inst) => inst.displayId).join(", ");
+      return `Task is waiting for ${unresolved.length} improvement(s) to complete: ${displayIds}. Next: ${first.status === "analysis" || first.status === "waiting_clarification" ? "dispatch improver with ypi_studio_subagent to analyze feedback and create an improvement plan" : first.status === "waiting_plan_approval" ? "ask the user to review and approve the improvement plan" : first.status === "implementing" || first.status === "checking" ? "call ypi_studio_wait or ypi_studio_subagent(action=collect) to check child progress; then advance the improvement workflow" : first.status === "waiting_user_acceptance" ? "ask the user to accept or reject the improvement change" : first.status === "cancelled" || first.status === "failed" ? "ask the user to accept-not-doing or retry the improvement" : "check the improvement status in task detail"}.`;
+    }
+    return "All improvements are resolved; transition the task to review and request user re-acceptance.";
+  }
   if (task.status === "awaiting_approval") return "Point the user to plan-review.md, summarize the saved plan/artifacts, and ask for explicit approval; do not transition to implementing without a server-recorded approval grant.";
   if (task.status === "planning") return "Finish design/planning artifacts and write meaningful plan-review.md with Markdown links to review materials. If the work triggers the UI prototype gate, dispatch ui-designer for an HTML prototype and request user approval. Save implementationPlan if applicable, then transition only to awaiting_approval and stop for user confirmation.";
   if (task.status === "implementing" && summary) {
@@ -564,6 +622,24 @@ function compactYpiStudioTaskForTool(root: string, task: YpiStudioTaskDetail): R
       nextSubtaskIds: task.implementationProgress.nextSubtaskIds ?? [],
     } : undefined,
     implementationProjection: compactProjection,
+    improvements: task.improvements ? {
+      parentStatus: task.improvements.parentStatus,
+      total: task.improvements.instances.length,
+      unresolved: task.improvements.instances.filter((inst) =>
+        !["accepted", "accepted_not_doing"].includes(inst.status)
+      ).length,
+      instances: task.improvements.instances.map((inst) => ({
+        id: inst.id,
+        displayId: inst.displayId,
+        title: inst.title,
+        status: inst.status,
+        owner: inst.owner,
+        approvalMode: inst.approvalMode,
+        updatedAt: inst.updatedAt,
+        // Bounded: never include full feedback in the compact tool projection.
+        feedbackPreview: inst.feedback ? oneLine(inst.feedback, 120) : undefined,
+      })),
+    } : undefined,
     subagents: {
       totalCount: task.subagents.length,
       statusCounts: subagentStatusCounts,
@@ -606,7 +682,9 @@ function isLocalReviewStatus(value: unknown): value is YpiStudioImplementationLo
 
 function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
   const raw = isObj(value) ? value : {};
-  const action = raw.action === "init_workflows" || raw.action === "create" || raw.action === "current" || raw.action === "get" || raw.action === "transition" || raw.action === "update_artifact" || raw.action === "archive" || raw.action === "update_implementation_plan" || raw.action === "implementation_next" || raw.action === "claim_implementation_subtask" || raw.action === "update_implementation_subtask" ? raw.action : undefined;
+  const action = raw.action === "init_workflows" || raw.action === "create" || raw.action === "current" || raw.action === "get" || raw.action === "transition" || raw.action === "update_artifact" || raw.action === "archive" || raw.action === "update_implementation_plan" || raw.action === "implementation_next" || raw.action === "claim_implementation_subtask" || raw.action === "claim_improvement_subtask" || raw.action === "update_implementation_subtask"
+    || raw.action === "create_improvement" || raw.action === "get_improvement" || raw.action === "transition_improvement" || raw.action === "resolve_improvement_disposition" || raw.action === "update_improvement_artifact" || raw.action === "update_improvement_plan" || raw.action === "record_improvement_approval" || raw.action === "revise_improvement_plan" || raw.action === "reconcile_improvements"
+    ? raw.action : undefined;
   const scope = raw.scope === "active" || raw.scope === "archived" || raw.scope === "all" ? raw.scope : undefined;
   return {
     action,
@@ -638,6 +716,11 @@ function normalizeTaskToolInput(value: unknown): StudioTaskToolInput {
     localReview: isObj(raw.localReview) ? { status: isLocalReviewStatus(raw.localReview.status) ? raw.localReview.status : undefined, runId: str(raw.localReview.runId) ?? undefined, summary: str(raw.localReview.summary) ?? undefined } : undefined,
     detail: raw.detail === "full" ? "full" : raw.detail === "compact" ? "compact" : undefined,
     includeFullDetail: raw.includeFullDetail === true,
+    improvementId: str(raw.improvementId) ?? undefined,
+    feedback: str(raw.feedback) ?? undefined,
+    owner: str(raw.owner) ?? undefined,
+    inputText: str(raw.inputText) ?? undefined,
+    artifactUpdates: isObj(raw.artifactUpdates) ? raw.artifactUpdates : undefined,
   };
 }
 
@@ -652,6 +735,7 @@ function normalizeSubagentInput(value: unknown): StudioSubagentInput {
     model: str(raw.model) ?? undefined,
     thinking: str(raw.thinking) ?? undefined,
     subtaskId: str(raw.subtaskId) ?? undefined,
+    improvementId: str(raw.improvementId) ?? undefined,
     runId: str(raw.runId) ?? undefined,
     runIds: Array.isArray(raw.runIds) ? raw.runIds.filter((item): item is string => typeof item === "string") : undefined,
     cancelReason: str(raw.cancelReason) ?? undefined,
@@ -821,6 +905,7 @@ interface ChildRunMeta {
   parentSessionId?: string;
   parentSessionFile?: string;
   subtaskId?: string;
+  improvementId?: string;
   continuationOnFinal?: boolean;
   runner?: YpiStudioTaskSubagentRun["runner"];
   childSessionId?: string;
@@ -1019,6 +1104,7 @@ function runChildPi(
       id: meta.runId,
       member: meta.member,
       subtaskId: meta.subtaskId,
+      improvementId: meta.improvementId,
       status: runStatus,
       startedAt: meta.startedAt,
       runner: meta.runner ?? "cli",
@@ -1441,6 +1527,7 @@ interface StudioSubagentRunProjection {
   taskId: string;
   taskKey?: string;
   subtaskId?: string;
+  improvementId?: string;
   member: string;
   taskTitle?: string;
   subtaskTitle?: string;
@@ -1503,6 +1590,7 @@ function compactSubagentRunForAsyncStart(run: StudioSubagentRunProjection): Reco
     taskTitle: run.taskTitle,
     subtaskId: run.subtaskId,
     subtaskTitle: run.subtaskTitle,
+    improvementId: run.improvementId,
     member: run.member,
     status: run.status,
     model: run.model,
@@ -1530,6 +1618,7 @@ function compactSubagentRunForLifecycle(run: StudioSubagentRunProjection): Recor
     taskTitle: run.taskTitle,
     subtaskId: run.subtaskId,
     subtaskTitle: run.subtaskTitle,
+    improvementId: run.improvementId,
     member: run.member,
     status: run.status,
     registryStatus: run.registryStatus,
@@ -1553,8 +1642,10 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba
   const { includeTranscriptPreview = true } = options;
   const handle = getYpiStudioChildRun(run.id);
   const detail = getYpiStudioTaskDetail(root, taskId);
+  const improvementInstance = run.improvementId ? detail?.improvements?.instances.find((inst) => inst.id === run.improvementId) : undefined;
   const subtaskTitle = run.subtaskId
-    ? detail?.implementationProjection?.subtasksWithStatus.find((subtask) => subtask.id === run.subtaskId)?.title
+    ? improvementInstance?.implementationPlan?.subtasks.find((subtask) => subtask.id === run.subtaskId)?.title
+      ?? detail?.implementationProjection?.subtasksWithStatus.find((subtask) => subtask.id === run.subtaskId)?.title
       ?? detail?.implementationPlan?.subtasks.find((subtask) => subtask.id === run.subtaskId)?.title
     : undefined;
   let transcriptPreview: unknown;
@@ -1570,6 +1661,7 @@ function projectSubagentRun(root: string, taskId: string, run: YpiStudioTaskSuba
     taskId,
     taskKey: detail?.key,
     subtaskId: run.subtaskId,
+    improvementId: run.improvementId,
     member: run.member,
     taskTitle: detail?.title,
     subtaskTitle,
@@ -1616,6 +1708,7 @@ function compactSubagentRunProjection(run: StudioSubagentRunProjection): Record<
     runId: run.runId,
     taskId: run.taskId,
     subtaskId: run.subtaskId,
+    improvementId: run.improvementId,
     member: run.member,
     taskTitle: run.taskTitle,
     subtaskTitle: run.subtaskTitle,
@@ -1657,6 +1750,7 @@ function compactSubagentRunForWait(run: StudioSubagentRunProjection): Record<str
     taskId: run.taskId,
     taskKey: run.taskKey,
     subtaskId: run.subtaskId,
+    improvementId: run.improvementId,
     member: run.member,
     taskTitle: run.taskTitle,
     subtaskTitle: run.subtaskTitle,
@@ -1670,24 +1764,70 @@ function compactSubagentRunForWait(run: StudioSubagentRunProjection): Record<str
   };
 }
 
-function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string, subtaskId?: string): string {
+function buildMemberPrompt(root: string, taskId: string, member: string, delegatedPrompt: string, subtaskId?: string, improvementId?: string): string {
   const definition = readText(join(root, ".ypi", "agents", memberFile(member)));
   if (!definition.trim()) throw new Error(`Studio member definition not found: .ypi/agents/${memberFile(member)}`);
-  const taskContext = getYpiStudioTaskContextForPrompt(root, taskId);
-  const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [taskContext.slice(0, 1200), member, delegatedPrompt].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
   const detail = getYpiStudioTaskDetail(root, taskId);
-  const selectedPlan = subtaskId && detail?.implementationPlan ? detail.implementationPlan.subtasks.find((item) => item.id === subtaskId) : null;
-  const selectedProgress = subtaskId ? detail?.implementationProgress?.subtasks[subtaskId] : undefined;
-  const implementationBlock = detail?.implementationPlan ? [
-    "## Implementation Plan Boundary",
-    `Plan summary: ${detail.implementationPlan.summary ?? "(no summary)"}`,
-    `Progress: ${detail.implementation?.done ?? 0}/${detail.implementation?.total ?? detail.implementationPlan.subtasks.length} done; active=${detail.implementation?.activeSubtaskId ?? "none"}; next=${detail.implementation?.nextSubtaskId ?? "none"}; blocked=${detail.implementation?.blocked ?? 0}`,
-    subtaskId ? `Assigned subtaskId: ${subtaskId}` : "Assigned subtaskId: none",
-    selectedPlan ? `Selected subtask JSON:\n${safeJson({ plan: selectedPlan, progress: selectedProgress })}` : "No selected subtask was found in the plan.",
-    member === "implementer" && subtaskId ? "Implementer rule: execute only the selected subtask boundary. Do not implement unrelated subtasks." : "",
-    member === "implementer" && !subtaskId ? "Implementer rule: because this task has an implementation plan but no subtaskId was assigned, do not implement the full task. Report blocked and ask the parent session to claim/select one subtask." : "",
-    member === "checker" && subtaskId ? "Checker rule: perform a local review for the selected subtask first, then report verdict and evidence." : "",
-  ].filter(Boolean).join("\n") : "## Implementation Plan Boundary\nNo implementation plan is saved for this task.";
+  if (!detail) throw new Error("Task not found");
+  let taskContext: string;
+  let implementationBlock: string;
+  if (improvementId) {
+    // Improvement-instance scoped delegation: build context from the instance artifacts/plan/progress
+    // only. Never inject the main task implementation plan/progress into an improvement member.
+    const instance = detail.improvements?.instances.find((inst) => inst.id === improvementId);
+    if (!instance) throw new Error(`Improvement not found: ${improvementId}`);
+    if (!instance.implementationPlan || !instance.implementationProgress) throw new Error(`Improvement ${instance.displayId} has no implementation plan/progress to delegate.`);
+    const instanceDir = join(root, detail.pathLabel, "improvements", improvementId);
+    const docs = Object.entries(instance.artifacts ?? {})
+      .map(([artifact, fileName]) => {
+        if (typeof fileName !== "string" || !fileName) return "";
+        const content = readText(join(instanceDir, fileName));
+        return content.trim() ? `## ${artifact} (${fileName})\n\n${content.slice(0, 256 * 1024)}` : "";
+      })
+      .filter(Boolean)
+      .join("\n\n---\n\n");
+    const selectedPlan = subtaskId ? instance.implementationPlan.subtasks.find((item) => item.id === subtaskId) ?? null : null;
+    const selectedProgress = subtaskId ? instance.implementationProgress.subtasks[subtaskId] : undefined;
+    const counts = implementationCounts(instance.implementationProgress);
+    const progressLine = `${counts.done}/${instance.implementationPlan.subtasks.length} done; ready=${counts.ready}; running=${counts.running}; queued=${counts.queued}; blocked=${counts.blocked}; failed=${counts.failed}; active=${instance.implementationProgress.activeSubtaskId ?? "none"}; next=${instance.implementationProgress.nextSubtaskId ?? "none"}`;
+    implementationBlock = [
+      "## Improvement Instance Boundary",
+      `Improvement: ${instance.displayId} "${instance.title}" (status: ${instance.status}, owner: ${instance.owner})`,
+      `Scope: IMP ${improvementId}. Resolve subtasks only against this improvement instance plan. Do not read or modify the main task implementation plan/progress or claim main-plan subtasks.`,
+      `Plan summary: ${instance.implementationPlan.summary ?? "(no summary)"}`,
+      `Progress: ${progressLine}`,
+      subtaskId ? `Assigned subtaskId: ${subtaskId}` : "Assigned subtaskId: none",
+      selectedPlan ? `Selected subtask JSON:\n${safeJson({ plan: selectedPlan, progress: selectedProgress })}` : "No selected subtask was found in the instance plan.",
+      member === "implementer" && subtaskId ? "Implementer rule: execute only the selected instance subtask boundary. Do not implement unrelated subtasks or the main task." : "",
+      member === "implementer" && !subtaskId ? "Implementer rule: this improvement instance has a plan but no subtaskId was assigned. Report blocked and ask the parent session to claim/select one instance subtask." : "",
+      member === "checker" && subtaskId ? "Checker rule: perform a local review for the selected instance subtask first, then report verdict and evidence." : "",
+    ].filter(Boolean).join("\n");
+    taskContext = [
+      "# YPI Studio Improvement Instance Context",
+      `Parent task: ${detail.id}`,
+      `Parent task title: ${detail.title}`,
+      `Parent task status: ${detail.status} (waiting for improvements)`,
+      `Improvement: ${instance.displayId} (${instance.id})`,
+      `Improvement status: ${instance.status}`,
+      `Owner: ${instance.owner}`,
+      docs ? `\n${docs}` : "",
+    ].filter(Boolean).join("\n");
+  } else {
+    taskContext = getYpiStudioTaskContextForPrompt(root, taskId);
+    const selectedPlan = subtaskId && detail.implementationPlan ? detail.implementationPlan.subtasks.find((item) => item.id === subtaskId) : null;
+    const selectedProgress = subtaskId ? detail.implementationProgress?.subtasks[subtaskId] : undefined;
+    implementationBlock = detail.implementationPlan ? [
+      "## Implementation Plan Boundary",
+      `Plan summary: ${detail.implementationPlan.summary ?? "(no summary)"}`,
+      `Progress: ${detail.implementation?.done ?? 0}/${detail.implementation?.total ?? detail.implementationPlan.subtasks.length} done; active=${detail.implementation?.activeSubtaskId ?? "none"}; next=${detail.implementation?.nextSubtaskId ?? "none"}; blocked=${detail.implementation?.blocked ?? 0}`,
+      subtaskId ? `Assigned subtaskId: ${subtaskId}` : "Assigned subtaskId: none",
+      selectedPlan ? `Selected subtask JSON:\n${safeJson({ plan: selectedPlan, progress: selectedProgress })}` : "No selected subtask was found in the plan.",
+      member === "implementer" && subtaskId ? "Implementer rule: execute only the selected subtask boundary. Do not implement unrelated subtasks." : "",
+      member === "implementer" && !subtaskId ? "Implementer rule: because this task has an implementation plan but no subtaskId was assigned, do not implement the full task. Report blocked and ask the parent session to claim/select one subtask." : "",
+      member === "checker" && subtaskId ? "Checker rule: perform a local review for the selected subtask first, then report verdict and evidence." : "",
+    ].filter(Boolean).join("\n") : "## Implementation Plan Boundary\nNo implementation plan is saved for this task.";
+  }
+  const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [taskContext.slice(0, 1200), member, delegatedPrompt].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
   return [
     "# YPI Studio Member Delegation",
     "You are already running as the delegated YPI Studio member below. Do not dispatch another Studio member or subagent unless the parent explicitly asks.",
@@ -1824,11 +1964,13 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       "The awaiting_approval -> implementing edge has a server-side approval gate; override cannot bypass it. Do not call implementer until a later explicit user approval has been recorded.",
       "For tasks with implementationPlan, save the plan before awaiting_approval. During implementing, call implementation_next with limit=<available concurrency slots> to inspect the ready batch, then claim all ready subtask(s) that fit the free slots before dispatching one async implementer per claimed subtaskId.",
       "current/get return compact summaries by default, with artifact paths, recent 10 events, event totalCount, and nextRecommendedAction. detail='full' returns summary metadata plus file paths instead of complete task JSON; read specific files only when needed.",
+      "Improvement actions (create_improvement, transition_improvement, etc.) operate on the main task's improvement instances. Only create improvements from review or user_acceptance status after confirming with the user.",
+      "record_improvement_approval requires the improvement to be in waiting_plan_approval with a meaningful plan-review.md and UI evidence (HTML prototype) when UI changes are needed.",
     ],
     parameters: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["init_workflows", "create", "current", "get", "transition", "update_artifact", "archive", "update_implementation_plan", "implementation_next", "claim_implementation_subtask", "update_implementation_subtask"] },
+        action: { type: "string", enum: ["init_workflows", "create", "current", "get", "transition", "update_artifact", "archive", "update_implementation_plan", "implementation_next", "claim_implementation_subtask", "claim_improvement_subtask", "update_implementation_subtask", "create_improvement", "get_improvement", "transition_improvement", "resolve_improvement_disposition", "update_improvement_artifact", "update_improvement_plan", "record_improvement_approval", "revise_improvement_plan", "reconcile_improvements"] },
         title: { type: "string" },
         workflowId: { type: "string" },
         taskId: { type: "string" },
@@ -1857,6 +1999,11 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         localReview: { type: "object" },
         detail: { type: "string", enum: ["compact", "full"], description: "current/get default to compact task summaries. full returns summary metadata and file paths instead of injecting complete task JSON." },
         includeFullDetail: { type: "boolean", description: "Compatibility alias for detail='full'. Defaults to false and does not inject complete task JSON." },
+        improvementId: { type: "string", description: "The internal id (imp_…) of the improvement instance to operate on. Required for claim_improvement_subtask; when passed with implementation_next, ready subtasks are resolved against the instance plan only." },
+        feedback: { type: "string", description: "User feedback text to attach when creating an improvement." },
+        owner: { type: "string", description: "Improvement owner member (defaults to improver)." },
+        inputText: { type: "string", description: "Explicit user approval text (required for record_improvement_approval)." },
+        artifactUpdates: { type: "object", description: "Map of artifact names to content for revising improvement plans." },
       },
     },
     execute: async (_id: string, inputValue: unknown, _signal?: AbortSignal, _onUpdate?: unknown, ctx?: PiExtensionContext): Promise<PiToolResult> => {
@@ -1903,11 +2050,15 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         }
         if (action === "implementation_next") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
-          const result = getNextYpiStudioImplementationSubtask(root, taskId, { limit: input.limit });
-          const waiting = input.includeWaitingReasons ? Object.values(result.task.implementationProgress?.subtasks ?? {}).filter((item) => item.status === "waiting" || item.status === "pending" || item.status === "blocked") : undefined;
+          const improvementId = str(input.improvementId) ?? undefined;
+          const result = getNextYpiStudioImplementationSubtask(root, taskId, { limit: input.limit, improvementId });
+          const instance = improvementId ? (result.task.improvements?.instances ?? []).find((inst) => inst.id === improvementId) : undefined;
+          const waitingProgress = instance?.implementationProgress ?? result.task.implementationProgress;
+          const waiting = input.includeWaitingReasons ? Object.values(waitingProgress?.subtasks ?? {}).filter((item) => item.status === "waiting" || item.status === "pending" || item.status === "blocked") : undefined;
+          const scopePrefix = improvementId ? `improvement ${instance?.displayId ?? improvementId} ` : "";
           const text = result.subtasks.length > 1
-            ? `Ready implementation subtasks: ${result.subtasks.map((subtask) => `${subtask.id} · ${subtask.title}`).join("; ")}`
-            : result.subtask ? `Next implementation subtask: ${result.subtask.id} · ${result.subtask.title}` : "No ready implementation subtask is available.";
+            ? `Ready ${scopePrefix}subtasks: ${result.subtasks.map((subtask) => `${subtask.id} · ${subtask.title}`).join("; ")}`
+            : result.subtask ? `Next ${scopePrefix}subtask: ${result.subtask.id} · ${result.subtask.title}` : `No ready ${improvementId ? "improvement" : "implementation"} subtask is available.`;
           return { content: [{ type: "text", text }], details: { ...result, task: taskToolPayload(root, result.task, input), waiting } };
         }
         if (action === "claim_implementation_subtask") {
@@ -1930,12 +2081,165 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             details: { task: taskToolPayload(root, task, input), newlyClaimedSubtaskIds, subtaskIds: claimedIds, activeSubtaskIds, queuedSubtaskIds, subtaskId: claimedIds[0] ?? task.implementationProgress?.activeSubtaskId },
           };
         }
+        if (action === "claim_improvement_subtask") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const improvementId = str(input.improvementId);
+          if (!improvementId) throw new Error("improvementId is required for claim_improvement_subtask");
+          const before = getYpiStudioTaskDetail(root, taskId);
+          const beforeInstance = before?.improvements?.instances.find((inst) => inst.id === improvementId);
+          const beforeNonTerminalIds = new Set([
+            ...(beforeInstance?.implementationProgress?.activeSubtaskIds ?? []),
+            ...(beforeInstance?.implementationProgress?.queuedSubtaskIds ?? []),
+          ]);
+          const targetStatus = input.status === "queued" || input.status === "running" ? input.status : undefined;
+          const task = claimYpiStudioImprovementSubtask(taskId, { cwd: root, action: "claim_improvement_subtask", improvementId, subtaskId: input.subtaskId, subtaskIds: input.subtaskIds, limit: input.limit, runId: input.runId, runIds: input.runIds, status: targetStatus, message: input.reason, contextId: key });
+          const instance = task.improvements?.instances.find((inst) => inst.id === improvementId);
+          const activeSubtaskIds = instance?.implementationProgress?.activeSubtaskIds ?? [];
+          const queuedSubtaskIds = instance?.implementationProgress?.queuedSubtaskIds ?? [];
+          const nonTerminalIds = [...activeSubtaskIds, ...queuedSubtaskIds];
+          const newlyClaimedSubtaskIds = nonTerminalIds.filter((id) => !beforeNonTerminalIds.has(id));
+          const fallbackClaimedIds = input.subtaskIds?.length ? input.subtaskIds : input.subtaskId ? [input.subtaskId] : [];
+          const claimedIds = newlyClaimedSubtaskIds.length ? newlyClaimedSubtaskIds : fallbackClaimedIds;
+          return {
+            content: [{ type: "text", text: `Claimed improvement ${instance?.displayId ?? improvementId} subtask(s) ${claimedIds.join(", ") || "unknown"}. Active=${activeSubtaskIds.join(", ") || "none"}; queued=${queuedSubtaskIds.join(", ") || "none"}. Dispatch one async ${instance?.owner ?? "implementer"} per newly claimed subtaskId with ypi_studio_subagent(improvementId=${improvementId}, subtaskId=<claimed id>).` }],
+            details: { task: taskToolPayload(root, task, input), improvementId, displayId: instance?.displayId, newlyClaimedSubtaskIds, subtaskIds: claimedIds, activeSubtaskIds, queuedSubtaskIds, subtaskId: claimedIds[0] ?? instance?.implementationProgress?.activeSubtaskId },
+          };
+        }
         if (action === "update_implementation_subtask") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const subtaskId = str(input.subtaskId);
           if (!subtaskId || !input.status) throw new Error("subtaskId and status are required for update_implementation_subtask");
           const task = updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedBy: input.blockedBy, blockedReason: input.blockedReason, skippedReason: input.skippedReason, terminationReason: input.terminationReason, localReview: input.localReview, contextId: key });
           return { content: [{ type: "text", text: `Implementation subtask ${subtaskId} -> ${input.status}.` }], details: { task: taskToolPayload(root, task, input), subtaskId } };
+        }
+        if (action === "create_improvement") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const title = str(input.title);
+          const feedback = str(input.feedback);
+          if (!title) throw new Error("title is required for create_improvement");
+          if (!feedback) throw new Error("feedback is required for create_improvement");
+          const owner = str(input.owner) ?? undefined;
+          const task = createYpiStudioImprovement(taskId, {
+            cwd: root,
+            action: "create_improvement",
+            title,
+            feedback,
+            contextId: key,
+            owner,
+          });
+          const imp = task.improvements?.instances?.at(-1);
+          return { content: [{ type: "text", text: `Created improvement ${imp?.displayId ?? "?"}: ${title}` }], details: { task: taskToolPayload(root, task, input), improvement: imp } };
+        }
+        if (action === "get_improvement") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const task = getYpiStudioTaskDetail(root, taskId);
+          if (!task) throw new Error("Task not found");
+          const improvementId = str(input.improvementId);
+          if (improvementId) {
+            const imp = task.improvements?.instances?.find((inst) => inst.id === improvementId);
+            if (!imp) throw new Error(`Improvement not found: ${improvementId}`);
+            return { content: [{ type: "text", text: JSON.stringify(imp, null, 2) }], details: { task: taskToolPayload(root, task, input), improvement: imp } };
+          }
+          const improvements = task.improvements?.instances ?? [];
+          return { content: [{ type: "text", text: improvements.length > 0 ? JSON.stringify(improvements.map((imp) => ({
+            id: imp.id, displayId: imp.displayId, title: imp.title, status: imp.status, owner: imp.owner,
+            approvalMode: imp.approvalMode, disposition: imp.disposition, updatedAt: imp.updatedAt,
+          })), null, 2) : "No improvements found." }], details: { task: taskToolPayload(root, task, input), improvements } };
+        }
+        if (action === "transition_improvement") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const improvementId = str(input.improvementId);
+          const to = str(input.to);
+          if (!improvementId) throw new Error("improvementId is required for transition_improvement");
+          if (!to) throw new Error("to is required for transition_improvement");
+          const reason = str(input.reason) ?? undefined;
+          const task = transitionYpiStudioImprovement(taskId, {
+            cwd: root,
+            action: "transition_improvement",
+            improvementId,
+            to: to as YpiStudioImprovementStatus,
+            contextId: key,
+            reason,
+          });
+          const imp = task.improvements?.instances?.find((inst) => inst.id === improvementId);
+          return { content: [{ type: "text", text: `Transitioned improvement ${imp?.displayId ?? improvementId} to ${to}.` }], details: { task: taskToolPayload(root, task, input), improvement: imp } };
+        }
+        if (action === "resolve_improvement_disposition") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const improvementId = str(input.improvementId);
+          if (!improvementId) throw new Error("improvementId is required for resolve_improvement_disposition");
+          const disposition = str(input.to);
+          if (!disposition) throw new Error("disposition (to field) is required for resolve_improvement_disposition");
+          const reasonDisp = str(input.reason) ?? undefined;
+          const task = resolveYpiStudioImprovementDisposition(taskId, {
+            cwd: root,
+            action: "resolve_improvement_disposition",
+            improvementId,
+            disposition: disposition as YpiStudioImprovementDisposition,
+            reason: reasonDisp,
+            contextId: key,
+          });
+          const imp = task.improvements?.instances?.find((inst) => inst.id === improvementId);
+          return { content: [{ type: "text", text: `Resolved improvement ${imp?.displayId ?? improvementId} disposition to ${disposition}.` }], details: { task: taskToolPayload(root, task, input), improvement: imp } };
+        }
+        if (action === "update_improvement_artifact") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const artifact = str(input.artifact);
+          const improvementId = str(input.improvementId);
+          if (!artifact) throw new Error("artifact is required for update_improvement_artifact");
+          if (!improvementId) throw new Error("improvementId is required for update_improvement_artifact");
+          const task = updateYpiStudioImprovementArtifact(taskId, {
+            cwd: root,
+            artifact,
+            content: input.content ?? "",
+            improvementId,
+            contextId: key,
+          });
+          return { content: [{ type: "text", text: `Updated improvement artifact ${artifact}.` }], details: { task: taskToolPayload(root, task, input) } };
+        }
+        if (action === "update_improvement_plan") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const improvementId = str(input.improvementId);
+          if (!improvementId) throw new Error("improvementId is required for update_improvement_plan");
+          const task = updateYpiStudioImprovementPlan(taskId, {
+            cwd: root,
+            action: "update_improvement_plan",
+            improvementId,
+            implementationPlan: isObj(input.implementationPlan) ? input.implementationPlan : undefined,
+            override: input.override === true,
+            contextId: key,
+          });
+          return { content: [{ type: "text", text: `Updated improvement implementation plan.` }], details: { task: taskToolPayload(root, task, input) } };
+        }
+        if (action === "record_improvement_approval") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const improvementId = str(input.improvementId);
+          const inputText = str(input.inputText);
+          if (!improvementId) throw new Error("improvementId is required for record_improvement_approval");
+          if (!inputText) throw new Error("inputText is required for record_improvement_approval");
+          const task = recordYpiStudioImprovementApproval(root, taskId, improvementId, key, inputText);
+          const imp = task.improvements?.instances?.find((inst) => inst.id === improvementId);
+          return { content: [{ type: "text", text: `Recorded user approval for improvement ${imp?.displayId ?? improvementId} (revision ${imp?.approval?.revision ?? "?"}).` }], details: { task: taskToolPayload(root, task, input), improvement: imp } };
+        }
+        if (action === "revise_improvement_plan") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const improvementId = str(input.improvementId);
+          if (!improvementId) throw new Error("improvementId is required for revise_improvement_plan");
+          const task = reviseYpiStudioImprovementPlan(taskId, {
+            cwd: root,
+            action: "update_improvement_plan",
+            improvementId,
+            implementationPlan: isObj(input.implementationPlan) ? input.implementationPlan : undefined,
+            artifactUpdates: isObj(input.artifactUpdates) ? input.artifactUpdates as Record<string, string> : undefined,
+            contextId: key,
+          });
+          const imp = task.improvements?.instances?.find((inst) => inst.id === improvementId);
+          return { content: [{ type: "text", text: `Revised improvement ${imp?.displayId ?? improvementId} plan to revision ${imp?.approval?.revision ?? "?"}.` }], details: { task: taskToolPayload(root, task, input), improvement: imp } };
+        }
+        if (action === "reconcile_improvements") {
+          const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
+          const task = reconcileYpiStudioImprovements(root, taskId);
+          return { content: [{ type: "text", text: `Reconciled improvements for task ${task.id}. Parent status: ${task.improvements?.parentStatus ?? "none"}.` }], details: { task: taskToolPayload(root, task, input) } };
         }
         if (action === "archive") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
@@ -1965,7 +2269,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
     name: "ypi_studio_subagent",
     label: "YPI Studio Subagent",
     description: "Dispatch a YPI Studio member as a child Pi process with the active Studio task context.",
-    promptSnippet: `Use ypi_studio_subagent to assign Studio role work to architect, ui-designer, implementer, or checker. ${PLAN_REVIEW_PROMPT} ${UI_PROTOTYPE_GATE_PROMPT}`,
+    promptSnippet: `Use ypi_studio_subagent to assign Studio role work to architect, improver, ui-designer, implementer, or checker. ${PLAN_REVIEW_PROMPT} ${UI_PROTOTYPE_GATE_PROMPT}`,
     promptGuidelines: [
       "Use ypi_studio_subagent when assigning YPI Studio member work. The main session orchestrates; members execute their role.",
       "For UI prototype gate tasks, architect must dispatch ui-designer before implementation; ui-designer must deliver an HTML prototype and the main session must obtain user approval.",
@@ -1978,10 +2282,11 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       properties: {
         action: { type: "string", enum: ["start", "poll", "collect", "cancel"], description: "Omitted for legacy synchronous start." },
         mode: { type: "string", enum: ["sync", "async"], description: "Omitted or sync keeps the existing blocking child run behavior." },
-        member: { type: "string", description: "architect, ui-designer, implementer, checker, or a custom .ypi/agents member id" },
+        member: { type: "string", description: "architect, improver, ui-designer, implementer, checker, or a custom .ypi/agents member id" },
         prompt: { type: "string" },
         taskId: { type: "string" },
         subtaskId: { type: "string" },
+        improvementId: { type: "string", description: "Improvement instance id (imp_…). When set, subtaskId is resolved against the instance plan only; required for implementer/checker while the main task waits for improvements." },
         runId: { type: "string" },
         runIds: { type: "array", items: { type: "string" } },
         cancelReason: { type: "string" },
@@ -2078,27 +2383,55 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         const startedAt = new Date().toISOString();
         const runId = str(input.runId) ?? `${member}-${hash(`${taskId}:${startedAt}:${prompt}`)}`;
         const subtaskId = str(input.subtaskId) ?? undefined;
-        if (subtaskId && taskDetail.implementationPlan && !taskDetail.implementationPlan.subtasks.some((item) => item.id === subtaskId)) {
-          throw new Error(`Unknown implementation subtask: ${subtaskId}`);
-        }
-        if (member === "implementer" && taskDetail.implementationPlan && !subtaskId) {
-          throw new Error("This task has an implementationPlan; ypi_studio_subagent(member=implementer) requires subtaskId and must not run the full task.");
-        }
-        if (subtaskId && taskDetail.implementationPlan) {
-          const current = taskDetail.implementationProgress?.subtasks[subtaskId];
-          if (!current) throw new Error(`Unknown implementation subtask: ${subtaskId}`);
-          if (taskDetail.status !== "implementing") {
-            throw new Error("Implementation subagent start requires the main task to be in implementing after user approval.");
+        const improvementId = str(input.improvementId) ?? undefined;
+        if (improvementId) {
+          // Improvement-instance scoped start: subtasks are resolved against the instance plan only.
+          if (taskDetail.status !== "waiting_for_improvements") throw new Error(`Improvement-scoped subagent start requires the main task to be waiting_for_improvements; current status is ${taskDetail.status}.`);
+          const instance = taskDetail.improvements?.instances.find((inst) => inst.id === improvementId);
+          if (!instance) throw new Error(`Improvement not found: ${improvementId}`);
+          if (instance.status !== "implementing" && instance.status !== "checking") throw new Error(`Improvement ${instance.displayId} is not executable (status: ${instance.status}); must be implementing or checking to start a member.`);
+          const instancePlan = instance.implementationPlan;
+          const instanceProgress = instance.implementationProgress;
+          if (!instancePlan || !instanceProgress) throw new Error(`Improvement ${instance.displayId} has no implementation plan/progress to dispatch against.`);
+          if ((member === "implementer" || member === "checker") && !subtaskId) throw new Error(`Improvement ${instance.displayId} has an implementation plan; ypi_studio_subagent(member=${member}) requires subtaskId together with improvementId.`);
+          if (subtaskId && !instancePlan.subtasks.some((item) => item.id === subtaskId)) throw new Error(`Unknown improvement subtask for ${instance.displayId}: ${subtaskId}. Subtask ids are scoped to the instance plan; main-plan ids are not accepted while the task waits for improvements.`);
+          if (subtaskId) {
+            const current = instanceProgress.subtasks[subtaskId];
+            if (!current) throw new Error(`Unknown improvement subtask: ${subtaskId}`);
+            if (mode === "async" && current.status === "ready") {
+              claimYpiStudioImprovementSubtask(taskId, { cwd: root, action: "claim_improvement_subtask", improvementId, subtaskId, runId, status: "running", message: `Async Studio subagent ${member} started for improvement ${instance.displayId}`, contextId: key });
+            } else if (current.status !== "queued" && current.status !== "running") {
+              const hint = mode === "async" ? "ready/queued/running" : "queued/running (claim it first with ypi_studio_task(action=claim_improvement_subtask, improvementId))";
+              throw new Error(`Improvement subtask ${subtaskId} must be ${hint} before ${mode} start; current status is ${current.status}.`);
+            }
           }
-          if (mode === "async" && current.status === "ready") {
-            claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId, runId, status: "running", message: `Async Studio subagent ${member} started`, contextId: key });
-          } else if (current.status !== "queued" && current.status !== "running") {
-            const hint = mode === "async" ? "ready/queued/running" : "queued/running (claim it first with ypi_studio_task)";
-            throw new Error(`Implementation subtask ${subtaskId} must be ${hint} before ${mode} start; current status is ${current.status}.`);
+        } else {
+          // Main-task scoped start. While the task waits for improvements, main-plan subtasks cannot be started.
+          if (taskDetail.status === "waiting_for_improvements" && subtaskId) {
+            throw new Error("The main task is waiting_for_improvements; main-plan subtasks cannot be started. Pass improvementId to start an improvement-instance subtask.");
+          }
+          if (subtaskId && taskDetail.implementationPlan && !taskDetail.implementationPlan.subtasks.some((item) => item.id === subtaskId)) {
+            throw new Error(`Unknown implementation subtask: ${subtaskId}`);
+          }
+          if (member === "implementer" && taskDetail.implementationPlan && !subtaskId) {
+            throw new Error("This task has an implementationPlan; ypi_studio_subagent(member=implementer) requires subtaskId and must not run the full task.");
+          }
+          if (subtaskId && taskDetail.implementationPlan) {
+            const current = taskDetail.implementationProgress?.subtasks[subtaskId];
+            if (!current) throw new Error(`Unknown implementation subtask: ${subtaskId}`);
+            if (taskDetail.status !== "implementing") {
+              throw new Error("Implementation subagent start requires the main task to be in implementing after user approval.");
+            }
+            if (mode === "async" && current.status === "ready") {
+              claimYpiStudioImplementationSubtask(taskId, { cwd: root, action: "claim_implementation_subtask", subtaskId, runId, status: "running", message: `Async Studio subagent ${member} started`, contextId: key });
+            } else if (current.status !== "queued" && current.status !== "running") {
+              const hint = mode === "async" ? "ready/queued/running" : "queued/running (claim it first with ypi_studio_task)";
+              throw new Error(`Implementation subtask ${subtaskId} must be ${hint} before ${mode} start; current status is ${current.status}.`);
+            }
           }
         }
 
-        const childPrompt = buildMemberPrompt(root, taskId, member, prompt, subtaskId);
+        const childPrompt = buildMemberPrompt(root, taskId, member, prompt, subtaskId, improvementId);
         let writer: YpiStudioSubagentTranscriptWriter | null = null;
         const warnings: string[] = [...runnerSelection.warnings];
         const persistentRunWarnings = new Set<string>([...policy.warnings, ...warnings]);
@@ -2126,6 +2459,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           id: runId,
           member,
           subtaskId,
+          improvementId,
           status: "running",
           startedAt,
           runner: runnerSelection.runner,
@@ -2161,6 +2495,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           recordYpiStudioSubagentRun(root, taskId, {
             ...existing,
             ...run,
+            improvementId: existing?.improvementId ?? run.improvementId ?? runningRun.improvementId,
             prompt: run.prompt ?? existing?.prompt ?? runningRun.prompt,
             summary: run.summary ?? existing?.summary ?? runningRun.summary,
             transcript: run.transcript ?? existing?.transcript ?? runningRun.transcript,
@@ -2208,7 +2543,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             ? { action: "start", mode: "async", projection: "ypi_studio_subagent_async_start_v1", task: compactYpiStudioTaskIdentity(taskAfterInitialRun), run: asyncStartRun, wait: asyncStartWaitHint, warnings: asyncStartWarnings.length ? asyncStartWarnings : undefined }
             : { run: compactSubagentRunProjection(projectSubagentRun(root, taskId, runningRun)) },
         });
-        const childMeta: ChildRunMeta = { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), parentSessionFile: getParentSessionFile(inputValue, ctx), subtaskId, continuationOnFinal: false, runner: runnerSelection.runner };
+        const childMeta: ChildRunMeta = { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), parentSessionFile: getParentSessionFile(inputValue, ctx), subtaskId, improvementId, continuationOnFinal: false, runner: runnerSelection.runner };
         const childOnUpdate = mode === "async" ? undefined : onUpdate;
         const childPromise = runnerSelection.runner === "sdk"
           ? runYpiStudioSdkChildSession({
@@ -2284,7 +2619,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         if (mode === "async") {
           childPromise.catch(() => {});
           return {
-            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${subtaskId ? ` for subtask ${subtaskId}` : ""}. Next call ypi_studio_wait(runId=${runId}) so the main chat waits for the child result and continues from the tool result; action=poll or action=collect with runId remains available.` }],
+            content: [{ type: "text", text: `Started async YPI Studio subagent ${member} run ${runId}${improvementId ? ` for improvement ${improvementId}` : ""}${subtaskId ? ` subtask ${subtaskId}` : ""}. Next call ypi_studio_wait(runId=${runId}) so the main chat waits for the child result and continues from the tool result; action=poll or action=collect with runId remains available.` }],
             details: { action: "start", mode: "async", projection: "ypi_studio_subagent_async_start_v1", task: compactYpiStudioTaskIdentity(taskAfterInitialRun), run: asyncStartRun, wait: asyncStartWaitHint, warnings: asyncStartWarnings.length ? asyncStartWarnings : undefined },
           };
         }
@@ -2295,6 +2630,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           id: runId,
           member,
           subtaskId,
+          improvementId,
           status: result.status,
           startedAt,
           finishedAt,

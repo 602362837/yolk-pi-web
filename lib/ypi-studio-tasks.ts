@@ -65,11 +65,23 @@ import type {
   YpiStudioTaskScope,
   YpiStudioTaskTransitionBody,
   YpiStudioWorkflowFile,
+  YpiStudioImprovement,
+  YpiStudioImprovementInstance,
+  YpiStudioImprovementStatus,
+  YpiStudioImprovementDisposition,
+  YpiStudioImprovementApprovalMode,
+  YpiStudioImprovementCreateBody,
+  YpiStudioImprovementTransitionBody,
+  YpiStudioImprovementDispositionBody,
+  YpiStudioImprovementArtifactUpdateBody,
+  YpiStudioImprovementPlanUpdateBody,
+  YpiStudioImprovementSubtaskClaimBody,
 } from "./ypi-studio-types";
 import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 
 const TASKS_DIR = path.join(".ypi", "tasks");
 const TASKS_ARCHIVE_DIR = path.join(TASKS_DIR, "archive");
+const IMPROVEMENTS_DIR_NAME = "improvements";
 const KNOWLEDGE_DIR = path.join(".ypi", "knowledge");
 const KNOWLEDGE_INDEX = "index.json";
 const RUNTIME_SESSIONS_DIR = path.join(".ypi", ".runtime", "sessions");
@@ -705,6 +717,22 @@ function assertTaskStatusForImplementationMutation(task: YpiStudioTaskRecord, st
   }
 }
 
+/** Resolve an improvement instance for execution and assert that the main task is in
+ *  `waiting_for_improvements` and the instance is in an executable `implementing | checking`
+ *  state with a plan/progress. Returns the instance; never touches the main task plan/progress. */
+function resolveImprovementInstanceForExecution(record: TaskRecordOnDisk, improvementId: string): YpiStudioImprovementInstance {
+  if (!record?.raw) throw new Error("Task not found");
+  if (record.archived) throw new Error("Archived tasks cannot execute improvement subtasks");
+  if (record.raw.status !== "waiting_for_improvements") throw new Error(`Improvement subtasks can only be claimed while the main task is waiting_for_improvements. Current status: ${record.raw.status}`);
+  const improvements = record.raw.improvements;
+  if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+  const instance = improvements.instances.find((inst) => inst.id === improvementId);
+  if (!instance) throw new Error(`Improvement not found: ${improvementId}`);
+  if (instance.status !== "implementing" && instance.status !== "checking") throw new Error(`Improvement ${instance.displayId} is not executable (status: ${instance.status}). It must be implementing or checking to claim subtasks.`);
+  if (!instance.implementationPlan || !instance.implementationProgress) throw new Error(`Improvement ${instance.displayId} has no implementation plan/progress to claim from.`);
+  return instance;
+}
+
 const DERIVED_DEPENDENCY_BLOCK_PREFIX = "Blocked by failed/blocked dependency:";
 
 function isDerivedDependencyBlock(subtask: YpiStudioImplementationSubtaskPlan, item: YpiStudioImplementationSubtaskProgress): boolean {
@@ -949,6 +977,51 @@ export function resolveYpiStudioTaskRelativeFile(cwd: string, taskIdOrKey: strin
   return { taskDir: record.dirPath, taskDirRealPath, filePath, realPath, relativePath, stat };
 }
 
+/**
+ * Resolve a file path relative to an improvement instance directory.
+ * Validation mirrors resolveYpiStudioTaskRelativeFile:
+ * - Verifies task ownership and improvement existence
+ * - Rejects absolute paths, URL schemes, backslashes, and ".." traversal
+ * - Rejects symlink targets that escape the improvement instance directory
+ */
+export function resolveYpiStudioImprovementRelativeFile(
+  cwd: string,
+  taskIdOrKey: string,
+  improvementId: string,
+  inputPath: string,
+): YpiStudioTaskRelativeFileResolution {
+  const ctx = createContext(cwd);
+  const record = loadTaskRecord(ctx, taskIdOrKey);
+  if (!record?.raw || record.readError) throw new Error("Task not found");
+
+  const improvements = record.raw.improvements;
+  if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+
+  const instance = improvements.instances.find((inst) => inst.id === improvementId);
+  if (!instance) throw new Error(`Improvement not found: ${improvementId}`);
+
+  const relativePath = normalizeTaskRelativeFilePath(inputPath);
+  const instanceDir = improvementInstanceDir(record.dirPath, improvementId);
+  const instanceDirRealPath = safeRealPath(instanceDir, ctx.workspaceRoot);
+
+  const filePath = path.resolve(instanceDir, ...relativePath.split("/"));
+  if (!pathInsideDirectory(instanceDir, filePath)) {
+    throw new YpiStudioTaskSecurityError("Path escapes improvement instance directory");
+  }
+
+  let stat = safeStatFile(filePath, ctx.workspaceRoot);
+  if (!stat) throw new Error("Not a file");
+
+  const realPath = safeRealPath(filePath, ctx.workspaceRoot);
+  if (!pathInsideDirectory(instanceDirRealPath, realPath)) {
+    throw new YpiStudioTaskSecurityError("Symlink target escapes improvement instance directory");
+  }
+
+  stat = statSync(realPath);
+  if (!stat.isFile()) throw new Error("Not a file");
+  return { taskDir: instanceDir, taskDirRealPath: instanceDirRealPath, filePath, realPath, relativePath, stat };
+}
+
 function readFileWithLimit(filePath: string, maxBytes: number): { content: string; truncated: boolean } {
   const stat = statSync(filePath);
   if (stat.size <= maxBytes) return { content: readFileSync(filePath, "utf8"), truncated: false };
@@ -1135,6 +1208,114 @@ function taskDir(ctx: TaskContext, taskIdOrKey: string): string {
     : path.join(ctx.tasksRoot, parsed.id);
 }
 
+const IMPROVEMENT_DEFAULT_ARTIFACTS: Record<string, string> = {
+  "plan-review": "plan-review.md",
+  brief: "brief.md",
+  prd: "prd.md",
+  ui: "ui.md",
+  design: "design.md",
+  implement: "implement.md",
+  checks: "checks.md",
+  review: "review.md",
+  summary: "summary.md",
+};
+
+const IMPROVEMENT_UNRESOLVED: ReadonlySet<YpiStudioImprovementStatus> = new Set([
+  "analysis",
+  "waiting_clarification",
+  "waiting_prototype",
+  "waiting_plan_approval",
+  "implementing",
+  "checking",
+  "waiting_user_acceptance",
+  "cancelled",
+  "failed",
+]);
+
+function isImprovementUnresolved(status: YpiStudioImprovementStatus): boolean {
+  return IMPROVEMENT_UNRESOLVED.has(status);
+}
+
+function isImprovementStatus(value: unknown): value is YpiStudioImprovementStatus {
+  return typeof value === "string"
+    && (IMPROVEMENT_UNRESOLVED.has(value as YpiStudioImprovementStatus) || value === "accepted" || value === "accepted_not_doing");
+}
+
+function isImprovementDisposition(value: unknown): value is YpiStudioImprovementDisposition {
+  return value === "accepted" || value === "cancelled" || value === "failed" || value === "accepted_not_doing";
+}
+
+function improvementInstanceDir(taskDir: string, instanceId: string): string {
+  return path.join(taskDir, IMPROVEMENTS_DIR_NAME, instanceId);
+}
+
+function normalizeImprovementInstance(value: unknown, displayId: string, now: string): YpiStudioImprovementInstance | null {
+  if (!isRecord(value)) return null;
+  const id = optionalString(value.id);
+  const title = optionalString(value.title);
+  const feedback = optionalString(value.feedback);
+  if (!id || !title) return null;
+  const status = isImprovementStatus(value.status) ? value.status : "analysis";
+  const artifacts = {
+    ...IMPROVEMENT_DEFAULT_ARTIFACTS,
+    ...(isRecord(value.artifacts)
+      ? Object.fromEntries(Object.entries(value.artifacts).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
+      : {}),
+  };
+  const approvalMode: YpiStudioImprovementApprovalMode | undefined = value.approvalMode === "standalone" || value.approvalMode === "inherit" ? value.approvalMode : undefined;
+  const approval = isRecord(value.approval) ? {
+    revision: typeof value.approval.revision === "number" && Number.isFinite(value.approval.revision) ? Math.max(1, Math.floor(value.approval.revision)) : undefined,
+    approvedAt: optionalString(value.approval.approvedAt),
+    contextId: optionalString(value.approval.contextId),
+    inputHash: optionalString(value.approval.inputHash),
+  } : undefined;
+  const acceptance = isRecord(value.acceptance) ? {
+    acceptedAt: optionalString(value.acceptance.acceptedAt),
+    contextId: optionalString(value.acceptance.contextId),
+    disposition: optionalString(value.acceptance.disposition),
+    reason: optionalString(value.acceptance.reason),
+  } : undefined;
+  return {
+    id,
+    displayId,
+    title,
+    feedback: feedback ?? "",
+    status,
+    phase: optionalString(value.phase),
+    owner: optionalString(value.owner) ?? "improver",
+    createdAt: optionalString(value.createdAt) ?? now,
+    updatedAt: optionalString(value.updatedAt) ?? now,
+    completedAt: value.completedAt === null ? null : optionalString(value.completedAt),
+    approvalMode,
+    approval,
+    acceptance,
+    disposition: isImprovementDisposition(value.disposition) ? value.disposition : undefined,
+    disposedAt: optionalString(value.disposedAt),
+    disposedBy: optionalString(value.disposedBy),
+    disposedReason: optionalString(value.disposedReason),
+    artifacts,
+    implementationPlan: normalizeImplementationPlan(value.implementationPlan),
+    implementationProgress: normalizeImplementationProgress(value.implementationProgress, normalizeImplementationPlan(value.implementationPlan)),
+    runIds: stringArray(value.runIds),
+    attempts: typeof value.attempts === "number" && Number.isFinite(value.attempts) ? Math.max(0, Math.floor(value.attempts)) : undefined,
+  };
+}
+
+function normalizeImprovements(value: unknown): YpiStudioImprovement | undefined {
+  if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.instances)) return undefined;
+  const now = nowIso();
+  const instances = value.instances.map((item, index) => {
+    const expectedDisplayId = `IMP-${String(index + 1).padStart(3, "0")}`;
+    const displayId = typeof item === "object" && item !== null && typeof (item as Record<string, unknown>).displayId === "string"
+      ? (item as Record<string, unknown>).displayId as string
+      : expectedDisplayId;
+    return normalizeImprovementInstance(item, displayId, now);
+  }).filter((item): item is YpiStudioImprovementInstance => !!item);
+  if (instances.length === 0 && (!isRecord(value) || !value.instances || !(value.instances as Array<unknown>).length)) return undefined;
+  const parentStatus = value.parentStatus === "waiting_for_improvements" || value.parentStatus === "review_ready" ? value.parentStatus : "none";
+  return { schemaVersion: 1, parentStatus, instances };
+}
+
 function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContext): YpiStudioTaskRecord {
   if (!isRecord(value)) throw new Error("task.json root must be an object");
   const id = optionalString(value.id) ?? fallbackId;
@@ -1151,6 +1332,7 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
     ? value.subagents.filter(isRecord).map((run): YpiStudioTaskSubagentRun => ({
         id: optionalString(run.id) ?? `run-${Date.now()}`,
         subtaskId: optionalString(run.subtaskId),
+        improvementId: optionalString(run.improvementId),
         member: optionalString(run.member) ?? "unknown",
         status: run.status === "queued" || run.status === "running" || run.status === "succeeded" || run.status === "failed" || run.status === "cancelled" || run.status === "waiting_for_user" ? run.status : "failed",
         startedAt: optionalString(run.startedAt) ?? nowIso(),
@@ -1174,6 +1356,7 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
     : [];
   const implementationPlan = normalizeImplementationPlan(value.implementationPlan);
   const implementationProgress = normalizeImplementationProgress(value.implementationProgress, implementationPlan);
+  const improvements = normalizeImprovements(value.improvements);
   return {
     schemaVersion: 1,
     id,
@@ -1188,9 +1371,15 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
     currentMember: optionalString(value.currentMember),
     artifacts,
     subagents,
-    meta: isRecord(value.meta) ? value.meta : {},
+    meta: isRecord(value.meta)
+      ? {
+          ...value.meta,
+          planRevision: typeof value.meta.planRevision === "number" && Number.isFinite(value.meta.planRevision) ? Math.max(1, Math.floor(value.meta.planRevision)) : undefined,
+        }
+      : {},
     implementationPlan,
     implementationProgress,
+    improvements,
   };
 }
 
@@ -1453,6 +1642,7 @@ function recordToDetail(ctx: TaskContext, record: TaskRecordOnDisk): YpiStudioTa
     implementationPlan: record.raw.implementationPlan,
     implementationProgress: record.raw.implementationProgress,
     implementationProjection: buildImplementationProjection(record.raw.implementationPlan, record.raw.implementationProgress, record.raw.subagents, record.raw.status),
+    improvements: record.raw.improvements,
   };
 }
 
@@ -1627,6 +1817,7 @@ export function archiveYpiStudioTask(taskIdOrKey: string, body: YpiStudioTaskArc
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Task is already archived");
   if (record.raw.status !== "completed") throw new Error("Only completed YPI Studio tasks can be archived. Transition unfinished work to cancelled instead.");
+  assertNoUnresolvedImprovementsForComplete(record.raw, "archive");
   const running = record.raw.subagents.filter((run) => run.status === "running");
   if (running.length > 0) throw new Error(`Cannot archive task while ${running.length} Studio member run(s) are still running.`);
 
@@ -1709,6 +1900,696 @@ export function archiveYpiStudioTask(taskIdOrKey: string, body: YpiStudioTaskArc
   const task = getYpiStudioTaskDetail(ctx.cwd, taskKeyValue);
   if (!task) throw new Error("Archived task could not be read");
   return { task, knowledge: entry, warnings: warnings.length ? warnings : undefined };
+}
+
+function assertNoUnresolvedImprovementsForComplete(task: YpiStudioTaskRecord, action: "complete" | "archive"): void {
+  if (!task.improvements?.instances?.length) return;
+  const unresolved = task.improvements.instances.filter((inst) => isImprovementUnresolved(inst.status));
+  if (unresolved.length > 0) {
+    const ids = unresolved.map((inst) => inst.displayId).join(", ");
+    throw new Error(`Cannot ${action} task while ${unresolved.length} improvement(s) remain unresolved: ${ids}. Resolve all improvements or accept-not-doing them before ${action === "complete" ? "completing" : "archiving"} the main task.`);
+  }
+}
+
+export function createYpiStudioImprovement(taskIdOrKey: string, body: YpiStudioImprovementCreateBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot create improvements");
+
+    const allowedStatuses = ["review", "user_acceptance", "waiting_for_improvements"];
+    if (!allowedStatuses.includes(record.raw.status)) {
+      throw new Error("Improvements can only be created while the main task is in review, user_acceptance, or waiting_for_improvements. Current status: " + record.raw.status);
+    }
+
+    const now = nowIso();
+    const instanceId = `imp_${Math.random().toString(36).slice(2, 10)}`;
+    const existingInstances = record.raw.improvements?.instances ?? [];
+    const displayId = `IMP-${String(existingInstances.length + 1).padStart(3, "0")}`;
+
+    const instance: YpiStudioImprovementInstance = {
+      id: instanceId,
+      displayId,
+      title: body.title,
+      feedback: body.feedback,
+      status: "analysis",
+      owner: body.owner ?? "improver",
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      artifacts: { ...IMPROVEMENT_DEFAULT_ARTIFACTS },
+      runIds: [],
+      attempts: 0,
+    };
+
+    // Create instance directory and placeholder artifacts
+    const instanceDir = improvementInstanceDir(record.dirPath, instanceId);
+    mkdirSync(instanceDir, { recursive: true });
+    assertDirectoryWithinWorkspace(instanceDir, ctx.workspaceRoot);
+    for (const fileName of Object.values(IMPROVEMENT_DEFAULT_ARTIFACTS)) {
+      if (!isSafeArtifactFileName(fileName)) continue;
+      const filePath = path.join(instanceDir, fileName);
+      if (!existsSync(filePath)) {
+        writeFileSync(filePath, placeholderContent(fileName), { encoding: "utf8", flag: "wx" });
+      }
+    }
+
+    // Add to improvements
+    const improvements = record.raw.improvements ?? { schemaVersion: 1, parentStatus: "none", instances: [] };
+    improvements.instances = [...improvements.instances, instance];
+    improvements.parentStatus = "waiting_for_improvements";
+    record.raw.improvements = improvements;
+
+    const previousStatus = record.raw.status;
+    if (record.raw.status === "user_acceptance" || record.raw.status === "review") {
+      record.raw.status = "waiting_for_improvements";
+      record.raw.currentMember = "main";
+    }
+
+    record.raw.updatedAt = now;
+    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) {
+      record.raw.contextIds.push(body.contextId);
+    }
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: `Created improvement ${displayId}: ${body.title}`,
+      data: { improvementId: instanceId, displayId, title: body.title, feedback: body.feedback },
+    });
+    if (previousStatus !== "waiting_for_improvements") {
+      appendTaskEvent(record.dirPath, {
+        type: "transition",
+        at: now,
+        taskId: record.raw.id,
+        from: previousStatus,
+        to: "waiting_for_improvements",
+        message: `Main task entered waiting_for_improvements due to ${displayId}`,
+        data: { improvementId: instanceId, displayId },
+      });
+    }
+
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after creating improvement");
+    return detail;
+  });
+}
+
+export function reconcileYpiStudioImprovements(cwd: string, taskIdOrKey: string): YpiStudioTaskDetail {
+  const ctx = createContext(cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot reconcile improvements");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) return getYpiStudioTaskDetail(ctx.cwd, record.raw.id)!;
+
+    const unresolvedCount = improvements.instances.filter((inst) => isImprovementUnresolved(inst.status)).length;
+    const now = nowIso();
+    let changed = false;
+
+    if (unresolvedCount > 0) {
+      if (improvements.parentStatus !== "waiting_for_improvements") {
+        improvements.parentStatus = "waiting_for_improvements";
+        changed = true;
+      }
+    } else {
+      // All improvements are resolved (accepted or accepted_not_doing)
+      if (improvements.parentStatus !== "review_ready") {
+        improvements.parentStatus = "review_ready";
+        changed = true;
+      }
+      // If parent is waiting_for_improvements, transition to review
+      if (record.raw.status === "waiting_for_improvements") {
+        record.raw.status = "review";
+        record.raw.currentMember = "main";
+        changed = true;
+        appendTaskEvent(record.dirPath, {
+          type: "transition",
+          at: now,
+          taskId: record.raw.id,
+          from: "waiting_for_improvements",
+          to: "review",
+          message: "All improvements resolved; main task returned to review for re-acceptance.",
+          data: { improvementsResolved: improvements.instances.length },
+        });
+      }
+    }
+
+    if (changed) {
+      record.raw.updatedAt = now;
+      writeTaskJson(record.dirPath, record.raw);
+    }
+
+    return getYpiStudioTaskDetail(ctx.cwd, record.raw.id)!;
+  });
+}
+
+/** Legal improvement transition map. The key is the from status; the value is the set of allowed target statuses. */
+const IMPROVEMENT_TRANSITIONS: ReadonlyMap<YpiStudioImprovementStatus, ReadonlySet<YpiStudioImprovementStatus>> = new Map([
+  ["analysis", new Set(["waiting_clarification", "waiting_prototype", "waiting_plan_approval", "cancelled", "failed"])],
+  ["waiting_clarification", new Set(["analysis", "cancelled", "failed"])],
+  ["waiting_prototype", new Set(["waiting_plan_approval", "cancelled", "failed"])],
+  ["waiting_plan_approval", new Set(["implementing", "cancelled", "failed"])],
+  ["implementing", new Set(["checking", "cancelled", "failed"])],
+  ["checking", new Set(["implementing", "waiting_user_acceptance", "cancelled", "failed"])],
+  ["waiting_user_acceptance", new Set(["accepted", "cancelled", "failed"])],
+  ["accepted", new Set()],
+  ["cancelled", new Set(["analysis", "accepted_not_doing"])],
+  ["failed", new Set(["analysis", "accepted_not_doing"])],
+  ["accepted_not_doing", new Set()],
+]);
+
+/** Internal reconciler that does not take its own lock; caller must hold the task mutation lock. */
+function reconcileImprovementsInLock(record: TaskRecordOnDisk & { raw: YpiStudioTaskRecord }): boolean {
+  const improvements = record.raw.improvements;
+  if (!improvements?.instances?.length) return false;
+
+  const unresolvedCount = improvements.instances.filter((inst) => isImprovementUnresolved(inst.status)).length;
+  const now = nowIso();
+  let changed = false;
+
+  if (unresolvedCount > 0) {
+    if (improvements.parentStatus !== "waiting_for_improvements") {
+      improvements.parentStatus = "waiting_for_improvements";
+      changed = true;
+    }
+  } else {
+    // All improvements are resolved (accepted or accepted_not_doing)
+    if (improvements.parentStatus !== "review_ready") {
+      improvements.parentStatus = "review_ready";
+      changed = true;
+    }
+    // If parent is waiting_for_improvements, transition to review
+    if (record.raw.status === "waiting_for_improvements") {
+      record.raw.status = "review";
+      record.raw.currentMember = "main";
+      changed = true;
+      appendTaskEvent(record.dirPath, {
+        type: "transition",
+        at: now,
+        taskId: record.raw.id,
+        from: "waiting_for_improvements",
+        to: "review",
+        message: "All improvements resolved; main task returned to review for re-acceptance.",
+        data: { improvementsResolved: improvements.instances.length },
+      });
+    }
+  }
+
+  if (changed) {
+    record.raw.updatedAt = now;
+    writeTaskJson(record.dirPath, record.raw);
+  }
+  return changed;
+}
+
+export function transitionYpiStudioImprovement(taskIdOrKey: string, body: YpiStudioImprovementTransitionBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot transition improvements");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) {
+      throw new Error("Task has no improvements");
+    }
+
+    const index = improvements.instances.findIndex((inst) => inst.id === body.improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
+
+    const instance = improvements.instances[index];
+    const allowedTargets = IMPROVEMENT_TRANSITIONS.get(instance.status);
+    if (!allowedTargets) throw new Error(`Unknown improvement status: ${instance.status}`);
+    if (!allowedTargets.has(body.to)) {
+      throw new Error(`Invalid improvement transition from ${instance.status} to ${body.to}`);
+    }
+
+    // Approval gate: waiting_plan_approval -> implementing requires recorded approval
+    if (instance.status === "waiting_plan_approval" && body.to === "implementing") {
+      if (!instance.approval?.approvedAt) {
+        throw new Error(`Improvement ${instance.displayId}: transition to implementing requires recorded user approval. Call recordYpiStudioImprovementApproval first after the user explicitly approves the plan.`);
+      }
+      if (instance.approval.contextId && body.contextId && instance.approval.contextId !== body.contextId) {
+        throw new Error(`Improvement ${instance.displayId}: approval was recorded in a different session context. Ask the user to approve in this chat session.`);
+      }
+      // Verify that plan-review and UI evidence gates were satisfied at the time of recording.
+      // We re-check them here as a safety net in case artifacts were removed after approval.
+      const instanceDir = improvementInstanceDir(record.dirPath, instance.id);
+      assertImprovementPlanReviewReady(instance, instanceDir, ctx.workspaceRoot);
+      assertImprovementUIEvidence(instance, instanceDir, ctx.workspaceRoot);
+    }
+
+    // For transitions into accepted/accepted_not_doing, require explicit acceptance or disposition
+    if (body.to === "accepted" && instance.status !== "waiting_user_acceptance") {
+      throw new Error("Improvement can only be accepted from waiting_user_acceptance");
+    }
+    if (body.to === "accepted_not_doing" && instance.status !== "cancelled" && instance.status !== "failed") {
+      throw new Error("Improvement can only be accepted_not_doing from cancelled or failed");
+    }
+
+    const now = nowIso();
+    const previousStatus = instance.status;
+    instance.status = body.to;
+    instance.updatedAt = now;
+    if (body.to === "accepted" || body.to === "accepted_not_doing") {
+      instance.completedAt = now;
+      if (body.to === "accepted") {
+        instance.acceptance = {
+          acceptedAt: now,
+          contextId: body.contextId,
+          disposition: "accepted",
+        };
+      }
+    }
+
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: body.reason
+        ? `Improvement ${instance.displayId}: ${previousStatus} -> ${body.to} (${body.reason})`
+        : `Improvement ${instance.displayId}: ${previousStatus} -> ${body.to}`,
+      data: { improvementId: instance.id, displayId: instance.displayId, from: previousStatus, to: body.to, reason: body.reason },
+    });
+
+    // Reconcile: if this transition made the instance terminal, check whether parent can move back to review
+    reconcileImprovementsInLock(record as TaskRecordOnDisk & { raw: YpiStudioTaskRecord });
+
+    writeTaskJson(record.dirPath, record.raw);
+
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after transitioning improvement");
+    return detail;
+  });
+}
+
+export function resolveYpiStudioImprovementDisposition(taskIdOrKey: string, body: YpiStudioImprovementDispositionBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot resolve improvement disposition");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) {
+      throw new Error("Task has no improvements");
+    }
+
+    const index = improvements.instances.findIndex((inst) => inst.id === body.improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
+
+    const instance = improvements.instances[index];
+
+    // Disposition is only meaningful on terminal unresolved statuses (cancelled, failed)
+    if (!isImprovementUnresolved(instance.status)) {
+      throw new Error(`Improvement ${instance.displayId} is already resolved (${instance.status}). Disposition only applies to unresolved statuses.`);
+    }
+    if (instance.status !== "cancelled" && instance.status !== "failed" && body.disposition === "accepted_not_doing") {
+      throw new Error(`accepted_not_doing disposition is only valid for cancelled or failed improvements, not ${instance.status}`);
+    }
+    if (body.disposition === "accepted" && instance.status !== "waiting_user_acceptance") {
+      throw new Error("Accepted disposition requires the improvement to be in waiting_user_acceptance. Use transitionYpiStudioImprovement instead.");
+    }
+
+    const now = nowIso();
+    const previousStatus = instance.status;
+
+    // Setting accepted_not_doing: mark as resolved, record disposition
+    if (body.disposition === "accepted_not_doing") {
+      instance.status = "accepted_not_doing";
+      instance.completedAt = now;
+      instance.disposition = body.disposition;
+      instance.disposedAt = now;
+      instance.disposedBy = body.contextId;
+      instance.disposedReason = body.reason ?? "User explicitly accepted not doing this improvement.";
+    } else if (body.disposition === "accepted") {
+      instance.status = "accepted";
+      instance.completedAt = now;
+      instance.acceptance = {
+        acceptedAt: now,
+        contextId: body.contextId,
+        disposition: "accepted",
+        reason: body.reason,
+      };
+    } else if (body.disposition === "cancelled") {
+      instance.status = "cancelled";
+      instance.disposition = body.disposition;
+      instance.disposedAt = now;
+      instance.disposedBy = body.contextId;
+      instance.disposedReason = body.reason;
+    } else if (body.disposition === "failed") {
+      instance.status = "failed";
+      instance.disposition = body.disposition;
+      instance.disposedAt = now;
+      instance.disposedBy = body.contextId;
+      instance.disposedReason = body.reason;
+    }
+
+    instance.updatedAt = now;
+
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: body.reason
+        ? `Improvement ${instance.displayId} disposition: ${previousStatus} -> ${instance.status} (${body.reason})`
+        : `Improvement ${instance.displayId} disposition: ${previousStatus} -> ${instance.status}`,
+      data: { improvementId: instance.id, displayId: instance.displayId, from: previousStatus, to: instance.status, disposition: body.disposition, reason: body.reason },
+    });
+
+    // Reconcile parent task status
+    reconcileImprovementsInLock(record as TaskRecordOnDisk & { raw: YpiStudioTaskRecord });
+
+    writeTaskJson(record.dirPath, record.raw);
+
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after resolving improvement disposition");
+    return detail;
+  });
+}
+
+/**
+ * Update an artifact file within an improvement instance.
+ * If the improvement is in waiting_plan_approval, any artifact change invalidates
+ * the recorded approval and bumps the plan revision.
+ */
+export function updateYpiStudioImprovementArtifact(taskIdOrKey: string, body: YpiStudioImprovementArtifactUpdateBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot update improvement artifacts");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+
+    const index = improvements.instances.findIndex((inst) => inst.id === body.improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
+
+    const instance = improvements.instances[index];
+    const instanceDir = improvementInstanceDir(record.dirPath, instance.id);
+    assertDirectoryWithinWorkspace(instanceDir, ctx.workspaceRoot);
+
+    const fileName = instance.artifacts?.[body.artifact] ?? body.artifact;
+    if (!isSafeArtifactFileName(fileName)) throw new YpiStudioTaskSecurityError("Invalid improvement artifact file name");
+    const filePath = path.join(instanceDir, fileName);
+    if (!existsSync(path.dirname(filePath))) mkdirSync(path.dirname(filePath), { recursive: true });
+    safeRealPath(instanceDir, ctx.workspaceRoot);
+    writeFileSync(filePath, body.content, "utf8");
+
+    const now = nowIso();
+
+    // If the improvement is waiting for plan approval, any material change invalidates prior approval.
+    if (instance.status === "waiting_plan_approval") {
+      const revision = (instance.approval?.revision ?? 1) + 1;
+      instance.approval = { ...instance.approval, revision, approvedAt: undefined, contextId: undefined, inputHash: undefined };
+    }
+
+    instance.updatedAt = now;
+    record.raw.updatedAt = now;
+    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: `Updated improvement ${instance.displayId} artifact ${body.artifact}`,
+      data: { improvementId: instance.id, displayId: instance.displayId, artifact: body.artifact },
+    });
+
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after updating improvement artifact");
+    return detail;
+  });
+}
+
+/**
+ * Update the implementation plan for an improvement instance.
+ * Only allowed while the improvement is in analysis, waiting_plan_approval,
+ * or waiting_prototype.  Revising during waiting_plan_approval invalidates the
+ * prior approval and bumps the revision.
+ */
+export function updateYpiStudioImprovementPlan(taskIdOrKey: string, body: YpiStudioImprovementPlanUpdateBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot update improvement plans");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+
+    const index = improvements.instances.findIndex((inst) => inst.id === body.improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
+
+    const instance = improvements.instances[index];
+    const allowedStatuses: YpiStudioImprovementStatus[] = ["analysis", "waiting_plan_approval", "waiting_prototype"];
+    if (!body.override && !allowedStatuses.includes(instance.status)) {
+      throw new Error(`Improvement plan can only be updated while in analysis, waiting_prototype, or waiting_plan_approval. Current: ${instance.status}`);
+    }
+
+    const now = nowIso();
+    if (body.implementationPlan) {
+      const plan = normalizeImplementationPlan(body.implementationPlan);
+      if (!plan) throw new Error("implementationPlan must contain at least one valid subtask with id and title");
+      instance.implementationPlan = { ...plan, updatedAt: now };
+      instance.implementationProgress = rebuildImplementationProgress(instance.implementationPlan, instance.implementationProgress);
+    }
+
+    // In waiting_plan_approval, any plan change bumps revision and clears old approval.
+    if (instance.status === "waiting_plan_approval") {
+      const revision = (instance.approval?.revision ?? 1) + 1;
+      instance.approval = { ...instance.approval, revision, approvedAt: undefined, contextId: undefined, inputHash: undefined };
+    }
+
+    instance.updatedAt = now;
+    record.raw.updatedAt = now;
+    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: `Updated improvement ${instance.displayId} implementation plan`,
+      data: { improvementId: instance.id, displayId: instance.displayId },
+    });
+
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after updating improvement plan");
+    return detail;
+  });
+}
+
+/** Regex matching HTML prototype file names inside the improvement instance directory. */
+const IMPROVEMENT_HTML_PROTOTYPE_RE = /\.html?$/i;
+
+/** Checks whether an improvement instance has a readable HTML prototype file in its
+ *  instance directory.  Does not validate the HTML content itself. */
+function improvementHasHtmlPrototype(instanceDir: string, workspaceRoot: string): boolean {
+  if (!existsSync(instanceDir)) return false;
+  try {
+    const entries = readdirSync(instanceDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!IMPROVEMENT_HTML_PROTOTYPE_RE.test(entry.name)) continue;
+      const filePath = path.join(instanceDir, entry.name);
+      if (!safeFileExists(filePath, workspaceRoot)) continue;
+      try {
+        const stat = statSync(filePath);
+        if (stat.size > 0) return true;
+      } catch {
+        // skip unreadable files
+      }
+    }
+  } catch {
+    // If the instance directory cannot be read, treat as no prototype.
+  }
+  return false;
+}
+
+/** Determine whether the improvement's ui.md artifact signals that a UI change is needed.
+ *  Heuristic: if ui.md is meaningfully written (not TBD/empty), a prototype is expected. */
+function improvementUiGateRequired(instance: YpiStudioImprovementInstance, instanceDir: string, workspaceRoot: string): boolean {
+  const uiArtifact = instance.artifacts?.ui;
+  if (!uiArtifact) return false;
+  const uiPath = path.join(instanceDir, uiArtifact);
+  if (!safeFileExists(uiPath, workspaceRoot)) return false;
+  try {
+    const content = readFileSync(uiPath, "utf8");
+    return artifactIsMeaningful(content);
+  } catch {
+    return false;
+  }
+}
+
+/** Assert that the improvement plan-review artifact exists and is meaningful.
+ *  Throws with a descriptive message when the gate is not satisfied. */
+function assertImprovementPlanReviewReady(instance: YpiStudioImprovementInstance, instanceDir: string, workspaceRoot: string): void {
+  const planReviewArtifact = instance.artifacts?.["plan-review"];
+  if (!planReviewArtifact || !isSafeArtifactFileName(planReviewArtifact)) {
+    throw new Error(`Improvement ${instance.displayId}: transition to implementing requires a valid plan-review artifact mapped to a safe .md file.`);
+  }
+  const filePath = path.join(instanceDir, planReviewArtifact);
+  if (!safeFileExists(filePath, workspaceRoot)) {
+    throw new Error(`Improvement ${instance.displayId}: plan-review.md is missing. Write a meaningful approval plan before requesting approval.`);
+  }
+  const content = readFileSync(filePath, "utf8");
+  if (!artifactIsMeaningful(content)) {
+    throw new Error(`Improvement ${instance.displayId}: plan-review.md is empty or contains only TBD placeholder text. Write meaningful content before approval.`);
+  }
+}
+
+/** Assert that when the improvement has UI changes (ui.md is meaningful), an HTML
+ *  prototype exists in the instance directory. */
+function assertImprovementUIEvidence(instance: YpiStudioImprovementInstance, instanceDir: string, workspaceRoot: string): void {
+  if (!improvementUiGateRequired(instance, instanceDir, workspaceRoot)) return;
+  if (!improvementHasHtmlPrototype(instanceDir, workspaceRoot)) {
+    throw new Error(`Improvement ${instance.displayId}: ui.md indicates a UI change is required, but no HTML prototype was found in the improvement directory. Create an HTML prototype before requesting plan approval.`);
+  }
+}
+
+/** Record explicit user approval for an improvement plan so it can proceed to implementing.
+ *  Ensures plan-review is ready and UI evidence exists when required before recording the grant.
+ *  Must be called while the improvement is in waiting_plan_approval. */
+export function recordYpiStudioImprovementApproval(cwd: string, taskIdOrKey: string, improvementId: string, contextId: string, inputText: string): YpiStudioTaskDetail {
+  if (!contextId || !isExplicitYpiStudioApprovalText(inputText)) {
+    throw new Error("Explicit approval text is required to record improvement approval (e.g., 确认，批准开始实现).");
+  }
+  const ctx = createContext(cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot record improvement approval");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+
+    const index = improvements.instances.findIndex((inst) => inst.id === improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${improvementId}`);
+
+    const instance = improvements.instances[index];
+    if (instance.status !== "waiting_plan_approval") {
+      throw new Error(`Improvement ${instance.displayId} must be in waiting_plan_approval to record approval. Current status: ${instance.status}`);
+    }
+
+    const instanceDir = improvementInstanceDir(record.dirPath, instance.id);
+    assertImprovementPlanReviewReady(instance, instanceDir, ctx.workspaceRoot);
+    assertImprovementUIEvidence(instance, instanceDir, ctx.workspaceRoot);
+
+    const now = nowIso();
+    const revision = (instance.approval?.revision ?? 1);
+    instance.approval = {
+      revision,
+      approvedAt: now,
+      contextId,
+      inputHash: hashText(inputText),
+    };
+    instance.updatedAt = now;
+    record.raw.updatedAt = now;
+    if (contextId && !record.raw.contextIds.includes(contextId)) record.raw.contextIds.push(contextId);
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: `User approved improvement ${instance.displayId} plan (revision ${revision})`,
+      data: { improvementId: instance.id, displayId: instance.displayId, revision, contextId },
+    });
+
+    if (contextId) writeRuntimePointer(ctx, contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after recording improvement approval");
+    return detail;
+  });
+}
+
+/**
+ * Revise the improvement plan atomically: bumps revision, clears old approval, and
+ * writes updated plan-review / artifacts given in the revision map.
+ * Accepts an optional map of artifact file names -> content to rewrite.
+ */
+export function reviseYpiStudioImprovementPlan(
+  taskIdOrKey: string,
+  body: YpiStudioImprovementPlanUpdateBody & { artifactUpdates?: Record<string, string> },
+): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot revise improvement plans");
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+
+    const index = improvements.instances.findIndex((inst) => inst.id === body.improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
+
+    const instance = improvements.instances[index];
+    const instanceDir = improvementInstanceDir(record.dirPath, instance.id);
+    assertDirectoryWithinWorkspace(instanceDir, ctx.workspaceRoot);
+
+    const now = nowIso();
+    const revision = (instance.approval?.revision ?? 1) + 1;
+    instance.approval = { ...instance.approval, revision, approvedAt: undefined, contextId: undefined, inputHash: undefined };
+    instance.updatedAt = now;
+    record.raw.updatedAt = now;
+
+    // Update implementation plan if provided
+    if (body.implementationPlan) {
+      const plan = normalizeImplementationPlan(body.implementationPlan);
+      if (!plan) throw new Error("implementationPlan must contain at least one valid subtask with id and title");
+      instance.implementationPlan = { ...plan, updatedAt: now };
+      instance.implementationProgress = rebuildImplementationProgress(instance.implementationPlan, instance.implementationProgress);
+    }
+
+    // Update artifact files if provided
+    if (body.artifactUpdates) {
+      for (const [artifact, content] of Object.entries(body.artifactUpdates)) {
+        const fileName = instance.artifacts?.[artifact] ?? artifact;
+        if (!isSafeArtifactFileName(fileName)) continue;
+        const filePath = path.join(instanceDir, fileName);
+        if (!existsSync(path.dirname(filePath))) mkdirSync(path.dirname(filePath), { recursive: true });
+        writeFileSync(filePath, content, "utf8");
+      }
+    }
+
+    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: `Revised improvement ${instance.displayId} plan to revision ${revision}`,
+      data: { improvementId: instance.id, displayId: instance.displayId, revision, clearedApproval: true },
+    });
+
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after revising improvement plan");
+    return detail;
+  });
 }
 
 function tokenizeKnowledge(value: string): Set<string> {
@@ -1875,6 +2756,24 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   const record = loadTaskRecord(ctx, taskIdOrKey);
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Archived tasks cannot transition");
+
+  // Block completed/archived when improvements are unresolved
+  if (body.to === "completed") {
+    assertNoUnresolvedImprovementsForComplete(record.raw, "complete");
+  }
+  if (body.to === "archived") {
+    assertNoUnresolvedImprovementsForComplete(record.raw, "archive");
+  }
+
+  // When attempting waiting_for_improvements -> review without override, ensure all improvements are resolved
+  if (record.raw.status === "waiting_for_improvements" && body.to === "review" && !body.override) {
+    const unresolved = record.raw.improvements?.instances?.filter((inst) => isImprovementUnresolved(inst.status)) ?? [];
+    if (unresolved.length > 0) {
+      const ids = unresolved.map((inst) => inst.displayId).join(", ");
+      throw new Error(`Cannot return to review while ${unresolved.length} improvement(s) remain unresolved: ${ids}. Resolve all improvements first or use override.`);
+    }
+  }
+
   const workflow = readYpiStudioWorkflow(ctx.cwd, record.raw.workflowId) ?? getYpiStudioWorkflowOrDefault(ctx.cwd, record.raw.workflowId);
   const from = record.raw.status;
   const transition = findYpiStudioTransition(workflow, from, body.to);
@@ -1900,6 +2799,11 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
       approvalGate: approvalGate(updatedAt, from, body.contextId),
       approvalGrant: undefined,
     };
+  } else if (from === "awaiting_approval" && (body.to === "planning" || body.to === "changes_requested")) {
+    // Leaving the approval state without going forward to implementing: clear the old grant
+    // so the user must re-approve after any revisions.
+    const revision = (record.raw.meta.planRevision ?? 1) + 1;
+    record.raw.meta = { ...record.raw.meta, approvalGrant: undefined, planRevision: revision };
   }
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "transition", at: updatedAt, taskId: record.raw.id, from, to: body.to, message: body.reason, data: { override: body.override === true, approvalGate: body.to === "awaiting_approval" } });
@@ -1914,6 +2818,11 @@ export function updateYpiStudioTaskArtifact(taskIdOrKey: string, body: YpiStudio
   const record = loadTaskRecord(ctx, taskIdOrKey);
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Archived tasks cannot update artifacts");
+  if (record.raw.status === "awaiting_approval") {
+    // Any artifact change during approval invalidates the old approval grant and bumps the plan revision.
+    const revision = (record.raw.meta.planRevision ?? 1) + 1;
+    record.raw.meta = { ...record.raw.meta, approvalGrant: undefined, planRevision: revision };
+  }
   const filePath = artifactPath(record.dirPath, record.raw, body.artifact);
   safeRealPath(record.dirPath, ctx.workspaceRoot);
   writeFileSync(filePath, body.content, "utf8");
@@ -1928,6 +2837,59 @@ export function updateYpiStudioTaskArtifact(taskIdOrKey: string, body: YpiStudio
   return detail;
 }
 
+/** Apply a subagent run's status to a single subtask progress entry and refresh the DAG.
+ *  Shared by the main-task and improvement-instance run recording paths so the queued/running/
+ *  done/failed/blocked semantics stay identical. The caller is responsible for scope validation
+ *  (main task vs improvement instance) before calling this helper. */
+function applySubagentRunToImplementationProgress(
+  plan: YpiStudioImplementationPlan,
+  progress: YpiStudioImplementationProgress,
+  run: YpiStudioTaskSubagentRun,
+  updatedAt: string,
+): void {
+  if (!run.subtaskId || !progress.subtasks[run.subtaskId]) return;
+  const subtask = progress.subtasks[run.subtaskId];
+  const previousStatus = subtask.status;
+  const hadRunId = subtask.runIds.includes(run.id);
+  subtask.runIds = Array.from(new Set([...subtask.runIds, run.id]));
+  subtask.lastRunId = run.id;
+  subtask.updatedAt = updatedAt;
+  if (run.status === "queued") {
+    subtask.status = "queued";
+    subtask.queuedAt ??= updatedAt;
+    subtask.finishedAt = undefined;
+    subtask.currentRunId = run.id;
+  } else if (run.status === "running") {
+    subtask.status = "running";
+    subtask.startedAt ??= updatedAt;
+    subtask.finishedAt = undefined;
+    subtask.currentRunId = run.id;
+    if (previousStatus === "queued" || (previousStatus !== "running" && !hadRunId)) subtask.attempts = Math.max(1, subtask.attempts + 1);
+    progress.activeSubtaskId = run.subtaskId;
+  } else if (run.status === "succeeded") {
+    subtask.status = "done";
+    subtask.finishedAt = run.finishedAt ?? updatedAt;
+    subtask.currentRunId = undefined;
+    subtask.summary = run.summary ?? subtask.summary;
+    subtask.terminationReason = run.terminationReason ?? subtask.terminationReason;
+  } else if (run.status === "failed" || run.status === "cancelled") {
+    subtask.status = "failed";
+    subtask.finishedAt = run.finishedAt ?? updatedAt;
+    subtask.currentRunId = undefined;
+    subtask.summary = run.summary ?? run.error ?? subtask.summary;
+    subtask.blockedReason = run.error ?? run.summary ?? subtask.blockedReason;
+    subtask.terminationReason = run.terminationReason ?? run.status;
+  } else if (run.status === "waiting_for_user") {
+    subtask.status = "blocked";
+    subtask.finishedAt = undefined;
+    subtask.currentRunId = undefined;
+    subtask.summary = run.summary ?? subtask.summary;
+    subtask.blockedReason = run.summary ?? run.error ?? "Child Studio member is waiting for user input.";
+    subtask.terminationReason = run.terminationReason ?? "waiting_for_user";
+  }
+  refreshDerivedImplementation(plan, progress);
+}
+
 export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run: YpiStudioTaskSubagentRun): YpiStudioTaskDetail {
   const ctx = createContext(cwd);
   return withTaskMutationLock(ctx, taskIdOrKey, () => {
@@ -1936,6 +2898,30 @@ export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run
   if (record.archived) throw new Error("Archived tasks cannot record subagent runs");
   const updatedAt = nowIso();
   record.raw.subagents = [...record.raw.subagents.filter((existing) => existing.id !== run.id), run];
+  if (run.improvementId) {
+    // Improvement-instance scoped run: attribute to instance.runIds and update only the
+    // scoped instance progress. The main task plan/progress and currentMember are never touched.
+    if (record.raw.status !== "waiting_for_improvements") throw new Error(`Improvement-scoped run ${run.id} cannot be recorded while the main task status is ${record.raw.status}; expected waiting_for_improvements.`);
+    const instance = record.raw.improvements?.instances.find((inst) => inst.id === run.improvementId);
+    if (!instance) throw new Error(`Improvement not found for run ${run.id}: ${run.improvementId}`);
+    instance.runIds = Array.from(new Set([...(instance.runIds ?? []), run.id]));
+    // Apply run state to the scoped instance progress only; the helper no-ops when the
+    // run carries no subtaskId or the subtaskId is not part of the instance plan.
+    if (instance.implementationPlan && instance.implementationProgress) {
+      applySubagentRunToImplementationProgress(instance.implementationPlan, instance.implementationProgress, run, updatedAt);
+    }
+    instance.updatedAt = updatedAt;
+    record.raw.updatedAt = updatedAt;
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "subagent",
+      at: updatedAt,
+      taskId: record.raw.id,
+      member: run.member,
+      message: run.summary ?? run.error ?? `${run.member} ${run.status}`,
+      data: { runId: run.id, subtaskId: run.subtaskId, status: run.status, improvementId: run.improvementId, displayId: instance.displayId, transcript: run.transcript },
+    });
+  } else {
   if (run.subtaskId && record.raw.implementationPlan && record.raw.implementationProgress?.subtasks[run.subtaskId]) {
     assertTaskStatusForImplementationMutation(record.raw, run.status === "succeeded" ? "done" : run.status === "cancelled" ? "failed" : run.status === "waiting_for_user" ? "blocked" : run.status);
     const progress = record.raw.implementationProgress;
@@ -1991,6 +2977,7 @@ export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run
     message: run.summary ?? run.error ?? `${run.member} ${run.status}`,
     data: { runId: run.id, subtaskId: run.subtaskId, status: run.status, transcript: run.transcript },
   });
+  }
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after subagent update");
   return detail;
@@ -2056,7 +3043,8 @@ export function updateYpiStudioImplementationPlan(taskIdOrKey: string, body: Ypi
   record.raw.implementationPlan = normalizedPlan;
   record.raw.implementationProgress = rebuildImplementationProgress(normalizedPlan, record.raw.implementationProgress);
   if (record.raw.status === "awaiting_approval") {
-    record.raw.meta = { ...record.raw.meta, approvalGate: approvalGate(updatedAt, record.raw.status, body.contextId), approvalGrant: undefined };
+    const revision = (record.raw.meta.planRevision ?? 1) + 1;
+    record.raw.meta = { ...record.raw.meta, approvalGate: approvalGate(updatedAt, record.raw.status, body.contextId), approvalGrant: undefined, planRevision: revision };
   }
   record.raw.updatedAt = updatedAt;
   if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
@@ -2069,9 +3057,19 @@ export function updateYpiStudioImplementationPlan(taskIdOrKey: string, body: Ypi
   });
 }
 
-export function getNextYpiStudioImplementationSubtask(cwd: string, taskIdOrKey: string, options: { limit?: number } = {}): { task: YpiStudioTaskDetail; subtask: YpiStudioImplementationSubtaskPlan | null; subtasks: YpiStudioImplementationSubtaskPlan[]; summary?: YpiStudioImplementationSummary } {
+export function getNextYpiStudioImplementationSubtask(cwd: string, taskIdOrKey: string, options: { limit?: number; improvementId?: string } = {}): { task: YpiStudioTaskDetail; subtask: YpiStudioImplementationSubtaskPlan | null; subtasks: YpiStudioImplementationSubtaskPlan[]; summary?: YpiStudioImplementationSummary; improvementId?: string; instance?: { id: string; displayId: string; title: string; status: string } } {
   const task = getYpiStudioTaskDetail(cwd, taskIdOrKey);
   if (!task) throw new Error("Task not found");
+  if (options.improvementId) {
+    if (task.status !== "waiting_for_improvements") throw new Error(`Improvement subtasks can only be queried while the main task is waiting_for_improvements. Current status: ${task.status}`);
+    const instance = task.improvements?.instances.find((inst) => inst.id === options.improvementId);
+    if (!instance) throw new Error(`Improvement not found: ${options.improvementId}`);
+    if (instance.status !== "implementing" && instance.status !== "checking") throw new Error(`Improvement ${instance.displayId} is not executable (status: ${instance.status}). It must be implementing or checking to query ready subtasks.`);
+    if (!instance.implementationPlan || !instance.implementationProgress) throw new Error(`Improvement ${instance.displayId} has no implementation plan/progress.`);
+    const subtasks = selectReadyYpiStudioImplementationSubtasks(instance.implementationPlan, instance.implementationProgress, options.limit);
+    const summary = summarizeImplementation(instance.implementationPlan, instance.implementationProgress);
+    return { task, subtask: subtasks[0] ?? null, subtasks, summary, improvementId: instance.id, instance: { id: instance.id, displayId: instance.displayId, title: instance.title, status: instance.status } };
+  }
   const subtasks = selectReadyYpiStudioImplementationSubtasks(task.implementationPlan, task.implementationProgress, options.limit);
   return { task, subtask: subtasks[0] ?? null, subtasks, summary: task.implementation };
 }
@@ -2137,6 +3135,75 @@ export function claimYpiStudioImplementationSubtask(taskIdOrKey: string, body: Y
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after claim");
+  return detail;
+  });
+}
+
+/** Scoped claim for an improvement instance DAG. Resolves subtasks against
+ *  `instance.implementationPlan` / `instance.implementationProgress` only; the main task
+ *  plan/progress are never read or mutated. Requires `improvementId` and that the main task
+ *  is `waiting_for_improvements` with the instance in `implementing | checking`. */
+export function claimYpiStudioImprovementSubtask(taskIdOrKey: string, body: YpiStudioImprovementSubtaskClaimBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+  const record = loadTaskRecord(ctx, taskIdOrKey);
+  if (!record?.raw) throw new Error("Task not found");
+  const instance = resolveImprovementInstanceForExecution(record, body.improvementId);
+  const plan = instance.implementationPlan!;
+  const progress = instance.implementationProgress!;
+  refreshDerivedImplementation(plan, progress);
+  const requestedIds = body.subtaskIds?.length ? body.subtaskIds : body.subtaskId ? [body.subtaskId] : undefined;
+  const requestedRunIds = body.runIds ?? (body.runId ? [body.runId] : undefined);
+  const targetStatus: YpiStudioImplementationSubtaskStatus = body.status === "queued" ? "queued" : "running";
+  const limit = Math.max(1, Math.floor(body.limit ?? requestedIds?.length ?? 1));
+  const candidates = requestedIds
+    ? requestedIds.map((id) => plan.subtasks.find((subtask) => subtask.id === id) ?? null)
+    : selectReadyYpiStudioImplementationSubtasks(plan, progress, limit);
+  if (candidates.some((candidate) => !candidate)) throw new Error("One or more requested improvement subtasks do not exist in the instance plan.");
+  const selected = candidates.filter((candidate): candidate is YpiStudioImplementationSubtaskPlan => !!candidate).slice(0, limit);
+  if (!selected.length) throw new Error("No ready improvement subtask is available. Check dependencies, blocked subtasks, or running active subtask.");
+  if (selected.length > concurrencySlotsAvailable(plan, progress)) throw new Error("Requested improvement subtasks exceed available concurrency slots.");
+  for (const candidate of selected) {
+    const item = progress.subtasks[candidate.id];
+    if (!item || item.status !== "ready") throw new Error(`Improvement subtask ${candidate.id} is not ready or no concurrency slot is available`);
+    if (!candidate.dependsOn.every((dep) => dependencySatisfiedForPlan(plan, progress, dep))) throw new Error(`Improvement subtask ${candidate.id} has unfinished dependencies`);
+  }
+  const updatedAt = nowIso();
+  const claimedIds: string[] = [];
+  selected.forEach((candidate, index) => {
+    const item = progress.subtasks[candidate.id];
+    const from = item.status;
+    const runId = requestedRunIds?.[index] ?? (selected.length === 1 ? body.runId : undefined);
+    item.status = targetStatus;
+    item.finishedAt = undefined;
+    item.updatedAt = updatedAt;
+    item.claimedAt = updatedAt;
+    item.claimedByContextId = body.contextId;
+    if (targetStatus === "running") {
+      item.startedAt = updatedAt;
+      item.attempts += 1;
+      progress.activeSubtaskId = candidate.id;
+    } else {
+      item.queuedAt = updatedAt;
+    }
+    if (runId) {
+      item.runIds = Array.from(new Set([...item.runIds, runId]));
+      item.lastRunId = runId;
+      item.currentRunId = runId;
+    }
+    progress.history = [...(progress.history ?? []), { at: updatedAt, subtaskId: candidate.id, from, to: targetStatus, runId, message: body.message }].slice(-200);
+    claimedIds.push(candidate.id);
+  });
+  refreshDerivedImplementation(plan, progress);
+  instance.implementationProgress = progress;
+  instance.updatedAt = updatedAt;
+  record.raw.updatedAt = updatedAt;
+  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+  writeTaskJson(record.dirPath, record.raw);
+  appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Claimed improvement ${instance.displayId} subtasks ${claimedIds.join(", ")}`, data: { improvementId: instance.id, displayId: instance.displayId, subtaskIds: claimedIds, status: targetStatus, runIds: requestedRunIds } });
+  if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+  const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+  if (!detail) throw new Error("Task not found after improvement claim");
   return detail;
   });
 }
@@ -2240,6 +3307,19 @@ export function isYpiStudioTaskImplementationSubtaskClaimBody(value: unknown): v
     && (value.contextId === undefined || typeof value.contextId === "string");
 }
 
+export function isYpiStudioImprovementSubtaskClaimBody(value: unknown): value is YpiStudioImprovementSubtaskClaimBody {
+  return isRecord(value) && value.action === "claim_improvement_subtask" && typeof value.cwd === "string"
+    && typeof value.improvementId === "string"
+    && (value.subtaskId === undefined || typeof value.subtaskId === "string")
+    && (value.subtaskIds === undefined || (Array.isArray(value.subtaskIds) && value.subtaskIds.every((item) => typeof item === "string")))
+    && (value.limit === undefined || (typeof value.limit === "number" && Number.isFinite(value.limit)))
+    && (value.runId === undefined || typeof value.runId === "string")
+    && (value.runIds === undefined || (Array.isArray(value.runIds) && value.runIds.every((item) => typeof item === "string")))
+    && (value.status === undefined || value.status === "queued" || value.status === "running")
+    && (value.message === undefined || typeof value.message === "string")
+    && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
 export function isYpiStudioTaskImplementationSubtaskUpdateBody(value: unknown): value is YpiStudioTaskImplementationSubtaskUpdateBody {
   return isRecord(value) && value.action === "update_implementation_subtask" && typeof value.cwd === "string"
     && typeof value.subtaskId === "string" && isImplementationStatus(value.status)
@@ -2263,4 +3343,72 @@ export function isYpiStudioTaskArchiveBody(value: unknown): value is YpiStudioTa
     && (value.knowledgeMarkdown === undefined || typeof value.knowledgeMarkdown === "string")
     && (value.tags === undefined || (Array.isArray(value.tags) && value.tags.every((tag) => typeof tag === "string")))
     && (value.allowFallbackKnowledge === undefined || typeof value.allowFallbackKnowledge === "boolean");
+}
+
+export function isYpiStudioImprovementCreateBody(value: unknown): value is YpiStudioImprovementCreateBody {
+  return isRecord(value)
+    && value.action === "create_improvement"
+    && typeof value.cwd === "string"
+    && typeof value.title === "string" && value.title.trim().length > 0
+    && typeof value.feedback === "string"
+    && (value.contextId === undefined || typeof value.contextId === "string")
+    && (value.owner === undefined || typeof value.owner === "string");
+}
+
+export function isYpiStudioImprovementTransitionBody(value: unknown): value is YpiStudioImprovementTransitionBody {
+  return isRecord(value)
+    && value.action === "transition_improvement"
+    && typeof value.cwd === "string"
+    && typeof value.improvementId === "string"
+    && typeof value.to === "string"
+    && (value.contextId === undefined || typeof value.contextId === "string")
+    && (value.reason === undefined || typeof value.reason === "string");
+}
+
+export function isYpiStudioImprovementDispositionBody(value: unknown): value is YpiStudioImprovementDispositionBody {
+  return isRecord(value)
+    && value.action === "resolve_improvement_disposition"
+    && typeof value.cwd === "string"
+    && typeof value.improvementId === "string"
+    && (value.disposition === "accepted" || value.disposition === "cancelled" || value.disposition === "failed" || value.disposition === "accepted_not_doing")
+    && (value.reason === undefined || typeof value.reason === "string")
+    && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
+export function isYpiStudioImprovementArtifactUpdateBody(value: unknown): value is YpiStudioImprovementArtifactUpdateBody {
+  return isRecord(value)
+    && typeof value.cwd === "string"
+    && typeof value.artifact === "string"
+    && typeof value.content === "string"
+    && typeof value.improvementId === "string"
+    && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
+export function isYpiStudioImprovementPlanUpdateBody(value: unknown): value is YpiStudioImprovementPlanUpdateBody {
+  return isRecord(value)
+    && value.action === "update_improvement_plan"
+    && typeof value.cwd === "string"
+    && typeof value.improvementId === "string"
+    && (value.implementationPlan === undefined || isRecord(value.implementationPlan))
+    && (value.override === undefined || typeof value.override === "boolean")
+    && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
+export function isYpiStudioImprovementApprovalBody(value: unknown): value is { cwd: string; action: "record_improvement_approval"; improvementId: string; contextId: string; inputText: string } {
+  return isRecord(value)
+    && value.action === "record_improvement_approval"
+    && typeof value.cwd === "string"
+    && typeof value.improvementId === "string"
+    && typeof value.contextId === "string"
+    && typeof value.inputText === "string";
+}
+
+export function isYpiStudioImprovementRevisionBody(value: unknown): value is YpiStudioImprovementPlanUpdateBody & { artifactUpdates?: Record<string, string> } {
+  return isRecord(value)
+    && value.action === "revise_improvement_plan"
+    && typeof value.cwd === "string"
+    && typeof value.improvementId === "string"
+    && (value.implementationPlan === undefined || isRecord(value.implementationPlan))
+    && (value.artifactUpdates === undefined || (isRecord(value.artifactUpdates) && Object.values(value.artifactUpdates).every((v) => typeof v === "string")))
+    && (value.contextId === undefined || typeof value.contextId === "string");
 }

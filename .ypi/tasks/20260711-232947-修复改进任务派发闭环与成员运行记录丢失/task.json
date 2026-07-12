@@ -1,0 +1,1815 @@
+{
+  "schemaVersion": 1,
+  "id": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+  "title": "修复改进任务派发闭环与成员运行记录丢失",
+  "workflowId": "feature-dev",
+  "status": "checking",
+  "cwd": "/Users/zyj/projects/git_projects/yolk-pi-web",
+  "createdAt": "2026-07-11T15:29:47.250Z",
+  "updatedAt": "2026-07-11T17:52:00.733Z",
+  "completedAt": null,
+  "contextIds": [
+    "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8"
+  ],
+  "currentMember": "checker",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-bced009f52b20c13aadc2b0d",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T15:30:12.232Z",
+      "finishedAt": "2026-07-11T15:37:51.522Z",
+      "runner": "sdk",
+      "childSessionId": "019f51cc-ecec-7bff-adfc-651d7b947364",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-30-12-332Z_019f51cc-ecec-7bff-adfc-651d7b947364.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f51cc-ecec-7bff-adfc-651d7b947364",
+        "model": "AITOB-OAI/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成返工设计并更新交接文档：\n\n- [brief.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/brief.md)\n- [design.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/design.md)\n- [implement.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/implement.md)\n- [checks.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/checks.md)\n- [handoff.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md)\n\n核心决策：run 继续唯一存于主任务 `subagents`，新增持久化 `improvementId`，并让 `instance.runIds` 成为去重审计索引。实例 ready/claim/run 回写只操作实例 DAG；无 `improvementId` 的主任务派发路径保持不变。计划包含 `claim_improvement_subtask`、`implementation_next(improvementId)`、subagent scoped start，以及 start/final/cancel/runtime-lost 的归属一致性。\n\n验证已运行：implementation plan JSON 解析通过，包含四个有序子任务；`git diff --check` 无 whitespace 错误。未修改生产代码，未运行 lint、TypeScript 或测试；交接中已列出实现后的必跑命令。无需新的产品决策；父 review 的 I1-I5 明确留在本次 B1/B2 修复范围之外。",
+      "model": "AITOB-OAI/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "AITOB-OAI/gpt-5.6-terra",
+          "arg": "AITOB-OAI/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T15:30:12.232Z",
+        "updatedAt": "2026-07-11T15:37:51.522Z",
+        "eventCount": 8002,
+        "lastTextPreview": "已完成返工设计并更新交接文档：\n\n- [brief.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/brief.md)\n- [design.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/design.md)\n- [implement.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/implement.md)\n- [checks.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/checks.md)\n- [handoff.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md)\n\n核心决策：run 继续唯一存于主任务 `subagents`，新增持久化 `improvementId`，并让 `instance.runIds` 成为去重审计索引。实例 ready/claim/run 回写只操作实例 DAG；无 `improvementId` 的主任务派发路径保持不变。计划包含 `claim_improvement_subtask`、`implementation_next(improvementId)`、subagent scoped start，以及 start/final/cancel/runtime-lost 的归属一致性。\n\n验证已运行：implementation plan JSON 解析通过，包含四个有序子任务；`git diff --check` 无 whitespace 错误。未修改生产代码，未运行 lint、TypeScript 或测试；交接中已列出实现后的必跑命令。无需新的产品决策；父 review 的 I1-I5 明确留在本次 B1/B2 修复范围之外。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T15:36:59.910Z",
+            "text": "校验通过：implementation plan JSON 可解析并包含四个有序子任务，文档中没有遗留 `_TBD`。用户需求已明确 checker 也可领取改进子任务，因此我会移除交接中不必要的“待确认”表述，标记为无需主会话决策。",
+            "model": "AITOB-OAI/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T15:36:59.922Z",
+            "toolCallId": "call_ZhI6GMYhiy4ufqF5G4Ge059g|fc_0bf7c51b215bfc3d016a526315bc548191a6e320b1584cb717",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 剩余风险与主会话决策\\n\\n- 需检查员确认 `checking` 实例的 checker 是否也应通过 `claim_improvement_subtask` 领取 DAG 子任务；本方案按用户任务描述支持 implementer/checker，且仅允许实例状态 `implementing | checking`。\\n- B1/B2 不解决父 review 的 I1-I5。主会话应将它们保留为独立返工或明确缩减产品承诺，避免本次阻塞修复扩大范围。\\n\",\n      \"newText\": \"## 剩余风险与主会话决策\\n\\n- 无需新的产品决策：已按任务要求让 implementer 与 checker 都可在实例状态 `implementing | checking` 下领取实例 DAG 子任务。\\n- B1/B2 不解决父 review 的 I1-I5。主会话应将它们保留为独立返工或明确缩减产品承诺，避免本次阻塞修复扩大范围。\\n\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T15:36:59.928Z",
+            "toolCallId": "call_ZhI6GMYhiy4ufqF5G4Ge059g|fc_0bf7c51b215bfc3d016a526315bc548191a6e320b1584cb717",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T15:37:20.127Z",
+            "text": "已完成返工设计并更新交接文档：\n\n- [brief.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/brief.md)\n- [design.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/design.md)\n- [implement.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/implement.md)\n- [checks.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/checks.md)\n- [handoff.md](/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md)\n\n核心决策：run 继续唯一存于主任务 `subagents`，新增持久化 `improvementId`，并让 `instance.runIds` 成为去重审计索引。实例 ready/claim/run 回写只操作实例 DAG；无 `improvementId` 的主任务派发路径保持不变。计划包含 `claim_improvement_subtask`、`implementation_next(improvementId)`、subagent scoped start，以及 start/final/cancel/runtime-lost 的归属一致性。\n\n验证已运行：implementation plan JSON 解析通过，包含四个有序子任务；`git diff --check` 无 whitespace 错误。未修改生产代码，未运行 lint、TypeScript 或测试；交接中已列出实现后的必跑命令。无需新的产品决策；父 review 的 I1-I5 明确留在本次 B1/B2 修复范围之外。",
+            "model": "AITOB-OAI/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T15:37:20.130Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1819,
+        "tokens": 583,
+        "tokenSource": "usage",
+        "tps": 1.38,
+        "firstTokenAt": "2026-07-11T15:30:15.979Z",
+        "lastTokenAt": "2026-07-11T15:37:17.967Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-bced009f52b20c13aadc2b0d",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/architect-bced009f52b20c13aadc2b0d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T15:30:12.232Z",
+        "finishedAt": "2026-07-11T15:37:51.465Z",
+        "updatedAt": "2026-07-11T15:37:51.465Z",
+        "itemCount": 79,
+        "messageCount": 7,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 302745,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f51cc-ecec-7bff-adfc-651d7b947364",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-30-12-332Z_019f51cc-ecec-7bff-adfc-651d7b947364.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-1c8ca97439e4ed99af910f09",
+      "subtaskId": "imp-scope-types",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T15:45:17.670Z",
+      "finishedAt": "2026-07-11T15:48:13.155Z",
+      "runner": "sdk",
+      "childSessionId": "019f51da-be02-7e9b-ab72-f91f907a6e71",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-45-17-826Z_019f51da-be02-7e9b-ab72-f91f907a6e71.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f51da-be02-7e9b-ab72-f91f907a6e71",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for run scope attribution across all lifecycle events.\n  - Added new `YpiStudioImprovementSubtaskClaimBody` interface with `action: \"claim_improvement_subtask\"` and required `improvementId`, mirroring the main-task claim body fields.\n  - Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged to keep main-task scope explicit and prevent scope confusion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no errors)\n\n#### Notes / Risks\n\n- `improvementId` is additive and optional on `YpiStudioTaskSubagentRun`, so existing callers without it remain valid; old runs are interpreted by the main-task path as before.\n- `YpiStudioImprovementSubtaskClaimBody.improvementId` is required (not implicit), so the API/tool layer can reject mixed-scope calls in `imp-scope-library` / `imp-scope-tool-api`.\n- No logical changes made; only type contracts added as scoped by this subtask. Subsequent subtasks (`imp-scope-library`, `imp-scope-tool-api`, `imp-scope-tests`) will implement the library logic, tool/route wiring, and DAG contract tests.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T15:45:17.670Z",
+        "updatedAt": "2026-07-11T15:48:13.154Z",
+        "eventCount": 207,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for run scope attribution across all lifecycle events.\n  - Added new `YpiStudioImprovementSubtaskClaimBody` interface with `action: \"claim_improvement_subtask\"` and required `improvementId`, mirroring the main-task claim body fields.\n  - Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged to keep main-task scope explicit and prevent scope confusion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no errors)\n\n#### Notes / Risks\n\n- `improvementId` is additive and optional on `YpiStudioTaskSubagentRun`, so existing callers without it remain valid; old runs are interpreted by the main-task path as before.\n- `YpiStudioImprovementSubtaskClaimBody.improvementId` is required (not implicit), so the API/tool layer can reject mixed-scope calls in `imp-scope-library` / `imp-scope-tool-api`.\n- No logical changes made; only type contracts added as scoped by this subtask. Subsequent subtasks (`imp-scope-library`, `imp-scope-tool-api`, `imp-scope-tests`) will implement the library logic, tool/route wiring, and DAG contract tests.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T15:47:50.702Z",
+            "toolCallId": "call_7a79",
+            "toolName": "bash",
+            "text": "492:  improvementId?: string;\n964:  improvementId: string;\n973:  improvementId: string;\n983:  improvementId: string;\n990:  improvementId: string;\n1030:/** Scoped claim for an improvement instance DAG. Requires `improvementId`; subtasks are resolved against\n1035:  improvementId: string;",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T15:47:55.573Z",
+            "toolCallId": "call_16b7",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"lib/ypi-studio-types.ts\",\n  \"offset\": 1020,\n  \"limit\": 25\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T15:47:55.603Z",
+            "toolCallId": "call_16b7",
+            "toolName": "read",
+            "text": "subtaskId?: string;\n  subtaskIds?: string[];\n  limit?: number;\n  runId?: string;\n  runIds?: string[];\n  status?: \"queued\" | \"running\";\n  message?: string;\n  contextId?: string;\n}\n\n/** Scoped claim for an improvement instance DAG. Requires `improvementId`; subtasks are resolved against\n *  `instance.implementationPlan` / `instance.implementationProgress`, never the main task plan. */\nexport interface YpiStudioImprovementSubtaskClaimBody {\n  cwd: string;\n  action: \"claim_improvement_subtask\";\n  improvementId: string;\n  subtaskId?: string;\n  subtaskIds?: string[];\n  limit?: number;\n  runId?: string;\n  runIds?: string[];\n  status?: \"queued\" | \"running\";\n  message?: string;\n  contextId?: string;\n}\n\n[76 more lines in file. Use offset=1045 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T15:48:13.083Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for run scope attribution across all lifecycle events.\n  - Added new `YpiStudioImprovementSubtaskClaimBody` interface with `action: \"claim_improvement_subtask\"` and required `improvementId`, mirroring the main-task claim body fields.\n  - Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged to keep main-task scope explicit and prevent scope confusion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — passed (no errors)\n\n#### Notes / Risks\n\n- `improvementId` is additive and optional on `YpiStudioTaskSubagentRun`, so existing callers without it remain valid; old runs are interpreted by the main-task path as before.\n- `YpiStudioImprovementSubtaskClaimBody.improvementId` is required (not implicit), so the API/tool layer can reject mixed-scope calls in `imp-scope-library` / `imp-scope-tool-api`.\n- No logical changes made; only type contracts added as scoped by this subtask. Subsequent subtasks (`imp-scope-library`, `imp-scope-tool-api`, `imp-scope-tests`) will implement the library logic, tool/route wiring, and DAG contract tests.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T15:48:13.085Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1251,
+        "tokens": 295,
+        "tokenSource": "usage",
+        "tps": 12.4,
+        "firstTokenAt": "2026-07-11T15:47:48.862Z",
+        "lastTokenAt": "2026-07-11T15:48:12.647Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-1c8ca97439e4ed99af910f09",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-1c8ca97439e4ed99af910f09.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T15:45:17.670Z",
+        "finishedAt": "2026-07-11T15:48:13.087Z",
+        "updatedAt": "2026-07-11T15:48:13.087Z",
+        "itemCount": 16,
+        "messageCount": 2,
+        "toolCallCount": 5,
+        "stderrBytes": 0,
+        "bytes": 25157,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f51da-be02-7e9b-ab72-f91f907a6e71",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-45-17-826Z_019f51da-be02-7e9b-ab72-f91f907a6e71.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-108db4482a195bfec0193688",
+      "subtaskId": "imp-scope-types",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T15:45:17.762Z",
+      "finishedAt": "2026-07-11T15:50:09.309Z",
+      "runner": "sdk",
+      "childSessionId": "019f51da-be3b-7eb1-a161-1153af91133f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-45-17-884Z_019f51da-be3b-7eb1-a161-1153af91133f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f51da-be3b-7eb1-a161-1153af91133f",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added `YpiStudioImprovementSubtaskClaimBody` with `action: \"claim_improvement_subtask\"` and **required** `improvementId: string` (other fields mirror the main claim body: `cwd`/`subtaskId?`/`subtaskIds?`/`limit?`/`runId?`/`runIds?`/`status?`/`message?`/`contextId?`).\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for stable scope attribution across start/progress/final/cancel/runtime-lost.\n  - **Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged** — no implicit `improvementId`, so scope confusion is rejected at the type layer.\n- `.ypi/tasks/20260711-232947-.../handoff.md` — recorded `imp-scope-types` completion, acceptance check, and handed off to `imp-scope-library`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- `improvementId` is **required** on the scoped claim body (the type-level first line of defense against main-plan subtasks masquerading as instance subtasks); the library layer (`imp-scope-library`) must still validate instance existence/state at runtime.\n- Only types were touched in this subtask — library/tool/API/test/docs remain for the subsequent subtasks.\n- No new product decisions needed; next implementer should claim `imp-scope-library` and implement instance-scoped `getNext`/`claimYpiStudioImprovementSubtask`/`recordYpiStudioSubagentRun` run-ids attribution in `lib/ypi-studio-tasks.ts`.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T15:45:17.762Z",
+        "updatedAt": "2026-07-11T15:50:09.309Z",
+        "eventCount": 959,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added `YpiStudioImprovementSubtaskClaimBody` with `action: \"claim_improvement_subtask\"` and **required** `improvementId: string` (other fields mirror the main claim body: `cwd`/`subtaskId?`/`subtaskIds?`/`limit?`/`runId?`/`runIds?`/`status?`/`message?`/`contextId?`).\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for stable scope attribution across start/progress/final/cancel/runtime-lost.\n  - **Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged** — no implicit `improvementId`, so scope confusion is rejected at the type layer.\n- `.ypi/tasks/20260711-232947-.../handoff.md` — recorded `imp-scope-types` completion, acceptance check, and handed off to `imp-scope-library`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- `improvementId` is **required** on the scoped claim body (the type-level first line of defense against main-plan subtasks masquerading as instance subtasks); the library layer (`imp-scope-library`) must still validate instance existence/state at runtime.\n- Only types were touched in this subtask — library/tool/API/test/docs remain for the subsequent subtasks.\n- No new product decisions needed; next implementer should claim `imp-scope-library` and implement instance-scoped `getNext`/`claimYpiStudioImprovementSubtask`/`recordYpiStudioSubagentRun` run-ids attribution in `lib/ypi-studio-tasks.ts`.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T15:49:30.893Z",
+            "toolCallId": "call_8f9b",
+            "toolName": "read",
+            "text": "# Handoff - 交给实现员\n\n## 已完成的规划产物\n\n- `brief.md`：B1/B2 根因、范围和验收目标。\n- `design.md`：明确 library/tool/API 的作用域、状态和 run 归属方案。\n- `implement.md`：4 个顺序子任务及机器可读 `ypi-implementation-plan`。\n- `checks.md`：自动、契约、手工和回归检查。\n\n## 实现边界\n\n本次只修复 B1/B2：改进实例的 ready/claim/subagent scope 和 `instance.runIds`。主任务仍是 run 审计唯一存储处；run 增加 `improvementId`，实例保存去重 run id 索引。不要借机实现 `approvalMode=inherit`、独立通知、UI 文案、feedback event 收缩或 improver thinking 决策。\n\n## 必改文件\n\n- `lib/ypi-studio-types.ts`\n- `lib/ypi-studio-tasks.ts`\n- `lib/ypi-studio-extension.ts`\n- `app/api/studio/tasks/[taskKey]/route.ts`\n- `scripts/test-ypi-studio-dag.mjs`\n- `docs/modules/library.md`、`docs/modules/api.md`\n\n## 验证\n\n规划阶段未修改生产代码，未运行测试。实现完成后必须运行：\n\n```bash\nnpm run test:studio-dag\nnpm run lint\nnode_modules/.bin/tsc --noEmit\n```\n\n并手工验证主/实例使用相同 `subtaskId` 时的 scope 拒绝、实例 async run 的完成和取消记录。\n\n## 剩余风险与主会话决策\n\n- 无需新的产品决策：已按任务要求让 implementer 与 checker 都可在实例状态 `implementing | checking` 下领取实例 DAG 子任务。\n- B1/B2 不解决父 review 的 I1-I5。主会话应将它们保留为独立返工或明确缩减产品承诺，避免本次阻塞修复扩大范围。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T15:50:02.971Z",
+            "toolCallId": "call_27ac",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"# Handoff - 交给实现员\\n\\n## 已完成的规划产物\",\n      \"newText\": \"# Handoff - 交给实现员\\n\\n## 子任务进度\\n\\n| 子任务 | 状态 | 说明 |\\n| --- | --- | --- |\\n| `imp-scope-types` | ✅ 完成 | 见下方「imp-scope-types 完成记录」。 |\\n| `imp-scope-library` | ⏳ ready，待领取 | 下一个实现员：在 `lib/ypi-studio-tasks.ts` 实现实例 next/claim/run 持久化与主/实例 plan 隔离。 |\\n| `imp-scope-tool-api` | 未开始 | 依赖 `imp-scope-library`。 |\\n| `imp-scope-tests` | 未开始 | 依赖 `imp-scope-tool-api`。 |\\n\\n## imp-scope-types 完成记录\\n\\n### Files Changed\\n\\n- `lib/ypi-studio-types.ts`\\n  - 新增 `YpiStudioImprovementSubtaskClaimBody`（`action: \\\"claim_improvement_subtask\\\"`，**required** `improvementId: string`，其余字段复用主 claim body：`cwd`/`subtaskId?`/`subtaskIds?`/`limit?`/`runId?`/`runIds?`/`status?`/`message?`/`contextId?`）。\\n  - 在 `YpiStudioTaskSubagentRun` 增加可选 `improvementId?: string`，作为 start/progress/final/cancel/runtime-lost 的稳定作用域归属。\\n  - **未改动** `YpiStudioTaskImplementationSubtaskClaimBody`：主任务 claim body 不含 `improvementId`，避免作用域隐式混用。\\n\\n### Verification\\n\\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\\n\\n### Acceptance 对照\\n\\n- 类型系统可表示 scoped claim（`YpiStudioImprovementSubtaskClaimBody`）与 scoped run（run 上的 `improvementId`）。\\n- 现有无 `improvementId` 调用者保持有效（`improvementId` 为可选；主 claim body 未引入该字段）。\\n\\n### Notes / Risks\\n\\n- `improvementId` 在 scoped claim body 上是 **required**（非可选），这是阻止“主 plan subtask 冒充实例 subtask”的类型层第一道防线；library 层必须在运行时再次校验实例存在与状态。\\n- 旧 run 无 `improvementId`，按主任务路径解释；旧 improvement 空 `runIds` 不回填。\\n- 本子任务只改 types，未触碰 library/tool/API/test/docs。\\n\\n## 已完成的规划产物\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T15:50:02.985Z",
+            "toolCallId": "call_27ac",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T15:50:09.302Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added `YpiStudioImprovementSubtaskClaimBody` with `action: \"claim_improvement_subtask\"` and **required** `improvementId: string` (other fields mirror the main claim body: `cwd`/`subtaskId?`/`subtaskIds?`/`limit?`/`runId?`/`runIds?`/`status?`/`message?`/`contextId?`).\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for stable scope attribution across start/progress/final/cancel/runtime-lost.\n  - **Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged** — no implicit `improvementId`, so scope confusion is rejected at the type layer.\n- `.ypi/tasks/20260711-232947-.../handoff.md` — recorded `imp-scope-types` completion, acceptance check, and handed off to `imp-scope-library`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- `improvementId` is **required** on the scoped claim body (the type-level first line of defense against main-plan subtasks masquerading as instance subtasks); the library layer (`imp-scope-library`) must still validate instance existence/state at runtime.\n- Only types were touched in this subtask — library/tool/API/test/docs remain for the subsequent subtasks.\n- No new product decisions needed; next implementer should claim `imp-scope-library` and implement instance-scoped `getNext`/`claimYpiStudioImprovementSubtask`/`recordYpiStudioSubagentRun` run-ids attribution in `lib/ypi-studio-tasks.ts`.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T15:50:09.303Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3073,
+        "tokens": 402,
+        "tokenSource": "usage",
+        "tps": 1.39,
+        "firstTokenAt": "2026-07-11T15:45:21.099Z",
+        "lastTokenAt": "2026-07-11T15:50:09.301Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-108db4482a195bfec0193688",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-108db4482a195bfec0193688.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T15:45:17.762Z",
+        "finishedAt": "2026-07-11T15:50:09.305Z",
+        "updatedAt": "2026-07-11T15:50:09.305Z",
+        "itemCount": 41,
+        "messageCount": 9,
+        "toolCallCount": 14,
+        "stderrBytes": 0,
+        "bytes": 54520,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f51da-be3b-7eb1-a161-1153af91133f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-45-17-884Z_019f51da-be3b-7eb1-a161-1153af91133f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-94c36fa565701326a462e82d",
+      "subtaskId": "imp-scope-library",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T15:50:03.264Z",
+      "finishedAt": "2026-07-11T16:08:24.068Z",
+      "runner": "sdk",
+      "childSessionId": "019f51df-1962-7342-a4fc-17e807551862",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-50-03-363Z_019f51df-1962-7342-a4fc-17e807551862.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f51df-1962-7342-a4fc-17e807551862",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "All tests pass. Let me write a quick ad-hoc sanity check to exercise the new instance claim + scoped run recording paths before handing off. First, let me look at the existing DAG test setup:",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T15:50:03.264Z",
+        "updatedAt": "2026-07-11T16:08:24.068Z",
+        "eventCount": 6800,
+        "lastTextPreview": "All tests pass. Let me write a quick ad-hoc sanity check to exercise the new instance claim + scoped run recording paths before handing off. First, let me look at the existing DAG test setup:",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T16:07:58.096Z",
+            "toolCallId": "call_d2e2",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/yolk-pi-web && rg -n \\\"createYpiStudioImprovement\\\\(|transitionYpiStudioImprovement\\\\(|updateYpiStudioImprovementPlan\\\\(|recordYpiStudioImprovementApproval\\\\(\\\" scripts/test-ypi-studio-dag.mjs | head -20\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T16:07:58.112Z",
+            "toolCallId": "call_d2e2",
+            "toolName": "bash",
+            "text": "486:    const detail = createYpiStudioImprovement(task.id, {\n532:    const detail = createYpiStudioImprovement(task.id, {\n555:      () => createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"test\", feedback: \"test\", contextId }),\n577:    const d1 = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Fix A\", feedback: \"feedback a\", contextId });\n580:    const d2 = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Fix B\", feedback: \"feedback b\", contextId });\n585:    const d3 = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Fix C\", feedback: \"feedback c\", contextId });\n607:    const created = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Transition test\", feedback: \"test\", contextId });\n614:    const d2 = transitionYpiStudioImprovement(task.id, {\n619:    recordYpiStudioImprovementApproval(cwd, task.id, impId, contextId, \"确认，批准开始实现\");\n621:    const d3 = transitionYpiStudioImprovement(task.id, {\n628:      () => transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"accepted\", contextId }),\n650:    const created = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Full test\", feedback: \"test\", contextId });\n658:    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"waiting_plan_approval\", contextId, reason: \"Plan ready\" });\n659:    recordYpiStudioImprovementApproval(cwd, task.id, impId, contextId, \"确认，批准开始实现\");\n660:    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"implementing\", contextId, reason: \"Approved\" });\n661:    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"checking\", contextId, reason: \"Implemented\" });\n675:    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"waiting_user_acceptance\", contextId, reason: \"Checks pass\" });\n676:    detail = transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"accepted\", contextId, reason: \"User accepted\" });\n712:    const created = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Failing test\", feedback: \"test\", contextId });\n716:    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"cancelled\", contextId, reason: \"Not needed\" });",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T16:08:20.159Z",
+            "toolCallId": "call_e6ea",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/yolk-pi-web/scripts/test-ypi-studio-dag.mjs\",\n  \"offset\": 640,\n  \"limit\": 50\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T16:08:20.161Z",
+            "toolCallId": "call_e6ea",
+            "toolName": "read",
+            "text": "const contextId = \"pi_imp_full\";\n    const task = createYpiStudioTask({ cwd, title: \"Full lifecycle\", workflowId: \"feature-dev\", contextId });\n    writePlanReview(cwd, task.id, contextId);\n    transitionYpiStudioTask(task.id, { cwd, to: \"planning\", override: true, contextId });\n    transitionYpiStudioTask(task.id, { cwd, to: \"awaiting_approval\", override: true, contextId });\n    recordYpiStudioUserApproval(cwd, contextId, \"确认开始实现\");\n    transitionYpiStudioTask(task.id, { cwd, to: \"implementing\", override: true, contextId });\n    transitionYpiStudioTask(task.id, { cwd, to: \"checking\", override: true, contextId });\n    transitionYpiStudioTask(task.id, { cwd, to: \"review\", override: true, contextId });\n\n    const created = createYpiStudioImprovement(task.id, { cwd, action: \"create_improvement\", title: \"Full test\", feedback: \"test\", contextId });\n    const impId = created.improvements.instances[0].id;\n\n    // Write meaningful plan-review for approval gate\n    const fullInstDir = join(cwd, \".ypi\", \"tasks\", task.id, \"improvements\", impId);\n    writeFileSync(join(fullInstDir, \"plan-review.md\"), \"# Plan Review\\n\\nMeaningful.\\n\", \"utf8\");\n\n    // Walk through valid transitions\n    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"waiting_plan_approval\", contextId, reason: \"Plan ready\" });\n    recordYpiStudioImprovementApproval(cwd, task.id, impId, contextId, \"确认，批准开始实现\");\n    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"implementing\", contextId, reason: \"Approved\" });\n    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"checking\", contextId, reason: \"Implemented\" });\n\n    // Before acceptance, task should still be waiting_for_improvements\n    let detail = getYpiStudioTaskDetail(cwd, task.id);\n    assert.equal(detail.status, \"waiting_for_improvements\");\n    assert.equal(detail.improvements.parentStatus, \"waiting_for_improvements\");\n\n    // Cannot complete while unresolved\n    assert.throws(\n      () => transitionYpiStudioTask(task.id, { cwd, to: \"completed\", override: true, contextId }),\n      /remain unresolved/,\n    );\n\n    // Accept the improvement\n    transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"waiting_user_acceptance\", contextId, reason: \"Checks pass\" });\n    detail = transitionYpiStudioImprovement(task.id, { cwd, action: \"transition_improvement\", improvementId: impId, to: \"accepted\", contextId, reason: \"User accepted\" });\n\n    // After acceptance, task should return to review (not completed!)\n    assert.equal(detail.status, \"review\");\n    assert.equal(detail.improvements.parentStatus, \"review_ready\");\n    assert.equal(detail.improvements.instances[0].status, \"accepted\");\n    assert.ok(detail.improvements.instances[0].completedAt);\n\n    // After improvements resolved, task should be in review and can proceed to user_acceptance\n    // Direct review -> completed is not a valid workflow transition (must go through user_acceptance)\n    assert.throws(\n      () => transitionYpiStudioTask(task.id, { cwd, to: \"completed\", contextId }),\n      /Invalid Studio transition/,\n    );\n\n[851 more lines in file. Use offset=690 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T16:08:24.059Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3332,
+        "tokens": 274,
+        "tokenSource": "usage",
+        "tps": 0.26,
+        "firstTokenAt": "2026-07-11T15:50:06.924Z",
+        "lastTokenAt": "2026-07-11T16:07:46.429Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-94c36fa565701326a462e82d",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-94c36fa565701326a462e82d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T15:50:03.264Z",
+        "finishedAt": "2026-07-11T16:08:24.060Z",
+        "updatedAt": "2026-07-11T16:08:24.060Z",
+        "itemCount": 192,
+        "messageCount": 28,
+        "toolCallCount": 80,
+        "stderrBytes": 0,
+        "bytes": 290354,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f51df-1962-7342-a4fc-17e807551862",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-50-03-363Z_019f51df-1962-7342-a4fc-17e807551862.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-95e08071de29c943fea4d2f3",
+      "subtaskId": "imp-scope-library",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T15:50:03.185Z",
+      "finishedAt": "2026-07-11T16:08:29.577Z",
+      "runner": "sdk",
+      "childSessionId": "019f51df-1938-746c-ba2b-d9074b0cfc3c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-50-03-321Z_019f51df-1938-746c-ba2b-d9074b0cfc3c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f51df-1938-746c-ba2b-d9074b0cfc3c",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "Both pass. Let me check whether tests already cover the improvement scope and whether my new helpers are unused (dead code):",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T15:50:03.185Z",
+        "updatedAt": "2026-07-11T16:08:29.577Z",
+        "eventCount": 5814,
+        "lastTextPreview": "Both pass. Let me check whether tests already cover the improvement scope and whether my new helpers are unused (dead code):",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T16:05:12.876Z",
+            "toolCallId": "call_2f61",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.10 test:studio-dag\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-dag.mjs\n\n(node:90858) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nypi-studio DAG scheduler tests passed",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T16:08:28.646Z",
+            "text": "Both pass. Let me check whether tests already cover the improvement scope and whether my new helpers are unused (dead code):",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T16:08:28.647Z",
+            "toolCallId": "call_e8ea",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/yolk-pi-web && grep -n \\\"claimYpiStudioImprovementSubtask\\\\|getNextYpiStudioImplementationSubtask.*improvementId\\\\|improvementId.*run\\\\|instance.runIds\\\\|imp-scope\\\\|improvement.*scope\\\\|isYpiStudioImprovementSubtaskClaimBody\\\\|IMPROVEMENT_EXECUTABLE\\\\|findExecutableImprovementInstance\\\\|resolveImprovementExecutionScope\\\\|applySubagentRunToImplementationProgress\\\\|resolveImprovementInstanceForExecution\\\" scripts/test-ypi-studio-dag.mjs lib/ypi-studio-tasks.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T16:08:28.698Z",
+            "toolCallId": "call_e8ea",
+            "toolName": "bash",
+            "text": "lib/ypi-studio-tasks.ts:723:function resolveImprovementInstanceForExecution(record: TaskRecordOnDisk, improvementId: string): YpiStudioImprovementInstance {\nlib/ypi-studio-tasks.ts:1335:        improvementId: optionalString(run.improvementId),\nlib/ypi-studio-tasks.ts:2844:function applySubagentRunToImplementationProgress(\nlib/ypi-studio-tasks.ts:2902:    // Improvement-instance scoped run: attribute to instance.runIds and update only the\nlib/ypi-studio-tasks.ts:2904:    if (record.raw.status !== \"waiting_for_improvements\") throw new Error(`Improvement-scoped run ${run.id} cannot be recorded while the main task status is ${record.raw.status}; expected waiting_for_improvements.`);\nlib/ypi-studio-tasks.ts:2907:    instance.runIds = Array.from(new Set([...(instance.runIds ?? []), run.id]));\nlib/ypi-studio-tasks.ts:2911:      applySubagentRunToImplementationProgress(instance.implementationPlan, instance.implementationProgress, run, updatedAt);\nlib/ypi-studio-tasks.ts:2922:      data: { runId: run.id, subtaskId: run.subtaskId, status: run.status, improvementId: run.improvementId, displayId: instance.displayId, transcript: run.transcript },\nlib/ypi-studio-tasks.ts:3060:export function getNextYpiStudioImplementationSubtask(cwd: string, taskIdOrKey: string, options: { limit?: number; improvementId?: string } = {}): { task: YpiStudioTaskDetail; subtask: YpiStudioImplementationSubtaskPlan | null; subtasks: YpiStudioImplementationSubtaskPlan[]; summary?: YpiStudioImplementationSummary; improvementId?: string; instance?: { id: string; displayId: string; title: string; status: string } } {\nlib/ypi-studio-tasks.ts:3146:export function claimYpiStudioImprovementSubtask(taskIdOrKey: string, body: YpiStudioImprovementSubtaskClaimBody): YpiStudioTaskDetail {\nlib/ypi-studio-tasks.ts:3151:  const instance = resolveImprovementInstanceForExecution(record, body.improvementId);\nlib/ypi-studio-tasks.ts:3203:  appendTaskEvent(record.dirPath, { type: \"note\", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Claimed improvement ${instance.displayId} subtasks ${claimedIds.join(\", \")}`, data: { improvementId: instance.id, displayId: instance.displayId, subtaskIds: claimedIds, status: targetStatus, runIds: requestedRunIds } });\nlib/ypi-studio-tasks.ts:3310:export function isYpiStudioImprovementSubtaskClaimBody(value: unknown): value is YpiStudioImprovementSubtaskClaimBody {",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T16:08:29.568Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2648,
+        "tokens": 362,
+        "tokenSource": "usage",
+        "tps": 0.36,
+        "firstTokenAt": "2026-07-11T15:50:27.292Z",
+        "lastTokenAt": "2026-07-11T16:07:26.696Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-95e08071de29c943fea4d2f3",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-95e08071de29c943fea4d2f3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T15:50:03.185Z",
+        "finishedAt": "2026-07-11T16:08:29.569Z",
+        "updatedAt": "2026-07-11T16:08:29.569Z",
+        "itemCount": 97,
+        "messageCount": 23,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 192898,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f51df-1938-746c-ba2b-d9074b0cfc3c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T15-50-03-321Z_019f51df-1938-746c-ba2b-d9074b0cfc3c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-38815262e06079df4f3cb530",
+      "subtaskId": "imp-scope-tool-api",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T16:51:24.652Z",
+      "finishedAt": "2026-07-11T17:11:57.925Z",
+      "runner": "sdk",
+      "childSessionId": "019f5217-459d-7071-b943-870a6b309491",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T16-51-24-701Z_019f5217-459d-7071-b943-870a6b309491.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f5217-459d-7071-b943-870a6b309491",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — 在 Studio task/subagent 工具中暴露改进实例作用域派发：\n  - 导入 `claimYpiStudioImprovementSubtask`、`implementationCounts`；`StudioTaskToolInput.action` 与 `normalizeTaskToolInput` 新增 `claim_improvement_subtask`，并补齐 normalizer 返回的 `improvementId`/`feedback`/`owner`/`inputText`/`artifactUpdates`（修复此前实例字段被丢弃、tool 路径 instance action 失效的隐患）。\n  - `implementation_next` 透传 `improvementId` 并按实例 progress 读取等待原因/区分文案；新增 `claim_improvement_subtask` action 调用 `claimYpiStudioImprovementSubtask` 并回包实例作用域；任务工具 JSON schema enum 与 `improvementId` 描述同步。\n  - `StudioSubagentInput`/`normalizeSubagentInput`/subagent schema 增加 `improvementId`；`StudioSubagentRunProjection`、`ChildRunMeta` 与全部 compact projection（async start/lifecycle/sync/wait/`summarizeStudioSubagentRun`）透传 `improvementId`。\n  - subagent `start` 校验改为显式作用域：有 `improvementId` → 要求主任务 `waiting_for_improvements`、实例 `implementing|checking` 有 plan、implementer/checker 必须带 `subtaskId`，仅在实例 plan 查找子任务（拒绝主 plan id），async ready 经实例 claim helper 领取；无 `improvementId` 但主任务等待改进且带 `subtaskId` 时在 child launch 前拒绝。\n  - `buildMemberPrompt` 实例作用域：注入实例 artifacts/plan/progress、`IMP` 作用域头与实例 selected subtask，绝不注入主 plan/progress。\n  - `runningRun`/sync 终态 `run`/`childMeta` 写入 `improvementId`；`persistRunSnapshot` 显式保归属，cancel/SDK fallback/runtime-lost 经持久化 run 保留同一 `improvementId`（B2：首次 start 持久化后写入 `instance.runIds`）。\n  - `buildImprovementStateInjection` 更新 `implementing|checking` 指引。\n- `app/api/studio/tasks/[taskKey]/route.ts` — 导入 `claimYpiStudioImprovementSubtask`/`isYpiStudioImprovementSubtaskClaimBody`，PATCH 在主 claim 分支相邻处新增 `claim_improvement_subtask` 分支，使用 `authorizedCwd` 覆盖 body.cwd，归属/状态由 library 校验。\n- `.ypi/tasks/.../handoff.md` — 更新子任务进度（types/library/tool-api 完成，tests 待领取）并补 imp-scope-library、imp-scope-tool-api 完成记录与下一步指引。\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass\n- `npm run test:studio-dag` — Pass（回归，现有 DAG 契约不退化）\n\n#### Notes / Risks\n\n- `normalizeTaskToolInput` 此前未返回 `improvementId` 等实例字段，导致旧 instance 改进 action 只能经 API route 生效；本次一并补齐，tool 与 API 路径现在一致——属 bug 修复，未改变既有主任务行为。\n- 运行期 `YpiStudioChildRunHandle` 未增加 `improvementId`，归属以持久化 run 为准，避免内存 handle 维护第二份作用域；`cancel`/SDK fallback/`reconcileYpiStudioRuntimeLostSubagentRun` 均经已持久化 run 的 `improvementId` 回写。\n- 主任务 `implementing` 的既有 claim/parallel/SDK fallback/cancel/poll/collect 行为不变（无 `improvementId` 时走原 else 分支，字节级保留）。\n- 作用域 scoped claim/next/run 归属的正向/拒绝契约测试与 `docs/modules/library.md`、`docs/modules/api.md` 更新属于下一个子任务 `imp-scope-tests`，本子任务不触及。\n- 需主会话决策：无。如需将 `imp-scope-tool-api` 在 task.json `implementationProgress` 标记为 done，需由主会话通过 `ypi_studio_task(action=update_implementation_subtask)` 推进（实现员不自行写 task.json plan 进度）。",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T16:51:24.652Z",
+        "updatedAt": "2026-07-11T17:11:57.925Z",
+        "eventCount": 7802,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — 在 Studio task/subagent 工具中暴露改进实例作用域派发：\n  - 导入 `claimYpiStudioImprovementSubtask`、`implementationCounts`；`StudioTaskToolInput.action` 与 `normalizeTaskToolInput` 新增 `claim_improvement_subtask`，并补齐 normalizer 返回的 `improvementId`/`feedback`/`owner`/`inputText`/`artifactUpdates`（修复此前实例字段被丢弃、tool 路径 instance action 失效的隐患）。\n  - `implementation_next` 透传 `improvementId` 并按实例 progress 读取等待原因/区分文案；新增 `claim_improvement_subtask` action 调用 `claimYpiStudioImprovementSubtask` 并回包实例作用域；任务工具 JSON schema enum 与 `improvementId` 描述同步。\n  - `StudioSubagentInput`/`normalizeSubagentInput`/subagent schema 增加 `improvementId`；`StudioSubagentRunProjection`、`ChildRunMeta` 与全部 compact projection（async start/lifecycle/sync/wait/`summarizeStudioSubagentRun`）透传 `improvementId`。\n  - subagent `start` 校验改为显式作用域：有 `improvementId` → 要求主任务 `waiting_for_improvements`、实例 `implementing|checking` 有 plan、implementer/checker 必须带 `subtaskId`，仅在实例 plan 查找子任务（拒绝主 plan id），async ready 经实例 claim helper 领取；无 `improvementId` 但主任务等待改进且带 `subtaskId` 时在 child launch 前拒绝。\n  - `buildMemberPrompt` 实例作用域：注入实例 artifacts/plan/progress、`IMP` 作用域头与实例 selected subtask，绝不注入主 plan/progress。\n  - `runningRun`/sync 终态 `run`/`childMeta` 写入 `improvementId`；`persistRunSnapshot` 显式保归属，cancel/SDK fallback/runtime-lost 经持久化 run 保留同一 `improvementId`（B2：首次 start 持久化后写入 `instance.runIds`）。\n  - `buildImprovementStateInjection` 更新 `implementing|checking` 指引。\n- `app/api/studio/tasks/[taskKey]/route.ts` — 导入 `claimYpiStudioImprovementSubtask`/`isYpiStudioImprovementSubtaskClaimBody`，PATCH 在主 claim 分支相邻处新增 `claim_improvement_subtask` 分支，使用 `authorizedCwd` 覆盖 body.cwd，归属/状态由 library 校验。\n- `.ypi/tasks/.../handoff.md` — 更新子任务进度（types/library/tool-api 完成，tests 待领取）并补 imp-scope-library、imp-scope-tool-api 完成记录与下一步指引。\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass\n- `npm run test:studio-dag` — Pass（回归，现有 DAG 契约不退化）\n\n#### Notes / Risks\n\n- `normalizeTaskToolInput` 此前未返回 `improvementId` 等实例字段，导致旧 instance 改进 action 只能经 API route 生效；本次一并补齐，tool 与 API 路径现在一致——属 bug 修复，未改变既有主任务行为。\n- 运行期 `YpiStudioChildRunHandle` 未增加 `improvementId`，归属以持久化 run 为准，避免内存 handle 维护第二份作用域；`cancel`/SDK fallback/`reconcileYpiStudioRuntimeLostSubagentRun` 均经已持久化 run 的 `improvementId` 回写。\n- 主任务 `implementing` 的既有 claim/parallel/SDK fallback/cancel/poll/collect 行为不变（无 `improvementId` 时走原 else 分支，字节级保留）。\n- 作用域 scoped claim/next/run 归属的正向/拒绝契约测试与 `docs/modules/library.md`、`docs/modules/api.md` 更新属于下一个子任务 `imp-scope-tests`，本子任务不触及。\n- 需主会话决策：无。如需将 `imp-scope-tool-api` 在 task.json `implementationProgress` 标记为 done，需由主会话通过 `ypi_studio_task(action=update_implementation_subtask)` 推进（实现员不自行写 task.json plan 进度）。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:11:36.205Z",
+            "text": "三项验证均已通过。我来获取最终的 diff 摘要以进行确认：",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T17:11:36.206Z",
+            "toolCallId": "call_6f96",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --stat lib/ypi-studio-extension.ts app/api/studio/tasks/\\\\[taskKey\\\\]/route.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T17:11:36.507Z",
+            "toolCallId": "call_6f96",
+            "toolName": "bash",
+            "text": "app/api/studio/tasks/[taskKey]/route.ts |  48 ++++\n lib/ypi-studio-extension.ts             | 428 ++++++++++++++++++++++++++++----\n 2 files changed, 430 insertions(+), 46 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:11:57.871Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-extension.ts` — 在 Studio task/subagent 工具中暴露改进实例作用域派发：\n  - 导入 `claimYpiStudioImprovementSubtask`、`implementationCounts`；`StudioTaskToolInput.action` 与 `normalizeTaskToolInput` 新增 `claim_improvement_subtask`，并补齐 normalizer 返回的 `improvementId`/`feedback`/`owner`/`inputText`/`artifactUpdates`（修复此前实例字段被丢弃、tool 路径 instance action 失效的隐患）。\n  - `implementation_next` 透传 `improvementId` 并按实例 progress 读取等待原因/区分文案；新增 `claim_improvement_subtask` action 调用 `claimYpiStudioImprovementSubtask` 并回包实例作用域；任务工具 JSON schema enum 与 `improvementId` 描述同步。\n  - `StudioSubagentInput`/`normalizeSubagentInput`/subagent schema 增加 `improvementId`；`StudioSubagentRunProjection`、`ChildRunMeta` 与全部 compact projection（async start/lifecycle/sync/wait/`summarizeStudioSubagentRun`）透传 `improvementId`。\n  - subagent `start` 校验改为显式作用域：有 `improvementId` → 要求主任务 `waiting_for_improvements`、实例 `implementing|checking` 有 plan、implementer/checker 必须带 `subtaskId`，仅在实例 plan 查找子任务（拒绝主 plan id），async ready 经实例 claim helper 领取；无 `improvementId` 但主任务等待改进且带 `subtaskId` 时在 child launch 前拒绝。\n  - `buildMemberPrompt` 实例作用域：注入实例 artifacts/plan/progress、`IMP` 作用域头与实例 selected subtask，绝不注入主 plan/progress。\n  - `runningRun`/sync 终态 `run`/`childMeta` 写入 `improvementId`；`persistRunSnapshot` 显式保归属，cancel/SDK fallback/runtime-lost 经持久化 run 保留同一 `improvementId`（B2：首次 start 持久化后写入 `instance.runIds`）。\n  - `buildImprovementStateInjection` 更新 `implementing|checking` 指引。\n- `app/api/studio/tasks/[taskKey]/route.ts` — 导入 `claimYpiStudioImprovementSubtask`/`isYpiStudioImprovementSubtaskClaimBody`，PATCH 在主 claim 分支相邻处新增 `claim_improvement_subtask` 分支，使用 `authorizedCwd` 覆盖 body.cwd，归属/状态由 library 校验。\n- `.ypi/tasks/.../handoff.md` — 更新子任务进度（types/library/tool-api 完成，tests 待领取）并补 imp-scope-library、imp-scope-tool-api 完成记录与下一步指引。\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass\n- `npm run test:studio-dag` — Pass（回归，现有 DAG 契约不退化）\n\n#### Notes / Risks\n\n- `normalizeTaskToolInput` 此前未返回 `improvementId` 等实例字段，导致旧 instance 改进 action 只能经 API route 生效；本次一并补齐，tool 与 API 路径现在一致——属 bug 修复，未改变既有主任务行为。\n- 运行期 `YpiStudioChildRunHandle` 未增加 `improvementId`，归属以持久化 run 为准，避免内存 handle 维护第二份作用域；`cancel`/SDK fallback/`reconcileYpiStudioRuntimeLostSubagentRun` 均经已持久化 run 的 `improvementId` 回写。\n- 主任务 `implementing` 的既有 claim/parallel/SDK fallback/cancel/poll/collect 行为不变（无 `improvementId` 时走原 else 分支，字节级保留）。\n- 作用域 scoped claim/next/run 归属的正向/拒绝契约测试与 `docs/modules/library.md`、`docs/modules/api.md` 更新属于下一个子任务 `imp-scope-tests`，本子任务不触及。\n- 需主会话决策：无。如需将 `imp-scope-tool-api` 在 task.json `implementationProgress` 标记为 done，需由主会话通过 `ypi_studio_task(action=update_implementation_subtask)` 推进（实现员不自行写 task.json plan 进度）。",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T17:11:57.872Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 5557,
+        "tokens": 1031,
+        "tokenSource": "usage",
+        "tps": 0.84,
+        "firstTokenAt": "2026-07-11T16:51:29.101Z",
+        "lastTokenAt": "2026-07-11T17:11:57.870Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-38815262e06079df4f3cb530",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-38815262e06079df4f3cb530.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T16:51:24.652Z",
+        "finishedAt": "2026-07-11T17:11:57.874Z",
+        "updatedAt": "2026-07-11T17:11:57.874Z",
+        "itemCount": 240,
+        "messageCount": 48,
+        "toolCallCount": 94,
+        "stderrBytes": 0,
+        "bytes": 427605,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5217-459d-7071-b943-870a6b309491",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T16-51-24-701Z_019f5217-459d-7071-b943-870a6b309491.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-9415efafe66139f7d6dc5267",
+      "subtaskId": "imp-scope-tool-api",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T16:51:24.679Z",
+      "finishedAt": "2026-07-11T17:13:37.929Z",
+      "runner": "sdk",
+      "childSessionId": "019f5217-45b4-7a10-90b7-d36df32a1aed",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T16-51-24-724Z_019f5217-45b4-7a10-90b7-d36df32a1aed.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f5217-45b4-7a10-90b7-d36df32a1aed",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "All checks green. Implementation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- **`lib/ypi-studio-extension.ts`** — completed the `imp-scope-tool-api` wiring (a prior run had done most of it; I filled the gaps and re-verified):\n  - `buildMemberPrompt(root, taskId, member, prompt, subtaskId?, improvementId?)` — added the **instance-scoped branch**: builds context from instance artifacts/plan/progress (read from `…/improvements/<id>/`), emits an `IMP` scope header, selects the subtask from the instance plan, and never injects the main task plan/progress. The main-task branch is byte-compatible.\n  - `persistRunSnapshot` — explicit `improvementId: existing?.improvementId ?? run.improvementId ?? runningRun.improvementId` so SDK/CLI finalizer, cancel, and runtime-lost keep the same scope via the persisted run.\n  - CLI `runSnapshot` — carries `meta.improvementId`.\n  - `projectSubagentRun` — `subtaskTitle` now falls back to the improvement instance plan for scoped runs.\n  - Async start reply text now labels the `improvementId` scope.\n  - (Already present from the prior run, verified: `claim_improvement_subtask` action + normalizer + schema enum, `implementation_next` improvementId pass-through, subagent `improvementId` input/normalizer/schema/`ChildRunMeta`/projections, start scope validation that rejects main-plan subtasks while waiting for improvements and auto-claims via the instance helper.)\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — verified the `isYpiStudioImprovementSubtaskClaimBody` → `claimYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd })` branch is present (cwd overridden by authorized value; library is the validation point).\n- **`.ypi/tasks/20260711-232947-…/handoff.md`** — appended an implementation re-review note so the code matches the recorded completion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass (EXIT=0)\n- `npm run test:studio-dag` — Pass (EXIT=0, regression only; scoped contract tests belong to `imp-scope-tests`)\n\n#### Notes / Risks\n\n- The worktree already contained most of `imp-scope-tool-api` from a previous interrupted run, but `buildMemberPrompt` had **not** actually been branched on `improvementId` (the handoff claimed it was). I implemented the missing instance-scoped prompt and the explicit `improvementId` retention, so the code now matches the handoff.\n- The runtime child handle (`YpiStudioChildRunHandle`) deliberately does **not** carry `improvementId`; attribution flows through the persisted run. The SDK runner (`lib/ypi-studio-child-session-runner.ts`) also omits `improvementId` from its snapshots, which is safe because `persistRunSnapshot` restores it from the persisted `existing` run. If the checker prefers the SDK runner to also carry `improvementId` end-to-end, that would require touching a file outside this subtask's declared scope — flagging for the main session.\n- Scoped contract tests (instance ready/next/claim isolation, `instance.runIds` dedupe across start/final/cancel) are the next subtask `imp-scope-tests`, not done here. Docs (`docs/modules/library.md`, `docs/modules/api.md`) are also `imp-scope-tests` scope.\n- Manual smoke tests still recommended per `checks.md`: overlapping main/instance `subtaskId` scope rejection, and instance async run completion/cancel attribution to `instance.runIds`.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T16:51:24.679Z",
+        "updatedAt": "2026-07-11T17:13:37.929Z",
+        "eventCount": 11038,
+        "lastTextPreview": "All checks green. Implementation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- **`lib/ypi-studio-extension.ts`** — completed the `imp-scope-tool-api` wiring (a prior run had done most of it; I filled the gaps and re-verified):\n  - `buildMemberPrompt(root, taskId, member, prompt, subtaskId?, improvementId?)` — added the **instance-scoped branch**: builds context from instance artifacts/plan/progress (read from `…/improvements/<id>/`), emits an `IMP` scope header, selects the subtask from the instance plan, and never injects the main task plan/progress. The main-task branch is byte-compatible.\n  - `persistRunSnapshot` — explicit `improvementId: existing?.improvementId ?? run.improvementId ?? runningRun.improvementId` so SDK/CLI finalizer, cancel, and runtime-lost keep the same scope via the persisted run.\n  - CLI `runSnapshot` — carries `meta.improvementId`.\n  - `projectSubagentRun` — `subtaskTitle` now falls back to the improvement instance plan for scoped runs.\n  - Async start reply text now labels the `improvementId` scope.\n  - (Already present from the prior run, verified: `claim_improvement_subtask` action + normalizer + schema enum, `implementation_next` improvementId pass-through, subagent `improvementId` input/normalizer/schema/`ChildRunMeta`/projections, start scope validation that rejects main-plan subtasks while waiting for improvements and auto-claims via the instance helper.)\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — verified the `isYpiStudioImprovementSubtaskClaimBody` → `claimYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd })` branch is present (cwd overridden by authorized value; library is the validation point).\n- **`.ypi/tasks/20260711-232947-…/handoff.md`** — appended an implementation re-review note so the code matches the recorded completion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass (EXIT=0)\n- `npm run test:studio-dag` — Pass (EXIT=0, regression only; scoped contract tests belong to `imp-scope-tests`)\n\n#### Notes / Risks\n\n- The worktree already contained most of `imp-scope-tool-api` from a previous interrupted run, but `buildMemberPrompt` had **not** actually been branched on `improvementId` (the handoff claimed it was). I implemented the missing instance-scoped prompt and the explicit `improvementId` retention, so the code now matches the handoff.\n- The runtime child handle (`YpiStudioChildRunHandle`) deliberately does **not** carry `improvementId`; attribution flows through the persisted run. The SDK runner (`lib/ypi-studio-child-session-runner.ts`) also omits `improvementId` from its snapshots, which is safe because `persistRunSnapshot` restores it from the persisted `existing` run. If the checker prefers the SDK runner to also carry `improvementId` end-to-end, that would require touching a file outside this subtask's declared scope — flagging for the main session.\n- Scoped contract tests (instance ready/next/claim isolation, `instance.runIds` dedupe across start/final/cancel) are the next subtask `imp-scope-tests`, not done here. Docs (`docs/modules/library.md`, `docs/modules/api.md`) are also `imp-scope-tests` scope.\n- Manual smoke tests still recommended per `checks.md`: overlapping main/instance `subtaskId` scope rejection, and instance async run completion/cancel attribution to `instance.runIds`.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:11:12.470Z",
+            "text": "交接说明已更新。让我进行最后的验证并运行记录所有检查：",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T17:11:12.472Z",
+            "toolCallId": "call_80ad",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/yolk-pi-web && echo \\\"=== tsc ===\\\" && node_modules/.bin/tsc --noEmit && echo \\\"tsc EXIT=$?\\\" && echo \\\"=== lint ===\\\" && npm run lint >/dev/null 2>&1 && echo \\\"lint EXIT=$?\\\" && echo \\\"=== test:studio-dag ===\\\" && npm run test:studio-dag >/dev/null 2>&1 && echo \\\"test EXIT=$?\\\"\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T17:13:12.484Z",
+            "toolCallId": "call_80ad",
+            "toolName": "bash",
+            "text": "=== tsc ===\ntsc EXIT=0\n=== lint ===\nlint EXIT=0\n=== test:studio-dag ===\ntest EXIT=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:13:37.900Z",
+            "text": "All checks green. Implementation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- **`lib/ypi-studio-extension.ts`** — completed the `imp-scope-tool-api` wiring (a prior run had done most of it; I filled the gaps and re-verified):\n  - `buildMemberPrompt(root, taskId, member, prompt, subtaskId?, improvementId?)` — added the **instance-scoped branch**: builds context from instance artifacts/plan/progress (read from `…/improvements/<id>/`), emits an `IMP` scope header, selects the subtask from the instance plan, and never injects the main task plan/progress. The main-task branch is byte-compatible.\n  - `persistRunSnapshot` — explicit `improvementId: existing?.improvementId ?? run.improvementId ?? runningRun.improvementId` so SDK/CLI finalizer, cancel, and runtime-lost keep the same scope via the persisted run.\n  - CLI `runSnapshot` — carries `meta.improvementId`.\n  - `projectSubagentRun` — `subtaskTitle` now falls back to the improvement instance plan for scoped runs.\n  - Async start reply text now labels the `improvementId` scope.\n  - (Already present from the prior run, verified: `claim_improvement_subtask` action + normalizer + schema enum, `implementation_next` improvementId pass-through, subagent `improvementId` input/normalizer/schema/`ChildRunMeta`/projections, start scope validation that rejects main-plan subtasks while waiting for improvements and auto-claims via the instance helper.)\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — verified the `isYpiStudioImprovementSubtaskClaimBody` → `claimYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd })` branch is present (cwd overridden by authorized value; library is the validation point).\n- **`.ypi/tasks/20260711-232947-…/handoff.md`** — appended an implementation re-review note so the code matches the recorded completion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass (EXIT=0)\n- `npm run test:studio-dag` — Pass (EXIT=0, regression only; scoped contract tests belong to `imp-scope-tests`)\n\n#### Notes / Risks\n\n- The worktree already contained most of `imp-scope-tool-api` from a previous interrupted run, but `buildMemberPrompt` had **not** actually been branched on `improvementId` (the handoff claimed it was). I implemented the missing instance-scoped prompt and the explicit `improvementId` retention, so the code now matches the handoff.\n- The runtime child handle (`YpiStudioChildRunHandle`) deliberately does **not** carry `improvementId`; attribution flows through the persisted run. The SDK runner (`lib/ypi-studio-child-session-runner.ts`) also omits `improvementId` from its snapshots, which is safe because `persistRunSnapshot` restores it from the persisted `existing` run. If the checker prefers the SDK runner to also carry `improvementId` end-to-end, that would require touching a file outside this subtask's declared scope — flagging for the main session.\n- Scoped contract tests (instance ready/next/claim isolation, `instance.runIds` dedupe across start/final/cancel) are the next subtask `imp-scope-tests`, not done here. Docs (`docs/modules/library.md`, `docs/modules/api.md`) are also `imp-scope-tests` scope.\n- Manual smoke tests still recommended per `checks.md`: overlapping main/instance `subtaskId` scope rejection, and instance async run completion/cancel attribution to `instance.runIds`.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T17:13:37.905Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 5954,
+        "tokens": 826,
+        "tokenSource": "usage",
+        "tps": 0.62,
+        "firstTokenAt": "2026-07-11T16:51:27.851Z",
+        "lastTokenAt": "2026-07-11T17:13:37.829Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-9415efafe66139f7d6dc5267",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-9415efafe66139f7d6dc5267.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T16:51:24.679Z",
+        "finishedAt": "2026-07-11T17:13:37.907Z",
+        "updatedAt": "2026-07-11T17:13:37.907Z",
+        "itemCount": 251,
+        "messageCount": 39,
+        "toolCallCount": 104,
+        "stderrBytes": 0,
+        "bytes": 475116,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5217-45b4-7a10-90b7-d36df32a1aed",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T16-51-24-724Z_019f5217-45b4-7a10-90b7-d36df32a1aed.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-271147f3e3d5e5c4e31b1aa9",
+      "subtaskId": "imp-scope-tests",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T17:14:20.548Z",
+      "finishedAt": "2026-07-11T17:47:52.911Z",
+      "runner": "sdk",
+      "childSessionId": "019f522c-4431-79ca-aa80-9b673d37bf81",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T17-14-20-593Z_019f522c-4431-79ca-aa80-9b673d37bf81.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f522c-4431-79ca-aa80-9b673d37bf81",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — Added `claimYpiStudioImprovementSubtask` and `reconcileYpiStudioRuntimeLostSubagentRun` imports; added `setupImprovementImplementing` helper plus 12 new contract test blocks covering: positive instance `implementation_next`/`claim_improvement_subtask`/checking-state claim; negative cases (unknown `improvementId`, non-executable instance state, main-plan id under improvement scope, instance id without `improvementId`, scoped run after parent leaves `waiting_for_improvements`); run attribution (running/succeeded/cancelled dedupe to `instance.runIds`, runtime-lost preserving `improvementId`); and two-instance isolation proving main/other-instance progress is not polluted.\n- `docs/modules/library.md` — Documented the improvement-instance execution-scope helpers (`getNextYpiStudioImplementationSubtask({ improvementId? })`, `claimYpiStudioImprovementSubtask`, `recordYpiStudioSubagentRun` improvement branch, `instance.runIds` append-only audit index) and the extension's `claim_improvement_subtask` action, `improvementId` parameter, and explicit-scope validation while `waiting_for_improvements`.\n- `docs/modules/api.md` — Documented the PATCH `claim_improvement_subtask` action (required `improvementId`, instance-only plan resolution, cwd override).\n- `.ypi/tasks/20260711-232947-.../handoff.md` — Marked `imp-scope-tests` ✅ complete with the completion record.\n\n#### Verification\n\n- `npm run test:studio-dag` — Pass (all DAG contract tests incl. 12 new blocks)\n- `npm run lint` — Pass\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- Tests are library-level contract tests proving scope isolation and durable `instance.runIds` attribution across running/succeeded/cancelled/runtime-lost writes. Extension schema wiring and the PATCH route smoke path (main/instance overlapping `subtaskId` → scope rejection; instance async run completion/cancel UI filtering) remain to be manually smoke-tested — this is the residual risk noted in the subtask's `risks`.\n- No design/code conflicts found; no new product decisions needed.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T17:14:20.548Z",
+        "updatedAt": "2026-07-11T17:47:52.911Z",
+        "eventCount": 1875,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — Added `claimYpiStudioImprovementSubtask` and `reconcileYpiStudioRuntimeLostSubagentRun` imports; added `setupImprovementImplementing` helper plus 12 new contract test blocks covering: positive instance `implementation_next`/`claim_improvement_subtask`/checking-state claim; negative cases (unknown `improvementId`, non-executable instance state, main-plan id under improvement scope, instance id without `improvementId`, scoped run after parent leaves `waiting_for_improvements`); run attribution (running/succeeded/cancelled dedupe to `instance.runIds`, runtime-lost preserving `improvementId`); and two-instance isolation proving main/other-instance progress is not polluted.\n- `docs/modules/library.md` — Documented the improvement-instance execution-scope helpers (`getNextYpiStudioImplementationSubtask({ improvementId? })`, `claimYpiStudioImprovementSubtask`, `recordYpiStudioSubagentRun` improvement branch, `instance.runIds` append-only audit index) and the extension's `claim_improvement_subtask` action, `improvementId` parameter, and explicit-scope validation while `waiting_for_improvements`.\n- `docs/modules/api.md` — Documented the PATCH `claim_improvement_subtask` action (required `improvementId`, instance-only plan resolution, cwd override).\n- `.ypi/tasks/20260711-232947-.../handoff.md` — Marked `imp-scope-tests` ✅ complete with the completion record.\n\n#### Verification\n\n- `npm run test:studio-dag` — Pass (all DAG contract tests incl. 12 new blocks)\n- `npm run lint` — Pass\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- Tests are library-level contract tests proving scope isolation and durable `instance.runIds` attribution across running/succeeded/cancelled/runtime-lost writes. Extension schema wiring and the PATCH route smoke path (main/instance overlapping `subtaskId` → scope rejection; instance async run completion/cancel UI filtering) remain to be manually smoke-tested — this is the residual risk noted in the subtask's `risks`.\n- No design/code conflicts found; no new product decisions needed.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:46:33.309Z",
+            "text": "Let me do a final full validation run:",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T17:46:33.311Z",
+            "toolCallId": "call_bf8e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:studio-dag 2>&1 | grep -E \\\"passed|Error|error\\\" | tail -5; echo \\\"exit=$?\\\"; node_modules/.bin/tsc --noEmit && echo \\\"tsc=ok\\\"; npm run lint --silent && echo \\\"lint=ok\\\"\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T17:47:32.887Z",
+            "toolCallId": "call_bf8e",
+            "toolName": "bash",
+            "text": "ypi-studio DAG scheduler tests passed\nexit=0\ntsc=ok\nlint=ok",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:47:52.892Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — Added `claimYpiStudioImprovementSubtask` and `reconcileYpiStudioRuntimeLostSubagentRun` imports; added `setupImprovementImplementing` helper plus 12 new contract test blocks covering: positive instance `implementation_next`/`claim_improvement_subtask`/checking-state claim; negative cases (unknown `improvementId`, non-executable instance state, main-plan id under improvement scope, instance id without `improvementId`, scoped run after parent leaves `waiting_for_improvements`); run attribution (running/succeeded/cancelled dedupe to `instance.runIds`, runtime-lost preserving `improvementId`); and two-instance isolation proving main/other-instance progress is not polluted.\n- `docs/modules/library.md` — Documented the improvement-instance execution-scope helpers (`getNextYpiStudioImplementationSubtask({ improvementId? })`, `claimYpiStudioImprovementSubtask`, `recordYpiStudioSubagentRun` improvement branch, `instance.runIds` append-only audit index) and the extension's `claim_improvement_subtask` action, `improvementId` parameter, and explicit-scope validation while `waiting_for_improvements`.\n- `docs/modules/api.md` — Documented the PATCH `claim_improvement_subtask` action (required `improvementId`, instance-only plan resolution, cwd override).\n- `.ypi/tasks/20260711-232947-.../handoff.md` — Marked `imp-scope-tests` ✅ complete with the completion record.\n\n#### Verification\n\n- `npm run test:studio-dag` — Pass (all DAG contract tests incl. 12 new blocks)\n- `npm run lint` — Pass\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- Tests are library-level contract tests proving scope isolation and durable `instance.runIds` attribution across running/succeeded/cancelled/runtime-lost writes. Extension schema wiring and the PATCH route smoke path (main/instance overlapping `subtaskId` → scope rejection; instance async run completion/cancel UI filtering) remain to be manually smoke-tested — this is the residual risk noted in the subtask's `risks`.\n- No design/code conflicts found; no new product decisions needed.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T17:47:52.894Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 4366,
+        "tokens": 506,
+        "tokenSource": "usage",
+        "tps": 0.25,
+        "firstTokenAt": "2026-07-11T17:14:23.152Z",
+        "lastTokenAt": "2026-07-11T17:47:52.342Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-271147f3e3d5e5c4e31b1aa9",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/implementer-271147f3e3d5e5c4e31b1aa9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T17:14:20.548Z",
+        "finishedAt": "2026-07-11T17:47:52.895Z",
+        "updatedAt": "2026-07-11T17:47:52.895Z",
+        "itemCount": 110,
+        "messageCount": 24,
+        "toolCallCount": 40,
+        "stderrBytes": 0,
+        "bytes": 198375,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f522c-4431-79ca-aa80-9b673d37bf81",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T17-14-20-593Z_019f522c-4431-79ca-aa80-9b673d37bf81.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-917fd7a4ff701e5404796590",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T17:48:59.268Z",
+      "finishedAt": "2026-07-11T17:51:41.721Z",
+      "runner": "sdk",
+      "childSessionId": "019f524b-fc4c-7314-94a3-cc2bdfd79de7",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T17-48-59-340Z_019f524b-fc4c-7314-94a3-cc2bdfd79de7.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f524b-fc4c-7314-94a3-cc2bdfd79de7",
+        "model": "CPA/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- **None blocking**\n- Non-blocking residual:\n  1. Extension/API wiring is covered by static review + library DAG tests, not end-to-end smoke tests\n  2. Checker cannot re-claim/start a already-`done` instance subtask (same as main DAG)\n  3. Parent I1–I5 remain out of scope\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-dag` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass**\n\nB1 and B2 are fixed:\n- **B1**: `claim_improvement_subtask` + `implementation_next(improvementId)` + scoped `ypi_studio_subagent` close the improvement dispatch loop; main/instance plans are isolated\n- **B2**: scoped runs append/dedupe into `instance.runIds`; UI already filters `task.subagents` by those ids\n\n#### Artifacts\n- Wrote `review.md`\n- Updated `handoff.md` with checker verdict\n\n#### Decisions needed from main session\n- None blocking. Optional: one real-session smoke test with overlapping main/instance `subtaskId`, then advance this task out of checking.",
+      "model": "CPA/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "CPA/grok-4.5",
+          "arg": "CPA/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T17:48:59.268Z",
+        "updatedAt": "2026-07-11T17:51:41.721Z",
+        "eventCount": 1144,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- **None blocking**\n- Non-blocking residual:\n  1. Extension/API wiring is covered by static review + library DAG tests, not end-to-end smoke tests\n  2. Checker cannot re-claim/start a already-`done` instance subtask (same as main DAG)\n  3. Parent I1–I5 remain out of scope\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-dag` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass**\n\nB1 and B2 are fixed:\n- **B1**: `claim_improvement_subtask` + `implementation_next(improvementId)` + scoped `ypi_studio_subagent` close the improvement dispatch loop; main/instance plans are isolated\n- **B2**: scoped runs append/dedupe into `instance.runIds`; UI already filters `task.subagents` by those ids\n\n#### Artifacts\n- Wrote `review.md`\n- Updated `handoff.md` with checker verdict\n\n#### Decisions needed from main session\n- None blocking. Optional: one real-session smoke test with overlapping main/instance `subtaskId`, then advance this task out of checking.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T17:51:30.208Z",
+            "toolCallId": "call-40907653-a930-4453-8599-b88c720ae150-38|fc_fa5fb29a-a4dd-9e91-85ff-f4dee5425c44_0",
+            "toolName": "read",
+            "text": "- `scripts/test-ypi-studio-dag.mjs`\n- `docs/modules/library.md`、`docs/modules/api.md`\n\n## 验证\n\n规划阶段未修改生产代码，未运行测试。实现完成后必须运行：\n\n```bash\nnpm run test:studio-dag\nnpm run lint\nnode_modules/.bin/tsc --noEmit\n```\n\n并手工验证主/实例使用相同 `subtaskId` 时的 scope 拒绝、实例 async run 的完成和取消记录。\n- 实现复核（本轮）：已补齐 `buildMemberPrompt` 实例作用域分支（注入实例 artifacts/plan/progress、`IMP` 作用域头）、`persistRunSnapshot` 显式 `improvementId` 合并、CLI `runSnapshot` 透传 `meta.improvementId`、`projectSubagentRun` 子任务标题回退实例 plan、async 启动回文标注 `improvementId`。重跑 `npm run lint`、`node_modules/.bin/tsc --noEmit`、`npm run test:studio-dag` 均通过，代码与本完成记录一致。\n\n## 剩余风险与主会话决策\n\n- 无需新的产品决策：已按任务要求让 implementer 与 checker 都可在实例状态 `implementing | checking` 下领取实例 DAG 子任务。\n- B1/B2 不解决父 review 的 I1-I5。主会话应将它们保留为独立返工或明确缩减产品承诺，避免本次阻塞修复扩大范围。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T17:51:36.562Z",
+            "toolCallId": "call-0e105b24-a7f3-4d9b-9924-707cbc8bc25f-39|fc_c4ef95f3-a8dc-99fe-9f27-c64c376b55c7_0",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 剩余风险与主会话决策\\n\\n- 无需新的产品决策：已按任务要求让 implementer 与 checker 都可在实例状态 `implementing | checking` 下领取实例 DAG 子任务。\\n- B1/B2 不解决父 review 的 I1-I5。主会话应将它们保留为独立返工或明确缩减产品承诺，避免本次阻塞修复扩大范围。\",\n      \"newText\": \"## 剩余风险与主会话决策\\n\\n- 无需新的产品决策：已按任务要求让 implementer 与 checker 都可在实例状态 `implementing | checking` 下领取实例 DAG 子任务。\\n- B1/B2 不解决父 review 的 I1-I5。主会话应将它们保留为独立返工或明确缩减产品承诺，避免本次阻塞修复扩大范围。\\n\\n## 检查员审查结果（checker）\\n\\n### Verdict\\n\\n**Pass** — B1/B2 验收通过。详见 `review.md`。\\n\\n### Artifacts Produced\\n\\n- `review.md` — 完整检查报告（验收映射、契约审查、验证结果、剩余非阻塞风险）\\n\\n### Verification Re-run\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:studio-dag` | Pass |\\n| `npm run lint` | Pass |\\n| `node_modules/.bin/tsc --noEmit` | Pass |\\n\\n### Findings Fixed\\n\\n- None（审查未发现需就地修复的缺陷）\\n\\n### Remaining Risks (non-blocking)\\n\\n1. Extension/API 接线无自动化烟测；建议主会话在真实 `waiting_for_improvements` 任务上手测：重叠 `subtaskId` 的 scope 拒绝 + 实例 async run 完成后 UI「成员运行」可见。\\n2. Checker 对已 `done` 子任务不能再 claim/start（与主 DAG 同构）；若产品需要 checking 阶段 review 已完成子任务，需后续单独设计。\\n3. 父任务 I1–I5 与其它范围外项仍未处理。\\n\\n### Decisions Needed From Main Session\\n\\n- 无阻塞决策。可按 workflow 将本任务从 checking 推进到完成/归档。\\n- 可选：安排一次真实会话手测；将父任务 I1–I5 拆为独立返工。\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T17:51:36.841Z",
+            "toolCallId": "call-0e105b24-a7f3-4d9b-9924-707cbc8bc25f-39|fc_c4ef95f3-a8dc-99fe-9f27-c64c376b55c7_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:51:41.697Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- **None blocking**\n- Non-blocking residual:\n  1. Extension/API wiring is covered by static review + library DAG tests, not end-to-end smoke tests\n  2. Checker cannot re-claim/start a already-`done` instance subtask (same as main DAG)\n  3. Parent I1–I5 remain out of scope\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-dag` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass**\n\nB1 and B2 are fixed:\n- **B1**: `claim_improvement_subtask` + `implementation_next(improvementId)` + scoped `ypi_studio_subagent` close the improvement dispatch loop; main/instance plans are isolated\n- **B2**: scoped runs append/dedupe into `instance.runIds`; UI already filters `task.subagents` by those ids\n\n#### Artifacts\n- Wrote `review.md`\n- Updated `handoff.md` with checker verdict\n\n#### Decisions needed from main session\n- None blocking. Optional: one real-session smoke test with overlapping main/instance `subtaskId`, then advance this task out of checking.",
+            "model": "CPA/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T17:51:41.698Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1517,
+        "tokens": 309,
+        "tokenSource": "usage",
+        "tps": 1.98,
+        "firstTokenAt": "2026-07-11T17:49:05.595Z",
+        "lastTokenAt": "2026-07-11T17:51:41.696Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-917fd7a4ff701e5404796590",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/checker-917fd7a4ff701e5404796590.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T17:48:59.268Z",
+        "finishedAt": "2026-07-11T17:51:41.700Z",
+        "updatedAt": "2026-07-11T17:51:41.700Z",
+        "itemCount": 89,
+        "messageCount": 5,
+        "toolCallCount": 40,
+        "stderrBytes": 0,
+        "bytes": 211737,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f524b-fc4c-7314-94a3-cc2bdfd79de7",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T17-48-59-340Z_019f524b-fc4c-7314-94a3-cc2bdfd79de7.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-30dce876ffb47f1089a76fd5",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-11T17:48:59.222Z",
+      "runner": "sdk",
+      "childSessionId": "019f524b-fc2e-7213-8f88-2b5e7d73ba5a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T17-48-59-310Z_019f524b-fc2e-7213-8f88-2b5e7d73ba5a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "childSessionId": "019f524b-fc2e-7213-8f88-2b5e7d73ba5a",
+        "model": "CPA/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- None（无阻塞/重要问题）\n- 非阻塞：extension/API 无自动化烟测；accepted 后迟到 scoped final 会被拒；父任务 I1–I5 仍独立\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-dag` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass** — B1/B2 已按设计落地并通过验证。\n\n### Handoff\n\n**Artifacts**\n- `review.md` — 完整检查报告\n- `handoff.md` — 已追加检查员审查结果\n\n**B1 闭环**：`claim_improvement_subtask` + `implementation_next(improvementId)` + scoped subagent start；主/实例 plan 严格隔离。\n\n**B2 归属**：start/progress/final/cancel/runtime-lost 保留 `improvementId`；`instance.runIds` Set 去重追加；UI 既有 `runIds` 过滤可展示。\n\n**主会话**\n- 无阻塞决策，可推进完成/归档\n- 可选真实会话手测：重叠 `subtaskId` 拒绝 + 实例 async run 后成员运行 Tab\n- I1–I5 保持独立返工",
+      "model": "CPA/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "CPA/grok-4.5",
+          "arg": "CPA/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-11T17:48:59.222Z",
+        "updatedAt": "2026-07-11T17:52:00.720Z",
+        "eventCount": 1386,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- None（无阻塞/重要问题）\n- 非阻塞：extension/API 无自动化烟测；accepted 后迟到 scoped final 会被拒；父任务 I1–I5 仍独立\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-dag` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass** — B1/B2 已按设计落地并通过验证。\n\n### Handoff\n\n**Artifacts**\n- `review.md` — 完整检查报告\n- `handoff.md` — 已追加检查员审查结果\n\n**B1 闭环**：`claim_improvement_subtask` + `implementation_next(improvementId)` + scoped subagent start；主/实例 plan 严格隔离。\n\n**B2 归属**：start/progress/final/cancel/runtime-lost 保留 `improvementId`；`instance.runIds` Set 去重追加；UI 既有 `runIds` 过滤可展示。\n\n**主会话**\n- 无阻塞决策，可推进完成/归档\n- 可选真实会话手测：重叠 `subtaskId` 拒绝 + 实例 async run 后成员运行 Tab\n- I1–I5 保持独立返工",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:51:57.048Z",
+            "text": "I'll refine the handoff checker section so it matches the actual review findings.",
+            "model": "CPA/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-11T17:51:57.050Z",
+            "toolCallId": "call-4c22efc5-ee6f-4a41-a93f-5dfb9cf39911-39|fc_c500a28c-cd0f-98e4-800e-c30fa3dae118_0",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 检查员审查结果（checker）\\n\\n### Verdict\\n\\n**Pass** — B1/B2 验收通过。详见 `review.md`。\\n\\n### Artifacts Produced\\n\\n- `review.md` — 完整检查报告（验收映射、契约审查、验证结果、剩余非阻塞风险）\\n\\n### Verification Re-run\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:studio-dag` | Pass |\\n| `npm run lint` | Pass |\\n| `node_modules/.bin/tsc --noEmit` | Pass |\\n\\n### Findings Fixed\\n\\n- None（审查未发现需就地修复的缺陷）\\n\\n### Remaining Risks (non-blocking)\\n\\n1. Extension/API 接线无自动化烟测；建议主会话在真实 `waiting_for_improvements` 任务上手测：重叠 `subtaskId` 的 scope 拒绝 + 实例 async run 完成后 UI「成员运行」可见。\\n2. Checker 对已 `done` 子任务不能再 claim/start（与主 DAG 同构）；若产品需要 checking 阶段 review 已完成子任务，需后续单独设计。\\n3. 父任务 I1–I5 与其它范围外项仍未处理。\\n\\n### Decisions Needed From Main Session\\n\\n- 无阻塞决策。可按 workflow 将本任务从 checking 推进到完成/归档。\\n- 可选：安排一次真实会话手测；将父任务 I1–I5 拆为独立返工。\",\n      \"newText\": \"## 检查员审查结果（checker）\\n\\n### Verdict\\n\\n**Pass** — B1/B2 验收通过。详见 `review.md`。\\n\\n### Artifacts Produced\\n\\n- `review.md` — 完整检查报告（验收映射、契约审查、验证结果、剩余非阻塞风险）\\n\\n### Scope Reviewed\\n\\n- Types: `YpiStudioImprovementSubtaskClaimBody`（required `improvementId`）；run `improvementId?`；主 claim body 未混入 scope。\\n- Library: instance next/claim、`recordYpiStudioSubagentRun` 归属分支、`instance.runIds` Set 去重、主/实例隔离。\\n- Tool/API: `claim_improvement_subtask`、subagent scope 校验、lifecycle/`persistRunSnapshot`/`buildMemberPrompt` 透传、PATCH `authorizedCwd`。\\n- Tests/docs: DAG 正向/负向/生命周期/隔离契约；`docs/modules/library.md` 与 `api.md`。\\n\\n### Verification Re-run\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:studio-dag` | Pass |\\n| `npm run lint` | Pass |\\n| `node_modules/.bin/tsc --noEmit` | Pass |\\n\\n### Findings Fixed\\n\\n- None（审查未发现需就地修复的缺陷）\\n\\n### Remaining Risks (non-blocking)\\n\\n1. Extension/API 接线无自动化烟测；建议主会话在真实 `waiting_for_improvements` 任务上手测：重叠 `subtaskId` 的 scope 拒绝 + 实例 async run 完成/取消后 UI「成员运行」可见。\\n2. 实例 accepted 后主任务离开 `waiting_for_improvements` 时，迟到的 scoped final/cancel 回写会被拒（与设计一致）；若 child 仍 running 时用户接受改进，可能留下 running 审计记录。\\n3. 父任务 I1–I5 与其它范围外项仍未处理，应独立返工。\\n\\n### Decisions Needed From Main Session\\n\\n- 无阻塞决策。可按 workflow 将本任务从 checking 推进到完成/归档。\\n- 可选：安排一次真实会话手测；将父任务 I1–I5 拆为独立返工。\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-11T17:51:57.055Z",
+            "toolCallId": "call-4c22efc5-ee6f-4a41-a93f-5dfb9cf39911-39|fc_c500a28c-cd0f-98e4-800e-c30fa3dae118_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Users/zyj/projects/git_projects/yolk-pi-web/.ypi/tasks/20260711-232947-修复改进任务派发闭环与成员运行记录丢失/handoff.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-11T17:52:00.709Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- None（无阻塞/重要问题）\n- 非阻塞：extension/API 无自动化烟测；accepted 后迟到 scoped final 会被拒；父任务 I1–I5 仍独立\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-dag` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass** — B1/B2 已按设计落地并通过验证。\n\n### Handoff\n\n**Artifacts**\n- `review.md` — 完整检查报告\n- `handoff.md` — 已追加检查员审查结果\n\n**B1 闭环**：`claim_improvement_subtask` + `implementation_next(improvementId)` + scoped subagent start；主/实例 plan 严格隔离。\n\n**B2 归属**：start/progress/final/cancel/runtime-lost 保留 `improvementId`；`instance.runIds` Set 去重追加；UI 既有 `runIds` 过滤可展示。\n\n**主会话**\n- 无阻塞决策，可推进完成/归档\n- 可选真实会话手测：重叠 `subtaskId` 拒绝 + 实例 async run 后成员运行 Tab\n- I1–I5 保持独立返工",
+            "model": "CPA/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-11T17:52:00.710Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1205,
+        "tokens": 309,
+        "tokenSource": "usage",
+        "tps": 1.74,
+        "firstTokenAt": "2026-07-11T17:49:03.251Z",
+        "lastTokenAt": "2026-07-11T17:52:00.708Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-30dce876ffb47f1089a76fd5",
+        "taskId": "20260711-232947-修复改进任务派发闭环与成员运行记录丢失",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260711-232947-/checker-30dce876ffb47f1089a76fd5.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-11T17:48:59.222Z",
+        "updatedAt": "2026-07-11T17:52:00.711Z",
+        "itemCount": 90,
+        "messageCount": 6,
+        "toolCallCount": 40,
+        "stderrBytes": 0,
+        "bytes": 207891,
+        "truncated": true,
+        "truncation": {
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384,
+          "itemTruncated": true
+        },
+        "runner": "sdk",
+        "childSessionId": "019f524b-fc2e-7213-8f88-2b5e7d73ba5a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web--/2026-07-11T17-48-59-310Z_019f524b-fc2e-7213-8f88-2b5e7d73ba5a.jsonl",
+        "finishedAt": "2026-07-11T17:52:00.711Z"
+      },
+      "finishedAt": "2026-07-11T17:52:00.721Z"
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-11T15:42:44.807Z",
+      "contextId": "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-11T15:44:00.400Z",
+      "contextId": "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+      "inputHash": "8cbe697b157364a5b1364628",
+      "source": "user-input"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-11T15:39:58.380Z",
+    "summary": "Close improvement-instance execution dispatch and durable member-run attribution without changing the main-task DAG path.",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "serial",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "imp-scope-types",
+          "title": "contracts",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "imp-scope-types"
+          ]
+        },
+        {
+          "id": "imp-scope-library",
+          "title": "library",
+          "relation": "serial",
+          "dependencies": [
+            "imp-scope-types"
+          ],
+          "subtaskIds": [
+            "imp-scope-library"
+          ]
+        },
+        {
+          "id": "imp-scope-tool-api",
+          "title": "integration",
+          "relation": "serial",
+          "dependencies": [
+            "imp-scope-library"
+          ],
+          "subtaskIds": [
+            "imp-scope-tool-api"
+          ]
+        },
+        {
+          "id": "imp-scope-tests",
+          "title": "verification",
+          "relation": "serial",
+          "dependencies": [
+            "imp-scope-tool-api"
+          ],
+          "subtaskIds": [
+            "imp-scope-tests"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "imp-scope-types",
+        "title": "Define explicit improvement claim and run scope contracts",
+        "phase": "contracts",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-types.ts"
+        ],
+        "instructions": [
+          "Add YpiStudioImprovementSubtaskClaimBody with action claim_improvement_subtask and required improvementId.",
+          "Add optional improvementId to YpiStudioTaskSubagentRun and preserve existing main-task payload compatibility.",
+          "Keep the existing main-task claim body/action unchanged."
+        ],
+        "acceptance": [
+          "Type system can represent a scoped claim and a scoped run.",
+          "Existing callers without improvementId remain valid."
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Making improvementId implicit in the main claim body would permit scope confusion."
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "imp-scope-library",
+        "title": "Implement instance-local ready, claim, and run persistence",
+        "phase": "library",
+        "order": 20,
+        "dependsOn": [
+          "imp-scope-types"
+        ],
+        "dependencies": [
+          "imp-scope-types"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-tasks.ts"
+        ],
+        "instructions": [
+          "Add locked instance resolver and executable-state guards.",
+          "Extend implementation_next with explicit improvementId scope and add claimYpiStudioImprovementSubtask without mutating the root plan/progress.",
+          "Update recordYpiStudioSubagentRun to append/dedupe instance.runIds and apply run state only to the scoped instance progress.",
+          "Retain the existing no-improvementId branch unchanged."
+        ],
+        "acceptance": [
+          "Main plan subtask ids are rejected for an improvement scope.",
+          "Each persisted scoped run is in exactly its instance runIds once.",
+          "Completion, cancellation, and runtime-lost status update the same instance scope."
+        ],
+        "validation": [
+          "npm run test:studio-dag",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "Duplicated DAG mutation code can drift; extract a narrowly typed shared internal helper only if it preserves clear scope checks."
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "imp-scope-tool-api",
+        "title": "Expose scoped dispatch through Studio tools and PATCH",
+        "phase": "integration",
+        "order": 30,
+        "dependsOn": [
+          "imp-scope-library"
+        ],
+        "dependencies": [
+          "imp-scope-library"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/ypi-studio-extension.ts",
+          "app/api/studio/tasks/[taskKey]/route.ts"
+        ],
+        "instructions": [
+          "Add claim_improvement_subtask and improvementId to task tool normalizer/schema and route guard/branch.",
+          "Pass improvementId into implementation_next and show scoped results.",
+          "Add improvementId to subagent input/meta/run projections; validate instance scope before start, auto-claim only through instance helper, and build prompt from instance plan/progress.",
+          "Ensure finalizer, cancel, SDK fallback, and runtime-lost paths preserve the stored improvementId via the persisted run."
+        ],
+        "acceptance": [
+          "Implementer/checker can start only an instance-owned claimed subtask while parent waits for improvements.",
+          "A start with parent waiting plus a main-plan-only subtaskId fails before child launch.",
+          "PATCH uses authorizedCwd and library validation."
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "One lifecycle snapshot that omits improvementId would make terminal persistence fall back to the wrong scope."
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "imp-scope-tests",
+        "title": "Prove isolation and durable run attribution",
+        "phase": "verification",
+        "order": 40,
+        "dependsOn": [
+          "imp-scope-tool-api"
+        ],
+        "dependencies": [
+          "imp-scope-tool-api"
+        ],
+        "relation": "serial",
+        "files": [
+          "scripts/test-ypi-studio-dag.mjs",
+          "docs/modules/library.md",
+          "docs/modules/api.md"
+        ],
+        "instructions": [
+          "Add positive and negative instance claim/next tests plus run start/final/cancel dedupe tests.",
+          "Update module docs for the new PATCH/tool contract and explicit scope rule.",
+          "Run required automated checks and record results in handoff."
+        ],
+        "acceptance": [
+          "Tests prove main and instance progress remain isolated.",
+          "Tests prove instance.runIds survives all lifecycle writes without duplicates.",
+          "Docs match the shipped API/tool action names."
+        ],
+        "validation": [
+          "npm run test:studio-dag",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "The existing script is library-level; manual tool/API smoke coverage remains necessary for extension schema wiring."
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-11T17:52:00.733Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 4,
+      "skipped": 0
+    },
+    "subtasks": {
+      "imp-scope-types": {
+        "id": "imp-scope-types",
+        "status": "done",
+        "updatedAt": "2026-07-11T15:50:09.311Z",
+        "startedAt": "2026-07-11T15:44:42.579Z",
+        "finishedAt": "2026-07-11T15:50:09.309Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-1c8ca97439e4ed99af910f09",
+          "implementer-108db4482a195bfec0193688"
+        ],
+        "lastRunId": "implementer-108db4482a195bfec0193688",
+        "claimedAt": "2026-07-11T15:44:42.579Z",
+        "claimedByContextId": "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/ypi-studio-types.ts`\n  - Added `YpiStudioImprovementSubtaskClaimBody` with `action: \"claim_improvement_subtask\"` and **required** `improvementId: string` (other fields mirror the main claim body: `cwd`/`subtaskId?`/`subtaskIds?`/`limit?`/`runId?`/`runIds?`/`status?`/`message?`/`contextId?`).\n  - Added optional `improvementId?: string` to `YpiStudioTaskSubagentRun` for stable scope attribution across start/progress/final/cancel/runtime-lost.\n  - **Left `YpiStudioTaskImplementationSubtaskClaimBody` unchanged** — no implicit `improvementId`, so scope confusion is rejected at the type layer.\n- `.ypi/tasks/20260711-232947-.../handoff.md` — recorded `imp-scope-types` completion, acceptance check, and handed off to `imp-scope-library`.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- `improvementId` is **required** on the scoped claim body (the type-level first line of defense against main-plan subtasks masquerading as instance subtasks); the library layer (`imp-scope-library`) must still validate instance existence/state at runtime.\n- Only types were touched in this subtask — library/tool/API/test/docs remain for the subsequent subtasks.\n- No new product decisions needed; next implementer should claim `imp-scope-library` and implement instance-scoped `getNext`/`claimYpiStudioImprovementSubtask`/`recordYpiStudioSubagentRun` run-ids attribution in `lib/ypi-studio-tasks.ts`."
+      },
+      "imp-scope-library": {
+        "id": "imp-scope-library",
+        "status": "done",
+        "updatedAt": "2026-07-11T16:08:29.578Z",
+        "startedAt": "2026-07-11T15:49:09.931Z",
+        "finishedAt": "2026-07-11T16:08:29.577Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-95e08071de29c943fea4d2f3",
+          "implementer-94c36fa565701326a462e82d"
+        ],
+        "lastRunId": "implementer-95e08071de29c943fea4d2f3",
+        "claimedAt": "2026-07-11T15:49:09.931Z",
+        "claimedByContextId": "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "summary": "Both pass. Let me check whether tests already cover the improvement scope and whether my new helpers are unused (dead code):"
+      },
+      "imp-scope-tool-api": {
+        "id": "imp-scope-tool-api",
+        "status": "done",
+        "updatedAt": "2026-07-11T17:13:37.937Z",
+        "startedAt": "2026-07-11T16:50:19.020Z",
+        "finishedAt": "2026-07-11T17:13:37.929Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-38815262e06079df4f3cb530",
+          "implementer-9415efafe66139f7d6dc5267"
+        ],
+        "lastRunId": "implementer-9415efafe66139f7d6dc5267",
+        "claimedAt": "2026-07-11T16:50:19.020Z",
+        "claimedByContextId": "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "summary": "All checks green. Implementation complete.\n\n### Implementation Complete\n\n#### Files Changed\n\n- **`lib/ypi-studio-extension.ts`** — completed the `imp-scope-tool-api` wiring (a prior run had done most of it; I filled the gaps and re-verified):\n  - `buildMemberPrompt(root, taskId, member, prompt, subtaskId?, improvementId?)` — added the **instance-scoped branch**: builds context from instance artifacts/plan/progress (read from `…/improvements/<id>/`), emits an `IMP` scope header, selects the subtask from the instance plan, and never injects the main task plan/progress. The main-task branch is byte-compatible.\n  - `persistRunSnapshot` — explicit `improvementId: existing?.improvementId ?? run.improvementId ?? runningRun.improvementId` so SDK/CLI finalizer, cancel, and runtime-lost keep the same scope via the persisted run.\n  - CLI `runSnapshot` — carries `meta.improvementId`.\n  - `projectSubagentRun` — `subtaskTitle` now falls back to the improvement instance plan for scoped runs.\n  - Async start reply text now labels the `improvementId` scope.\n  - (Already present from the prior run, verified: `claim_improvement_subtask` action + normalizer + schema enum, `implementation_next` improvementId pass-through, subagent `improvementId` input/normalizer/schema/`ChildRunMeta`/projections, start scope validation that rejects main-plan subtasks while waiting for improvements and auto-claims via the instance helper.)\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — verified the `isYpiStudioImprovementSubtaskClaimBody` → `claimYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd })` branch is present (cwd overridden by authorized value; library is the validation point).\n- **`.ypi/tasks/20260711-232947-…/handoff.md`** — appended an implementation re-review note so the code matches the recorded completion.\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n- `npm run lint` — Pass (EXIT=0)\n- `npm run test:studio-dag` — Pass (EXIT=0, regression only; scoped contract tests belong to `imp-scope-tests`)\n\n#### Notes / Risks\n\n- The worktree already contained most of `imp-scope-tool-api` from a previous interrupted run, but `buildMemberPrompt` had **not** actually been branched on `improvementId` (the handoff claimed it was). I implemented the missing instance-scoped prompt and the explicit `improvementId` retention, so the code now matches the handoff.\n- The runtime child handle (`YpiStudioChildRunHandle`) deliberately does **not** carry `improvementId`; attribution flows through the persisted run. The SDK runner (`lib/ypi-studio-child-session-runner.ts`) also omits `improvementId` from its snapshots, which is safe because `persistRunSnapshot` restores it from the persisted `existing` run. If the checker prefers the SDK runner to also carry `improvementId` end-to-end, that would require touching a file outside this subtask's declared scope — flagging for the main session.\n- Scoped contract tests (instance ready/next/claim isolation, `instance.runIds` dedupe across start/final/cancel) are the next subtask `imp-scope-tests`, not done here. Docs (`docs/modules/library.md`, `docs/modules/api.md`) are also `imp-scope-tests` scope.\n- Manual smoke tests still recommended per `checks.md`: overlapping main/instance `subtaskId` scope rejection, and instance async run completion/cancel attribution to `instance.runIds`."
+      },
+      "imp-scope-tests": {
+        "id": "imp-scope-tests",
+        "status": "done",
+        "updatedAt": "2026-07-11T17:47:52.916Z",
+        "startedAt": "2026-07-11T17:13:42.017Z",
+        "finishedAt": "2026-07-11T17:47:52.911Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-271147f3e3d5e5c4e31b1aa9"
+        ],
+        "lastRunId": "implementer-271147f3e3d5e5c4e31b1aa9",
+        "claimedAt": "2026-07-11T17:13:42.017Z",
+        "claimedByContextId": "pi_019f50d2-36f8-769e-bfa4-3d50d18b27a8",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-ypi-studio-dag.mjs` — Added `claimYpiStudioImprovementSubtask` and `reconcileYpiStudioRuntimeLostSubagentRun` imports; added `setupImprovementImplementing` helper plus 12 new contract test blocks covering: positive instance `implementation_next`/`claim_improvement_subtask`/checking-state claim; negative cases (unknown `improvementId`, non-executable instance state, main-plan id under improvement scope, instance id without `improvementId`, scoped run after parent leaves `waiting_for_improvements`); run attribution (running/succeeded/cancelled dedupe to `instance.runIds`, runtime-lost preserving `improvementId`); and two-instance isolation proving main/other-instance progress is not polluted.\n- `docs/modules/library.md` — Documented the improvement-instance execution-scope helpers (`getNextYpiStudioImplementationSubtask({ improvementId? })`, `claimYpiStudioImprovementSubtask`, `recordYpiStudioSubagentRun` improvement branch, `instance.runIds` append-only audit index) and the extension's `claim_improvement_subtask` action, `improvementId` parameter, and explicit-scope validation while `waiting_for_improvements`.\n- `docs/modules/api.md` — Documented the PATCH `claim_improvement_subtask` action (required `improvementId`, instance-only plan resolution, cwd override).\n- `.ypi/tasks/20260711-232947-.../handoff.md` — Marked `imp-scope-tests` ✅ complete with the completion record.\n\n#### Verification\n\n- `npm run test:studio-dag` — Pass (all DAG contract tests incl. 12 new blocks)\n- `npm run lint` — Pass\n- `node_modules/.bin/tsc --noEmit` — Pass (EXIT=0)\n\n#### Notes / Risks\n\n- Tests are library-level contract tests proving scope isolation and durable `instance.runIds` attribution across running/succeeded/cancelled/runtime-lost writes. Extension schema wiring and the PATCH route smoke path (main/instance overlapping `subtaskId` → scope rejection; instance async run completion/cancel UI filtering) remain to be manually smoke-tested — this is the residual risk noted in the subtask's `risks`.\n- No design/code conflicts found; no new product decisions needed."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-11T15:44:42.579Z",
+        "subtaskId": "imp-scope-types",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-11T15:49:09.931Z",
+        "subtaskId": "imp-scope-library",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-11T16:50:19.020Z",
+        "subtaskId": "imp-scope-tool-api",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-11T17:13:42.017Z",
+        "subtaskId": "imp-scope-tests",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

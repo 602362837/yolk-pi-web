@@ -322,6 +322,51 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
     optionalArtifacts: detail.progress.optionalArtifacts,
     status: "active" as const,
   }];
+  const improvementSummary = detail.improvements?.instances?.length ? (() => {
+    const instances = detail.improvements!.instances;
+    const unresolved = instances.filter((inst) =>
+      !["accepted", "accepted_not_doing"].includes(inst.status)
+    );
+    const firstUnresolved = unresolved[0];
+    const blocker = firstUnresolved
+      ? firstUnresolved.status === "waiting_plan_approval"
+        ? `${firstUnresolved.displayId} 等待计划批准`
+        : firstUnresolved.status === "waiting_clarification"
+          ? `${firstUnresolved.displayId} 等待澄清`
+          : firstUnresolved.status === "cancelled" || firstUnresolved.status === "failed"
+            ? `${firstUnresolved.displayId} ${firstUnresolved.status === "cancelled" ? "已取消" : "失败"}，等待"接受不处理"`
+            : `${firstUnresolved.displayId} ${firstUnresolved.status}`
+      : undefined;
+    const nextAction = firstUnresolved
+      ? firstUnresolved.status === "analysis" || firstUnresolved.status === "waiting_clarification"
+        ? "在绑定聊天中派发改进师"
+        : firstUnresolved.status === "waiting_plan_approval"
+          ? `在绑定聊天中批准 ${firstUnresolved.displayId} 的计划`
+          : firstUnresolved.status === "implementing" || firstUnresolved.status === "checking"
+            ? "等待子成员完成"
+            : firstUnresolved.status === "waiting_user_acceptance"
+              ? `请验收 ${firstUnresolved.displayId}`
+              : firstUnresolved.status === "cancelled" || firstUnresolved.status === "failed"
+                ? `在聊天中说明是否接受不处理 ${firstUnresolved.displayId}`
+                : "复核改进状态"
+      : "复核全部改进并再次验收主任务";
+    return {
+      parentStatus: detail.improvements!.parentStatus,
+      total: instances.length,
+      unresolved: unresolved.length,
+      blocker,
+      nextAction,
+      instances: instances.map((inst) => ({
+        id: inst.id,
+        displayId: inst.displayId,
+        title: inst.title,
+        status: inst.status,
+        owner: inst.owner,
+        updatedAt: inst.updatedAt,
+      })),
+    };
+  })() : undefined;
+
   return {
     key: detail.key,
     id: detail.id,
@@ -348,6 +393,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
     events: detail.events.slice(-5).reverse().map((event) => ({ type: event.type, at: event.at, message: event.message, from: event.from, to: event.to, member: event.member, artifact: event.artifact })),
     implementation: detail.implementation,
     implementationProjection: buildWidgetImplementationProjection(detail),
+    improvements: improvementSummary,
   };
 }
 

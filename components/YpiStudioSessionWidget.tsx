@@ -200,6 +200,13 @@ function computeBallUrgency(tasks: YpiStudioSessionTaskLinkCandidate[]): BallUrg
     if (subtaskCounts && (subtaskCounts.failed > 0 || subtaskCounts.blocked > 0)) {
       urgency = "failed";
     }
+    // Improvement flows that wait on the user should surface as needs_user.
+    const imp = c.task.improvements;
+    if (imp && imp.unresolved > 0) {
+      const first = imp.instances.find((inst) => inst.status === "waiting_plan_approval" || inst.status === "waiting_user_acceptance");
+      if (first) return "needs_user";
+      if (urgency === "idle") urgency = "running";
+    }
     const hasActive = c.task.subagents.some((r) => r.status === "running" || r.status === "queued" || r.status === "waiting_for_user");
     if (hasActive && urgency === "idle") urgency = "running";
   }
@@ -378,6 +385,9 @@ function TaskCard({
   const runtime = task.implementationProjection?.sessionRuntime;
   const subtasks = visibleSubtasks(task);
   const runSummary = latestRunSummary(runs);
+  const improvements = task.improvements;
+  const improvementUnresolved = improvements?.unresolved ?? 0;
+  const improvementWaiting = task.status === "waiting_for_improvements" || (improvements && improvementUnresolved > 0);
 
   return (
     <div
@@ -421,7 +431,9 @@ function TaskCard({
 
       {/* Meta row */}
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", color: "var(--text-dim)", fontSize: 10, marginBottom: 3 }}>
-        <span style={{ color: statusColor(task.status), fontWeight: 700 }}>{task.statusLabel}</span>
+        <span style={{ color: improvementWaiting ? "#b45309" : statusColor(task.status), fontWeight: 700 }}>
+          {task.status === "waiting_for_improvements" ? "等待改进完成" : task.statusLabel}
+        </span>
         <span>·</span>
         <span>{task.currentMember ?? "—"}</span>
         <span>·</span>
@@ -433,6 +445,34 @@ function TaskCard({
           </>
         )}
       </div>
+
+      {/* Improvement flow — bounded summary; never includes full feedback. */}
+      {improvements && improvementUnresolved > 0 && (
+        <div
+          className="ypi-studio-widget-improvement"
+          style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 3, padding: "5px 7px", borderRadius: 7, border: "1px solid rgba(245,158,11,0.35)", background: "rgba(245,158,11,0.08)" }}
+          aria-live="polite"
+        >
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#b45309", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            待处理改进 {improvementUnresolved} 项
+          </span>
+          {improvements.blocker && (
+            <span style={{ fontSize: 10, color: "#b45309", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              阻塞：{improvements.blocker}
+            </span>
+          )}
+          {improvements.nextAction && (
+            <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              下一步：{improvements.nextAction}
+            </span>
+          )}
+        </div>
+      )}
+      {improvements && improvements.parentStatus === "review_ready" && improvementUnresolved === 0 && improvements.total > 0 && (
+        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} aria-live="polite">
+          改进已完成，主任务需要再次验收
+        </div>
+      )}
 
       {/* Runtime */}
       {runtime && runtime.status !== "idle" && (
@@ -747,7 +787,7 @@ export function YpiStudioSessionWidget({
     const primary = sortedCandidates[0];
     const primaryTask = primary?.task;
     const pillLabel = primaryTask
-      ? `工 Studio ${primaryTask.progress}% · ${primaryTask.currentMember ?? primaryTask.statusLabel}`
+      ? `工 Studio ${primaryTask.progress}% · ${primaryTask.status === "waiting_for_improvements" ? "等待改进完成" : (primaryTask.currentMember ?? primaryTask.statusLabel)}`
       : `工 Studio (${tasks.length})`;
 
     return (
