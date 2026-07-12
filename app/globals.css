@@ -1283,3 +1283,9 @@ span.linenumber {
     border-bottom: 1px solid var(--border) !important;
   }
 }
+
+@media (max-width: 640px) {
+  .model-select-provider-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
