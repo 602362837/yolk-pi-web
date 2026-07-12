@@ -108,6 +108,34 @@
       "requiredArtifacts": [],
       "optionalArtifacts": []
     },
+    "review": {
+      "id": "review",
+      "label": "审核",
+      "owner": "main",
+      "progress": 95,
+      "instruction": "检查通过，等待主 session 请求用户验收。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
+    "user_acceptance": {
+      "id": "user_acceptance",
+      "label": "用户验收",
+      "owner": "main",
+      "progress": 97,
+      "instruction": "等待用户确认验收。无问题则完成；有问题则创建改进项进入等待改进完成。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": [],
+      "requiresUserApproval": true
+    },
+    "waiting_for_improvements": {
+      "id": "waiting_for_improvements",
+      "label": "等待改进完成",
+      "owner": "main",
+      "progress": 96,
+      "instruction": "改进项处理中，全部完成后返回 review 再次请求用户验收。",
+      "requiredArtifacts": [],
+      "optionalArtifacts": []
+    },
     "completed": {
       "id": "completed",
       "label": "完成",
@@ -184,6 +212,27 @@
       "to": "completed"
     },
     {
+      "from": "checking",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "user_acceptance"
+    },
+    {
+      "from": "user_acceptance",
+      "to": "completed",
+      "requiresUserApproval": true
+    },
+    {
+      "from": "user_acceptance",
+      "to": "waiting_for_improvements"
+    },
+    {
+      "from": "waiting_for_improvements",
+      "to": "review"
+    },
+    {
       "from": "intake",
       "to": "blocked",
       "overrideAllowed": true
@@ -204,6 +253,11 @@
       "overrideAllowed": true
     },
     {
+      "from": "waiting_for_improvements",
+      "to": "blocked",
+      "overrideAllowed": true
+    },
+    {
       "from": "blocked",
       "to": "intake",
       "overrideAllowed": true
@@ -219,6 +273,11 @@
       "overrideAllowed": true
     },
     {
+      "from": "blocked",
+      "to": "waiting_for_improvements",
+      "overrideAllowed": true
+    },
+    {
       "from": "intake",
       "to": "cancelled",
       "overrideAllowed": true
@@ -230,6 +289,11 @@
     },
     {
       "from": "awaiting_approval",
+      "to": "cancelled",
+      "overrideAllowed": true
+    },
+    {
+      "from": "waiting_for_improvements",
       "to": "cancelled",
       "overrideAllowed": true
     },
