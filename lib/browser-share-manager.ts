@@ -24,6 +24,7 @@ import type {
   BrowserShareTabInfo,
   BrowserShareViewport,
 } from "./browser-share-types";
+import { isBudgetExpired, type BrowserShareDiagnostic, type DiagnosticBudget } from "./memory-diagnostics-types";
 
 const SHARE_TTL_MS = 5 * 60 * 1000;
 const SNAPSHOT_TEXT_LIMIT = 12_000;
@@ -513,6 +514,66 @@ export class BrowserShareManager {
     };
   }
 
+  /**
+   * Bounded read-only diagnostic projection of all Browser Share containers
+   * (shares, codes, session bindings, tombstones, commands, command waiters).
+   * Returns counts and status aggregates only; never reads tab/url/snapshot/
+   * command payload/result text. Does NOT call `cleanupExpired()` so expired
+   * records remain untouched (projection is strictly read-only).
+   */
+  projectDiagnostic(budget: DiagnosticBudget): BrowserShareDiagnostic {
+    const sharesByStatus: Record<string, number> = {};
+    const sharesByLifecycleStatus: Record<string, number> = {};
+    const tombstonesByLifecycleStatus: Record<string, number> = {};
+    const commandsByStatus: Record<string, number> = {};
+    try {
+      for (const share of this.shares.values()) {
+        if (isBudgetExpired(budget)) break;
+        sharesByStatus[share.status] = (sharesByStatus[share.status] ?? 0) + 1;
+        sharesByLifecycleStatus[share.lifecycleStatus] = (sharesByLifecycleStatus[share.lifecycleStatus] ?? 0) + 1;
+      }
+    } catch {
+      // best-effort
+    }
+    try {
+      for (const tombstone of this.tombstones.values()) {
+        if (isBudgetExpired(budget)) break;
+        tombstonesByLifecycleStatus[tombstone.lifecycleStatus] = (tombstonesByLifecycleStatus[tombstone.lifecycleStatus] ?? 0) + 1;
+      }
+    } catch {
+      // best-effort
+    }
+    try {
+      for (const command of this.commands.values()) {
+        if (isBudgetExpired(budget)) break;
+        commandsByStatus[command.status] = (commandsByStatus[command.status] ?? 0) + 1;
+      }
+    } catch {
+      // best-effort
+    }
+    let commandWaiterCount = 0;
+    try {
+      for (const waiters of this.commandWaiters.values()) {
+        if (isBudgetExpired(budget)) break;
+        commandWaiterCount += waiters.size;
+      }
+    } catch {
+      // best-effort
+    }
+    return {
+      shareCount: this.shares.size,
+      shareCodeCount: this.shareCodes.size,
+      sessionBindingCount: this.sessionBindings.size,
+      tombstoneCount: this.tombstones.size,
+      commandCount: this.commands.size,
+      commandWaiterCount,
+      sharesByStatus,
+      sharesByLifecycleStatus,
+      commandsByStatus,
+      tombstonesByLifecycleStatus,
+    };
+  }
+
   enqueueCommand(sessionId: string, type: BrowserShareCommandType, payload: Partial<BrowserShareCommand>): BrowserShareCommand {
     this.cleanupExpired();
     const shareId = this.sessionBindings.get(sessionId);
@@ -799,4 +860,29 @@ export class BrowserShareManager {
 export function getBrowserShareManager(): BrowserShareManager {
   globalThis.__browserShareManager ??= new BrowserShareManager();
   return globalThis.__browserShareManager;
+}
+
+/**
+ * Bounded read-only projection of the process-wide Browser Share manager.
+ * See {@link BrowserShareManager.projectDiagnostic} for the safety boundary.
+ */
+export function projectBrowserShareRuntime(budget: DiagnosticBudget): BrowserShareDiagnostic {
+  try {
+    return getBrowserShareManager().projectDiagnostic(budget);
+  } catch (error) {
+    const diagnostic: BrowserShareDiagnostic = {
+      shareCount: 0,
+      shareCodeCount: 0,
+      sessionBindingCount: 0,
+      tombstoneCount: 0,
+      commandCount: 0,
+      commandWaiterCount: 0,
+      sharesByStatus: {},
+      sharesByLifecycleStatus: {},
+      commandsByStatus: {},
+      tombstonesByLifecycleStatus: {},
+      error: error instanceof Error ? error.message : String(error),
+    };
+    return diagnostic;
+  }
 }

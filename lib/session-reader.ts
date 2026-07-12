@@ -8,6 +8,12 @@ import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd, expandCwd } from "./cwd";
 import { parseSessionHeaderMetadata } from "./session-header-metadata";
 import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
+import {
+  isBudgetExpired,
+  type CacheDiagnostic,
+  type DiagnosticBudget,
+  type DiagnosticLimits,
+} from "./memory-diagnostics-types";
 
 export { getAgentDir };
 
@@ -247,6 +253,41 @@ export function cacheSessionPath(sessionId: string, filePath: string): void {
 
 export function invalidateSessionPathCache(sessionId: string): void {
   getPathCache().delete(sessionId);
+}
+
+/**
+ * Bounded read-only projection of the in-process session id → file path cache.
+ * Returns total count plus a capped sample of `{ sessionId, path }` pairs.
+ * Mutates nothing; never triggers `SessionManager.listAll()` or any scan.
+ */
+export function projectSessionPathCache(
+  budget: DiagnosticBudget,
+  limits: DiagnosticLimits,
+): CacheDiagnostic {
+  const cache = getPathCache();
+  const samples: CacheDiagnostic["samples"] = [];
+  let truncated = 0;
+  try {
+    for (const [sessionId, path] of cache.entries()) {
+      if (isBudgetExpired(budget)) {
+        truncated = cache.size - samples.length;
+        break;
+      }
+      if (samples.length >= limits.maxPathCacheSamples) {
+        truncated = cache.size - samples.length;
+        break;
+      }
+      samples.push({ sessionId, path });
+    }
+  } catch {
+    // best-effort projection
+  }
+  return {
+    total: cache.size,
+    sampled: samples.length,
+    truncated,
+    samples,
+  };
 }
 
 export function getSessionEntries(filePath: string): SessionEntry[] {

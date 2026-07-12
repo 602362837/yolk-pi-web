@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Yolk Pi Memory Diagnostics Prototype</title>
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --text: #cccccc;
+      --text-dim: #858585;
+      --border: #3c3c3c;
+      --accent: #0e639c;
+      --accent-hover: #1177bb;
+      --error: #f48771;
+      --success: #89d185;
+      --warning: #cca700;
+      --info: #3794ff;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    }
+
+    body {
+      background-color: #121212;
+      color: var(--text);
+      font-family: var(--font-sans);
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 24px;
+      color: #ffffff;
+    }
+
+    .settings-dialog {
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 900px;
+      height: 600px;
+      display: flex;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+
+    /* Left Sidebar */
+    .sidebar {
+      width: 200px;
+      border-right: 1px solid var(--border);
+      background-color: rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 0;
+      box-sizing: border-box;
+    }
+
+    .sidebar-item {
+      padding: 10px 20px;
+      font-size: 13px;
+      color: var(--text-dim);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .sidebar-item:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    .sidebar-item.active {
+      background-color: var(--accent);
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    /* Right Content Area */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .section-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    /* State Switcher for prototype demo */
+    .proto-controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      background: #2d2d2d;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      width: 900px;
+      box-sizing: border-box;
+      justify-content: center;
+    }
+
+    .proto-btn {
+      background: #3a3a3a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+
+    .proto-btn:hover {
+      background: #4a4a4a;
+    }
+
+    .proto-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    /* UI State Containers */
+    .diagnostic-state {
+      display: none;
+    }
+
+    .diagnostic-state.active {
+      display: block;
+    }
+
+    /* Diagnostic Card & Elements */
+    .action-panel {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 13px;
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Callouts */
+    .callout {
+      border-left: 3px solid var(--warning);
+      background: rgba(204, 167, 0, 0.08);
+      padding: 12px;
+      border-radius: 0 4px 4px 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .callout-title {
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .callout.info {
+      border-left-color: var(--info);
+      background: rgba(55, 148, 255, 0.08);
+    }
+
+    .callout.error {
+      border-left-color: var(--error);
+      background: rgba(244, 135, 113, 0.08);
+    }
+
+    /* Spinner Animation */
+    .spinner {
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top: 2px solid #ffffff;
+      border-radius: 50%;
+      width: 14px;
+      height: 14px;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Results layout */
+    .result-section {
+      background: rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      font-size: 13px;
+    }
+
+    .result-row {
+      display: flex;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      padding-bottom: 8px;
+    }
+
+    .result-row:last-child {
+      margin-bottom: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .result-label {
+      width: 180px;
+      color: var(--text-dim);
+    }
+
+    .result-value {
+      flex: 1;
+      word-break: break-all;
+      color: #eeeeee;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .path-copy-btn {
+      background: #333333;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-sans);
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .path-copy-btn:hover {
+      background: #444444;
+    }
+
+    .badge {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .badge-warning {
+      background-color: rgba(204, 167, 0, 0.2);
+      color: var(--warning);
+      border: 1px solid rgba(204, 167, 0, 0.4);
+    }
+
+    .badge-success {
+      background-color: rgba(137, 209, 133, 0.2);
+      color: var(--success);
+      border: 1px solid rgba(137, 209, 133, 0.4);
+    }
+
+    .badge-error {
+      background-color: rgba(244, 135, 113, 0.2);
+      color: var(--error);
+      border: 1px solid rgba(244, 135, 113, 0.4);
+    }
+
+    .info-footer {
+      margin-top: auto;
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.45;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .info-footer code {
+      font-family: var(--font-mono);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>内存诊断快照 UI 原型设计 - 状态展示</h1>
+
+  <!-- State Switcher -->
+  <div class="proto-controls">
+    <button class="proto-btn active" onclick="switchState('idle', this)">1. 默认空闲 (Idle)</button>
+    <button class="proto-btn" onclick="switchState('loading', this)">2. 正在采集 (Loading)</button>
+    <button class="proto-btn" onclick="switchState('success', this)">3. 采集成功 (Success)</button>
+    <button class="proto-btn" onclick="switchState('error', this)">4. 采集失败 (Error)</button>
+    <button class="proto-btn" onclick="switchState('busy', this)">5. 并发冲突 (409 Busy)</button>
+  </div>
+
+  <!-- Settings Dialog Shell -->
+  <div class="settings-dialog">
+    
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-item">Yolk Chat</div>
+      <div class="sidebar-item">Worktree 默认值</div>
+      <div class="sidebar-item">Studio 团队</div>
+      <div class="sidebar-item">ChatGPT 额度</div>
+      <div class="sidebar-item">终端 SSH</div>
+      <div class="sidebar-item active">诊断 / Diagnostics</div>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content-area">
+      <div class="section-title">内存诊断快照 (Memory Diagnostics)</div>
+      <div class="section-desc">
+        采集当前服务进程内存与 AgentSession、Studio 等运行时的只读快照状态，并将结果原子写入本地 diagnostics 目录。快照以 JSON 格式输出，用于分析疑似内存泄漏和容器膨胀。
+      </div>
+
+      <!-- STATE 1: IDLE -->
+      <div id="state-idle" class="diagnostic-state active">
+        <div class="action-panel">
+          <button class="btn-primary">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm0-2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V6a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1z"/></svg>
+            生成内存诊断快照
+          </button>
+        </div>
+      </div>
+
+      <!-- STATE 2: LOADING -->
+      <div id="state-loading" class="diagnostic-state">
+        <div class="action-panel">
+          <button class="btn-primary" disabled>
+            <span class="spinner"></span>
+            正在采集内存诊断快照...
+          </button>
+        </div>
+        <div class="callout info">
+          <div class="callout-title">采集进行中</div>
+          正在扫描服务内存、遍历活动会话 (AgentSession) 及 Studio 运行时状态。此过程是严格只读的，有 5 秒 deadline 控制，通常在数毫秒内完成。
+        </div>
+      </div>
+
+      <!-- STATE 3: SUCCESS -->
+      <div id="state-success" class="diagnostic-state">
+        <div class="action-panel">
+          <button class="btn-primary">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm0-2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V6a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1z"/></svg>
+            重新生成内存快照
+          </button>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <div class="callout info" style="border-left-color: var(--success); background: rgba(137, 209, 133, 0.05); margin-bottom: 12px;">
+            <div class="callout-title" style="color: var(--success);">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+              快照生成成功
+            </div>
+            本地诊断文件已就绪。由于诊断文件中包含敏感的本机工作区路径与会话标识，我们没有在浏览器网页上直接展示完整文件内容或提供下载。
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-row">
+            <div class="result-label">快照 ID</div>
+            <div class="result-value">snap-20260711-234508-3a8c</div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">文件路径</div>
+            <div class="result-value">
+              <span>~/.pi/agent/diagnostics/memory-20260711T234508Z-pid12405-3a8c6b4f.json</span>
+              <button class="path-copy-btn" onclick="copyPath(this, '~/.pi/agent/diagnostics/memory-20260711T234508Z-pid12405-3a8c6b4f.json')">复制路径</button>
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">文件大小</div>
+            <div class="result-value">342.5 KiB</div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">采集耗时</div>
+            <div class="result-value">76 ms</div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">状态标识</div>
+            <div class="result-value">
+              <span class="badge badge-success">Schema v1</span>
+              <span class="badge badge-success">Completed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE 4: ERROR -->
+      <div id="state-error" class="diagnostic-state">
+        <div class="action-panel">
+          <button class="btn-primary">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm0-2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V6a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1z"/></svg>
+            重试生成快照
+          </button>
+        </div>
+
+        <div class="callout error">
+          <div class="callout-title" style="color: var(--error);">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm0-2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V6a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1z"/></svg>
+            快照生成失败
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 11px; margin-top: 6px; color: #eee;">
+            Error: Snapshot serialization exceeded maximum safety threshold of 5 MiB (snapshot_too_large).
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE 5: 409 BUSY -->
+      <div id="state-busy" class="diagnostic-state">
+        <div class="action-panel">
+          <button class="btn-primary" disabled>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm0-2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V6a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1z"/></svg>
+            生成内存诊断快照
+          </button>
+        </div>
+
+        <div class="callout error" style="border-left-color: var(--warning); background: rgba(204, 167, 0, 0.08);">
+          <div class="callout-title" style="color: var(--warning);">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm0-2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V6a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1z"/></svg>
+            诊断服务正忙
+          </div>
+          <div style="font-size: 12px; margin-top: 6px; color: #eee; line-height: 1.4;">
+            当前进程有另一个内存快照采集正在执行。请稍候（通常 5 秒内会释放互斥锁）再重试。
+          </div>
+        </div>
+      </div>
+
+      <!-- Privacy Callout -->
+      <div class="callout" style="margin-top: 20px;">
+        <div class="callout-title">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+          隐私提示 (Privacy Notice)
+        </div>
+        本快照不包含敏感的环境变量、API 密钥或聊天消息全文，但会保留本机的工作区路径、Session ID 目录及文件名称以方便定位分析。
+        <strong style="color: #ffffff;">此文件不会自动发送给任何服务器。分享诊断快照给他人前，请务必人工审阅快照内容。</strong>
+      </div>
+
+      <!-- Footer Info -->
+      <div class="info-footer">
+        运维提示：你也可以在宿主机直接通过命令行接口触发采集：<br>
+        <code>curl -X POST http://localhost:30141/api/diagnostics/memory-snapshot</code>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function switchState(stateId, btn) {
+      // Deactivate all states
+      document.querySelectorAll('.diagnostic-state').forEach(el => {
+        el.classList.remove('active');
+      });
+      // Activate target state
+      document.getElementById('state-' + stateId).classList.add('active');
+
+      // Update button highlights
+      document.querySelectorAll('.proto-btn').forEach(el => {
+        el.classList.remove('active');
+      });
+      btn.classList.add('active');
+    }
+
+    function copyPath(btn, path) {
+      navigator.clipboard.writeText(path).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = '已复制';
+        btn.style.backgroundColor = 'var(--success)';
+        btn.style.color = '#121212';
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.style.backgroundColor = '#333333';
+          btn.style.color = 'var(--text)';
+        }, 1500);
+      });
+    }
+  </script>
+</body>
+</html>

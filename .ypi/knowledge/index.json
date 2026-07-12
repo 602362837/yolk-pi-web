@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-10T06:44:10.863Z",
+  "updatedAt": "2026-07-12T05:20:28.709Z",
   "entries": [
+    {
+      "id": "20260712-132028-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件",
+      "title": "新增内存诊断快照能力：采集进程/AgentSession/Studio运行时状态并写入诊断文件",
+      "taskId": "20260711-233128-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件",
+      "taskKey": "archived:2026-07:20260711-233128-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件",
+      "workflowId": "feature-dev",
+      "summary": "已完成内存诊断快照：owner 有界只读 projection + collector/API + Settings 诊断按钮。关键结论：私有容器由 owner 投影不越权；API/UI 只回元数据；严格只读禁 cleanup/abort/GC；5s deadline/5MiB/单飞409；OpenAI Codex 仅 known-session 公开 getter 数值/布尔；content-block 上限须 per-message；Settings 连点需 request generation 防竞态；前端入口触发 UI 原型门禁；诊断文件保留本机路径需分享前审阅。",
+      "tags": [
+        "feature-dev",
+        "memory-diagnostics",
+        "readonly-snapshot",
+        "settings-ui",
+        "owner-projection",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260711-233128-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件",
+      "knowledgePath": ".ypi/knowledge/20260712-132028-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件.md",
+      "createdAt": "2026-07-12T05:20:28.709Z",
+      "archivedAt": "2026-07-12T05:20:28.709Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260710-144410-修复-cpa-多账号导入覆盖并提示缺少-refresh-token",
       "title": "修复 CPA 多账号导入覆盖并提示缺少 refresh token",

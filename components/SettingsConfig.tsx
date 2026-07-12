@@ -84,7 +84,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "opencodeGo" | "editor" | "trellis";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "opencodeGo" | "editor" | "trellis" | "diagnostics";
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -356,6 +356,259 @@ function StatusRow({ label, value, ok, detail }: { label: string; value: string;
       <span title={detail} style={{ color: "var(--text)", fontSize: 12, overflowWrap: "anywhere" }}>{value}</span>
       <StatusBadge ok={ok} />
     </div>
+  );
+}
+
+type DiagnosticsState = "idle" | "loading" | "success" | "busy" | "error";
+
+type DiagnosticsSuccess = {
+  ok: true;
+  kind: string;
+  schemaVersion: number;
+  snapshotId: string;
+  capturedAt: string;
+  filePath: string;
+  fileName: string;
+  bytes: number;
+  durationMs: number;
+  partial: boolean;
+  compacted?: boolean;
+  sectionSummary?: Array<{ name: string; ok: boolean; truncated?: boolean; error?: boolean }>;
+  errorCount?: number;
+  truncationCount?: number;
+};
+
+type DiagnosticsError = { ok: false; code: string; message: string; partial?: boolean };
+
+function formatBytes(bytes: number): string {
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 ? 0 : value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
+function DiagnosticsPanel() {
+  const [state, setState] = useState<DiagnosticsState>("idle");
+  const [success, setSuccess] = useState<DiagnosticsSuccess | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [copied, setCopied] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  // Generation counter so a slower previous response cannot overwrite a newer trigger.
+  const requestGenRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const trigger = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const gen = requestGenRef.current + 1;
+    requestGenRef.current = gen;
+    setState("loading");
+    setErrorMessage("");
+    try {
+      const res = await fetch("/api/diagnostics/memory-snapshot", {
+        method: "POST",
+        signal: controller.signal,
+      });
+      if (requestGenRef.current !== gen) return;
+      const data = await res.json() as DiagnosticsSuccess | DiagnosticsError;
+      if (requestGenRef.current !== gen) return;
+      if (res.status === 409 || (data as DiagnosticsError).code === "snapshot_in_progress") {
+        setState("busy");
+        return;
+      }
+      if (!res.ok || data.ok === false) {
+        const err = data as DiagnosticsError;
+        setErrorMessage(err.message || err.code || `HTTP ${res.status}`);
+        setState("error");
+        return;
+      }
+      setSuccess(data as DiagnosticsSuccess);
+      setState("success");
+    } catch (err) {
+      if (isAbortError(err) || requestGenRef.current !== gen) return;
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setState("error");
+    }
+  }, []);
+
+  const copyPath = useCallback(async () => {
+    if (!success) return;
+    try {
+      await navigator.clipboard.writeText(success.filePath);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }, [success]);
+
+  const loading = state === "loading";
+  const primaryLabel = loading
+    ? "正在采集内存诊断快照…"
+    : state === "success"
+      ? "重新生成内存快照"
+      : state === "error"
+        ? "重试生成快照"
+        : "生成内存诊断快照";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div>
+        <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>内存诊断快照 (Memory Diagnostics)</h3>
+        <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+          采集当前服务进程内存与 AgentSession、Studio 等运行时的只读快照状态，并将结果原子写入本地 diagnostics 目录。快照以 JSON 格式输出，用于分析疑似内存泄漏和容器膨胀。严格只读，有 5 秒 deadline 控制，通常在数毫秒内完成。
+        </p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+        <button
+          type="button"
+          onClick={() => void trigger()}
+          disabled={loading}
+          style={{
+            alignSelf: "flex-start",
+            padding: "8px 16px",
+            borderRadius: 7,
+            border: "none",
+            background: loading ? "var(--border)" : "var(--accent)",
+            color: "white",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {primaryLabel}
+        </button>
+
+        {state === "busy" && (
+          <div style={{ padding: "10px 12px", borderRadius: 8, borderLeft: "3px solid var(--warning, #cca700)", background: "rgba(204,167,0,0.08)", color: "var(--text)", fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 700, color: "var(--warning, #cca700)", marginBottom: 4 }}>诊断服务正忙</div>
+            当前进程有另一个内存快照采集正在执行。请稍候（通常 5 秒内会释放互斥锁）再重试。
+          </div>
+        )}
+
+        {state === "error" && (
+          <div style={{ padding: "10px 12px", borderRadius: 8, borderLeft: "3px solid #f87171", background: "rgba(244,135,113,0.08)", color: "var(--text)", fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 700, color: "#f87171", marginBottom: 4 }}>快照生成失败</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, overflowWrap: "anywhere" }}>{errorMessage || "未知错误"}</div>
+          </div>
+        )}
+
+        {state === "success" && success && (
+          <>
+            <div style={{ padding: "10px 12px", borderRadius: 8, borderLeft: "3px solid #22c55e", background: "rgba(34,197,94,0.08)", color: "var(--text)", fontSize: 12, lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>快照生成成功</div>
+              本地诊断文件已就绪。由于诊断文件中包含敏感的本机工作区路径与会话标识，我们没有在浏览器上直接展示完整文件内容或提供下载。
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 12, borderRadius: 8, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 12 }}>
+              <DiagnosticsResultRow label="快照 ID" value={success.snapshotId} />
+              <DiagnosticsResultRow label="文件路径" value={success.filePath} copyable onCopy={copyPath} copied={copied} />
+              <DiagnosticsResultRow label="文件大小" value={formatBytes(success.bytes)} />
+              <DiagnosticsResultRow label="采集耗时" value={`${success.durationMs} ms`} />
+              <DiagnosticsResultRow label="Schema" value={`v${success.schemaVersion}`} />
+              <DiagnosticsResultRow
+                label="状态标识"
+                valueNode={
+                  <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <DiagnosticsBadge tone={success.partial ? "warning" : "success"} label={success.partial ? "Partial" : "Completed"} />
+                    {success.compacted && <DiagnosticsBadge tone="warning" label="Compacted" />}
+                    {success.errorCount ? <DiagnosticsBadge tone="warning" label={`${success.errorCount} errors`} /> : null}
+                    {success.truncationCount ? <DiagnosticsBadge tone="warning" label={`${success.truncationCount} truncated`} /> : null}
+                  </span>
+                }
+              />
+              {success.sectionSummary && success.sectionSummary.length > 0 && (
+                <DiagnosticsResultRow
+                  label="Section"
+                  valueNode={
+                    <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {success.sectionSummary.map((s) => (
+                        <DiagnosticsBadge key={s.name} tone={s.error ? "error" : s.ok ? "success" : "warning"} label={s.name + (s.truncated ? "*" : "")} />
+                      ))}
+                    </span>
+                  }
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ padding: "10px 12px", borderRadius: 8, borderLeft: "3px solid var(--warning, #cca700)", background: "rgba(204,167,0,0.08)", fontSize: 12, lineHeight: 1.5, color: "var(--text)" }}>
+        <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>隐私提示 (Privacy Notice)</div>
+        本快照不包含敏感的环境变量、API 密钥或聊天消息全文，但会保留本机的工作区路径、Session ID、目录及文件名称以方便定位分析。
+        <strong style={{ color: "var(--text)" }}>此文件不会自动发送给任何服务器。分享诊断快照给他人前，请务必人工审阅快照内容。</strong>
+      </div>
+
+      <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+        运维提示：你也可以在宿主机直接通过命令行接口触发采集：
+        <br />
+        <code style={{ fontFamily: "var(--font-mono)", background: "var(--bg-subtle)", padding: "2px 4px", borderRadius: 4 }}>curl -X POST http://localhost:30141/api/diagnostics/memory-snapshot</code>
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticsResultRow({
+  label,
+  value,
+  valueNode,
+  copyable,
+  onCopy,
+  copied,
+}: {
+  label: string;
+  value?: string;
+  valueNode?: React.ReactNode;
+  copyable?: boolean;
+  onCopy?: () => void;
+  copied?: boolean;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10, alignItems: "center", padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+      <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{label}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: 11, overflowWrap: "anywhere" }}>
+        {valueNode ?? value}
+        {copyable && value && (
+          <button
+            type="button"
+            onClick={onCopy}
+            style={{ padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", background: copied ? "rgba(34,197,94,0.2)" : "var(--bg-subtle)", color: copied ? "#22c55e" : "var(--text-muted)", fontSize: 10, cursor: "pointer", flexShrink: 0 }}
+          >
+            {copied ? "已复制" : "复制"}
+          </button>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function DiagnosticsBadge({ tone, label }: { tone: "success" | "warning" | "error"; label: string }) {
+  const palette = {
+    success: { bg: "rgba(34,197,94,0.16)", fg: "#22c55e", border: "rgba(34,197,94,0.4)" },
+    warning: { bg: "rgba(204,167,0,0.16)", fg: "#cca700", border: "rgba(204,167,0,0.4)" },
+    error: { bg: "rgba(244,135,113,0.16)", fg: "#f87171", border: "rgba(244,135,113,0.4)" },
+  }[tone];
+  return (
+    <span style={{ padding: "2px 6px", borderRadius: 4, background: palette.bg, color: palette.fg, border: `1px solid ${palette.border}`, fontSize: 10, fontWeight: 600 }}>
+      {label}
+    </span>
   );
 }
 
@@ -1082,6 +1335,7 @@ export function SettingsConfig({
             {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
             {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
+            {renderSectionButton("diagnostics", "诊断", "内存诊断快照")}
           </div>
 
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
@@ -1617,6 +1871,8 @@ export function SettingsConfig({
                       <div style={{ marginTop: 8 }}>这些是 Monaco 自带编辑行为，不写入 yolk pi web 配置；上面的开关只控制 yolk pi web 额外接管的快捷键/鼠标手势。</div>
                     </div>
                   </div>
+                ) : section === "diagnostics" ? (
+                  <DiagnosticsPanel />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div style={{ padding: 12, borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>

@@ -12,6 +12,12 @@ import {
   TerminalSshRunnerError,
   type TerminalSshLaunchPlan,
 } from "./terminal-ssh-runner";
+import {
+  isBudgetExpired,
+  type DiagnosticBudget,
+  type DiagnosticLimits,
+  type TerminalDiagnostic,
+} from "./memory-diagnostics-types";
 
 const TERMINAL_IDLE_KILL_MS = 5_000;
 const TERMINAL_BUFFER_LIMIT = 500;
@@ -410,4 +416,79 @@ export function closeTerminalSession(id: string): void {
     // Process may already be gone.
   }
   runCleanupCallbacks(session);
+}
+
+/**
+ * Bounded read-only projection of live terminal sessions. Counts sessions by
+ * kind/backend, sums subscriber counts and buffer chunk counts, and estimates
+ * total retained buffer bytes by summing `Buffer.byteLength(chunk)` per chunk
+ * WITHOUT joining or copying the chunk text. Never subscribes, writes, resizes,
+ * or closes a session. Mutates nothing.
+ */
+export function projectTerminalRuntime(
+  budget: DiagnosticBudget,
+  limits: DiagnosticLimits,
+): TerminalDiagnostic {
+  const sessions = getTerminalSessions();
+  const byKind: Record<string, number> = {};
+  const byBackend: Record<string, number> = {};
+  const samples: TerminalDiagnostic["sessions"]["samples"] = [];
+  let totalSubscribers = 0;
+  let totalBufferChunks = 0;
+  let estimatedBufferBytes = 0;
+  let truncated = 0;
+  let sessionCount = 0;
+  try {
+    for (const session of sessions.values()) {
+      sessionCount += 1;
+      if (isBudgetExpired(budget)) {
+        truncated = sessions.size - samples.length;
+        break;
+      }
+      byKind[session.kind] = (byKind[session.kind] ?? 0) + 1;
+      byBackend[session.backend] = (byBackend[session.backend] ?? 0) + 1;
+      totalSubscribers += session.subscribers.size;
+      totalBufferChunks += session.buffer.length;
+      let sessionBytes = 0;
+      for (const chunk of session.buffer) {
+        try {
+          sessionBytes += Buffer.byteLength(chunk, "utf8");
+        } catch {
+          // Skip a chunk that cannot be measured; never join text.
+        }
+      }
+      estimatedBufferBytes += sessionBytes;
+      if (samples.length >= limits.maxTerminalSamples) {
+        truncated = sessions.size - samples.length;
+        continue;
+      }
+      samples.push({
+        id: session.id,
+        kind: session.kind,
+        backend: session.backend,
+        cwd: session.cwd,
+        shell: session.shell,
+        subscriberCount: session.subscribers.size,
+        bufferChunks: session.buffer.length,
+        estimatedBufferBytes: sessionBytes,
+        closed: session.closed,
+      });
+    }
+  } catch {
+    // best-effort projection
+  }
+  return {
+    sessionCount,
+    byKind,
+    byBackend,
+    totalSubscribers,
+    totalBufferChunks,
+    estimatedBufferBytes,
+    sessions: {
+      total: sessionCount,
+      sampled: samples.length,
+      truncated,
+      samples,
+    },
+  };
 }

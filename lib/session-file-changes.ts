@@ -10,6 +10,12 @@ import type {
   SessionFileChangeStatus,
   SessionFileDiffResponse,
 } from "./types";
+import {
+  isBudgetExpired,
+  type DiagnosticBudget,
+  type DiagnosticLimits,
+  type SessionFileChangesDiagnostic,
+} from "./memory-diagnostics-types";
 
 const SIDECAR_VERSION = 1;
 const MAX_TEXT_FILE_BYTES = 512 * 1024;
@@ -370,4 +376,96 @@ export function getSessionFileDiff(sessionId: string, relativePath: string): Ses
   const record = sidecar?.files[normalizeSlashes(relativePath)];
   if (!record) return null;
   return { ...toSummary(record), diff: record.diffAvailable ? record.diff : undefined };
+}
+
+/**
+ * Bounded read-only projection of the session-file-change sidecars for a set
+ * of active session ids (provided by the caller, normally the live RPC
+ * registry). For each active session it reads only the sidecar's top-level
+ * file/pending counts and stats the sidecar file for size/updatedAt; it never
+ * returns diff/baseline/latest text or snapshot content. Sidecars larger than
+ * `limits.sessionFileChangeMaxStatBytes` are skipped (count only). Mutates
+ * nothing. The caller supplies the active session id list so this module does
+ * not need to import the RPC registry (avoids a circular dependency).
+ */
+export function projectSessionFileChanges(
+  activeSessionIds: readonly string[],
+  budget: DiagnosticBudget,
+  limits: DiagnosticLimits,
+): SessionFileChangesDiagnostic {
+  const sessions: SessionFileChangesDiagnostic["sessions"] = [];
+  let truncated = 0;
+  let sampled = 0;
+  try {
+    for (const sessionId of activeSessionIds) {
+      if (isBudgetExpired(budget)) {
+        truncated = activeSessionIds.length - sampled;
+        break;
+      }
+      if (sessions.length >= limits.maxSessionFileChangeSessions) {
+        truncated = activeSessionIds.length - sampled;
+        break;
+      }
+      sampled += 1;
+      let sidecarBytes: number | undefined;
+      let sidecarUpdatedAt: string | undefined;
+      let sidecarError: string | undefined;
+      try {
+        const sidecarPath = getSessionChangesPath(sessionId);
+        const stat = statSync(sidecarPath);
+        sidecarBytes = stat.size;
+        sidecarUpdatedAt = stat.mtime.toISOString();
+        if (stat.size > limits.sessionFileChangeMaxStatBytes) {
+          // Oversized sidecar: record counts as zero with a note, do not parse body.
+          sessions.push({
+            sessionId,
+            fileCount: 0,
+            pendingToolCount: 0,
+            sidecarBytes,
+            sidecarUpdatedAt,
+            sidecarError: "oversized",
+          });
+          continue;
+        }
+      } catch (error) {
+        // Sidecar may not exist for an active session; record absence and move on.
+        const code = (error as NodeJS.ErrnoException)?.code;
+        if (code !== "ENOENT") {
+          sidecarError = error instanceof Error ? error.message : String(error);
+        }
+        sessions.push({
+          sessionId,
+          fileCount: 0,
+          pendingToolCount: 0,
+          sidecarError: sidecarError ?? "no_sidecar",
+        });
+        continue;
+      }
+      let fileCount = 0;
+      let pendingToolCount = 0;
+      try {
+        const sidecar = readSessionChangesSidecar(sessionId);
+        fileCount = sidecar ? Object.keys(sidecar.files).length : 0;
+        pendingToolCount = sidecar?.pendingTools ? Object.keys(sidecar.pendingTools).length : 0;
+      } catch (error) {
+        sidecarError = error instanceof Error ? error.message : String(error);
+      }
+      sessions.push({
+        sessionId,
+        fileCount,
+        pendingToolCount,
+        sidecarBytes,
+        sidecarUpdatedAt,
+        sidecarError,
+      });
+    }
+  } catch {
+    // best-effort projection
+  }
+  return {
+    sessionCount: activeSessionIds.length,
+    sampled,
+    truncated,
+    sessions,
+  };
 }
