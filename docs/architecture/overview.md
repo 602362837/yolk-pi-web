@@ -97,7 +97,7 @@ WorkTree space metadata is best-effort. Registry records may store the worktree 
 
 Path matching uses `canonicalizeProjectPath()` from `lib/project-registry.ts`: expand and normalize the display path, prefer `fs.realpath` for `realRootPath`/`realPath`, and compare the resulting de-trailed `pathKey`. Project and space dedupe, WorkTree matching, legacy exact-cwd matching, and allowed-root checks should compare `pathKey` rather than display paths so symlinks do not create duplicate projects.
 
-`pi-web-session-index.json` is a best-effort performance sidecar for newly linked/forked sessions. Session JSONL headers remain the source of truth for project-space linkage.
+`pi-web-session-index.json` is a best-effort performance sidecar for newly linked/forked sessions. Session JSONL headers remain the source of truth for project-space linkage. Session-list reads also use a bounded one-second single-flight snapshot and invalidate it after local delete/archive/unarchive mutations; stale external writes are reconciled by the short TTL. The index must never be treated as an exclusion list without inventory/header reconciliation.
 
 ### WorkTree Archive Space Sync
 

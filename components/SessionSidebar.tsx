@@ -364,6 +364,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [trellisStatusRefreshKey, setTrellisStatusRefreshKey] = useState(0);
   const [sessionsSwitching, setSessionsSwitching] = useState(false);
   const loadSessionsTokenRef = useRef(0);
+  const loadSessionsAbortRef = useRef<AbortController | null>(null);
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
   const prevSpaceKeyRef = useRef<string | null>(null);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionListRef = useRef<HTMLDivElement>(null);
@@ -391,7 +394,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   const loadSessions = useCallback(async (showLoading = false) => {
     const token = ++loadSessionsTokenRef.current;
-    const selected = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
+    loadSessionsAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadSessionsAbortRef.current = controller;
+    const selected = findProjectSpace(projectsRef.current, selectedProjectId, selectedSpaceId);
     if (!selected) {
       if (token === loadSessionsTokenRef.current) {
         setAllSessions([]);
@@ -410,7 +416,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           setArchivedSessions([]);
         }
       }
-      const res = await fetch(`/api/projects/${encodeURIComponent(selected.project.id)}/spaces/${encodeURIComponent(selected.space.id)}/sessions`);
+      const res = await fetch(`/api/projects/${encodeURIComponent(selected.project.id)}/spaces/${encodeURIComponent(selected.space.id)}/sessions`, {
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { sessions?: SessionInfo[]; archivedCounts?: Record<string, number>; error?: string };
       if (data.error) throw new Error(data.error);
@@ -425,6 +433,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         sessionRefreshTimerRef.current = setTimeout(() => setSessionRefreshDone(false), 2000);
       }
     } catch (e) {
+      if (controller.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) return;
       if (token !== loadSessionsTokenRef.current) return;
       setError(String(e));
     } finally {
@@ -433,7 +442,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         setSessionsSwitching(false);
       }
     }
-  }, [projects, selectedProjectId, selectedSpaceId]);
+  }, [selectedProjectId, selectedSpaceId]);
 
   const loadArchivedSessions = useCallback(async (cwd: string) => {
     try {
@@ -1370,7 +1379,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               {creatingWorktree ? "创建中…" : "WorkTree"}
             </button>
             <button
-              onClick={() => { void loadProjects(false); void loadSessions(false); }}
+              onClick={() => { void loadProjects(false); }}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: (sessionRefreshDone || projectsRefreshDone) ? "rgba(74,222,128,0.18)" : "var(--bg-hover)",

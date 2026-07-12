@@ -103,6 +103,10 @@ Batch-reorder non-main spaces for a single project. Validates that `orderedSpace
 
 Legacy compatibility wrapper. Delegates to `archiveWorktreeSpacesByPaths([worktreePath], { reason: "api_archive" })` and returns just the `archivedSpaces` array. All new callers should use `archiveWorktreeSpacesByPaths` directly for multi-alias matching and `unmatchedPaths` feedback.
 
+## Session List Reader Performance
+
+`lib/session-reader.ts` owns the session-list snapshot cache. It is bounded and short-lived, shares concurrent scans, and must be invalidated after in-process session file mutations. Session JSONL/header data remains authoritative; index data cannot be used as an exclusion list without reconciliation.
+
 ## Reuse Rules
 
 - Do not duplicate JSONL parsing or tool-call normalization in UI code.

@@ -14,6 +14,7 @@ import {
   type DiagnosticBudget,
   type DiagnosticLimits,
 } from "./memory-diagnostics-types";
+import { SessionListTimingCollector } from "./session-list-timing";
 
 export { getAgentDir };
 
@@ -83,6 +84,7 @@ function deleteSessionFile(session: Pick<PiSessionInfo, "id" | "path" | "cwd">):
   }
 
   invalidateSessionPathCache(session.id);
+  invalidateSessionListSnapshots();
   try { rmdirSync(dirname(session.path)); } catch { /* keep non-empty session directories */ }
   return { id: session.id, path: session.path, cwd: session.cwd ?? "" };
 }
@@ -128,41 +130,108 @@ export interface ListAllSessionsOptions {
   includeStudioChildren?: boolean;
   /** Populate UI-only Studio child title projection. Defaults to false to avoid extra task.json I/O in global scans. */
   includeStudioChildDisplay?: boolean;
+  /**
+   * Optional content-safe stage timing collector (PERF-001 measure phase).
+   * When provided, the reader records `inventory`, `header`, and
+   * `studioProjection` stage durations plus scalar counts. When omitted
+   * (the default for all production callers), overhead is essentially zero.
+   * The collector never receives session titles, messages, or tool content.
+   */
+  timing?: SessionListTimingCollector;
 }
 
 function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
   return values.map((value) => value?.trim()).find((value): value is string => Boolean(value));
 }
 
+const STUDIO_DISPLAY_CACHE_TTL_MS = 1000;
+const studioDisplayCache = new Map<string, { expiresAt: number; value?: StudioChildSessionDisplay }>();
+
 export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChildSessionInfo): StudioChildSessionDisplay | undefined {
   if (!studioChild?.taskId) return undefined;
+  const cacheKey = `${canonicalizeCwd(cwd)}:${studioChild.taskId}`;
+  const cached = studioDisplayCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
   try {
     let detail = getYpiStudioTaskDetail(cwd, studioChild.taskId);
     if (!detail) {
       const match = listYpiStudioTasks(cwd, { scope: "all" }).tasks.find((task) => task.id === studioChild.taskId);
       if (match) detail = getYpiStudioTaskDetail(cwd, match.key);
     }
-    if (!detail) return undefined;
+    if (!detail) {
+      studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS });
+      return undefined;
+    }
     const run = detail.subagents.find((item) => item.id === studioChild.runId);
     const subtaskTitle = studioChild.subtaskId
       ? detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === studioChild.subtaskId)?.title
         ?? detail.implementationPlan?.subtasks.find((item) => item.id === studioChild.subtaskId)?.title
       : undefined;
     const runSummary = firstNonEmpty(run?.summary, run?.progress?.lastTextPreview);
-    return {
+    const value = {
       taskTitle: firstNonEmpty(detail.title),
       subtaskTitle,
       runSummary,
     };
+    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
+    return value;
   } catch {
+    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS });
     return undefined;
   }
 }
 
 export { parseSessionHeaderMetadata } from "./session-header-metadata";
 
+declare global {
+  var __piSessionListSnapshots: Map<string, { expiresAt: number; value?: SessionInfo[]; pending?: Promise<SessionInfo[]> }> | undefined;
+}
+
+const SESSION_LIST_CACHE_TTL_MS = 1000;
+const SESSION_LIST_CACHE_LIMIT = 8;
+
+function getSessionListSnapshots() {
+  if (!globalThis.__piSessionListSnapshots) globalThis.__piSessionListSnapshots = new Map();
+  return globalThis.__piSessionListSnapshots;
+}
+
+function sessionListCacheKey(options: ListAllSessionsOptions): string {
+  return [Boolean(options.includeGit), Boolean(options.includeStudioChildren), Boolean(options.includeStudioChildDisplay)].join(":");
+}
+
+export function invalidateSessionListSnapshots(): void {
+  getSessionListSnapshots().clear();
+  archivedCwdsCache = undefined;
+  studioDisplayCache.clear();
+}
+
 export async function listAllSessions(options: ListAllSessionsOptions = {}): Promise<SessionInfo[]> {
-  let piSessions: PiSessionInfo[] = await SessionManager.listAll();
+  const cache = getSessionListSnapshots();
+  const key = sessionListCacheKey(options);
+  const now = Date.now();
+  const cached = cache.get(key);
+  if (cached?.value && cached.expiresAt > now) return cached.value.slice();
+  if (cached?.pending) return (await cached.pending).slice();
+
+  const pending = listAllSessionsUncached(options);
+  cache.set(key, { expiresAt: now + SESSION_LIST_CACHE_TTL_MS, pending });
+  while (cache.size > SESSION_LIST_CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
+  try {
+    const value = await pending;
+    cache.set(key, { expiresAt: Date.now() + SESSION_LIST_CACHE_TTL_MS, value });
+    return value.slice();
+  } catch (error) {
+    cache.delete(key);
+    throw error;
+  }
+}
+
+async function listAllSessionsUncached(options: ListAllSessionsOptions = {}): Promise<SessionInfo[]> {
+  const timing = options.timing;
+  let piSessions: PiSessionInfo[] = timing
+    ? await timing.measureAsync("inventory", () => SessionManager.listAll())
+    : await SessionManager.listAll();
+  if (timing) timing.addCount("activeSessions", piSessions.length);
   const prunedSessionIds = pruneDeletedWorktreeSessions(piSessions);
   if (prunedSessionIds.size > 0) {
     piSessions = piSessions.filter((session) => !prunedSessionIds.has(session.id));
@@ -200,19 +269,29 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
   }
 
   const cache = getPathCache();
-  return piSessions.map((s) => {
+  const result = piSessions.map((s) => {
     const cwd = canonicalCwdBySessionId.get(s.id) ?? s.cwd;
     // Populate path cache so resolveSessionPath works without a full scan
     cache.set(s.id, s.path);
     let projectLink: { legacyUnassigned: boolean; projectId?: string; spaceId?: string } = { legacyUnassigned: true };
     let studioChild: StudioChildSessionInfo | undefined;
     try {
-      const metadata = parseSessionHeaderMetadata(readFirstLineSync(s.path));
+      const line = timing
+        ? timing.measureSync("header", () => readFirstLineSync(s.path))
+        : readFirstLineSync(s.path);
+      const metadata = parseSessionHeaderMetadata(line);
       projectLink = metadata.projectLink;
       studioChild = metadata.studioChild;
     } catch {
       // Keep session listing tolerant of malformed/missing headers; orphan handling lives in detail routes.
     }
+    if (timing && studioChild) timing.addCount("studioChildren");
+    const studioChildDisplay = options.includeStudioChildDisplay && studioChild
+      ? timing
+        ? timing.measureSync("studioProjection", () => projectStudioChildDisplay(cwd ?? "", studioChild))
+        : projectStudioChildDisplay(cwd ?? "", studioChild)
+      : undefined;
+    if (timing && options.includeStudioChildDisplay && studioChild) timing.addCount("studioProjectionCalls");
     return {
       path: s.path,
       id: s.id,
@@ -222,7 +301,7 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
       spaceId: projectLink.spaceId,
       legacyUnassigned: studioChild ? false : projectLink.legacyUnassigned,
       studioChild,
-      studioChildDisplay: options.includeStudioChildDisplay ? projectStudioChildDisplay(cwd ?? "", studioChild) : undefined,
+      studioChildDisplay,
       created: s.created instanceof Date ? s.created.toISOString() : String(s.created),
       modified: s.modified instanceof Date ? s.modified.toISOString() : String(s.modified),
       messageCount: s.messageCount,
@@ -232,6 +311,7 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
       git: options.includeGit && cwd ? gitByCwd.get(cwd) : undefined,
     };
   }).filter((session) => options.includeStudioChildren || !session.studioChild);
+  return result;
 }
 
 // ============================================================================
@@ -434,6 +514,7 @@ export function archiveSessionFile(sessionPath: string): string {
   renameSync(sessionPath, target);
   // Update parentSession refs in sibling files
   updateParentSessionRefs(dirname(sessionPath), sessionPath, target);
+  invalidateSessionListSnapshots();
   return target;
 }
 
@@ -447,6 +528,7 @@ export function unarchiveSessionFile(archivePath: string): string {
   renameSync(archivePath, target);
   // Update parentSession refs in sibling files
   updateParentSessionRefs(dirname(archivePath), archivePath, target);
+  invalidateSessionListSnapshots();
   return target;
 }
 
@@ -483,11 +565,21 @@ function updateParentSessionRefs(dirPath: string, oldPath: string, newPath: stri
  * Scan the archive directory and return which cwds have archived sessions.
  * Reads the first session file's header to extract the actual cwd path.
  */
+let archivedCwdsCache: { expiresAt: number; value: { cwds: string[]; counts: Record<string, number> } } | undefined;
+const ARCHIVE_SCAN_CACHE_TTL_MS = 1000;
+
 export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, number> } {
+  if (archivedCwdsCache && archivedCwdsCache.expiresAt > Date.now()) {
+    return { cwds: archivedCwdsCache.value.cwds.slice(), counts: { ...archivedCwdsCache.value.counts } };
+  }
   const archiveDir = getSessionsArchiveDir();
   const cwds: string[] = [];
   const counts: Record<string, number> = {};
-  if (!existsSync(archiveDir)) return { cwds, counts };
+  if (!existsSync(archiveDir)) {
+    const value = { cwds, counts };
+    archivedCwdsCache = { expiresAt: Date.now() + ARCHIVE_SCAN_CACHE_TTL_MS, value };
+    return value;
+  }
 
   const entries = readdirSync(archiveDir, { withFileTypes: true });
   for (const entry of entries) {
@@ -508,7 +600,9 @@ export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, num
       // skip malformed files
     }
   }
-  return { cwds, counts };
+  const value = { cwds, counts };
+  archivedCwdsCache = { expiresAt: Date.now() + ARCHIVE_SCAN_CACHE_TTL_MS, value };
+  return { cwds: cwds.slice(), counts: { ...counts } };
 }
 
 /**

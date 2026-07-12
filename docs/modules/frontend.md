@@ -77,3 +77,5 @@ Components may reference these CSS variables directly:
 ```
 
 They are also mapped to Tailwind `--color-*` utility aliases. The theme toggles by adding/removing `dark` on `document.documentElement`.
+
+Session sidebar loading uses stable project/space selection identity, aborts obsolete requests, and ignores `AbortError`; refresh actions should not launch a second session-list request.

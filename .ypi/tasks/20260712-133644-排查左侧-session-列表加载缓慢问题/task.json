@@ -1,0 +1,1977 @@
+{
+  "schemaVersion": 1,
+  "id": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+  "title": "排查左侧 session 列表加载缓慢问题",
+  "workflowId": "feature-dev",
+  "status": "user_acceptance",
+  "cwd": "/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051",
+  "createdAt": "2026-07-12T05:36:44.522Z",
+  "updatedAt": "2026-07-12T11:39:34.670Z",
+  "completedAt": null,
+  "contextIds": [
+    "pi_019f54d3-9e48-7798-a7f5-146b5f7d545a"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-f0a5f6ba27fccddb6adfbf7e",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T05:37:06.767Z",
+      "finishedAt": "2026-07-12T05:44:11.852Z",
+      "runner": "sdk",
+      "childSessionId": "019f54d4-4b0c-73cc-b67a-22e66a35f594",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T05-37-06-828Z_019f54d4-4b0c-73cc-b67a-22e66a35f594.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f54d4-4b0c-73cc-b67a-22e66a35f594",
+        "model": "AITOB-OAI/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请分析左侧 session 列表加载偶发缓慢问题。遵循项目 AGENTS.md 和 feature-dev 工作流：先阅读相关 docs/modules/frontend.md、docs/modules/api.md、docs/architecture/overview.md 及具体前后端代码；追踪请求触发、重复请求/竞态、sessions API 的扫描解析排序、缓存和列表渲染开销。输出 brief/prd/design/implement/checks 等所需规划产物；…",
+      "summary": "已完成根因分析与规划，未修改生产代码、未提交 Git。 产出文件位于 [.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题)： - [brief.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/brief.md) - [prd.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/prd.md) - [ui.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/ui.md) - [design.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/design.md) - [implement.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/implement.md) - [checks.md](/Users/zyj/projects/git_projects/yolk-pi-web…",
+      "model": "AITOB-OAI/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "AITOB-OAI/gpt-5.6-sol",
+          "arg": "AITOB-OAI/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T05:37:06.767Z",
+        "updatedAt": "2026-07-12T05:44:11.852Z",
+        "eventCount": 1487,
+        "lastTextPreview": "已完成根因分析与规划，未修改生产代码、未提交 Git。\n\n产出文件位于 [.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题)：\n\n- [brief.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/brief.md)\n- [prd.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/prd.md)\n- [ui.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/ui.md)\n- [design.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/design.md)\n- [implement.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/implement.md)\n- [checks.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/checks.md)\n- [plan-review.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/plan-review.md)\n- [handoff.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/handoff.md)\n- [summary.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/summary.md)\n\n核心结论：\n\n- project-space sessions API 仍全量扫描所有 active sessions，之后才过滤目标空间。\n- 每次扫描重复读取 JSONL header，并对 Studio child 重复解析 task detail。\n- 已有 session sidecar index 未进入读取链路，且本机仅覆盖 16/50 sessions，不能作为唯一真相。\n- 前端刷新存在重复请求，generation token 仅防止旧响应写入，没有取消服务端扫描。\n- 当前列表树渲染不是首要瓶颈。\n\n`implement.md` 中的 7 项 DAG 计划已通过 JSON 解析检查。当前方案保持加载 UI 不变，因此不触发 UI 原型门禁；若改为骨架屏、保留旧列表、分页或其他可见加载交互，必须先派发 UI 设计员。\n\n未运行 lint/TypeScript 检查，因为本轮没有生产代码变更。主会话需要确认：1 秒缓存复用窗口、外部 session 写入 1 秒内可见，以及首期性能指标先作为非阻塞 benchmark。确认后应保存 implementation plan 并进入计划审批，用户批准前不应实施。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-12T05:43:48.977Z",
+            "toolCallId": "call_YaH3PCA5WBjKWmKEiDgkToFI|fc_01c87c06d71393ca016a53298ee6bc8195b6cdbc7760b77347",
+            "toolName": "bash",
+            "text": ".ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/review.md:3:_TBD by YPI Studio workflow._",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-12T05:43:49.323Z",
+            "toolCallId": "call_345H1k8ZY7UyvdEduRmiilvY|fc_01c87c06d71393ca016a53298ee6d08195abe2bb61f884b693",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260712-133644-\\346\\216\\222\\346\\237\\245\\345\\267\\246\\344\\276\\247-session-\\345\\210\\227\\350\\241\\250\\345\\212\\240\\350\\275\\275\\347\\274\\223\\346\\205\\242\\351\\227\\256\\351\\242\\230/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-12T05:43:49.326Z",
+            "toolCallId": "call_a0nmWq0ukwmaxSW61YX3qUHR|fc_01c87c06d71393ca016a53298ee6c881959d2d2edb2a764318",
+            "toolName": "bash",
+            "text": "plan ok: 7 subtasks, maxConcurrency=2",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T05:44:11.818Z",
+            "text": "已完成根因分析与规划，未修改生产代码、未提交 Git。\n\n产出文件位于 [.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题)：\n\n- [brief.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/brief.md)\n- [prd.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/prd.md)\n- [ui.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/ui.md)\n- [design.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/design.md)\n- [implement.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/implement.md)\n- [checks.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/checks.md)\n- [plan-review.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/plan-review.md)\n- [handoff.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/handoff.md)\n- [summary.md](/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/summary.md)\n\n核心结论：\n\n- project-space sessions API 仍全量扫描所有 active sessions，之后才过滤目标空间。\n- 每次扫描重复读取 JSONL header，并对 Studio child 重复解析 task detail。\n- 已有 session sidecar index 未进入读取链路，且本机仅覆盖 16/50 sessions，不能作为唯一真相。\n- 前端刷新存在重复请求，generation token 仅防止旧响应写入，没有取消服务端扫描。\n- 当前列表树渲染不是首要瓶颈。\n\n`implement.md` 中的 7 项 DAG 计划已通过 JSON 解析检查。当前方案保持加载 UI 不变，因此不触发 UI 原型门禁；若改为骨架屏、保留旧列表、分页或其他可见加载交互，必须先派发 UI 设计员。\n\n未运行 lint/TypeScript 检查，因为本轮没有生产代码变更。主会话需要确认：1 秒缓存复用窗口、外部 session 写入 1 秒内可见，以及首期性能指标先作为非阻塞 benchmark。确认后应保存 implementation plan 并进入计划审批，用户批准前不应实施。",
+            "model": "AITOB-OAI/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T05:44:11.821Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3133,
+        "tokens": 876,
+        "tokenSource": "usage",
+        "tps": 2.14,
+        "firstTokenAt": "2026-07-12T05:37:22.606Z",
+        "lastTokenAt": "2026-07-12T05:44:11.801Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-f0a5f6ba27fccddb6adfbf7e",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/architect-f0a5f6ba27fccddb6adfbf7e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T05:37:06.767Z",
+        "finishedAt": "2026-07-12T05:44:11.824Z",
+        "updatedAt": "2026-07-12T05:44:11.824Z",
+        "itemCount": 92,
+        "messageCount": 6,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 235081,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f54d4-4b0c-73cc-b67a-22e66a35f594",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T05-37-06-828Z_019f54d4-4b0c-73cc-b67a-22e66a35f594.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-0ae0c88cd277efd2417cbaf0",
+      "subtaskId": "PERF-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T06:59:03.074Z",
+      "finishedAt": "2026-07-12T07:04:54.306Z",
+      "runner": "sdk",
+      "childSessionId": "019f551f-4f35-71cf-820e-790e0ea8fbe0",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T06-59-03-093Z_019f551f-4f35-71cf-820e-790e0ea8fbe0.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f551f-4f35-71cf-820e-790e0ea8fbe0",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "Now let me look at `getYpiStudioTaskDetail` to build a minimal valid task fixture for the Studio projection path.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T06:59:03.074Z",
+        "updatedAt": "2026-07-12T07:04:54.306Z",
+        "eventCount": 2906,
+        "lastTextPreview": "Now let me look at `getYpiStudioTaskDetail` to build a minimal valid task fixture for the Studio projection path.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-12T07:04:37.009Z",
+            "toolCallId": "call_c024",
+            "toolName": "write",
+            "text": "Successfully wrote 6228 bytes to /Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:04:49.871Z",
+            "text": "Now let me look at `getYpiStudioTaskDetail` to build a minimal valid task fixture for the Studio projection path.",
+            "model": "opencode-go/glm-5.2",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-12T07:04:49.872Z",
+            "toolCallId": "call_5a03",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051 && sed -n '2647,2720p' lib/ypi-studio-tasks.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-12T07:04:51.790Z",
+            "toolCallId": "call_5a03",
+            "toolName": "bash",
+            "text": "export function getYpiStudioTaskDetail(cwd: string, taskIdOrKey: string): YpiStudioTaskDetail | null {\n  const ctx = createContext(cwd);\n  const record = loadTaskRecord(ctx, taskIdOrKey);\n  return record ? recordToDetail(ctx, record) : null;\n}\n\nexport function getYpiStudioTaskIdForContext(cwd: string, contextId: string): string | null {\n  const ctx = createContext(cwd);\n  return readRuntimePointer(ctx, contextId);\n}\n\nexport function getCurrentYpiStudioTaskDetail(cwd: string, contextId: string): YpiStudioTaskDetail | null {\n  const ctx = createContext(cwd);\n  const taskId = getYpiStudioTaskIdForContext(ctx.cwd, contextId);\n  return taskId ? getYpiStudioTaskDetail(ctx.cwd, taskId) : null;\n}\n\nexport function createYpiStudioTask(body: YpiStudioTaskCreateBody): YpiStudioTaskDetail {\n  const ctx = createContext(body.cwd);\n  ensureTaskRoots(ctx);\n  const workflow = getYpiStudioWorkflowOrDefault(ctx.cwd, body.workflowId);\n  let id = createTaskId(body.title);\n  let dirPath = path.join(ctx.tasksRoot, id);\n  if (existsSync(dirPath)) {\n    id = `${id}-${Math.random().toString(36).slice(2, 6)}`;\n    dirPath = path.join(ctx.tasksRoot, id);\n  }\n  mkdirSync(dirPath, { recursive: false });\n  assertDirectoryWithinWorkspace(dirPath, ctx.workspaceRoot);\n  const createdAt = nowIso();\n  const contextIds = body.contextId ? [body.contextId] : [];\n  const initialState = workflow.states[workflow.initialStatus];\n  const task: YpiStudioTaskRecord = {\n    schemaVersion: 1,\n    id,\n    title: body.title,\n    workflowId: workflow.id,\n    status: workflow.initialStatus,\n    cwd: ctx.cwd,\n    createdAt,\n    updatedAt: createdAt,\n    completedAt: null,\n    contextIds,\n    currentMember: initialState?.owner,\n    artifacts: { ...DEFAULT_ARTIFACTS },\n    subagents: [],\n    meta: {},\n  };\n  writeTaskJson(dirPath, task);\n  writeFileSync(path.join(dirPath, EVENTS_JSONL), \"\", { encoding: \"utf8\", flag: \"wx\" });\n  createArtifactFiles(dirPath, task.artifacts);\n  appendTaskEvent(dirPath, { type: \"created\", at: createdAt, taskId: id, message: `Created YPI Studio task '${body.title}'`, data: { workflowId: workflow.id } });\n  if (body.contextId) writeRuntimePointer(ctx, body.contextId, id);\n  const detail = getYpiStudioTaskDetail(ctx.cwd, id);\n  if (!detail) throw new Error(\"Created task could not be read\");\n  return detail;\n}\n\nexport function bindYpiStudioTaskToContext(cwd: string, taskIdOrKey: string, contextId: string): YpiStudioTaskDetail {\n  const ctx = createContext(cwd);\n  const record = loadTaskRecord(ctx, taskIdOrKey);\n  if (!record?.raw) throw new Error(\"Task not found\");\n  if (record.archived) throw new Error(\"Archived tasks cannot be rebound\");\n  if (!record.raw.contextIds.includes(contextId)) {\n    record.raw.contextIds.push(contextId);\n    record.raw.updatedAt = nowIso();\n    writeTaskJson(record.dirPath, record.raw);\n    appendTaskEvent(record.dirPath, { type: \"note\", at: record.raw.updatedAt, taskId: record.raw.id, message: \"Bound task to Studio context\", data: { contextId } });\n  }\n  writeRuntimePointer(ctx, contextId, record.raw.id);\n  const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);\n  if (!detail) throw new Error(\"Task not found after binding\");\n  return detail;\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:04:54.296Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1380,
+        "tokens": 707,
+        "tokenSource": "usage",
+        "tps": 2.13,
+        "firstTokenAt": "2026-07-12T06:59:17.119Z",
+        "lastTokenAt": "2026-07-12T07:04:49.520Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-0ae0c88cd277efd2417cbaf0",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-0ae0c88cd277efd2417cbaf0.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T06:59:03.074Z",
+        "finishedAt": "2026-07-12T07:04:54.297Z",
+        "updatedAt": "2026-07-12T07:04:54.297Z",
+        "itemCount": 85,
+        "messageCount": 15,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 150919,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f551f-4f35-71cf-820e-790e0ea8fbe0",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T06-59-03-093Z_019f551f-4f35-71cf-820e-790e0ea8fbe0.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a32fb7e031d8443c4bf7082f",
+      "subtaskId": "BE-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:05:22.199Z",
+      "finishedAt": "2026-07-12T07:05:23.451Z",
+      "runner": "sdk",
+      "childSessionId": "019f5525-1861-7544-8e1e-d3256cfa7aa5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-22-273Z_019f5525-1861-7544-8e1e-d3256cfa7aa5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5525-1861-7544-8e1e-d3256cfa7aa5",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:05:22.199Z",
+        "updatedAt": "2026-07-12T07:05:23.451Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:22.199Z",
+            "text": "SDK child session created: 019f5525-1861-7544-8e1e-d3256cfa7aa5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:22.348Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:23.448Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:05:23.449Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a32fb7e031d8443c4bf7082f",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-a32fb7e031d8443c4bf7082f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:05:22.199Z",
+        "finishedAt": "2026-07-12T07:05:23.449Z",
+        "updatedAt": "2026-07-12T07:05:23.449Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 884,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5525-1861-7544-8e1e-d3256cfa7aa5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-22-273Z_019f5525-1861-7544-8e1e-d3256cfa7aa5.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d24ac5627ceeece0395fdfb3",
+      "subtaskId": "FE-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:05:22.243Z",
+      "finishedAt": "2026-07-12T07:05:24.210Z",
+      "runner": "sdk",
+      "childSessionId": "019f5525-1873-7932-8eec-e3abe1ffcd7c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-22-291Z_019f5525-1873-7932-8eec-e3abe1ffcd7c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5525-1873-7932-8eec-e3abe1ffcd7c",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:05:22.243Z",
+        "updatedAt": "2026-07-12T07:05:24.210Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:22.243Z",
+            "text": "SDK child session created: 019f5525-1873-7932-8eec-e3abe1ffcd7c",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:22.348Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:24.207Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:05:24.208Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d24ac5627ceeece0395fdfb3",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-d24ac5627ceeece0395fdfb3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:05:22.243Z",
+        "finishedAt": "2026-07-12T07:05:24.208Z",
+        "updatedAt": "2026-07-12T07:05:24.208Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 894,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5525-1873-7932-8eec-e3abe1ffcd7c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-22-291Z_019f5525-1873-7932-8eec-e3abe1ffcd7c.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3997c92c668b495ed5c59dd5",
+      "subtaskId": "BE-003",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:05:57.845Z",
+      "finishedAt": "2026-07-12T07:05:59.047Z",
+      "runner": "sdk",
+      "childSessionId": "019f5525-a382-764f-8eb9-fa3c566a4182",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-57-890Z_019f5525-a382-764f-8eb9-fa3c566a4182.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5525-a382-764f-8eb9-fa3c566a4182",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:05:57.845Z",
+        "updatedAt": "2026-07-12T07:05:59.047Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:57.845Z",
+            "text": "SDK child session created: 019f5525-a382-764f-8eb9-fa3c566a4182",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:57.944Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:59.044Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:05:59.045Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3997c92c668b495ed5c59dd5",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-3997c92c668b495ed5c59dd5.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:05:57.845Z",
+        "finishedAt": "2026-07-12T07:05:59.045Z",
+        "updatedAt": "2026-07-12T07:05:59.045Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 881,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5525-a382-764f-8eb9-fa3c566a4182",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-57-890Z_019f5525-a382-764f-8eb9-fa3c566a4182.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-8553ca56ff64692a09fd9b2b",
+      "subtaskId": "BE-002",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:05:57.809Z",
+      "finishedAt": "2026-07-12T07:05:59.205Z",
+      "runner": "sdk",
+      "childSessionId": "019f5525-a376-7921-af95-7a50bf3dd399",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-57-878Z_019f5525-a376-7921-af95-7a50bf3dd399.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5525-a376-7921-af95-7a50bf3dd399",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:05:57.809Z",
+        "updatedAt": "2026-07-12T07:05:59.205Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:57.809Z",
+            "text": "SDK child session created: 019f5525-a376-7921-af95-7a50bf3dd399",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:57.943Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:05:59.202Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:05:59.202Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-8553ca56ff64692a09fd9b2b",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-8553ca56ff64692a09fd9b2b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:05:57.809Z",
+        "finishedAt": "2026-07-12T07:05:59.203Z",
+        "updatedAt": "2026-07-12T07:05:59.203Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 886,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5525-a376-7921-af95-7a50bf3dd399",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-05-57-878Z_019f5525-a376-7921-af95-7a50bf3dd399.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-55cf33db7e1ea5f643d2eee6",
+      "subtaskId": "INT-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:06:21.810Z",
+      "finishedAt": "2026-07-12T07:06:23.229Z",
+      "runner": "sdk",
+      "childSessionId": "019f5526-0110-7c06-b438-21ad99c85849",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-06-21-840Z_019f5526-0110-7c06-b438-21ad99c85849.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5526-0110-7c06-b438-21ad99c85849",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:06:21.810Z",
+        "updatedAt": "2026-07-12T07:06:23.229Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:06:21.810Z",
+            "text": "SDK child session created: 019f5526-0110-7c06-b438-21ad99c85849",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:06:21.872Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:06:23.226Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:06:23.226Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-55cf33db7e1ea5f643d2eee6",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-55cf33db7e1ea5f643d2eee6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:06:21.810Z",
+        "finishedAt": "2026-07-12T07:06:23.227Z",
+        "updatedAt": "2026-07-12T07:06:23.227Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 908,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5526-0110-7c06-b438-21ad99c85849",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-06-21-840Z_019f5526-0110-7c06-b438-21ad99c85849.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-ac7a2fc7addb2522d2715f6d",
+      "subtaskId": "DOC-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:06:47.524Z",
+      "finishedAt": "2026-07-12T07:06:48.760Z",
+      "runner": "sdk",
+      "childSessionId": "019f5526-658a-79ef-98d9-0df00a7334be",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-06-47-562Z_019f5526-658a-79ef-98d9-0df00a7334be.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5526-658a-79ef-98d9-0df00a7334be",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:06:47.524Z",
+        "updatedAt": "2026-07-12T07:06:48.760Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:06:47.524Z",
+            "text": "SDK child session created: 019f5526-658a-79ef-98d9-0df00a7334be",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:06:47.624Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:06:48.757Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:06:48.757Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-ac7a2fc7addb2522d2715f6d",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-ac7a2fc7addb2522d2715f6d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:06:47.524Z",
+        "finishedAt": "2026-07-12T07:06:48.758Z",
+        "updatedAt": "2026-07-12T07:06:48.758Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1044,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5526-658a-79ef-98d9-0df00a7334be",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-06-47-562Z_019f5526-658a-79ef-98d9-0df00a7334be.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-33bb05c2fdfb282550b50ace",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:07:04.433Z",
+      "finishedAt": "2026-07-12T07:10:40.780Z",
+      "runner": "sdk",
+      "childSessionId": "019f5526-a7a2-73ff-aa78-0efc5253eec1",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-07-04-482Z_019f5526-a7a2-73ff-aa78-0efc5253eec1.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5526-a7a2-73ff-aa78-0efc5253eec1",
+        "model": "CPA/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Verdict\n**Needs work** — 不能通过验收。\n\n#### Findings Fixed\nNone（按要求未改生产代码）\n\n#### Remaining Findings（阻塞）\n1. **实现完成度不实**：计划显示 7/7，事件中多轮 implementer 以 `SDK child run finished without a captured final assistant message` 结束；代码仅有 PERF-001 局部计时。\n2. **未交付主需求**：\n   - FE-001：`SessionSidebar` 仍依赖整个 `projects`，刷新仍并发 `loadProjects`+`loadSessions`，无 Abort\n   - BE-001/002/003：无 single-flight、文件级缓存、index 候选回退、Studio 去重、archive 缓存\n   - INT-001：无生命周期失效\n   - DOC-001 / R6：无 docs、fixture、benchmark\n3. **`tsc` 失败**：`scanArchivedCwds()` 同步函数被 `measureAsync` 包装，类型错误\n4. **R1 部分有误**：`listAll` 与子阶段叠加使 `totalMs` 双重计数\n\n#### Verification\n| 命令 | 结果 |\n| --- | --- |\n| `tsc --noEmit` | **Fail**（route archive timing） |\n| focused eslint on changed files | warning（unused eslint-disable） |\n| focused tests / benchmark | **缺失** |\n| full `npm run lint` | 超时未完成 |\n\n#### Artifacts\n- 已写 [review.md](.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/review.md)\n\n#### 当前实际改动\n- `lib/session-list-timing.ts`（新）\n- `lib/session-reader.ts`（可选 timing）\n- `app/api/projects/.../sessions/route.ts`（阶段计时日志）\n\n#### 主会话需决策\n1. 进度回退到 **implementing**（推荐）\n2. 失败的 async implementer 是否改为可观察执行，避免“无最终消息却标完成”\n3. 性能门槛仍作首期非阻塞报告项（推荐维持，但需同 fixture 前后数据）",
+      "model": "CPA/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "CPA/grok-4.5",
+          "arg": "CPA/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:07:04.433Z",
+        "updatedAt": "2026-07-12T07:10:40.780Z",
+        "eventCount": 1018,
+        "lastTextPreview": "### Check Complete\n\n#### Verdict\n**Needs work** — 不能通过验收。\n\n#### Findings Fixed\nNone（按要求未改生产代码）\n\n#### Remaining Findings（阻塞）\n1. **实现完成度不实**：计划显示 7/7，事件中多轮 implementer 以 `SDK child run finished without a captured final assistant message` 结束；代码仅有 PERF-001 局部计时。\n2. **未交付主需求**：\n   - FE-001：`SessionSidebar` 仍依赖整个 `projects`，刷新仍并发 `loadProjects`+`loadSessions`，无 Abort\n   - BE-001/002/003：无 single-flight、文件级缓存、index 候选回退、Studio 去重、archive 缓存\n   - INT-001：无生命周期失效\n   - DOC-001 / R6：无 docs、fixture、benchmark\n3. **`tsc` 失败**：`scanArchivedCwds()` 同步函数被 `measureAsync` 包装，类型错误\n4. **R1 部分有误**：`listAll` 与子阶段叠加使 `totalMs` 双重计数\n\n#### Verification\n| 命令 | 结果 |\n| --- | --- |\n| `tsc --noEmit` | **Fail**（route archive timing） |\n| focused eslint on changed files | warning（unused eslint-disable） |\n| focused tests / benchmark | **缺失** |\n| full `npm run lint` | 超时未完成 |\n\n#### Artifacts\n- 已写 [review.md](.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/review.md)\n\n#### 当前实际改动\n- `lib/session-list-timing.ts`（新）\n- `lib/session-reader.ts`（可选 timing）\n- `app/api/projects/.../sessions/route.ts`（阶段计时日志）\n\n#### 主会话需决策\n1. 进度回退到 **implementing**（推荐）\n2. 失败的 async implementer 是否改为可观察执行，避免“无最终消息却标完成”\n3. 性能门槛仍作首期非阻塞报告项（推荐维持，但需同 fixture 前后数据）",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:10:35.600Z",
+            "text": "已确认实现严重不完整且 tsc 失败。正在撰写 `review.md` 验收结论。",
+            "model": "CPA/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-12T07:10:35.601Z",
+            "toolCallId": "call-5875d31b-6f94-485a-b870-900a0a974dce-18|fc_ccd4ef74-aeee-91fc-8401-93b6ea7c8686_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/review.md\",\n  \"content\": \"# Check Complete\\n\\n## 审查范围\\n\\n- 产物：`brief.md` / `prd.md` / `ui.md` / `design.md` / `implement.md` / `checks.md` / `plan-review.md` / `handoff.md` / `events.jsonl`\\n- 工作区实际代码 diff：\\n  - `lib/session-list-timing.ts`（新增）\\n  - `lib/session-reader.ts`（可选 timing 接入）\\n  - `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts`（阶段计时与慢请求日志）\\n- 未改动但被需求覆盖的关键路径：`components/SessionSidebar.tsx`、`lib/project-session-index.ts`、create/fork/archive/unarchive/delete/rename 失效点、文档与 focused tests/benchmark\\n\\n## Findings Fixed\\n\\nNone（按委托要求，本次检查未修改生产代码）。\\n\\n## Remaining Findings\\n\\n### 阻塞\\n\\n1. **实现完成度严重不实；计划 7/7 与代码不符**\\n   - 事件显示多轮 implementer 以 `SDK child run finished without a captured final assistant message` 结束，但子任务仍被 claim 并最终切到 `checking`。\\n   - 实际只落地了 **PERF-001 的局部计时**；下列子任务均未实现：\\n     - `FE-001`：稳定请求身份 / 刷新合并 / `AbortController`\\n     - `BE-001`：single-flight + `path+mtime+size` 摘要缓存\\n     - `BE-002`：index 候选 + inventory/header 校验回退 + best-effort repair\\n     - `BE-003`：Studio task 投影按 `cwd+taskId` 去重、archive count 独立缓存\\n     - `INT-001`：专用查询接入与 create/fork/rename/archive/unarchive/delete 显式失效\\n     - `DOC-001`：文档、基准、回归门禁\\n   - **结论：不得按“实现完成”验收。**\\n\\n2. **R2 请求去重/竞态未做（前端根因仍在）**\\n   - `SessionSidebar.loadSessions` 仍依赖整个 `projects` 数组：\\n     ```ts\\n     }, [projects, selectedProjectId, selectedSpaceId]);\\n     ```\\n   - 手动刷新仍并发触发：\\n     ```ts\\n     onClick={() => { void loadProjects(false); void loadSessions(false); }}\\n     ```\\n   - 仍只有 generation token，无 sessions 请求 `AbortController`，AbortError 处理也未接入。\\n   - 验收失败：一次刷新可产生重复 sessions 请求；快速切换仍让过期请求继续占用服务端扫描。\\n\\n3. **R3/R4/R5 生命周期与性能主路径未做**\\n   - project-space route 仍调用全局 `listAllSessions({ includeStudioChildren: true, includeStudioChildDisplay: true })` 后过滤。\\n   - 无文件级摘要缓存、无 inventory single-flight、无 index 候选加速、无 archive snapshot。\\n   - Studio projection 仍对每个 child 调 `projectStudioChildDisplay()`，内部仍可能重复读同一 task detail。\\n   - 无 mutation 失效入口；外部写入可见性也没有“缓存 + TTL/reconciliation”契约可验收。\\n   - 无 route contract / cache / index / lifecycle focused tests。\\n\\n4. **R6 性能目标与 PERF-001 基线缺失**\\n   - 没有固定 fixture（>=500 sessions / 100 Studio children / 100MB）。\\n   - 没有 cold/warm P50/P95/P99、底层读取次数、并发 single-flight 证据。\\n   - 无 benchmark 脚本；不能宣称 warm P95 或 cold 降幅达标。\\n\\n5. **类型检查失败（当前改动不可合并）**\\n   - `node_modules/.bin/tsc --noEmit`：\\n     ```\\n     app/api/projects/.../sessions/route.ts(88,65): error TS2739\\n     Type '{ cwds... }' is missing properties from type 'Promise<unknown>'\\n     ```\\n   - 根因：`scanArchivedCwds()` 是同步函数，却传入 `timing.measureAsync(\\\"archive\\\", () => scanArchivedCwds())`；`measureAsync` 签名要求 `() => Promise<T>`。\\n   - 同段还连带产生 `archived`/`archivedCount` 为 `unknown` 的后续错误。\\n\\n6. **R1 可观测性只部分落地，且 total 语义有误**\\n   - 已有 content-safe collector 与慢请求/debug 日志门控，方向正确。\\n   - 但 route 同时计 `listAll`，reader 再计 `inventory`/`header`/`studioProjection`，`snapshot().totalMs` **按 stage 求和会双重计数**，可能误触发慢请求阈值或误导主导阶段判断。\\n   - 无 cache-hit / index-hit 计数（因无缓存/index 路径）。\\n   - 无固定 fixture 下“能定位主导阶段”的验证记录。\\n\\n### 非阻塞\\n\\n1. **ESLint warning**：route 中 `eslint-disable-next-line no-console` 被报告为 unused。\\n2. **route 文件末尾缺换行**。\\n3. **debug serialize 探测**对 body 执行了两次 `JSON.stringify`；若保留，应复用一次结果。\\n4. **`SyncOrAsync` 类型导出未使用**；`measureAsync` 未接受同步函数，导致本次 tsc 失败。\\n5. **`studioChildDisplay` 条件从** `includeStudioChildDisplay ? project...(cwd, studioChild)` **收紧为** 同时要求 `studioChild`；因 `projectStudioChildDisplay` 在无 taskId 时本就返回 `undefined`，行为基本等价，但应在回归契约中显式覆盖。\\n6. **文档未更新**：`docs/modules/{api,frontend,library}.md`、`docs/architecture/overview.md` 未记录 timing/缓存/index 真相边界。\\n7. **流程风险**：实现员失败后仍推进到 checking；后续需主会话纠正进度状态，避免“假完成”。\\n\\n## 需求覆盖对照\\n\\n| 需求 | 结果 |\\n| --- | --- |\\n| R1 可观测性 | 部分：有 collector/日志门控；无基线、total 双重计数、无 cache/index 计数 |\\n| R2 请求去重与竞态 | 失败：前端未改 |\\n| R3 扫描与缓存 | 失败：无 single-flight/增量缓存 |\\n| R4 索引安全 | 失败：index 仍未进入读取链路 |\\n| R5 行为兼容 | 未验证：无契约测试；核心列表逻辑基本未改，但整体优化未交付 |\\n| R6 性能目标 | 失败：无 fixture/benchmark |\\n| UI 门禁 | 通过：当前 diff 不改变可见加载交互；仍无 HTML 原型需求 |\\n\\n## Verification\\n\\n| 命令 | 结果 |\\n| --- | --- |\\n| `node_modules/.bin/tsc --noEmit` | **Fail** — route.ts archive `measureAsync` 类型错误及连锁 `unknown` |\\n| `npx eslint lib/session-list-timing.ts lib/session-reader.ts app/api/projects/.../sessions/route.ts` | Warning — unused `eslint-disable` for `no-console` |\\n| `npm run lint`（全量） | 超时未完成（>120s）；已用 focused eslint 覆盖改动文件 |\\n| focused tests（cache/index/route/frontend） | **缺失** |\\n| fixed fixture benchmark | **缺失** |\\n| 人工 Network/lifecycle smoke | 未执行；实现未达可验收状态 |\\n\\n## Verdict\\n\\n**Needs work**\\n\\n原因：任务被标为 checking/7/7，但生产改动仅覆盖 PERF-001 的局部计时，且该改动本身导致 `tsc` 失败；R2–R6 及生命周期失效、index 安全、基准与文档均未交付。应退回 **implementing**，先修复 timing 类型/total 语义，再按 `implement.md` 重新完成 FE-001 → BE-001 → BE-002/BE-003 → INT-001 → DOC-001，并保留真实验证证据后再进入检查。\\n\\n## 建议返工顺序（不重新设计）\\n\\n1. 主会话把实现进度改回真实状态（至少 PERF-001 partial；其余 todo）。\\n2. 实现员修复 `measureAsync`/`measureSync` 用法与 `totalMs` 双重计数；补 timing 单测。\\n3. 按原 DAG 完成前端 abort/去重、服务端 cache/single-flight、index 候选回退、Studio/archive 去重缓存、mutation 失效。\\n4. 补契约测试 + fixture benchmark + lint/tsc + 人工 smoke，再重新派检查员。\\n\\n## 主会话需决策\\n\\n- 是否确认当前状态应回退到 `implementing`（推荐：是）。\\n- 失败的 async implementer 运行是否需要改为同步/可观察执行，避免再次“无最终消息却标记完成”。\\n- 性能绝对值是否仍按原审批作为首期非阻塞报告项（推荐维持；但至少要有同 fixture 前后对比数据）。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-12T07:10:35.708Z",
+            "toolCallId": "call-5875d31b-6f94-485a-b870-900a0a974dce-18|fc_ccd4ef74-aeee-91fc-8401-93b6ea7c8686_0",
+            "toolName": "write",
+            "text": "Successfully wrote 5066 bytes to /Users/zyj/projects/git_projects/yolk-pi-web.worktrees/pi-20260712-133051/.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:10:40.771Z",
+            "text": "### Check Complete\n\n#### Verdict\n**Needs work** — 不能通过验收。\n\n#### Findings Fixed\nNone（按要求未改生产代码）\n\n#### Remaining Findings（阻塞）\n1. **实现完成度不实**：计划显示 7/7，事件中多轮 implementer 以 `SDK child run finished without a captured final assistant message` 结束；代码仅有 PERF-001 局部计时。\n2. **未交付主需求**：\n   - FE-001：`SessionSidebar` 仍依赖整个 `projects`，刷新仍并发 `loadProjects`+`loadSessions`，无 Abort\n   - BE-001/002/003：无 single-flight、文件级缓存、index 候选回退、Studio 去重、archive 缓存\n   - INT-001：无生命周期失效\n   - DOC-001 / R6：无 docs、fixture、benchmark\n3. **`tsc` 失败**：`scanArchivedCwds()` 同步函数被 `measureAsync` 包装，类型错误\n4. **R1 部分有误**：`listAll` 与子阶段叠加使 `totalMs` 双重计数\n\n#### Verification\n| 命令 | 结果 |\n| --- | --- |\n| `tsc --noEmit` | **Fail**（route archive timing） |\n| focused eslint on changed files | warning（unused eslint-disable） |\n| focused tests / benchmark | **缺失** |\n| full `npm run lint` | 超时未完成 |\n\n#### Artifacts\n- 已写 [review.md](.ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/review.md)\n\n#### 当前实际改动\n- `lib/session-list-timing.ts`（新）\n- `lib/session-reader.ts`（可选 timing）\n- `app/api/projects/.../sessions/route.ts`（阶段计时日志）\n\n#### 主会话需决策\n1. 进度回退到 **implementing**（推荐）\n2. 失败的 async implementer 是否改为可观察执行，避免“无最终消息却标完成”\n3. 性能门槛仍作首期非阻塞报告项（推荐维持，但需同 fixture 前后数据）",
+            "model": "CPA/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:10:40.773Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1349,
+        "tokens": 503,
+        "tokenSource": "usage",
+        "tps": 2.55,
+        "firstTokenAt": "2026-07-12T07:07:23.764Z",
+        "lastTokenAt": "2026-07-12T07:10:40.769Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-33bb05c2fdfb282550b50ace",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/checker-33bb05c2fdfb282550b50ace.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:07:04.433Z",
+        "finishedAt": "2026-07-12T07:10:40.775Z",
+        "updatedAt": "2026-07-12T07:10:40.775Z",
+        "itemCount": 46,
+        "messageCount": 4,
+        "toolCallCount": 19,
+        "stderrBytes": 0,
+        "bytes": 97241,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5526-a7a2-73ff-aa78-0efc5253eec1",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-07-04-482Z_019f5526-a7a2-73ff-aa78-0efc5253eec1.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-043216fa929d38f4677dd3d4",
+      "subtaskId": "REWORK-001",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:13:40.735Z",
+      "finishedAt": "2026-07-12T07:13:56.172Z",
+      "runner": "sdk",
+      "childSessionId": "019f552c-b458-7a16-a4c1-206431f6179a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-13-40-952Z_019f552c-b458-7a16-a4c1-206431f6179a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f552c-b458-7a16-a4c1-206431f6179a",
+        "model": "opencode-go/glm-5.2",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "opencode-go/glm-5.2",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/glm-5.2",
+          "arg": "opencode-go/glm-5.2",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:13:40.735Z",
+        "updatedAt": "2026-07-12T07:13:56.172Z",
+        "eventCount": 9,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:13:40.735Z",
+            "text": "SDK child session created: 019f552c-b458-7a16-a4c1-206431f6179a",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:13:41.152Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:13:56.165Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T07:13:56.166Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-043216fa929d38f4677dd3d4",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/implementer-043216fa929d38f4677dd3d4.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:13:40.735Z",
+        "finishedAt": "2026-07-12T07:13:56.167Z",
+        "updatedAt": "2026-07-12T07:13:56.167Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 957,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f552c-b458-7a16-a4c1-206431f6179a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-13-40-952Z_019f552c-b458-7a16-a4c1-206431f6179a.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-36e1e5200e19910e6eb92eaa",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T07:26:08.620Z",
+      "finishedAt": "2026-07-12T07:32:34.729Z",
+      "runner": "sdk",
+      "childSessionId": "019f5538-1d37-7d61-809b-521d5c3cd48c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-26-08-695Z_019f5538-1d37-7d61-809b-521d5c3cd48c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f5538-1d37-7d61-809b-521d5c3cd48c",
+        "model": "CPA/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "tsc 已通过。接着跑 focused lint，并核对 `refreshKey` 与 DELETE 失效路径。",
+      "model": "CPA/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "CPA/grok-4.5",
+          "arg": "CPA/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T07:26:08.620Z",
+        "updatedAt": "2026-07-12T07:32:34.729Z",
+        "eventCount": 607,
+        "lastTextPreview": "tsc 已通过。接着跑 focused lint，并核对 `refreshKey` 与 DELETE 失效路径。",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:30:04.391Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:30:11.492Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:31:15.566Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:31:23.582Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T07:32:34.707Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 153,
+        "tokens": 1325,
+        "tokenSource": "usage",
+        "tps": 16.53,
+        "firstTokenAt": "2026-07-12T07:26:29.757Z",
+        "lastTokenAt": "2026-07-12T07:27:49.906Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-36e1e5200e19910e6eb92eaa",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/checker-36e1e5200e19910e6eb92eaa.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T07:26:08.620Z",
+        "finishedAt": "2026-07-12T07:32:34.709Z",
+        "updatedAt": "2026-07-12T07:32:34.709Z",
+        "itemCount": 79,
+        "messageCount": 3,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 120666,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f5538-1d37-7d61-809b-521d5c3cd48c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T07-26-08-695Z_019f5538-1d37-7d61-809b-521d5c3cd48c.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-36e61cc78a91cde335de036c",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-12T11:34:14.303Z",
+      "finishedAt": "2026-07-12T11:38:36.544Z",
+      "runner": "sdk",
+      "childSessionId": "019f561b-4047-7dba-b845-479bf6db5a85",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T11-34-14-343Z_019f561b-4047-7dba-b845-479bf6db5a85.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "childSessionId": "019f561b-4047-7dba-b845-479bf6db5a85",
+        "model": "CPA/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "CPA/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "CPA/grok-4.5",
+          "arg": "CPA/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-12T11:34:14.303Z",
+        "updatedAt": "2026-07-12T11:38:36.544Z",
+        "eventCount": 31,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-12T11:36:24.150Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T11:37:26.723Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T11:37:34.722Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-12T11:38:36.541Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-12T11:38:36.542Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-36e61cc78a91cde335de036c",
+        "taskId": "20260712-133644-排查左侧-session-列表加载缓慢问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260712-133644-_-session-/checker-36e61cc78a91cde335de036c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-12T11:34:14.303Z",
+        "finishedAt": "2026-07-12T11:38:36.542Z",
+        "updatedAt": "2026-07-12T11:38:36.542Z",
+        "itemCount": 11,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 1649,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f561b-4047-7dba-b845-479bf6db5a85",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-yolk-pi-web.worktrees-pi-20260712-133051--/2026-07-12T11-34-14-343Z_019f561b-4047-7dba-b845-479bf6db5a85.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-12T05:46:09.807Z",
+      "contextId": "pi_019f54d3-9e48-7798-a7f5-146b5f7d545a",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-12T06:58:32.085Z",
+      "contextId": "pi_019f54d3-9e48-7798-a7f5-146b5f7d545a",
+      "inputHash": "36f33adaf0942634a8ece1ee",
+      "source": "user-input"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-12T07:12:08.966Z",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "G1",
+          "title": "G1",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "REWORK-001"
+          ]
+        },
+        {
+          "id": "G2",
+          "title": "G2",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "REWORK-002"
+          ]
+        },
+        {
+          "id": "G3",
+          "title": "G3",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "REWORK-003"
+          ]
+        },
+        {
+          "id": "G4",
+          "title": "G4",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "REWORK-004"
+          ]
+        },
+        {
+          "id": "G5",
+          "title": "G5",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "REWORK-005"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "REWORK-001",
+        "title": "修复计时实现并建立可运行基线",
+        "phase": "measure",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/session-list-timing.ts",
+          "lib/session-reader.ts",
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+          "scripts/"
+        ],
+        "acceptance": [
+          "tsc 通过",
+          "阶段计时语义不重复计数",
+          "有可运行的基线验证"
+        ],
+        "validation": [
+          "tsc",
+          "focused lint",
+          "benchmark"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "REWORK-002",
+        "title": "实现前端请求取消与后端 inventory 缓存",
+        "phase": "core",
+        "order": 2,
+        "dependsOn": [
+          "REWORK-001"
+        ],
+        "dependencies": [
+          "REWORK-001"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/SessionSidebar.tsx",
+          "lib/session-reader.ts"
+        ],
+        "acceptance": [
+          "刷新和切换不产生重复有效请求",
+          "过期请求可取消且不覆盖新空间",
+          "并发扫描共享且缓存可检测新增修改删除"
+        ],
+        "validation": [
+          "focused tests",
+          "tsc"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "REWORK-003",
+        "title": "实现 index 回退与 Studio/archive 投影缓存",
+        "phase": "projection",
+        "order": 3,
+        "dependsOn": [
+          "REWORK-002"
+        ],
+        "dependencies": [
+          "REWORK-002"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/project-session-index.ts",
+          "lib/session-reader.ts",
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts"
+        ],
+        "acceptance": [
+          "损坏/部分 index 不漏数据",
+          "同 task child 不重复读取 detail",
+          "archive count 行为一致"
+        ],
+        "validation": [
+          "focused tests",
+          "tsc"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "REWORK-004",
+        "title": "接入专用 route 与生命周期失效",
+        "phase": "integration",
+        "order": 4,
+        "dependsOn": [
+          "REWORK-002",
+          "REWORK-003"
+        ],
+        "dependencies": [
+          "REWORK-002",
+          "REWORK-003"
+        ],
+        "relation": "serial",
+        "files": [
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+          "lib/agent-session-bootstrap.ts",
+          "lib/rpc-manager.ts",
+          "app/api/sessions/archive/route.ts",
+          "app/api/sessions/unarchive/route.ts",
+          "app/api/sessions/[id]/route.ts"
+        ],
+        "acceptance": [
+          "生命周期后列表及时正确",
+          "响应契约等价",
+          "外部写入按 TTL/reconciliation 可见"
+        ],
+        "validation": [
+          "focused tests",
+          "tsc",
+          "manual smoke"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "REWORK-005",
+        "title": "完成文档、基准和最终检查",
+        "phase": "verify",
+        "order": 5,
+        "dependsOn": [
+          "REWORK-004"
+        ],
+        "dependencies": [
+          "REWORK-004"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/api.md",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md",
+          ".ypi/tasks/20260712-133644-排查左侧-session-列表加载缓慢问题/checks.md"
+        ],
+        "acceptance": [
+          "基准和读取计数可复现",
+          "文档契约一致",
+          "lint/tsc/focused tests 通过"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "focused tests",
+          "benchmark"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-12T11:39:34.669Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "REWORK-001": {
+        "id": "REWORK-001",
+        "status": "done",
+        "updatedAt": "2026-07-12T07:13:56.189Z",
+        "startedAt": "2026-07-12T07:13:14.865Z",
+        "finishedAt": "2026-07-12T07:13:56.172Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-043216fa929d38f4677dd3d4"
+        ],
+        "lastRunId": "implementer-043216fa929d38f4677dd3d4",
+        "claimedAt": "2026-07-12T07:13:14.865Z",
+        "claimedByContextId": "pi_019f54d3-9e48-7798-a7f5-146b5f7d545a",
+        "summary": "SDK child run finished without a captured final assistant message."
+      },
+      "REWORK-002": {
+        "id": "REWORK-002",
+        "status": "done",
+        "updatedAt": "2026-07-12T11:26:16.870Z",
+        "startedAt": "2026-07-12T11:26:08.539Z",
+        "finishedAt": "2026-07-12T11:26:16.870Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-12T11:26:08.539Z",
+        "claimedByContextId": "pi_019f54d3-9e48-7798-a7f5-146b5f7d545a"
+      },
+      "REWORK-003": {
+        "id": "REWORK-003",
+        "status": "done",
+        "updatedAt": "2026-07-12T11:30:54.105Z",
+        "startedAt": "2026-07-12T11:26:48.152Z",
+        "finishedAt": "2026-07-12T11:30:54.105Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-12T11:26:48.152Z",
+        "claimedByContextId": "pi_019f54d3-9e48-7798-a7f5-146b5f7d545a"
+      },
+      "REWORK-004": {
+        "id": "REWORK-004",
+        "status": "done",
+        "updatedAt": "2026-07-12T11:33:05.660Z",
+        "finishedAt": "2026-07-12T11:33:05.660Z",
+        "attempts": 0,
+        "runIds": []
+      },
+      "REWORK-005": {
+        "id": "REWORK-005",
+        "status": "done",
+        "updatedAt": "2026-07-12T11:33:57.493Z",
+        "finishedAt": "2026-07-12T11:33:57.493Z",
+        "attempts": 0,
+        "runIds": []
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-12T07:13:14.865Z",
+        "subtaskId": "REWORK-001",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-12T11:26:08.539Z",
+        "subtaskId": "REWORK-002",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-12T11:26:16.870Z",
+        "subtaskId": "REWORK-002",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-12T11:26:48.152Z",
+        "subtaskId": "REWORK-003",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-12T11:30:54.105Z",
+        "subtaskId": "REWORK-003",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-12T11:33:05.660Z",
+        "subtaskId": "REWORK-004",
+        "from": "ready",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-12T11:33:57.493Z",
+        "subtaskId": "REWORK-005",
+        "from": "ready",
+        "to": "done"
+      }
+    ]
+  }
+}
