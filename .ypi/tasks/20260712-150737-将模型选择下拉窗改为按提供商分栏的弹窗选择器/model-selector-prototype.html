@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YPI Model Selector HTML Prototype</title>
+  <style>
+    /* CSS Variables matching Pi theme system */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f8fafc;
+      --bg-hover: #f1f5f9;
+      --bg-selected: #e2e8f0;
+      --bg-subtle: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #f8fafc;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f8fafc;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    /* Dark theme overrides */
+    body.dark {
+      --bg: #0f172a;
+      --bg-panel: #1e293b;
+      --bg-hover: #334155;
+      --bg-selected: #475569;
+      --bg-subtle: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #cbd5e1;
+      --text-dim: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f1f5f9;
+      color: var(--text);
+      transition: background-color 0.2s, color 0.2s;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.dark {
+      background-color: #020617;
+    }
+
+    /* Navigation header for the prototype controls */
+    header.proto-header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      z-index: 10;
+    }
+
+    .proto-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .proto-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Page main content sandbox */
+    main.proto-main {
+      flex: 1;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+    }
+
+    .demo-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    }
+
+    .demo-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .chat-input-simulator {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chat-input-textarea {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      height: 48px;
+      width: 100%;
+    }
+
+    .chat-input-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+
+    /* Target modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.4);
+      z-index: 2100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease-out;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Modal box sizing & responsive structure */
+    .modal-container {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 960px; /* PRD viewport mode standard */
+      max-height: 85vh;
+      box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: scale(0.95);
+      transition: transform 0.15s ease-out;
+    }
+
+    .modal-overlay.open .modal-container {
+      transform: scale(1);
+    }
+
+    /* Modal Header styling */
+    .modal-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--bg-panel);
+    }
+
+    .modal-header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    /* Search input styles */
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-wrapper:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .search-icon {
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    /* Main Modal Content: Provider Columns Grid */
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: var(--bg);
+    }
+
+    /* Desktop layout: auto-fit columns grid */
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+
+    /* Provider column container */
+    .provider-col {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Provider Header */
+    .provider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .provider-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .provider-count {
+      font-size: 10px;
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    /* Option Items styling */
+    .option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .option-item {
+      background: var(--bg);
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 10px;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    .option-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .option-item:focus, .option-item.highlighted {
+      outline: none;
+      background: var(--bg-hover);
+      border-color: var(--accent);
+    }
+
+    .option-item.selected {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .option-check {
+      color: var(--accent);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+    }
+
+    .option-item.selected .option-check {
+      color: #ffffff;
+    }
+
+    .option-content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .option-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .option-item.selected .option-label {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .option-detail {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .option-item.selected .option-detail {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* Empty state styling */
+    .empty-state {
+      padding: 40px 16px;
+      text-align: center;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .empty-state svg {
+      color: var(--text-dim);
+      opacity: 0.6;
+    }
+
+    .empty-state-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .empty-state-desc {
+      font-size: 12px;
+    }
+
+    /* Special "Model Policy" styling for Settings (first column styling) */
+    .provider-col.policy-col {
+      background: rgba(37, 99, 235, 0.03);
+      border-color: rgba(37, 99, 235, 0.15);
+    }
+    body.dark .provider-col.policy-col {
+      background: rgba(59, 130, 246, 0.05);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .provider-col.policy-col .provider-name {
+      color: var(--accent);
+    }
+
+    /* Helper styling to display focus-trap/keyboard hints */
+    .kb-helper-bar {
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      background: var(--bg-panel);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .kb-tags {
+      display: flex;
+      gap: 6px;
+    }
+
+    .kb-tag {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    /* Screen Reader Only class */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      .modal-container {
+        max-height: 100vh;
+        height: 100%;
+        border-radius: 0;
+      }
+      .modal-overlay {
+        padding: 0;
+      }
+      /* PRD requirement: Single column grouping for <= 640px mobile */
+      .provider-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Prototype toolbar controls -->
+  <header class="proto-header">
+    <div class="proto-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <line x1="9" y1="3" x2="9" y2="21" />
+        <line x1="15" y1="3" x2="15" y2="21" />
+      </svg>
+      <span>模型选择器 HTML 原型面板</span>
+    </div>
+    <div class="proto-controls">
+      <button class="btn" id="theme-toggle" title="切换深色/浅色主题">
+        <span class="icon-sun">☀️</span>
+        <span class="icon-moon" style="display:none;">🌙</span>
+        主题切换
+      </button>
+      <button class="btn btn-primary" id="btn-demo-chat">
+        打开聊天版选择器
+      </button>
+      <button class="btn btn-primary" id="btn-demo-settings">
+        打开设置版选择器 (含策略首栏)
+      </button>
+    </div>
+  </header>
+
+  <!-- Sandbox main contents -->
+  <main class="proto-main">
+    <!-- Chat simulator demo card -->
+    <div class="demo-card">
+      <div class="demo-card-title">聊天窗口模型选择区 (Compact ModelSelect)</div>
+      <div class="chat-input-simulator">
+        <textarea class="chat-input-textarea" placeholder="输入消息（按 Enter 发送，Shift+Enter 换行）..." readonly></textarea>
+        <div class="chat-input-footer">
+          <!-- Compact ModelSelect Trigger -->
+          <button type="button" class="btn" id="trigger-compact-select" aria-haspopup="dialog">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+              <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
+              <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
+            </svg>
+            <span id="trigger-label-chat" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              anthropic/claude-3-5-sonnet
+            </span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          <button class="btn btn-primary" style="padding: 4px 10px;" disabled>发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings field demo card -->
+    <div class="demo-card">
+      <div class="demo-card-title">系统设置模型策略 (Field ModelSelect)</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <label style="font-size: 12px; font-weight: 500; color: var(--text-muted);">
+          架构师成员推荐模型策略
+        </label>
+        <!-- Field ModelSelect Trigger -->
+        <button type="button" class="btn" id="trigger-field-select" style="width: 100%; justify-content: space-between;" aria-haspopup="dialog">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+              <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
+              <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
+            </svg>
+            <span id="trigger-label-settings" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              跟随主会话模型
+            </span>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7; flex-shrink: 0;">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div style="font-size: 11px; color: var(--text-dim);">
+          设置选择器首栏将单独显示模型特殊策略（如“跟随主会话”、“不指定”等）。
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal Selector Dialog Portal Overlay -->
+  <div class="modal-overlay" id="modal-overlay" role="presentation">
+    <div class="modal-container" id="modal-container" role="dialog" aria-modal="true" aria-labelledby="modal-title-id">
+      
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-header-top">
+          <span class="modal-title" id="modal-title-id">选择 AI 模型</span>
+          <button class="modal-close-btn" id="modal-close" aria-label="关闭选择器">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Unified Search -->
+        <div class="search-wrapper">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input type="text" id="modal-search" class="search-input" placeholder="搜索模型、提供商名称或ID (例如: sonnet, deepseek, gpt-4)" autocomplete="off" spellcheck="false">
+          <button class="modal-close-btn" id="search-clear" aria-label="清空搜索内容" style="padding: 2px; display: none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body" id="modal-body">
+        <div class="provider-grid" id="provider-grid">
+          <!-- Columns dynamically populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Keyboard/Accessibility Helper Footer -->
+      <div class="kb-helper-bar">
+        <span>已选中: <strong id="selected-model-info" style="font-family: var(--font-mono);">无</strong></span>
+        <div class="kb-tags">
+          <span>切换焦点: <span class="kb-tag">Tab</span> / <span class="kb-tag">Shift + Tab</span></span>
+          <span>导航: <span class="kb-tag">↑</span> <span class="kb-tag">↓</span> <span class="kb-tag">←</span> <span class="kb-tag">→</span></span>
+          <span>选中: <span class="kb-tag">Enter</span></span>
+          <span>取消: <span class="kb-tag">Esc</span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Client-side demo interactions script -->
+  <script>
+    // Theme support
+    const body = document.body;
+    const themeToggle = document.getElementById('theme-toggle');
+    const iconSun = themeToggle.querySelector('.icon-sun');
+    const iconMoon = themeToggle.querySelector('.icon-moon');
+
+    themeToggle.addEventListener('click', () => {
+      body.classList.toggle('dark');
+      const isDark = body.classList.contains('dark');
+      if (isDark) {
+        iconSun.style.display = 'none';
+        iconMoon.style.display = 'inline';
+      } else {
+        iconSun.style.display = 'inline';
+        iconMoon.style.display = 'none';
+      }
+    });
+
+    // Mock Options Database
+    const MOCK_OPTIONS = [
+      // Settings specific policies
+      { value: "inherit", label: "跟随主会话模型", group: "模型策略", detail: "session default policy" },
+      { value: "pi-default", label: "Pi 默认模型", group: "模型策略", detail: "pi system fallback" },
+      { value: "unspecified", label: "本层不指定", group: "模型策略", detail: "none" },
+      
+      // OpenAI Provider
+      { value: "openai/gpt-4o", label: "GPT-4o", provider: "openai", providerDisplayName: "OpenAI", modelId: "gpt-4o", keywords: ["gpt4", "4o"] },
+      { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", provider: "openai", providerDisplayName: "OpenAI", modelId: "gpt-4o-mini", keywords: ["mini", "4o"] },
+      { value: "openai/o1-mini", label: "o1 Mini", provider: "openai", providerDisplayName: "OpenAI", modelId: "o1-mini", keywords: ["o1", "reasoning"] },
+      { value: "openai/o1-preview", label: "o1 Preview", provider: "openai", providerDisplayName: "OpenAI", modelId: "o1-preview", keywords: ["o1", "reasoning"] },
+
+      // Anthropic Provider
+      { value: "anthropic/claude-3-5-sonnet", label: "Claude 3.5 Sonnet", provider: "anthropic", providerDisplayName: "Anthropic", modelId: "claude-3-5-sonnet", keywords: ["sonnet", "3.5", "claude"] },
+      { value: "anthropic/claude-3-5-haiku", label: "Claude 3.5 Haiku", provider: "anthropic", providerDisplayName: "Anthropic", modelId: "claude-3-5-haiku", keywords: ["haiku", "3.5", "claude"] },
+      { value: "anthropic/claude-3-opus", label: "Claude 3 Opus", provider: "anthropic", providerDisplayName: "Anthropic", modelId: "claude-3-opus", keywords: ["opus", "claude"] },
+
+      // DeepSeek Provider
+      { value: "deepseek/deepseek-chat", label: "DeepSeek V3", provider: "deepseek", providerDisplayName: "DeepSeek", modelId: "deepseek-chat", keywords: ["v3", "ds"] },
+      { value: "deepseek/deepseek-reasoner", label: "DeepSeek R1", provider: "deepseek", providerDisplayName: "DeepSeek", modelId: "deepseek-reasoner", keywords: ["r1", "reasoner", "dsr1"] },
+
+      // OpenCode Go Provider
+      { value: "opencode-go/qwen-2.5-coder-72b", label: "Qwen 2.5 Coder 72B", provider: "opencode-go", providerDisplayName: "OpenCode Go", modelId: "qwen-2.5-coder-72b", keywords: ["qwen", "coder", "72b"] },
+      { value: "opencode-go/llama-3-1-70b", label: "Llama 3.1 70B", provider: "opencode-go", providerDisplayName: "OpenCode Go", modelId: "llama-3-1-70b", keywords: ["llama", "70b"] }
+    ];
+
+    // Current State
+    let currentMode = "chat"; // "chat" or "settings"
+    let currentValue = "anthropic/claude-3-5-sonnet";
+    let lastActiveTrigger = null;
+    let filteredOptions = [];
+    let highlightedIndex = -1;
+
+    // Elements
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalContainer = document.getElementById('modal-container');
+    const modalSearch = document.getElementById('modal-search');
+    const searchClear = document.getElementById('search-clear');
+    const providerGrid = document.getElementById('provider-grid');
+    const selectedModelInfo = document.getElementById('selected-model-info');
+    const modalClose = document.getElementById('modal-close');
+    
+    const triggerCompactSelect = document.getElementById('trigger-compact-select');
+    const triggerFieldSelect = document.getElementById('trigger-field-select');
+    const triggerLabelChat = document.getElementById('trigger-label-chat');
+    const triggerLabelSettings = document.getElementById('trigger-label-settings');
+
+    const btnDemoChat = document.getElementById('btn-demo-chat');
+    const btnDemoSettings = document.getElementById('btn-demo-settings');
+
+    // Display helpers
+    function getDisplayLabel(val) {
+      const opt = MOCK_OPTIONS.find(o => o.value === val);
+      if (!opt) return val;
+      if (opt.group === "模型策略") return opt.label;
+      const providerPart = opt.providerDisplayName || opt.provider || "";
+      return providerPart ? `${providerPart}/${opt.label}` : opt.label;
+    }
+
+    // Modal Lifecycle
+    function openModal(mode, trigger) {
+      currentMode = mode;
+      lastActiveTrigger = trigger;
+      
+      if (currentMode === "chat") {
+        // Chat doesn't include policy options
+        if (currentValue === "inherit" || currentValue === "pi-default" || currentValue === "unspecified") {
+          currentValue = "anthropic/claude-3-5-sonnet";
+        }
+      }
+
+      modalOverlay.classList.add('open');
+      modalSearch.value = "";
+      searchClear.style.display = 'none';
+      highlightedIndex = -1;
+      
+      // Update displays
+      updateModelInfo();
+      renderGrid();
+      
+      // Body scroll lock
+      document.body.style.overflow = 'hidden';
+
+      // Focus search immediately
+      setTimeout(() => modalSearch.focus(), 50);
+    }
+
+    function closeModal() {
+      modalOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+      if (lastActiveTrigger) {
+        lastActiveTrigger.focus();
+      }
+    }
+
+    function updateModelInfo() {
+      selectedModelInfo.innerText = currentValue;
+    }
+
+    // Search score implementation matching subsequencescore
+    function scoreOption(option, query) {
+      if (!query.trim()) return 0;
+      
+      const q = query.toLowerCase().trim();
+      const candidates = [
+        option.label,
+        option.detail,
+        option.provider,
+        option.modelId,
+        option.group,
+        option.value,
+        ...(option.keywords || [])
+      ].filter(Boolean).map(c => c.toLowerCase());
+
+      let bestScore = -1;
+      for (const candidate of candidates) {
+        // Simple search logic for mock prototype
+        if (candidate.includes(q)) {
+          const score = 1000 - candidate.indexOf(q) - (candidate.length - q.length);
+          bestScore = Math.max(bestScore, score);
+        }
+      }
+      return bestScore >= 0 ? bestScore : null;
+    }
+
+    // Build the Grid rendering based on search and modes
+    function renderGrid() {
+      const query = modalSearch.value;
+      
+      // Filter options by mode and query
+      let items = MOCK_OPTIONS;
+      if (currentMode === "chat") {
+        items = items.filter(opt => opt.group !== "模型策略");
+      }
+
+      // Filter and score
+      const scored = items.map(option => ({
+        option,
+        score: scoreOption(option, query)
+      })).filter(entry => entry.score !== null);
+
+      if (query.trim()) {
+        scored.sort((a, b) => b.score - a.score);
+      }
+      
+      filteredOptions = scored.map(s => s.option);
+
+      // Group options by display provider/group
+      const groups = {};
+      
+      filteredOptions.forEach(opt => {
+        const groupName = opt.group || opt.providerDisplayName || opt.provider || "Others";
+        if (!groups[groupName]) {
+          groups[groupName] = [];
+        }
+        groups[groupName].push(opt);
+      });
+
+      // Clear layout
+      providerGrid.innerHTML = "";
+
+      if (filteredOptions.length === 0) {
+        providerGrid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <div class="empty-state-title">未找到匹配的模型</div>
+            <div class="empty-state-desc">请尝试输入不同的提供商或模型名称</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Keep flat track of visual options for keyboard indexes
+      let optionElements = [];
+
+      // Render columns
+      Object.keys(groups).forEach(groupName => {
+        const col = document.createElement('div');
+        col.className = 'provider-col';
+        if (groupName === "模型策略") {
+          col.classList.add('policy-col');
+        }
+
+        const header = document.createElement('div');
+        header.className = 'provider-header';
+        
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'provider-name';
+        titleSpan.innerText = groupName;
+
+        const countSpan = document.createElement('span');
+        countSpan.className = 'provider-count';
+        countSpan.innerText = groups[groupName].length;
+
+        header.appendChild(titleSpan);
+        header.appendChild(countSpan);
+        col.appendChild(header);
+
+        const listDiv = document.createElement('div');
+        listDiv.className = 'option-list';
+
+        groups[groupName].forEach(opt => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'option-item';
+          btn.setAttribute('role', 'option');
+          
+          const isSelected = opt.value === currentValue;
+          if (isSelected) {
+            btn.classList.add('selected');
+            btn.setAttribute('aria-selected', 'true');
+          }
+
+          // Checkbox mark
+          const checkIcon = document.createElement('div');
+          checkIcon.className = 'option-check';
+          if (isSelected) {
+            checkIcon.innerHTML = `
+              <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1.5 5 4 7.5 8.5 2.5" />
+              </svg>
+            `;
+          }
+          btn.appendChild(checkIcon);
+
+          // Labels
+          const content = document.createElement('div');
+          content.className = 'option-content';
+          
+          const label = document.createElement('span');
+          label.className = 'option-label';
+          label.innerText = opt.label;
+          content.appendChild(label);
+
+          if (opt.detail) {
+            const detail = document.createElement('span');
+            detail.className = 'option-detail';
+            detail.innerText = opt.detail;
+            content.appendChild(detail);
+          }
+          btn.appendChild(content);
+
+          // Add events
+          btn.addEventListener('click', () => {
+            selectValue(opt.value);
+          });
+
+          // Store reference for keyboard navigation
+          opt.elementRef = btn;
+          listDiv.appendChild(btn);
+        });
+
+        col.appendChild(listDiv);
+        providerGrid.appendChild(col);
+      });
+
+      updateKeyboardHighlights();
+    }
+
+    function selectValue(val) {
+      currentValue = val;
+      updateModelInfo();
+      
+      // Update simulated triggers
+      if (currentMode === "chat") {
+        triggerLabelChat.innerText = getDisplayLabel(val);
+      } else {
+        triggerLabelSettings.innerText = getDisplayLabel(val);
+      }
+
+      closeModal();
+    }
+
+    // Keyboard Highlights syncing
+    function updateKeyboardHighlights() {
+      filteredOptions.forEach((opt, idx) => {
+        if (!opt.elementRef) return;
+        opt.elementRef.classList.remove('highlighted');
+        if (idx === highlightedIndex) {
+          opt.elementRef.classList.add('highlighted');
+          // Scroll into view if needed
+          opt.elementRef.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      });
+    }
+
+    // Event Handlers
+    triggerCompactSelect.addEventListener('click', () => {
+      openModal('chat', triggerCompactSelect);
+    });
+
+    triggerFieldSelect.addEventListener('click', () => {
+      openModal('settings', triggerFieldSelect);
+    });
+
+    btnDemoChat.addEventListener('click', () => {
+      openModal('chat', btnDemoChat);
+    });
+
+    btnDemoSettings.addEventListener('click', () => {
+      openModal('settings', btnDemoSettings);
+    });
+
+    modalClose.addEventListener('click', closeModal);
+
+    modalOverlay.addEventListener('mousedown', (e) => {
+      if (e.target === modalOverlay) {
+        closeModal();
+      }
+    });
+
+    modalSearch.addEventListener('input', () => {
+      const q = modalSearch.value;
+      searchClear.style.display = q ? 'inline-flex' : 'none';
+      highlightedIndex = 0; // reset highlight to first match when search query changes
+      renderGrid();
+    });
+
+    searchClear.addEventListener('click', () => {
+      modalSearch.value = "";
+      searchClear.style.display = 'none';
+      highlightedIndex = -1;
+      renderGrid();
+      modalSearch.focus();
+    });
+
+    // Keyboard Event Handling inside Dialog
+    window.addEventListener('keydown', (event) => {
+      if (!modalOverlay.classList.contains('open')) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeModal();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (filteredOptions.length > 0) {
+          highlightedIndex = Math.min(filteredOptions.length - 1, highlightedIndex + 1);
+          updateKeyboardHighlights();
+        }
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (filteredOptions.length > 0) {
+          highlightedIndex = Math.max(0, highlightedIndex - 1);
+          updateKeyboardHighlights();
+        }
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+          selectValue(filteredOptions[highlightedIndex].value);
+        } else if (filteredOptions.length > 0) {
+          selectValue(filteredOptions[0].value);
+        }
+      } else if (event.key === 'Tab') {
+        // Trap Tab focus inside the modal
+        const focusable = [modalSearch, modalClose, ...filteredOptions.map(o => o.elementRef).filter(Boolean)];
+        const index = focusable.indexOf(document.activeElement);
+        if (event.shiftKey) {
+          if (index === 0) {
+            event.preventDefault();
+            focusable[focusable.length - 1].focus();
+          }
+        } else {
+          if (index === focusable.length - 1) {
+            event.preventDefault();
+            focusable[0].focus();
+          }
+        }
+      }
+    });
+
+  </script>
+</body>
+</html>
