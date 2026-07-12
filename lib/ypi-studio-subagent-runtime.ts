@@ -4,6 +4,12 @@ import type {
   YpiStudioSubagentRunner,
   YpiStudioTaskSubagentRun,
 } from "./ypi-studio-types";
+import {
+  isBudgetExpired,
+  type DiagnosticBudget,
+  type DiagnosticLimits,
+  type StudioRuntimeDiagnostic,
+} from "./memory-diagnostics-types";
 
 export type YpiStudioChildRunRegistryStatus = YpiStudioSubagentRunStatus | "runtime_lost";
 
@@ -218,6 +224,106 @@ export function countActiveYpiStudioChildRunsForSession(parentSessionId: string)
     if (handle.status === "queued" || handle.status === "running") count += 1;
   }
   return count;
+}
+
+/**
+ * Bounded read-only projection of the YPI Studio runtime containers: child
+ * run registry, session continuation callbacks, terminal continuation keys,
+ * and pending continuations. Only ids/status/runner/member/timestamps/age and
+ * aggregate counts are returned. `result`, `promise`, `abort`, `callback`,
+ * `summary`, and progress text/items are deliberately omitted. Mutates nothing.
+ */
+export function projectYpiStudioRuntime(
+  budget: DiagnosticBudget,
+  limits: DiagnosticLimits,
+): StudioRuntimeDiagnostic {
+  const childByStatus: Record<string, number> = {};
+  const childByRunner: Record<string, number> = {};
+  const childByMember: Record<string, number> = {};
+  const childSamples: StudioRuntimeDiagnostic["childRuns"]["samples"] = [];
+  let childTruncated = false;
+  let childTotal = 0;
+  try {
+    const now = budget.now;
+    for (const handle of registry().values()) {
+      if (isBudgetExpired(budget)) { childTruncated = true; break; }
+      childTotal += 1;
+      childByStatus[handle.status] = (childByStatus[handle.status] ?? 0) + 1;
+      const runnerKey = handle.runner ?? "unknown";
+      childByRunner[runnerKey] = (childByRunner[runnerKey] ?? 0) + 1;
+      childByMember[handle.member] = (childByMember[handle.member] ?? 0) + 1;
+      if (childSamples.length >= limits.maxChildRunSamples) { childTruncated = true; continue; }
+      const startedMs = Date.parse(handle.startedAt);
+      childSamples.push({
+        runId: handle.runId,
+        taskId: handle.taskId,
+        subtaskId: handle.subtaskId,
+        member: handle.member,
+        status: handle.status,
+        runner: handle.runner,
+        startedAt: handle.startedAt,
+        parentSessionId: handle.parentSessionId,
+        ageMs: Number.isFinite(startedMs) ? Math.max(0, now - startedMs) : undefined,
+      });
+    }
+  } catch {
+    // best-effort projection
+  }
+
+  const pendingSamples: StudioRuntimeDiagnostic["pendingContinuations"]["samples"] = [];
+  let pendingTruncated = false;
+  let pendingTotal = 0;
+  try {
+    for (const pending of pendingContinuations().values()) {
+      if (isBudgetExpired(budget)) { pendingTruncated = true; break; }
+      pendingTotal += 1;
+      if (pendingSamples.length >= limits.maxPendingContinuationSamples) { pendingTruncated = true; continue; }
+      pendingSamples.push({
+        continuationKey: pending.payload.continuationKey,
+        parentSessionId: pending.payload.parentSessionId,
+        taskId: pending.payload.taskId,
+        runId: pending.payload.runId,
+        attempts: pending.attempts,
+      });
+    }
+  } catch {
+    // best-effort projection
+  }
+
+  let continuationCallbackCount = 0;
+  let terminalContinuationKeyCount = 0;
+  try {
+    continuationCallbackCount = continuationRegistry().size;
+  } catch {
+    // best-effort
+  }
+  try {
+    terminalContinuationKeyCount = terminalContinuationKeys().size;
+  } catch {
+    // best-effort
+  }
+
+  return {
+    childRunTotal: childTotal,
+    childRunByStatus: childByStatus,
+    childRunByRunner: childByRunner,
+    childRunByMember: childByMember,
+    childRuns: {
+      total: childTotal,
+      sampled: childSamples.length,
+      truncated: childTruncated ? (childTotal - childSamples.length) : 0,
+      samples: childSamples,
+    },
+    continuationCallbackCount,
+    terminalContinuationKeyCount,
+    pendingContinuationTotal: pendingTotal,
+    pendingContinuations: {
+      total: pendingTotal,
+      sampled: pendingSamples.length,
+      truncated: pendingTruncated ? (pendingTotal - pendingSamples.length) : 0,
+      samples: pendingSamples,
+    },
+  };
 }
 
 export function projectYpiStudioRuntimeLostRun(

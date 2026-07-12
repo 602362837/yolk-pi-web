@@ -2897,6 +2897,7 @@ export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Archived tasks cannot record subagent runs");
   const updatedAt = nowIso();
+  const previousRun = record.raw.subagents.find((existing) => existing.id === run.id);
   record.raw.subagents = [...record.raw.subagents.filter((existing) => existing.id !== run.id), run];
   if (run.improvementId) {
     // Improvement-instance scoped run: attribute to instance.runIds and update only the
@@ -2969,14 +2970,17 @@ export function recordYpiStudioSubagentRun(cwd: string, taskIdOrKey: string, run
   record.raw.updatedAt = updatedAt;
   record.raw.currentMember = run.member;
   writeTaskJson(record.dirPath, record.raw);
-  appendTaskEvent(record.dirPath, {
-    type: "subagent",
-    at: updatedAt,
-    taskId: record.raw.id,
-    member: run.member,
-    message: run.summary ?? run.error ?? `${run.member} ${run.status}`,
-    data: { runId: run.id, subtaskId: run.subtaskId, status: run.status, transcript: run.transcript },
-  });
+  const lifecycleChanged = !previousRun || previousRun.status !== run.status;
+  if (lifecycleChanged) {
+    appendTaskEvent(record.dirPath, {
+      type: "subagent",
+      at: updatedAt,
+      taskId: record.raw.id,
+      member: run.member,
+      message: run.summary ?? run.error ?? `${run.member} ${run.status}`,
+      data: { runId: run.id, subtaskId: run.subtaskId, status: run.status, transcript: run.transcript },
+    });
+  }
   }
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after subagent update");

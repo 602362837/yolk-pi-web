@@ -18,6 +18,15 @@ import {
 import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
 import { attemptOpencodeGoAccountFailover, getActiveOpencodeGoAccountId, type OpencodeGoFailoverTurnBudget } from "./opencode-go-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
+import {
+  isBudgetExpired,
+  type AgentSessionDiagnosticSample,
+  type DiagnosticBudget,
+  type DiagnosticLimits,
+  type OpenAICodexStatsDiagnostic,
+  type RpcRuntimeDiagnostic,
+} from "./memory-diagnostics-types";
+import { getOpenAICodexWebSocketDebugStats } from "@earendil-works/pi-ai/api/openai-codex-responses";
 
 // ============================================================================
 // Types
@@ -34,6 +43,110 @@ const ABORT_WAIT_TIMEOUT_MS = 3_000;
 const STUDIO_CONTINUATION_RETRY_MS = 2_000;
 const STUDIO_FOLLOW_UP_RETRY_MS = 2_000;
 const STUDIO_FOLLOW_UP_MAX_RETRIES = 10;
+
+// ---------------------------------------------------------------------------
+// Memory diagnostic projection helpers (read-only, bounded, no content copy)
+// ---------------------------------------------------------------------------
+
+interface ContentTallyState {
+  totalChars: number;
+  totalBytes: number;
+  maxLen: number;
+  truncated: boolean;
+}
+
+/**
+ * Tally role/content-type counts and string length/byte estimates for one
+ * agent message without copying its content. Only `.text` / `.thinking`
+ * string lengths are measured (for a retained-content estimate); tool call
+ * inputs, image data/urls and tool result objects are never copied or
+ * serialized into the projection.
+ *
+ * Content-block scan caps are enforced **per message** (not across the
+ * whole session): at most `limits.maxContentBlocksPerMessage` blocks are
+ * inspected for each message, matching the diagnostic design contract.
+ */
+function tallyMessageContent(
+  message: unknown,
+  limits: DiagnosticLimits,
+  roleCounts: Record<string, number>,
+  contentTypeCounts: Record<string, number>,
+  state: ContentTallyState,
+): void {
+  if (!message || typeof message !== "object") return;
+  const role = (message as { role?: unknown }).role;
+  if (typeof role === "string") roleCounts[role] = (roleCounts[role] ?? 0) + 1;
+  const content = (message as { content?: unknown }).content;
+  if (typeof content === "string") {
+    contentTypeCounts["text"] = (contentTypeCounts["text"] ?? 0) + 1;
+    state.totalChars += content.length;
+    state.totalBytes += Buffer.byteLength(content, "utf8");
+    state.maxLen = Math.max(state.maxLen, content.length);
+    return;
+  }
+  if (!Array.isArray(content)) return;
+  // Per-message block counter: reset for every message so a large early
+  // message cannot starve later messages of length estimates.
+  let blocksScanned = 0;
+  for (const block of content) {
+    if (blocksScanned >= limits.maxContentBlocksPerMessage) {
+      state.truncated = true;
+      break;
+    }
+    blocksScanned += 1;
+    if (!block || typeof block !== "object") {
+      contentTypeCounts["unknown"] = (contentTypeCounts["unknown"] ?? 0) + 1;
+      continue;
+    }
+    const type = (block as { type?: unknown }).type;
+    const typeKey = typeof type === "string" ? type : "unknown";
+    contentTypeCounts[typeKey] = (contentTypeCounts[typeKey] ?? 0) + 1;
+    // Only measure string payloads for length estimates; never read tool
+    // input/result objects, image data/url fields, or other nested content.
+    const text = (block as { text?: unknown }).text;
+    if (typeof text === "string") {
+      state.totalChars += text.length;
+      state.totalBytes += Buffer.byteLength(text, "utf8");
+      state.maxLen = Math.max(state.maxLen, text.length);
+    }
+    const thinking = (block as { thinking?: unknown }).thinking;
+    if (typeof thinking === "string") {
+      state.totalChars += thinking.length;
+      state.totalBytes += Buffer.byteLength(thinking, "utf8");
+      state.maxLen = Math.max(state.maxLen, thinking.length);
+    }
+  }
+}
+
+/**
+ * Project the public OpenAI Codex WebSocket debug stats for a known active
+ * session id into a numeric/boolean-only shape. `lastPreviousResponseId` and
+ * `lastWebSocketError` are intentionally omitted (response id / error strings
+ * are not safe to persist). This is a known-session projection, not an
+ * enumeration of the SDK's private WebSocket cache.
+ */
+function projectOpenAICodexStats(sessionId: string): OpenAICodexStatsDiagnostic | undefined {
+  try {
+    const stats = getOpenAICodexWebSocketDebugStats(sessionId);
+    if (!stats) return undefined;
+    return {
+      requests: stats.requests,
+      connectionsCreated: stats.connectionsCreated,
+      connectionsReused: stats.connectionsReused,
+      cachedContextRequests: stats.cachedContextRequests,
+      storeTrueRequests: stats.storeTrueRequests,
+      fullContextRequests: stats.fullContextRequests,
+      deltaRequests: stats.deltaRequests,
+      lastInputItems: stats.lastInputItems,
+      lastDeltaInputItems: stats.lastDeltaInputItems,
+      websocketFailures: stats.websocketFailures,
+      sseFallbacks: stats.sseFallbacks,
+      websocketFallbackActive: stats.websocketFallbackActive,
+    };
+  } catch {
+    return undefined;
+  }
+}
 
 function sanitizeYpiStudioContextId(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180) || "session";
@@ -416,6 +529,75 @@ export class AgentSessionWrapper {
     };
   }
 
+  /**
+   * Bounded, read-only memory diagnostic projection of this wrapper. Only
+   * counts/lengths/ids/state flags are returned; message content, tool args /
+   * results, system prompt text, and Codex response ids / error strings are
+   * never copied into the projection. Mutates nothing.
+   */
+  projectDiagnostic(budget: DiagnosticBudget, limits: DiagnosticLimits): AgentSessionDiagnosticSample {
+    const model = this.inner.model;
+    const roleCounts: Record<string, number> = {};
+    const contentTypeCounts: Record<string, number> = {};
+    const tally: ContentTallyState = {
+      totalChars: 0,
+      totalBytes: 0,
+      maxLen: 0,
+      truncated: false,
+    };
+    let branchEntryCount = 0;
+    let agentMessageCount = 0;
+    let truncated = false;
+    try {
+      let entries: unknown[];
+      try {
+        entries = this.inner.sessionManager.getEntries() as unknown[];
+      } catch {
+        entries = [];
+      }
+      for (let i = 0; i < entries.length; i += 1) {
+        if (branchEntryCount >= limits.maxBranchEntriesPerSession) { truncated = true; break; }
+        if (isBudgetExpired(budget)) { truncated = true; break; }
+        branchEntryCount += 1;
+        const entry = entries[i] as { type?: unknown; message?: unknown } | null;
+        if (!entry || entry.type !== "message") continue;
+        if (agentMessageCount >= limits.maxMessagesPerSession) { truncated = true; break; }
+        agentMessageCount += 1;
+        tallyMessageContent(entry.message, limits, roleCounts, contentTypeCounts, tally);
+      }
+    } catch {
+      // Keep whatever partial counts we have; never throw the whole snapshot.
+    }
+    const sample: AgentSessionDiagnosticSample = {
+      sessionId: this.sessionId,
+      cwd: this.cwd,
+      sessionFile: this.sessionFile,
+      provider: model?.provider,
+      model: model?.id,
+      alive: this._alive,
+      isStreaming: this.inner.isStreaming,
+      isCompacting: this.inner.isCompacting,
+      listenerCount: this.listeners.length,
+      hasIdleTimer: this.idleTimer !== null,
+      studioChildCount: countActiveYpiStudioChildRunsForSession(this.sessionId),
+      branchEntryCount,
+      agentMessageCount,
+      roleCounts,
+      contentTypeCounts,
+      totalContentChars: tally.totalChars,
+      totalContentBytes: tally.totalBytes,
+      maxSingleContentLength: tally.maxLen,
+      systemPromptLength: this.inner.agent.state?.systemPrompt?.length ?? 0,
+      activeToolCount: this.inner.getActiveToolNames().length,
+      truncated: truncated || tally.truncated,
+    };
+    if (model?.provider === "openai-codex") {
+      const stats = projectOpenAICodexStats(this.sessionId);
+      if (stats) sample.openaiCodexStats = stats;
+    }
+    return sample;
+  }
+
   onDestroy(cb: () => void): void {
     this.onDestroyCallback = cb;
   }
@@ -685,6 +867,82 @@ function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSes
 
 export function getRpcSession(sessionId: string): AgentSessionWrapper | undefined {
   return getRegistry().get(sessionId);
+}
+
+/**
+ * Bounded read-only projection of the AgentSession registry and start locks.
+ * Sessions are projected in place (no destroy/abort/reset/cleanup), sorted by
+ * estimated retained content bytes descending, then capped to `limits.maxSessions`.
+ * Mutates nothing in the runtime.
+ */
+export function projectRpcRuntimeDiagnostic(
+  budget: DiagnosticBudget,
+  limits: DiagnosticLimits,
+): RpcRuntimeDiagnostic {
+  const registry = getRegistry();
+  const allSamples: AgentSessionDiagnosticSample[] = [];
+  let aliveCount = 0;
+  let streamingCount = 0;
+  let compactingCount = 0;
+  let studioChildPinnedSessionCount = 0;
+  try {
+    for (const wrapper of registry.values()) {
+      if (isBudgetExpired(budget)) break;
+      if (wrapper.isAlive()) aliveCount += 1;
+      try {
+        if (wrapper.inner.isStreaming) streamingCount += 1;
+        if (wrapper.inner.isCompacting) compactingCount += 1;
+      } catch {
+        // Provider/SDK state access is best-effort.
+      }
+      try {
+        if (countActiveYpiStudioChildRunsForSession(wrapper.sessionId) > 0) studioChildPinnedSessionCount += 1;
+      } catch {
+        // Studio bookkeeping is best-effort.
+      }
+      let sample: AgentSessionDiagnosticSample;
+      try {
+        sample = wrapper.projectDiagnostic(budget, limits);
+      } catch {
+        // Skip a session that cannot be projected; other sessions still produce output.
+        continue;
+      }
+      allSamples.push(sample);
+    }
+  } catch {
+    // Return whatever partial projection we have.
+  }
+  allSamples.sort((a, b) => b.totalContentBytes - a.totalContentBytes);
+  const total = allSamples.length;
+  const truncated = Math.max(0, total - limits.maxSessions);
+  const samples = allSamples.slice(0, limits.maxSessions);
+  return {
+    registryTotal: registry.size,
+    aliveCount,
+    streamingCount,
+    compactingCount,
+    startLockCount: getLocks().size,
+    studioChildPinnedSessionCount,
+    sessions: {
+      total,
+      sampled: samples.length,
+      truncated,
+      samples,
+    },
+  };
+}
+
+/**
+ * Return the session ids that are currently alive in the registry. Used by
+ * downstream owner projections (e.g. session-file-changes) that need the set
+ * of active sessions without importing the private registry accessor.
+ */
+export function getActiveRpcSessionIds(): string[] {
+  const ids: string[] = [];
+  for (const wrapper of getRegistry().values()) {
+    if (wrapper.isAlive()) ids.push(wrapper.sessionId);
+  }
+  return ids;
 }
 
 export function reloadRpcAuthState(): number {

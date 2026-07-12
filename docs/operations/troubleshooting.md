@@ -91,3 +91,27 @@ The failover lock is **process-level** (`globalThis.__piOpencodeGoFailover`). In
 - If child audit sessions appear in ordinary history during debugging, remove `includeStudioChildren=1` from the session-list request or reset the UI debug view. The underlying JSONL can remain for audit/replay.
 - Use `npm run test:studio-dag` for DAG scheduling regressions and `npm run test:studio-policy` for approval/policy regressions.
 - UI truncation flags on subagent transcripts are display limits, not failure signals; use run status, `result.isError`, and termination reason for severity.
+
+## Memory Diagnostic Snapshots
+
+When the Yolk Pi Web process memory grows (potentially to multiple GiB after days of uptime), generate a bounded read-only diagnostic snapshot to gather evidence for offline analysis. This is a diagnosis tool only; it does **not** fix or clean up leaks, abort sessions, force GC, or take heap snapshots.
+
+- **Primary entry**: Settings → 诊断 / Diagnostics → 生成内存诊断快照. The UI shows file metadata (path/size/duration, schema version, partial/compacted badges) only and never renders the full JSON. A `409 busy` state means another capture is in progress on the same process.
+- **Compatibility entry**: `curl -i -X POST http://localhost:30141/api/diagnostics/memory-snapshot`. The response is metadata only (`filePath`, `fileName`, `bytes`, `durationMs`, `partial`, `compacted`, `sectionSummary`, …); the full JSON is never returned over HTTP.
+- Inspect the file on disk with `jq`:
+  ```bash
+  jq . "$(printenv HOME)/.pi/agent/diagnostics/<fileName from API response>"
+  jq '.process.memoryUsage, .runtime.agentSessions.registryTotal, .findings' "...path..."
+  ```
+  With `PI_CODING_AGENT_DIR` override the directory is `<PI_CODING_AGENT_DIR>/diagnostics/`.
+- **Multi-snapshot comparison**: collect snapshots at low memory, while growing, and after growth, then compare `capturedAt`, `process.memoryUsage.rss`/`heapUsed`, `runtime.agentSessions.aliveCount`/`registryTotal`, per-session `totalContentBytes`, `runtime.studio.childRunTotal`/`pendingContinuationTotal`, `runtime.sessionPathCache.total`, and `findings[]` trends. The snapshots are self-describing JSON and can be diffed with `jq`/normal tools.
+- **Privacy before sharing**: the file may contain local workspace/session paths and identifiers (to help correlate), but it does **not** contain message content, tool args/results, system prompts, response ids, terminal buffers, browser snapshots, env vars, or credentials. Review and redact paths before sharing; each file includes a `privacy` block with a share-before-review warning.
+- **Known limitation**: OpenAI Codex WebSocket debug stats are recorded **only for known active openai-codex sessions** via public getters (numeric/boolean fields only). The diagnostic does not enumerate the third-party private WebSocket cache/map, so the per-session stats may undercount the full set of cached sessions.
+- **Cleanup**: there is no automatic retention, file list, or download center. Delete files manually when no longer needed:
+  ```bash
+  rm ~/.pi/agent/diagnostics/memory-*.json   # review before deleting
+  ```
+- If capture returns `409 snapshot_in_progress` from the UI or curl, another capture is in flight on the same process — retry shortly. The single-flight lock is process-level (`globalThis.__piMemoryDiagnosticSnapshotInFlight`); a crashed mid-capture process resets the lock on next start (the lock lives in memory, not on disk).
+- If capture returns `500 snapshot_too_large`, even the compact form (samples removed, totals kept) exceeded the 5 MiB cap; retry after restarting the process or open the file-less error as evidence that the in-process state is exceptionally large.
+- `partial: true` is expected when a section threw or the 5s deadline expired before later sections started; `sectionSummary` shows which sections have errors, and `errors[]`/`truncation[]` in the file explain the partial result.
+- Use `npm run test:memory-diagnostics` for focused schema/marker/caps/deadline/size/atomic-write/lock regressions.
