@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>子 session 名称拼入 step 编号信息 - UI 原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f172a;
+      --panel: #111827;
+      --item: #172033;
+      --item-active: #1e293b;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: #334155;
+      --accent: #3b82f6;
+      --accent-dim: rgba(59, 130, 246, 0.12);
+      --accent-border: rgba(59, 130, 246, 0.22);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #020617;
+      font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .controls {
+      width: 100%;
+      max-width: 900px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 10px;
+    }
+    .controls h1 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .controls p {
+      margin: 0 0 12px 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .demo-container {
+      display: flex;
+      gap: 30px;
+      width: 100%;
+      max-width: 900px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .sidebar-wrapper {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      min-width: 280px;
+    }
+    .sidebar-wrapper.narrow {
+      max-width: 190px; /* 约 160px 宽度展示侧栏内容 (加上 padding) */
+    }
+    .sidebar-wrapper h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sidebar-wrapper h2 .badge {
+      font-size: 10px;
+      background: var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .sidebar {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .session {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      color: var(--text);
+      overflow: hidden;
+      white-space: nowrap;
+      cursor: pointer;
+      position: relative;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .session:hover {
+      background: var(--item-active);
+    }
+    .session.active {
+      background: var(--item-active);
+      border-color: var(--border);
+    }
+    .check {
+      flex: 0 0 auto;
+      width: 13px;
+      height: 13px;
+      border: 1px solid #64748b;
+      border-radius: 3px;
+      opacity: .8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .session.active .check {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .session.active .check::after {
+      content: "";
+      width: 7px;
+      height: 4px;
+      border-left: 2px solid white;
+      border-bottom: 2px solid white;
+      transform: rotate(-45deg) translate(1px, -1px);
+    }
+    .content {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .title {
+      font-weight: 600;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 3px;
+    }
+    .detail {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .badge {
+      flex: 0 0 auto;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+      background: var(--accent-dim);
+      border-radius: 999px;
+      padding: 1px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .badge.success {
+      border-color: rgba(16, 185, 129, 0.22);
+      color: #10b981;
+      background: rgba(16, 185, 129, 0.12);
+    }
+    .badge.running {
+      border-color: rgba(245, 158, 11, 0.22);
+      color: #f59e0b;
+      background: rgba(245, 158, 11, 0.12);
+    }
+    .actions {
+      flex: 0 0 auto;
+      display: none;
+      gap: 3px;
+    }
+    .session:hover .actions {
+      display: flex;
+    }
+    .btn {
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--muted);
+      background: var(--panel);
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .btn:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    /* Tooltip styling for mock */
+    .tooltip-mock {
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 8px 12px;
+      max-width: 320px;
+      font-size: 12px;
+      color: #f1f5f9;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+      margin-top: 10px;
+    }
+    .tooltip-mock .tooltip-line {
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tooltip-mock .tooltip-line:last-child {
+      margin-bottom: 0;
+    }
+    .tooltip-mock .tooltip-label {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <h1>子会话名称拼入 Step 编号 - 交互与视觉设计原型</h1>
+    <p>
+      侧栏列表的每个子会话 (Studio child session) 维持 54px 高度的单行截断规则。超长标题和窄宽度下会优先截断 title 文本以保护完整的 step 编号。
+    </p>
+    <p>
+      <strong>信息分工契约：</strong>
+      <br>• <strong>主标题 (Title)</strong>: <code>{subtask.id} · {subtask.title}</code> (有 step) 或 <code>{member} · {taskTitle}</code> (无 step)。
+      <br>• <strong>状态徽标 (Badge)</strong>: 右侧紧跟的 status badge (显示 <code>member · status</code>，如 <code>improver · running</code>)。
+      <br>• <strong>第二行详情 (Detail)</strong>: <code>{subtaskTitle} · run {runShortId}</code>。
+      <br>• <strong>悬浮提示 (Tooltip)</strong>: 展示完整的 Session 路径与详细任务属性，避免信息丢失。
+    </p>
+  </div>
+
+  <div class="demo-container">
+    <!-- 宽度 280px 的常规侧栏演示 -->
+    <div class="sidebar-wrapper">
+      <h2><span>常规侧栏 (280px)</span> <span class="badge">普通宽度</span></h2>
+      <div class="sidebar">
+        <!-- 场景 1: 有 step 的 implementer/checker child -->
+        <div class="session" title="STEP-01 · 增加共享 child session 标题 helper&#10;Subtask: 增加共享 child session 标题 helper&#10;Member: implementer&#10;Status: succeeded&#10;Run: implementer-abc123456789">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">STEP-01 · 增加共享 child session 标题 helper</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge success">implementer · succeeded</span>
+              <span class="detail">增加共享 child session 标题 helper · run abc12345</span>
+            </div>
+          </div>
+          <div class="actions"><span class="btn">⋯</span></div>
+        </div>
+
+        <!-- 场景 2: 同一主任务多个不同 step 并列可区分 -->
+        <div class="session active" title="CHECK-02 · 验证历史 session 投影与截断&#10;Subtask: 验证历史 session 投影与截断&#10;Member: checker&#10;Status: running&#10;Run: checker-9876543210abc">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">CHECK-02 · 验证历史 session 投影与截断</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge running">checker · running</span>
+              <span class="detail">验证历史 session 投影与截断 · run 98765432</span>
+            </div>
+          </div>
+          <div class="actions"><span class="btn">⋯</span></div>
+        </div>
+
+        <!-- 场景 3: 无 subtask 的 architect/improver child，无伪编号 -->
+        <div class="session" title="architect · 子 session 名称拼入 step 编号信息&#10;Member: architect&#10;Status: succeeded&#10;Run: architect-xyz789012345">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">architect · 子 session 名称拼入 step 编号信息</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge success">architect · succeeded</span>
+              <span class="detail">子 session 名称拼入 step 编号信息 · run xyz78901</span>
+            </div>
+          </div>
+          <div class="actions"><span class="btn">⋯</span></div>
+        </div>
+
+        <!-- 场景 4.1: 超长 id + 超长标题 -->
+        <div class="session" title="VERY-LONG-SUBTASK-ID-999-STABLE · 这是一个非常非常非常非常长长长长长长的子任务标题测试用例&#10;Subtask: 这是一个非常非常非常非常长长长长长长的子任务标题测试用例&#10;Member: implementer&#10;Status: running&#10;Run: implementer-longrun12345">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">VERY-LONG-SUBTASK-ID-999-STABLE · 这是一个非常非常非常非常长长长长长长的子任务标题测试用例</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge running">implementer · running</span>
+              <span class="detail">这是一个非常非常非常非常长长长长长长的子任务标题测试用例 · run longrun1</span>
+            </div>
+          </div>
+          <div class="actions"><span class="btn">⋯</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 宽度 160px 的窄侧栏演示 -->
+    <div class="sidebar-wrapper narrow">
+      <h2><span>窄侧栏 (~160px)</span> <span class="badge">窄版</span></h2>
+      <div class="sidebar">
+        <!-- 场景 1 -->
+        <div class="session" title="STEP-01 · 增加共享 child session 标题 helper&#10;Subtask: 增加共享 child session 标题 helper&#10;Member: implementer&#10;Status: succeeded&#10;Run: implementer-abc123456789">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">STEP-01 · 增加共享 child session 标题 helper</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge success">implementer</span>
+              <span class="detail">增加共享 child session 标题 helper · run abc12345</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 场景 2 -->
+        <div class="session active" title="CHECK-02 · 验证历史 session 投影与截断&#10;Subtask: 验证历史 session 投影与截断&#10;Member: checker&#10;Status: running&#10;Run: checker-9876543210abc">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">CHECK-02 · 验证历史 session 投影与截断</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge running">checker</span>
+              <span class="detail">验证历史 session 投影与截断 · run 98765432</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 场景 3 -->
+        <div class="session" title="architect · 子 session 名称拼入 step 编号信息&#10;Member: architect&#10;Status: succeeded&#10;Run: architect-xyz789012345">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">architect · 子 session 名称拼入 step 编号信息</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge success">architect</span>
+              <span class="detail">子 session 名称拼入 step 编号信息 · run xyz78901</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 场景 4.2: 超长 id 在窄侧栏下的 ellipsis 截断 -->
+        <div class="session" title="VERY-LONG-SUBTASK-ID-999-STABLE · 这是一个非常非常非常非常长长长长长长的子任务标题测试用例&#10;Subtask: 这是一个非常非常非常非常长长长长长长的子任务标题测试用例&#10;Member: implementer&#10;Status: running&#10;Run: implementer-longrun12345">
+          <span class="check"></span>
+          <div class="content">
+            <div class="title-row">
+              <span class="title">VERY-LONG-SUBTASK-ID-999-STABLE · 这是一个非常非常非常非常长长长长长长的子任务标题测试用例</span>
+            </div>
+            <div class="meta-row">
+              <span class="badge running">implementer</span>
+              <span class="detail">这是一个非常非常非常非常长长长长长长的子任务标题测试用例 · run longrun1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tooltip 示意图 -->
+    <div style="flex: 1; min-width: 250px;">
+      <h2 style="font-size: 14px; margin: 0 0 10px 0; font-weight: 600;">悬浮 Tooltip 样式</h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">当鼠标悬停在上述行上时，原生/自定义 Tooltip 会展示完整信息：</p>
+      <div class="tooltip-mock">
+        <div class="tooltip-line" style="font-weight: 600; border-bottom: 1px solid #475569; padding-bottom: 4px; margin-bottom: 6px;">
+          CHECK-02 · 验证历史 session 投影与截断
+        </div>
+        <div class="tooltip-line"><span class="tooltip-label">Subtask:</span> 验证历史 session 投影与截断</div>
+        <div class="tooltip-line"><span class="tooltip-label">Member:</span> checker</div>
+        <div class="tooltip-line"><span class="tooltip-label">Status:</span> running</div>
+        <div class="tooltip-line"><span class="tooltip-label">Run:</span> checker-9876543210abc</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -328,6 +328,8 @@ export interface WorktreeInfo {
 
 export interface StudioChildSessionDisplay {
   taskTitle?: string;
+  /** Stable implementation step id projected from studioChild header (UI-only). */
+  subtaskId?: string;
   subtaskTitle?: string;
   runSummary?: string;
 }

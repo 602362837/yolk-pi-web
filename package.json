@@ -42,6 +42,7 @@
     "test:studio-dag": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-dag.mjs",
     "test:studio-session-ownership": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-session-ownership.mjs",
     "test:studio-sdk-runner": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-sdk-runner.mjs",
+    "test:session-title": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-title.mjs",
     "test:ypic-cli": "node scripts/test-ypic-cli.mjs",
     "test:memory-diagnostics": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-memory-diagnostics.mjs",
     "test:terminal-ssh": "node scripts/test-terminal-ssh-config.mjs",

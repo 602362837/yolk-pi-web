@@ -1,0 +1,982 @@
+{
+  "schemaVersion": 1,
+  "id": "20260713-125949-子-session-名称拼入-step-编号信息",
+  "title": "子 session 名称拼入 step 编号信息",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125618",
+  "createdAt": "2026-07-13T04:59:49.763Z",
+  "updatedAt": "2026-07-13T05:23:13.602Z",
+  "completedAt": "2026-07-13T05:22:03.811Z",
+  "contextIds": [
+    "pi_019f59d6-8c13-748e-b84c-a7efbcdb9c95"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-23fc6128184263550ef0e4a6",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:00:01.376Z",
+      "finishedAt": "2026-07-13T05:08:44.442Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d8-b1e9-7bba-8fde-58234c20330b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-00-01-385Z_019f59d8-b1e9-7bba-8fde-58234c20330b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "childSessionId": "019f59d8-b1e9-7bba-8fde-58234c20330b",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成架构规划，未修改生产代码。\n\n### 已产出\n\n目录：`.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心决策\n\n- step 编号采用稳定 `subtask.id`，不采用 1-based index。\n- 有 subtask：`{subtaskId} · {subtaskTitle}`。\n- 无 subtask：`{member} · {taskTitle}`，不生成伪编号。\n- 截断优先级：编号 > 标题 > member。\n- 侧栏与新 `session_info` 复用同一 helper。\n- 存量 session 通过读时投影生效，不回写 JSONL。\n- 额外发现：`projectStudioChildDisplay` 缓存键需要纳入 `subtaskId/runId`，避免同一任务多个 child 串用投影。\n\n### 验证\n\n- implementation plan JSON 解析成功。\n- 3 个子任务均包含要求的机器计划字段。\n- 规划产物完整性检查通过。\n- 未运行 lint/tsc：本轮未修改生产代码。\n\n### 阻塞与主会话待办\n\n任务触发 UI 原型硬门禁，但当前 delegated architect 环境没有 Studio/subagent 派发工具，因此未能派发 UI 设计员，任务也未擅自转为 `awaiting_approval`。\n\n主会话需要：\n\n1. 派发 `ui-designer` 产出 `session-step-title-prototype.html`。\n2. 请求用户审批 HTML 原型及 `plan-review.md`。\n3. 通过 Studio task action 保存 `implement.md` 中的 implementationPlan。\n4. 再转入 `awaiting_approval`，等待用户明确批准后才能实现。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:00:01.376Z",
+        "updatedAt": "2026-07-13T05:08:44.442Z",
+        "eventCount": 1107,
+        "lastTextPreview": "已完成架构规划，未修改生产代码。\n\n### 已产出\n\n目录：`.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心决策\n\n- step 编号采用稳定 `subtask.id`，不采用 1-based index。\n- 有 subtask：`{subtaskId} · {subtaskTitle}`。\n- 无 subtask：`{member} · {taskTitle}`，不生成伪编号。\n- 截断优先级：编号 > 标题 > member。\n- 侧栏与新 `session_info` 复用同一 helper。\n- 存量 session 通过读时投影生效，不回写 JSONL。\n- 额外发现：`projectStudioChildDisplay` 缓存键需要纳入 `subtaskId/runId`，避免同一任务多个 child 串用投影。\n\n### 验证\n\n- implementation plan JSON 解析成功。\n- 3 个子任务均包含要求的机器计划字段。\n- 规划产物完整性检查通过。\n- 未运行 lint/tsc：本轮未修改生产代码。\n\n### 阻塞与主会话待办\n\n任务触发 UI 原型硬门禁，但当前 delegated architect 环境没有 Studio/subagent 派发工具，因此未能派发 UI 设计员，任务也未擅自转为 `awaiting_approval`。\n\n主会话需要：\n\n1. 派发 `ui-designer` 产出 `session-step-title-prototype.html`。\n2. 请求用户审批 HTML 原型及 `plan-review.md`。\n3. 通过 Studio task action 保存 `implement.md` 中的 implementationPlan。\n4. 再转入 `awaiting_approval`，等待用户明确批准后才能实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:08:22.814Z",
+            "toolCallId": "call_mMQ3dXbzGcnLczwdPiJyYEvp|fc_0574b411344cc8f5016a5472c6debc8199a92a5f6001c1387b",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260713-125949-\\345\\255\\220-session-\\345\\220\\215\\347\\247\\260\\346\\213\\274\\345\\205\\245-step-\\347\\274\\226\\345\\217\\267\\344\\277\\241\\346\\201\\257/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:08:33.063Z",
+            "toolCallId": "call_nE7ENLIpYBJO6QM9BY3mkspj|fc_0574b411344cc8f5016a5472cb6bc88199b2d563770ebc4543",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport json,re\\nroot=Path('.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息')\\ns=(root/'implement.md').read_text()\\nm=re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```',s,re.S)\\nassert m, 'missing implementation plan block'\\nplan=json.loads(m.group(1))\\nassert plan['schemaVersion']==2 and len(plan['subtasks'])==3\\nrequired={'id','title','phase','order','dependsOn','files','instructions','acceptance','validation','risks','parallelizable','localReview'}\\nfor st in plan['subtasks']:\\n    missing=required-set(st)\\n    assert not missing,(st['id'],missing)\\nprint('implementation plan JSON valid:', ', '.join(st['id'] for st in plan['subtasks']))\\nfor name in ('brief.md','prd.md','ui.md','design.md','implement.md','checks.md','plan-review.md','handoff.md'):\\n    p=root/name\\n    assert p.exists() and p.stat().st_size > 100, name\\nprint('planning artifacts present')\\nPY\\nprintf '\\\\nTBD scan:\\\\n'\\nrg -n '_TBD' '.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息' --glob '*.md' || true\",\n  \"timeout\": 10\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:08:33.125Z",
+            "toolCallId": "call_nE7ENLIpYBJO6QM9BY3mkspj|fc_0574b411344cc8f5016a5472cb6bc88199b2d563770ebc4543",
+            "toolName": "bash",
+            "text": "implementation plan JSON valid: UI-STEP-TITLE, TITLE-PROJECTION, TITLE-CHECKS\nplanning artifacts present\n\nTBD scan:\n.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/review.md:3:_TBD by YPI Studio workflow._\n.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/summary.md:3:_TBD by YPI Studio workflow._",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:08:44.439Z",
+            "text": "已完成架构规划，未修改生产代码。\n\n### 已产出\n\n目录：`.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心决策\n\n- step 编号采用稳定 `subtask.id`，不采用 1-based index。\n- 有 subtask：`{subtaskId} · {subtaskTitle}`。\n- 无 subtask：`{member} · {taskTitle}`，不生成伪编号。\n- 截断优先级：编号 > 标题 > member。\n- 侧栏与新 `session_info` 复用同一 helper。\n- 存量 session 通过读时投影生效，不回写 JSONL。\n- 额外发现：`projectStudioChildDisplay` 缓存键需要纳入 `subtaskId/runId`，避免同一任务多个 child 串用投影。\n\n### 验证\n\n- implementation plan JSON 解析成功。\n- 3 个子任务均包含要求的机器计划字段。\n- 规划产物完整性检查通过。\n- 未运行 lint/tsc：本轮未修改生产代码。\n\n### 阻塞与主会话待办\n\n任务触发 UI 原型硬门禁，但当前 delegated architect 环境没有 Studio/subagent 派发工具，因此未能派发 UI 设计员，任务也未擅自转为 `awaiting_approval`。\n\n主会话需要：\n\n1. 派发 `ui-designer` 产出 `session-step-title-prototype.html`。\n2. 请求用户审批 HTML 原型及 `plan-review.md`。\n3. 通过 Studio task action 保存 `implement.md` 中的 implementationPlan。\n4. 再转入 `awaiting_approval`，等待用户明确批准后才能实现。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:08:44.439Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 962,
+        "tokens": 515,
+        "tokenSource": "usage",
+        "tps": 72.21,
+        "firstTokenAt": "2026-07-13T05:08:37.137Z",
+        "lastTokenAt": "2026-07-13T05:08:44.269Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-23fc6128184263550ef0e4a6",
+        "taskId": "20260713-125949-子-session-名称拼入-step-编号信息",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125949-_-session-_-step-/architect-23fc6128184263550ef0e4a6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:00:01.376Z",
+        "finishedAt": "2026-07-13T05:08:44.440Z",
+        "updatedAt": "2026-07-13T05:08:44.440Z",
+        "itemCount": 73,
+        "messageCount": 1,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 241818,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59d8-b1e9-7bba-8fde-58234c20330b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-00-01-385Z_019f59d8-b1e9-7bba-8fde-58234c20330b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-68ef133de78dc1f1613f439f",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:08:58.536Z",
+      "finishedAt": "2026-07-13T05:10:00.555Z",
+      "runner": "sdk",
+      "childSessionId": "019f59e0-e440-7939-84dd-957b671a1b5f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-08-58-560Z_019f59e0-e440-7939-84dd-957b671a1b5f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "childSessionId": "019f59e0-e440-7939-84dd-957b671a1b5f",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## UI Summary\n\n- **设计目标**：在 YPI Studio 子会话 (child session) 列表中拼入稳定可区分的 step 编号信息，同时确保不破坏单行截断样式，非 step 成员不生成伪编号，以及超长标题与窄宽度的兼容。\n- **信息分工契约**：\n  - **主标题**：有 step 时显示 `{subtask.id} · {subtask.title}`；无 step 时显示 `{member} · {taskTitle}`。优先保护 Step 编号。\n  - **徽标**：右侧显示状态及成员徽标 `{member} · {status}` (如 `improver · running`)。\n  - **详情行**：显示 `{subtaskTitle} · run {runShortId}`。\n  - **Tooltip**：悬浮提示展示完整详细属性，防止信息丢失。\n\n## HTML Prototype\n\n已产出独立、自包含的 HTML 原型文件，已通过以下相对路径写入：\n- **原型路径**：`.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/session-step-title-prototype.html`\n\n该原型完全覆盖了：\n1. **有 step 场景** (implementer/checker)；\n2. **多 step 并列快速区分**；\n3. **无 step 场景** (architect/improver, 不显示伪编号)；\n4. **超长 ID 及长标题在窄侧栏 (约 160px) 下的 ellipsis 截断**；\n5. **主标题、badge、detail 及 tooltip 的详细信息分工**。\n\n## Review Request\n\n已将 HTML 原型路径及其链接更新至任务文档的以下两处，并移除了“原型未产出阻塞”的状态：\n1. **UI 门禁状态文档**：`ui.md`\n2. **主计划审批书**：`plan-review.md`\n\n请主会话/用户审阅以上产出。在取得用户对计划和 HTML 原型的明确批准前，暂不进入实现阶段，亦未修改任何生产代码或执行 `git` 操作。",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:08:58.536Z",
+        "updatedAt": "2026-07-13T05:10:00.555Z",
+        "eventCount": 193,
+        "lastTextPreview": "## UI Summary\n\n- **设计目标**：在 YPI Studio 子会话 (child session) 列表中拼入稳定可区分的 step 编号信息，同时确保不破坏单行截断样式，非 step 成员不生成伪编号，以及超长标题与窄宽度的兼容。\n- **信息分工契约**：\n  - **主标题**：有 step 时显示 `{subtask.id} · {subtask.title}`；无 step 时显示 `{member} · {taskTitle}`。优先保护 Step 编号。\n  - **徽标**：右侧显示状态及成员徽标 `{member} · {status}` (如 `improver · running`)。\n  - **详情行**：显示 `{subtaskTitle} · run {runShortId}`。\n  - **Tooltip**：悬浮提示展示完整详细属性，防止信息丢失。\n\n## HTML Prototype\n\n已产出独立、自包含的 HTML 原型文件，已通过以下相对路径写入：\n- **原型路径**：`.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/session-step-title-prototype.html`\n\n该原型完全覆盖了：\n1. **有 step 场景** (implementer/checker)；\n2. **多 step 并列快速区分**；\n3. **无 step 场景** (architect/improver, 不显示伪编号)；\n4. **超长 ID 及长标题在窄侧栏 (约 160px) 下的 ellipsis 截断**；\n5. **主标题、badge、detail 及 tooltip 的详细信息分工**。\n\n## Review Request\n\n已将 HTML 原型路径及其链接更新至任务文档的以下两处，并移除了“原型未产出阻塞”的状态：\n1. **UI 门禁状态文档**：`ui.md`\n2. **主计划审批书**：`plan-review.md`\n\n请主会话/用户审阅以上产出。在取得用户对计划和 HTML 原型的明确批准前，暂不进入实现阶段，亦未修改任何生产代码或执行 `git` 操作。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:09:51.337Z",
+            "toolCallId": "call_1783919392652869254_80|fc_call_1783919392652869254_80",
+            "toolName": "edit",
+            "text": "Successfully replaced 2 block(s) in .ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/plan-review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:09:55.272Z",
+            "toolCallId": "call_1783919396986271023_81|fc_call_1783919396986271023_81",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:09:55.317Z",
+            "toolCallId": "call_1783919396986271023_81|fc_call_1783919396986271023_81",
+            "toolName": "bash",
+            "text": "On branch pi/20260713-125618\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t\".ypi/tasks/20260713-125949-\\345\\255\\220-session-\\345\\220\\215\\347\\247\\260\\346\\213\\274\\345\\205\\245-step-\\347\\274\\226\\345\\217\\267\\344\\277\\241\\346\\201\\257/\"\n\nnothing added to commit but untracked files present (use \"git add\" to track)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:10:00.549Z",
+            "text": "## UI Summary\n\n- **设计目标**：在 YPI Studio 子会话 (child session) 列表中拼入稳定可区分的 step 编号信息，同时确保不破坏单行截断样式，非 step 成员不生成伪编号，以及超长标题与窄宽度的兼容。\n- **信息分工契约**：\n  - **主标题**：有 step 时显示 `{subtask.id} · {subtask.title}`；无 step 时显示 `{member} · {taskTitle}`。优先保护 Step 编号。\n  - **徽标**：右侧显示状态及成员徽标 `{member} · {status}` (如 `improver · running`)。\n  - **详情行**：显示 `{subtaskTitle} · run {runShortId}`。\n  - **Tooltip**：悬浮提示展示完整详细属性，防止信息丢失。\n\n## HTML Prototype\n\n已产出独立、自包含的 HTML 原型文件，已通过以下相对路径写入：\n- **原型路径**：`.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/session-step-title-prototype.html`\n\n该原型完全覆盖了：\n1. **有 step 场景** (implementer/checker)；\n2. **多 step 并列快速区分**；\n3. **无 step 场景** (architect/improver, 不显示伪编号)；\n4. **超长 ID 及长标题在窄侧栏 (约 160px) 下的 ellipsis 截断**；\n5. **主标题、badge、detail 及 tooltip 的详细信息分工**。\n\n## Review Request\n\n已将 HTML 原型路径及其链接更新至任务文档的以下两处，并移除了“原型未产出阻塞”的状态：\n1. **UI 门禁状态文档**：`ui.md`\n2. **主计划审批书**：`plan-review.md`\n\n请主会话/用户审阅以上产出。在取得用户对计划和 HTML 原型的明确批准前，暂不进入实现阶段，亦未修改任何生产代码或执行 `git` 操作。",
+            "model": "cpa/gemini-3.5-flash-low",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:10:00.549Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 967,
+        "tokens": 489,
+        "tokenSource": "usage",
+        "tps": 489000,
+        "firstTokenAt": "2026-07-13T05:10:00.395Z",
+        "lastTokenAt": "2026-07-13T05:10:00.396Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-68ef133de78dc1f1613f439f",
+        "taskId": "20260713-125949-子-session-名称拼入-step-编号信息",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125949-_-session-_-step-/ui-designer-68ef133de78dc1f1613f439f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:08:58.536Z",
+        "finishedAt": "2026-07-13T05:10:00.554Z",
+        "updatedAt": "2026-07-13T05:10:00.554Z",
+        "itemCount": 33,
+        "messageCount": 1,
+        "toolCallCount": 14,
+        "stderrBytes": 0,
+        "bytes": 59547,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f59e0-e440-7939-84dd-957b671a1b5f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-08-58-560Z_019f59e0-e440-7939-84dd-957b671a1b5f.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-ee884a3b1f8913b59b0290f3",
+      "subtaskId": "TITLE-PROJECTION",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:13:11.316Z",
+      "finishedAt": "2026-07-13T05:15:40.790Z",
+      "runner": "sdk",
+      "childSessionId": "019f59e4-bf9e-7d47-8201-5c8df8e671bc",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-13-11-326Z_019f59e4-bf9e-7d47-8201-5c8df8e671bc.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "childSessionId": "019f59e4-bf9e-7d47-8201-5c8df8e671bc",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Added pure `studioChildSessionTitle()` with 50-char budget (id > title > member); `displayTitleForSession()` routes Studio children through it.\n- `lib/types.ts` — `StudioChildSessionDisplay` gains optional UI-only `subtaskId`.\n- `lib/session-reader.ts` — Projection returns `subtaskId`; cache key is `cwd:taskId:subtaskId:runId`; header-only fallback when task detail missing/fails.\n- `lib/ypi-studio-child-session-runner.ts` — `studioChildSessionInfoName()` uses the shared helper (no separate `YPI Studio … · runId` envelope).\n- `components/SessionSidebar.tsx` — Detail/tooltip prefer projected `subtaskId`; main title still via `displayTitleForSession()`.\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:studio-sdk-runner` — pass\n- `npm run test:session-title` — script not present yet (TITLE-CHECKS)\n- Ad-hoc smoke of `studioChildSessionTitle` / `displayTitleForSession` — pass\n\n#### Notes / Risks\n\n- TITLE-CHECKS still needs focused tests, docs, and manual sidebar cases.\n- New child `session_info` names drop the old envelope; run short id remains in detail/tooltip only.\n- No JSONL rewrite/schema change; legacy rows rely on read-time projection.\n- No product decisions needed from main session for this subtask.",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:13:11.316Z",
+        "updatedAt": "2026-07-13T05:15:40.789Z",
+        "eventCount": 1119,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Added pure `studioChildSessionTitle()` with 50-char budget (id > title > member); `displayTitleForSession()` routes Studio children through it.\n- `lib/types.ts` — `StudioChildSessionDisplay` gains optional UI-only `subtaskId`.\n- `lib/session-reader.ts` — Projection returns `subtaskId`; cache key is `cwd:taskId:subtaskId:runId`; header-only fallback when task detail missing/fails.\n- `lib/ypi-studio-child-session-runner.ts` — `studioChildSessionInfoName()` uses the shared helper (no separate `YPI Studio … · runId` envelope).\n- `components/SessionSidebar.tsx` — Detail/tooltip prefer projected `subtaskId`; main title still via `displayTitleForSession()`.\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:studio-sdk-runner` — pass\n- `npm run test:session-title` — script not present yet (TITLE-CHECKS)\n- Ad-hoc smoke of `studioChildSessionTitle` / `displayTitleForSession` — pass\n\n#### Notes / Risks\n\n- TITLE-CHECKS still needs focused tests, docs, and manual sidebar cases.\n- New child `session_info` names drop the old envelope; run short id remains in detail/tooltip only.\n- No JSONL rewrite/schema change; legacy rows rely on read-time projection.\n- No product decisions needed from main session for this subtask.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:15:32.034Z",
+            "toolCallId": "call-1954c6b0-67bf-4394-bbca-670af9164ccf-29|fc_947a3977-6852-9f7a-888a-0009c1487940_1",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125618/lib/ypi-studio-child-session-runner.ts\",\n  \"offset\": 110,\n  \"limit\": 40\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:15:32.049Z",
+            "toolCallId": "call-1954c6b0-67bf-4394-bbca-670af9164ccf-28|fc_947a3977-6852-9f7a-888a-0009c1487940_0",
+            "toolName": "read",
+            "text": "export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChildSessionInfo): StudioChildSessionDisplay | undefined {\n  if (!studioChild?.taskId) return undefined;\n  // Isolate by subtask/run: title/summary depend on both, not only the parent task.\n  const cacheKey = `${canonicalizeCwd(cwd)}:${studioChild.taskId}:${studioChild.subtaskId ?? \"\"}:${studioChild.runId ?? \"\"}`;\n  const cached = studioDisplayCache.get(cacheKey);\n  if (cached && cached.expiresAt > Date.now()) return cached.value;\n  const headerSubtaskId = firstNonEmpty(studioChild.subtaskId);\n  try {\n    let detail = getYpiStudioTaskDetail(cwd, studioChild.taskId);\n    if (!detail) {\n      const match = listYpiStudioTasks(cwd, { scope: \"all\" }).tasks.find((task) => task.id === studioChild.taskId);\n      if (match) detail = getYpiStudioTaskDetail(cwd, match.key);\n    }\n    if (!detail) {\n      // Header-only projection still exposes stable step id for legacy children.\n      const value = headerSubtaskId ? { subtaskId: headerSubtaskId } : undefined;\n      studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });\n      return value;\n    }\n    const run = detail.subagents.find((item) => item.id === studioChild.runId);\n    const subtaskTitle = studioChild.subtaskId\n      ? detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === studioChild.subtaskId)?.title\n        ?? detail.implementationPlan?.subtasks.find((item) => item.id === studioChild.subtaskId)?.title\n      : undefined;\n    const runSummary = firstNonEmpty(run?.summary, run?.progress?.lastTextPreview);\n    const value: StudioChildSessionDisplay = {\n      taskTitle: firstNonEmpty(detail.title),\n      subtaskId: headerSubtaskId,\n      subtaskTitle,\n      runSummary,\n    };\n    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });\n    return value;\n  } catch {\n    const value = headerSubtaskId ? { subtaskId: headerSubtaskId } : undefined;\n    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });\n    return value;\n  }\n}\n\nexport { parseSessionHeaderMetadata } from \"./session-header-metadata\";\n\ndeclare global {\n  var __piSessionListSnapshots: Map<string, { expiresAt: number; value?: SessionInfo[]; pending?: Promise<SessionInfo[]> }> | undefined;\n}\n\nconst SESSION_LIST_CACHE_TTL_MS = 1000;\nconst SESSION_LIST_CACHE_LIMIT = 8;\n\nfunction getSessionListSnapshots() {\n\n[604 more lines in file. Use offset=205 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:15:32.050Z",
+            "toolCallId": "call-1954c6b0-67bf-4394-bbca-670af9164ccf-29|fc_947a3977-6852-9f7a-888a-0009c1487940_1",
+            "toolName": "read",
+            "text": "function getStudioChildTaskDetail(root: string, taskId: string): NonNullable<ReturnType<typeof getYpiStudioTaskDetail>> | null {\n  const detail = getYpiStudioTaskDetail(root, taskId);\n  if (detail) return detail;\n  const match = listYpiStudioTasks(root, { scope: \"all\" }).tasks.find((task) => task.id === taskId);\n  return match ? getYpiStudioTaskDetail(root, match.key) : null;\n}\n\nfunction studioChildSubtaskTitle(detail: NonNullable<ReturnType<typeof getYpiStudioTaskDetail>>, subtaskId?: string): string | undefined {\n  if (!subtaskId) return undefined;\n  return str(detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === subtaskId)?.title)\n    ?? str(detail.implementationPlan?.subtasks.find((item) => item.id === subtaskId)?.title);\n}\n\nfunction studioChildSessionInfoName(root: string, meta: StudioSdkChildRunMeta): string {\n  try {\n    const detail = getStudioChildTaskDetail(root, meta.taskId);\n    const subtaskTitle = detail ? studioChildSubtaskTitle(detail, meta.subtaskId) : undefined;\n    const title = studioChildSessionTitle({\n      subtaskId: meta.subtaskId,\n      subtaskTitle,\n      member: meta.member,\n      taskTitle: str(detail?.title),\n      taskId: meta.taskId,\n    });\n    if (title) return title;\n  } catch {\n    // Durable session_info is only a fallback; task.json remains the display authority.\n  }\n  // Header/meta fields alone still produce a safe canonical title without inventing step numbers.\n  return studioChildSessionTitle({\n    subtaskId: meta.subtaskId,\n    member: meta.member,\n    taskId: meta.taskId,\n  }) || meta.member;\n}\n\nfunction boundedAppendTail(previous: string, addition: string, maxBytes: number): string {\n  const combined = `${previous}${addition}`;\n  if (byteLength(combined) <= maxBytes) return combined;\n  let start = Math.max(0, combined.length - maxBytes);\n\n[447 more lines in file. Use offset=150 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:15:40.786Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Added pure `studioChildSessionTitle()` with 50-char budget (id > title > member); `displayTitleForSession()` routes Studio children through it.\n- `lib/types.ts` — `StudioChildSessionDisplay` gains optional UI-only `subtaskId`.\n- `lib/session-reader.ts` — Projection returns `subtaskId`; cache key is `cwd:taskId:subtaskId:runId`; header-only fallback when task detail missing/fails.\n- `lib/ypi-studio-child-session-runner.ts` — `studioChildSessionInfoName()` uses the shared helper (no separate `YPI Studio … · runId` envelope).\n- `components/SessionSidebar.tsx` — Detail/tooltip prefer projected `subtaskId`; main title still via `displayTitleForSession()`.\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:studio-sdk-runner` — pass\n- `npm run test:session-title` — script not present yet (TITLE-CHECKS)\n- Ad-hoc smoke of `studioChildSessionTitle` / `displayTitleForSession` — pass\n\n#### Notes / Risks\n\n- TITLE-CHECKS still needs focused tests, docs, and manual sidebar cases.\n- New child `session_info` names drop the old envelope; run short id remains in detail/tooltip only.\n- No JSONL rewrite/schema change; legacy rows rely on read-time projection.\n- No product decisions needed from main session for this subtask.",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:15:40.787Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1657,
+        "tokens": 481,
+        "tokenSource": "usage",
+        "tps": 3.76,
+        "firstTokenAt": "2026-07-13T05:13:32.330Z",
+        "lastTokenAt": "2026-07-13T05:15:40.405Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-ee884a3b1f8913b59b0290f3",
+        "taskId": "20260713-125949-子-session-名称拼入-step-编号信息",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125949-_-session-_-step-/implementer-ee884a3b1f8913b59b0290f3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:13:11.316Z",
+        "finishedAt": "2026-07-13T05:15:40.788Z",
+        "updatedAt": "2026-07-13T05:15:40.788Z",
+        "itemCount": 68,
+        "messageCount": 4,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 88876,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f59e4-bf9e-7d47-8201-5c8df8e671bc",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-13-11-326Z_019f59e4-bf9e-7d47-8201-5c8df8e671bc.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-9843b562cd104ceec7744d6c",
+      "subtaskId": "TITLE-CHECKS",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:16:32.162Z",
+      "finishedAt": "2026-07-13T05:19:14.744Z",
+      "runner": "sdk",
+      "childSessionId": "019f59e7-d02c-775a-84bc-087793b36412",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-16-32-172Z_019f59e7-d02c-775a-84bc-087793b36412.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "childSessionId": "019f59e7-d02c-775a-84bc-087793b36412",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-session-title.mjs` — helper + projection cache isolation tests\n- `scripts/test-ypi-studio-sdk-runner.mjs` — shared title helper contract\n- `package.json` — `test:session-title`\n- `docs/modules/library.md` — canonical titles, cache key, no JSONL migration\n- `docs/modules/frontend.md` — sidebar title/detail split\n- `docs/architecture/overview.md` — projection + formatter contract\n- `docs/standards/code-style.md` — focused test scripts\n- `.ypi/tasks/.../checks.md` — validation evidence + manual gaps\n- `.ypi/tasks/.../handoff.md` — TITLE-CHECKS complete\n\n#### Verification\n- `npm run test:session-title` — passed (11)\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n- Live browser/SDK child run not executed; narrow-sidebar ellipsis/hover remains residual manual risk.\n- No product decisions needed; TITLE-CHECKS done.",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:16:32.162Z",
+        "updatedAt": "2026-07-13T05:19:14.744Z",
+        "eventCount": 1176,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-session-title.mjs` — helper + projection cache isolation tests\n- `scripts/test-ypi-studio-sdk-runner.mjs` — shared title helper contract\n- `package.json` — `test:session-title`\n- `docs/modules/library.md` — canonical titles, cache key, no JSONL migration\n- `docs/modules/frontend.md` — sidebar title/detail split\n- `docs/architecture/overview.md` — projection + formatter contract\n- `docs/standards/code-style.md` — focused test scripts\n- `.ypi/tasks/.../checks.md` — validation evidence + manual gaps\n- `.ypi/tasks/.../handoff.md` — TITLE-CHECKS complete\n\n#### Verification\n- `npm run test:session-title` — passed (11)\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n- Live browser/SDK child run not executed; narrow-sidebar ellipsis/hover remains residual manual risk.\n- No product decisions needed; TITLE-CHECKS done.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:19:02.369Z",
+            "toolCallId": "call-1a2c110d-ce9e-41fc-8aee-6ce9326f2464-38|fc_7be42887-673f-96f8-8d6e-30a0e2c4df37_0",
+            "toolName": "bash",
+            "text": "EXIT:0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:19:09.345Z",
+            "toolCallId": "call-43491fc9-4ed7-41c5-b9d5-9f71bda369b6-39|fc_0b48f703-06b1-9cd4-8490-606035ff7b25_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125618/.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/handoff.md\",\n  \"content\": \"# Handoff\\n\\n## Implementation Complete — TITLE-CHECKS\\n\\n### Files Changed\\n\\n- `scripts/test-session-title.mjs` — focused helper + projection cache isolation tests\\n- `scripts/test-ypi-studio-sdk-runner.mjs` — shared title helper contract for durable names\\n- `package.json` — `test:session-title` script\\n- `docs/modules/library.md` — canonical child titles, cache identity, no JSONL migration\\n- `docs/modules/frontend.md` — SessionSidebar title/detail information split\\n- `docs/architecture/overview.md` — projection fields + shared formatter contract\\n- `docs/standards/code-style.md` — document new focused test scripts\\n- `.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/checks.md` — validation evidence + explicit manual gaps\\n\\n### Verification\\n\\n- `npm run test:session-title` — passed (11 cases)\\n- `npm run test:studio-sdk-runner` — passed\\n- `npm run lint` — passed\\n- `node_modules/.bin/tsc --noEmit` — passed\\n\\n### Manual / SDK gaps\\n\\n- Did not start a live Studio SDK child run or browser narrow-sidebar check (may need model credentials / parent orchestration).\\n- Historical JSONL no-rewrite behavior is covered by read-time projection tests and code path, not a live UI spot-check.\\n\\n### Notes / Risks\\n\\n- Pure helper + projection isolation tests cover the main regression risks; live UI remains residual risk for ellipsis/row interaction only.\\n- No decisions needed from main session for code merge; optional follow-up is browser manual acceptance listed in checks.md.\\n\\n### Plan status\\n\\n- UI-STEP-TITLE: done\\n- TITLE-PROJECTION: done (prior)\\n- TITLE-CHECKS: done\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:19:09.349Z",
+            "toolCallId": "call-43491fc9-4ed7-41c5-b9d5-9f71bda369b6-39|fc_0b48f703-06b1-9cd4-8490-606035ff7b25_0",
+            "toolName": "write",
+            "text": "Successfully wrote 1565 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125618/.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:19:14.742Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-session-title.mjs` — helper + projection cache isolation tests\n- `scripts/test-ypi-studio-sdk-runner.mjs` — shared title helper contract\n- `package.json` — `test:session-title`\n- `docs/modules/library.md` — canonical titles, cache key, no JSONL migration\n- `docs/modules/frontend.md` — sidebar title/detail split\n- `docs/architecture/overview.md` — projection + formatter contract\n- `docs/standards/code-style.md` — focused test scripts\n- `.ypi/tasks/.../checks.md` — validation evidence + manual gaps\n- `.ypi/tasks/.../handoff.md` — TITLE-CHECKS complete\n\n#### Verification\n- `npm run test:session-title` — passed (11)\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n- Live browser/SDK child run not executed; narrow-sidebar ellipsis/hover remains residual manual risk.\n- No product decisions needed; TITLE-CHECKS done.",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:19:14.742Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1290,
+        "tokens": 277,
+        "tokenSource": "usage",
+        "tps": 2.11,
+        "firstTokenAt": "2026-07-13T05:17:03.302Z",
+        "lastTokenAt": "2026-07-13T05:19:14.741Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-9843b562cd104ceec7744d6c",
+        "taskId": "20260713-125949-子-session-名称拼入-step-编号信息",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125949-_-session-_-step-/implementer-9843b562cd104ceec7744d6c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:16:32.162Z",
+        "finishedAt": "2026-07-13T05:19:14.742Z",
+        "updatedAt": "2026-07-13T05:19:14.742Z",
+        "itemCount": 88,
+        "messageCount": 4,
+        "toolCallCount": 40,
+        "stderrBytes": 0,
+        "bytes": 180202,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59e7-d02c-775a-84bc-087793b36412",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-16-32-172Z_019f59e7-d02c-775a-84bc-087793b36412.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-624cba72e7181011afecd87f",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:19:28.386Z",
+      "finishedAt": "2026-07-13T05:20:36.529Z",
+      "runner": "sdk",
+      "childSessionId": "019f59ea-808b-75fd-b73e-aae84ea9689b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-19-28-395Z_019f59ea-808b-75fd-b73e-aae84ea9689b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "childSessionId": "019f59ea-808b-75fd-b73e-aae84ea9689b",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- **Non-blocking:** no live browser / real SDK child run for narrow-sidebar ellipsis (unit + projection tests cover title contract)\n- **Non-blocking:** `package-lock.json` typescript pin noise unrelated to feature\n- Historical JSONL not rewritten is **intentional**, not a defect\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:session-title` | Pass |\n| `npm run test:studio-sdk-runner` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass** — recommend **user_acceptance**\n\n### Handoff\n- **Artifact:** `.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/review.md`\n- **Code review:** helper truncation priority, projection cache identity (`subtaskId`+`runId`), shared runner `session_info` naming, sidebar detail/tooltip split, tests/docs all match design\n- **Risks:** residual live UI only\n- **Main session decision:** move task to user acceptance; optional manual browser spot-check later",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:19:28.386Z",
+        "updatedAt": "2026-07-13T05:20:36.529Z",
+        "eventCount": 791,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- **Non-blocking:** no live browser / real SDK child run for narrow-sidebar ellipsis (unit + projection tests cover title contract)\n- **Non-blocking:** `package-lock.json` typescript pin noise unrelated to feature\n- Historical JSONL not rewritten is **intentional**, not a defect\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:session-title` | Pass |\n| `npm run test:studio-sdk-runner` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass** — recommend **user_acceptance**\n\n### Handoff\n- **Artifact:** `.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/review.md`\n- **Code review:** helper truncation priority, projection cache identity (`subtaskId`+`runId`), shared runner `session_info` naming, sidebar detail/tooltip split, tests/docs all match design\n- **Risks:** residual live UI only\n- **Main session decision:** move task to user acceptance; optional manual browser spot-check later",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:20:32.054Z",
+            "text": "Acceptance criteria and code paths look solid; writing `review.md` with the pass verdict and residual risks.",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:20:32.055Z",
+            "toolCallId": "call-2ff39089-63fd-482e-8fd6-d43f8e99d5aa-16|fc_d03e3d43-4a5d-95f3-be00-19e59baea578_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125618/.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/review.md\",\n  \"content\": \"# review\\n\\n## Check Complete\\n\\n### Scope Reviewed\\n\\n- Task: 子 session 名称拼入 step 编号信息\\n- Artifacts: PRD / Design / Implement / Checks / UI / plan-review / handoff\\n- Code: `lib/session-title.ts`, `lib/session-reader.ts`, `lib/types.ts`, `lib/ypi-studio-child-session-runner.ts`, `components/SessionSidebar.tsx`\\n- Tests/docs: `scripts/test-session-title.mjs`, `scripts/test-ypi-studio-sdk-runner.mjs`, `package.json`, module/architecture docs\\n\\n### Findings Fixed\\n\\n- None\\n\\n### Remaining Findings\\n\\n#### Non-blocking\\n\\n1. **Live browser / SDK child manual gap** — focused unit/integration tests cover helper, projection isolation, header-only fallback, and shared runner contract; real sidebar narrow-width ellipsis + live SDK child `session_info` write were not exercised in this environment (may need model credentials / parent orchestration). Residual UX risk only for row interaction/ellipsis, not for title contract logic.\\n2. **Unrelated lockfile pin noise** — `package-lock.json` pins `typescript` from `^5.9.3` → `5.9.3` to match existing `package.json`; not part of the title feature behavior.\\n\\n#### Intentionally not defects\\n\\n- Historical child JSONL `session_info` not rewritten — read-time projection is the approved design.\\n- No `studioChild` header schema / schemaVersion change — additive UI-only `StudioChildSessionDisplay.subtaskId`.\\n- Main title omits member/run short id when subtask-bound — detail/badge/tooltip retain them.\\n\\n### Requirement Coverage\\n\\n| ID | Criterion | Result |\\n| --- | --- | --- |\\n| R1 | `{subtaskId} · {subtaskTitle}` via stable `subtask.id`; id-only when title missing | Pass — `studioChildSessionTitle` / tests |\\n| R2 | No fake step for architect/improver; `member · taskTitle` | Pass |\\n| R3 | 50-char budget; id > title > member | Pass — subtask keeps full id first; no-subtask drops member when over budget |\\n| R4 | Shared helper for sidebar + new `session_info` | Pass — `displayTitleForSession` + `studioChildSessionInfoName` |\\n| R5 | Legacy via projection only; header-only id when task missing | Pass — `projectStudioChildDisplay` fallback `{ subtaskId }` |\\n| R6 | Cache key includes subtaskId + runId | Pass — key `cwd:taskId:subtaskId:runId` + isolation test |\\n| UI gate | HTML prototype + explicit user approval | Pass — `ui.md` / `session-step-title-prototype.html` |\\n\\n### Design / Boundary Review\\n\\n- Pure helper lives in `lib/session-title.ts` with type-only import of types; runner imports helper one-way — no cycle risk.\\n- `StudioChildSessionDisplay.subtaskId` is UI projection only; persistent header already carried `subtaskId`.\\n- Space sessions API still requests `includeStudioChildDisplay: true`; single-session detail always projects display.\\n- Sidebar detail/tooltip prefer projected subtaskId and keep run short id / member / status outside main title.\\n\\n### Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:session-title` | Pass (11 cases) |\\n| `npm run test:studio-sdk-runner` | Pass |\\n| `npm run lint` | Pass |\\n| `node_modules/.bin/tsc --noEmit` | Pass |\\n\\n### Verdict\\n\\n**Pass**\\n\\nImplementation matches the approved plan and acceptance criteria. Automatic gates are green. Remaining risk is limited to optional live UI/SDK spot-check already documented in `checks.md`.\\n\\n### Recommendation\\n\\n- Advance to **user_acceptance**.\\n- Optional follow-up (not required to pass this check): browser narrow-sidebar check with ≥2 distinct subtask children and one no-subtask child; spot-check a historical child without JSONL rewrite.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:20:32.060Z",
+            "toolCallId": "call-2ff39089-63fd-482e-8fd6-d43f8e99d5aa-16|fc_d03e3d43-4a5d-95f3-be00-19e59baea578_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3489 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125618/.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:20:36.525Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None\n\n#### Remaining Findings\n- **Non-blocking:** no live browser / real SDK child run for narrow-sidebar ellipsis (unit + projection tests cover title contract)\n- **Non-blocking:** `package-lock.json` typescript pin noise unrelated to feature\n- Historical JSONL not rewritten is **intentional**, not a defect\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:session-title` | Pass |\n| `npm run test:studio-sdk-runner` | Pass |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n\n#### Verdict\n**Pass** — recommend **user_acceptance**\n\n### Handoff\n- **Artifact:** `.ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/review.md`\n- **Code review:** helper truncation priority, projection cache identity (`subtaskId`+`runId`), shared runner `session_info` naming, sidebar detail/tooltip split, tests/docs all match design\n- **Risks:** residual live UI only\n- **Main session decision:** move task to user acceptance; optional manual browser spot-check later",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:20:36.526Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1283,
+        "tokens": 280,
+        "tokenSource": "usage",
+        "tps": 4.41,
+        "firstTokenAt": "2026-07-13T05:19:33.050Z",
+        "lastTokenAt": "2026-07-13T05:20:36.525Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-624cba72e7181011afecd87f",
+        "taskId": "20260713-125949-子-session-名称拼入-step-编号信息",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125949-_-session-_-step-/checker-624cba72e7181011afecd87f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:19:28.386Z",
+        "finishedAt": "2026-07-13T05:20:36.528Z",
+        "updatedAt": "2026-07-13T05:20:36.528Z",
+        "itemCount": 41,
+        "messageCount": 3,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 79555,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59ea-808b-75fd-b73e-aae84ea9689b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125618--/2026-07-13T05-19-28-395Z_019f59ea-808b-75fd-b73e-aae84ea9689b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-13T05:11:43.403Z",
+      "contextId": "pi_019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-13T05:12:28.185Z",
+      "contextId": "pi_019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+      "inputHash": "8cbe697b157364a5b1364628",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-13T05:23:13.602Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260713-132313-子-session-名称拼入-step-编号信息",
+    "knowledgePath": ".ypi/knowledge/20260713-132313-子-session-名称拼入-step-编号信息.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-13T05:11:38.927Z",
+    "summary": "Use stable Studio subtask ids in child session titles, share one formatter between UI and persisted session_info, and preserve legacy sessions through read-time projection.",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "serial",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "step-title-delivery",
+          "title": "Prototype, implementation, and verification",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "UI-STEP-TITLE",
+            "TITLE-PROJECTION",
+            "TITLE-CHECKS"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "UI-STEP-TITLE",
+        "title": "Produce and approve the child-session step-title HTML prototype",
+        "phase": "ui",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          ".ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/ui.md",
+          ".ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/session-step-title-prototype.html",
+          ".ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/plan-review.md"
+        ],
+        "validation": [
+          "Open the HTML prototype in a browser and compare it with the current SessionSidebar visual language",
+          "Confirm the approved copy uses subtask.id rather than a 1-based index"
+        ],
+        "risks": [
+          "Implementation must not start before prototype and approval evidence exist"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "TITLE-PROJECTION",
+        "title": "Unify Studio child step titles and projection identity",
+        "phase": "implement",
+        "order": 20,
+        "dependsOn": [
+          "UI-STEP-TITLE"
+        ],
+        "dependencies": [
+          "UI-STEP-TITLE"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/session-title.ts",
+          "lib/types.ts",
+          "lib/session-reader.ts",
+          "lib/ypi-studio-child-session-runner.ts",
+          "components/SessionSidebar.tsx"
+        ],
+        "validation": [
+          "npm run test:session-title",
+          "npm run test:studio-sdk-runner",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "A cache key that omits runId can still cross-contaminate runSummary",
+          "Naive truncation can preserve member while hiding the stable step id",
+          "Duplicated formatting in runner and session-title will drift again"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "TITLE-CHECKS",
+        "title": "Add focused tests, update docs, and validate sidebar behavior",
+        "phase": "checks",
+        "order": 30,
+        "dependsOn": [
+          "TITLE-PROJECTION"
+        ],
+        "dependencies": [
+          "TITLE-PROJECTION"
+        ],
+        "relation": "serial",
+        "files": [
+          "scripts/test-session-title.mjs",
+          "scripts/test-ypi-studio-sdk-runner.mjs",
+          "package.json",
+          "docs/modules/library.md",
+          "docs/modules/frontend.md",
+          "docs/architecture/overview.md",
+          ".ypi/tasks/20260713-125949-子-session-名称拼入-step-编号信息/checks.md"
+        ],
+        "validation": [
+          "npm run test:session-title",
+          "npm run test:studio-sdk-runner",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "Manual browser verification with at least two distinct subtask children and one no-subtask child"
+        ],
+        "risks": [
+          "Pure helper tests alone do not prove the runtime projection path",
+          "A real child-run check may require configured model credentials"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-13T05:23:13.602Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 3,
+      "skipped": 0
+    },
+    "subtasks": {
+      "UI-STEP-TITLE": {
+        "id": "UI-STEP-TITLE",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:12:52.158Z",
+        "startedAt": "2026-07-13T05:12:44.933Z",
+        "finishedAt": "2026-07-13T05:12:52.158Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-13T05:12:44.933Z",
+        "claimedByContextId": "pi_019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "validation": [
+          "HTML prototype exists at session-step-title-prototype.html",
+          "ui.md links prototype and records user approval (批准, 2026-07-13)",
+          "plan-review.md links HTML prototype",
+          "Approved copy uses subtask.id not 1-based index"
+        ]
+      },
+      "TITLE-PROJECTION": {
+        "id": "TITLE-PROJECTION",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:15:40.790Z",
+        "startedAt": "2026-07-13T05:13:01.564Z",
+        "finishedAt": "2026-07-13T05:15:40.790Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ee884a3b1f8913b59b0290f3"
+        ],
+        "lastRunId": "implementer-ee884a3b1f8913b59b0290f3",
+        "claimedAt": "2026-07-13T05:13:01.564Z",
+        "claimedByContextId": "pi_019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/session-title.ts` — Added pure `studioChildSessionTitle()` with 50-char budget (id > title > member); `displayTitleForSession()` routes Studio children through it.\n- `lib/types.ts` — `StudioChildSessionDisplay` gains optional UI-only `subtaskId`.\n- `lib/session-reader.ts` — Projection returns `subtaskId`; cache key is `cwd:taskId:subtaskId:runId`; header-only fallback when task detail missing/fails.\n- `lib/ypi-studio-child-session-runner.ts` — `studioChildSessionInfoName()` uses the shared helper (no separate `YPI Studio … · runId` envelope).\n- `components/SessionSidebar.tsx` — Detail/tooltip prefer projected `subtaskId`; main title still via `displayTitleForSession()`.\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `npm run test:studio-sdk-runner` — pass\n- `npm run test:session-title` — script not present yet (TITLE-CHECKS)\n- Ad-hoc smoke of `studioChildSessionTitle` / `displayTitleForSession` — pass\n\n#### Notes / Risks\n\n- TITLE-CHECKS still needs focused tests, docs, and manual sidebar cases.\n- New child `session_info` names drop the old envelope; run short id remains in detail/tooltip only.\n- No JSONL rewrite/schema change; legacy rows rely on read-time projection.\n- No product decisions needed from main session for this subtask."
+      },
+      "TITLE-CHECKS": {
+        "id": "TITLE-CHECKS",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:19:14.745Z",
+        "startedAt": "2026-07-13T05:16:26.330Z",
+        "finishedAt": "2026-07-13T05:19:14.744Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-9843b562cd104ceec7744d6c"
+        ],
+        "lastRunId": "implementer-9843b562cd104ceec7744d6c",
+        "claimedAt": "2026-07-13T05:16:26.330Z",
+        "claimedByContextId": "pi_019f59d6-8c13-748e-b84c-a7efbcdb9c95",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-session-title.mjs` — helper + projection cache isolation tests\n- `scripts/test-ypi-studio-sdk-runner.mjs` — shared title helper contract\n- `package.json` — `test:session-title`\n- `docs/modules/library.md` — canonical titles, cache key, no JSONL migration\n- `docs/modules/frontend.md` — sidebar title/detail split\n- `docs/architecture/overview.md` — projection + formatter contract\n- `docs/standards/code-style.md` — focused test scripts\n- `.ypi/tasks/.../checks.md` — validation evidence + manual gaps\n- `.ypi/tasks/.../handoff.md` — TITLE-CHECKS complete\n\n#### Verification\n- `npm run test:session-title` — passed (11)\n- `npm run test:studio-sdk-runner` — passed\n- `npm run lint` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n\n#### Notes / Risks\n- Live browser/SDK child run not executed; narrow-sidebar ellipsis/hover remains residual manual risk.\n- No product decisions needed; TITLE-CHECKS done."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-13T05:12:44.933Z",
+        "subtaskId": "UI-STEP-TITLE",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:12:52.158Z",
+        "subtaskId": "UI-STEP-TITLE",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-13T05:13:01.564Z",
+        "subtaskId": "TITLE-PROJECTION",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:16:26.330Z",
+        "subtaskId": "TITLE-CHECKS",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

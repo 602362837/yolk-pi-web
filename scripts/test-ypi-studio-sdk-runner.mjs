@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeSessionHeader } from "../lib/ypi-studio-child-session-header.ts";
 import { parseSessionHeaderMetadata } from "../lib/session-header-metadata.ts";
+import { studioChildSessionTitle } from "../lib/session-title.ts";
 
 const now = "2026-07-07T00:00:00.000Z";
 const root = mkdtempSync(join(tmpdir(), "ypi-studio-sdk-runner-"));
@@ -58,6 +59,27 @@ try {
   assert.equal(metadata.studioChild?.taskId, "task-1");
   assert.equal(metadata.studioChild?.runId, "run-1");
   assert.equal(metadata.studioChild?.member, "checker");
+  assert.equal(metadata.studioChild?.subtaskId, "sdk-runner-validation-docs");
+
+  // Durable session_info names share the pure title helper used by sidebar projection.
+  assert.equal(
+    studioChildSessionTitle({
+      subtaskId: metadata.studioChild?.subtaskId,
+      subtaskTitle: "Validate header docs",
+      member: metadata.studioChild?.member,
+      taskTitle: "SDK runner task",
+      taskId: metadata.studioChild?.taskId,
+    }),
+    "sdk-runner-validation-docs · Validate header docs",
+  );
+  assert.equal(
+    studioChildSessionTitle({
+      member: "architect",
+      taskTitle: "SDK runner task",
+      taskId: metadata.studioChild?.taskId,
+    }),
+    "architect · SDK runner task",
+  );
 
   const mergedHeader = writeSessionHeader(childSessionFile, {
     studioChild: { ...header.studioChild, status: "succeeded", finishedAt: now, terminationReason: "done" },

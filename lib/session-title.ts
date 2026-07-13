@@ -32,23 +32,81 @@ function taskIdTitleFallback(taskId?: string): string {
   return parts[parts.length - 1] ?? value;
 }
 
-function memberPrefixedStudioChildTitle(member: string | undefined, value: string | undefined): string {
-  const normalized = collapseWhitespace(value ?? "");
-  if (!normalized) return "";
-  const normalizedMember = collapseWhitespace(member ?? "");
-  return truncateSessionTitle(normalizedMember ? `${normalizedMember} · ${normalized}` : normalized);
+export interface StudioChildSessionTitleInput {
+  subtaskId?: string;
+  subtaskTitle?: string;
+  member?: string;
+  taskTitle?: string;
+  runSummary?: string;
+  taskId?: string;
+  maxLength?: number;
+}
+
+/** Prefer stable step id, then title; drop member from the main title when a subtask is bound. */
+function formatSubtaskSessionTitle(subtaskId: string, subtaskTitle: string, maxLength: number): string {
+  if (subtaskId.length >= maxLength) return subtaskId.slice(0, maxLength);
+  if (!subtaskTitle) return subtaskId;
+  const separator = " · ";
+  const remaining = maxLength - subtaskId.length - separator.length;
+  if (remaining <= 0) return subtaskId;
+  const titlePart = subtaskTitle.length > remaining ? subtaskTitle.slice(0, remaining) : subtaskTitle;
+  return titlePart ? `${subtaskId}${separator}${titlePart}` : subtaskId;
+}
+
+/** Prefer full `member · taskTitle`; when over budget keep the task title (title > member). */
+function formatMemberTaskTitle(member: string, taskTitle: string, maxLength: number): string {
+  if (member) {
+    const full = `${member} · ${taskTitle}`;
+    if (full.length <= maxLength) return full;
+  }
+  return truncateSessionTitle(taskTitle, maxLength);
+}
+
+function memberPrefixedStudioChildTitle(member: string, value: string, maxLength: number): string {
+  if (!value) return "";
+  if (!member) return truncateSessionTitle(value, maxLength);
+  return truncateSessionTitle(`${member} · ${value}`, maxLength);
+}
+
+/**
+ * Canonical Studio child session title for sidebar display and new session_info names.
+ * Priority: subtaskId+title > subtaskId > member+taskTitle > member+runSummary > member+taskId.
+ */
+export function studioChildSessionTitle(input: StudioChildSessionTitleInput): string {
+  const maxLength = input.maxLength ?? SESSION_TITLE_MAX_LENGTH;
+  const subtaskId = collapseWhitespace(input.subtaskId ?? "");
+  const subtaskTitle = collapseWhitespace(input.subtaskTitle ?? "");
+  const member = collapseWhitespace(input.member ?? "");
+  const taskTitle = collapseWhitespace(input.taskTitle ?? "");
+  const runSummary = collapseWhitespace(input.runSummary ?? "");
+  const taskId = taskIdTitleFallback(input.taskId);
+
+  if (subtaskId) {
+    return formatSubtaskSessionTitle(subtaskId, subtaskTitle, maxLength);
+  }
+  if (taskTitle) {
+    return formatMemberTaskTitle(member, taskTitle, maxLength);
+  }
+  if (runSummary) {
+    return memberPrefixedStudioChildTitle(member, runSummary, maxLength);
+  }
+  if (taskId) {
+    return memberPrefixedStudioChildTitle(member, taskId, maxLength);
+  }
+  return "";
 }
 
 export function displayTitleForSession(session: Pick<SessionInfo, "id" | "name" | "firstMessage" | "messageCount" | "studioChild" | "studioChildDisplay">): string {
   if (session.studioChild) {
-    const subtaskTitle = truncateSessionTitle(session.studioChildDisplay?.subtaskTitle ?? "");
-    if (subtaskTitle) return subtaskTitle;
-    const taskTitle = memberPrefixedStudioChildTitle(session.studioChild.member, session.studioChildDisplay?.taskTitle);
-    if (taskTitle) return taskTitle;
-    const runSummary = memberPrefixedStudioChildTitle(session.studioChild.member, session.studioChildDisplay?.runSummary);
-    if (runSummary) return runSummary;
-    const taskId = memberPrefixedStudioChildTitle(session.studioChild.member, taskIdTitleFallback(session.studioChild.taskId));
-    if (taskId) return taskId;
+    const title = studioChildSessionTitle({
+      subtaskId: session.studioChildDisplay?.subtaskId ?? session.studioChild.subtaskId,
+      subtaskTitle: session.studioChildDisplay?.subtaskTitle,
+      member: session.studioChild.member,
+      taskTitle: session.studioChildDisplay?.taskTitle,
+      runSummary: session.studioChildDisplay?.runSummary,
+      taskId: session.studioChild.taskId,
+    });
+    if (title) return title;
   }
   if (session.name?.trim()) return session.name.trim();
   const firstMessage = truncateSessionTitle(session.firstMessage ?? "");

@@ -1,4 +1,3 @@
-import { basename } from "node:path";
 import type { ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import { readSessionHeaderFromFile } from "./session-project-link";
 import { writeSessionHeader } from "./ypi-studio-child-session-header";
@@ -11,6 +10,7 @@ import {
 } from "./ypi-studio-transcripts";
 import { registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
+import { studioChildSessionTitle } from "./session-title";
 import type { SessionHeader, StudioChildSessionInfo } from "./types";
 import type {
   YpiStudioSubagentCurrentTool,
@@ -121,17 +121,26 @@ function studioChildSubtaskTitle(detail: NonNullable<ReturnType<typeof getYpiStu
 }
 
 function studioChildSessionInfoName(root: string, meta: StudioSdkChildRunMeta): string {
-  const runShortId = meta.runId.slice(0, 8);
   try {
     const detail = getStudioChildTaskDetail(root, meta.taskId);
     const subtaskTitle = detail ? studioChildSubtaskTitle(detail, meta.subtaskId) : undefined;
-    if (subtaskTitle) return `YPI Studio ${oneLine(subtaskTitle, 80)} · ${meta.member} · ${runShortId}`;
-    const taskTitle = str(detail?.title);
-    if (taskTitle) return `YPI Studio ${meta.member} · ${oneLine(taskTitle, 80)} · ${runShortId}`;
+    const title = studioChildSessionTitle({
+      subtaskId: meta.subtaskId,
+      subtaskTitle,
+      member: meta.member,
+      taskTitle: str(detail?.title),
+      taskId: meta.taskId,
+    });
+    if (title) return title;
   } catch {
     // Durable session_info is only a fallback; task.json remains the display authority.
   }
-  return `YPI Studio ${meta.member} · ${basename(meta.taskId)} · ${runShortId}`;
+  // Header/meta fields alone still produce a safe canonical title without inventing step numbers.
+  return studioChildSessionTitle({
+    subtaskId: meta.subtaskId,
+    member: meta.member,
+    taskId: meta.taskId,
+  }) || meta.member;
 }
 
 function boundedAppendTail(previous: string, addition: string, maxBytes: number): string {
