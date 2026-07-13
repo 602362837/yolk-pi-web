@@ -1,0 +1,1434 @@
+{
+  "schemaVersion": 1,
+  "id": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+  "title": "任务浮窗在等待审批时支持计划审批书预览",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334",
+  "createdAt": "2026-07-13T04:55:38.379Z",
+  "updatedAt": "2026-07-13T05:28:22.705Z",
+  "completedAt": "2026-07-13T05:27:46.790Z",
+  "contextIds": [
+    "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-30d2d16475360d94a511a926",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:55:47.528Z",
+      "finishedAt": "2026-07-13T05:08:01.485Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d4-d26b-7b98-adc3-f9678b3d3a64",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T04-55-47-563Z_019f59d4-d26b-7b98-adc3-f9678b3d3a64.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59d4-d26b-7b98-adc3-f9678b3d3a64",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "规划全流程已完成，任务已停在 `awaiting_approval`，未进入实现。\n\n### 产物\n\n目录：`.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/`\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `ui.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `ui-prototype.html` — UI 设计员交付的交互原型\n- `ui-designer-notes.md`\n\nImplementation Plan 已保存，共 5 个子任务。\n\n### 验证\n\n- HTML 解析、产物完整性、相对链接及机器计划结构：通过\n- Task API 状态验证：`awaiting_approval`\n- `approvalGate` 已建立，`approvalGrant` 尚未建立\n- 未修改生产代码，因此未运行 lint/tsc\n\n### 待主会话决定\n\n请用户审阅并批准：\n\n1. [计划审批书](.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/plan-review.md)\n2. [HTML 原型](.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/ui-prototype.html)\n\n重点确认入口位置、`IMP-xxx` 文案、只读审批边界及移动端弹窗形态。批准前不得进入 `implementing`。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:55:47.528Z",
+        "updatedAt": "2026-07-13T05:08:01.485Z",
+        "eventCount": 13121,
+        "lastTextPreview": "规划全流程已完成，任务已停在 `awaiting_approval`，未进入实现。\n\n### 产物\n\n目录：`.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/`\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `ui.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `ui-prototype.html` — UI 设计员交付的交互原型\n- `ui-designer-notes.md`\n\nImplementation Plan 已保存，共 5 个子任务。\n\n### 验证\n\n- HTML 解析、产物完整性、相对链接及机器计划结构：通过\n- Task API 状态验证：`awaiting_approval`\n- `approvalGate` 已建立，`approvalGrant` 尚未建立\n- 未修改生产代码，因此未运行 lint/tsc\n\n### 待主会话决定\n\n请用户审阅并批准：\n\n1. [计划审批书](.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/plan-review.md)\n2. [HTML 原型](.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/ui-prototype.html)\n\n重点确认入口位置、`IMP-xxx` 文案、只读审批边界及移动端弹窗形态。批准前不得进入 `implementing`。",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:07:49.602Z",
+            "toolCallId": "call_8xSLxCa1TwoGLGQEYTZjDhkI|fc_0555662dd049eae3016a5472a5aa80819a957484a1f925d95a",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nimport json,urllib.request,urllib.parse\\ncwd='/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334'; task='20260713-125538-任务浮窗在等待审批时支持计划审批书预览'\\nurl='http://localhost:30141/api/studio/tasks/'+urllib.parse.quote(task,safe='')+'?cwd='+urllib.parse.quote(cwd,safe='')\\nwith urllib.request.urlopen(url) as r: p=json.load(r)['task']\\nprint('status:',p['status']); print('currentMember:',p.get('currentMember')); print('planSubtasks:',len(p.get('implementationPlan',{}).get('subtasks',[]))); print('approvalGate:',bool(p.get('meta',{}).get('approvalGate'))); print('approvalGrant:',bool(p.get('meta',{}).get('approvalGrant')))\\nassert p['status']=='awaiting_approval'; assert len(p.get('implementationPlan',{}).get('subtasks',[]))==5; assert p.get('meta',{}).get('approvalGate'); assert not p.get('meta',{}).get('approvalGrant')\\nprint('task API validation: PASS')\\nPY\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:07:49.690Z",
+            "toolCallId": "call_DGzN8UfyMY8fCLYwdTse0W58|fc_0555662dd049eae3016a5472a5aa68819aa94f929c8a20de0d",
+            "toolName": "bash",
+            "text": "artifact/html/plan/link validation: PASS\n\n--- git status ---\n?? \".ypi/tasks/20260713-125538-\\344\\273\\273\\345\\212\\241\\346\\265\\256\\347\\252\\227\\345\\234\\250\\347\\255\\211\\345\\276\\205\\345\\256\\241\\346\\211\\271\\346\\227\\266\\346\\224\\257\\346\\214\\201\\350\\256\\241\\345\\210\\222\\345\\256\\241\\346\\211\\271\\344\\271\\246\\351\\242\\204\\350\\247\\210/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:07:52.811Z",
+            "toolCallId": "call_8xSLxCa1TwoGLGQEYTZjDhkI|fc_0555662dd049eae3016a5472a5aa80819a957484a1f925d95a",
+            "toolName": "bash",
+            "text": "status: awaiting_approval\ncurrentMember: main\nplanSubtasks: 5\napprovalGate: True\napprovalGrant: False\ntask API validation: PASS",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:08:01.478Z",
+            "text": "规划全流程已完成，任务已停在 `awaiting_approval`，未进入实现。\n\n### 产物\n\n目录：`.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/`\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `ui.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `ui-prototype.html` — UI 设计员交付的交互原型\n- `ui-designer-notes.md`\n\nImplementation Plan 已保存，共 5 个子任务。\n\n### 验证\n\n- HTML 解析、产物完整性、相对链接及机器计划结构：通过\n- Task API 状态验证：`awaiting_approval`\n- `approvalGate` 已建立，`approvalGrant` 尚未建立\n- 未修改生产代码，因此未运行 lint/tsc\n\n### 待主会话决定\n\n请用户审阅并批准：\n\n1. [计划审批书](.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/plan-review.md)\n2. [HTML 原型](.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/ui-prototype.html)\n\n重点确认入口位置、`IMP-xxx` 文案、只读审批边界及移动端弹窗形态。批准前不得进入 `implementing`。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:08:01.478Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 682,
+        "tokens": 396,
+        "tokenSource": "usage",
+        "tps": 81,
+        "firstTokenAt": "2026-07-13T05:07:56.343Z",
+        "lastTokenAt": "2026-07-13T05:08:01.232Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-30d2d16475360d94a511a926",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/architect-30d2d16475360d94a511a926.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:55:47.528Z",
+        "finishedAt": "2026-07-13T05:08:01.481Z",
+        "updatedAt": "2026-07-13T05:08:01.481Z",
+        "itemCount": 107,
+        "messageCount": 1,
+        "toolCallCount": 51,
+        "stderrBytes": 0,
+        "bytes": 355754,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59d4-d26b-7b98-adc3-f9678b3d3a64",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T04-55-47-563Z_019f59d4-d26b-7b98-adc3-f9678b3d3a64.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-deca074990f87448d2dce34c",
+      "subtaskId": "IMP-1",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:11:23.245Z",
+      "finishedAt": "2026-07-13T05:13:59.204Z",
+      "runner": "sdk",
+      "childSessionId": "019f59e3-1982-7283-a0a4-2a0b4bfe9f12",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-11-23-266Z_019f59e3-1982-7283-a0a4-2a0b4bfe9f12.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59e3-1982-7283-a0a4-2a0b4bfe9f12",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Subtask\n- **IMP-1** 共享任务本地预览链接逻辑\n\n#### Files Changed\n\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\n\n#### Verification\n\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\n- `node_modules/.bin/tsc --noEmit` — **passed**\n\n#### Notes / Risks\n\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\n- 未改 API / task schema / approval 写路径。\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:11:23.245Z",
+        "updatedAt": "2026-07-13T05:13:59.204Z",
+        "eventCount": 988,
+        "lastTextPreview": "### Implementation Complete\n\n#### Subtask\n- **IMP-1** 共享任务本地预览链接逻辑\n\n#### Files Changed\n\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\n\n#### Verification\n\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\n- `node_modules/.bin/tsc --noEmit` — **passed**\n\n#### Notes / Risks\n\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\n- 未改 API / task schema / approval 写路径。\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:13:31.885Z",
+            "toolCallId": "call-4155185b-6011-44b5-ab20-e279a49b579e-20|fc_ccc5efeb-236f-94ff-8cd3-24c039e64a46_0",
+            "toolName": "bash",
+            "text": "40:    \"lint\": \"eslint .\",\n83:  \"devDependencies\": {\n88:    \"eslint\": \"^9\",\n89:    \"eslint-config-next\": \"16.2.9\",\n92:    \"typescript\": \"5.9.3\"\nNODE_ENV=production\nnpm warn node_modules/react\nnpm warn   peer react@\"^16.8 || ^17 || ^18\" from @emoji-mart/react@1.1.1\nnpm warn   node_modules/@emoji-mart/react\nnpm warn     @emoji-mart/react@\"^1.1.1\" from @lobehub/ui@5.10.0\nnpm warn     node_modules/@lobehub/ui\n\nadded 302 packages, and audited 1199 packages in 8s\n\n322 packages are looking for funding\n  run `npm fund` for details\n\n11 vulnerabilities (2 low, 7 moderate, 2 high)\n\nTo address issues that do not require attention, run:\n  npm audit fix\n\nTo address all issues (including breaking changes), run:\n  npm audit fix --force\n\nRun `npm audit` for details.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:13:36.018Z",
+            "toolCallId": "call-19d51e1b-0195-4198-9018-0b3ef1c83fc7-21|fc_27b88c54-7b19-95f0-ae66-a6f9f4c97c54_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run lint 2>&1 | tail -60; echo '---TSC---'; node_modules/.bin/tsc --noEmit 2>&1 | tail -60\",\n  \"timeout\": 180\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:13:50.940Z",
+            "toolCallId": "call-19d51e1b-0195-4198-9018-0b3ef1c83fc7-21|fc_27b88c54-7b19-95f0-ae66-a6f9f4c97c54_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.12 lint\n> eslint .\n\n---TSC---",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:13:59.202Z",
+            "text": "### Implementation Complete\n\n#### Subtask\n- **IMP-1** 共享任务本地预览链接逻辑\n\n#### Files Changed\n\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\n\n#### Verification\n\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\n- `node_modules/.bin/tsc --noEmit` — **passed**\n\n#### Notes / Risks\n\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\n- 未改 API / task schema / approval 写路径。\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:13:59.202Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 984,
+        "tokens": 622,
+        "tokenSource": "usage",
+        "tps": 207.61,
+        "firstTokenAt": "2026-07-13T05:13:56.067Z",
+        "lastTokenAt": "2026-07-13T05:13:59.063Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-deca074990f87448d2dce34c",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/implementer-deca074990f87448d2dce34c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:11:23.245Z",
+        "finishedAt": "2026-07-13T05:13:59.202Z",
+        "updatedAt": "2026-07-13T05:13:59.202Z",
+        "itemCount": 49,
+        "messageCount": 1,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 91508,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59e3-1982-7283-a0a4-2a0b4bfe9f12",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-11-23-266Z_019f59e3-1982-7283-a0a4-2a0b4bfe9f12.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d855024e661538b66269bc8a",
+      "subtaskId": "IMP-2",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:14:24.602Z",
+      "finishedAt": "2026-07-13T05:17:56.377Z",
+      "runner": "sdk",
+      "childSessionId": "019f59e5-dde5-7cb0-ba04-e2115bfb6460",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-14-24-613Z_019f59e5-dde5-7cb0-ba04-e2115bfb6460.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59e5-dde5-7cb0-ba04-e2115bfb6460",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — IMP-2\n\n#### Files Changed\n\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\n\n未改动（按边界复用）：\n\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\n- 未接入浮窗入口（IMP-3 范围）\n\n#### 导出契约（供 IMP-3）\n\n```ts\nimport {\n  YpiStudioPlanReviewModal,\n  type YpiStudioPlanReviewTarget,\n} from \"@/components/YpiStudioPlanReviewModal\";\n\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\n```\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\n\n#### Notes / Risks\n\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:14:24.602Z",
+        "updatedAt": "2026-07-13T05:17:56.377Z",
+        "eventCount": 1382,
+        "lastTextPreview": "### Implementation Complete — IMP-2\n\n#### Files Changed\n\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\n\n未改动（按边界复用）：\n\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\n- 未接入浮窗入口（IMP-3 范围）\n\n#### 导出契约（供 IMP-3）\n\n```ts\nimport {\n  YpiStudioPlanReviewModal,\n  type YpiStudioPlanReviewTarget,\n} from \"@/components/YpiStudioPlanReviewModal\";\n\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\n```\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\n\n#### Notes / Risks\n\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:17:36.857Z",
+            "toolCallId": "call-252636ef-7bb8-41c1-b177-ce6e246ef585-33|fc_0bafdd39-2cb7-9da5-af34-34fb71f4115c_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334/components/YpiStudioPlanReviewModal.tsx.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:17:36.863Z",
+            "toolCallId": "call-252636ef-7bb8-41c1-b177-ce6e246ef585-34|fc_0bafdd39-2cb7-9da5-af34-34fb71f4115c_1",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334/components/YpiStudioPlanReviewModal.tsx.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:17:48.295Z",
+            "toolCallId": "call-252636ef-7bb8-41c1-b177-ce6e246ef585-35|fc_0bafdd39-2cb7-9da5-af34-34fb71f4115c_2",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.12 lint\n> eslint .",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:17:56.373Z",
+            "text": "### Implementation Complete — IMP-2\n\n#### Files Changed\n\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\n\n未改动（按边界复用）：\n\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\n- 未接入浮窗入口（IMP-3 范围）\n\n#### 导出契约（供 IMP-3）\n\n```ts\nimport {\n  YpiStudioPlanReviewModal,\n  type YpiStudioPlanReviewTarget,\n} from \"@/components/YpiStudioPlanReviewModal\";\n\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\n```\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\n\n#### Notes / Risks\n\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:17:56.373Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1298,
+        "tokens": 749,
+        "tokenSource": "usage",
+        "tps": 3.97,
+        "firstTokenAt": "2026-07-13T05:14:47.698Z",
+        "lastTokenAt": "2026-07-13T05:17:56.338Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d855024e661538b66269bc8a",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/implementer-d855024e661538b66269bc8a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:14:24.602Z",
+        "finishedAt": "2026-07-13T05:17:56.376Z",
+        "updatedAt": "2026-07-13T05:17:56.376Z",
+        "itemCount": 80,
+        "messageCount": 4,
+        "toolCallCount": 36,
+        "stderrBytes": 0,
+        "bytes": 159692,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f59e5-dde5-7cb0-ba04-e2115bfb6460",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-14-24-613Z_019f59e5-dde5-7cb0-ba04-e2115bfb6460.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-179e8d69fb2e28673ed34324",
+      "subtaskId": "IMP-3",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:18:32.535Z",
+      "finishedAt": "2026-07-13T05:21:17.929Z",
+      "runner": "sdk",
+      "childSessionId": "019f59e9-a665-7ef9-aa8d-30fce9e48f2d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-18-32-549Z_019f59e9-a665-7ef9-aa8d-30fce9e48f2d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59e9-a665-7ef9-aa8d-30fce9e48f2d",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — IMP-3\n\n#### Files Changed\n\n- `components/YpiStudioSessionWidget.tsx` — 主任务 `awaiting_approval` / 改进项 `waiting_plan_approval` 独立入口；action row；`planReviewTarget` + `YpiStudioPlanReviewModal`；`cwd` / `onOpenFile` props；session/cwd 变化清 stale target；桌面/移动共用\n- `components/AppShell.tsx` — 向 widget 传入 `studioCwd` 与 `handleOpenFile`\n- `app/globals.css` — 浮窗审批入口 action row / amber 次级按钮样式（flex-wrap，适配 360px）\n\n未改：`lib/ypi-studio-types.ts`（投影已含 status/improvements，无需正文投影）\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器主/多改进项矩阵留给 **IMP-5**\n\n#### Notes / Risks\n\n- 入口仅按语义状态显隐；每个改进项用稳定 `improvementId`，不猜测\n- Modal 只读，无 PATCH / approval grant\n- 360px 宽度未改；详情箭头 / 拖拽事件已 `stopPropagation`\n- 风险：多改进项串读、焦点/移动布局需 IMP-5 浏览器验收\n- 主会话请将 **IMP-3 → done**，再 claim **IMP-4**（docs）",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:18:32.535Z",
+        "updatedAt": "2026-07-13T05:21:17.929Z",
+        "eventCount": 1353,
+        "lastTextPreview": "### Implementation Complete — IMP-3\n\n#### Files Changed\n\n- `components/YpiStudioSessionWidget.tsx` — 主任务 `awaiting_approval` / 改进项 `waiting_plan_approval` 独立入口；action row；`planReviewTarget` + `YpiStudioPlanReviewModal`；`cwd` / `onOpenFile` props；session/cwd 变化清 stale target；桌面/移动共用\n- `components/AppShell.tsx` — 向 widget 传入 `studioCwd` 与 `handleOpenFile`\n- `app/globals.css` — 浮窗审批入口 action row / amber 次级按钮样式（flex-wrap，适配 360px）\n\n未改：`lib/ypi-studio-types.ts`（投影已含 status/improvements，无需正文投影）\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器主/多改进项矩阵留给 **IMP-5**\n\n#### Notes / Risks\n\n- 入口仅按语义状态显隐；每个改进项用稳定 `improvementId`，不猜测\n- Modal 只读，无 PATCH / approval grant\n- 360px 宽度未改；详情箭头 / 拖拽事件已 `stopPropagation`\n- 风险：多改进项串读、焦点/移动布局需 IMP-5 浏览器验收\n- 主会话请将 **IMP-3 → done**，再 claim **IMP-4**（docs）",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:21:09.932Z",
+            "toolCallId": "call-0a9ae459-88ba-4d91-89a1-49566abae433-39|fc_d4fd4417-e150-92bb-80cb-a30dc9e9063b_1",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334/components/YpiStudioSessionWidget.tsx\",\n  \"offset\": 500,\n  \"limit\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:21:09.947Z",
+            "toolCallId": "call-0a9ae459-88ba-4d91-89a1-49566abae433-38|fc_d4fd4417-e150-92bb-80cb-a30dc9e9063b_0",
+            "toolName": "bash",
+            "text": "96:            \"inputPreview\": \"{\\n  \\\"command\\\": \\\"python3 - <<'PY'\\\\nimport json,urllib.request,urllib.parse\\\\ncwd='/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334'; task='20260713-125538-任务浮窗在等待审批时支持计划审批书预览'\\\\nurl='http://localhost:30141/api/studio/tasks/'+urllib.parse.quote(task,safe='')+'?cwd='+urllib.parse.quote(cwd,safe='')\\\\nwith urllib.request.urlopen(url) as r: p=json.load(r)['task']\\\\nprint('status:',p['status']); print('currentMember:',p.get('currentMember')); print('planSubtasks:',len(p.get('implementationPlan',{}).get('subtasks',[]))); print('approvalGate:',bool(p.get('meta',{}).get('approvalGate'))); print('approvalGrant:',bool(p.get('meta',{}).get('approvalGrant')))\\\\nassert p['status']=='awaiting_approval'; assert len(p.get('implementationPlan',{}).get('subtasks',[]))==5; assert p.get('meta',{}).get('approvalGate'); assert not p.get('meta',{}).get('approvalGrant')\\\\nprint('task API validation: PASS')\\\\nPY\\\",\\n  \\\"timeout\\\": 20\\n}\",\n195:      \"summary\": \"### Implementation Complete\\n\\n#### Subtask\\n- **IMP-1** 共享任务本地预览链接逻辑\\n\\n#### Files Changed\\n\\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\\n\\n#### Verification\\n\\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\\n- `node_modules/.bin/tsc --noEmit` — **passed**\\n\\n#### Notes / Risks\\n\\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\\n- 未改 API / task schema / approval 写路径。\\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。\",\n236:        \"lastTextPreview\": \"### Implementation Complete\\n\\n#### Subtask\\n- **IMP-1** 共享任务本地预览链接逻辑\\n\\n#### Files Changed\\n\\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\\n\\n#### Verification\\n\\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\\n- `node_modules/.bin/tsc --noEmit` — **passed**\\n\\n#### Notes / Risks\\n\\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\\n- 未改 API / task schema / approval 写路径。\\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。\",\n267:            \"text\": \"### Implementation Complete\\n\\n#### Subtask\\n- **IMP-1** 共享任务本地预览链接逻辑\\n\\n#### Files Changed\\n\\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\\n\\n#### Verification\\n\\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\\n- `node_modules/.bin/tsc --noEmit` — **passed**\\n\\n#### Notes / Risks\\n\\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\\n- 未改 API / task schema / approval 写路径。\\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。\",\n342:      \"summary\": \"### Implementation Complete — IMP-2\\n\\n#### Files Changed\\n\\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\\n\\n未改动（按边界复用）：\\n\\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\\n- 未接入浮窗入口（IMP-3 范围）\\n\\n#### 导出契约（供 IMP-3）\\n\\n```ts\\nimport {\\n  YpiStudioPlanReviewModal,\\n  type YpiStudioPlanReviewTarget,\\n} from \\\"@/components/YpiStudioPlanReviewModal\\\";\\n\\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\\n```\\n\\n#### Verification\\n\\n- `npm run lint` — pass\\n- `node_modules/.bin/tsc --noEmit` — pass\\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\\n\\n#### Notes / Risks\\n\\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）\",\n383:        \"lastTextPreview\": \"### Implementation Complete — IMP-2\\n\\n#### Files Changed\\n\\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\\n\\n未改动（按边界复用）：\\n\\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\\n- 未接入浮窗入口（IMP-3 范围）\\n\\n#### 导出契约（供 IMP-3）\\n\\n```ts\\nimport {\\n  YpiStudioPlanReviewModal,\\n  type YpiStudioPlanReviewTarget,\\n} from \\\"@/components/YpiStudioPlanReviewModal\\\";\\n\\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\\n```\\n\\n#### Verification\\n\\n- `npm run lint` — pass\\n- `node_modules/.bin/tsc --noEmit` — pass\\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\\n\\n#### Notes / Risks\\n\\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）\",\n415:            \"text\": \"### Implementation Complete — IMP-2\\n\\n#### Files Changed\\n\\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\\n\\n未改动（按边界复用）：\\n\\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\\n- 未接入浮窗入口（IMP-3 范围）\\n\\n#### 导出契约（供 IMP-3）\\n\\n```ts\\nimport {\\n  YpiStudioPlanReviewModal,\\n  type YpiStudioPlanReviewTarget,\\n} from \\\"@/components/YpiStudioPlanReviewModal\\\";\\n\\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\\n```\\n\\n#### Verification\\n\\n- `npm run lint` — pass\\n- `node_modules/.bin/tsc --noEmit` — pass\\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\\n\\n#### Notes / Risks\\n\\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）\",\n471:      \"subtaskId\": \"IMP-3\",\n489:      \"prompt\": \"实现子任务 IMP-3：在 Studio 任务浮窗接入审批入口。 按 implement.md / design.md / ui.md / plan-review.md： - 在 YpiStudioSessionWidget 中： - 主任务 awaiting_approval 显示「计划审批书」 - 每个 waiting_plan_approval 改进项显示「计划审批书 · IMP-xxx」 - 入口在状态元信息后的独立 action row - AppShell 传入…\",\n536:            \"text\": \"实现子任务 IMP-3：在 Studio 任务浮窗接入审批入口。\\n\\n按 implement.md / design.md / ui.md / plan-review.md：\\n- 在 YpiStudioSessionWidget 中：\\n  - 主任务 awaiting_approval 显示「计划审批书」\\n  - 每个 waiting_plan_approval 改进项显示「计划审批书 · IMP-xxx」\\n  - 入口在状态元信息后的独立 action row\\n- AppShell 传入 cwd / handleOpenFile 等所需 props\\n- 点击打开 IMP-2 的只读 modal，正确携带 taskKey 与 improvementId\\n- 非审批态不显示入口；不改 360px 宽度；不破坏详情/拖拽/收纳\\n- 不要越界做 IMP-4 文档或 IMP-5 全量验收以外的事\\n- 完成后更新子任务状态\",\n592:  \"implementationPlan\": {\n621:          \"id\": \"IMP-3\",\n628:            \"IMP-3\"\n636:            \"IMP-3\"\n647:            \"IMP-3\",\n722:        \"id\": \"IMP-3\",\n762:          \"IMP-3\"\n765:          \"IMP-3\"\n789:          \"IMP-3\",\n793:          \"IMP-3\",\n825:  \"implementationProgress\": {\n828:    \"activeSubtaskId\": \"IMP-3\",\n830:      \"IMP-3\"\n858:        \"summary\": \"### Implementation Complete\\n\\n#### Subtask\\n- **IMP-1** 共享任务本地预览链接逻辑\\n\\n#### Files Changed\\n\\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\\n\\n#### Verification\\n\\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\\n- `node_modules/.bin/tsc --noEmit` — **passed**\\n\\n#### Notes / Risks\\n\\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\\n- 未改 API / task schema / approval 写路径。\\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。\"\n873:        \"summary\": \"### Implementation Complete — IMP-2\\n\\n#### Files Changed\\n\\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\\n\\n未改动（按边界复用）：\\n\\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\\n- 未接入浮窗入口（IMP-3 范围）\\n\\n#### 导出契约（供 IMP-3）\\n\\n```ts\\nimport {\\n  YpiStudioPlanReviewModal,\\n  type YpiStudioPlanReviewTarget,\\n} from \\\"@/components/YpiStudioPlanReviewModal\\\";\\n\\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\\n```\\n\\n#### Verification\\n\\n- `npm run lint` — pass\\n- `node_modules/.bin/tsc --noEmit` — pass\\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\\n\\n#### Notes / Risks\\n\\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）\"\n875:      \"IMP-3\": {\n876:        \"id\": \"IMP-3\",\n897:            \"id\": \"IMP-3\",\n911:            \"id\": \"IMP-3\",\n938:        \"subtaskId\": \"IMP-3\",",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:21:09.965Z",
+            "toolCallId": "call-0a9ae459-88ba-4d91-89a1-49566abae433-39|fc_d4fd4417-e150-92bb-80cb-a30dc9e9063b_1",
+            "toolName": "read",
+            "text": "{/* Improvement flow — bounded summary; never includes full feedback. */}\n      {improvements && improvementUnresolved > 0 && (\n        <div\n          className=\"ypi-studio-widget-improvement\"\n          style={{ display: \"flex\", flexDirection: \"column\", gap: 2, marginBottom: 3, padding: \"5px 7px\", borderRadius: 7, border: \"1px solid rgba(245,158,11,0.35)\", background: \"rgba(245,158,11,0.08)\" }}\n          aria-live=\"polite\"\n        >\n          <span style={{ fontSize: 10, fontWeight: 800, color: \"#b45309\", overflow: \"hidden\", textOverflow: \"ellipsis\", whiteSpace: \"nowrap\" }}>\n            待处理改进 {improvementUnresolved} 项\n          </span>\n          {improvements.blocker && (\n            <span style={{ fontSize: 10, color: \"#b45309\", overflow: \"hidden\", textOverflow: \"ellipsis\", whiteSpace: \"nowrap\" }}>\n              阻塞：{improvements.blocker}\n            </span>\n          )}\n          {improvements.nextAction && (\n            <span style={{ fontSize: 10, color: \"var(--accent)\", fontWeight: 700, overflow: \"hidden\", textOverflow: \"ellipsis\", whiteSpace: \"nowrap\" }}>\n              下一步：{improvements.nextAction}\n            </span>\n          )}\n        </div>\n      )}\n      {improvements && improvements.parentStatus === \"review_ready\" && improvementUnresolved === 0 && improvements.total > 0 && (\n        <div style={{ fontSize: 10, fontWeight: 700, color: \"var(--accent)\", marginBottom: 3, overflow: \"hidden\", textOverflow: \"ellipsis\", whiteSpace: \"nowrap\" }} aria-live=\"polite\">\n          改进已完成，主任务需要再次验收\n        </div>\n      )}\n\n      {/* Waiting-approval plan review entries only — never grant approval. */}\n      {planReviewEntries.length > 0 && (\n        <div className=\"ypi-studio-widget-plan-action-row\" role=\"group\" aria-label=\"计划审批书预览\">\n          {planReviewEntries.map((entry) => (\n            <button\n              key={entry.key}\n              type=\"button\"\n              className=\"ypi-studio-widget-plan-review-btn\"\n              aria-label={entry.ariaLabel}\n              title={entry.label}\n              onPointerDown={(event) => event.stopPropagation()}\n              onClick={(event) => {\n                event.stopPropagation();\n                onPreviewPlan?.(entry.target);\n              }}\n            >\n              <span className=\"ypi-studio-widget-plan-review-btn-icon\" aria-hidden=\"true\">▦</span>\n              {entry.label}\n            </button>\n          ))}\n        </div>\n      )}\n\n      {/* Runtime */}\n      {runtime && runtime.status !== \"idle\" && (\n        <div style={{\n          display: \"flex\", gap: 5, alignItems: \"center\", marginBottom: 3,\n          color: runtime.status === \"needs_user\" ? \"#f59e0b\" : runtime.status === \"completed\" ? \"#22c55e\" : \"var(--accent)\",\n          fontSize: 10, fontWeight: 700, overflow: \"hidden\",\n        }}>\n          <span\n\n[559 more lines in file. Use offset=560 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:21:17.916Z",
+            "text": "### Implementation Complete — IMP-3\n\n#### Files Changed\n\n- `components/YpiStudioSessionWidget.tsx` — 主任务 `awaiting_approval` / 改进项 `waiting_plan_approval` 独立入口；action row；`planReviewTarget` + `YpiStudioPlanReviewModal`；`cwd` / `onOpenFile` props；session/cwd 变化清 stale target；桌面/移动共用\n- `components/AppShell.tsx` — 向 widget 传入 `studioCwd` 与 `handleOpenFile`\n- `app/globals.css` — 浮窗审批入口 action row / amber 次级按钮样式（flex-wrap，适配 360px）\n\n未改：`lib/ypi-studio-types.ts`（投影已含 status/improvements，无需正文投影）\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器主/多改进项矩阵留给 **IMP-5**\n\n#### Notes / Risks\n\n- 入口仅按语义状态显隐；每个改进项用稳定 `improvementId`，不猜测\n- Modal 只读，无 PATCH / approval grant\n- 360px 宽度未改；详情箭头 / 拖拽事件已 `stopPropagation`\n- 风险：多改进项串读、焦点/移动布局需 IMP-5 浏览器验收\n- 主会话请将 **IMP-3 → done**，再 claim **IMP-4**（docs）",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:21:17.918Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 888,
+        "tokens": 495,
+        "tokenSource": "usage",
+        "tps": 6.15,
+        "firstTokenAt": "2026-07-13T05:19:57.372Z",
+        "lastTokenAt": "2026-07-13T05:21:17.914Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-179e8d69fb2e28673ed34324",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/implementer-179e8d69fb2e28673ed34324.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:18:32.535Z",
+        "finishedAt": "2026-07-13T05:21:17.923Z",
+        "updatedAt": "2026-07-13T05:21:17.923Z",
+        "itemCount": 86,
+        "messageCount": 2,
+        "toolCallCount": 40,
+        "stderrBytes": 0,
+        "bytes": 180375,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59e9-a665-7ef9-aa8d-30fce9e48f2d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-18-32-549Z_019f59e9-a665-7ef9-aa8d-30fce9e48f2d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a774173b4a3e64b6da108cdc",
+      "subtaskId": "IMP-4",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:21:34.727Z",
+      "finishedAt": "2026-07-13T05:22:38.182Z",
+      "runner": "sdk",
+      "childSessionId": "019f59ec-6e23-7133-ac42-02ee5bd9c1b2",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-21-34-755Z_019f59ec-6e23-7133-ac42-02ee5bd9c1b2.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59ec-6e23-7133-ac42-02ee5bd9c1b2",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — Documented:\n  - `YpiStudioSessionWidget` waiting-approval plan-review entries (`awaiting_approval` / `waiting_plan_approval`), `cwd`/`onOpenFile`, on-demand modal target (no body in projection), read-only boundary\n  - New `YpiStudioPlanReviewModal` (fetch/state machine, Markdown/HTML links, a11y, mobile layout, no write APIs)\n  - `YpiStudioPanel` shared `lib/ypi-studio-task-preview` helpers\n  - `AppShell` passes Studio `cwd` + `handleOpenFile` to the widget\n  - `MarkdownBody` optional `onLinkClick` for Studio previews\n  - Plan-review widget/modal CSS classes in Styles\n- `docs/modules/library.md` — Added `lib/ypi-studio-task-preview.ts` (referenced by frontend docs; client UX only, server remains authority)\n\n#### Verification\n\n- Manual对照: widget entry conditions, modal props/API, helper exports, CSS class names, AppShell props match implementation\n- No production code changes; lint/tsc not required for docs-only IMP-4\n\n#### Notes / Risks\n\n- None blocking. IMP-5 still owns browser matrix and automatic checks.\n- Docs explicitly state: preview does **not** grant approval and does **not** embed `plan-review.md` in widget projection.\n\n#### Handoff\n\nIMP-4 done. Main session can mark IMP-4 complete and claim IMP-5.",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:21:34.727Z",
+        "updatedAt": "2026-07-13T05:22:38.182Z",
+        "eventCount": 878,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — Documented:\n  - `YpiStudioSessionWidget` waiting-approval plan-review entries (`awaiting_approval` / `waiting_plan_approval`), `cwd`/`onOpenFile`, on-demand modal target (no body in projection), read-only boundary\n  - New `YpiStudioPlanReviewModal` (fetch/state machine, Markdown/HTML links, a11y, mobile layout, no write APIs)\n  - `YpiStudioPanel` shared `lib/ypi-studio-task-preview` helpers\n  - `AppShell` passes Studio `cwd` + `handleOpenFile` to the widget\n  - `MarkdownBody` optional `onLinkClick` for Studio previews\n  - Plan-review widget/modal CSS classes in Styles\n- `docs/modules/library.md` — Added `lib/ypi-studio-task-preview.ts` (referenced by frontend docs; client UX only, server remains authority)\n\n#### Verification\n\n- Manual对照: widget entry conditions, modal props/API, helper exports, CSS class names, AppShell props match implementation\n- No production code changes; lint/tsc not required for docs-only IMP-4\n\n#### Notes / Risks\n\n- None blocking. IMP-5 still owns browser matrix and automatic checks.\n- Docs explicitly state: preview does **not** grant approval and does **not** embed `plan-review.md` in widget projection.\n\n#### Handoff\n\nIMP-4 done. Main session can mark IMP-4 complete and claim IMP-5.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:22:30.274Z",
+            "toolCallId": "call-f548a81a-76a2-4889-97aa-4dcf9a34b198-16|fc_22f29c5c-8a3e-9970-bbb6-d7c7c44173ad_1",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"ypi-studio-widget-plan|onLinkClick\\\" components/MarkdownBody.tsx app/globals.css | head -20; ls components/MarkdownBody.tsx; rg -n \\\"onLinkClick\\\" components/MarkdownBody.tsx | head -10\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:22:30.292Z",
+            "toolCallId": "call-f548a81a-76a2-4889-97aa-4dcf9a34b198-15|fc_22f29c5c-8a3e-9970-bbb6-d7c7c44173ad_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334/docs/modules/library.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:22:30.300Z",
+            "toolCallId": "call-f548a81a-76a2-4889-97aa-4dcf9a34b198-16|fc_22f29c5c-8a3e-9970-bbb6-d7c7c44173ad_1",
+            "toolName": "bash",
+            "text": "components/MarkdownBody.tsx:15:  onLinkClick?: (href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => void | boolean;\ncomponents/MarkdownBody.tsx:37:export function MarkdownBody({ children, className, isStreaming, onLinkClick }: MarkdownBodyProps) {\ncomponents/MarkdownBody.tsx:76:            if (!onLinkClick || !href) return <a href={href} {...props}>{children}</a>;\ncomponents/MarkdownBody.tsx:82:                  const result = onLinkClick(href, flattenReactNodeText(children), event);\napp/globals.css:1000:.ypi-studio-widget-plan-action-row {\napp/globals.css:1008:.ypi-studio-widget-plan-review-btn {\napp/globals.css:1028:.ypi-studio-widget-plan-review-btn:hover {\napp/globals.css:1033:.ypi-studio-widget-plan-review-btn:focus-visible {\napp/globals.css:1038:.ypi-studio-widget-plan-review-btn-icon {\ncomponents/MarkdownBody.tsx\n15:  onLinkClick?: (href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => void | boolean;\n37:export function MarkdownBody({ children, className, isStreaming, onLinkClick }: MarkdownBodyProps) {\n76:            if (!onLinkClick || !href) return <a href={href} {...props}>{children}</a>;\n82:                  const result = onLinkClick(href, flattenReactNodeText(children), event);",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:22:38.178Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — Documented:\n  - `YpiStudioSessionWidget` waiting-approval plan-review entries (`awaiting_approval` / `waiting_plan_approval`), `cwd`/`onOpenFile`, on-demand modal target (no body in projection), read-only boundary\n  - New `YpiStudioPlanReviewModal` (fetch/state machine, Markdown/HTML links, a11y, mobile layout, no write APIs)\n  - `YpiStudioPanel` shared `lib/ypi-studio-task-preview` helpers\n  - `AppShell` passes Studio `cwd` + `handleOpenFile` to the widget\n  - `MarkdownBody` optional `onLinkClick` for Studio previews\n  - Plan-review widget/modal CSS classes in Styles\n- `docs/modules/library.md` — Added `lib/ypi-studio-task-preview.ts` (referenced by frontend docs; client UX only, server remains authority)\n\n#### Verification\n\n- Manual对照: widget entry conditions, modal props/API, helper exports, CSS class names, AppShell props match implementation\n- No production code changes; lint/tsc not required for docs-only IMP-4\n\n#### Notes / Risks\n\n- None blocking. IMP-5 still owns browser matrix and automatic checks.\n- Docs explicitly state: preview does **not** grant approval and does **not** embed `plan-review.md` in widget projection.\n\n#### Handoff\n\nIMP-4 done. Main session can mark IMP-4 complete and claim IMP-5.",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:22:38.179Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1306,
+        "tokens": 511,
+        "tokenSource": "usage",
+        "tps": 135.98,
+        "firstTokenAt": "2026-07-13T05:22:34.419Z",
+        "lastTokenAt": "2026-07-13T05:22:38.177Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a774173b4a3e64b6da108cdc",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/implementer-a774173b4a3e64b6da108cdc.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:21:34.727Z",
+        "finishedAt": "2026-07-13T05:22:38.179Z",
+        "updatedAt": "2026-07-13T05:22:38.179Z",
+        "itemCount": 39,
+        "messageCount": 1,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 140764,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59ec-6e23-7133-ac42-02ee5bd9c1b2",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-21-34-755Z_019f59ec-6e23-7133-ac42-02ee5bd9c1b2.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-1f0a4c1ac886a9c18e173344",
+      "subtaskId": "IMP-5",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:22:53.853Z",
+      "finishedAt": "2026-07-13T05:24:18.949Z",
+      "runner": "sdk",
+      "childSessionId": "019f59ed-a337-7920-944c-aaeea347312f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-22-53-879Z_019f59ed-a337-7920-944c-aaeea347312f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59ed-a337-7920-944c-aaeea347312f",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — IMP-5\n\n#### Files Changed\n- None（验收通过，无需代码修复）\n\n#### Verification\n\n| Command / Check | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass (`ypi-studio DAG scheduler tests passed`) |\n| Focused helper probe (`resolveTaskRelativeHref` / `buildStudioTaskFileApiUrl` / improvement scope) | Pass：合法 `prd.md`/`ui-prototype.html` 通过；scheme、绝对路径、`..`、反斜杠拒绝；`improvementId` 仅改进 URL 携带 |\n| API `mode=read` `plan-review.md`（本任务目录） | Pass，正文 ~3072 字符 |\n| API 非法路径 | `400`：`..` / 绝对路径 / scheme / 反斜杠 |\n| API `mode=preview` HTML | `200` + CSP sandbox + `nosniff` + `no-referrer` |\n| Static code review vs `checks.md` | Pass（见下） |\n\n#### Static review (checks coverage)\n\n- **入口显隐**：`planReviewEntriesForTask` 仅主任务 `awaiting_approval` + 每个 `waiting_plan_approval` 实例；独立 `improvementId`，无 first-item 猜测。\n- **只读边界**：`YpiStudioPlanReviewModal` 无 PATCH/approve/grant/transition；固定只读提示文案与原型一致。\n- **按需读取**：打开后 `mode=read`；`AbortController` + `retryToken` + `active` stale guard；target 含 `taskKey`/`improvementId`。\n- **Projection**：`buildProjection` 仅 status/ids 等轻量字段，无 `plan-review` 正文。\n- **链接安全**：共享 `lib/ypi-studio-task-preview.ts`；Panel 已改为 import 共享 helper，无本地重复实现。\n- **a11y/布局**：`role=dialog` / `aria-modal` / focus trap / Escape / backdrop / 关闭按钮；桌面居中 + `≤640px` 近全屏底部 sheet；独立 action row 样式。\n- **文档**：`docs/modules/frontend.md` 已记录 widget 入口、modal 只读/按需读取、API 复用边界。\n- **原型一致性**：文案/状态机/入口位置与 `ui-prototype.html` 对齐；图标原型 `▤` vs 实现 `▦` 为非阻塞差异。\n\n#### Remaining manual browser items（需 checker / 主会话）\n\n当前主任务状态为 `implementing`，**未改 task 状态**（避免副作用），因此以下路径未在真实 UI 点通：\n\n1. 主任务 `awaiting_approval` 浮窗「计划审批书」点击 → loading/success → 关闭后仍绑定聊天、task.json 无 approval 写入  \n2. 双 `waiting_plan_approval` 改进项分别打开、URL `improvementId` 与正文不串读  \n3. 慢请求/404/403/网络失败/空 TBD/target 竞态 UI  \n4. Escape/遮罩/焦点恢复、长内容滚动、浅深色、360px 不溢出、`≤640px` pill → sheet → modal  \n5. 拖拽/收纳球/详情箭头无回归  \n\nAPI/helper/自动检查已覆盖安全与逻辑主干；dialog 焦点与移动布局仍需真实浏览器证据（checks 原风险已注明）。\n\n#### Notes / Risks\n- 无自动验证失败项，无本子任务范围内必修缺陷。  \n- Checker 需独立对照 `ui-prototype.html` 并完成上表浏览器矩阵后，主会话才可把 IMP-5 标为 done 并进入 checking。  \n- 若要构造 `awaiting_approval` / 多改进项样例，应由主会话决定是否临时改状态或另建 fixture，实现员未擅自改 task 状态。",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:22:53.853Z",
+        "updatedAt": "2026-07-13T05:24:18.949Z",
+        "eventCount": 1644,
+        "lastTextPreview": "### Implementation Complete — IMP-5\n\n#### Files Changed\n- None（验收通过，无需代码修复）\n\n#### Verification\n\n| Command / Check | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass (`ypi-studio DAG scheduler tests passed`) |\n| Focused helper probe (`resolveTaskRelativeHref` / `buildStudioTaskFileApiUrl` / improvement scope) | Pass：合法 `prd.md`/`ui-prototype.html` 通过；scheme、绝对路径、`..`、反斜杠拒绝；`improvementId` 仅改进 URL 携带 |\n| API `mode=read` `plan-review.md`（本任务目录） | Pass，正文 ~3072 字符 |\n| API 非法路径 | `400`：`..` / 绝对路径 / scheme / 反斜杠 |\n| API `mode=preview` HTML | `200` + CSP sandbox + `nosniff` + `no-referrer` |\n| Static code review vs `checks.md` | Pass（见下） |\n\n#### Static review (checks coverage)\n\n- **入口显隐**：`planReviewEntriesForTask` 仅主任务 `awaiting_approval` + 每个 `waiting_plan_approval` 实例；独立 `improvementId`，无 first-item 猜测。\n- **只读边界**：`YpiStudioPlanReviewModal` 无 PATCH/approve/grant/transition；固定只读提示文案与原型一致。\n- **按需读取**：打开后 `mode=read`；`AbortController` + `retryToken` + `active` stale guard；target 含 `taskKey`/`improvementId`。\n- **Projection**：`buildProjection` 仅 status/ids 等轻量字段，无 `plan-review` 正文。\n- **链接安全**：共享 `lib/ypi-studio-task-preview.ts`；Panel 已改为 import 共享 helper，无本地重复实现。\n- **a11y/布局**：`role=dialog` / `aria-modal` / focus trap / Escape / backdrop / 关闭按钮；桌面居中 + `≤640px` 近全屏底部 sheet；独立 action row 样式。\n- **文档**：`docs/modules/frontend.md` 已记录 widget 入口、modal 只读/按需读取、API 复用边界。\n- **原型一致性**：文案/状态机/入口位置与 `ui-prototype.html` 对齐；图标原型 `▤` vs 实现 `▦` 为非阻塞差异。\n\n#### Remaining manual browser items（需 checker / 主会话）\n\n当前主任务状态为 `implementing`，**未改 task 状态**（避免副作用），因此以下路径未在真实 UI 点通：\n\n1. 主任务 `awaiting_approval` 浮窗「计划审批书」点击 → loading/success → 关闭后仍绑定聊天、task.json 无 approval 写入  \n2. 双 `waiting_plan_approval` 改进项分别打开、URL `improvementId` 与正文不串读  \n3. 慢请求/404/403/网络失败/空 TBD/target 竞态 UI  \n4. Escape/遮罩/焦点恢复、长内容滚动、浅深色、360px 不溢出、`≤640px` pill → sheet → modal  \n5. 拖拽/收纳球/详情箭头无回归  \n\nAPI/helper/自动检查已覆盖安全与逻辑主干；dialog 焦点与移动布局仍需真实浏览器证据（checks 原风险已注明）。\n\n#### Notes / Risks\n- 无自动验证失败项，无本子任务范围内必修缺陷。  \n- Checker 需独立对照 `ui-prototype.html` 并完成上表浏览器矩阵后，主会话才可把 IMP-5 标为 done 并进入 checking。  \n- 若要构造 `awaiting_approval` / 多改进项样例，应由主会话决定是否临时改状态或另建 fixture，实现员未擅自改 task 状态。",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:24:05.571Z",
+            "toolCallId": "call-2269c4ec-213f-4849-bb98-3fd21e27b494-29|fc_967d47d1-ad03-96da-8d2f-4e7945ab0e20_1",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"# Verify widget projection API sample doesn't include plan body (if endpoint exists)\\nrg -n \\\"studio-task|session.*studio\\\" app/api -g'**/route.ts' | head -30\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:24:05.591Z",
+            "toolCallId": "call-2269c4ec-213f-4849-bb98-3fd21e27b494-29|fc_967d47d1-ad03-96da-8d2f-4e7945ab0e20_1",
+            "toolName": "bash",
+            "text": "app/api/sessions/[id]/studio-task/route.ts:7:import { YpiStudioTaskSecurityError } from \"@/lib/ypi-studio-tasks\";\napp/api/sessions/[id]/studio-task/route.ts:52:          reason: \"studio-task poll observed ready subtasks with free concurrency slots (primary task only)\",\napp/api/studio/tasks/[taskKey]/files/route.ts:10:} from \"@/lib/ypi-studio-tasks\";\napp/api/studio/tasks/route.ts:9:} from \"@/lib/ypi-studio-tasks\";\napp/api/studio/tasks/[taskKey]/subagents/[runId]/route.ts:5:import { getYpiStudioTaskDetail, reconcileYpiStudioRuntimeLostSubagentRun, recordYpiStudioSubagentRun, YpiStudioTaskSecurityError } from \"@/lib/ypi-studio-tasks\";\napp/api/studio/tasks/[taskKey]/route.ts:36:} from \"@/lib/ypi-studio-tasks\";\napp/api/studio/tasks/[taskKey]/subagents/[runId]/transcript/route.ts:4:import { getYpiStudioTaskDetail, YpiStudioTaskSecurityError } from \"@/lib/ypi-studio-tasks\";\napp/api/agent/[id]/events/route.ts:110:      encode({ type: \"connected\", sessionId, mode: \"studio_child_audit\" });\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:57:          !session.studioChild &&\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:64:      if (!session.studioChild) return false;\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:66:      return !!session.studioChild.parentSessionId && linkedRootIds.has(session.studioChild.parentSessionId);\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:74:        parentSessionId: session.parentSessionId ?? session.studioChild?.parentSessionId,\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:80:            .filter((session) => !session.studioChild && (!session.projectId || !session.spaceId))\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:99:        const parentId = session.studioChild?.parentSessionId;\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:107:    const body = { sessions: linked, legacyUnassigned, archivedCounts, studioChildrenByParentSessionId };",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:24:05.593Z",
+            "toolCallId": "call-2269c4ec-213f-4849-bb98-3fd21e27b494-28|fc_967d47d1-ad03-96da-8d2f-4e7945ab0e20_0",
+            "toolName": "bash",
+            "text": "lib/ypi-studio-task-preview.ts:23:export function taskRelativeFilePath(\nlib/ypi-studio-task-preview.ts:32:export function improvementRelativePath(improvementId: string, relativePath: string): string {\nlib/ypi-studio-task-preview.ts:40:export function resolveTaskRelativeHref(href: string): TaskRelativeHrefResult {\nlib/ypi-studio-task-preview.ts:69:export function buildStudioTaskFileApiUrl(options: {\nlib/ypi-studio-task-preview.ts:84:export function openTaskRelativeLink(options: {",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:24:18.947Z",
+            "text": "### Implementation Complete — IMP-5\n\n#### Files Changed\n- None（验收通过，无需代码修复）\n\n#### Verification\n\n| Command / Check | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass (`ypi-studio DAG scheduler tests passed`) |\n| Focused helper probe (`resolveTaskRelativeHref` / `buildStudioTaskFileApiUrl` / improvement scope) | Pass：合法 `prd.md`/`ui-prototype.html` 通过；scheme、绝对路径、`..`、反斜杠拒绝；`improvementId` 仅改进 URL 携带 |\n| API `mode=read` `plan-review.md`（本任务目录） | Pass，正文 ~3072 字符 |\n| API 非法路径 | `400`：`..` / 绝对路径 / scheme / 反斜杠 |\n| API `mode=preview` HTML | `200` + CSP sandbox + `nosniff` + `no-referrer` |\n| Static code review vs `checks.md` | Pass（见下） |\n\n#### Static review (checks coverage)\n\n- **入口显隐**：`planReviewEntriesForTask` 仅主任务 `awaiting_approval` + 每个 `waiting_plan_approval` 实例；独立 `improvementId`，无 first-item 猜测。\n- **只读边界**：`YpiStudioPlanReviewModal` 无 PATCH/approve/grant/transition；固定只读提示文案与原型一致。\n- **按需读取**：打开后 `mode=read`；`AbortController` + `retryToken` + `active` stale guard；target 含 `taskKey`/`improvementId`。\n- **Projection**：`buildProjection` 仅 status/ids 等轻量字段，无 `plan-review` 正文。\n- **链接安全**：共享 `lib/ypi-studio-task-preview.ts`；Panel 已改为 import 共享 helper，无本地重复实现。\n- **a11y/布局**：`role=dialog` / `aria-modal` / focus trap / Escape / backdrop / 关闭按钮；桌面居中 + `≤640px` 近全屏底部 sheet；独立 action row 样式。\n- **文档**：`docs/modules/frontend.md` 已记录 widget 入口、modal 只读/按需读取、API 复用边界。\n- **原型一致性**：文案/状态机/入口位置与 `ui-prototype.html` 对齐；图标原型 `▤` vs 实现 `▦` 为非阻塞差异。\n\n#### Remaining manual browser items（需 checker / 主会话）\n\n当前主任务状态为 `implementing`，**未改 task 状态**（避免副作用），因此以下路径未在真实 UI 点通：\n\n1. 主任务 `awaiting_approval` 浮窗「计划审批书」点击 → loading/success → 关闭后仍绑定聊天、task.json 无 approval 写入  \n2. 双 `waiting_plan_approval` 改进项分别打开、URL `improvementId` 与正文不串读  \n3. 慢请求/404/403/网络失败/空 TBD/target 竞态 UI  \n4. Escape/遮罩/焦点恢复、长内容滚动、浅深色、360px 不溢出、`≤640px` pill → sheet → modal  \n5. 拖拽/收纳球/详情箭头无回归  \n\nAPI/helper/自动检查已覆盖安全与逻辑主干；dialog 焦点与移动布局仍需真实浏览器证据（checks 原风险已注明）。\n\n#### Notes / Risks\n- 无自动验证失败项，无本子任务范围内必修缺陷。  \n- Checker 需独立对照 `ui-prototype.html` 并完成上表浏览器矩阵后，主会话才可把 IMP-5 标为 done 并进入 checking。  \n- 若要构造 `awaiting_approval` / 多改进项样例，应由主会话决定是否临时改状态或另建 fixture，实现员未擅自改 task 状态。",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:24:18.948Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2219,
+        "tokens": 1208,
+        "tokenSource": "usage",
+        "tps": 179.57,
+        "firstTokenAt": "2026-07-13T05:24:11.934Z",
+        "lastTokenAt": "2026-07-13T05:24:18.661Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-1f0a4c1ac886a9c18e173344",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/implementer-1f0a4c1ac886a9c18e173344.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:22:53.853Z",
+        "finishedAt": "2026-07-13T05:24:18.948Z",
+        "updatedAt": "2026-07-13T05:24:18.948Z",
+        "itemCount": 65,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 137879,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59ed-a337-7920-944c-aaeea347312f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-22-53-879Z_019f59ed-a337-7920-944c-aaeea347312f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-c23f5c32bea4f2107eb6af79",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:24:32.145Z",
+      "finishedAt": "2026-07-13T05:26:54.711Z",
+      "runner": "sdk",
+      "childSessionId": "019f59ef-232e-7840-8f32-8a569d505ad8",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-24-32-174Z_019f59ef-232e-7840-8f32-8a569d505ad8.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "childSessionId": "019f59ef-232e-7840-8f32-8a569d505ad8",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- 入口图标对齐获批原型：`▦` → `▤`（`components/YpiStudioSessionWidget.tsx`）\n- 撤销无关 `package-lock.json` 钉死噪声\n\n#### Remaining Findings\n- **阻塞：None**\n- **非阻塞：** 真实浏览器矩阵未完整点通（当前任务已是 `checking`，入口按设计不显示；未擅自改状态造 fixture）。用户验收需确认：主/双改进项入口与不串读、错误态、焦点、移动端、拖拽/详情无回归。\n- 深色主题按钮色沿用固定 amber（与现有 waiting 色一致），可目视确认。\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass |\n| Helper probe（合法/非法路径 + `improvementId`） | Pass |\n| 静态：只读边界 / 状态门控 / 无投影正文 / 无 PATCH·grant | Pass |\n\n#### Verdict\n**Pass — 可进入用户验收**\n\n实现覆盖 PRD/Design/Implement：共享 `lib/ypi-studio-task-preview.ts`、只读 `YpiStudioPlanReviewModal`、浮窗 `awaiting_approval` / `waiting_plan_approval` 门控、`AppShell` 传入 `cwd`+`handleOpenFile`、文档已更新。UI 原型已有用户批准记录。\n\n### Handoff（主会话）\n- **产物：** `.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/review.md`\n- **检查员改动：** `YpiStudioSessionWidget.tsx` 图标；`package-lock.json` 还原\n- **无法写 `task.json`（子会话限制）** → 请主会话推进：**`checking` → `review` → `user_acceptance`**\n- **风险：** 浏览器路径需用户验收；勿在 modal 加批准按钮\n- **决策：** 无需产品重审；验收用真实 `awaiting_approval` 或双改进 fixture 即可",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:24:32.145Z",
+        "updatedAt": "2026-07-13T05:26:54.711Z",
+        "eventCount": 1233,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- 入口图标对齐获批原型：`▦` → `▤`（`components/YpiStudioSessionWidget.tsx`）\n- 撤销无关 `package-lock.json` 钉死噪声\n\n#### Remaining Findings\n- **阻塞：None**\n- **非阻塞：** 真实浏览器矩阵未完整点通（当前任务已是 `checking`，入口按设计不显示；未擅自改状态造 fixture）。用户验收需确认：主/双改进项入口与不串读、错误态、焦点、移动端、拖拽/详情无回归。\n- 深色主题按钮色沿用固定 amber（与现有 waiting 色一致），可目视确认。\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass |\n| Helper probe（合法/非法路径 + `improvementId`） | Pass |\n| 静态：只读边界 / 状态门控 / 无投影正文 / 无 PATCH·grant | Pass |\n\n#### Verdict\n**Pass — 可进入用户验收**\n\n实现覆盖 PRD/Design/Implement：共享 `lib/ypi-studio-task-preview.ts`、只读 `YpiStudioPlanReviewModal`、浮窗 `awaiting_approval` / `waiting_plan_approval` 门控、`AppShell` 传入 `cwd`+`handleOpenFile`、文档已更新。UI 原型已有用户批准记录。\n\n### Handoff（主会话）\n- **产物：** `.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/review.md`\n- **检查员改动：** `YpiStudioSessionWidget.tsx` 图标；`package-lock.json` 还原\n- **无法写 `task.json`（子会话限制）** → 请主会话推进：**`checking` → `review` → `user_acceptance`**\n- **风险：** 浏览器路径需用户验收；勿在 modal 加批准按钮\n- **决策：** 无需产品重审；验收用真实 `awaiting_approval` 或双改进 fixture 即可",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:26:31.674Z",
+            "toolCallId": "call-faabe080-23e7-4291-9af8-ec2731da9034-19|fc_cb4b5ff3-126f-9585-8b06-4c9fa0d812ae_1",
+            "toolName": "bash",
+            "text": "components/YpiStudioPlanReviewModal.tsx:67:  if (status === 400) return \"安全规则拒绝了该文件访问。\";\ncomponents/YpiStudioPlanReviewModal.tsx:170:        const res = await fetch(url, { signal: controller.signal });\n1008:.ypi-studio-widget-plan-review-btn {\n1018:  color: #b45309;\n1028:.ypi-studio-widget-plan-review-btn:hover {\n1033:.ypi-studio-widget-plan-review-btn:focus-visible {\n1038:.ypi-studio-widget-plan-review-btn-icon {\n1089:.ypi-studio-workflow-rail-node.is-blocked { border-color: #b45309; background: #b45309; color: white; }\n1128:.ypi-studio-workflow-rail-line.is-blocked { background: #b45309; }\nlint=0\n> @alan-zhao/yolk-pi-web@0.7.12 lint\n> eslint .\n\ntsc=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:26:47.826Z",
+            "toolCallId": "call-1e358c05-5197-4d2c-a99b-21be245a9a63-20|fc_de2f8d05-0d82-9597-8829-0ba6ceee4e5a_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334/.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/review.md\",\n  \"content\": \"# Review：任务浮窗在等待审批时支持计划审批书预览\\n\\n## Check Complete\\n\\n检查员对照 `prd.md` / `design.md` / `implement.md` / `checks.md` / `plan-review.md` / 获批 `ui-prototype.html`，审查实现 diff 与相关调用方，并重跑自动验证。\\n\\n### Findings Fixed\\n\\n- 入口按钮图标由实现中的 `▦` 改回与获批原型一致的 `▤`（`components/YpiStudioSessionWidget.tsx`）。\\n- 撤销无关的 `package-lock.json` typescript 版本钉死噪声（实现环境 `npm install` 副作用，不属于本需求）。\\n\\n### Remaining Findings\\n\\n#### 阻塞\\n\\n- None。\\n\\n#### 非阻塞 / 用户验收残留\\n\\n1. **真实浏览器矩阵未在本检查会话完整点通**（当前主任务状态为 `checking`，入口按设计不显示；实现员也未擅自改状态构造 fixture）。代码与 API/helper 静态审查覆盖主干逻辑，但下列仍需主会话或用户在 UI 上确认：\\n   - 主任务 `awaiting_approval`：浮窗入口 → loading/success → 关闭后仍在绑定聊天，且 `task.json` 无 approval 写入。\\n   - 两个并存 `waiting_plan_approval` 改进项：独立 `IMP-xxx` 入口、请求 `improvementId` 与正文不串读。\\n   - 慢请求 / 404 / 403 / 网络失败 / 空 TBD / 快速切换 target 竞态。\\n   - Escape / 遮罩 / 焦点恢复 / 长内容滚动 / 浅深色 / 360px 换行 / `≤640px` pill → sheet → modal。\\n   - 详情箭头、拖拽、收纳球、排序、绑定过滤无回归。\\n2. **深色主题按钮色**仍用固定 amber `#b45309`（与浮窗既有 waiting 色一致），未单独做 `html.dark` 覆盖；对比度可在用户验收时目视确认。\\n3. **未新增 focused helper 自动化测试文件**（`checks.md` 为建议项）；已用 Node 探针覆盖合法/非法路径与 `improvementId` URL 构造。\\n\\n### 需求与设计覆盖\\n\\n| 验收点 | 结论 | 证据 |\\n| --- | --- | --- |\\n| R1 主任务仅 `awaiting_approval` 显示入口 | Pass | `planReviewEntriesForTask` 状态门控；非审批态无 action row |\\n| R2 每个 `waiting_plan_approval` 独立 `IMP-xxx` 入口 | Pass | 按 `instance.id` 建 target，无 first-item 猜测 |\\n| R3 按需 `mode=read` + `MarkdownBody`，不投影正文 | Pass | Modal effect 打开后 fetch；`session-link` projection 仅 status/ids |\\n| R4 dialog a11y / Escape / 遮罩 / 滚动 / 移动近全屏 | Pass（静态） | `role=dialog`、`aria-modal`、focus trap/restore、`globals.css` ≤640px sheet |\\n| R5 loading / empty-TBD / error+retry / 只读提示 | Pass | Modal 状态机与文案对齐原型；无批准按钮 |\\n| R6 task-local 相对链接安全 + improvement scope | Pass | 共享 `lib/ypi-studio-task-preview.ts`；HTML `mode=preview` + `improvementId` |\\n| R7 无回归：详情/拖拽/尺寸/绑定 | Pass（静态） | 按钮 `stopPropagation`；独立 action row；360px 未改；无 API/schema 变更 |\\n| 只读边界：不写 grant / PATCH / transition | Pass | Modal 仅 GET files；无 approve UI |\\n| UI 原型一致性 | Pass | 入口位置、文案、只读提示、状态卡、桌面/移动形态对齐；图标已修 |\\n| UI 原型审批门禁 | Pass | events 记录用户已批准 plan-review + HTML 原型后进入 implementing |\\n\\n### 代码审查摘要\\n\\n1. **`lib/ypi-studio-task-preview.ts`**  \\n   抽取路径校验、API URL、打开链接逻辑；注释明确服务端 resolver 为权威。Panel 删除重复实现并改为 import，改进项 scope 行为保持。\\n\\n2. **`components/YpiStudioPlanReviewModal.tsx`**  \\n   集中 fetch/AbortController/`retryToken`/stale guard、meaningful 判定、错误脱敏、Markdown 链接、dialog 焦点与 portal。无写状态 API。\\n\\n3. **`components/YpiStudioSessionWidget.tsx` + `AppShell.tsx`**  \\n   Props 传入授权 `cwd` 与 `handleOpenFile`；入口独立 flex-wrap row；desktop/mobile/ball 均挂载同一 modal；任务离开 session 或 cwd 丢失时清理 target。\\n\\n4. **`docs/modules/frontend.md` / `library.md`**  \\n   记录 widget 入口、modal 只读/按需读取、helper 复用与安全边界，与实现一致。\\n\\n5. **未改**  \\n   task schema、widget projection 正文、`/api/studio/tasks/.../files` 契约、approval gate/grant、浮窗宽度/拖拽模型。\\n\\n### Verification\\n\\n| Command / Check | Result |\\n| --- | --- |\\n| `npm run lint` | Pass |\\n| `node_modules/.bin/tsc --noEmit` | Pass |\\n| `npm run test:studio-dag` | Pass |\\n| Focused helper probe（合法 `prd.md` / `ui-prototype.html`；scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝；`improvementId` URL） | Pass |\\n| 静态审查：只读边界 / 状态门控 / 不串读 / 无投影正文 | Pass |\\n| 真实浏览器 checks 矩阵 | 未完整执行（见残留项） |\\n\\n### Verdict\\n\\n**Pass — 可进入用户验收（user_acceptance）**\\n\\n代码与设计/PRD/获批原型一致，自动验证通过，只读审批边界与 improvementId 隔离成立，无阻塞缺陷。完整浏览器路径与多改进项实机串读验证留给用户验收；主会话不应因静态检查缺口回退 redesign，也不应在 modal 内追加批准按钮。\\n\\n### 建议主会话动作\\n\\n1. 将本任务推进到 **`review` → `user_acceptance`**（或工作流等价的用户验收态）。\\n2. 在验收时如需观察入口，可使用其它 `awaiting_approval` 任务，或临时构造双 `waiting_plan_approval` 改进 fixture（不要在生产路径写假 grant）。\\n3. 用户验收通过后再 `completed` / 归档；若浏览器发现焦点/移动/串读问题，再开 improvement，勿直接扩 scope 加 modal 批准。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:26:47.831Z",
+            "toolCallId": "call-1e358c05-5197-4d2c-a99b-21be245a9a63-20|fc_de2f8d05-0d82-9597-8829-0ba6ceee4e5a_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3587 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-125334/.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:26:54.708Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- 入口图标对齐获批原型：`▦` → `▤`（`components/YpiStudioSessionWidget.tsx`）\n- 撤销无关 `package-lock.json` 钉死噪声\n\n#### Remaining Findings\n- **阻塞：None**\n- **非阻塞：** 真实浏览器矩阵未完整点通（当前任务已是 `checking`，入口按设计不显示；未擅自改状态造 fixture）。用户验收需确认：主/双改进项入口与不串读、错误态、焦点、移动端、拖拽/详情无回归。\n- 深色主题按钮色沿用固定 amber（与现有 waiting 色一致），可目视确认。\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass |\n| Helper probe（合法/非法路径 + `improvementId`） | Pass |\n| 静态：只读边界 / 状态门控 / 无投影正文 / 无 PATCH·grant | Pass |\n\n#### Verdict\n**Pass — 可进入用户验收**\n\n实现覆盖 PRD/Design/Implement：共享 `lib/ypi-studio-task-preview.ts`、只读 `YpiStudioPlanReviewModal`、浮窗 `awaiting_approval` / `waiting_plan_approval` 门控、`AppShell` 传入 `cwd`+`handleOpenFile`、文档已更新。UI 原型已有用户批准记录。\n\n### Handoff（主会话）\n- **产物：** `.ypi/tasks/20260713-125538-任务浮窗在等待审批时支持计划审批书预览/review.md`\n- **检查员改动：** `YpiStudioSessionWidget.tsx` 图标；`package-lock.json` 还原\n- **无法写 `task.json`（子会话限制）** → 请主会话推进：**`checking` → `review` → `user_acceptance`**\n- **风险：** 浏览器路径需用户验收；勿在 modal 加批准按钮\n- **决策：** 无需产品重审；验收用真实 `awaiting_approval` 或双改进 fixture 即可",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:26:54.709Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1252,
+        "tokens": 530,
+        "tokenSource": "usage",
+        "tps": 3.84,
+        "firstTokenAt": "2026-07-13T05:24:36.813Z",
+        "lastTokenAt": "2026-07-13T05:26:54.708Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-c23f5c32bea4f2107eb6af79",
+        "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-125538-/checker-c23f5c32bea4f2107eb6af79.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:24:32.145Z",
+        "finishedAt": "2026-07-13T05:26:54.709Z",
+        "updatedAt": "2026-07-13T05:26:54.709Z",
+        "itemCount": 49,
+        "messageCount": 3,
+        "toolCallCount": 21,
+        "stderrBytes": 0,
+        "bytes": 156266,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59ef-232e-7840-8f32-8a569d505ad8",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-125334--/2026-07-13T05-24-32-174Z_019f59ef-232e-7840-8f32-8a569d505ad8.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-13T05:07:12.111Z",
+      "contextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-13T05:10:21.512Z",
+      "contextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+      "inputHash": "8cbe697b157364a5b1364628",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-13T05:28:22.705Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260713-132822-任务浮窗在等待审批时支持计划审批书预览",
+    "knowledgePath": ".ypi/knowledge/20260713-132822-任务浮窗在等待审批时支持计划审批书预览.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-13T05:06:35.098Z",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "IMP-1",
+          "title": "implement",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "IMP-1"
+          ]
+        },
+        {
+          "id": "IMP-2",
+          "title": "implement",
+          "relation": "serial",
+          "dependencies": [
+            "IMP-1"
+          ],
+          "subtaskIds": [
+            "IMP-2"
+          ]
+        },
+        {
+          "id": "IMP-3",
+          "title": "implement",
+          "relation": "serial",
+          "dependencies": [
+            "IMP-2"
+          ],
+          "subtaskIds": [
+            "IMP-3"
+          ]
+        },
+        {
+          "id": "IMP-4",
+          "title": "docs",
+          "relation": "parallel",
+          "dependencies": [
+            "IMP-3"
+          ],
+          "subtaskIds": [
+            "IMP-4"
+          ]
+        },
+        {
+          "id": "IMP-5",
+          "title": "checks",
+          "relation": "serial",
+          "dependencies": [
+            "IMP-3",
+            "IMP-4"
+          ],
+          "subtaskIds": [
+            "IMP-5"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "IMP-1",
+        "title": "共享任务本地预览链接逻辑",
+        "phase": "implement",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "components/YpiStudioPanel.tsx",
+          "lib/ypi-studio-task-preview.ts"
+        ],
+        "acceptance": [
+          "Panel 现有主计划和改进计划链接行为不变",
+          "客户端拒绝 scheme、绝对路径、.. 和反斜杠",
+          "改进项链接始终保持 improvementId scope"
+        ],
+        "validation": [
+          "静态审查所有旧 helper 调用方",
+          "对合法 Markdown/HTML 与非法路径做 focused helper 检查"
+        ],
+        "risks": [
+          "抽取时改变现有 Panel 文件路径",
+          "客户端校验被误当成服务端安全边界"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "IMP-2",
+        "title": "实现只读计划审批书模态预览",
+        "phase": "implement",
+        "order": 2,
+        "dependsOn": [
+          "IMP-1"
+        ],
+        "dependencies": [
+          "IMP-1"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/YpiStudioPlanReviewModal.tsx",
+          "components/MarkdownBody.tsx",
+          "app/globals.css"
+        ],
+        "acceptance": [
+          "只在打开后请求正文",
+          "所有读取状态有明确反馈",
+          "预览固定提示不会自动批准",
+          "dialog 键盘与焦点行为可用",
+          "Markdown/HTML 相对链接遵循 task-local 安全契约"
+        ],
+        "validation": [
+          "模拟 200/404/403/网络失败/空内容",
+          "快速切换 target 验证旧响应不覆盖",
+          "键盘与移动视口手工检查"
+        ],
+        "risks": [
+          "请求竞态",
+          "焦点逃逸",
+          "长 Markdown 撑破视口",
+          "错误信息泄露服务端绝对路径"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "IMP-3",
+        "title": "在 Studio 任务浮窗接入审批入口",
+        "phase": "implement",
+        "order": 3,
+        "dependsOn": [
+          "IMP-2"
+        ],
+        "dependencies": [
+          "IMP-2"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/YpiStudioSessionWidget.tsx",
+          "components/AppShell.tsx",
+          "lib/ypi-studio-types.ts"
+        ],
+        "acceptance": [
+          "主任务入口显隐准确",
+          "多个改进项可分别打开且不串读",
+          "非审批态无入口",
+          "详情箭头、拖拽、收纳球、排序、绑定过滤和移动 sheet 无回归"
+        ],
+        "validation": [
+          "构造主 awaiting_approval 与非审批态",
+          "构造两个 waiting_plan_approval 改进项",
+          "桌面拖拽/收纳与移动 sheet smoke"
+        ],
+        "risks": [
+          "360px 卡片拥挤",
+          "按钮事件触发拖拽或详情",
+          "session 切换后保留旧 modal"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "IMP-4",
+        "title": "更新前端模块文档",
+        "phase": "docs",
+        "order": 4,
+        "dependsOn": [
+          "IMP-3"
+        ],
+        "dependencies": [
+          "IMP-3"
+        ],
+        "relation": "parallel",
+        "files": [
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "文档与最终实现一致",
+          "明确预览不授予审批且不嵌入 widget 正文"
+        ],
+        "validation": [
+          "人工对照代码与 API 文档"
+        ],
+        "risks": [
+          "文档声称未实现能力"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "IMP-5",
+        "title": "执行自动与用户路径验收",
+        "phase": "checks",
+        "order": 5,
+        "dependsOn": [
+          "IMP-3",
+          "IMP-4"
+        ],
+        "dependencies": [
+          "IMP-3",
+          "IMP-4"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/YpiStudioSessionWidget.tsx",
+          "components/YpiStudioPlanReviewModal.tsx",
+          "components/YpiStudioPanel.tsx",
+          "components/AppShell.tsx",
+          "app/globals.css",
+          "docs/modules/frontend.md"
+        ],
+        "acceptance": [
+          "自动验证通过",
+          "浏览器主路径和错误路径通过",
+          "无审批门禁写入或浮窗回归",
+          "checker 记录原型一致性结论"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-dag",
+          "checks.md 浏览器矩阵"
+        ],
+        "risks": [
+          "静态检查无法覆盖 dialog 焦点和移动布局",
+          "仅单一任务样本漏掉多改进项串读"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-07-13T05:28:22.704Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "IMP-1": {
+        "id": "IMP-1",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:13:59.205Z",
+        "startedAt": "2026-07-13T05:11:17.982Z",
+        "finishedAt": "2026-07-13T05:13:59.204Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-deca074990f87448d2dce34c"
+        ],
+        "lastRunId": "implementer-deca074990f87448d2dce34c",
+        "claimedAt": "2026-07-13T05:11:17.982Z",
+        "claimedByContextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "summary": "### Implementation Complete\n\n#### Subtask\n- **IMP-1** 共享任务本地预览链接逻辑\n\n#### Files Changed\n\n- `lib/ypi-studio-task-preview.ts` — 新增 client-safe 共享 helper：`resolveTaskRelativeHref`、`taskRelativeFilePath`、`improvementRelativePath`、`buildStudioTaskFileApiUrl`、`openTaskRelativeLink`、`openImprovementRelativeLink`。客户端仅做 UX 拦截；注释明确服务端 resolver 仍是安全权威。\n- `components/YpiStudioPanel.tsx` — 删除本地重复 helper，改为从共享模块导入；主任务/改进项调用点签名与行为保持一致（改进项 HTML preview 继续带 `improvementId`，文件查看器路径继续 `improvements/<id>/...`）。\n\n#### Verification\n\n- Focused helper check（合法 `prd.md` / `ui-prototype.html`，scheme / 绝对路径 / `..` / 反斜杠 / 目录拒绝，改进项 scope）— **passed**\n- `npm run lint` — **passed**（先 `npm install --include=dev`，因环境 `NODE_ENV=production` 跳过了 devDeps）\n- `node_modules/.bin/tsc --noEmit` — **passed**\n\n#### Notes / Risks\n\n- 未实现 IMP-2/IMP-3（无 modal / 浮窗入口）。\n- 未改 API / task schema / approval 写路径。\n- 风险：Panel 行为靠静态复用与 helper 单测覆盖；完整主/改进计划链接 UI 回归留给后续 browser checks。\n- 主会话需将 **IMP-1 → done**，再 claim **IMP-2**。"
+      },
+      "IMP-2": {
+        "id": "IMP-2",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:17:56.378Z",
+        "startedAt": "2026-07-13T05:14:15.995Z",
+        "finishedAt": "2026-07-13T05:17:56.377Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-d855024e661538b66269bc8a"
+        ],
+        "lastRunId": "implementer-d855024e661538b66269bc8a",
+        "claimedAt": "2026-07-13T05:14:15.995Z",
+        "claimedByContextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "summary": "### Implementation Complete — IMP-2\n\n#### Files Changed\n\n- `components/YpiStudioPlanReviewModal.tsx` — 新增只读计划审批书 modal：按需 `mode=read` 拉取、`MarkdownBody` 渲染、loading/success/empty/error+retry、AbortController、Escape/遮罩/焦点陷阱与恢复、移动端底部近全屏；复用 IMP-1 `ypi-studio-task-preview` helper；无批准按钮/写状态 API\n- `app/globals.css` — 增加 modal 布局、只读提示、状态区、spinner、窄屏与 reduced-motion 样式\n\n未改动（按边界复用）：\n\n- `components/MarkdownBody.tsx` — 已有 `onLinkClick`，无需修改\n- 未接入浮窗入口（IMP-3 范围）\n\n#### 导出契约（供 IMP-3）\n\n```ts\nimport {\n  YpiStudioPlanReviewModal,\n  type YpiStudioPlanReviewTarget,\n} from \"@/components/YpiStudioPlanReviewModal\";\n\n// target: { taskKey, taskTitle, pathLabel, improvementId?, improvementDisplayId?, fileName? }\n// <YpiStudioPlanReviewModal open cwd target onClose onOpenFile />\n```\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器手工矩阵（主/改进入口、焦点、移动布局）留给 IMP-3 接入后 + IMP-5\n\n#### Notes / Risks\n\n- Modal 已可独立挂载；IMP-3 需在 `YpiStudioSessionWidget`/`AppShell` 传入 `cwd`、`pathLabel`、`handleOpenFile` 与 preview target\n- 错误文案已做路径脱敏；最终安全仍依赖 task-local 服务端 resolver\n- 多 target 竞态靠 effect cleanup abort + `active` 标志；快速切换需在接入后做手工验收\n- meaningful/empty 判定与 Panel `artifactDocumentIsMeaningful` 一致（含 TBD 占位）"
+      },
+      "IMP-3": {
+        "id": "IMP-3",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:21:17.931Z",
+        "startedAt": "2026-07-13T05:18:27.698Z",
+        "finishedAt": "2026-07-13T05:21:17.929Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-179e8d69fb2e28673ed34324"
+        ],
+        "lastRunId": "implementer-179e8d69fb2e28673ed34324",
+        "claimedAt": "2026-07-13T05:18:27.698Z",
+        "claimedByContextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "summary": "### Implementation Complete — IMP-3\n\n#### Files Changed\n\n- `components/YpiStudioSessionWidget.tsx` — 主任务 `awaiting_approval` / 改进项 `waiting_plan_approval` 独立入口；action row；`planReviewTarget` + `YpiStudioPlanReviewModal`；`cwd` / `onOpenFile` props；session/cwd 变化清 stale target；桌面/移动共用\n- `components/AppShell.tsx` — 向 widget 传入 `studioCwd` 与 `handleOpenFile`\n- `app/globals.css` — 浮窗审批入口 action row / amber 次级按钮样式（flex-wrap，适配 360px）\n\n未改：`lib/ypi-studio-types.ts`（投影已含 status/improvements，无需正文投影）\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- 浏览器主/多改进项矩阵留给 **IMP-5**\n\n#### Notes / Risks\n\n- 入口仅按语义状态显隐；每个改进项用稳定 `improvementId`，不猜测\n- Modal 只读，无 PATCH / approval grant\n- 360px 宽度未改；详情箭头 / 拖拽事件已 `stopPropagation`\n- 风险：多改进项串读、焦点/移动布局需 IMP-5 浏览器验收\n- 主会话请将 **IMP-3 → done**，再 claim **IMP-4**（docs）"
+      },
+      "IMP-4": {
+        "id": "IMP-4",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:22:38.183Z",
+        "startedAt": "2026-07-13T05:21:29.965Z",
+        "finishedAt": "2026-07-13T05:22:38.182Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-a774173b4a3e64b6da108cdc"
+        ],
+        "lastRunId": "implementer-a774173b4a3e64b6da108cdc",
+        "claimedAt": "2026-07-13T05:21:29.965Z",
+        "claimedByContextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — Documented:\n  - `YpiStudioSessionWidget` waiting-approval plan-review entries (`awaiting_approval` / `waiting_plan_approval`), `cwd`/`onOpenFile`, on-demand modal target (no body in projection), read-only boundary\n  - New `YpiStudioPlanReviewModal` (fetch/state machine, Markdown/HTML links, a11y, mobile layout, no write APIs)\n  - `YpiStudioPanel` shared `lib/ypi-studio-task-preview` helpers\n  - `AppShell` passes Studio `cwd` + `handleOpenFile` to the widget\n  - `MarkdownBody` optional `onLinkClick` for Studio previews\n  - Plan-review widget/modal CSS classes in Styles\n- `docs/modules/library.md` — Added `lib/ypi-studio-task-preview.ts` (referenced by frontend docs; client UX only, server remains authority)\n\n#### Verification\n\n- Manual对照: widget entry conditions, modal props/API, helper exports, CSS class names, AppShell props match implementation\n- No production code changes; lint/tsc not required for docs-only IMP-4\n\n#### Notes / Risks\n\n- None blocking. IMP-5 still owns browser matrix and automatic checks.\n- Docs explicitly state: preview does **not** grant approval and does **not** embed `plan-review.md` in widget projection.\n\n#### Handoff\n\nIMP-4 done. Main session can mark IMP-4 complete and claim IMP-5."
+      },
+      "IMP-5": {
+        "id": "IMP-5",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:24:18.950Z",
+        "startedAt": "2026-07-13T05:22:49.231Z",
+        "finishedAt": "2026-07-13T05:24:18.949Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-1f0a4c1ac886a9c18e173344"
+        ],
+        "lastRunId": "implementer-1f0a4c1ac886a9c18e173344",
+        "claimedAt": "2026-07-13T05:22:49.231Z",
+        "claimedByContextId": "pi_019f59d4-1751-7ce5-ac41-34d1ccdddda1",
+        "summary": "### Implementation Complete — IMP-5\n\n#### Files Changed\n- None（验收通过，无需代码修复）\n\n#### Verification\n\n| Command / Check | Result |\n| --- | --- |\n| `npm run lint` | Pass |\n| `node_modules/.bin/tsc --noEmit` | Pass |\n| `npm run test:studio-dag` | Pass (`ypi-studio DAG scheduler tests passed`) |\n| Focused helper probe (`resolveTaskRelativeHref` / `buildStudioTaskFileApiUrl` / improvement scope) | Pass：合法 `prd.md`/`ui-prototype.html` 通过；scheme、绝对路径、`..`、反斜杠拒绝；`improvementId` 仅改进 URL 携带 |\n| API `mode=read` `plan-review.md`（本任务目录） | Pass，正文 ~3072 字符 |\n| API 非法路径 | `400`：`..` / 绝对路径 / scheme / 反斜杠 |\n| API `mode=preview` HTML | `200` + CSP sandbox + `nosniff` + `no-referrer` |\n| Static code review vs `checks.md` | Pass（见下） |\n\n#### Static review (checks coverage)\n\n- **入口显隐**：`planReviewEntriesForTask` 仅主任务 `awaiting_approval` + 每个 `waiting_plan_approval` 实例；独立 `improvementId`，无 first-item 猜测。\n- **只读边界**：`YpiStudioPlanReviewModal` 无 PATCH/approve/grant/transition；固定只读提示文案与原型一致。\n- **按需读取**：打开后 `mode=read`；`AbortController` + `retryToken` + `active` stale guard；target 含 `taskKey`/`improvementId`。\n- **Projection**：`buildProjection` 仅 status/ids 等轻量字段，无 `plan-review` 正文。\n- **链接安全**：共享 `lib/ypi-studio-task-preview.ts`；Panel 已改为 import 共享 helper，无本地重复实现。\n- **a11y/布局**：`role=dialog` / `aria-modal` / focus trap / Escape / backdrop / 关闭按钮；桌面居中 + `≤640px` 近全屏底部 sheet；独立 action row 样式。\n- **文档**：`docs/modules/frontend.md` 已记录 widget 入口、modal 只读/按需读取、API 复用边界。\n- **原型一致性**：文案/状态机/入口位置与 `ui-prototype.html` 对齐；图标原型 `▤` vs 实现 `▦` 为非阻塞差异。\n\n#### Remaining manual browser items（需 checker / 主会话）\n\n当前主任务状态为 `implementing`，**未改 task 状态**（避免副作用），因此以下路径未在真实 UI 点通：\n\n1. 主任务 `awaiting_approval` 浮窗「计划审批书」点击 → loading/success → 关闭后仍绑定聊天、task.json 无 approval 写入  \n2. 双 `waiting_plan_approval` 改进项分别打开、URL `improvementId` 与正文不串读  \n3. 慢请求/404/403/网络失败/空 TBD/target 竞态 UI  \n4. Escape/遮罩/焦点恢复、长内容滚动、浅深色、360px 不溢出、`≤640px` pill → sheet → modal  \n5. 拖拽/收纳球/详情箭头无回归  \n\nAPI/helper/自动检查已覆盖安全与逻辑主干；dialog 焦点与移动布局仍需真实浏览器证据（checks 原风险已注明）。\n\n#### Notes / Risks\n- 无自动验证失败项，无本子任务范围内必修缺陷。  \n- Checker 需独立对照 `ui-prototype.html` 并完成上表浏览器矩阵后，主会话才可把 IMP-5 标为 done 并进入 checking。  \n- 若要构造 `awaiting_approval` / 多改进项样例，应由主会话决定是否临时改状态或另建 fixture，实现员未擅自改 task 状态。"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-13T05:11:17.982Z",
+        "subtaskId": "IMP-1",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:14:15.995Z",
+        "subtaskId": "IMP-2",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:18:27.698Z",
+        "subtaskId": "IMP-3",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:21:29.965Z",
+        "subtaskId": "IMP-4",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:22:49.231Z",
+        "subtaskId": "IMP-5",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

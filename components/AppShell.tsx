@@ -1762,6 +1762,8 @@ export function AppShell() {
               liveOverlays={studioLiveOverlays.filter((overlay) => !overlay.taskKey || studioBoundTaskKeys.has(overlay.taskKey))}
               onOpenTask={(taskKey) => handleOpenStudioSessionTask(taskKey)}
               primaryTaskKey={studioPrimaryTaskKey ?? undefined}
+              cwd={studioCwd ?? undefined}
+              onOpenFile={handleOpenFile}
             />
           )}
           </div>

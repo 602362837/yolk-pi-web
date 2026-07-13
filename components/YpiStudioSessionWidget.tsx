@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import {
+  YpiStudioPlanReviewModal,
+  type YpiStudioPlanReviewTarget,
+} from "@/components/YpiStudioPlanReviewModal";
 import type {
   YpiStudioImplementationCompactTimelineItem,
   YpiStudioImplementationSubtaskStatus,
@@ -16,6 +20,10 @@ interface Props {
   liveOverlays?: YpiStudioLiveRunOverlay[];
   onOpenTask: (taskKey: string) => void;
   primaryTaskKey?: string;
+  /** Authorized Studio cwd for on-demand plan-review reads. */
+  cwd?: string;
+  /** Optional file viewer opener for Markdown relative links / source. */
+  onOpenFile?: (filePath: string, fileName: string) => void;
 }
 
 interface WidgetPosition { left: number; top: number }
@@ -337,6 +345,47 @@ function WorkflowRail({ task }: { task: YpiStudioTaskWidgetProjection }) {
   );
 }
 
+type PlanReviewEntry = {
+  key: string;
+  label: string;
+  ariaLabel: string;
+  target: YpiStudioPlanReviewTarget;
+};
+
+/** Build independent preview targets from lightweight widget projection statuses only. */
+function planReviewEntriesForTask(task: YpiStudioTaskWidgetProjection): PlanReviewEntry[] {
+  const entries: PlanReviewEntry[] = [];
+  if (task.status === "awaiting_approval") {
+    entries.push({
+      key: "main",
+      label: "计划审批书",
+      ariaLabel: `预览《${task.title}》的主计划审批书`,
+      target: {
+        taskKey: task.key,
+        taskTitle: task.title,
+        pathLabel: task.pathLabel,
+      },
+    });
+  }
+  for (const instance of task.improvements?.instances ?? []) {
+    if (instance.status !== "waiting_plan_approval") continue;
+    const displayId = instance.displayId || instance.id;
+    entries.push({
+      key: instance.id,
+      label: `计划审批书 · ${displayId}`,
+      ariaLabel: `预览《${task.title}》改进项 ${displayId} 的计划审批书`,
+      target: {
+        taskKey: task.key,
+        taskTitle: task.title,
+        pathLabel: task.pathLabel,
+        improvementId: instance.id,
+        improvementDisplayId: displayId,
+      },
+    });
+  }
+  return entries;
+}
+
 function BallVisual({
   urgency,
   taskCount,
@@ -372,11 +421,13 @@ function TaskCard({
   runs,
   isPrimary,
   onOpen,
+  onPreviewPlan,
 }: {
   candidate: YpiStudioSessionTaskLinkCandidate;
   runs: YpiStudioTaskWidgetSubagentRun[];
   isPrimary: boolean;
   onOpen: () => void;
+  onPreviewPlan?: (target: YpiStudioPlanReviewTarget) => void;
 }) {
   const task = candidate.task;
   const completedCount = task.artifacts.completed.length;
@@ -388,6 +439,7 @@ function TaskCard({
   const improvements = task.improvements;
   const improvementUnresolved = improvements?.unresolved ?? 0;
   const improvementWaiting = task.status === "waiting_for_improvements" || (improvements && improvementUnresolved > 0);
+  const planReviewEntries = planReviewEntriesForTask(task);
 
   return (
     <div
@@ -474,6 +526,29 @@ function TaskCard({
         </div>
       )}
 
+      {/* Waiting-approval plan review entries only — never grant approval. */}
+      {planReviewEntries.length > 0 && (
+        <div className="ypi-studio-widget-plan-action-row" role="group" aria-label="计划审批书预览">
+          {planReviewEntries.map((entry) => (
+            <button
+              key={entry.key}
+              type="button"
+              className="ypi-studio-widget-plan-review-btn"
+              aria-label={entry.ariaLabel}
+              title={entry.label}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onPreviewPlan?.(entry.target);
+              }}
+            >
+              <span className="ypi-studio-widget-plan-review-btn-icon" aria-hidden="true">▤</span>
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Runtime */}
       {runtime && runtime.status !== "idle" && (
         <div style={{
@@ -532,6 +607,8 @@ export function YpiStudioSessionWidget({
   liveOverlays = [],
   onOpenTask,
   primaryTaskKey,
+  cwd,
+  onOpenFile,
 }: Props) {
   const isMobile = useMobile();
   const [expanded, setExpanded] = useState(() => readExpandedState());
@@ -541,6 +618,26 @@ export function YpiStudioSessionWidget({
   const [ballDragging, setBallDragging] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [attentionSequence, setAttentionSequence] = useState(0);
+  const [planReviewTarget, setPlanReviewTarget] = useState<YpiStudioPlanReviewTarget | null>(null);
+
+  const handlePreviewPlan = useCallback((target: YpiStudioPlanReviewTarget) => {
+    setPlanReviewTarget(target);
+  }, []);
+
+  const handleClosePlanReview = useCallback(() => {
+    setPlanReviewTarget(null);
+  }, []);
+
+  // Drop stale modal targets when session tasks or authorized cwd change.
+  useEffect(() => {
+    if (!planReviewTarget) return;
+    if (!cwd?.trim()) {
+      setPlanReviewTarget(null);
+      return;
+    }
+    const stillVisible = tasks.some((candidate) => candidate.task.key === planReviewTarget.taskKey);
+    if (!stillVisible) setPlanReviewTarget(null);
+  }, [cwd, planReviewTarget, tasks]);
 
   const panelRef = useRef<HTMLElement | null>(null);
   const ballRef = useRef<HTMLDivElement | null>(null);
@@ -776,6 +873,16 @@ export function YpiStudioSessionWidget({
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobile]);
 
+  const planReviewModal = (
+    <YpiStudioPlanReviewModal
+      open={Boolean(planReviewTarget) && Boolean(cwd?.trim())}
+      cwd={cwd ?? ""}
+      target={planReviewTarget}
+      onClose={handleClosePlanReview}
+      onOpenFile={onOpenFile}
+    />
+  );
+
   // A bound task is the sole rendering prerequisite. Drawer focus must not hide
   // or rewrite the user-selected expanded/collapsed presentation.
   if (tasks.length === 0) return null;
@@ -852,12 +959,14 @@ export function YpiStudioSessionWidget({
                     runs={candidateRuns.get(c.task.key) ?? []}
                     isPrimary={c.task.key === primaryTaskKey}
                     onOpen={() => { onOpenTask(c.task.key); setMobileOpen(false); }}
+                    onPreviewPlan={handlePreviewPlan}
                   />
                 ))}
               </div>
             </div>
           </div>
         )}
+        {planReviewModal}
       </>
     );
   }
@@ -867,39 +976,42 @@ export function YpiStudioSessionWidget({
   // ═══════════════════════════════════════════
   if (!expanded) {
     return (
-      <div
-        ref={ballRef}
-        role="button"
-        tabIndex={0}
-        aria-label={`打开 YPI Studio 任务面板（${tasks.length} 个任务，${ballUrgency === "needs_user" ? "需要处理" : ballUrgency === "failed" ? "存在失败或阻塞" : ballUrgency === "running" ? "正在运行" : "空闲"}）`}
-        onPointerDown={handleBallPointerDown}
-        onPointerMove={handleBallPointerMove}
-        onPointerUp={handleBallPointerUp}
-        onPointerCancel={handleBallPointerCancel}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(true); } }}
-        className={`ypi-studio-widget-ball-shell${ballDragging ? " is-dragging" : ""}`}
-        style={{
-          position: "absolute",
-          zIndex: 250,
-          width: 48, height: 48,
-          left: ballPosition?.left,
-          top: ballPosition?.top,
-          cursor: ballDragging ? "grabbing" : "grab",
-          // Position and drag feedback belong to the shell; visual animation is inside BallVisual.
-          transform: ballDragging ? "scale(1.06)" : "scale(1)",
-          border: "none",
-          userSelect: "none",
-          touchAction: "none",
-        }}
-      >
-        <BallVisual
-          urgency={ballUrgency}
-          taskCount={tasks.length}
-          colors={ballColors}
-          dragging={ballDragging}
-          attentionSequence={attentionSequence}
-        />
-      </div>
+      <>
+        <div
+          ref={ballRef}
+          role="button"
+          tabIndex={0}
+          aria-label={`打开 YPI Studio 任务面板（${tasks.length} 个任务，${ballUrgency === "needs_user" ? "需要处理" : ballUrgency === "failed" ? "存在失败或阻塞" : ballUrgency === "running" ? "正在运行" : "空闲"}）`}
+          onPointerDown={handleBallPointerDown}
+          onPointerMove={handleBallPointerMove}
+          onPointerUp={handleBallPointerUp}
+          onPointerCancel={handleBallPointerCancel}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(true); } }}
+          className={`ypi-studio-widget-ball-shell${ballDragging ? " is-dragging" : ""}`}
+          style={{
+            position: "absolute",
+            zIndex: 250,
+            width: 48, height: 48,
+            left: ballPosition?.left,
+            top: ballPosition?.top,
+            cursor: ballDragging ? "grabbing" : "grab",
+            // Position and drag feedback belong to the shell; visual animation is inside BallVisual.
+            transform: ballDragging ? "scale(1.06)" : "scale(1)",
+            border: "none",
+            userSelect: "none",
+            touchAction: "none",
+          }}
+        >
+          <BallVisual
+            urgency={ballUrgency}
+            taskCount={tasks.length}
+            colors={ballColors}
+            dragging={ballDragging}
+            attentionSequence={attentionSequence}
+          />
+        </div>
+        {planReviewModal}
+      </>
     );
   }
 
@@ -981,6 +1093,7 @@ export function YpiStudioSessionWidget({
             runs={candidateRuns.get(c.task.key) ?? []}
             isPrimary={c.task.key === primaryTaskKey}
             onOpen={() => onOpenTask(c.task.key)}
+            onPreviewPlan={handlePreviewPlan}
           />
         ))}
       </div>
@@ -998,6 +1111,7 @@ export function YpiStudioSessionWidget({
         共绑定 {tasks.length} 个任务 · 仅展示绑定当前会话的 Task
       </div>
       </div>
+      {planReviewModal}
     </aside>
   );
 }

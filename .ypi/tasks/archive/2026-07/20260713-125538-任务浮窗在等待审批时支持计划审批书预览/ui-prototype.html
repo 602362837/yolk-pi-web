@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>任务浮窗 · 计划审批书预览原型</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg-subtle: rgba(0,0,0,.03);
+      --warning: #d97706;
+      --warning-bg: rgba(245,158,11,.10);
+      --danger: #dc2626;
+      --danger-bg: rgba(239,68,68,.09);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "PingFang SC", monospace;
+    }
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --bg-subtle: rgba(255,255,255,.04);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245,158,11,.12);
+      --danger: #f87171;
+      --danger-bg: rgba(239,68,68,.12);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { overflow: hidden; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC",sans-serif; }
+    button { font: inherit; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .app { position: relative; height: 100dvh; min-height: 620px; overflow: hidden; background:
+      radial-gradient(circle at 50% 0, color-mix(in srgb,var(--accent) 7%,transparent), transparent 34%), var(--bg); }
+    .topbar { height: 38px; padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--bg-panel); display: flex; align-items: center; gap: 10px; }
+    .brand { font-size: 12px; font-weight: 800; }
+    .path { color: var(--text-dim); font: 10px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .demo-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    .tool-btn, .secondary-btn, .review-btn, .icon-btn {
+      border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-muted); cursor: pointer;
+      border-radius: 8px; font-weight: 700;
+    }
+    .tool-btn { padding: 4px 8px; font-size: 11px; }
+    .tool-btn:hover, .secondary-btn:hover, .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .chat { height: calc(100% - 38px); display: grid; place-items: center; color: var(--text-dim); }
+    .chat-copy { width: min(560px,75%); }
+    .bubble { width: 86%; margin: 10px 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel); }
+    .bubble.user { margin-left: auto; background: color-mix(in srgb,var(--accent) 7%,var(--bg)); }
+
+    /* Existing 360px Studio floating panel language */
+    .widget { position: absolute; z-index: 20; top: 58px; right: 18px; width: 360px; max-width: calc(100% - 36px); }
+    .widget-shell { max-height: min(70vh,600px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 14px; background: color-mix(in srgb,var(--bg-panel) 92%,transparent); box-shadow: 0 16px 45px rgba(0,0,0,.18); backdrop-filter: blur(10px); }
+    .widget-head { min-height: 38px; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); font-size: 11px; font-weight: 700; }
+    .widget-body { overflow: auto; min-height: 0; }
+    .widget-foot { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--text-muted); text-align: center; font-size: 10px; }
+    .task-card { padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb,var(--border) 50%,transparent); border-left: 3px solid transparent; }
+    .task-card.primary { border-left-color: var(--accent); background: color-mix(in srgb,var(--accent) 6%,transparent); }
+    .task-top { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .studio-mark { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border-radius: 6px; background: color-mix(in srgb,var(--accent) 13%,transparent); color: var(--accent); font-size: 10px; font-weight: 900; }
+    .workflow { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .progress { margin-left: auto; font-size: 11px; font-weight: 700; }
+    .detail-btn { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; }
+    .task-title { margin-bottom: 6px; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .rail { display: flex; align-items: flex-start; margin: 1px 0 7px; }
+    .station { flex: 1; display: flex; align-items: flex-start; }
+    .station:last-child { flex: 0; }
+    .node-wrap { display: grid; justify-items: center; gap: 2px; }
+    .node { width: 13px; height: 13px; display: grid; place-items: center; border: 1px solid var(--text-dim); border-radius: 50%; color: var(--text-dim); font-size: 9px; font-weight: 900; }
+    .node.done { border-color: #16a34a; background: #16a34a; color: white; }
+    .node.attention { border-color: var(--warning); background: #f59e0b; color: #1f2937; }
+    .rail-label { max-width: 42px; color: var(--text-dim); font-size: 8px; font-weight: 700; white-space: nowrap; }
+    .line { height: 1px; flex: 1; min-width: 4px; margin: 6px 3px 0; background: var(--border); }
+    .line.done { background: #16a34a; }
+    .meta { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; color: var(--text-dim); font-size: 10px; }
+    .waiting { color: var(--warning); font-weight: 800; }
+    .improvement-box { margin: 4px 0 6px; padding: 6px 7px; border: 1px solid color-mix(in srgb,var(--warning) 40%,transparent); border-radius: 7px; background: var(--warning-bg); color: var(--warning); font-size: 10px; }
+    .improvement-box strong { display: block; }
+    .action-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 3px; }
+    .review-btn { min-height: 29px; padding: 5px 9px; border-color: color-mix(in srgb,var(--warning) 48%,var(--border)); background: var(--warning-bg); color: var(--warning); font-size: 11px; }
+    .review-btn:hover { border-color: var(--warning); background: color-mix(in srgb,var(--warning) 16%,var(--bg)); }
+    .review-btn .doc { margin-right: 4px; }
+    .hint { color: var(--text-dim); font-size: 9px; }
+
+    /* Mobile Studio entry and bottom panel */
+    .mobile-pill { display: none; position: absolute; z-index: 30; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 7px 16px; border: 1px solid var(--warning); border-radius: 999px; background: color-mix(in srgb,var(--bg-panel) 94%,transparent); color: var(--text); box-shadow: 0 10px 30px rgba(0,0,0,.18),0 0 0 3px color-mix(in srgb,var(--warning) 28%,transparent); font-size: 12px; font-weight: 800; }
+    .sheet-backdrop { display: none; position: fixed; z-index: 50; inset: 0; align-items: flex-end; background: rgba(0,0,0,.35); }
+    .sheet { width: 100%; max-height: 78dvh; overflow: auto; padding-bottom: env(safe-area-inset-bottom); border: 1px solid var(--border); border-radius: 16px 16px 0 0; background: var(--bg); box-shadow: 0 -16px 40px rgba(0,0,0,.22); }
+    .sheet-head { position: sticky; top: 0; z-index: 1; padding: 12px 14px 7px; display: flex; align-items: center; justify-content: space-between; background: var(--bg); }
+    .sheet-title { font-size: 14px; font-weight: 700; }
+    .secondary-btn { padding: 6px 10px; font-size: 12px; }
+
+    /* Plan review modal */
+    .modal-layer { display: none; position: fixed; z-index: 100; inset: 0; padding: 20px; align-items: center; justify-content: center; background: rgba(0,0,0,.48); backdrop-filter: blur(2px); }
+    .modal-layer.open { display: flex; }
+    .dialog { width: min(760px,calc(100vw - 32px)); max-height: min(82dvh,760px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); box-shadow: 0 24px 80px rgba(0,0,0,.34); }
+    .dialog-head { flex: none; padding: 14px 16px 12px; display: flex; gap: 12px; align-items: flex-start; border-bottom: 1px solid var(--border); background: var(--bg-panel); }
+    .dialog-title-wrap { min-width: 0; flex: 1; }
+    .eyebrow { margin-bottom: 3px; color: var(--warning); font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+    .dialog h2 { margin: 0; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+    .subtitle { margin-top: 4px; color: var(--text-muted); font-size: 11px; }
+    .icon-btn { width: 32px; height: 32px; flex: none; display: grid; place-items: center; font-size: 18px; }
+    .readonly { flex: none; margin: 10px 16px 0; padding: 8px 10px; border: 1px solid color-mix(in srgb,var(--warning) 35%,transparent); border-radius: 8px; background: var(--warning-bg); color: var(--warning); font-size: 12px; line-height: 1.5; }
+    .dialog-body { min-height: 230px; flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding: 14px 18px 24px; }
+    .dialog-foot { flex: none; padding: 9px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--border); background: var(--bg-panel); color: var(--text-dim); font-size: 10px; }
+    .source-link { color: var(--accent); font-size: 11px; font-weight: 700; text-decoration: none; }
+    .state-center { min-height: 260px; display: grid; place-items: center; text-align: center; }
+    .state-card { max-width: 430px; color: var(--text-muted); }
+    .state-icon { width: 42px; height: 42px; margin: 0 auto 12px; display: grid; place-items: center; border-radius: 50%; background: var(--bg-panel); color: var(--accent); font-size: 20px; }
+    .state-card h3 { margin: 0 0 6px; color: var(--text); font-size: 14px; }
+    .state-card p { margin: 0 0 14px; font-size: 12px; line-height: 1.55; }
+    .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+    .retry { border: 1px solid var(--accent); border-radius: 8px; padding: 7px 12px; background: var(--accent); color: white; cursor: pointer; font-size: 12px; font-weight: 700; }
+    .error .state-icon { color: var(--danger); background: var(--danger-bg); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Mirrors project MarkdownBody styling */
+    .markdown-body { font-size: 14px; line-height: 1.7; color: var(--text); word-break: break-word; }
+    .markdown-body h1,.markdown-body h2,.markdown-body h3 { color: var(--text); line-height: 1.35; font-weight: 600; }
+    .markdown-body h1 { margin: 0 0 9px; font-size: 1.16em; }
+    .markdown-body h2 { margin: 16px 0 6px; font-size: 1.08em; }
+    .markdown-body h3 { margin: 12px 0 5px; font-size: .98em; color: color-mix(in srgb,var(--text) 88%,var(--text-muted)); }
+    .markdown-body p { margin: 0 0 8px; }
+    .markdown-body ul,.markdown-body ol { margin: 5px 0 8px; padding-left: 22px; }
+    .markdown-body li { margin: 3px 0; }
+    .markdown-body li::marker { color: color-mix(in srgb,var(--accent) 72%,var(--text-muted)); font-weight: 600; }
+    .markdown-body strong { color: color-mix(in srgb,var(--text) 88%,var(--accent)); }
+    .markdown-body a { color: var(--accent); text-decoration-color: color-mix(in srgb,var(--accent) 45%,transparent); text-underline-offset: 3px; }
+    .markdown-body blockquote { margin: 8px 0; padding: 7px 11px; border-left: 3px solid color-mix(in srgb,var(--border) 75%,var(--text-muted)); border-radius: 0 6px 6px 0; background: var(--bg-subtle); color: var(--text-muted); }
+    .table-wrap { width: 100%; overflow-x: auto; margin: 9px 0; border: 1px solid var(--border); border-radius: 7px; }
+    table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
+    th,td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--bg-panel); }
+    tr:last-child td { border-bottom: 0; }
+    code { padding: 1px 5px; border-radius: 5px; background: var(--bg-subtle); box-shadow: inset 0 0 0 1px color-mix(in srgb,var(--border) 70%,transparent); font-family: var(--font-mono); font-size: .92em; }
+    pre { overflow-x: auto; margin: 8px 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 7px; background: color-mix(in srgb,var(--bg) 92%,var(--bg-panel)); font: 12px/1.62 var(--font-mono); }
+    pre code { padding: 0; background: none; box-shadow: none; }
+
+    .mobile-sim .widget, .mobile-sim .chat-copy { display: none; }
+    .mobile-sim .mobile-pill { display: block; }
+    .mobile-sim .app { width: min(390px,100%); margin: auto; border-inline: 1px solid var(--border); }
+    .mobile-sim .topbar .path { display: none; }
+    .mobile-sim .tool-btn[data-mobile-hide] { display: none; }
+    .mobile-sim .sheet-backdrop.open { display: flex; }
+    .mobile-sim .dialog { width: 100%; max-width: none; max-height: calc(100dvh - 10px); margin-top: auto; border-radius: 16px 16px 0 0; border-bottom: 0; }
+    .mobile-sim .modal-layer { padding: 10px 0 0; align-items: flex-end; }
+    .mobile-sim .dialog-body { padding-inline: 14px; }
+    @media (max-width: 640px) {
+      .app { min-height: 0; }
+      .widget, .chat-copy { display: none; }
+      .mobile-pill { display: block; }
+      .sheet-backdrop.open { display: flex; }
+      .dialog { width: 100%; max-height: calc(100dvh - 10px); margin-top: auto; border-radius: 16px 16px 0 0; border-bottom: 0; }
+      .modal-layer { padding: 10px 0 0; align-items: flex-end; }
+      .dialog-body { padding-inline: 14px; }
+      .demo-tools .tool-btn:first-child { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 1.6s; } }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <header class="topbar">
+      <span class="brand">yolk pi web</span>
+      <span class="path">…/pi-agent-web · 当前聊天</span>
+      <div class="demo-tools" aria-label="原型演示工具">
+        <button class="tool-btn" id="themeBtn" type="button">深色</button>
+        <button class="tool-btn" id="mobileBtn" type="button" data-mobile-hide>移动端</button>
+      </div>
+    </header>
+    <section class="chat" aria-label="聊天上下文示意">
+      <div class="chat-copy">
+        <div class="bubble">架构师已完成规划，任务正在等待你的明确审批。</div>
+        <div class="bubble user">我先查看计划审批书。</div>
+      </div>
+    </section>
+
+    <aside class="widget" aria-label="YPI Studio 任务面板">
+      <div class="widget-shell">
+        <div class="widget-head"><span>⚡ YPI Studio (2)</span><button class="detail-btn" type="button" aria-label="收纳为悬浮球">−</button></div>
+        <div class="widget-body" id="desktopCards"></div>
+        <div class="widget-foot">共绑定 2 个任务 · 仅展示绑定当前会话的 Task</div>
+      </div>
+    </aside>
+
+    <button class="mobile-pill" id="mobilePill" type="button">工 Studio 72% · 需要审批 <b>2</b></button>
+    <div class="sheet-backdrop" id="sheetLayer" aria-hidden="true">
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+        <div class="sheet-head"><span class="sheet-title" id="sheetTitle">YPI Studio (2)</span><button class="secondary-btn" id="sheetClose" type="button">关闭</button></div>
+        <div id="mobileCards"></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="modal-layer" id="modalLayer" aria-hidden="true">
+    <section class="dialog" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" tabindex="-1">
+      <header class="dialog-head">
+        <div class="dialog-title-wrap">
+          <div class="eyebrow" id="planKind">只读 · 主计划</div>
+          <h2 id="dialogTitle">任务浮窗在等待审批时支持计划审批书预览</h2>
+          <div class="subtitle" id="planMeta">计划审批书 · plan-review.md</div>
+        </div>
+        <button class="icon-btn" id="modalClose" type="button" aria-label="关闭计划审批书预览" title="关闭（Esc）">×</button>
+      </header>
+      <div class="readonly"><strong>只读预览：</strong>预览不会自动批准计划，仍需在绑定聊天中明确回复确认或提出修改。</div>
+      <div class="dialog-body" id="modalBody" aria-live="polite"></div>
+      <footer class="dialog-foot"><span>安全读取 · 任务目录内相对链接</span><a class="source-link" id="sourceLink" href="#source">打开源文件 ↗</a></footer>
+    </section>
+  </div>
+
+  <template id="cardsTemplate">
+    <article class="task-card primary">
+      <div class="task-top"><span class="studio-mark">工</span><span class="workflow">Studio · UI 改动</span><span class="progress">72%</span><button class="detail-btn" type="button" aria-label="打开主任务详情" title="打开任务详情">→</button></div>
+      <div class="task-title">任务浮窗在等待审批时支持计划审批书预览</div>
+      <div class="rail" aria-label="Workflow 进度：当前 Design 需要关注">
+        <span class="station"><span class="node-wrap"><i class="node done">✓</i><small class="rail-label">Brief</small></span><i class="line done"></i></span>
+        <span class="station"><span class="node-wrap"><i class="node attention">?</i><small class="rail-label">Design</small></span><i class="line"></i></span>
+        <span class="station"><span class="node-wrap"><i class="node">•</i><small class="rail-label">Implement</small></span><i class="line"></i></span>
+        <span class="station"><span class="node-wrap"><i class="node">•</i><small class="rail-label">Checks</small></span><i class="line"></i></span>
+        <span class="station"><span class="node-wrap"><i class="node">•</i><small class="rail-label">Review</small></span></span>
+      </div>
+      <div class="meta"><span class="waiting">等待计划批准</span><span>·</span><span>architect</span><span>·</span><span>产物 4/6</span></div>
+      <div class="action-row"><button class="review-btn" type="button" data-kind="main" aria-label="预览《任务浮窗在等待审批时支持计划审批书预览》的主计划审批书"><span class="doc">▤</span>计划审批书</button></div>
+      <div class="hint">查看材料后，请回到绑定聊天明确批准或提出修改。</div>
+    </article>
+    <article class="task-card">
+      <div class="task-top"><span class="studio-mark">工</span><span class="workflow">Studio · 功能开发</span><span class="progress">86%</span><button class="detail-btn" type="button" aria-label="打开改进任务详情" title="打开任务详情">→</button></div>
+      <div class="task-title">优化会话分支导航与历史定位</div>
+      <div class="meta"><span class="waiting">等待改进完成</span><span>·</span><span>improver</span><span>·</span><span>产物 6/7</span></div>
+      <div class="improvement-box"><strong>待处理改进 1 项</strong><span>阻塞：IMP-003 等待计划批准</span><br><span>下一步：在绑定聊天中批准 IMP-003 的计划</span></div>
+      <div class="action-row"><button class="review-btn" type="button" data-kind="improvement" aria-label="预览改进项 IMP-003 的计划审批书"><span class="doc">▤</span>计划审批书 · IMP-003</button></div>
+      <div class="hint">每个等待改进项均有独立入口，不会串读其它实例。</div>
+    </article>
+  </template>
+
+  <template id="markdownTemplate">
+    <article class="markdown-body">
+      <h1>计划审批书</h1>
+      <blockquote><strong>审批请求：</strong>请审阅以下范围、交互与风险。此页面仅用于阅读，不会写入审批状态。</blockquote>
+      <h2>任务概览</h2>
+      <p>在绑定当前 session 的 360px Studio 任务浮窗中，为等待审批的主任务与改进项增加按需读取的计划审批书入口。</p>
+      <h2>用户路径</h2>
+      <ol><li>用户在任务浮窗看到“等待计划批准”。</li><li>点击对应的“计划审批书”按钮。</li><li>模态窗口读取并渲染 <code>plan-review.md</code>。</li><li>关闭预览后，用户仍停留在当前聊天，通过绑定聊天明确批准或提出修改。</li></ol>
+      <h2>范围与实现边界</h2>
+      <div class="table-wrap"><table><thead><tr><th>能力</th><th>方案</th><th>边界</th></tr></thead><tbody><tr><td>主计划</td><td>仅 <code>awaiting_approval</code> 显示入口</td><td>读取任务根目录</td></tr><tr><td>改进计划</td><td>仅 <code>waiting_plan_approval</code> 显示入口</td><td>携带同一 improvementId</td></tr><tr><td>正文</td><td>点击后按需读取并渲染 Markdown</td><td>不进入轻量投影</td></tr><tr><td>审批</td><td>回到绑定聊天明确回复</td><td>模态内无批准按钮</td></tr></tbody></table></div>
+      <h2>关键交互</h2>
+      <ul><li>支持右上角关闭、<code>Escape</code> 与点击遮罩关闭。</li><li>打开时焦点进入关闭按钮，关闭后返回原触发按钮。</li><li>长内容仅在正文区域滚动，标题与只读提示保持可见。</li><li>移动端从底部任务面板进入，预览采用接近全屏的底部面板。</li></ul>
+      <h2>相关产物</h2>
+      <p><a href="#prd">PRD</a> · <a href="#design">Design</a> · <a href="#ui">UI 原型</a></p>
+      <h2>安全规则</h2>
+      <pre><code>GET /api/studio/tasks/{taskKey}/files
+?cwd={authorizedCwd}&amp;path=plan-review.md&amp;mode=read
+&amp;improvementId={optional}</code></pre>
+      <p>scheme、绝对路径、<code>..</code>、反斜杠、目录及符号链接逃逸均由服务端拒绝。HTML 相对链接使用 CSP sandbox 预览。</p>
+      <h2>风险与缓解</h2>
+      <ul><li><strong>误认为已经批准：</strong>固定只读提示，模态不出现批准/拒绝按钮。</li><li><strong>多个改进项串读：</strong>触发目标包含稳定的 improvementId。</li><li><strong>请求竞态：</strong>切换目标与关闭时中止或忽略旧请求。</li><li><strong>窄屏可用性：</strong>正文独立滚动，并保留底部安全区。</li></ul>
+      <h2>验收决定</h2>
+      <p>若认可此计划，请关闭预览并在绑定聊天中明确回复“批准计划”；若需调整，请在聊天中指出具体修改项。</p>
+    </article>
+  </template>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const body = document.body;
+      const app = document.getElementById('app');
+      const desktopCards = document.getElementById('desktopCards');
+      const mobileCards = document.getElementById('mobileCards');
+      const cardsHTML = document.getElementById('cardsTemplate').innerHTML;
+      desktopCards.innerHTML = cardsHTML;
+      mobileCards.innerHTML = cardsHTML;
+
+      const modalLayer = document.getElementById('modalLayer');
+      const modalBody = document.getElementById('modalBody');
+      const modalClose = document.getElementById('modalClose');
+      const title = document.getElementById('dialogTitle');
+      const kind = document.getElementById('planKind');
+      const meta = document.getElementById('planMeta');
+      const sheetLayer = document.getElementById('sheetLayer');
+      let trigger = null;
+      let currentTarget = 'main';
+      let timer = null;
+
+      const loadingView = () => `<div class="state-center"><div class="state-card"><div class="state-icon"><span class="spinner" aria-hidden="true"></span></div><h3>正在读取计划审批书…</h3><p>正文仅在你打开预览后按需读取。</p></div></div>`;
+      const errorView = () => `<div class="state-center error"><div class="state-card"><div class="state-icon" aria-hidden="true">!</div><h3>计划审批书读取失败</h3><p>网络连接异常，或文件访问被安全规则拒绝。未展示任何不完整内容。</p><button class="retry" type="button" id="retryBtn">重试</button></div></div>`;
+      const emptyView = () => `<div class="state-center"><div class="state-card"><div class="state-icon" aria-hidden="true">▤</div><h3>计划审批书尚未准备好</h3><p>plan-review.md 为空或仍为 TBD，暂不能作为可审批材料。</p><button class="secondary-btn" type="button" id="retryBtn">重新读取</button></div></div>`;
+      const markdownView = () => document.getElementById('markdownTemplate').innerHTML;
+
+      function setState(state) {
+        clearTimeout(timer);
+        modalBody.scrollTop = 0;
+        if (state === 'loading') {
+          modalBody.innerHTML = loadingView();
+          timer = setTimeout(() => setState('success'), 700);
+        } else if (state === 'error') modalBody.innerHTML = errorView();
+        else if (state === 'empty') modalBody.innerHTML = emptyView();
+        else modalBody.innerHTML = markdownView();
+        const retry = document.getElementById('retryBtn');
+        if (retry) retry.addEventListener('click', () => setState('loading'));
+      }
+
+      function openModal(target, source) {
+        currentTarget = target;
+        trigger = source || document.activeElement;
+        const improvement = target === 'improvement';
+        title.textContent = improvement ? '优化会话分支导航与历史定位' : '任务浮窗在等待审批时支持计划审批书预览';
+        kind.textContent = improvement ? '只读 · 改进计划 · IMP-003' : '只读 · 主计划';
+        meta.textContent = improvement ? '计划审批书 · improvements/imp_003/plan-review.md' : '计划审批书 · plan-review.md';
+        modalLayer.classList.add('open');
+        modalLayer.setAttribute('aria-hidden','false');
+        sheetLayer.classList.remove('open');
+        sheetLayer.setAttribute('aria-hidden','true');
+        setState('loading');
+        requestAnimationFrame(() => modalClose.focus());
+      }
+      function closeModal() {
+        clearTimeout(timer);
+        modalLayer.classList.remove('open');
+        modalLayer.setAttribute('aria-hidden','true');
+        if (trigger && trigger.isConnected) trigger.focus();
+      }
+      document.addEventListener('click', e => {
+        const btn = e.target.closest('[data-kind]');
+        if (btn) openModal(btn.dataset.kind, btn);
+      });
+      modalClose.addEventListener('click', closeModal);
+      modalLayer.addEventListener('click', e => { if (e.target === modalLayer) closeModal(); });
+      document.getElementById('dialog').addEventListener('click', e => e.stopPropagation());
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && modalLayer.classList.contains('open')) closeModal();
+        else if (e.key === 'Escape' && sheetLayer.classList.contains('open')) closeSheet();
+        if (e.key === 'Tab' && modalLayer.classList.contains('open')) {
+          const focusables = [...document.getElementById('dialog').querySelectorAll('button,a[href]')].filter(x => !x.disabled);
+          if (!focusables.length) return;
+          const first = focusables[0], last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      });
+
+      function closeSheet() { sheetLayer.classList.remove('open'); sheetLayer.setAttribute('aria-hidden','true'); document.getElementById('mobilePill').focus(); }
+      document.getElementById('mobilePill').addEventListener('click', () => { sheetLayer.classList.add('open'); sheetLayer.setAttribute('aria-hidden','false'); document.getElementById('sheetClose').focus(); });
+      document.getElementById('sheetClose').addEventListener('click', closeSheet);
+      sheetLayer.addEventListener('click', e => { if (e.target === sheetLayer) closeSheet(); });
+
+      document.getElementById('themeBtn').addEventListener('click', e => {
+        root.classList.toggle('dark');
+        e.currentTarget.textContent = root.classList.contains('dark') ? '浅色' : '深色';
+      });
+      document.getElementById('mobileBtn').addEventListener('click', e => {
+        body.classList.toggle('mobile-sim');
+        e.currentTarget.textContent = body.classList.contains('mobile-sim') ? '桌面端' : '移动端';
+      });
+      document.getElementById('sourceLink').addEventListener('click', e => { e.preventDefault(); alert('原型提示：生产实现将交给现有文件查看器打开对应 plan-review.md；此操作不会批准计划。'); });
+
+      /* Keyboard-accessible prototype-only state shortcuts: Alt+L / Alt+E / Alt+0 / Alt+S. */
+      document.addEventListener('keydown', e => {
+        if (!e.altKey || !modalLayer.classList.contains('open')) return;
+        if (e.key.toLowerCase() === 'l') setState('loading');
+        if (e.key.toLowerCase() === 'e') setState('error');
+        if (e.key === '0') setState('empty');
+        if (e.key.toLowerCase() === 's') setState('success');
+      });
+
+      /* Click the header eyebrow to expose a compact reviewer state menu without adding production UI. */
+      kind.title = '原型演示：点击切换 loading / error / empty / success';
+      kind.style.cursor = 'pointer';
+      kind.addEventListener('click', () => {
+        const choice = prompt('原型状态：loading / error / empty / success', 'error');
+        if (['loading','error','empty','success'].includes(choice)) setState(choice);
+      });
+    })();
+  </script>
+</body>
+</html>

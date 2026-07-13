@@ -1,7 +1,33 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T03:37:11.744Z",
+  "updatedAt": "2026-07-13T05:28:22.705Z",
   "entries": [
+    {
+      "id": "20260713-132822-任务浮窗在等待审批时支持计划审批书预览",
+      "title": "任务浮窗在等待审批时支持计划审批书预览",
+      "taskId": "20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+      "taskKey": "archived:2026-07:20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+      "workflowId": "feature-dev",
+      "summary": "任务浮窗在 awaiting_approval / waiting_plan_approval 时提供只读 plan-review 预览：独立 action row 入口、按需 mode=read 拉取、不写 approval grant。共享 lib/ypi-studio-task-preview.ts 做 task-local 相对链接；YpiStudioPlanReviewModal 集中 fetch/Abort/stale/Markdown/a11y；改进项必须显式 improvementId 防串读；不改 API/schema/浮窗宽度。",
+      "tags": [
+        "ypi-studio",
+        "session-widget",
+        "plan-review",
+        "awaiting-approval",
+        "readonly-preview",
+        "feature-dev",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-125538-任务浮窗在等待审批时支持计划审批书预览",
+      "knowledgePath": ".ypi/knowledge/20260713-132822-任务浮窗在等待审批时支持计划审批书预览.md",
+      "createdAt": "2026-07-13T05:28:22.705Z",
+      "archivedAt": "2026-07-13T05:28:22.705Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "brief.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-113711-修复侧栏宽度-ssr-客户端-hydration-mismatch",
       "title": "修复侧栏宽度 SSR/客户端 hydration mismatch",
