@@ -400,8 +400,14 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     const selected = findProjectSpace(projectsRef.current, selectedProjectId, selectedSpaceId);
     if (!selected) {
       if (token === loadSessionsTokenRef.current) {
-        setAllSessions([]);
+        // Only clear when there is no selection intent. If project/space ids are
+        // already set (URL restore) but the projects registry has not loaded yet,
+        // keep the current list and wait for a later retry.
+        if (!selectedProjectId || !selectedSpaceId) {
+          setAllSessions([]);
+        }
         setSessionsSwitching(false);
+        if (showLoading) setLoading(false);
       }
       return;
     }
@@ -552,6 +558,15 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, [loadSessions, onSessionDeleted]);
 
   const initialLoadDone = useRef(false);
+  const lastSessionRefreshKeyRef = useRef(0);
+  // Stable key that becomes non-null only once the projects registry can resolve
+  // the currently selected project/space. Used to retry session loads after URL
+  // restore sets ids before /api/projects returns.
+  const resolvedSpaceKey = (() => {
+    const selected = findProjectSpace(projects, selectedProjectId, selectedSpaceId);
+    return selected ? `${selected.project.id}/${selected.space.id}` : null;
+  })();
+
   useEffect(() => {
     const isFirst = !initialLoadDone.current;
     initialLoadDone.current = true;
@@ -562,8 +577,21 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     const spaceKey = `${selectedProjectId ?? ""}/${selectedSpaceId ?? ""}`;
     const isSpaceChange = prevSpaceKeyRef.current !== null && prevSpaceKeyRef.current !== spaceKey;
     prevSpaceKeyRef.current = spaceKey;
-    void loadSessions(isSpaceChange);
-  }, [loadSessions, selectedProjectId, selectedSpaceId]);
+
+    // Selection exists but projects are not ready yet (common on hard refresh with
+    // ?session=...). Wait until resolvedSpaceKey becomes available.
+    if (selectedProjectId && selectedSpaceId && !resolvedSpaceKey) return;
+
+    void loadSessions(isSpaceChange && Boolean(resolvedSpaceKey));
+  }, [loadSessions, selectedProjectId, selectedSpaceId, resolvedSpaceKey]);
+
+  // AppShell bumps refreshKey after new-session creation, agent end, fork, etc.
+  // That used to only reload projects; sessions must refresh explicitly too.
+  useEffect(() => {
+    if (!refreshKey || refreshKey === lastSessionRefreshKeyRef.current) return;
+    lastSessionRefreshKeyRef.current = refreshKey;
+    void loadSessions(false);
+  }, [refreshKey, loadSessions]);
 
   useEffect(() => {
     if (!archivedExpanded || !selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) return;
@@ -1379,7 +1407,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               {creatingWorktree ? "创建中…" : "WorkTree"}
             </button>
             <button
-              onClick={() => { void loadProjects(false); }}
+              onClick={() => { void loadProjects(false); void loadSessions(false); }}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: (sessionRefreshDone || projectsRefreshDone) ? "rgba(74,222,128,0.18)" : "var(--bg-hover)",

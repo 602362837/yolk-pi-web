@@ -6,6 +6,7 @@ import { canonicalizeProjectPath, getProjectSpace } from "./project-registry";
 import { writeSessionProjectLink } from "./session-project-link";
 import type { SessionHeader } from "./types";
 import { upsertProjectSessionIndexEntry } from "./project-session-index";
+import { invalidateSessionListSnapshots } from "./session-reader";
 
 export class AgentSessionBootstrapError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -104,6 +105,10 @@ export async function createConfiguredEmptyAgentSession({
       spaceId,
     });
   }
+
+  // Drop the short-lived listAllSessions snapshot so the sidebar does not miss
+  // a brand-new draft/prompt session created within the cache TTL window.
+  invalidateSessionListSnapshots();
 
   if (provider && modelId) {
     await session.send({ type: "set_model", provider, modelId });

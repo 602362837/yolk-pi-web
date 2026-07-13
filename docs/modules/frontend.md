@@ -78,4 +78,4 @@ Components may reference these CSS variables directly:
 
 They are also mapped to Tailwind `--color-*` utility aliases. The theme toggles by adding/removing `dark` on `document.documentElement`.
 
-Session sidebar loading uses stable project/space selection identity, aborts obsolete requests, and ignores `AbortError`; refresh actions should not launch a second session-list request.
+Session sidebar loading uses stable project/space selection identity, aborts obsolete requests, and ignores `AbortError`. Session list reloads when the selected project/space changes, when the projects registry first resolves that selection (URL `?session=` restore race), when AppShell bumps `refreshKey` (new session / agent end / fork), and when the manual refresh button runs. If project/space ids are set before projects load, the sidebar waits instead of clearing the list; it does not depend on full `projects` array identity for every metadata-only project refresh.

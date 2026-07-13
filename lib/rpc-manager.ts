@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
-import { cacheSessionPath } from "./session-reader";
+import { cacheSessionPath, invalidateSessionListSnapshots } from "./session-reader";
 import { readSessionHeaderFromFile, writeSessionProjectLink } from "./session-project-link";
 import { upsertProjectSessionIndexEntry } from "./project-session-index";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
@@ -734,6 +734,7 @@ export class AgentSessionWrapper {
           });
         }
         cacheSessionPath(newSessionId, newSessionFile);
+        invalidateSessionListSnapshots();
         this.destroy();
         return { cancelled: false, newSessionId };
       }
