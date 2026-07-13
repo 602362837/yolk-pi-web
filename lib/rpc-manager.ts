@@ -2,10 +2,13 @@ import { createHash } from "crypto";
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath, invalidateSessionListSnapshots } from "./session-reader";
+
 import { readSessionHeaderFromFile, writeSessionProjectLink } from "./session-project-link";
 import { upsertProjectSessionIndexEntry } from "./project-session-index";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
+import { recordObservedUsage } from "./llm-usage-recorder";
+import type { Usage } from "@earendil-works/pi-ai/compat";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
 import { createBrowserShareExtension } from "./browser-share-extension";
 import {
@@ -450,6 +453,30 @@ export class AgentSessionWrapper {
         }
       } catch {
         // File-change projection must never interrupt normal agent event delivery.
+      }
+      // Capture LLM usage from message_end events (never blocks agent event flow)
+      try {
+        if (event.type === "message_end") {
+          const msg = event.message as { role?: string; usage?: Usage; provider?: string; model?: string; responseModel?: string; api?: string; stopReason?: string } | undefined;
+          if (msg?.role === "assistant" && msg?.usage) {
+            const status = msg.stopReason === "error" ? "error" as const
+              : msg.stopReason === "aborted" ? "aborted" as const
+              : "success" as const;
+            recordObservedUsage(msg.usage, {
+              sourceKind: "chat",
+              invocation: "agent_turn",
+              workspacePath: this.cwd,
+              sessionId: this.sessionId,
+              provider: msg.provider,
+              requestedModel: msg.model,
+              responseModel: msg.responseModel,
+              api: msg.api,
+              status,
+            });
+          }
+        }
+      } catch {
+        // Usage capture must never interrupt normal agent event delivery.
       }
       const deliveredEvent = event.type === "agent_end"
         ? { ...event, studioChildRunCount: countActiveYpiStudioChildRunsForSession(this.sessionId) }

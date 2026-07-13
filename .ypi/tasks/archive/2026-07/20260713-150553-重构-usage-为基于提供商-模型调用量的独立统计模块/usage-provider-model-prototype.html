@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YPI Studio Usage Provider/Model HTML Prototype</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f9fafb;
+      --bg-subtle: rgba(0,0,0,0.03);
+      
+      /* Status Colors */
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.1);
+      --error: #ef4444;
+      --error-bg: rgba(239, 68, 68, 0.1);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.1);
+      --info: #3b82f6;
+      --info-bg: rgba(59, 130, 246, 0.1);
+    }
+
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --assistant-bg: #1a1a1a;
+      --tool-bg: #1f2937;
+      --bg-subtle: rgba(255,255,255,0.04);
+      
+      --success: #34d399;
+      --success-bg: rgba(52, 211, 153, 0.15);
+      --error: #f87171;
+      --error-bg: rgba(248, 113, 113, 0.15);
+      --warning: #fbbf24;
+      --warning-bg: rgba(251, 191, 36, 0.15);
+      --info: #60a5fa;
+      --info-bg: rgba(96, 165, 250, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #121212;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Top Sandbox Control Panel */
+    .sandbox-header {
+      background-color: #1c1c1c;
+      border-bottom: 2px solid #333;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      z-index: 1000;
+    }
+
+    .sandbox-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sandbox-badge {
+      background-color: #3b82f6;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .sandbox-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .sandbox-btn {
+      background-color: #2a2a2a;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .sandbox-btn:hover {
+      background-color: #3a3a3a;
+      color: #fff;
+    }
+
+    .sandbox-btn.active {
+      background-color: var(--accent);
+      border-color: var(--accent-hover);
+      color: #fff;
+    }
+
+    /* Workspace container mimicking the app background */
+    .app-workspace {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #0f0f10;
+      padding: 20px;
+      overflow: auto;
+      position: relative;
+    }
+
+    /* Outer Modal Container resembling YPI Modal */
+    .pi-modal-overlay {
+      position: relative;
+      width: 100%;
+      max-width: 980px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 22px 70px rgba(0,0,0,0.35);
+      color: var(--text);
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s, border-color 0.3s;
+    }
+
+    /* Header styling */
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .header-title-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .header-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .header-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* Toolbar for filters */
+    .filter-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .filter-select, .filter-input {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      outline: none;
+      height: 28px;
+      cursor: pointer;
+    }
+
+    .filter-select:focus, .filter-input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-clear-filter {
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-clear-filter:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Scrollable body content */
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Coverage Alert Banner */
+    .coverage-banner {
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      border: 1px solid transparent;
+    }
+
+    .coverage-banner.info {
+      background-color: var(--info-bg);
+      border-color: var(--info);
+      color: var(--text);
+    }
+
+    .coverage-banner.warning {
+      background-color: var(--warning-bg);
+      border-color: var(--warning);
+      color: var(--text);
+    }
+
+    .coverage-banner-icon {
+      font-size: 14px;
+      line-height: 1;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .coverage-banner-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .coverage-banner-details {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 6px;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .metric-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+
+    .metric-value.highlight {
+      font-size: 20px;
+      color: var(--accent);
+    }
+
+    .metric-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Top Charts Section */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card-panel {
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-subtitle {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: normal;
+    }
+
+    /* Mini Daily Bar Chart list */
+    .daily-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .daily-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 70px;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+    }
+
+    .daily-date {
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .daily-bar-container {
+      height: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .daily-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #10b981);
+      border-radius: 4px;
+      transition: width 0.4s ease-out;
+    }
+
+    .daily-value {
+      text-align: right;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Token types Breakdown */
+    .token-types-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .token-type-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .token-type-item:last-child {
+      border-bottom: none;
+    }
+
+    .token-type-label {
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .token-type-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .token-type-val {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .token-type-pct {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-left: 6px;
+    }
+
+    /* Main Usage Table */
+    .table-container {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .usage-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .usage-table th {
+      background: var(--bg-panel);
+      padding: 8px 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      user-select: none;
+    }
+
+    .usage-table th.num-col {
+      text-align: right;
+    }
+
+    .usage-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text);
+    }
+
+    .usage-table td.num-col {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Expandable Row styling */
+    .row-provider {
+      background-color: var(--bg-subtle);
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.2s;
+    }
+
+    .row-provider:hover {
+      background-color: var(--bg-hover);
+    }
+
+    .row-model {
+      background-color: var(--bg);
+    }
+
+    .row-model:hover {
+      background-color: var(--bg-subtle);
+    }
+
+    .provider-toggle-icon {
+      display: inline-block;
+      width: 12px;
+      transition: transform 0.2s;
+      margin-right: 6px;
+      color: var(--text-muted);
+    }
+
+    .row-provider.collapsed .provider-toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .row-model.hidden {
+      display: none;
+    }
+
+    .cell-indent {
+      padding-left: 28px !important;
+    }
+
+    .text-success {
+      color: var(--success);
+    }
+
+    .text-error {
+      color: var(--error);
+    }
+
+    .badge-subtle {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: normal;
+      text-transform: uppercase;
+      border: 1px solid currentColor;
+    }
+
+    .badge-subtle.local {
+      color: var(--info);
+      background-color: var(--info-bg);
+    }
+
+    .badge-subtle.zero-cost {
+      color: var(--success);
+      background-color: var(--success-bg);
+    }
+
+    .badge-subtle.unknown {
+      color: var(--text-dim);
+      background-color: var(--border);
+    }
+
+    /* Pagination / Footer info */
+    .table-footer-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--bg-panel);
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Modal Footer */
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      font-size: 11px;
+      color: var(--text-muted);
+      justify-content: space-between;
+    }
+
+    .compatibility-note {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-dim);
+    }
+
+    /* Custom scrollbar helper */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    /* State Layouts (Switchable by Sandbox) */
+    .state-container {
+      display: none;
+      width: 100%;
+      height: 100%;
+    }
+
+    .state-container.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Loading state overlay style */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+      gap: 10px;
+      text-align: center;
+    }
+
+    .empty-icon {
+      font-size: 24px;
+      color: var(--text-dim);
+    }
+
+    /* Error state */
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      color: var(--text);
+      gap: 12px;
+      text-align: center;
+    }
+
+    .error-card {
+      border: 1px solid var(--error);
+      background-color: var(--error-bg);
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .error-title {
+      font-weight: 600;
+      color: var(--error);
+    }
+
+    .error-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Backfilling sub-component */
+    .backfill-progress-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--bg-subtle);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+
+    .backfill-status-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    .backfill-progress-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .backfill-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      width: 65%;
+      animation: pulsate 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulsate {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+
+    /* Details Drawer for mobile / small screen drilldown */
+    .details-drawer {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 320px;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      box-shadow: -10px 0 30px rgba(0,0,0,0.15);
+      z-index: 1001;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      color: var(--text);
+    }
+
+    .details-drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .drawer-title {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .drawer-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .drawer-body {
+      padding: 18px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      font-size: 12px;
+    }
+
+    .drawer-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .drawer-section-title {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .drawer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: 8px;
+      background: var(--bg-panel);
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .drawer-grid-label {
+      color: var(--text-muted);
+    }
+
+    .drawer-grid-val {
+      font-weight: 600;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Small Screen Responsive overrides */
+    @media (max-width: 640px) {
+      .pi-modal-overlay {
+        max-height: 100vh;
+        border-radius: 0;
+        border: none;
+        height: 100vh;
+      }
+
+      .modal-header {
+        padding: 10px 14px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      .filter-toolbar {
+        padding: 8px 14px;
+        gap: 6px;
+      }
+
+      .filter-group {
+        flex: 1 1 45%;
+      }
+
+      .filter-select, .filter-input {
+        width: 100%;
+      }
+
+      .modal-body {
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      /* Hide less critical columns in small screen */
+      .usage-table th.hide-mobile,
+      .usage-table td.hide-mobile {
+        display: none;
+      }
+
+      .modal-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .compatibility-note {
+        font-size: 10px;
+      }
+    }
+  </style>
+</head>
+<body class="dark"> <!-- Defaulting to Dark Mode, typical for coder theme -->
+
+  <!-- Sandbox Top Controls (For Reviewers to Test States & Layouts) -->
+  <div class="sandbox-header">
+    <div class="sandbox-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+        <line x1="6" y1="6" x2="6.01" y2="6"/>
+        <line x1="6" y1="18" x2="6.01" y2="18"/>
+      </svg>
+      YPI Studio UI Sandbox
+      <span class="sandbox-badge">UI Designer Prototype</span>
+    </div>
+    
+    <div class="filter-group">
+      <span style="color:#aaa; font-size:11px;">Theme:</span>
+      <button class="sandbox-btn active" id="btn-theme-dark" onclick="setTheme('dark')">Dark Theme</button>
+      <button class="sandbox-btn" id="btn-theme-light" onclick="setTheme('light')">Light Theme</button>
+    </div>
+
+    <div class="filter-group" style="border-left: 1px solid #444; padding-left: 15px;">
+      <span style="color:#aaa; font-size:11px;">Simulator State:</span>
+      <button class="sandbox-btn active" onclick="switchState('normal')">Normal (All Records)</button>
+      <button class="sandbox-btn" onclick="switchState('backfilling')">Historical Backfilling</button>
+      <button class="sandbox-btn" onclick="switchState('partial')">Partial / Corrupted Warnings</button>
+      <button class="sandbox-btn" onclick="switchState('empty')">Empty Result</button>
+      <button class="sandbox-btn" onclick="switchState('loading')">Loading State</button>
+      <button class="sandbox-btn" onclick="switchState('error')">Server Error</button>
+    </div>
+
+    <div class="filter-group" style="border-left: 1px solid #444; padding-left: 15px;">
+      <span style="color:#aaa; font-size:11px;">Screen Width:</span>
+      <button class="sandbox-btn active" id="btn-size-desktop" onclick="setModalWidth('980px')">Desktop (980px)</button>
+      <button class="sandbox-btn" id="btn-size-tablet" onclick="setModalWidth('720px')">Tablet (720px)</button>
+      <button class="sandbox-btn" id="btn-size-mobile" onclick="setModalWidth('375px')">Mobile (375px)</button>
+    </div>
+  </div>
+
+  <!-- App Workspace (Mimicking YPI Host environment) -->
+  <div class="app-workspace">
+    
+    <!-- YPI Usage Stats Modal Shell -->
+    <div class="pi-modal-overlay" id="usage-modal" role="dialog" aria-modal="true" aria-label="LLM Usage Ledger Overview">
+      
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="header-title-area">
+          <!-- Coins/Billing SVG Icon -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          <div style="min-width: 0;">
+            <div class="header-title">全局 LLM 调用账本统计 (Usage Ledger)</div>
+            <div class="header-subtitle">基于独立 append-only 调用日志汇总，排除 session 生命周期和归档限制的真实调用凭证</div>
+          </div>
+        </div>
+        
+        <!-- Quick Stats Rollup in Header -->
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+          <button class="sandbox-btn" style="border-radius: 6px; padding: 4px 8px; display: flex; align-items: center; gap: 4px;" onclick="alert('触发全量 session 历史重新 backfill 对账！')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            重新对账 (Sync)
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter & Control Toolbar -->
+      <div class="filter-toolbar">
+        <div class="filter-group">
+          <span>时间范围:</span>
+          <input type="date" class="filter-input" value="2026-07-07">
+          <span>至</span>
+          <input type="date" class="filter-input" value="2026-07-13">
+        </div>
+
+        <div class="filter-group">
+          <span>工作区:</span>
+          <select class="filter-select">
+            <option value="all">所有工作空间 (All Spaces)</option>
+            <option value="hash-current">当前工作区 (pi-agnet-web)</option>
+            <option value="hash-other">其他关联工作区 (navi-project)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <span>来源 (Source):</span>
+          <select class="filter-select" id="filter-source">
+            <option value="all">所有来源 (All)</option>
+            <option value="chat">主聊天会话 (Chat)</option>
+            <option value="studio_sdk">Studio SDK 子任务</option>
+            <option value="studio_cli">Studio CLI (--no-session)</option>
+            <option value="assist">辅助工具/模型测试 (Assist/Test)</option>
+            <option value="system">系统维护/摘要压缩 (System)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <span>状态 (Status):</span>
+          <select class="filter-select">
+            <option value="all">所有状态</option>
+            <option value="success">仅成功 (Success)</option>
+            <option value="error">仅失败 (Error)</option>
+            <option value="aborted">已中断 (Aborted)</option>
+          </select>
+        </div>
+
+        <button class="btn-clear-filter" onclick="resetFilters()">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          重置过滤
+        </button>
+      </div>
+
+      <!-- Scrollable Main Content -->
+      <div class="modal-body">
+
+        <!-- ==================== STATE 1: NORMAL VIEW ==================== -->
+        <div class="state-container active" id="state-normal">
+          
+          <!-- Coverage banner: Ledger coverage statement -->
+          <div class="coverage-banner info" id="coverage-banner-info">
+            <span class="coverage-banner-icon">ℹ️</span>
+            <div style="flex: 1;">
+              <div class="coverage-banner-title">独立调用账本覆盖率声明 (Ledger Coverage)</div>
+              <div>当前统计自 <strong>2026-07-01</strong> 起启用实时 native ledger 写入。已自动进行历史 session 幂等 backfill 补账。</div>
+              <div class="coverage-banner-details">
+                <div>• <strong>主 Chat / Studio SDK / CLI:</strong> 100% 完整覆盖</div>
+                <div>• <strong>Compaction / Branch Summary:</strong> 已由 0.81.0 SDK 拦截捕获</div>
+                <div>• <strong>历史直接请求/CLI (2026-07-01前):</strong> <span class="text-error">无法回溯</span> (已标明 coverage gap 起点)</div>
+                <div>• <strong>坏账隔离:</strong> 0 个文件解析失败，0 条记录损坏被跳过</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics Highlights -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-label">预估费用 (Cost)</span>
+              <span class="metric-value highlight">$142.85</span>
+              <span class="metric-desc">SDK 计算最终费用的日汇总累计</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">调用次数 (Calls)</span>
+              <span class="metric-value">1,482 次</span>
+              <span class="metric-desc">可观测 completion 终态次数</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">总消耗 Token</span>
+              <span class="metric-value">34.21M</span>
+              <span class="metric-desc">输入+输出+缓存读取+缓存写入</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">调用成功率</span>
+              <span class="metric-value" style="color: var(--success);">98.4%</span>
+              <span class="metric-desc">成功 1,458 / 失败 18 / 中断 6</span>
+            </div>
+          </div>
+
+          <!-- Daily bar chart & Token type breakdown -->
+          <div class="charts-row">
+            <!-- Daily chart list -->
+            <div class="card-panel">
+              <div class="card-title">
+                每日调用费用占比趋势
+                <span class="card-subtitle">按 UTC 日期归集费用排行</span>
+              </div>
+              <div class="daily-list">
+                <div class="daily-row">
+                  <span class="daily-date">07-13 今天</span>
+                  <div class="daily-bar-container">
+                    <div class="daily-bar" style="width: 100%;"></div>
+                  </div>
+                  <span class="daily-value">$42.15</span>
+                </div>
+                <div class="daily-row">
+                  <span class="daily-date">07-12 昨天</span>
+                  <div class="daily-bar-container">
+                    <div class="daily-bar" style="width: 75%;"></div>
+                  </div>
+                  <span class="daily-value">$31.60</span>
+                </div>
+                <div class="daily-row">
+                  <span class="daily-date">07-11 前天</span>
+                  <div class="daily-bar-container">
+                    <div class="daily-bar" style="width: 58%;"></div>
+                  </div>
+                  <span class="daily-value">$24.45</span>
+                </div>
+                <div class="daily-row">
+                  <span class="daily-date">07-10 周五</span>
+                  <div class="daily-bar-container">
+                    <div class="daily-bar" style="width: 40%;"></div>
+                  </div>
+                  <span class="daily-value">$16.80</span>
+                </div>
+                <div class="daily-row">
+                  <span class="daily-date">07-09 周四</span>
+                  <div class="daily-bar-container">
+                    <div class="daily-bar" style="width: 32%;"></div>
+                  </div>
+                  <span class="daily-value">$13.50</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Token Breakdown -->
+            <div class="card-panel">
+              <div class="card-title">Token 物理拆分占比</div>
+              <div class="token-types-list">
+                <div class="token-type-item">
+                  <span class="token-type-label">
+                    <span class="token-type-dot" style="background-color: var(--accent);"></span>
+                    Input Token (普通输入)
+                  </span>
+                  <span class="token-type-val">12.50M <span class="token-type-pct">(36.5%)</span></span>
+                </div>
+                <div class="token-type-item">
+                  <span class="token-type-label">
+                    <span class="token-type-dot" style="background-color: #10b981;"></span>
+                    Output Token (模型生成)
+                  </span>
+                  <span class="token-type-val">4.82M <span class="token-type-pct">(14.1%)</span></span>
+                </div>
+                <div class="token-type-item">
+                  <span class="token-type-label">
+                    <span class="token-type-dot" style="background-color: #f59e0b;"></span>
+                    Cache Read (命中读取)
+                  </span>
+                  <span class="token-type-val">15.10M <span class="token-type-pct">(44.1%)</span></span>
+                </div>
+                <div class="token-type-item">
+                  <span class="token-type-label">
+                    <span class="token-type-dot" style="background-color: #ec4899;"></span>
+                    Cache Write (未命中写入)
+                  </span>
+                  <span class="token-type-val">1.79M <span class="token-type-pct">(5.3%)</span></span>
+                </div>
+                <div class="token-type-item" style="border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 10px;">
+                  <span class="token-type-label" style="font-weight: 600;">
+                    🧠 Reasoning (推理消耗)
+                  </span>
+                  <span class="token-type-val">1.25M <span class="token-type-pct" style="color:var(--text-dim)">(已包含于 Output)</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Table Section -->
+          <div class="table-container">
+            <table class="usage-table" id="usage-table-data">
+              <thead>
+                <tr>
+                  <th scope="col">提供商 / 模型名称</th>
+                  <th scope="col" class="num-col">Calls</th>
+                  <th scope="col" class="num-col hide-mobile">成功率</th>
+                  <th scope="col" class="num-col hide-mobile">Input</th>
+                  <th scope="col" class="num-col hide-mobile">Output</th>
+                  <th scope="col" class="num-col hide-mobile">Cache R/W</th>
+                  <th scope="col" class="num-col">预估费用</th>
+                  <th scope="col" class="num-col hide-mobile">占比</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+                <!-- OpenAI Provider Group -->
+                <tr class="row-provider" onclick="toggleProviderGroup('openai', this)" aria-expanded="true">
+                  <td colspan="8">
+                    <span class="provider-toggle-icon">▼</span>
+                    OpenAI
+                    <span style="font-weight: normal; font-size: 10px; color: var(--text-dim); margin-left: 8px;">
+                      (3 个模型，共 425 次调用)
+                    </span>
+                  </td>
+                </tr>
+                <tr class="row-model openai-child" onclick="showModelDetails('OpenAI', 'gpt-4o', 320, '$54.20', '12.8M', 'Chat (250) / SDK (70)')">
+                  <td class="cell-indent">gpt-4o</td>
+                  <td class="num-col">320</td>
+                  <td class="num-col hide-mobile text-success">99.1%</td>
+                  <td class="num-col hide-mobile">5.40M</td>
+                  <td class="num-col hide-mobile">2.10M</td>
+                  <td class="num-col hide-mobile">5.3M / 0.5M</td>
+                  <td class="num-col font-semibold">$54.20</td>
+                  <td class="num-col hide-mobile">37.9%</td>
+                </tr>
+                <tr class="row-model openai-child" onclick="showModelDetails('OpenAI', 'gpt-4o-mini', 85, '$2.45', '4.2M', 'Chat (30) / CLI (55)')">
+                  <td class="cell-indent">gpt-4o-mini</td>
+                  <td class="num-col">85</td>
+                  <td class="num-col hide-mobile text-success">100%</td>
+                  <td class="num-col hide-mobile">3.10M</td>
+                  <td class="num-col hide-mobile">1.10M</td>
+                  <td class="num-col hide-mobile">0.0M / 0.0M</td>
+                  <td class="num-col font-semibold">$2.45</td>
+                  <td class="num-col hide-mobile">1.7%</td>
+                </tr>
+                <tr class="row-model openai-child" onclick="showModelDetails('OpenAI', 'o1-preview', 20, '$22.80', '1.1M', 'Assist (20)')">
+                  <td class="cell-indent">o1-preview <span class="badge-subtle unknown" style="border-color: var(--accent); color: var(--accent);">Reasoning</span></td>
+                  <td class="num-col">20</td>
+                  <td class="num-col hide-mobile text-error">90.0%</td>
+                  <td class="num-col hide-mobile">0.50M</td>
+                  <td class="num-col hide-mobile">0.60M</td>
+                  <td class="num-col hide-mobile">0.0M / 0.0M</td>
+                  <td class="num-col font-semibold">$22.80</td>
+                  <td class="num-col hide-mobile">16.0%</td>
+                </tr>
+
+                <!-- Anthropic Provider Group -->
+                <tr class="row-provider" onclick="toggleProviderGroup('anthropic', this)" aria-expanded="true">
+                  <td colspan="8">
+                    <span class="provider-toggle-icon">▼</span>
+                    Anthropic
+                    <span style="font-weight: normal; font-size: 10px; color: var(--text-dim); margin-left: 8px;">
+                      (2 个模型，共 850 次调用)
+                    </span>
+                  </td>
+                </tr>
+                <tr class="row-model anthropic-child" onclick="showModelDetails('Anthropic', 'claude-3-5-sonnet', 820, '$61.50', '15.4M', 'Chat (600) / SDK (180) / CLI (40)')">
+                  <td class="cell-indent">claude-3-5-sonnet</td>
+                  <td class="num-col">820</td>
+                  <td class="num-col hide-mobile text-success">98.5%</td>
+                  <td class="num-col hide-mobile">3.20M</td>
+                  <td class="num-col hide-mobile">1.02M</td>
+                  <td class="num-col hide-mobile">9.8M / 1.2M</td>
+                  <td class="num-col font-semibold">$61.50</td>
+                  <td class="num-col hide-mobile">43.0%</td>
+                </tr>
+                <tr class="row-model anthropic-child" onclick="showModelDetails('Anthropic', 'claude-3-haiku', 30, '$0.80', '0.6M', 'CLI (30)')">
+                  <td class="cell-indent">claude-3-haiku</td>
+                  <td class="num-col">30</td>
+                  <td class="num-col hide-mobile text-success">100%</td>
+                  <td class="num-col hide-mobile">0.30M</td>
+                  <td class="num-col hide-mobile">0.30M</td>
+                  <td class="num-col hide-mobile">0.0M / 0.0M</td>
+                  <td class="num-col font-semibold">$0.80</td>
+                  <td class="num-col hide-mobile">0.6%</td>
+                </tr>
+
+                <!-- Local Provider Group (Zero cost demo) -->
+                <tr class="row-provider" onclick="toggleProviderGroup('local', this)" aria-expanded="true">
+                  <td colspan="8">
+                    <span class="provider-toggle-icon">▼</span>
+                    Local (Ollama / VLLM)
+                    <span style="font-weight: normal; font-size: 10px; color: var(--text-dim); margin-left: 8px;">
+                      (1 个模型，共 182 次调用，本地模型计费免除)
+                    </span>
+                  </td>
+                </tr>
+                <tr class="row-model local-child" onclick="showModelDetails('Local', 'qwen2.5-coder-7b', 182, '$0.00', '0.3M', 'Chat (102) / System (80)')">
+                  <td class="cell-indent">
+                    qwen2.5-coder-7b
+                    <span class="badge-subtle local">Local</span>
+                    <span class="badge-subtle zero-cost">Zero Cost</span>
+                  </td>
+                  <td class="num-col">182</td>
+                  <td class="num-col hide-mobile text-success">99.4%</td>
+                  <td class="num-col hide-mobile">0.20M</td>
+                  <td class="num-col hide-mobile">0.10M</td>
+                  <td class="num-col hide-mobile">0.0M / 0.0M</td>
+                  <td class="num-col font-semibold">$0.00</td>
+                  <td class="num-col hide-mobile">0.0%</td>
+                </tr>
+
+                <!-- Unknown/Custom Provider Group (demonstrating resilience) -->
+                <tr class="row-provider" onclick="toggleProviderGroup('unknown', this)" aria-expanded="true">
+                  <td colspan="8">
+                    <span class="provider-toggle-icon">▼</span>
+                    Unknown Provider
+                    <span style="font-weight: normal; font-size: 10px; color: var(--text-dim); margin-left: 8px;">
+                      (无法解析 Provider 标识的零散调用)
+                    </span>
+                  </td>
+                </tr>
+                <tr class="row-model unknown-child" onclick="showModelDetails('Unknown', 'deepseek-chat (legacy)', 25, '$1.10', '0.01M', 'Assist (25)')">
+                  <td class="cell-indent">
+                    deepseek-chat (legacy)
+                    <span class="badge-subtle unknown">Legacy Event</span>
+                  </td>
+                  <td class="num-col">25</td>
+                  <td class="num-col hide-mobile text-muted">--</td>
+                  <td class="num-col hide-mobile">--</td>
+                  <td class="num-col hide-mobile">--</td>
+                  <td class="num-col hide-mobile">--</td>
+                  <td class="num-col font-semibold">$1.10</td>
+                  <td class="num-col hide-mobile">0.8%</td>
+                </tr>
+
+              </tbody>
+            </table>
+            
+            <div class="table-footer-info">
+              <span>* 点击各行模型可查看详细过滤细分及调用场景</span>
+              <span>共扫描 4 个大类提供商，7 个 LLM 模型，隔离 0 个脏事件文件</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== STATE 2: BACKFILLING VIEW ==================== -->
+        <div class="state-container" id="state-backfilling">
+          
+          <!-- Backfill coverage banner -->
+          <div class="coverage-banner warning">
+            <span class="coverage-banner-icon">⏳</span>
+            <div style="flex: 1;">
+              <div class="coverage-banner-title">历史会话补账同步中 (Historical Backfill in Progress)</div>
+              <div>当前正在扫描 active/archive 历史会话 JSONL 记录。此操作幂等且安全，不修改历史 JSONL 文件内容。</div>
+            </div>
+          </div>
+
+          <!-- Live Progress component -->
+          <div class="backfill-progress-container">
+            <div class="backfill-status-line">
+              <span style="font-weight:600; color:var(--text)">会话扫描进度 (Session Scanning):</span>
+              <span class="font-mono text-success">65.2% (132/202 sessions)</span>
+            </div>
+            <div class="backfill-progress-bar">
+              <div class="backfill-progress-fill"></div>
+            </div>
+            <div class="backfill-status-line" style="color: var(--text-muted); font-size:10px; margin-top:2px;">
+              <span>当前扫描: ~/.pi/agent/sessions/encoded_cwd/2026-07-06_xxxx.jsonl</span>
+              <span>预计耗时: ~12s</span>
+            </div>
+          </div>
+
+          <div class="empty-state">
+            <span class="spinner"></span>
+            <div style="font-size:12px; margin-top:8px;">正在为您的页面准备双读对账数据...请稍候</div>
+          </div>
+        </div>
+
+        <!-- ==================== STATE 3: PARTIAL VIEW ==================== -->
+        <div class="state-container" id="state-partial">
+          
+          <!-- Coverage banner with skip warning -->
+          <div class="coverage-banner warning">
+            <span class="coverage-banner-icon">⚠️</span>
+            <div style="flex: 1;">
+              <div class="coverage-banner-title">部分调用日志损坏与遗漏警告 (Ledger Integrity Advisory)</div>
+              <div>本次查询中发现部分数据源有损坏或遗漏，整体结果已进行降级处理。</div>
+              <div class="coverage-banner-details" style="grid-template-columns:1fr;">
+                <div>• <strong>坏账事件文件:</strong> <span class="text-error" style="font-weight:bold;">3 个文件损坏</span>，在 <code>~/.pi/agent/usage-events/v1/2026-07-08/</code> 路径中解析 JSON 异常，已自动隔离跳过，未造成统计崩溃。</div>
+                <div>• <strong>遗漏的已知调用:</strong> 2026-07-01 以前的 Studio CLI `--no-session` 属于不可回填的历史 gap。</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: center; padding: 20px; font-size: 11px; color: var(--text-muted);">
+            数据加载成功，显示损坏文件被剔除后的完整模型用量表。您可以正常浏览下方的主表。
+          </div>
+          
+          <!-- Mini table just to show content continues -->
+          <div class="table-container" style="opacity: 0.8;">
+            <table class="usage-table">
+              <thead>
+                <tr>
+                  <th>提供商 / 模型</th>
+                  <th class="num-col">Calls</th>
+                  <th class="num-col">预估费用</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>OpenAI / gpt-4o</td>
+                  <td class="num-col">120</td>
+                  <td class="num-col">$18.40</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ==================== STATE 4: EMPTY VIEW ==================== -->
+        <div class="state-container" id="state-empty">
+          <div class="empty-state">
+            <div class="empty-icon">📁</div>
+            <div style="font-weight: 600; color: var(--text);">无统计范围内的调用数据</div>
+            <div style="font-size: 11px; max-width: 320px; margin-top:4px;">
+              在此时间段或过滤条件下未找到任何 LLM 调用账本文件。若为首次使用，可点击顶部的<strong>重新对账</strong>补全历史。
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== STATE 5: LOADING VIEW ==================== -->
+        <div class="state-container" id="state-loading">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <div style="font-weight: 600; font-size:12px; color:var(--text);">正在读取事件分区账本...</div>
+            <div style="font-size:11px; max-width: 250px; text-align:center;">读取 ~/.. /usage-events/v1/2026-07-13/ 的只读事件单文件</div>
+          </div>
+        </div>
+
+        <!-- ==================== STATE 6: ERROR VIEW ==================== -->
+        <div class="state-container" id="state-error">
+          <div class="error-state">
+            <div class="error-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <div class="error-title">读取账本事件发生异常 (Ledger Query Fail)</div>
+              <div class="error-desc">
+                错误原因: <code>Failed to list UTC date partitions: EACCES permission denied to folder '~/.pi/agent/usage-events/'</code>.<br>
+                请检查该文件夹的系统读写权限，或执行进程没有足够的操作系统权限。
+              </div>
+              <button class="sandbox-btn" style="margin-top: 10px; border-color: var(--error);" onclick="alert('重新尝试连接本地 API 账本服务...')">
+                重试读取日志
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <!-- Compatibility Warning -->
+        <div class="compatibility-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          兼容提示: 主聊天窗口顶部 Session rollup 模块仍由旧的 JSONL 扫描实时返回，与本全局账本在 compaction Turn 统计上存在口径偏差。
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button class="sandbox-btn" onclick="alert('已启用 Legacy Scan 作为临时比对源。')">Legacy 兼容模式</button>
+          <button class="sandbox-btn" style="background-color: var(--bg-hover);" onclick="alert('关闭 Modal 模拟')">关闭</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Details Sidebar Drawer for Drill-down View (Desktop and Mobile) -->
+    <div class="details-drawer" id="model-details-drawer">
+      <div class="drawer-header">
+        <span class="drawer-title" id="drawer-header-title">模型详情 / 细分</span>
+        <button class="drawer-close" onclick="closeModelDetails()">×</button>
+      </div>
+      <div class="drawer-body">
+        
+        <div class="drawer-section">
+          <span class="drawer-section-title">基本属性</span>
+          <div class="drawer-grid">
+            <span class="drawer-grid-label">提供商</span>
+            <span class="drawer-grid-val" id="drawer-provider">OpenAI</span>
+            <span class="drawer-grid-label">模型名</span>
+            <span class="drawer-grid-val" id="drawer-model">gpt-4o</span>
+          </div>
+        </div>
+
+        <div class="drawer-section">
+          <span class="drawer-section-title">汇总指标</span>
+          <div class="drawer-grid">
+            <span class="drawer-grid-label">调用次数</span>
+            <span class="drawer-grid-val" id="drawer-calls">320 次</span>
+            <span class="drawer-grid-label">累计费用</span>
+            <span class="drawer-grid-val" id="drawer-cost">$54.20</span>
+            <span class="drawer-grid-label">估计 Token</span>
+            <span class="drawer-grid-val" id="drawer-tokens">12.80M</span>
+          </div>
+        </div>
+
+        <div class="drawer-section">
+          <span class="drawer-section-title">调用来源细分 (Source)</span>
+          <div class="drawer-grid" id="drawer-source-breakdown" style="grid-template-columns: 1fr;">
+            <!-- Will insert items dynamically -->
+            Chat (250) / SDK (70)
+          </div>
+        </div>
+
+        <div class="drawer-section" style="margin-top: 10px;">
+          <span class="drawer-section-title">可访问性提示 (A11y)</span>
+          <div style="font-size:10px; color:var(--text-muted); line-height: 1.4;">
+            使用 <code>ESC</code> 键可以快速关闭本详情抽屉或外层统计弹窗。表格中数值支持千分位格式和等宽 Tabular-nums 字体，保障弱视人群的数据比对一致性。
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Simulated interactive behaviors -->
+  <script>
+    // Theme switching
+    function setTheme(theme) {
+      document.body.className = theme;
+      document.getElementById('btn-theme-dark').classList.toggle('active', theme === 'dark');
+      document.getElementById('btn-theme-light').classList.toggle('active', theme === 'light');
+    }
+
+    // Modal width resizing simulator
+    function setModalWidth(width) {
+      const modal = document.getElementById('usage-modal');
+      modal.style.width = width;
+      
+      document.getElementById('btn-size-desktop').classList.toggle('active', width === '980px');
+      document.getElementById('btn-size-tablet').classList.toggle('active', width === '720px');
+      document.getElementById('btn-size-mobile').classList.toggle('active', width === '375px');
+      
+      // Simulate mobile class for table responsiveness
+      if (width === '375px') {
+        modal.classList.add('mobile-mode');
+      } else {
+        modal.classList.remove('mobile-mode');
+      }
+    }
+
+    // Tab switcher simulator
+    function switchState(stateName) {
+      // Hide all states
+      const states = ['normal', 'backfilling', 'partial', 'empty', 'loading', 'error'];
+      states.forEach(s => {
+        const el = document.getElementById('state-' + s);
+        if (el) el.classList.remove('active');
+      });
+
+      // Show requested state
+      const target = document.getElementById('state-' + stateName);
+      if (target) target.classList.add('active');
+
+      // Sync active button styles
+      const btns = document.querySelectorAll('.sandbox-header button');
+      btns.forEach(btn => {
+        if (btn.innerText.toLowerCase().includes(stateName) || (stateName === 'normal' && btn.innerText.includes('All Records'))) {
+          // Keep active
+        }
+      });
+      
+      // Auto close drawer when changing states to avoid confusion
+      closeModelDetails();
+    }
+
+    // Accordion Expand/Collapse rows
+    function toggleProviderGroup(providerId, rowElement) {
+      rowElement.classList.toggle('collapsed');
+      const isExpanded = !rowElement.classList.contains('collapsed');
+      rowElement.setAttribute('aria-expanded', isExpanded);
+      
+      const icon = rowElement.querySelector('.provider-toggle-icon');
+      if (icon) {
+        icon.innerText = isExpanded ? '▼' : '▶';
+      }
+
+      // Hide or show children
+      const children = document.querySelectorAll('.' + providerId + '-child');
+      children.forEach(child => {
+        child.classList.toggle('hidden', !isExpanded);
+      });
+    }
+
+    // Model details drawer show / hide
+    function showModelDetails(provider, model, calls, cost, tokens, sourceBreakdown) {
+      const drawer = document.getElementById('model-details-drawer');
+      drawer.classList.add('open');
+      
+      document.getElementById('drawer-header-title').innerText = `${provider} / ${model} 详细使用指标`;
+      document.getElementById('drawer-provider').innerText = provider;
+      document.getElementById('drawer-model').innerText = model;
+      document.getElementById('drawer-calls').innerText = calls + ' 次';
+      document.getElementById('drawer-cost').innerText = cost;
+      document.getElementById('drawer-tokens').innerText = tokens;
+      
+      // Render source breakdown
+      const breakdownContainer = document.getElementById('drawer-source-breakdown');
+      breakdownContainer.innerHTML = '';
+      
+      const items = sourceBreakdown.split('/');
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justify = 'space-between';
+        div.style.padding = '4px 0';
+        div.style.borderBottom = '1px solid var(--border)';
+        
+        const parts = item.trim().split('(');
+        const name = parts[0].trim();
+        const value = parts[1] ? parts[1].replace(')', '') : '0';
+        
+        div.innerHTML = `<span style="color:var(--text-muted)">${name}</span><strong>${value} 次</strong>`;
+        breakdownContainer.appendChild(div);
+      });
+    }
+
+    function closeModelDetails() {
+      document.getElementById('model-details-drawer').classList.remove('open');
+    }
+
+    // Filter Simulator
+    function resetFilters() {
+      // Just alert user that filters reset
+      alert('已重置所有时间、工作区和调用来源过滤！');
+      document.querySelectorAll('.filter-select').forEach(sel => sel.selectedIndex = 0);
+      document.getElementById('filter-source').selectedIndex = 0;
+    }
+
+    // Listen for ESC key for accessibility
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeModelDetails();
+        // Also mock close modal
+        console.log('Esc key pressed: Closing drawer/modal simulator');
+      }
+    });
+  </script>
+</body>
+</html>

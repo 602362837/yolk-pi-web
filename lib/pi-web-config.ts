@@ -103,6 +103,8 @@ export interface PiWebStudioConfig {
 
 export interface PiWebUsageConfig {
   includeArchived: boolean;
+  /** Which data source the Usage modal uses: "legacy" (session scan) or "ledger" (independent event store). Default "ledger". */
+  statsSource: "legacy" | "ledger";
 }
 
 export interface PiWebChatGptWarmupConfig {
@@ -233,6 +235,7 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   },
   usage: {
     includeArchived: true,
+    statsSource: "ledger" as const,
   },
   terminal: {
     enabled: false,
@@ -380,6 +383,10 @@ function readThinkingLevel(value: unknown, fallback: PiWebThinkingLevel): PiWebT
 
 function readSessionDisplay(value: unknown, fallback: "separate" | "tag"): "separate" | "tag" {
   return value === "separate" || value === "tag" ? value : fallback;
+}
+
+function readStatsSource(value: unknown, fallback: "legacy" | "ledger"): "legacy" | "ledger" {
+  return value === "legacy" || value === "ledger" ? value : fallback;
 }
 
 function normalizeDailyTime(value: unknown): string | null {
@@ -723,6 +730,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     },
     usage: {
       includeArchived: readBoolean(usage.includeArchived, defaults.usage.includeArchived),
+      statsSource: readStatsSource(usage.statsSource, defaults.usage.statsSource),
     },
     terminal: {
       enabled: readBoolean(terminal.enabled, defaults.terminal.enabled),
@@ -1018,6 +1026,7 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
   }
   return {
     includeArchived: requireBoolean(value.includeArchived, "usage.includeArchived"),
+    statsSource: readStatsSource(value.statsSource, "ledger"),
   };
 }
 

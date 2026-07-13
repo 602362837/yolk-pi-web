@@ -1,7 +1,41 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T06:50:26.491Z",
+  "updatedAt": "2026-07-13T09:58:12.036Z",
   "entries": [
+    {
+      "id": "20260713-175812-重构-usage-为基于提供商-模型调用量的独立统计模块",
+      "title": "重构 Usage 为基于提供商-模型调用量的独立统计模块",
+      "taskId": "20260713-150553-重构-usage-为基于提供商-模型调用量的独立统计模块",
+      "taskKey": "archived:2026-07:20260713-150553-重构-usage-为基于提供商-模型调用量的独立统计模块",
+      "workflowId": "feature-dev",
+      "summary": "Usage 重构完成并经用户验收：保留旧 Session Usage，新增独立 provider/model LLM 用量账本，默认启用 Chat 旁路记录；统计输入、输出、缓存读写，支持缓存命中率、完整数字、使用量/费用切换、按模型每日堆叠图及区域级 tooltip。账本与 session 生命周期解耦，记录失败不阻断 LLM。",
+      "tags": [
+        "usage",
+        "llm-usage-ledger",
+        "provider-model",
+        "billing",
+        "cache-hit-rate",
+        "stacked-chart",
+        "tooltip",
+        "feature-dev",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-150553-重构-usage-为基于提供商-模型调用量的独立统计模块",
+      "knowledgePath": ".ypi/knowledge/20260713-175812-重构-usage-为基于提供商-模型调用量的独立统计模块.md",
+      "createdAt": "2026-07-13T09:58:12.036Z",
+      "archivedAt": "2026-07-13T09:58:12.036Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-145026-优化-chat-顶部-session-速率-计费-上下文为标签化展示-并支持子-session-",
       "title": "优化 Chat 顶部 session 速率/计费/上下文为标签化展示，并支持子 session 悬停浮窗",

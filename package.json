@@ -50,6 +50,7 @@
     "test:opencode-go-failover-behavior": "node scripts/test-opencode-go-failover-behavior.mjs",
     "test:api-key-accounts": "node scripts/run-api-key-accounts-test.mjs",
     "test:usage-rollup": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-usage-stats-rollup.mjs",
+    "test:llm-usage-store": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-llm-usage-store.mjs",
     "test:session-metadata": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-metadata-scanner.mjs",
     "test:session-list-performance": "node --expose-gc --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-list-performance.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",

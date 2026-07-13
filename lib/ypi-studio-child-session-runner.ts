@@ -17,6 +17,8 @@ import {
   type YpiStudioChildContextUsageSnapshot,
 } from "./ypi-studio-subagent-runtime";
 import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
+import { recordObservedUsage } from "./llm-usage-recorder";
+import type { Usage } from "@earendil-works/pi-ai/compat";
 import { studioChildSessionTitle } from "./session-title";
 import type { SessionHeader, StudioChildSessionInfo } from "./types";
 import type {
@@ -451,6 +453,32 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
         if (usageTokens !== undefined) { tokens = usageTokens; tokenSource = "usage"; }
         else { tokens = Math.max(tokens ?? 0, Math.ceil(outputChars / 4)); tokenSource = tokenSource ?? "estimated_chars"; }
         appendItem({ kind: "assistant", at, text: output, model: policy.modelLabel, truncated: output.length < text.length });
+      }
+      // Capture LLM usage for ledger (never block child session execution)
+      try {
+        const msg = isObj(event) && isObj(event.message) ? event.message : null;
+        if (msg && typeof msg.role === "string" && msg.role === "assistant" && msg.usage) {
+          const stopReason = typeof msg.stopReason === "string" ? msg.stopReason : undefined;
+          const status = stopReason === "error" ? "error" as const
+            : stopReason === "aborted" ? "aborted" as const
+            : "success" as const;
+          recordObservedUsage(msg.usage as Usage, {
+            sourceKind: "studio_sdk",
+            invocation: "agent_turn",
+            workspacePath: root,
+            sessionId: childSessionId,
+            parentSessionId: meta.parentSessionId,
+            studioRunId: meta.runId,
+            taskId: meta.taskId,
+            provider: typeof msg.provider === "string" ? msg.provider : undefined,
+            requestedModel: typeof msg.model === "string" ? msg.model : undefined,
+            responseModel: typeof msg.responseModel === "string" ? msg.responseModel : undefined,
+            api: typeof msg.api === "string" ? msg.api : undefined,
+            status,
+          });
+        }
+      } catch {
+        // Usage capture must never interrupt child session execution.
       }
     } else if (eventType === "tool_execution_start") {
       const ev = isObj(event) ? event : {};

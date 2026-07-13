@@ -2,13 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UsageStatsResult, UsageTotals } from "@/lib/usage-stats";
+import type { PiWebConfig } from "@/lib/pi-web-config";
+import { UsageProviderModelTable } from "./UsageProviderModelTable";
 
 interface UsageStatsModalProps {
   cwd?: string | null;
   onClose: () => void;
 }
 
+type UsageView = "legacy" | "ledger";
+
 type UsageScope = "all" | "cwd";
+
+/**
+ * Read the pi-web config's usage.statsSource to determine the default view.
+ * Defaults to "legacy" when config is unavailable (SSR / fetch failure).
+ */
+async function resolveDefaultUsageView(): Promise<UsageView> {
+  try {
+    const res = await fetch("/api/web-config");
+    const data = (await res.json()) as { config?: PiWebConfig } | undefined;
+    const source = data?.config?.usage?.statsSource;
+    if (source === "ledger") return "ledger";
+  } catch { /* fetch may fail; keep legacy */ }
+  return "legacy";
+}
 
 /**
  * 将日期对象格式化为日期输入框需要的本地日期字符串。
@@ -78,6 +96,15 @@ function totalTokens(totals: UsageTotals): number {
  * @returns 用于查看费用统计的 React 节点。
  */
 export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
+  const [viewMode, setViewMode] = useState<UsageView>("legacy");
+
+  // Resolve the default view from config on mount
+  useEffect(() => {
+    resolveDefaultUsageView().then((defaultView) => {
+      setViewMode(defaultView);
+    });
+  }, []);
+
   const defaults = useMemo(() => getDefaultInputRange(), []);
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -115,14 +142,20 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
   }, [activeCwd, from, to]);
 
   useEffect(() => {
+    if (viewMode !== "legacy") return;
     const controller = new AbortController();
     void loadStats(controller.signal);
     return () => controller.abort();
-  }, [loadStats]);
+  }, [loadStats, viewMode]);
 
   useEffect(() => {
     if (!cwd && scope === "cwd") setScope("all");
   }, [cwd, scope]);
+
+  // Render ledger view via the dedicated component
+  if (viewMode === "ledger") {
+    return <UsageProviderModelTable cwd={cwd} onClose={onClose} onSwitchToLegacy={() => setViewMode("legacy")} />;
+  }
 
   return (
     <div
@@ -158,7 +191,7 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
           overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <line x1="12" y1="1" x2="12" y2="23" />
@@ -170,6 +203,29 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
                 Includes YPI Studio child sessions when present; children are rolled up to their parent chat.
               </div>
             </div>
+          </div>
+
+          {/* View toggle — independent layout space to avoid clipping */}
+          <div style={{ display: "flex", height: 26, border: "1px solid var(--border)", borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
+            {(["legacy", "ledger"] as UsageView[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: "0 10px",
+                  border: "none",
+                  borderLeft: mode === "ledger" ? "1px solid var(--border)" : "none",
+                  background: viewMode === mode ? "var(--bg-selected)" : "transparent",
+                  color: viewMode === mode ? "var(--text)" : "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {mode === "legacy" ? "Session 统计" : "调用账本"}
+              </button>
+            ))}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
