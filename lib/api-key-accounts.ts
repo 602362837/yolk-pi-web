@@ -1,11 +1,11 @@
 /**
  * Provider-scoped API-key multi-account storage and active mirror service layer.
  *
- * Manages multiple API Key "accounts" per provider (v1: opencode-go only) in a
- * dedicated application-managed directory, keeping upstream pi SDK / AuthStorage
- * unaware of multi-account semantics.  The currently active credential is always
- * mirrored back to `auth.json` so runtime auth reads continue to work through
- * the existing `AuthStorage.get(provider)` contract.
+ * Manages multiple API Key "accounts" per provider (currently: opencode-go, xai)
+ * in a dedicated application-managed directory, keeping upstream pi SDK /
+ * AuthStorage unaware of multi-account semantics.  The currently active
+ * credential is always mirrored back to `auth.json` so runtime auth reads
+ * continue to work through the existing `AuthStorage.get(provider)` contract.
  *
  * Security boundaries:
  * - Metadata files never contain plaintext keys (only masked previews and
@@ -22,11 +22,11 @@ import { join } from "node:path";
 import { AuthStorage, getAgentDir, type ApiKeyCredential } from "@earendil-works/pi-coding-agent";
 
 // ---------------------------------------------------------------------------
-// Provider allowlist — v1 only opencode-go enters managed accounts mode.
+// Provider allowlist — only listed providers enter managed accounts mode.
 // Other API-key providers keep the legacy single-key model.
 // ---------------------------------------------------------------------------
 
-const MANAGED_ACCOUNT_PROVIDERS = new Set<string>(["opencode-go"]);
+const MANAGED_ACCOUNT_PROVIDERS = new Set<string>(["opencode-go", "xai"]);
 
 // ---------------------------------------------------------------------------
 // Constants

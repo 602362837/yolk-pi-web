@@ -4,8 +4,8 @@
  * GET  /api/auth/api-key/[provider]/accounts  — list all saved accounts (masked only)
  * POST /api/auth/api-key/[provider]/accounts  — create a new account
  *
- * v1: only opencode-go is allowlisted for managed accounts.  Other providers
- *     receive a 400 error from the service layer.
+ * Managed-account providers (currently opencode-go, xai) are allowlisted in
+ * lib/api-key-accounts.ts.  Other providers receive a 400 from the service layer.
  */
 
 import { NextResponse } from "next/server";

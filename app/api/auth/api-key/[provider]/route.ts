@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ provider: string }> };
 
 // GET /api/auth/api-key/[provider] — returns auth status (never returns the actual key).
-// For managed-account providers (v1: opencode-go) the response is extended with
+// For managed-account providers (currently opencode-go, xai) the response is extended with
 // authMode, accountCount, activeAccountId, and activeAccountDisplayName so
 // consumers can detect managed mode without calling /api/auth/all-providers.
 export async function GET(_req: Request, { params }: Params) {
@@ -55,7 +55,7 @@ export async function GET(_req: Request, { params }: Params) {
 // POST /api/auth/api-key/[provider]  body: { apiKey: string }
 //
 // For single-key providers this continues to write directly to auth.json.
-// For managed-account providers (v1: opencode-go) this preserves the legacy
+// For managed-account providers (currently opencode-go, xai) this preserves the legacy
 // "replace current active key" semantics:
 //   1. If an active managed account exists — update its secret in place.
 //   2. If managed accounts exist but none is active — pick the most recent
