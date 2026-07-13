@@ -10,9 +10,9 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `projects/[projectId]/` | GET/PATCH | Read or update project metadata (`displayName`, `tags`, `pinned`, `archived`, `metadata`, `lastOpenedAt`). |
 | `projects/[projectId]/spaces/` | GET/PATCH | List spaces for one registered project, or batch-reorder non-main spaces. Space records include optional `sortOrder?: number` for persisted non-main space ordering. `main` space ignores `sortOrder`. PATCH accepts `{ orderedSpaceIds: string[] }` with active non-main space ids in desired order; rejects main, unknown, archived, duplicate, or cross-project ids; appends active non-main spaces missing from the payload to the end while preserving their relative order; returns the updated project and spaces. |
 | `projects/[projectId]/spaces/[spaceId]/` | GET/PATCH | Read or update project-space metadata, including the main space created at registration. Space records include optional `sortOrder?: number` (non-main spaces only). |
-| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List sessions explicitly linked to one project space; root `sessions` exclude Studio child audit roots but include child rows whose `studioChild.parentSessionId` belongs to a visible parent so the Sidebar can fold them under that parent. Optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. |
+| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List **active** sessions explicitly linked to one project space. Response is `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` with **no** `archivedCounts` and **no** `scanArchivedCwds()` / `sessions-archive/` I/O on this hot path. Root `sessions` exclude Studio child audit roots but include child rows whose `studioChild.parentSessionId` belongs to a visible parent so the Sidebar can fold them under that parent. Optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. Active inventory still comes from global `listAllSessions()` then filters by project/space link (not a per-space directed scan). |
 | `projects/[projectId]/worktrees/refresh/` | POST | Full refresh: discover `git worktree list --porcelain` entries for a registered project, upsert discovered worktree spaces (un-archiving previously-archived ones if the path reappears), and archive spaces no longer found by Git. After the full refresh, runs a best-effort missing-only passive sync (`syncMissingWorktreeSpaces`) to catch CLI removals not reflected in porcelain. Response includes `archivedMissing` space ids from the Git refresh and optional `missingSync.archivedSpaces` from the follow-up missing-only pass. |
-| `sessions/` | GET | List lightweight active session summaries grouped by cwd (includes `archivedCwds` and `archivedCounts`); Git/worktree metadata is omitted by default and only included with `includeGit=1`. YPI Studio child audit sessions are filtered unless `includeStudioChildren=1` is provided for debugging/audit views. |
+| `sessions/` | GET | List lightweight **active** session summaries as `{ sessions }`. Does **not** scan `sessions-archive/` and does **not** return `archivedCwds` / `archivedCounts` (legacy CWD-picker fields; Project Registry is the project list source). Git/worktree metadata is omitted by default and only included with `includeGit=1`. YPI Studio child audit sessions are filtered unless `includeStudioChildren=1` is provided for debugging/audit views. In-repo `ypic` only consumes `body.sessions`. |
 | `sessions/[id]/` | GET/PATCH/DELETE | Read session detail, rename, delete. Returns `archived: true` for archived sessions and includes optional `studioChild` metadata plus UI-only `studioChildDisplay` title projection for child audit sessions. |
 | `sessions/[id]/context/` | GET | Get context for a specific `leafId`. |
 | `sessions/[id]/changes/` | GET | List files changed by tracked agent file tools in this session from non-Git sidecar data. |
@@ -51,10 +51,10 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 | `commands/` | GET | List slash commands from built-in YPI Studio extension commands plus skills and prompt templates for a cwd. |
 | `cwd/validate/` | POST | Validate a candidate workspace path. |
 | `git/worktrees/` | GET/POST/DELETE | Inspect, create, and remove Git worktrees from the selected cwd; creation returns the effective `baseRef` and upserts a registered project worktree space with that optional `baseRef` when the main worktree is registered, while DELETE soft-archives matching worktree registry spaces via `archiveWorktreeSpacesByPaths` with multi-path-alias matching, invalidates allowed-roots cache, and deletes sessions for that worktree cwd. DELETE response includes `archivedSpaces`, `deletedSessionIds`, optional `unmatchedPaths`, and optional `warning`. |
-| `sessions/archive/` | POST | Archive one or more sessions (moves to `sessions-archive/`). |
-| `sessions/unarchive/` | POST | Unarchive one or more sessions (moves back to `sessions/`). |
-| `sessions/archive-all/` | POST | Archive all sessions for a cwd. |
-| `sessions/archived/` | GET | List archived sessions for a cwd. |
+| `sessions/archive/` | POST | Archive one or more sessions (moves to `sessions-archive/`). Sidebar write path only; success refreshes active list. |
+| `sessions/unarchive/` | POST | Unarchive one or more sessions (moves back to `sessions/`). Kept as an explicit API; SessionSidebar no longer exposes a restore UI. |
+| `sessions/archive-all/` | POST | Archive all **active** sessions for a cwd (does not re-process already-archived files). |
+| `sessions/archived/` | GET | Explicit list of archived sessions for a cwd via `listArchivedSessionsForCwd()`. Not used by the SessionSidebar hot path. |
 | `git/worktrees/archive/` | POST | Squash, push, merge, and remove a Git worktree after user risk confirmation. Soft-archives matching worktree registry spaces via `archiveWorktreeSpacesByPaths` with multi-path-alias matching (`cwd`, `status.cwd`, `status.worktree.repoRoot`), invalidates allowed-roots cache, and deletes sessions for that worktree cwd. Response includes `archivedSpaces`, `deletedSessionIds`, optional `unmatchedPaths`, and optional `warning` for partial session-cleanup failures. |
 | `git/info/` | GET | Return best-effort Git branch/worktree metadata for a cwd, including current branch and WorkTree/main-worktree details when detectable. Creation-time `baseRef` is only available from registry/API creation paths, not from generic Git discovery for old or external worktrees. |
 | `git/status/` | GET | Return detailed Git status (branch, commits, staged/unstaged changes, untracked files, stash) for a cwd. |
@@ -117,20 +117,24 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 
 ## Session List Performance
 
-Project-space and global session list responses keep the existing wire shape (id/cwd/name/messageCount/firstMessage/modified, Studio child nesting, project/space link, archive flags). Inventory is produced by `lib/session-metadata-scanner.ts` via `lib/session-reader.ts` — not Pi SDK `SessionManager.listAll()` / `buildSessionInfo()`, which accumulate `allMessages[]` and `allMessagesText` for every session.
+Active list routes return active inventory only. Project-space response shape is `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }`; global `GET /api/sessions` is `{ sessions }`. Session summary fields remain id/cwd/name/messageCount/firstMessage/modified plus Studio child nesting and project/space link fields when present. Inventory is produced by `lib/session-metadata-scanner.ts` via `lib/session-reader.ts` — not Pi SDK `SessionManager.listAll()` / `buildSessionInfo()`, which accumulate `allMessages[]` and `allMessagesText` for every session.
 
 | Path | Inventory source |
 | --- | --- |
-| `GET /api/sessions`, project-space sessions | `listAllSessions()` → `scanSessionInventory()` |
+| `GET /api/sessions`, project-space sessions | active only: `listAllSessions()` → `scanSessionInventory()` over `sessions/` (no archive scan, no `archivedCounts`/`archivedCwds`) |
 | Allowed-roots cwd discovery | `listSessionCwdsForAllowedRoots()` → `scanSessionInventory()` |
 | WorkTree session delete-by-cwd | `deleteSessionsForCwd()` → `scanSessionInventory()` |
-| `POST /api/sessions/archive-all` | direct `scanSessionInventory()` then cwd filter + move |
-| Archived session lists | `scanSessionInventory({ rootDir: sessions-archive })` |
-| `archivedCwds` / counts for picker | `scanArchivedCwds()` header-only per archive dir |
+| `POST /api/sessions/archive-all` | direct active `scanSessionInventory()` then cwd filter + move |
+| Explicit `GET /api/sessions/archived` | `listArchivedSessionsForCwd()` → `scanSessionInventory({ rootDir: sessions-archive })` |
+| Usage archive opt-in | archived helpers / `listAllArchivedSessionMetadata()` when `usage.includeArchived` is enabled |
+
+`scanArchivedCwds()` still exists in `lib/session-reader.ts` as a header-only cwd/count helper for explicit/future callers, but **active list routes and SessionSidebar no longer call it**. Project visibility comes from Project Registry, not from archive cwd counts.
 
 List reads use a bounded one-second single-flight snapshot and invalidate it on session deletion/archive/unarchive. JSONL remains authoritative; any sidecar index is only an optimization candidate and must reconcile against session inventory before filtering. Scanner concurrency is fixed (default 8); `firstMessage` is bounded (default 100 chars; UI still shows 50 normalized chars). Results and caches must not retain full message bodies, tool results, or `allMessagesText`.
 
-Studio child and Usage boundaries are unchanged: lists hide Studio children by default (`includeStudioChildren` opt-in); Usage precise totals still open selected JSONL files for assistant `usage` only after lightweight inventory. Detail/context/branch/export routes may still call `SessionManager.open(...).getEntries()` for a single target session.
+**Honest hot-path boundary:** removing archive scan/display from the Sidebar path only eliminates `sessions-archive/` I/O on active list loads. Project-space listing still calls global `listAllSessions()` and filters by space afterward; directed per-space inventory / project-session index redesign is out of scope for the archive decoupling work.
+
+Studio child and Usage boundaries are unchanged: lists hide Studio children by default (`includeStudioChildren` opt-in); Usage precise totals still open selected JSONL files for assistant `usage` only after lightweight inventory, and `usage.includeArchived` still controls whether Usage scans archive storage. Detail/context/branch/export routes may still call `SessionManager.open(...).getEntries()` for a single target session, including archived-by-id detail.
 
 Regression helpers: `npm run test:session-metadata`, `npm run test:session-list-performance` (prefer `node --expose-gc`). Rollback is code-only at the inventory call sites; do not reintroduce SDK full-text list scans as the default.
 

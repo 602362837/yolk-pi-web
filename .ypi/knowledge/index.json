@@ -1,7 +1,38 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T03:37:11.744Z",
+  "updatedAt": "2026-07-13T05:05:43.203Z",
   "entries": [
+    {
+      "id": "20260713-130543-侧栏-session-列表热路径移除归档读取与展示",
+      "title": "侧栏 session 列表热路径移除归档读取与展示",
+      "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+      "taskKey": "archived:2026-07:20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+      "workflowId": "feature-dev",
+      "summary": "侧栏 session 列表热路径已剥离归档扫描与展示：project-space sessions 与 GET /api/sessions 不再调用 scanArchivedCwds、不返回 archivedCounts/archivedCwds；SessionSidebar 删除已归档区块/展开加载/unarchive UI，保留 single/batch/archive-all 写操作且成功后只刷 active；archive 存储、显式 API、按 id 打开与 Usage includeArchived 保留。active listAllSessions 全量扫描未改，仍是后续性能主因。",
+      "tags": [
+        "feature-dev",
+        "session-list",
+        "archive-hot-path",
+        "sidebar-performance",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+      "knowledgePath": ".ypi/knowledge/20260713-130543-侧栏-session-列表热路径移除归档读取与展示.md",
+      "createdAt": "2026-07-13T05:05:43.203Z",
+      "archivedAt": "2026-07-13T05:05:43.203Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-113711-修复侧栏宽度-ssr-客户端-hydration-mismatch",
       "title": "修复侧栏宽度 SSR/客户端 hydration mismatch",

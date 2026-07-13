@@ -150,11 +150,17 @@ Archived sessions are stored at:
 
 Archive/unarchive is a pure file move (`renameSync`) between `sessions/` and `sessions-archive/`. The session JSONL content is never modified. Active RPC sessions are destroyed before the file is moved.
 
-Active sessions live under `sessions/`; archived sessions live under `sessions-archive/`. Both directories are enumerated by the same lightweight metadata scanner with different roots (`scanSessionInventory()` vs `scanSessionInventory({ rootDir: getSessionsArchiveDir() })`). `scanArchivedCwds()` remains a cheaper header-only cwd/count pass (first line of one file per archive dir) for project picker visibility. Project visibility is preserved by returning `archivedCwds` and `archivedCounts` from `GET /api/sessions`, allowing the CWD picker to include projects that have only archived sessions. Archive-all matches target sessions by canonical cwd against the lightweight active inventory and must not call SDK `SessionManager.listAll()`.
+Active sessions live under `sessions/`; archived sessions live under `sessions-archive/`. Both directories are enumerated by the same lightweight metadata scanner with different roots (`scanSessionInventory()` vs `scanSessionInventory({ rootDir: getSessionsArchiveDir() })`), but **call sites are separated**:
+
+- **Active Sidebar / list hot path:** `GET /api/projects/:projectId/spaces/:spaceId/sessions` and `GET /api/sessions` only read active inventory. They do **not** call `scanArchivedCwds()`, do **not** walk `sessions-archive/`, and do **not** return `archivedCounts` / `archivedCwds`. SessionSidebar only displays active history and archive **write** actions (single/batch/archive-all); it has no archived list, count, or unarchive UI.
+- **Explicit archive capability (kept):** `POST /api/sessions/archive`, `archive-all`, `unarchive`, `GET /api/sessions/archived`, session-by-id detail with `archived: true` (read-only chat), and Usage when `usage.includeArchived` is enabled. `scanArchivedCwds()` remains available in `lib/session-reader.ts` for explicit helpers but is not wired into active list routes.
+- **Project list source:** Project Registry (`pi-web-projects.json`), not archive cwd counts or a CWD picker synthesized from sessions.
+
+Archive-all matches target sessions by canonical cwd against the lightweight **active** inventory and must not call SDK `SessionManager.listAll()`. Removing archive I/O from the Sidebar path does **not** by itself rewrite active `listAllSessions()` into a directed per-space scan; that remains a separate performance concern.
 
 ### Session inventory memory contract
 
-- **In scope (lightweight only):** global/project session lists, allowed-roots session cwd discovery, delete sessions for WorkTree cwd, archive-all, and archived session lists that need name/count/firstMessage/modified.
+- **In scope (lightweight only):** global/project **active** session lists, allowed-roots session cwd discovery, delete sessions for WorkTree cwd, archive-all (active inventory), and **explicit** archived session lists / Usage archive helpers that need name/count/firstMessage/modified.
 - **Out of scope (may open full files):** session detail, context/branch tree, export, and Usage precise assistant-`usage` scans for selected sessions. Usage still builds its session set from the lightweight inventory (`listAllSessions` / archived helpers with `includeStudioChildren: true`) and must not depend on `allMessagesText`.
 - **Studio child defaults unchanged:** list roots hide Studio children unless `includeStudioChildren` is set; UI may opt into `includeStudioChildDisplay` for task-title projection; Usage opt-in child rollup is unchanged.
 - **Rollback:** code-level only — restore previous inventory call sites to SDK `SessionManager.listAll()` if needed. No JSONL migration or data rollback. Do not long-term default back to the full-text inventory path.

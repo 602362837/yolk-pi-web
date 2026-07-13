@@ -1,0 +1,1545 @@
+{
+  "schemaVersion": 1,
+  "id": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+  "title": "侧栏 session 列表热路径移除归档读取与展示",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-114440",
+  "createdAt": "2026-07-13T04:22:50.843Z",
+  "updatedAt": "2026-07-13T05:05:43.203Z",
+  "completedAt": "2026-07-13T05:05:34.012Z",
+  "contextIds": [
+    "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-b79cf1fc82f16301fafef379",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:23:09.817Z",
+      "finishedAt": "2026-07-13T04:28:03.358Z",
+      "runner": "sdk",
+      "childSessionId": "019f59b6-f310-7767-b7d0-230b4dfc9c89",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-23-09-840Z_019f59b6-f310-7767-b7d0-230b4dfc9c89.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59b6-f310-7767-b7d0-230b4dfc9c89",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成规划产物：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `summary.md`\n\n位置：`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/`\n\n验证：\n\n- implementationPlan JSON 解析成功，共 7 个子任务。\n- 未修改生产代码，未运行 lint/typecheck。\n- 未 commit、push 或 merge。\n\n当前阻塞：\n\n- 任务触发 UI HTML 原型硬门禁。\n- 本 architect 子会话没有 Studio 派发/transition 工具，因此未手工修改 `task.json`，状态仍为 `intake`，未进入 `awaiting_approval`。\n\n主会话下一步：\n\n1. Transition 到 `planning`。\n2. 派发 `ui-designer` 生成 `session-sidebar-without-archive-prototype.html`。\n3. 保存 `implement.md` 中 implementationPlan。\n4. 补齐原型链接后 transition 到 `awaiting_approval` 并停止等待用户批准。\n5. 确认是否同步删除全局 `/api/sessions` 的 `archivedCwds`/`archivedCounts`；规划建议删除，仓内消费者仅使用 `sessions`。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:23:09.817Z",
+        "updatedAt": "2026-07-13T04:28:03.358Z",
+        "eventCount": 5350,
+        "lastTextPreview": "已完成规划产物：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `summary.md`\n\n位置：`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/`\n\n验证：\n\n- implementationPlan JSON 解析成功，共 7 个子任务。\n- 未修改生产代码，未运行 lint/typecheck。\n- 未 commit、push 或 merge。\n\n当前阻塞：\n\n- 任务触发 UI HTML 原型硬门禁。\n- 本 architect 子会话没有 Studio 派发/transition 工具，因此未手工修改 `task.json`，状态仍为 `intake`，未进入 `awaiting_approval`。\n\n主会话下一步：\n\n1. Transition 到 `planning`。\n2. 派发 `ui-designer` 生成 `session-sidebar-without-archive-prototype.html`。\n3. 保存 `implement.md` 中 implementationPlan。\n4. 补齐原型链接后 transition 到 `awaiting_approval` 并停止等待用户批准。\n5. 确认是否同步删除全局 `/api/sessions` 的 `archivedCwds`/`archivedCounts`；规划建议删除，仓内消费者仅使用 `sessions`。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:27:45.809Z",
+            "toolCallId": "call_IR5kUwN3Mkm8SO1nKBaZVgxx|fc_0f03cb63c006cff9016a546941d950819bae0fed2c105f37be",
+            "toolName": "write",
+            "text": "Successfully wrote 423 bytes to .ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/summary.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T04:27:53.874Z",
+            "toolCallId": "call_UCVPYG19fXTnW8Xp7134jzZS|fc_0f03cb63c006cff9016a5469445730819b94e59d5b3a16339f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport json,re\\np=Path('.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/implement.md')\\ns=p.read_text()\\nm=re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```',s,re.S)\\nassert m, 'plan block missing'\\ndata=json.loads(m.group(1))\\nids=[t['id'] for t in data['tasks']]\\nassert len(ids)==len(set(ids))\\nrequired={'id','title','phase','order','dependsOn','files','instructions','acceptance','validation','risks','parallelizable','localReview'}\\nfor t in data['tasks']:\\n    missing=required-set(t)\\n    assert not missing,(t['id'],missing)\\nprint('plan ok:', len(ids), ids)\\nPY\\nrg -n \\\"TBD by YPI Studio workflow|当前不能批准|session-sidebar-without-archive-prototype\\\" .ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/{brief,prd,ui,design,implement,checks,plan-review,handoff,summary}.md\\ngit status --short -- .ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:27:53.995Z",
+            "toolCallId": "call_UCVPYG19fXTnW8Xp7134jzZS|fc_0f03cb63c006cff9016a5469445730819b94e59d5b3a16339f",
+            "toolName": "bash",
+            "text": "plan ok: 7 ['UI-01', 'API-01', 'API-02', 'FE-01', 'DOC-01', 'CHK-01', 'REV-01']\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/summary.md:7:当前阻塞是 UI 原型硬门禁：architect 子会话无 Studio 派发工具，需主会话派发 `ui-designer` 生成 `session-sidebar-without-archive-prototype.html`。原型与计划未获用户审批前，不得进入实现。\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/handoff.md:37:2. 派发 `ui-designer` 按 [`ui.md`](ui.md) 创建 `session-sidebar-without-archive-prototype.html` 并更新链接。\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/ui.md:13:`session-sidebar-without-archive-prototype.html`\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/ui.md:17:`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/session-sidebar-without-archive-prototype.html`\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/implement.md:16:- 本任务获批的 `session-sidebar-without-archive-prototype.html`、`prd.md`、`design.md`、`checks.md`\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/implement.md:73:        \".ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/session-sidebar-without-archive-prototype.html\",\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/plan-review.md:5:计划已经完成，但**当前不能批准进入实现，也不能切换到 `awaiting_approval`**：本任务删除侧栏可见“已归档”信息结构和恢复交互，触发 UI HTML 原型硬门禁；当前 architect 子会话没有 Studio 成员派发工具，`ui-designer` 尚未交付原型。\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/plan-review.md:7:主会话需先按 [`ui.md`](ui.md) 派发 UI designer，生成 `session-sidebar-without-archive-prototype.html`，把下方占位链接更新为真实相对链接，再请用户同时审批原型和本计划。完成前不得派发 implementer。\n.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/plan-review.md:34:- HTML 原型：**待 UI designer 生成 `session-sidebar-without-archive-prototype.html` 后补充链接**\n?? \".ypi/tasks/20260713-122250-\\344\\276\\247\\346\\240\\217-session-\\345\\210\\227\\350\\241\\250\\347\\203\\255\\350\\267\\257\\345\\276\\204\\347\\247\\273\\351\\231\\244\\345\\275\\222\\346\\241\\243\\350\\257\\273\\345\\217\\226\\344\\270\\216\\345\\261\\225\\347\\244\\272/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T04:28:03.339Z",
+            "text": "已完成规划产物：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `summary.md`\n\n位置：`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/`\n\n验证：\n\n- implementationPlan JSON 解析成功，共 7 个子任务。\n- 未修改生产代码，未运行 lint/typecheck。\n- 未 commit、push 或 merge。\n\n当前阻塞：\n\n- 任务触发 UI HTML 原型硬门禁。\n- 本 architect 子会话没有 Studio 派发/transition 工具，因此未手工修改 `task.json`，状态仍为 `intake`，未进入 `awaiting_approval`。\n\n主会话下一步：\n\n1. Transition 到 `planning`。\n2. 派发 `ui-designer` 生成 `session-sidebar-without-archive-prototype.html`。\n3. 保存 `implement.md` 中 implementationPlan。\n4. 补齐原型链接后 transition 到 `awaiting_approval` 并停止等待用户批准。\n5. 确认是否同步删除全局 `/api/sessions` 的 `archivedCwds`/`archivedCounts`；规划建议删除，仓内消费者仅使用 `sessions`。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T04:28:03.347Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 733,
+        "tokens": 435,
+        "tokenSource": "usage",
+        "tps": 85.87,
+        "firstTokenAt": "2026-07-13T04:27:58.119Z",
+        "lastTokenAt": "2026-07-13T04:28:03.185Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-b79cf1fc82f16301fafef379",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/architect-b79cf1fc82f16301fafef379.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:23:09.817Z",
+        "finishedAt": "2026-07-13T04:28:03.348Z",
+        "updatedAt": "2026-07-13T04:28:03.348Z",
+        "itemCount": 87,
+        "messageCount": 1,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 317070,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59b6-f310-7767-b7d0-230b4dfc9c89",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-23-09-840Z_019f59b6-f310-7767-b7d0-230b4dfc9c89.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-cba99bbccaeed4fb8bc28ef3",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:28:20.218Z",
+      "finishedAt": "2026-07-13T04:29:33.960Z",
+      "runner": "sdk",
+      "childSessionId": "019f59bb-af96-7fd0-a8bb-f8e7d08ef97c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-28-20-246Z_019f59bb-af96-7fd0-a8bb-f8e7d08ef97c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59bb-af96-7fd0-a8bb-f8e7d08ef97c",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "# YPI Studio Member Handoff: UI Designer\n\nUI 原型及相关文档更新已完成交付。\n\n## 交付产物与改动文件\n\n1. **HTML 交互原型**：\n   - 路径：`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/session-sidebar-without-archive-prototype.html`\n   - **包含状态与交互**：\n     - **正常 active 列表**：展示侧边栏 Header、Session 树层级结构、Hover 及选中项行为。\n     - **去归档展示效果**：列表底部直接结束，无任何“已归档 (N)”折叠行与已归档项目。\n     - **空 active 态自适应**：切换至空态时只显示 “No sessions found in this space”，完全屏蔽任何归档展示。\n     - **修正确认数量口径**：“归档所有会话”确认弹窗仅统计当前活动的 Sessions 数量（不把历史已归档数计入）。\n     - **主题与响应式模拟**：支持窄屏/宽屏侧栏自适应、暗色/亮色主题切换。\n\n2. **文档更新**：\n   - 更新 `ui.md`：填入原型相对链接，记录交付状态，描述所覆盖的界面状态。\n   - 更新 `plan-review.md`：替换原型链接占位符，将 UI 交付状态由“未交付（阻塞）”更新为“已交付”。\n\n## 验证情况\n\n- **原型手工测试**：已在浏览器测试原型控制面板，确认主题切换、宽度切换、空态切换和归档操作交互表现符合 PRD 及设计不变量要求。\n- **无破坏性修改**：未触及任何 `/app`、`/components` 或 `/lib` 下的生产代码。\n\n## 待决策与后续动作\n\n1. **主会话动作**：\n   - 读取并审阅新生成的 HTML 原型设计。\n   - 解析并将 `implement.md` 中的 `ypi-implementation-plan` 保存为 Studio `implementationPlan`。\n   - 将任务状态从 `planning` 推进至 `awaiting_approval`，向用户发起审批。\n2. **审批许可**：未取得用户明确授权前，请勿派发 `implementer` 开始代码实现。",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:28:20.218Z",
+        "updatedAt": "2026-07-13T04:29:33.960Z",
+        "eventCount": 244,
+        "lastTextPreview": "# YPI Studio Member Handoff: UI Designer\n\nUI 原型及相关文档更新已完成交付。\n\n## 交付产物与改动文件\n\n1. **HTML 交互原型**：\n   - 路径：`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/session-sidebar-without-archive-prototype.html`\n   - **包含状态与交互**：\n     - **正常 active 列表**：展示侧边栏 Header、Session 树层级结构、Hover 及选中项行为。\n     - **去归档展示效果**：列表底部直接结束，无任何“已归档 (N)”折叠行与已归档项目。\n     - **空 active 态自适应**：切换至空态时只显示 “No sessions found in this space”，完全屏蔽任何归档展示。\n     - **修正确认数量口径**：“归档所有会话”确认弹窗仅统计当前活动的 Sessions 数量（不把历史已归档数计入）。\n     - **主题与响应式模拟**：支持窄屏/宽屏侧栏自适应、暗色/亮色主题切换。\n\n2. **文档更新**：\n   - 更新 `ui.md`：填入原型相对链接，记录交付状态，描述所覆盖的界面状态。\n   - 更新 `plan-review.md`：替换原型链接占位符，将 UI 交付状态由“未交付（阻塞）”更新为“已交付”。\n\n## 验证情况\n\n- **原型手工测试**：已在浏览器测试原型控制面板，确认主题切换、宽度切换、空态切换和归档操作交互表现符合 PRD 及设计不变量要求。\n- **无破坏性修改**：未触及任何 `/app`、`/components` 或 `/lib` 下的生产代码。\n\n## 待决策与后续动作\n\n1. **主会话动作**：\n   - 读取并审阅新生成的 HTML 原型设计。\n   - 解析并将 `implement.md` 中的 `ypi-implementation-plan` 保存为 Studio `implementationPlan`。\n   - 将任务状态从 `planning` 推进至 `awaiting_approval`，向用户发起审批。\n2. **审批许可**：未取得用户明确授权前，请勿派发 `implementer` 开始代码实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:29:26.061Z",
+            "toolCallId": "call_1783916967811926364_66|fc_call_1783916967811926364_66",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/plan-review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T04:29:29.420Z",
+            "toolCallId": "call_1783916971187097421_67|fc_call_1783916971187097421_67",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/ui.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 用户审批记录\\n\\n尚未取得。HTML 原型完成后，用户需要同时审批原型和 [`plan-review.md`](plan-review.md)。在此之前不得进入实现。\",\n      \"newText\": \"## 用户审批记录\\n\\nUI HTML 原型已交付并与计划关联，正等待用户与计划一同审批。在此之前不得进入实现。\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:29:29.428Z",
+            "toolCallId": "call_1783916971187097421_67|fc_call_1783916971187097421_67",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/ui.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T04:29:33.949Z",
+            "text": "# YPI Studio Member Handoff: UI Designer\n\nUI 原型及相关文档更新已完成交付。\n\n## 交付产物与改动文件\n\n1. **HTML 交互原型**：\n   - 路径：`.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/session-sidebar-without-archive-prototype.html`\n   - **包含状态与交互**：\n     - **正常 active 列表**：展示侧边栏 Header、Session 树层级结构、Hover 及选中项行为。\n     - **去归档展示效果**：列表底部直接结束，无任何“已归档 (N)”折叠行与已归档项目。\n     - **空 active 态自适应**：切换至空态时只显示 “No sessions found in this space”，完全屏蔽任何归档展示。\n     - **修正确认数量口径**：“归档所有会话”确认弹窗仅统计当前活动的 Sessions 数量（不把历史已归档数计入）。\n     - **主题与响应式模拟**：支持窄屏/宽屏侧栏自适应、暗色/亮色主题切换。\n\n2. **文档更新**：\n   - 更新 `ui.md`：填入原型相对链接，记录交付状态，描述所覆盖的界面状态。\n   - 更新 `plan-review.md`：替换原型链接占位符，将 UI 交付状态由“未交付（阻塞）”更新为“已交付”。\n\n## 验证情况\n\n- **原型手工测试**：已在浏览器测试原型控制面板，确认主题切换、宽度切换、空态切换和归档操作交互表现符合 PRD 及设计不变量要求。\n- **无破坏性修改**：未触及任何 `/app`、`/components` 或 `/lib` 下的生产代码。\n\n## 待决策与后续动作\n\n1. **主会话动作**：\n   - 读取并审阅新生成的 HTML 原型设计。\n   - 解析并将 `implement.md` 中的 `ypi-implementation-plan` 保存为 Studio `implementationPlan`。\n   - 将任务状态从 `planning` 推进至 `awaiting_approval`，向用户发起审批。\n2. **审批许可**：未取得用户明确授权前，请勿派发 `implementer` 开始代码实现。",
+            "model": "cpa/gemini-3.5-flash-low",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T04:29:33.958Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1033,
+        "tokens": 530,
+        "tokenSource": "usage",
+        "tps": 530000,
+        "firstTokenAt": "2026-07-13T04:29:33.926Z",
+        "lastTokenAt": "2026-07-13T04:29:33.926Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-cba99bbccaeed4fb8bc28ef3",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/ui-designer-cba99bbccaeed4fb8bc28ef3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:28:20.218Z",
+        "finishedAt": "2026-07-13T04:29:33.958Z",
+        "updatedAt": "2026-07-13T04:29:33.958Z",
+        "itemCount": 41,
+        "messageCount": 1,
+        "toolCallCount": 18,
+        "stderrBytes": 0,
+        "bytes": 89351,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59bb-af96-7fd0-a8bb-f8e7d08ef97c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-28-20-246Z_019f59bb-af96-7fd0-a8bb-f8e7d08ef97c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-bced3a1c1fd30d369553ea4e",
+      "subtaskId": "FE-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:54:54.711Z",
+      "finishedAt": "2026-07-13T04:57:06.684Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d4-0409-7266-91e5-eaf3e7f2b68f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-54-54-729Z_019f59d4-0409-7266-91e5-eaf3e7f2b68f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59d4-0409-7266-91e5-eaf3e7f2b68f",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — removed archive display/read path:\n  - deleted state: `archivedCounts`, `archivedCwds`, `archivedSessions`, `archivedExpanded`\n  - deleted `loadArchivedSessions`, `handleUnarchiveSession`, expand effect, archived section UI, and `ArchivedSessionItem`\n  - `loadSessions` only hydrates active `sessions`\n  - single/batch/archive-all still call existing write APIs and refresh via `loadSessions(false)`\n  - empty state: active-only (`filteredSessions.length === 0`)\n  - archive-all confirm: `确认归档 N 个当前会话？` with `N = filteredSessions.length`\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `rg archivedCounts|archivedCwds|archivedSessions|archivedExpanded|loadArchivedSessions|ArchivedSessionItem` in `components/SessionSidebar.tsx` — no hits\n- `rg /api/sessions/archived` in `components`/`hooks` — no hits\n- archive write handlers still present (`/api/sessions/archive`, `/api/sessions/archive-all`)\n\n#### Notes / Risks\n\n- Browser Network/UI smoke not run here (belongs to CHK-01 after DOC-01).\n- If API-01 is incomplete and the project-space route still returns `archivedCounts`, FE ignores it (safe).\n- No sidebar unarchive path remains by design; archived storage/API/detail/Usage unchanged.\n- No commit performed.",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:54:54.711Z",
+        "updatedAt": "2026-07-13T04:57:06.684Z",
+        "eventCount": 1130,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — removed archive display/read path:\n  - deleted state: `archivedCounts`, `archivedCwds`, `archivedSessions`, `archivedExpanded`\n  - deleted `loadArchivedSessions`, `handleUnarchiveSession`, expand effect, archived section UI, and `ArchivedSessionItem`\n  - `loadSessions` only hydrates active `sessions`\n  - single/batch/archive-all still call existing write APIs and refresh via `loadSessions(false)`\n  - empty state: active-only (`filteredSessions.length === 0`)\n  - archive-all confirm: `确认归档 N 个当前会话？` with `N = filteredSessions.length`\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `rg archivedCounts|archivedCwds|archivedSessions|archivedExpanded|loadArchivedSessions|ArchivedSessionItem` in `components/SessionSidebar.tsx` — no hits\n- `rg /api/sessions/archived` in `components`/`hooks` — no hits\n- archive write handlers still present (`/api/sessions/archive`, `/api/sessions/archive-all`)\n\n#### Notes / Risks\n\n- Browser Network/UI smoke not run here (belongs to CHK-01 after DOC-01).\n- If API-01 is incomplete and the project-space route still returns `archivedCounts`, FE ignores it (safe).\n- No sidebar unarchive path remains by design; archived storage/API/detail/Usage unchanged.\n- No commit performed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:57:00.244Z",
+            "toolCallId": "call-4378f425-e7e8-4f49-afac-edc321558a44-21|fc_5e212eaf-e0cf-9a5b-bf74-11ffa861a56e_0",
+            "toolName": "bash",
+            "text": "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:98:    // Active hot path only: no sessions-archive scan or archivedCounts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:57:00.260Z",
+            "toolCallId": "call-4378f425-e7e8-4f49-afac-edc321558a44-22|fc_5e212eaf-e0cf-9a5b-bf74-11ffa861a56e_1",
+            "toolName": "read",
+            "text": "const [worktreeAction, setWorktreeAction] = useState<WorktreeActionState | null>(null);\n  const [projectSpaceContextMenu, setProjectSpaceContextMenu] = useState<ProjectSpaceContextMenuState | null>(null);\n  const [removedWorktreeCwds, setRemovedWorktreeCwds] = useState<string[]>([]);\n  const [selectedCwdGit, setSelectedCwdGit] = useState<GitInfo | undefined>(undefined);\n  const [trellisSetupStatus, setTrellisSetupStatus] = useState<TrellisSetupStatus | null>(null);\n  const [trellisStatusRefreshKey, setTrellisStatusRefreshKey] = useState(0);\n  const [sessionsSwitching, setSessionsSwitching] = useState(false);\n  const loadSessionsTokenRef = useRef(0);\n  const loadSessionsAbortRef = useRef<AbortController | null>(null);\n  const projectsRef = useRef(projects);\n  projectsRef.current = projects;\n  const prevSpaceKeyRef = useRef<string | null>(null);\n  const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const sessionListRef = useRef<HTMLDivElement>(null);\n\n  const loadProjects = useCallback(async (showLoading = false) => {\n    try {\n      if (showLoading) setLoading(true);\n      const res = await fetch(\"/api/projects?sync=missing\");\n      if (!res.ok) throw new Error(`HTTP ${res.status}`);\n      const data = await res.json() as { projects?: PiWebProjectRecord[]; error?: string };\n      if (data.error) throw new Error(data.error);\n      setProjects(data.projects ?? []);\n      setError(null);\n      if (!showLoading) {\n        setProjectsRefreshDone(true);\n        if (sessionRefreshTimerRef.current) clearTimeout(sessionRefreshTimerRef.current);\n        sessionRefreshTimerRef.current = setTimeout(() => setProjectsRefreshDone(false), 2000);\n      }\n    } catch (e) {\n      setError(String(e));\n    } finally {\n      if (showLoading) setLoading(false);\n    }\n  }, []);\n\n  const loadSessions = useCallback(async (showLoading = false) => {\n    const token = ++loadSessionsTokenRef.current;\n    loadSessionsAbortRef.current?.abort();\n    const controller = new AbortController();\n    loadSessionsAbortRef.current = controller;\n    const selected = findProjectSpace(projectsRef.current, selectedProjectId, selectedSpaceId);\n    if (!selected) {\n      if (token === loadSessionsTokenRef.current) {\n        // Only clear when there is no selection intent. If project/space ids are\n        // already set (URL restore) but the projects registry has not loaded yet,\n        // keep the current list and wait for a later retry.\n        if (!selectedProjectId || !selectedSpaceId) {\n          setAllSessions([]);\n        }\n        setSessionsSwitching(false);\n        if (showLoading) setLoading(false);\n      }\n      return;\n    }\n    try {\n      if (showLoading) {\n        if (token === loadSessionsTokenRef.current) {\n          setSessionsSwitching(true);\n          setLoading(true);\n          setAllSessions([]);\n          setSelectedForArchive(new Set());\n        }\n      }\n      const res = await fetch(`/api/projects/${encodeURIComponent(selected.project.id)}/spaces/${encodeURIComponent(selected.space.id)}/sessions`, {\n        signal: controller.signal,\n      });\n      if (!res.ok) throw new Error(`HTTP ${res.status}`);\n      const data = await res.json() as { sessions?: SessionInfo[]; error?: string };\n      if (data.error) throw new Error(data.error);\n      if (token !== loadSessionsTokenRef.current) return;\n      setAllSessions(data.sessions ?? []);\n      setError(null);\n      if (!showLoading) {\n        setSessionRefreshDone(true);\n        if (sessionRefreshTimerRef.current) clearTimeout(sessionRefreshTimerRef.current);\n        sessionRefreshTimerRef.current = setTimeout(() => setSessionRefreshDone(false), 2000);\n      }\n    } catch (e) {\n      if (controller.signal.aborted || (e instanceof DOMException && e.name === \"AbortError\")) return;\n      if (token !== loadSessionsTokenRef.current) return;\n      setError(String(e));\n    } finally {\n      if (token === loadSessionsTokenRef.current) {\n        if (showLoading) setLoading(false);\n        setSessionsSwitching(false);\n      }\n    }\n  }, [selectedProjectId, selectedSpaceId]);\n\n  const handleArchiveSession = useCallback(async (sessionId: string) => {\n    try {\n      const res = await fetch(\"/api/sessions/archive\", {\n        method: \"POST\",\n        headers: { \"Content-Type\": \"application/json\" },\n        body: JSON.stringify({ sessionIds: [sessionId] }),\n      });\n      if (res.ok) {\n        setSelectedForArchive((prev) => {\n          const next = new Set(prev);\n          next.delete(sessionId);\n          return next;\n        });\n        void loadSessions(false);\n      }\n    } catch {\n      // ignore\n    }\n  }, [loadSessions]);\n\n  const handleBatchArchive = useCallback(async () => {\n    const ids = [...selectedForArchive];\n    if (ids.length === 0) return;\n    try {\n      const res = await fetch(\"/api/sessions/archive\", {\n        method: \"POST\",\n        headers: { \"Content-Type\": \"application/json\" },\n        body: JSON.stringify({ sessionIds: ids }),\n      });\n      if (res.ok) {\n        setSelectedForArchive(new Set());\n        void loadSessions(false);\n      }\n    } catch {\n      // ignore\n    }\n  }, [selectedForArchive, loadSessions]);\n\n  const handleArchiveAll = useCallback(async () => {\n    if (!selectedCwd) return;\n    setArchiveAllBusy(true);\n    try {\n      const res = await fetch(\"/api/sessions/archive-all\", {\n        method: \"POST\",\n        headers: { \"Content-Type\": \"application/json\" },\n        body: JSON.stringify({ cwd: selectedCwd }),\n      });\n      if (res.ok) {\n        setArchiveAllConfirming(false);\n        void loadSessions(false);\n      }\n    } catch {\n      // ignore\n    } finally {\n      setArchiveAllBusy(false);\n    }\n  }, [selectedCwd, loadSessions]);\n\n  const handleDeleteSession = useCallback(async (session: SessionInfo) => {\n    const title = displayTitleForSession(session);\n\n[2031 more lines in file. Use offset=505 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:57:00.261Z",
+            "toolCallId": "call-4378f425-e7e8-4f49-afac-edc321558a44-23|fc_5e212eaf-e0cf-9a5b-bf74-11ffa861a56e_2",
+            "toolName": "read",
+            "text": "</div>\n      )}\n\n      {/* Archive-all confirmation */}\n      {archiveAllConfirming && selectedCwd && (\n        <div\n          onMouseDown={(e) => e.stopPropagation()}\n          style={{ position: \"fixed\", inset: 0, zIndex: 1100, display: \"flex\", alignItems: \"center\", justifyContent: \"center\", background: \"rgba(0,0,0,0.28)\", padding: 16 }}\n        >\n          <div style={{ width: \"min(420px, 100%)\", borderRadius: 12, background: \"var(--bg)\", border: \"1px solid var(--border)\", boxShadow: \"0 18px 50px rgba(0,0,0,0.25)\", padding: 16 }}>\n            <div style={{ fontSize: 16, fontWeight: 700, color: \"var(--text)\", marginBottom: 8 }}>\n              归档所有会话\n            </div>\n            <div style={{ fontSize: 12, color: \"var(--text-muted)\", lineHeight: 1.5, marginBottom: 16 }}>\n              确认归档 <strong>{filteredSessions.length}</strong> 个当前会话？\n            </div>\n            <div style={{ display: \"flex\", justifyContent: \"flex-end\", gap: 8 }}>\n              <button\n                onClick={() => setArchiveAllConfirming(false)}\n                disabled={archiveAllBusy}\n                style={{ padding: \"7px 12px\", borderRadius: 7, border: \"1px solid var(--border)\", background: \"var(--bg)\", color: \"var(--text-muted)\", cursor: archiveAllBusy ? \"not-allowed\" : \"pointer\", fontSize: 12 }}\n              >\n                取消\n              </button>\n              <button\n                onClick={() => void handleArchiveAll()}\n                disabled={archiveAllBusy}\n                style={{ padding: \"7px 12px\", borderRadius: 7, border: \"none\", background: \"var(--accent)\", color: \"#fff\", cursor: archiveAllBusy ? \"not-allowed\" : \"pointer\", fontSize: 12, fontWeight: 700, opacity: archiveAllBusy ? 0.65 : 1 }}\n              >\n                {archiveAllBusy ? \"归档中…\" : \"确认归档\"}\n              </button>\n            </div>\n          </div>\n        </div>\n      )}\n\n      {showTrellisInitializePrompt && selectedCwd && (\n        <div style={{ margin: \"8px 10px\", padding: 9, borderRadius: 8, border: \"1px solid rgba(37,99,235,0.24)\", background: \"rgba(37,99,235,0.08)\", color: \"var(--text-muted)\", fontSize: 11, lineHeight: 1.45, flexShrink: 0 }}>\n          <div style={{ color: \"var(--text)\", fontWeight: 800, marginBottom: 4 }}>Trellis 未初始化</div>\n          <div style={{ marginBottom: 7 }}>点击按钮会打开底部终端并填入初始化命令，请在终端中按回车并完成交互问询。</div>\n          <code style={{ display: \"block\", padding: \"5px 6px\", marginBottom: 7, borderRadius: 6, border: \"1px solid var(--border)\", background: \"var(--bg)\", color: \"var(--text)\", fontFamily: \"var(--font-mono)\", fontSize: 10, overflowWrap: \"anywhere\" }}>{trellisInitCommand}</code>\n          <button\n            type=\"button\"\n            disabled={!canOpenTrellisInitTerminal}\n            onClick={() => {\n              if (!canOpenTrellisInitTerminal) return;\n              onOpenTerminalCommand?.(selectedCwd, trellisInitCommand);\n              setTrellisStatusRefreshKey((key) => key + 1);\n            }}\n            title={terminalEnabled ? \"在终端中填入 Trellis 初始化命令\" : \"请先在设置中启用 Web Terminal\"}\n            style={{ width: \"100%\", padding: \"6px 8px\", borderRadius: 7, border: \"none\", background: canOpenTrellisInitTerminal ? \"var(--accent)\" : \"var(--border)\", color: \"white\", cursor: canOpenTrellisInitTerminal ? \"pointer\" : \"not-allowed\", fontSize: 12, fontWeight: 800 }}\n          >\n            在终端中初始化\n          </button>\n        </div>\n      )}\n\n      {/* Session list */}\n      <div ref={sessionListRef} style={{ flex: \"1 1 auto\", overflowY: \"auto\", padding: \"0\", minHeight: MIN_SESSION_LIST_HEIGHT }}>\n        {error && !sessionsSwitching && (\n          <div style={{ padding: \"12px 14px\", color: \"#f87171\", fontSize: 12 }}>\n            {error}\n          </div>\n        )}\n        {sessionsSwitching && (\n          <div style={{ padding: \"4px 8px\", pointerEvents: \"none\" }} aria-busy=\"true\">\n            {[0, 1, 2, 3].map((i) => (\n              <div key={i} style={{ display: \"flex\", alignItems: \"center\", gap: 8, padding: \"12px 6px\", borderRadius: 8, marginBottom: 2 }}>\n                <div style={{\n                  width: 18, height: 18, borderRadius: 5, background: \"var(--border)\", flexShrink: 0,\n                  animation: \"pulse 1.5s ease-in-out infinite\", animationDelay: `${i * 0.1}s`,\n                }} />\n                <div style={{\n                  flex: 1, height: 14, borderRadius: 4, background: \"var(--border)\",\n                  animation: \"pulse 1.5s ease-in-out infinite\", animationDelay: `${i * 0.1}s`,\n                }} />\n              </div>\n            ))}\n          </div>\n        )}\n        {!sessionsSwitching && loading && (\n          <div style={{ padding: \"16px 14px\", color: \"var(--text-muted)\", fontSize: 12 }}>\n            Loading...\n          </div>\n        )}\n        {!sessionsSwitching && !loading && !error && activeProjects.length === 0 && (\n          <div style={{ padding: \"16px 14px\", color: \"var(--text-muted)\", fontSize: 12, lineHeight: 1.5 }}>\n            No registered projects yet. Add a project path from the selector above to start.\n          </div>\n        )}\n        {!sessionsSwitching && !loading && !error && activeProjects.length > 0 && filteredSessions.length === 0 && (\n          <div style={{ padding: \"16px 14px\", color: \"var(--text-muted)\", fontSize: 12 }}>\n            No sessions found in this space\n          </div>\n        )}\n        {!sessionsSwitching && sessionTree.map((node) => (\n          <SessionTreeItem\n            key={node.session.id}\n            node={node}\n            selectedSessionId={selectedSessionId}\n            onSelectSession={onSelectSession}\n            onRenamed={loadSessions}\n            onSessionDeleted={(id) => {\n              onSessionDeleted?.(id);\n              loadSessions();\n            }}\n            onArchive={handleArchiveSession}\n            onContextMenu={(event, session) => setSessionContextMenu({ x: event.clientX, y: event.clientY, session })}\n            depth={0}\n            selectedForArchive={selectedForArchive}\n            onToggleSelect={(id) => {\n              setSelectedForArchive((prev) => {\n                const next = new Set(prev);\n                if (next.has(id)) next.delete(id);\n                else next.add(id);\n                return next;\n              });\n            }}\n          />\n        ))}\n\n        {/* Batch archive action bar — appears as soon as any sessions are checked */}\n        {selectedForArchive.size > 0 && (\n          <div style={{\n            borderTop: \"1px solid var(--border)\",\n            padding: \"8px 14px\",\n            display: \"flex\",\n            alignItems: \"center\",\n            justifyContent: \"space-between\",\n            gap: 8,\n            flexShrink: 0,\n          }}>\n            <span style={{ fontSize: 11, color: \"var(--text-dim)\" }}>\n              已选择 {selectedForArchive.size} 个会话\n            </span>\n            <div style={{ display: \"flex\", gap: 6 }}>\n              <button\n                onClick={() => {\n                  setSelectedForArchive(new Set());\n                }}\n                style={{ padding: \"6px 12px\", borderRadius: 7, border: \"1px solid var(--border)\", background: \"var(--bg)\", color: \"var(--text-muted)\", cursor: \"pointer\", fontSize: 11, fontWeight: 500 }}\n              >\n                取消\n              </button>\n              <button\n                onClick={() => void handleBatchArchive()}\n                disabled={selectedForArchive.size === 0}\n                style={{\n                  padding: \"6px 12px\", borderRadius: 7, border: \"none\",\n                  background: selectedForArchive.size === 0 ? \"var(--border)\" : \"var(--accent)\",\n                  color: selectedForArchive.size === 0 ? \"var(--text-dim)\" : \"#fff\",\n                  cursor: selectedForArchive.size === 0 ? \"not-allowed\" : \"pointer\",\n                  fontSize: 11, fontWeight: 600,\n                }}\n              >\n                归档 {selectedForArchive.size > 0 ? `(${selectedForArchive.size})` : \"\"}\n              </button>\n            </div>\n          </div>\n        )}\n\n[536 more lines in file. Use offset=2000 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T04:57:06.676Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — removed archive display/read path:\n  - deleted state: `archivedCounts`, `archivedCwds`, `archivedSessions`, `archivedExpanded`\n  - deleted `loadArchivedSessions`, `handleUnarchiveSession`, expand effect, archived section UI, and `ArchivedSessionItem`\n  - `loadSessions` only hydrates active `sessions`\n  - single/batch/archive-all still call existing write APIs and refresh via `loadSessions(false)`\n  - empty state: active-only (`filteredSessions.length === 0`)\n  - archive-all confirm: `确认归档 N 个当前会话？` with `N = filteredSessions.length`\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `rg archivedCounts|archivedCwds|archivedSessions|archivedExpanded|loadArchivedSessions|ArchivedSessionItem` in `components/SessionSidebar.tsx` — no hits\n- `rg /api/sessions/archived` in `components`/`hooks` — no hits\n- archive write handlers still present (`/api/sessions/archive`, `/api/sessions/archive-all`)\n\n#### Notes / Risks\n\n- Browser Network/UI smoke not run here (belongs to CHK-01 after DOC-01).\n- If API-01 is incomplete and the project-space route still returns `archivedCounts`, FE ignores it (safe).\n- No sidebar unarchive path remains by design; archived storage/API/detail/Usage unchanged.\n- No commit performed.",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T04:57:06.678Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1459,
+        "tokens": 496,
+        "tokenSource": "usage",
+        "tps": 5.59,
+        "firstTokenAt": "2026-07-13T04:55:37.946Z",
+        "lastTokenAt": "2026-07-13T04:57:06.605Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-bced3a1c1fd30d369553ea4e",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/implementer-bced3a1c1fd30d369553ea4e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:54:54.711Z",
+        "finishedAt": "2026-07-13T04:57:06.679Z",
+        "updatedAt": "2026-07-13T04:57:06.679Z",
+        "itemCount": 54,
+        "messageCount": 2,
+        "toolCallCount": 24,
+        "stderrBytes": 0,
+        "bytes": 114037,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f59d4-0409-7266-91e5-eaf3e7f2b68f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-54-54-729Z_019f59d4-0409-7266-91e5-eaf3e7f2b68f.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-9b742fbdc22992f35e83c452",
+      "subtaskId": "API-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:54:54.671Z",
+      "finishedAt": "2026-07-13T04:57:07.522Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d4-0400-79e8-8a70-e9c9291a4974",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-54-54-720Z_019f59d4-0400-79e8-8a70-e9c9291a4974.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59d4-0400-79e8-8a70-e9c9291a4974",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — API-01\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts`\n  - Removed `scanArchivedCwds` import\n  - Removed archive timing stage (`archive`), `archiveCwds` count, pathKey aggregation\n  - Response body is now `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` (no `archivedCounts`)\n  - Active list / legacy / Studio child / other timing stages unchanged\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- Hot-path search: no `scanArchivedCwds` / functional `archivedCounts` (only a clarifying comment)\n\nNote: first `npm install` skipped devDeps; re-ran with `--include=dev` so eslint/tsc were available.\n\n#### Notes / Risks\n\n- Curl smoke of live project-space route not run here (no assumed running server / project ids).\n- Sidebar still expects `archivedCounts` until FE-01; temporary type/runtime mismatch is expected while API-01/FE-01 run in parallel.\n- `scanArchivedCwds` remains in `lib/session-reader.ts` for explicit archive paths.\n\n#### Decisions needed from main session\n\n- None for API-01. Proceed with API-02 / FE-01 / DOC-01 as planned.",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:54:54.671Z",
+        "updatedAt": "2026-07-13T04:57:07.522Z",
+        "eventCount": 687,
+        "lastTextPreview": "### Implementation Complete — API-01\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts`\n  - Removed `scanArchivedCwds` import\n  - Removed archive timing stage (`archive`), `archiveCwds` count, pathKey aggregation\n  - Response body is now `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` (no `archivedCounts`)\n  - Active list / legacy / Studio child / other timing stages unchanged\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- Hot-path search: no `scanArchivedCwds` / functional `archivedCounts` (only a clarifying comment)\n\nNote: first `npm install` skipped devDeps; re-ran with `--include=dev` so eslint/tsc were available.\n\n#### Notes / Risks\n\n- Curl smoke of live project-space route not run here (no assumed running server / project ids).\n- Sidebar still expects `archivedCounts` until FE-01; temporary type/runtime mismatch is expected while API-01/FE-01 run in parallel.\n- `scanArchivedCwds` remains in `lib/session-reader.ts` for explicit archive paths.\n\n#### Decisions needed from main session\n\n- None for API-01. Proceed with API-02 / FE-01 / DOC-01 as planned.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:56:42.349Z",
+            "toolCallId": "call-15aea327-b8ba-45ea-b433-8ff6faa16b8f-9|fc_7eb0290c-681f-9874-b200-20e02ff533f5_0",
+            "toolName": "bash",
+            "text": "npm warn node_modules/@emoji-mart/react\nnpm warn   @emoji-mart/react@\"^1.1.1\" from @lobehub/ui@5.10.0\nnpm warn   node_modules/@lobehub/ui\nnpm warn\nnpm warn Conflicting peer dependency: react@18.3.1\nnpm warn node_modules/react\nnpm warn   peer react@\"^16.8 || ^17 || ^18\" from @emoji-mart/react@1.1.1\nnpm warn   node_modules/@emoji-mart/react\nnpm warn     @emoji-mart/react@\"^1.1.1\" from @lobehub/ui@5.10.0\nnpm warn     node_modules/@lobehub/ui\n\nadded 302 packages, and audited 1199 packages in 9s\n\n322 packages are looking for funding\n  run `npm fund` for details\n\n11 vulnerabilities (2 low, 7 moderate, 2 high)\n\nTo address issues that do not require attention, run:\n  npm audit fix\n\nTo address all issues (including breaking changes), run:\n  npm audit fix --force\n\nRun `npm audit` for details.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T04:56:51.654Z",
+            "toolCallId": "call-edb15e59-c1bc-467d-8a58-2c53bea6828b-10|fc_305ad6b0-7a4b-9b9f-83e6-3bb56f20ac26_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run lint 2>&1 | tail -40; echo \\\"---TSC---\\\"; node_modules/.bin/tsc --noEmit 2>&1 | tail -40\",\n  \"timeout\": 180\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:57:02.419Z",
+            "toolCallId": "call-edb15e59-c1bc-467d-8a58-2c53bea6828b-10|fc_305ad6b0-7a4b-9b9f-83e6-3bb56f20ac26_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.11 lint\n> eslint .\n\n---TSC---",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T04:57:07.520Z",
+            "text": "### Implementation Complete — API-01\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts`\n  - Removed `scanArchivedCwds` import\n  - Removed archive timing stage (`archive`), `archiveCwds` count, pathKey aggregation\n  - Response body is now `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` (no `archivedCounts`)\n  - Active list / legacy / Studio child / other timing stages unchanged\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- Hot-path search: no `scanArchivedCwds` / functional `archivedCounts` (only a clarifying comment)\n\nNote: first `npm install` skipped devDeps; re-ran with `--include=dev` so eslint/tsc were available.\n\n#### Notes / Risks\n\n- Curl smoke of live project-space route not run here (no assumed running server / project ids).\n- Sidebar still expects `archivedCounts` until FE-01; temporary type/runtime mismatch is expected while API-01/FE-01 run in parallel.\n- `scanArchivedCwds` remains in `lib/session-reader.ts` for explicit archive paths.\n\n#### Decisions needed from main session\n\n- None for API-01. Proceed with API-02 / FE-01 / DOC-01 as planned.",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T04:57:07.521Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1235,
+        "tokens": 400,
+        "tokenSource": "usage",
+        "tps": 4.15,
+        "firstTokenAt": "2026-07-13T04:55:31.189Z",
+        "lastTokenAt": "2026-07-13T04:57:07.519Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-9b742fbdc22992f35e83c452",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/implementer-9b742fbdc22992f35e83c452.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:54:54.671Z",
+        "finishedAt": "2026-07-13T04:57:07.521Z",
+        "updatedAt": "2026-07-13T04:57:07.521Z",
+        "itemCount": 28,
+        "messageCount": 2,
+        "toolCallCount": 11,
+        "stderrBytes": 0,
+        "bytes": 33694,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f59d4-0400-79e8-8a70-e9c9291a4974",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-54-54-720Z_019f59d4-0400-79e8-8a70-e9c9291a4974.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-76bbf80ffe9ac71327442a7f",
+      "subtaskId": "API-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:54:54.699Z",
+      "finishedAt": "2026-07-13T04:58:42.772Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d4-0405-7df7-9620-30cd6c34c38e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-54-54-725Z_019f59d4-0405-7df7-9620-30cd6c34c38e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59d4-0405-7df7-9620-30cd6c34c38e",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (API-02)\n\n#### Files Changed\n\n- `app/api/sessions/route.ts` — 删除 `scanArchivedCwds` import/调用；`GET /api/sessions` 响应收敛为 `{ sessions }`；保留 `includeGit` / `includeStudioChildren` 查询语义。\n- `bin/ypic.js` — 只读确认，未改动（仅消费 `body.sessions`）。\n\n#### Verification\n\n- 仓内消费方：`archivedCwds`/`archivedCounts` 在 `app/api/sessions/route.ts` 与 `bin/ypic.js` 已无引用；helpers 仍在 `lib/session-reader.ts`；`SessionSidebar` / project-space 留给其他子任务。\n- `npm run lint` — 通过\n- `node_modules/.bin/tsc --noEmit` — 通过\n- 静态确认：`app/api/sessions/route.ts` 不再出现 `scanArchivedCwds`\n- 未跑 live `curl`（本环境未启动 dev server）；逻辑上响应已为 `{ sessions }`\n\n#### Notes / Risks\n\n- 文档（`docs/modules/api.md`、`docs/architecture/overview.md`）仍描述旧字段；属 **DOC-01**。\n- 未记录外部客户端若依赖 `archivedCwds`/`archivedCounts` 会受影响；仓内无消费者。\n- 未改 archive helpers / archived API / Usage。\n- 本 worktree 的 `node_modules` 原先不完整，为跑校验安装了 eslint/typescript；未 commit。",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:54:54.699Z",
+        "updatedAt": "2026-07-13T04:58:42.772Z",
+        "eventCount": 1040,
+        "lastTextPreview": "### Implementation Complete (API-02)\n\n#### Files Changed\n\n- `app/api/sessions/route.ts` — 删除 `scanArchivedCwds` import/调用；`GET /api/sessions` 响应收敛为 `{ sessions }`；保留 `includeGit` / `includeStudioChildren` 查询语义。\n- `bin/ypic.js` — 只读确认，未改动（仅消费 `body.sessions`）。\n\n#### Verification\n\n- 仓内消费方：`archivedCwds`/`archivedCounts` 在 `app/api/sessions/route.ts` 与 `bin/ypic.js` 已无引用；helpers 仍在 `lib/session-reader.ts`；`SessionSidebar` / project-space 留给其他子任务。\n- `npm run lint` — 通过\n- `node_modules/.bin/tsc --noEmit` — 通过\n- 静态确认：`app/api/sessions/route.ts` 不再出现 `scanArchivedCwds`\n- 未跑 live `curl`（本环境未启动 dev server）；逻辑上响应已为 `{ sessions }`\n\n#### Notes / Risks\n\n- 文档（`docs/modules/api.md`、`docs/architecture/overview.md`）仍描述旧字段；属 **DOC-01**。\n- 未记录外部客户端若依赖 `archivedCwds`/`archivedCounts` 会受影响；仓内无消费者。\n- 未改 archive helpers / archived API / Usage。\n- 本 worktree 的 `node_modules` 原先不完整，为跑校验安装了 eslint/typescript；未 commit。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:58:29.418Z",
+            "toolCallId": "call-d7c4945e-fdcc-4d3a-ab93-8527c5df3cbe-19|fc_7e3ea0d8-5815-9acd-8244-9e896a60d91d_2",
+            "toolName": "bash",
+            "text": "(no output)\n\nCommand exited with code 1",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:58:29.425Z",
+            "toolCallId": "call-d7c4945e-fdcc-4d3a-ab93-8527c5df3cbe-18|fc_7e3ea0d8-5815-9acd-8244-9e896a60d91d_1",
+            "toolName": "bash",
+            "text": "lib/session-reader.ts:209:  archivedCwdsCache = undefined;\nlib/session-reader.ts:574:let archivedCwdsCache: { expiresAt: number; value: { cwds: string[]; counts: Record<string, number> } } | undefined;\nlib/session-reader.ts:578:  if (archivedCwdsCache && archivedCwdsCache.expiresAt > Date.now()) {\nlib/session-reader.ts:579:    return { cwds: archivedCwdsCache.value.cwds.slice(), counts: { ...archivedCwdsCache.value.counts } };\nlib/session-reader.ts:586:    archivedCwdsCache = { expiresAt: Date.now() + ARCHIVE_SCAN_CACHE_TTL_MS, value };\nlib/session-reader.ts:610:  archivedCwdsCache = { expiresAt: Date.now() + ARCHIVE_SCAN_CACHE_TTL_MS, value };\napp/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts:98:    // Active hot path only: no sessions-archive scan or archivedCounts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T04:58:30.459Z",
+            "toolCallId": "call-d7c4945e-fdcc-4d3a-ab93-8527c5df3cbe-17|fc_7e3ea0d8-5815-9acd-8244-9e896a60d91d_0",
+            "toolName": "bash",
+            "text": "tsc_exit=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T04:58:42.770Z",
+            "text": "### Implementation Complete (API-02)\n\n#### Files Changed\n\n- `app/api/sessions/route.ts` — 删除 `scanArchivedCwds` import/调用；`GET /api/sessions` 响应收敛为 `{ sessions }`；保留 `includeGit` / `includeStudioChildren` 查询语义。\n- `bin/ypic.js` — 只读确认，未改动（仅消费 `body.sessions`）。\n\n#### Verification\n\n- 仓内消费方：`archivedCwds`/`archivedCounts` 在 `app/api/sessions/route.ts` 与 `bin/ypic.js` 已无引用；helpers 仍在 `lib/session-reader.ts`；`SessionSidebar` / project-space 留给其他子任务。\n- `npm run lint` — 通过\n- `node_modules/.bin/tsc --noEmit` — 通过\n- 静态确认：`app/api/sessions/route.ts` 不再出现 `scanArchivedCwds`\n- 未跑 live `curl`（本环境未启动 dev server）；逻辑上响应已为 `{ sessions }`\n\n#### Notes / Risks\n\n- 文档（`docs/modules/api.md`、`docs/architecture/overview.md`）仍描述旧字段；属 **DOC-01**。\n- 未记录外部客户端若依赖 `archivedCwds`/`archivedCounts` 会受影响；仓内无消费者。\n- 未改 archive helpers / archived API / Usage。\n- 本 worktree 的 `node_modules` 原先不完整，为跑校验安装了 eslint/typescript；未 commit。",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T04:58:42.771Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 904,
+        "tokens": 466,
+        "tokenSource": "usage",
+        "tps": 72.07,
+        "firstTokenAt": "2026-07-13T04:58:36.303Z",
+        "lastTokenAt": "2026-07-13T04:58:42.769Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-76bbf80ffe9ac71327442a7f",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/implementer-76bbf80ffe9ac71327442a7f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:54:54.699Z",
+        "finishedAt": "2026-07-13T04:58:42.771Z",
+        "updatedAt": "2026-07-13T04:58:42.771Z",
+        "itemCount": 45,
+        "messageCount": 1,
+        "toolCallCount": 20,
+        "stderrBytes": 0,
+        "bytes": 42443,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f59d4-0405-7df7-9620-30cd6c34c38e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-54-54-725Z_019f59d4-0405-7df7-9620-30cd6c34c38e.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-6abad9e0978c2677d2451cb6",
+      "subtaskId": "DOC-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T04:58:56.479Z",
+      "finishedAt": "2026-07-13T05:00:07.655Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d7-b47c-7f24-b447-1010d1355869",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-58-56-508Z_019f59d7-b47c-7f24-b447-1010d1355869.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59d7-b47c-7f24-b447-1010d1355869",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — SessionSidebar 只描述 active list；去掉归档区块/unarchive/archived rows；写明 archive 写路径仍在、`archive-all` 只计 active；reload 不请求 `/api/sessions/archived`\n- `docs/modules/api.md` — project-space 响应无 `archivedCounts`/无 archive scan；`GET /api/sessions` 收敛为 `{ sessions }`；保留 archive/unarchive/archived API；Session List Performance 表与诚实性能边界已更新\n- `docs/architecture/overview.md` — Archive path 区分 active 热路径 vs 显式归档能力；Project Registry 为项目列表源；明确 `listAllSessions` 全量扫描未重构\n\n#### Verification\n\n- `rg archivedCwds|archivedCounts|scanArchivedCwds docs/modules docs/architecture/overview.md` — 仅出现“不再返回/不再调用/helper 仍存在”的说明，无“Sidebar/picker 消费 counts”旧契约\n- 对照代码：`app/api/sessions/route.ts` → `{ sessions }`；project-space route 注释/body 无 archive；`SessionSidebar` 无 archived loader/UI，archive 写动作 + `filteredSessions.length` 确认文案存在\n- 未改 `components/` / `app/` / `lib/` 生产代码\n\n#### Notes / Risks\n\n- `docs/modules/library.md` 仍描述 `scanArchivedCwds()` helper（合理保留，不在 DOC-01 文件范围）\n- 历史 research 文档未改（按计划不重写档案）\n- 主会话可标 DOC-01 done，进入 CHK-01；无需本子任务决策",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T04:58:56.479Z",
+        "updatedAt": "2026-07-13T05:00:07.655Z",
+        "eventCount": 873,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — SessionSidebar 只描述 active list；去掉归档区块/unarchive/archived rows；写明 archive 写路径仍在、`archive-all` 只计 active；reload 不请求 `/api/sessions/archived`\n- `docs/modules/api.md` — project-space 响应无 `archivedCounts`/无 archive scan；`GET /api/sessions` 收敛为 `{ sessions }`；保留 archive/unarchive/archived API；Session List Performance 表与诚实性能边界已更新\n- `docs/architecture/overview.md` — Archive path 区分 active 热路径 vs 显式归档能力；Project Registry 为项目列表源；明确 `listAllSessions` 全量扫描未重构\n\n#### Verification\n\n- `rg archivedCwds|archivedCounts|scanArchivedCwds docs/modules docs/architecture/overview.md` — 仅出现“不再返回/不再调用/helper 仍存在”的说明，无“Sidebar/picker 消费 counts”旧契约\n- 对照代码：`app/api/sessions/route.ts` → `{ sessions }`；project-space route 注释/body 无 archive；`SessionSidebar` 无 archived loader/UI，archive 写动作 + `filteredSessions.length` 确认文案存在\n- 未改 `components/` / `app/` / `lib/` 生产代码\n\n#### Notes / Risks\n\n- `docs/modules/library.md` 仍描述 `scanArchivedCwds()` helper（合理保留，不在 DOC-01 文件范围）\n- 历史 research 文档未改（按计划不重写档案）\n- 主会话可标 DOC-01 done，进入 CHK-01；无需本子任务决策",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:00:00.575Z",
+            "toolCallId": "call-40428d80-9514-48d7-93c3-ba2a7537ae3e-19|fc_9afd9dd0-d6f2-91ea-95bd-5c8730a70c35_0",
+            "toolName": "bash",
+            "text": "docs/modules/api.md:13:| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List **active** sessions explicitly linked to one project space. Response is `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` with **no** `archivedCounts` and **no** `scanArchivedCwds()` / `sessions-archive/` I/O on this hot path. Root `sessions` exclude Studio child audit roots but include child rows whose `studioChild.parentSessionId` belongs to a visible parent so the Sidebar can fold them under that parent. Optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. Active inventory still comes from global `listAllSessions()` then filters by project/space link (not a per-space directed scan). |\ndocs/modules/api.md:15:| `sessions/` | GET | List lightweight **active** session summaries as `{ sessions }`. Does **not** scan `sessions-archive/` and does **not** return `archivedCwds` / `archivedCounts` (legacy CWD-picker fields; Project Registry is the project list source). Git/worktree metadata is omitted by default and only included with `includeGit=1`. YPI Studio child audit sessions are filtered unless `includeStudioChildren=1` is provided for debugging/audit views. In-repo `ypic` only consumes `body.sessions`. |\ndocs/modules/api.md:124:| `GET /api/sessions`, project-space sessions | active only: `listAllSessions()` → `scanSessionInventory()` over `sessions/` (no archive scan, no `archivedCounts`/`archivedCwds`) |\ndocs/modules/api.md:131:`scanArchivedCwds()` still exists in `lib/session-reader.ts` as a header-only cwd/count helper for explicit/future callers, but **active list routes and SessionSidebar no longer call it**. Project visibility comes from Project Registry, not from archive cwd counts.\ndocs/modules/frontend.md:8:| `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, and lazy-loads **active** linked sessions for the selected project space via `GET /api/projects/:projectId/spaces/:spaceId/sessions` (response `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` only — no `archivedCounts`, no `sessions-archive/` scan). The sidebar does **not** load, expand, or restore archived session lists: there is no “已归档 (N)” block, no `archivedSessions` state, and no client call to `/api/sessions/archived` or unarchive. Empty space state is active-only (`No sessions found in this space`). Single/batch/`archive-all` write actions remain (POST archive / archive-all); success only refreshes the active list via `loadSessions(false)`, and archive-all confirmation counts the current active `filteredSessions.length`. It hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, keeps WorkTree actions available for worktree spaces, and includes the integrated file explorer with a resizable session/explorer split. **Project/space selection** has been replaced from an inline dropdown to a compact top switch button (`选择项目空间` when empty, or `ProjectName / SpaceName` when selected). Clicking the button opens `ProjectSpaceSwitchDialog` for layered (left project list → right space list) browsing, search, and add-project flows inside a viewport-level modal dialog. The `SessionSidebar` owns all project/space state and callbacks (registration from manual path, OS directory picker, Git clone, default directory) and passes them into the dialog as props; the dialog is purely a UI shell that calls back to the sidebar's existing `upsertProjectAndSelectMainSpace()`, `handleDirectoryPicker()`, `commitCustomPath()`, `handleGitCloneSubmit()`, etc. The sidebar header displays current project name / space subtitle / WorkTree badge; WorkTree archive/delete remains available by right-clicking the selected switch button or a WorkTree row inside the dialog. Add-project forms (manual path, Git clone) are rendered inside the dialog with mutually exclusive toggles; empty registry onboarding renders directly in the dialog with large primary buttons for `Add project folder…` / `Add project path…` / `Add project from Git…` / `Use default directory`. The dialog closes on successful registration/clone and selects the returned main space; on failure the current project is unchanged. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. Session, Studio child, hover-action, and delete-confirmation rows keep title/metadata content on single non-wrapping lines and ellipsize long text at narrow sidebar widths. **WorkTree archive/delete flow:** `confirmWorktreeAction()` optimistically merges the API response's `archivedSpaces` into local project state so the worktree space disappears immediately, then refreshes projects in the background. If the currently-selected space was the archived/deleted one, fallback preference is: (1) `main` space of the same project, (2) any other active non-missing space in that project, (3) API-provided `fallbackCwd`, (4) null. Deleted session ids are forwarded via `onSessionDeleted`. The sidebar **centralizes project and space context menu state** through `ProjectSpaceContextMenuState` (targeting a specific project or project+space pair). Context menu callbacks (`handleDialogProjectContextMenu`, `handleDialogSpaceContextMenu`) bridge dialog right-click events into the sidebar state so that edit/star/archive/WorkTree-delete actions operate on the right-clicked target, not just the currently selected workspace. **Space drag-reorder** is handled by `handleReorderSpaces` which optimistically updates local state and calls `PATCH /api/projects/[projectId]/spaces`, rolling back to pre-drag project state on failure. **Top workspace menu and metadata dialog** labels have been unified to \"星标/取消星标\" for both projects and spaces; the metadata dialog distinguishes the two with contextual hints (\"星标项目优先排序\" for projects vs \"仅用于标记，不影响空间排序\" for spaces). |\ndocs/architecture/overview.md:155:- **Active Sidebar / list hot path:** `GET /api/projects/:projectId/spaces/:spaceId/sessions` and `GET /api/sessions` only read active inventory. They do **not** call `scanArchivedCwds()`, do **not** walk `sessions-archive/`, and do **not** return `archivedCounts` / `archivedCwds`. SessionSidebar only displays active history and archive **write** actions (single/batch/archive-all); it has no archived list, count, or unarchive UI.\ndocs/architecture/overview.md:156:- **Explicit archive capability (kept):** `POST /api/sessions/archive`, `archive-all`, `unarchive`, `GET /api/sessions/archived`, session-by-id detail with `archived: true` (read-only chat), and Usage when `usage.includeArchived` is enabled. `scanArchivedCwds()` remains available in `lib/session-reader.ts` for explicit helpers but is not wired into active list routes.\ndocs/architecture/overview.md:157:- **Project list source:** Project Registry (`pi-web-projects.json`), not archive cwd counts or a CWD picker synthesized from sessions.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:00:00.576Z",
+            "toolCallId": "call-40428d80-9514-48d7-93c3-ba2a7537ae3e-20|fc_9afd9dd0-d6f2-91ea-95bd-5c8730a70c35_1",
+            "toolName": "bash",
+            "text": "docs/modules/api.md:13:| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List **active** sessions explicitly linked to one project space. Response is `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` with **no** `archivedCounts` and **no** `scanArchivedCwds()` / `sessions-archive/` I/O on this hot path. Root `sessions` exclude Studio child audit roots but include child rows whose `studioChild.parentSessionId` belongs to a visible parent so the Sidebar can fold them under that parent. Optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. Active inventory still comes from global `listAllSessions()` then filters by project/space link (not a per-space directed scan). |\ndocs/modules/api.md:15:| `sessions/` | GET | List lightweight **active** session summaries as `{ sessions }`. Does **not** scan `sessions-archive/` and does **not** return `archivedCwds` / `archivedCounts` (legacy CWD-picker fields; Project Registry is the project list source). Git/worktree metadata is omitted by default and only included with `includeGit=1`. YPI Studio child audit sessions are filtered unless `includeStudioChildren=1` is provided for debugging/audit views. In-repo `ypic` only consumes `body.sessions`. |\ndocs/modules/api.md:56:| `sessions/archive-all/` | POST | Archive all **active** sessions for a cwd (does not re-process already-archived files). |\ndocs/modules/api.md:124:| `GET /api/sessions`, project-space sessions | active only: `listAllSessions()` → `scanSessionInventory()` over `sessions/` (no archive scan, no `archivedCounts`/`archivedCwds`) |\ndocs/modules/api.md:127:| `POST /api/sessions/archive-all` | direct active `scanSessionInventory()` then cwd filter + move |\ndocs/modules/api.md:128:| Explicit `GET /api/sessions/archived` | `listArchivedSessionsForCwd()` → `scanSessionInventory({ rootDir: sessions-archive })` |\ndocs/modules/api.md:131:`scanArchivedCwds()` still exists in `lib/session-reader.ts` as a header-only cwd/count helper for explicit/future callers, but **active list routes and SessionSidebar no longer call it**. Project visibility comes from Project Registry, not from archive cwd counts.\ndocs/modules/api.md:135:**Honest hot-path boundary:** removing archive scan/display from the Sidebar path only eliminates `sessions-archive/` I/O on active list loads. Project-space listing still calls global `listAllSessions()` and filters by space afterward; directed per-space inventory / project-session index redesign is out of scope for the archive decoupling work.\ndocs/modules/frontend.md:8:| `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, and lazy-loads **active** linked sessions for the selected project space via `GET /api/projects/:projectId/spaces/:spaceId/sessions` (response `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` only — no `archivedCounts`, no `sessions-archive/` scan). The sidebar does **not** load, expand, or restore archived session lists: there is no “已归档 (N)” block, no `archivedSessions` state, and no client call to `/api/sessions/archived` or unarchive. Empty space state is active-only (`No sessions found in this space`). Single/batch/`archive-all` write actions remain (POST archive / archive-all); success only refreshes the active list via `loadSessions(false)`, and archive-all confirmation counts the current active `filteredSessions.length`. It hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, keeps WorkTree actions available for worktree spaces, and includes the integrated file explorer with a resizable session/explorer split. **Project/space selection** has been replaced from an inline dropdown to a compact top switch button (`选择项目空间` when empty, or `ProjectName / SpaceName` when selected). Clicking the button opens `ProjectSpaceSwitchDialog` for layered (left project list → right space list) browsing, search, and add-project flows inside a viewport-level modal dialog. The `SessionSidebar` owns all project/space state and callbacks (registration from manual path, OS directory picker, Git clone, default directory) and passes them into the dialog as props; the dialog is purely a UI shell that calls back to the sidebar's existing `upsertProjectAndSelectMainSpace()`, `handleDirectoryPicker()`, `commitCustomPath()`, `handleGitCloneSubmit()`, etc. The sidebar header displays current project name / space subtitle / WorkTree badge; WorkTree archive/delete remains available by right-clicking the selected switch button or a WorkTree row inside the dialog. Add-project forms (manual path, Git clone) are rendered inside the dialog with mutually exclusive toggles; empty registry onboarding renders directly in the dialog with large primary buttons for `Add project folder…` / `Add project path…` / `Add project from Git…` / `Use default directory`. The dialog closes on successful registration/clone and selects the returned main space; on failure the current project is unchanged. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. Session, Studio child, hover-action, and delete-confirmation rows keep title/metadata content on single non-wrapping lines and ellipsize long text at narrow sidebar widths. **WorkTree archive/delete flow:** `confirmWorktreeAction()` optimistically merges the API response's `archivedSpaces` into local project state so the worktree space disappears immediately, then refreshes projects in the background. If the currently-selected space was the archived/deleted one, fallback preference is: (1) `main` space of the same project, (2) any other active non-missing space in that project, (3) API-provided `fallbackCwd`, (4) null. Deleted session ids are forwarded via `onSessionDeleted`. The sidebar **centralizes project and space context menu state** through `ProjectSpaceContextMenuState` (targeting a specific project or project+space pair). Context menu callbacks (`handleDialogProjectContextMenu`, `handleDialogSpaceContextMenu`) bridge dialog right-click events into the sidebar state so that edit/star/archive/WorkTree-delete actions operate on the right-clicked target, not just the currently selected workspace. **Space drag-reorder** is handled by `handleReorderSpaces` which optimistically updates local state and calls `PATCH /api/projects/[projectId]/spaces`, rolling back to pre-drag project state on failure. **Top workspace menu and metadata dialog** labels have been unified to \"星标/取消星标\" for both projects and spaces; the metadata dialog distinguishes the two with contextual hints (\"星标项目优先排序\" for projects vs \"仅用于标记，不影响空间排序\" for spaces). |\ndocs/modules/frontend.md:81:Session sidebar loading uses stable project/space selection identity, aborts obsolete requests, and ignores `AbortError`. Session list reloads when the selected project/space changes, when the projects registry first resolves that selection (URL `?session=` restore race), when AppShell bumps `refreshKey` (new session / agent end / fork), and when the manual refresh button runs. Reloads only hit the project-space active sessions route; they never request `/api/sessions/archived` and never depend on archive counts. If project/space ids are set before projects load, the sidebar waits instead of clearing the list; it does not depend on full `projects` array identity for every metadata-only project refresh. Known archived session ids can still open read-only chat detail through the session-by-id path (`ChatWindow` archived banner); that is independent of the sidebar list.\ndocs/architecture/overview.md:138:- Active inventory (`listAllSessions`, allowed-roots cwd discovery, delete-by-cwd, archive-all) and archived list inventory reuse `scanSessionInventory()` / `scanSessionMetadata()` from `lib/session-metadata-scanner.ts`. Results keep path/id/cwd/name/parent path, created/modified, messageCount, and a bounded `firstMessage` (API default 100 chars; UI titles still use the existing 50-char display normalization). Single-file failures are isolated; malformed/orphan files are omitted rather than failing the whole list.\ndocs/architecture/overview.md:155:- **Active Sidebar / list hot path:** `GET /api/projects/:projectId/spaces/:spaceId/sessions` and `GET /api/sessions` only read active inventory. They do **not** call `scanArchivedCwds()`, do **not** walk `sessions-archive/`, and do **not** return `archivedCounts` / `archivedCwds`. SessionSidebar only displays active history and archive **write** actions (single/batch/archive-all); it has no archived list, count, or unarchive UI.\ndocs/architecture/overview.md:156:- **Explicit archive capability (kept):** `POST /api/sessions/archive`, `archive-all`, `unarchive`, `GET /api/sessions/archived`, session-by-id detail with `archived: true` (read-only chat), and Usage when `usage.includeArchived` is enabled. `scanArchivedCwds()` remains available in `lib/session-reader.ts` for explicit helpers but is not wired into active list routes.\ndocs/architecture/overview.md:159:Archive-all matches target sessions by canonical cwd against the lightweight **active** inventory and must not call SDK `SessionManager.listAll()`. Removing archive I/O from the Sidebar path does **not** by itself rewrite active `listAllSessions()` into a directed per-space scan; that remains a separate performance concern.\ndocs/architecture/overview.md:163:- **In scope (lightweight only):** global/project **active** session lists, allowed-roots session cwd discovery, delete sessions for WorkTree cwd, archive-all (active inventory), and **explicit** archived session lists / Usage archive helpers that need name/count/firstMessage/modified.\ndocs/architecture/overview.md:164:- **Out of scope (may open full files):** session detail, context/branch tree, export, and Usage precise assistant-`usage` scans for selected sessions. Usage still builds its session set from the lightweight inventory (`listAllSessions` / archived helpers with `includeStudioChildren: true`) and must not depend on `allMessagesText`.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:00:00.578Z",
+            "toolCallId": "call-40428d80-9514-48d7-93c3-ba2a7537ae3e-21|fc_9afd9dd0-d6f2-91ea-95bd-5c8730a70c35_2",
+            "toolName": "bash",
+            "text": "docs/architecture/overview.md:10:  ├─ GET /api/sessions ───▶ reads ~/.pi/agent/sessions/    │\ndocs/architecture/overview.md:11:  ├─ GET /api/sessions/[id] reads .jsonl file directly     │\ndocs/architecture/overview.md:117:`SessionSidebar.confirmWorktreeAction()` optimistically merges the API response's `archivedSpaces` into local project state so the worktree space disappears immediately, then refreshes projects in the background. If the currently-selected space was the archived one, fallback preference: (1) `main` space of the same project, (2) any other active non-missing space, (3) API-provided `fallbackCwd`, (4) null.\ndocs/architecture/overview.md:131:- In-session branch uses `navigate_tree` within the same file. Multiple entries may share a `parentId`; switching branches calls `/api/sessions/[id]/context?leafId=`.\ndocs/architecture/overview.md:143:### Archive path\ndocs/architecture/overview.md:151:Archive/unarchive is a pure file move (`renameSync`) between `sessions/` and `sessions-archive/`. The session JSONL content is never modified. Active RPC sessions are destroyed before the file is moved.\ndocs/architecture/overview.md:153:Active sessions live under `sessions/`; archived sessions live under `sessions-archive/`. Both directories are enumerated by the same lightweight metadata scanner with different roots (`scanSessionInventory()` vs `scanSessionInventory({ rootDir: getSessionsArchiveDir() })`), but **call sites are separated**:\ndocs/architecture/overview.md:155:- **Active Sidebar / list hot path:** `GET /api/projects/:projectId/spaces/:spaceId/sessions` and `GET /api/sessions` only read active inventory. They do **not** call `scanArchivedCwds()`, do **not** walk `sessions-archive/`, and do **not** return `archivedCounts` / `archivedCwds`. SessionSidebar only displays active history and archive **write** actions (single/batch/archive-all); it has no archived list, count, or unarchive UI.\ndocs/architecture/overview.md:156:- **Explicit archive capability (kept):** `POST /api/sessions/archive`, `archive-all`, `unarchive`, `GET /api/sessions/archived`, session-by-id detail with `archived: true` (read-only chat), and Usage when `usage.includeArchived` is enabled. `scanArchivedCwds()` remains available in `lib/session-reader.ts` for explicit helpers but is not wired into active list routes.\ndocs/architecture/overview.md:213:~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl\ndocs/modules/api.md:13:| `projects/[projectId]/spaces/[spaceId]/sessions/` | GET | List **active** sessions explicitly linked to one project space. Response is `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` with **no** `archivedCounts` and **no** `scanArchivedCwds()` / `sessions-archive/` I/O on this hot path. Root `sessions` exclude Studio child audit roots but include child rows whose `studioChild.parentSessionId` belongs to a visible parent so the Sidebar can fold them under that parent. Optional `includeLegacy=1` returns exact-cwd legacy sessions separately without backfilling headers. Active inventory still comes from global `listAllSessions()` then filters by project/space link (not a per-space directed scan). |\ndocs/modules/api.md:15:| `sessions/` | GET | List lightweight **active** session summaries as `{ sessions }`. Does **not** scan `sessions-archive/` and does **not** return `archivedCwds` / `archivedCounts` (legacy CWD-picker fields; Project Registry is the project list source). Git/worktree metadata is omitted by default and only included with `includeGit=1`. YPI Studio child audit sessions are filtered unless `includeStudioChildren=1` is provided for debugging/audit views. In-repo `ypic` only consumes `body.sessions`. |\ndocs/modules/api.md:16:| `sessions/[id]/` | GET/PATCH/DELETE | Read session detail, rename, delete. Returns `archived: true` for archived sessions and includes optional `studioChild` metadata plus UI-only `studioChildDisplay` title projection for child audit sessions. |\ndocs/modules/api.md:17:| `sessions/[id]/context/` | GET | Get context for a specific `leafId`. |\ndocs/modules/api.md:18:| `sessions/[id]/changes/` | GET | List files changed by tracked agent file tools in this session from non-Git sidecar data. |\ndocs/modules/api.md:19:| `sessions/[id]/changes/file/` | GET | Return the stored unified diff or metadata-only reason for one tracked session-changed file. |\ndocs/modules/api.md:20:| `sessions/[id]/trellis-task/` | GET | Resolve the high-confidence Trellis task associated with one pi session, using session-local transcript evidence or exact per-session Trellis runtime pointers only. |\ndocs/modules/api.md:21:| `sessions/[id]/studio-task/` | GET | Resolve all YPI Studio tasks bound to one pi session (task `contextIds` contain an exact session context key) and return a multi-task widget/Chat projection (no artifact bodies or full transcripts). Binding is exclusive per task (one session-class owner), but a session may still bind many different tasks: multiple bound tasks no longer produce a fatal `ambiguous` — all candidates are returned sorted by priority. The response keeps backward-compatible `task` (primary task) and adds `tasks[]` (all bound candidates with `current`/`primary` flags), `primaryTaskKey`, `warnings`, and optional `diagnostics` for unbound transcript/runtime references. After exclusive transfer away from this session, the task leaves `tasks[]` even if the transcript still mentions it; transcript-only unbound tasks stay diagnostics-only and are excluded from `tasks[]`. Compact runtime projection per task includes `waiting_for_studio_children` / `needs_user` hints. Autocontinue fires only for the primary implementing task to prevent accidental multi-task dispatch. |\ndocs/modules/api.md:22:| `sessions/[id]/export/` | GET | Export session as Markdown. |\ndocs/modules/api.md:23:| `sessions/new/` | 410 | Deprecated route kept for compatibility. |\ndocs/modules/api.md:34:| `browser-share/sessions/[sessionId]/bind/` | POST/DELETE | Bind a one-time share code to the explicit target chat/session, replacing any previous session binding and writing a tombstone for the old share; DELETE unbinds the current share, fails active commands, and lets the extension release debugger through heartbeat/command control projection. |\ndocs/modules/api.md:35:| `browser-share/sessions/[sessionId]/state/` | GET | Return the current session-scoped Browser Share status, lifecycle/operator authorization projection, tab, snapshot, heartbeat/connection projection, active commands, recent terminal commands, and optional source/capture/persistent-debugger/screenshot metadata for `BrowserShareControl` and tools. |\ndocs/modules/api.md:36:| `browser-share/sessions/[sessionId]/commands/` | POST | Queue a Browser Share action command for the current session binding only; permission mode decides pending approval vs queued, and action execution requires the extension's persistent debugger to be attached. |\ndocs/modules/api.md:37:| `browser-share/sessions/[sessionId]/commands/[commandId]/approval/` | POST | Approve a pending command into `queued` or reject it into terminal `rejected`, notifying command waiters. |\ndocs/modules/api.md:54:| `sessions/archive/` | POST | Archive one or more sessions (moves to `sessions-archive/`). Sidebar write path only; success refreshes active list. |\ndocs/modules/api.md:55:| `sessions/unarchive/` | POST | Unarchive one or more sessions (moves back to `sessions/`). Kept as an explicit API; SessionSidebar no longer exposes a restore UI. |\ndocs/modules/api.md:56:| `sessions/archive-all/` | POST | Archive all **active** sessions for a cwd (does not re-process already-archived files). |\ndocs/modules/api.md:57:| `sessions/archived/` | GET | Explicit list of archived sessions for a cwd via `listArchivedSessionsForCwd()`. Not used by the SessionSidebar hot path. |\ndocs/modules/api.md:74:| `terminal/sessions/` | POST | Create a Web Terminal session for an authorized workspace cwd when the Terminal setting is enabled. Old local bodies `{ cwd, cols, rows }` still create local shells; `{ kind: \"ssh\", profileId, cwd, cols, rows }` creates an OpenSSH-backed SSH session when `terminal.ssh.enabled` is true. Responses include `kind` and optional SSH profile/target labels without secrets. |\ndocs/modules/api.md:75:| `terminal/sessions/[id]/` | DELETE | Close a Web Terminal session and terminate its process. |\ndocs/modules/api.md:76:| `terminal/sessions/[id]/events/` | GET | Stream Web Terminal output through SSE. |\ndocs/modules/api.md:77:| `terminal/sessions/[id]/input/` | POST | Write user input to a Web Terminal session. |\ndocs/modules/api.md:78:| `terminal/sessions/[id]/resize/` | POST | Resize a Web Terminal PTY. |\ndocs/modules/api.md:118:## Session List Performance\ndocs/modules/api.md:124:| `GET /api/sessions`, project-space sessions | active only: `listAllSessions()` → `scanSessionInventory()` over `sessions/` (no archive scan, no `archivedCounts`/`archivedCwds`) |\ndocs/modules/api.md:127:| `POST /api/sessions/archive-all` | direct active `scanSessionInventory()` then cwd filter + move |\ndocs/modules/api.md:128:| Explicit `GET /api/sessions/archived` | `listArchivedSessionsForCwd()` → `scanSessionInventory({ rootDir: sessions-archive })` |\ndocs/modules/api.md:131:`scanArchivedCwds()` still exists in `lib/session-reader.ts` as a header-only cwd/count helper for explicit/future callers, but **active list routes and SessionSidebar no longer call it**. Project visibility comes from Project Registry, not from archive cwd counts.\ndocs/modules/frontend.md:8:| `components/SessionSidebar.tsx` | Project Registry-driven project/space tree sidebar. It loads projects from `/api/projects` instead of synthesizing them from sessions, and lazy-loads **active** linked sessions for the selected project space via `GET /api/projects/:projectId/spaces/:spaceId/sessions` (response `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` only — no `archivedCounts`, no `sessions-archive/` scan). The sidebar does **not** load, expand, or restore archived session lists: there is no “已归档 (N)” block, no `archivedSessions` state, and no client call to `/api/sessions/archived` or unarchive. Empty space state is active-only (`No sessions found in this space`). Single/batch/`archive-all` write actions remain (POST archive / archive-all); success only refreshes the active list via `loadSessions(false)`, and archive-all confirmation counts the current active `filteredSessions.length`. It hides YPI Studio child audit sessions from ordinary root history by default while showing them as nested Studio audit rows under visible parents, shows exact-cwd legacy unassigned sessions separately, keeps WorkTree actions available for worktree spaces, and includes the integrated file explorer with a resizable session/explorer split. **Project/space selection** has been replaced from an inline dropdown to a compact top switch button (`选择项目空间` when empty, or `ProjectName / SpaceName` when selected). Clicking the button opens `ProjectSpaceSwitchDialog` for layered (left project list → right space list) browsing, search, and add-project flows inside a viewport-level modal dialog. The `SessionSidebar` owns all project/space state and callbacks (registration from manual path, OS directory picker, Git clone, default directory) and passes them into the dialog as props; the dialog is purely a UI shell that calls back to the sidebar's existing `upsertProjectAndSelectMainSpace()`, `handleDirectoryPicker()`, `commitCustomPath()`, `handleGitCloneSubmit()`, etc. The sidebar header displays current project name / space subtitle / WorkTree badge; WorkTree archive/delete remains available by right-clicking the selected switch button or a WorkTree row inside the dialog. Add-project forms (manual path, Git clone) are rendered inside the dialog with mutually exclusive toggles; empty registry onboarding renders directly in the dialog with large primary buttons for `Add project folder…` / `Add project path…` / `Add project from Git…` / `Use default directory`. The dialog closes on successful registration/clone and selects the returned main space; on failure the current project is unchanged. Main spaces without a custom display name render as `主空间` while keeping `spaceId: \"main\"`; the selected space header subtitle shows `空间：...` plus the current Git branch or WorkTree branch/base status, appends path-missing state when needed, and keeps full path/status details in the hover/focus tooltip. WorkTree badges remain compact (`WT` plus branch) with a tooltip for branch and base/unknown state. Session, Studio child, hover-action, and delete-confirmation rows keep title/metadata content on single non-wrapping lines and ellipsize long text at narrow sidebar widths. **WorkTree archive/delete flow:** `confirmWorktreeAction()` optimistically merges the API response's `archivedSpaces` into local project state so the worktree space disappears immediately, then refreshes projects in the background. If the currently-selected space was the archived/deleted one, fallback preference is: (1) `main` space of the same project, (2) any other active non-missing space in that project, (3) API-provided `fallbackCwd`, (4) null. Deleted session ids are forwarded via `onSessionDeleted`. The sidebar **centralizes project and space context menu state** through `ProjectSpaceContextMenuState` (targeting a specific project or project+space pair). Context menu callbacks (`handleDialogProjectContextMenu`, `handleDialogSpaceContextMenu`) bridge dialog right-click events into the sidebar state so that edit/star/archive/WorkTree-delete actions operate on the right-clicked target, not just the currently selected workspace. **Space drag-reorder** is handled by `handleReorderSpaces` which optimistically updates local state and calls `PATCH /api/projects/[projectId]/spaces`, rolling back to pre-drag project state on failure. **Top workspace menu and metadata dialog** labels have been unified to \"星标/取消星标\" for both projects and spaces; the metadata dialog distinguishes the two with contextual hints (\"星标项目优先排序\" for projects vs \"仅用于标记，不影响空间排序\" for spaces). |\ndocs/modules/frontend.md:9:| `components/ProjectSpaceSwitchDialog.tsx` | Viewport-level modal dialog (`role=\"dialog\"`, `aria-modal=\"true\"`) for layered project/space switching. Receives all state and callbacks as props from `SessionSidebar`. Left pane: search box, add-project toolbar (`Add project folder…`, `Add path…`, `From Git…`), scrollable sorted project list with pinned markers, current-selection highlight, space counts, and path ellipsis. Right pane: selected project header with root path, scrollable space list with Main/WT type badges, branch/base/path metadata, `路径缺失` disabled state, current-selection checkmark, hover highlighting, and right-click context menus on every card/row. **All project cards and all space rows (main + WorkTree) now support right-click context menus** via `onProjectContextMenu` / `onSpaceContextMenu` callbacks — the dialog fires these events and `SessionSidebar` owns the action state, so users can edit, star, archive, or delete any project/space without switching to it first. **Non-main spaces display a drag handle (`⋮⋮`)** and support HTML5 drag-and-drop reordering; the dialog manages local drag state (`dragId`/`dropTargetId`) with dashed-border drag affordance and calls `onReorderSpaces` on drop to persist the new order. Pinned projects and spaces show a visible `★` badge. Includes mutually exclusive inline add-project forms Includes mutually exclusive inline add-project forms (manual path with `Enter`/`Escape` handling, Git clone with parent directory picker + remote URL) that render under the toolbar when toggled. **Empty registry onboarding:** when `activeProjects.length === 0`, the right pane shows a centered onboarding card with large primary buttons for all four add-project paths, plus inline forms below the buttons. Supports keyboard navigation (focus trap, `Esc` close with clone-busy guard, `Tab`/`Shift+Tab` cycling), backdrop click close, focus restoration to trigger button on close, auto-focus search on open, and responsive max-width/max-height clamped to viewport with independent scroll areas. Uses proj…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:00:07.644Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — SessionSidebar 只描述 active list；去掉归档区块/unarchive/archived rows；写明 archive 写路径仍在、`archive-all` 只计 active；reload 不请求 `/api/sessions/archived`\n- `docs/modules/api.md` — project-space 响应无 `archivedCounts`/无 archive scan；`GET /api/sessions` 收敛为 `{ sessions }`；保留 archive/unarchive/archived API；Session List Performance 表与诚实性能边界已更新\n- `docs/architecture/overview.md` — Archive path 区分 active 热路径 vs 显式归档能力；Project Registry 为项目列表源；明确 `listAllSessions` 全量扫描未重构\n\n#### Verification\n\n- `rg archivedCwds|archivedCounts|scanArchivedCwds docs/modules docs/architecture/overview.md` — 仅出现“不再返回/不再调用/helper 仍存在”的说明，无“Sidebar/picker 消费 counts”旧契约\n- 对照代码：`app/api/sessions/route.ts` → `{ sessions }`；project-space route 注释/body 无 archive；`SessionSidebar` 无 archived loader/UI，archive 写动作 + `filteredSessions.length` 确认文案存在\n- 未改 `components/` / `app/` / `lib/` 生产代码\n\n#### Notes / Risks\n\n- `docs/modules/library.md` 仍描述 `scanArchivedCwds()` helper（合理保留，不在 DOC-01 文件范围）\n- 历史 research 文档未改（按计划不重写档案）\n- 主会话可标 DOC-01 done，进入 CHK-01；无需本子任务决策",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:00:07.646Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1228,
+        "tokens": 431,
+        "tokenSource": "usage",
+        "tps": 10.28,
+        "firstTokenAt": "2026-07-13T04:59:25.707Z",
+        "lastTokenAt": "2026-07-13T05:00:07.642Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-6abad9e0978c2677d2451cb6",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/implementer-6abad9e0978c2677d2451cb6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T04:58:56.479Z",
+        "finishedAt": "2026-07-13T05:00:07.648Z",
+        "updatedAt": "2026-07-13T05:00:07.648Z",
+        "itemCount": 50,
+        "messageCount": 2,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 178639,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59d7-b47c-7f24-b447-1010d1355869",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T04-58-56-508Z_019f59d7-b47c-7f24-b447-1010d1355869.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-292f0d5c99de8078309d73f9",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-13T05:00:56.738Z",
+      "finishedAt": "2026-07-13T05:02:42.018Z",
+      "runner": "sdk",
+      "childSessionId": "019f59d9-8a39-716f-99b6-0b5710cb7e70",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T05-00-56-761Z_019f59d9-8a39-716f-99b6-0b5710cb7e70.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "childSessionId": "019f59d9-8a39-716f-99b6-0b5710cb7e70",
+        "model": "cpa/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None（只 review，未改生产代码）\n\n#### Remaining Findings\n- **Blocker / High / Medium:** None\n- **Low:**\n  1. archive-all 确认文案比 HTML 原型少第二句（“归档后仍可通过保留的 API/已知链接恢复”）；计数口径正确\n  2. `package-lock.json` 有无关的 `typescript` 版本钉死，建议提交前剔除\n\n#### Verification\n- `npm run lint` — Pass  \n- `node_modules/.bin/tsc --noEmit` — Pass  \n- 热路径 `rg`（archivedCounts / archived list state / `/api/sessions/archived` / `scanArchivedCwds` in app/api）— 干净  \n- archive routes / `session-reader` helpers / Usage `includeArchived` — 未误伤  \n- 未扩 scope 改 `listAllSessions` / index  \n- 注意：本机 `:30141` 是全局 `ypi` 包进程，**不能**当本 worktree 的 API 验收证据\n\n#### Verdict\n**Pass** — 与 PRD/Design/原型批准范围一致；**REV-01 可标 done**。\n\n### Handoff\n| Item | Detail |\n| --- | --- |\n| **Artifacts** | `.ypi/tasks/20260713-122250-.../review.md` |\n| **Code changed** | none by checker |\n| **Risks** | global response 删字段影响未记录外部客户端（已披露）；active 全量扫描长尾仍在（范围外） |\n| **Main session** | 可选补文案 / 还原 package-lock；完成任务状态收尾；不要 commit |",
+      "model": "cpa/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/grok-4.5",
+          "arg": "cpa/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-13T05:00:56.738Z",
+        "updatedAt": "2026-07-13T05:02:42.018Z",
+        "eventCount": 1173,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None（只 review，未改生产代码）\n\n#### Remaining Findings\n- **Blocker / High / Medium:** None\n- **Low:**\n  1. archive-all 确认文案比 HTML 原型少第二句（“归档后仍可通过保留的 API/已知链接恢复”）；计数口径正确\n  2. `package-lock.json` 有无关的 `typescript` 版本钉死，建议提交前剔除\n\n#### Verification\n- `npm run lint` — Pass  \n- `node_modules/.bin/tsc --noEmit` — Pass  \n- 热路径 `rg`（archivedCounts / archived list state / `/api/sessions/archived` / `scanArchivedCwds` in app/api）— 干净  \n- archive routes / `session-reader` helpers / Usage `includeArchived` — 未误伤  \n- 未扩 scope 改 `listAllSessions` / index  \n- 注意：本机 `:30141` 是全局 `ypi` 包进程，**不能**当本 worktree 的 API 验收证据\n\n#### Verdict\n**Pass** — 与 PRD/Design/原型批准范围一致；**REV-01 可标 done**。\n\n### Handoff\n| Item | Detail |\n| --- | --- |\n| **Artifacts** | `.ypi/tasks/20260713-122250-.../review.md` |\n| **Code changed** | none by checker |\n| **Risks** | global response 删字段影响未记录外部客户端（已披露）；active 全量扫描长尾仍在（范围外） |\n| **Main session** | 可选补文案 / 还原 package-lock；完成任务状态收尾；不要 commit |",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:02:27.121Z",
+            "text": "磁盘源码正确；本地 30141 跑的是全局 `ypi` 包，不能用来验收本 worktree。正在写入 `review.md`。",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-13T05:02:27.122Z",
+            "toolCallId": "call-10d077c9-abee-41be-8e1f-9d5601bdb196-25|fc_04bd5d96-c210-9cb8-b44a-7a38823e8a49_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-114440/.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/review.md\",\n  \"content\": \"# Review：侧栏 session 列表热路径移除归档读取与展示\\n\\n**Reviewer:** checker（检查员）  \\n**Subtask:** REV-01  \\n**Date:** 2026-07-13  \\n**Verdict:** **Pass**\\n\\n## Scope Reviewed\\n\\n对照 `plan-review.md` / `prd.md` / `design.md` / `implement.md` / `checks.md` / HTML 原型，审阅工作区 diff：\\n\\n| File | Change summary |\\n| --- | --- |\\n| `app/api/projects/.../sessions/route.ts` | 移除 `scanArchivedCwds` import、archive timing/count、`archivedCounts` 响应字段 |\\n| `app/api/sessions/route.ts` | 移除 archive 扫描；响应收敛为 `{ sessions }` |\\n| `components/SessionSidebar.tsx` | 删除 archived state/loader/effect/section/`ArchivedSessionItem`/unarchive；保留 archive 写动作 |\\n| `docs/modules/api.md` | 契约与诚实性能边界已更新 |\\n| `docs/modules/frontend.md` | Sidebar 无归档浏览入口已更新 |\\n| `docs/architecture/overview.md` | Archive path 与 active/explicit 分离已更新 |\\n| `package-lock.json` | **无关** typescript 版本钉死（见 low） |\\n\\n未改：`lib/session-reader.ts` archive helpers、archive/unarchive/archive-all/archived routes、Usage `includeArchived` 实现。\\n\\n## Requirements Coverage\\n\\n| FR / 验收点 | 结论 |\\n| --- | --- |\\n| FR-1 热路径零归档扫描 | **Pass** — project-space 与 global list 均不再 import/call `scanArchivedCwds`；响应无 `archivedCounts`/`archivedCwds` |\\n| FR-2 侧栏只展示 active | **Pass** — 无“已归档 (N)”区块、归档行、恢复入口；空态仅看 `filteredSessions.length === 0` |\\n| FR-3 归档动作可用 | **Pass** — single/batch/archive-all 仍 POST 既有 API；成功后仅 `loadSessions(false)`；archive-all 计数为 `filteredSessions.length` |\\n| FR-4 低频归档能力保留 | **Pass** — routes/helpers/Usage 路径仍在；`scanArchivedCwds` 函数保留于 `session-reader` |\\n| FR-5 文档与验证 | **Pass** — 三份模块/架构文档与实现一致；lint/tsc 通过；目标符号检索干净 |\\n| 不扩 scope 改 active inventory | **Pass** — 仍 `listAllSessions()` 后 filter；无 index/cache/定向扫描重构 |\\n| UI 原型一致性 | **Pass（小差异见 low）** — 信息结构删除与计数口径一致；确认框第二句文案略短于原型 |\\n\\n## Code Review Notes\\n\\n### API\\n\\n- Project-space body 现为 `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }`，**不保留**空 `archivedCounts` 兼容壳，符合设计。\\n- Global `GET /api/sessions` 仅 `{ sessions }`；仓内 `bin/ypic.js` 只读 `body.sessions`，兼容。\\n- Active 过滤、legacy、Studio child 嵌套逻辑未被动到。\\n\\n### Frontend\\n\\n- 归档展示相关 state/effect/component 一次性删除，无半删除残留。\\n- `rg`：`components`/`hooks` 无 `/api/sessions/archived` 调用。\\n- archive 写路径：`handleArchiveSession` / batch / all 均成功后 `loadSessions(false)`。\\n- archive-all 文案：`确认归档 N 个当前会话？`，N=`filteredSessions.length`，不再加已有归档数。\\n\\n### Docs\\n\\n- 明确 Sidebar 无归档浏览、global 字段删除、active 全量扫描仍存在；保留显式 archive/Usage 能力说明。\\n- `docs/research/session-archive-design.md` 仍含旧字段描述——属研究档案，设计允许不改。\\n\\n### Non-goals / boundary\\n\\n- **不因** active `listAllSessions()` 全量扫描残余长尾判 fail。\\n- 本变更只保证去掉 archive 热路径 I/O 与侧栏归档投影。\\n\\n## Findings Fixed\\n\\nNone（检查员未改生产代码，按任务要求只 review）。\\n\\n## Remaining Findings\\n\\n### Blocker\\n\\nNone.\\n\\n### High\\n\\nNone.\\n\\n### Medium\\n\\nNone.\\n\\n### Low\\n\\n1. **Archive-all 确认文案与 HTML 原型略有差异**  \\n   原型/ design 建议：`确认归档 N 个当前会话？归档后仍可通过保留的 API/已知链接恢复。`  \\n   实现：`确认归档 N 个当前会话？`  \\n   计数口径正确，不暗示处理已有归档；不阻塞。若要像素级对齐原型可补第二句（不得承诺侧栏恢复入口）。\\n\\n2. **`package-lock.json` 无关变更**  \\n   `typescript` 从 `^5.9.3` 钉为 `5.9.3`。与本任务无关，提交前建议还原或单独处理，避免污染本功能 diff。\\n\\n## Capability Regression Check\\n\\n| Capability | Status |\\n| --- | --- |\\n| `POST /api/sessions/archive` | 保留；Sidebar 仍调用 |\\n| `POST /api/sessions/archive-all` | 保留；Sidebar 仍调用 |\\n| `POST /api/sessions/unarchive` | 路由保留；Sidebar 不再暴露 UI（产品取舍） |\\n| `GET /api/sessions/archived` | 路由保留；Sidebar 不调用 |\\n| `GET /api/sessions/[id]` archived detail | 未改；docs 仍说明只读详情 |\\n| `scanArchivedCwds` / `listArchivedSessionsForCwd` / `listAllArchivedSessions*` | `lib/session-reader.ts` 保留 |\\n| Usage `includeArchived` | `lib/usage-stats.ts` + settings/API 未改 |\\n| Active inventory / project-session index | 未重构 |\\n\\n## Verification\\n\\n| Check | Result |\\n| --- | --- |\\n| `npm run lint` | Pass |\\n| `node_modules/.bin/tsc --noEmit` | Pass (`tsc_exit=0`) |\\n| 热路径 `rg archivedCounts\\\\|archivedSessions\\\\|loadArchivedSessions\\\\|ArchivedSessionItem` | 仅 project-space 注释命中 `archivedCounts` |\\n| `rg /api/sessions/archived` in `components`/`hooks` | 无命中 |\\n| `rg scanArchivedCwds` in `app/api` | 无命中（仅 `lib/session-reader.ts` 定义） |\\n| 保留能力 `listArchivedSessionsForCwd` / Usage includeArchived | 仍存在 |\\n| `git diff` 范围 | 无 session-reader / archive routes / usage 误伤 |\\n| Live API smoke on `:30141` | **不可作为本 worktree 证据**：该进程 cwd 为全局包 `/opt/homebrew/lib/node_modules/@alan-zhao/yolk-pi-web`（`ypi`），非本 worktree；磁盘源码已正确收敛响应 |\\n\\n说明：浏览器 Network 手工 smoke（切空间/归档动作）依赖本 worktree 的 `npm run dev`；静态与源码证据已充分覆盖 FR。若主会话尚未在本 worktree dev 上做 Network 确认，建议合并前补一次，但**不作为 blocker**（源码路径上已无 archived list 请求点）。\\n\\n## UI Gate\\n\\n- HTML 原型已交付：`session-sidebar-without-archive-prototype.html`\\n- 实现与批准范围一致：无归档区块、空态 active-only、archive 写入口保留、archive-all 仅计 active\\n- 小文案差异见 Low-1\\n\\n## Verdict\\n\\n**Pass**\\n\\n实现完整覆盖批准范围：侧栏/list 热路径剥离 archive 扫描与展示，归档写与显式读/Usage 能力未误伤，未扩 scope 到 active inventory 重构。文档与 lint/tsc 达标。\\n\\n### REV-01\\n\\n可标 **done**。实现计划 7/7 可视为完成（在主会话完成 artifact/状态机收尾后）。\\n\\n## Handoff for Main Session\\n\\n- **Artifacts produced:** 本 `review.md`\\n- **Production code changed by checker:** none\\n- **Validation run:** lint pass, tsc pass, targeted rg pass\\n- **Remaining risks:** global `/api/sessions` 字段删除可能影响未记录外部客户端（计划已披露）；active 全量扫描长尾仍在（范围外）\\n- **Decisions needed:** 无产品决策。可选：是否补齐 archive-all 第二句文案；是否从本任务 diff 剔除 `package-lock.json`\\n- **Next:** 主会话可将 REV-01 → done，任务进入 completed / 用户验收；不要 commit（本成员模式禁止）\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-13T05:02:27.140Z",
+            "toolCallId": "call-10d077c9-abee-41be-8e1f-9d5601bdb196-25|fc_04bd5d96-c210-9cb8-b44a-7a38823e8a49_0",
+            "toolName": "write",
+            "text": "Successfully wrote 5160 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260713-114440/.ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-13T05:02:42.016Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None（只 review，未改生产代码）\n\n#### Remaining Findings\n- **Blocker / High / Medium:** None\n- **Low:**\n  1. archive-all 确认文案比 HTML 原型少第二句（“归档后仍可通过保留的 API/已知链接恢复”）；计数口径正确\n  2. `package-lock.json` 有无关的 `typescript` 版本钉死，建议提交前剔除\n\n#### Verification\n- `npm run lint` — Pass  \n- `node_modules/.bin/tsc --noEmit` — Pass  \n- 热路径 `rg`（archivedCounts / archived list state / `/api/sessions/archived` / `scanArchivedCwds` in app/api）— 干净  \n- archive routes / `session-reader` helpers / Usage `includeArchived` — 未误伤  \n- 未扩 scope 改 `listAllSessions` / index  \n- 注意：本机 `:30141` 是全局 `ypi` 包进程，**不能**当本 worktree 的 API 验收证据\n\n#### Verdict\n**Pass** — 与 PRD/Design/原型批准范围一致；**REV-01 可标 done**。\n\n### Handoff\n| Item | Detail |\n| --- | --- |\n| **Artifacts** | `.ypi/tasks/20260713-122250-.../review.md` |\n| **Code changed** | none by checker |\n| **Risks** | global response 删字段影响未记录外部客户端（已披露）；active 全量扫描长尾仍在（范围外） |\n| **Main session** | 可选补文案 / 还原 package-lock；完成任务状态收尾；不要 commit |",
+            "model": "cpa/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-13T05:02:42.017Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1093,
+        "tokens": 397,
+        "tokenSource": "usage",
+        "tps": 10.7,
+        "firstTokenAt": "2026-07-13T05:02:04.896Z",
+        "lastTokenAt": "2026-07-13T05:02:42.016Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-292f0d5c99de8078309d73f9",
+        "taskId": "20260713-122250-侧栏-session-列表热路径移除归档读取与展示",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260713-122250-_-session-/checker-292f0d5c99de8078309d73f9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-13T05:00:56.738Z",
+        "finishedAt": "2026-07-13T05:02:42.017Z",
+        "updatedAt": "2026-07-13T05:02:42.017Z",
+        "itemCount": 59,
+        "messageCount": 3,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 103951,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f59d9-8a39-716f-99b6-0b5710cb7e70",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260713-114440--/2026-07-13T05-00-56-761Z_019f59d9-8a39-716f-99b6-0b5710cb7e70.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-13T04:31:01.518Z",
+      "contextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-13T04:53:07.428Z",
+      "contextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+      "inputHash": "5e2a80cb94cd2934d3216017",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-13T05:05:43.203Z",
+    "archiveReason": "用户请求归档",
+    "knowledgeEntryId": "20260713-130543-侧栏-session-列表热路径移除归档读取与展示",
+    "knowledgePath": ".ypi/knowledge/20260713-130543-侧栏-session-列表热路径移除归档读取与展示.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-13T04:30:58.176Z",
+    "maxConcurrency": 3,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 3,
+      "groups": [
+        {
+          "id": "G-UI",
+          "title": "UI 原型审批",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "UI-01"
+          ]
+        },
+        {
+          "id": "G-IMPL",
+          "title": "API+Sidebar 并行实现",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "API-01",
+            "API-02",
+            "FE-01"
+          ]
+        },
+        {
+          "id": "G-DOC",
+          "title": "文档",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "DOC-01"
+          ]
+        },
+        {
+          "id": "G-CHK",
+          "title": "检查",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "CHK-01"
+          ]
+        },
+        {
+          "id": "G-REV",
+          "title": "评审",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "REV-01"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "UI-01",
+        "title": "生成并审批侧栏去归档 HTML 原型",
+        "phase": "ui",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          ".ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/session-sidebar-without-archive-prototype.html",
+          ".ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/ui.md",
+          ".ypi/tasks/20260713-122250-侧栏-session-列表热路径移除归档读取与展示/plan-review.md"
+        ],
+        "acceptance": [
+          "存在真实 HTML 文件而非纯 Markdown 线框",
+          "原型覆盖正常、空态、归档操作与窄侧栏",
+          "用户明确批准原型和计划"
+        ],
+        "validation": [
+          "在浏览器打开原型检查浅色/深色和窄侧栏",
+          "确认 ui.md 与 plan-review.md 使用相对链接指向原型"
+        ],
+        "risks": [
+          "当前 architect 子会话没有 Studio 派发工具",
+          "删除恢复入口必须在审批时明确"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "API-01",
+        "title": "移除 project-space sessions 热路径归档扫描",
+        "phase": "implement",
+        "order": 2,
+        "dependsOn": [
+          "UI-01"
+        ],
+        "dependencies": [
+          "UI-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts"
+        ],
+        "acceptance": [
+          "route 不调用 scanArchivedCwds",
+          "响应不含 archivedCounts",
+          "active/legacy/Studio child 契约保持"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "curl project-space route 并检查响应字段"
+        ],
+        "risks": [
+          "误改 active listAllSessions 路径",
+          "遗留 archive timing 文档或计数"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "API-02",
+        "title": "收敛 global sessions 响应并移除归档扫描",
+        "phase": "implement",
+        "order": 3,
+        "dependsOn": [
+          "UI-01"
+        ],
+        "dependencies": [
+          "UI-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "app/api/sessions/route.ts",
+          "bin/ypic.js"
+        ],
+        "acceptance": [
+          "GET /api/sessions 返回 sessions 且不扫描 archive",
+          "includeGit/includeStudioChildren 保持",
+          "ypic recent-session 查找兼容"
+        ],
+        "validation": [
+          "仓库搜索 archivedCwds/archivedCounts 消费方",
+          "curl /api/sessions",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "未记录外部客户端依赖已删除字段"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "FE-01",
+        "title": "删除 Sidebar 归档展示与读取状态",
+        "phase": "implement",
+        "order": 4,
+        "dependsOn": [
+          "UI-01"
+        ],
+        "dependencies": [
+          "UI-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "components/SessionSidebar.tsx"
+        ],
+        "acceptance": [
+          "侧栏无已归档区块和 /api/sessions/archived 请求",
+          "单个/批量/全部归档入口保留",
+          "归档后 active row 消失且列表刷新",
+          "空态与 archive-all 数量正确"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "rg archived state/loader/component",
+          "浏览器 Network 和交互 smoke"
+        ],
+        "risks": [
+          "删除 ArchivedSessionItem 时误伤 active SessionTreeItem",
+          "archive-all 文案仍暗示已有归档计数"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "DOC-01",
+        "title": "同步归档热路径与侧栏文档",
+        "phase": "implement",
+        "order": 5,
+        "dependsOn": [
+          "API-01",
+          "API-02",
+          "FE-01"
+        ],
+        "dependencies": [
+          "API-01",
+          "API-02",
+          "FE-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/api.md",
+          "docs/architecture/overview.md"
+        ],
+        "acceptance": [
+          "文档不再声称 Sidebar/picker 消费 archive counts",
+          "文档保留显式归档能力说明",
+          "性能边界诚实"
+        ],
+        "validation": [
+          "rg archivedCwds archivedCounts docs/modules docs/architecture/overview.md",
+          "人工对照实际响应和组件"
+        ],
+        "risks": [
+          "历史 research 文档被误当现行契约；无需重写归档研究档案"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "CHK-01",
+        "title": "执行归档热路径与回归检查",
+        "phase": "checks",
+        "order": 6,
+        "dependsOn": [
+          "DOC-01"
+        ],
+        "dependencies": [
+          "DOC-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "checks.md",
+          "components/SessionSidebar.tsx",
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+          "app/api/sessions/route.ts"
+        ],
+        "acceptance": [
+          "lint 与 typecheck 通过",
+          "手工 smoke 有记录",
+          "无 blocker/high 回归"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "checks.md 全项"
+        ],
+        "risks": [
+          "仅依赖静态检查会遗漏浏览器 Network 行为"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "REV-01",
+        "title": "独立评审范围与归档能力边界",
+        "phase": "review",
+        "order": 7,
+        "dependsOn": [
+          "CHK-01"
+        ],
+        "dependencies": [
+          "CHK-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/SessionSidebar.tsx",
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+          "app/api/sessions/route.ts",
+          "docs/modules/frontend.md",
+          "docs/modules/api.md",
+          "docs/architecture/overview.md",
+          "checks.md"
+        ],
+        "acceptance": [
+          "实现与审批原型一致",
+          "无未处理 blocker/high finding",
+          "验证和性能边界说明完整"
+        ],
+        "validation": [
+          "审阅 git diff",
+          "复核 checks.md 与浏览器/API 证据"
+        ],
+        "risks": [
+          "将 active 全量扫描既有问题误判为本任务失败或顺手扩 scope"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-13T05:05:43.203Z",
+    "activeSubtaskId": "REV-01",
+    "activeSubtaskIds": [
+      "REV-01"
+    ],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 1,
+      "blocked": 0,
+      "failed": 0,
+      "done": 6,
+      "skipped": 0
+    },
+    "subtasks": {
+      "UI-01": {
+        "id": "UI-01",
+        "status": "done",
+        "updatedAt": "2026-07-13T04:54:38.300Z",
+        "startedAt": "2026-07-13T04:54:34.596Z",
+        "finishedAt": "2026-07-13T04:54:38.300Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-13T04:54:34.596Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "validation": [
+          "HTML 原型 session-sidebar-without-archive-prototype.html 已交付",
+          "ui.md / plan-review.md 已链接原型",
+          "用户明确批准计划与原型"
+        ]
+      },
+      "API-01": {
+        "id": "API-01",
+        "status": "done",
+        "updatedAt": "2026-07-13T04:57:07.523Z",
+        "startedAt": "2026-07-13T04:54:44.293Z",
+        "finishedAt": "2026-07-13T04:57:07.522Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-9b742fbdc22992f35e83c452"
+        ],
+        "lastRunId": "implementer-9b742fbdc22992f35e83c452",
+        "claimedAt": "2026-07-13T04:54:44.293Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "summary": "### Implementation Complete — API-01\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts`\n  - Removed `scanArchivedCwds` import\n  - Removed archive timing stage (`archive`), `archiveCwds` count, pathKey aggregation\n  - Response body is now `{ sessions, legacyUnassigned, studioChildrenByParentSessionId }` (no `archivedCounts`)\n  - Active list / legacy / Studio child / other timing stages unchanged\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- Hot-path search: no `scanArchivedCwds` / functional `archivedCounts` (only a clarifying comment)\n\nNote: first `npm install` skipped devDeps; re-ran with `--include=dev` so eslint/tsc were available.\n\n#### Notes / Risks\n\n- Curl smoke of live project-space route not run here (no assumed running server / project ids).\n- Sidebar still expects `archivedCounts` until FE-01; temporary type/runtime mismatch is expected while API-01/FE-01 run in parallel.\n- `scanArchivedCwds` remains in `lib/session-reader.ts` for explicit archive paths.\n\n#### Decisions needed from main session\n\n- None for API-01. Proceed with API-02 / FE-01 / DOC-01 as planned."
+      },
+      "API-02": {
+        "id": "API-02",
+        "status": "done",
+        "updatedAt": "2026-07-13T04:58:42.773Z",
+        "startedAt": "2026-07-13T04:54:44.293Z",
+        "finishedAt": "2026-07-13T04:58:42.772Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-76bbf80ffe9ac71327442a7f"
+        ],
+        "lastRunId": "implementer-76bbf80ffe9ac71327442a7f",
+        "claimedAt": "2026-07-13T04:54:44.293Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "summary": "### Implementation Complete (API-02)\n\n#### Files Changed\n\n- `app/api/sessions/route.ts` — 删除 `scanArchivedCwds` import/调用；`GET /api/sessions` 响应收敛为 `{ sessions }`；保留 `includeGit` / `includeStudioChildren` 查询语义。\n- `bin/ypic.js` — 只读确认，未改动（仅消费 `body.sessions`）。\n\n#### Verification\n\n- 仓内消费方：`archivedCwds`/`archivedCounts` 在 `app/api/sessions/route.ts` 与 `bin/ypic.js` 已无引用；helpers 仍在 `lib/session-reader.ts`；`SessionSidebar` / project-space 留给其他子任务。\n- `npm run lint` — 通过\n- `node_modules/.bin/tsc --noEmit` — 通过\n- 静态确认：`app/api/sessions/route.ts` 不再出现 `scanArchivedCwds`\n- 未跑 live `curl`（本环境未启动 dev server）；逻辑上响应已为 `{ sessions }`\n\n#### Notes / Risks\n\n- 文档（`docs/modules/api.md`、`docs/architecture/overview.md`）仍描述旧字段；属 **DOC-01**。\n- 未记录外部客户端若依赖 `archivedCwds`/`archivedCounts` 会受影响；仓内无消费者。\n- 未改 archive helpers / archived API / Usage。\n- 本 worktree 的 `node_modules` 原先不完整，为跑校验安装了 eslint/typescript；未 commit。"
+      },
+      "FE-01": {
+        "id": "FE-01",
+        "status": "done",
+        "updatedAt": "2026-07-13T04:57:06.686Z",
+        "startedAt": "2026-07-13T04:54:44.293Z",
+        "finishedAt": "2026-07-13T04:57:06.684Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-bced3a1c1fd30d369553ea4e"
+        ],
+        "lastRunId": "implementer-bced3a1c1fd30d369553ea4e",
+        "claimedAt": "2026-07-13T04:54:44.293Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/SessionSidebar.tsx` — removed archive display/read path:\n  - deleted state: `archivedCounts`, `archivedCwds`, `archivedSessions`, `archivedExpanded`\n  - deleted `loadArchivedSessions`, `handleUnarchiveSession`, expand effect, archived section UI, and `ArchivedSessionItem`\n  - `loadSessions` only hydrates active `sessions`\n  - single/batch/archive-all still call existing write APIs and refresh via `loadSessions(false)`\n  - empty state: active-only (`filteredSessions.length === 0`)\n  - archive-all confirm: `确认归档 N 个当前会话？` with `N = filteredSessions.length`\n\n#### Verification\n\n- `npm run lint` — pass\n- `node_modules/.bin/tsc --noEmit` — pass\n- `rg archivedCounts|archivedCwds|archivedSessions|archivedExpanded|loadArchivedSessions|ArchivedSessionItem` in `components/SessionSidebar.tsx` — no hits\n- `rg /api/sessions/archived` in `components`/`hooks` — no hits\n- archive write handlers still present (`/api/sessions/archive`, `/api/sessions/archive-all`)\n\n#### Notes / Risks\n\n- Browser Network/UI smoke not run here (belongs to CHK-01 after DOC-01).\n- If API-01 is incomplete and the project-space route still returns `archivedCounts`, FE ignores it (safe).\n- No sidebar unarchive path remains by design; archived storage/API/detail/Usage unchanged.\n- No commit performed."
+      },
+      "DOC-01": {
+        "id": "DOC-01",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:00:07.657Z",
+        "startedAt": "2026-07-13T04:58:51.352Z",
+        "finishedAt": "2026-07-13T05:00:07.655Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-6abad9e0978c2677d2451cb6"
+        ],
+        "lastRunId": "implementer-6abad9e0978c2677d2451cb6",
+        "claimedAt": "2026-07-13T04:58:51.352Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/modules/frontend.md` — SessionSidebar 只描述 active list；去掉归档区块/unarchive/archived rows；写明 archive 写路径仍在、`archive-all` 只计 active；reload 不请求 `/api/sessions/archived`\n- `docs/modules/api.md` — project-space 响应无 `archivedCounts`/无 archive scan；`GET /api/sessions` 收敛为 `{ sessions }`；保留 archive/unarchive/archived API；Session List Performance 表与诚实性能边界已更新\n- `docs/architecture/overview.md` — Archive path 区分 active 热路径 vs 显式归档能力；Project Registry 为项目列表源；明确 `listAllSessions` 全量扫描未重构\n\n#### Verification\n\n- `rg archivedCwds|archivedCounts|scanArchivedCwds docs/modules docs/architecture/overview.md` — 仅出现“不再返回/不再调用/helper 仍存在”的说明，无“Sidebar/picker 消费 counts”旧契约\n- 对照代码：`app/api/sessions/route.ts` → `{ sessions }`；project-space route 注释/body 无 archive；`SessionSidebar` 无 archived loader/UI，archive 写动作 + `filteredSessions.length` 确认文案存在\n- 未改 `components/` / `app/` / `lib/` 生产代码\n\n#### Notes / Risks\n\n- `docs/modules/library.md` 仍描述 `scanArchivedCwds()` helper（合理保留，不在 DOC-01 文件范围）\n- 历史 research 文档未改（按计划不重写档案）\n- 主会话可标 DOC-01 done，进入 CHK-01；无需本子任务决策"
+      },
+      "CHK-01": {
+        "id": "CHK-01",
+        "status": "done",
+        "updatedAt": "2026-07-13T05:00:34.384Z",
+        "startedAt": "2026-07-13T05:00:14.404Z",
+        "finishedAt": "2026-07-13T05:00:34.384Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-13T05:00:14.404Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d",
+        "validation": [
+          "npm run lint passed",
+          "tsc --noEmit passed",
+          "hot-path files free of archivedCounts/archivedSessions/loadArchivedSessions",
+          "no /api/sessions/archived client calls",
+          "no scanArchivedCwds in app/api",
+          "archive write actions retained; archive-all uses filteredSessions.length",
+          "docs updated for active-only list path"
+        ]
+      },
+      "REV-01": {
+        "id": "REV-01",
+        "status": "running",
+        "updatedAt": "2026-07-13T05:00:38.934Z",
+        "startedAt": "2026-07-13T05:00:38.934Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-13T05:00:38.934Z",
+        "claimedByContextId": "pi_019f59ad-31ce-7b55-95a7-152dc6aaec2d"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-13T04:54:34.596Z",
+        "subtaskId": "UI-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T04:54:38.300Z",
+        "subtaskId": "UI-01",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-13T04:54:44.293Z",
+        "subtaskId": "API-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T04:54:44.293Z",
+        "subtaskId": "API-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T04:54:44.293Z",
+        "subtaskId": "FE-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T04:58:51.352Z",
+        "subtaskId": "DOC-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:00:14.404Z",
+        "subtaskId": "CHK-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-13T05:00:34.384Z",
+        "subtaskId": "CHK-01",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-13T05:00:38.934Z",
+        "subtaskId": "REV-01",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}
