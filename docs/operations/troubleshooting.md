@@ -27,9 +27,20 @@ Use `scripts/start-pi-web-proxy.sh` or `scripts/start-pi-web-proxy.ps1` when pro
 - Stale SSH temp dirs are named `ypi-terminal-ssh-*` under the OS temp directory and are swept on server startup if older than 24h. If a crashed dev server leaves files behind, confirm they use that prefix before manually deleting them.
 - Run `node scripts/test-terminal-ssh-config.mjs` for dry-run checks covering config defaults, redaction boundaries, HostKeyAlias generation, ProxyCommand gates, proxy command secret handling, and temp cleanup assumptions.
 
-## ## OpenCode Go Auto Failover & Account Recovery
+## Managed API-key accounts (OpenCode Go, xAI)
 
-The optional OpenCode Go auto-failover feature (`opencodeGo.autoFailover` in `~/.pi/agent/pi-web.json`) automatically switches the globally active managed API-key account when a request fails with a quota/billing error or a permanent `Invalid/Missing API key` error. It does **not** trigger on transient 429/rate-limit, network errors, or 5xx.
+Allowlisted providers store multi-account metadata and secrets under `~/.pi/agent/auth-api-key-accounts/<provider>/`:
+
+- OpenCode Go: `~/.pi/agent/auth-api-key-accounts/opencode-go/`
+- xAI: `~/.pi/agent/auth-api-key-accounts/xai/`
+
+Each directory holds `accounts.json` (masked previews, fingerprints, active id, optional disable metadata) and per-account `<accountId>.json` secret files (mode 0600). Metadata never contains plaintext keys. Accounts are provider-scoped; matching fingerprints across providers are not shared or deduped.
+
+Both providers support **manual** multi-key management in Settings → Models (add/edit/activate/enable/disable/delete/reveal). Only OpenCode Go has optional automatic failover (`opencodeGo.autoFailover`). **xAI does not auto-failover** — users must activate the desired key manually.
+
+## OpenCode Go Auto Failover & Account Recovery
+
+The optional OpenCode Go auto-failover feature (`opencodeGo.autoFailover` in `~/.pi/agent/pi-web.json`) automatically switches the globally active **OpenCode Go** managed API-key account when a request fails with a quota/billing error or a permanent `Invalid/Missing API key` error. It does **not** apply to xAI, and it does **not** trigger on transient 429/rate-limit, network errors, or 5xx.
 
 ### Symptoms when failover triggers
 
@@ -64,9 +75,11 @@ When an account is permanently unusable (invalid/missing API key), the failover 
 
 ### Verifying account state from the filesystem
 
-Managed account metadata lives at `~/.pi/agent/auth-api-key-accounts/opencode-go/`:
+OpenCode Go failover inspects managed account metadata at `~/.pi/agent/auth-api-key-accounts/opencode-go/`:
 - `accounts.json` — metadata for all accounts, including `disabled`, `disabledReason`, `disabledBy`, `autoDisabledReason`, `enabledAt`, `enabledBy`.
 - `<accountId>.json` (mode 0600) — per-account secret; never inspect this file casually.
+
+xAI multi-key state (manual only) uses the same layout under `~/.pi/agent/auth-api-key-accounts/xai/`; it is independent of the OpenCode Go store and is not read by auto-failover.
 
 A disabled account has `disabled: true` in `accounts.json`. An enabled account either has `disabled: false` or the field is absent (old metadata defaults to enabled).
 

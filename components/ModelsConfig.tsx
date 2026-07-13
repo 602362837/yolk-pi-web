@@ -2107,6 +2107,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     setAddActivate(true);
     setAddSaving(false);
     setEditAccount(null);
+    setEditDisplayName("");
+    setEditDescription("");
+    setEditApiKey("");
+    setEditSaving(false);
+    setEditError(null);
     setDeleteConfirm(null);
     setDeleteDeleting(false);
     setToast(null);
@@ -2613,7 +2618,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                         borderColor: isBusy ? "var(--border)" : "rgba(74,222,128,0.3)",
                         cursor: isBusy ? "not-allowed" : "pointer",
                       }}
-                      title="Re-enable this account so it can be activated or used for failover"
+                      title="Re-enable this account so it can be activated"
                     >
                       {enablingId === account.accountId ? "Enabling…" : "Enable"}
                     </button>
@@ -2627,7 +2632,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                         borderColor: isBusy ? "var(--border)" : "rgba(245,158,11,0.3)",
                         cursor: isBusy ? "not-allowed" : "pointer",
                       }}
-                      title={isActive ? "Disable this account — you will need to select a replacement or confirm clearing the active key" : "Disable this account to exclude it from failover and activation"}
+                      title={isActive ? "Disable this account — you will need to select a replacement or confirm clearing the active key" : "Disable this account so it cannot be activated until re-enabled"}
                     >
                       Disable
                     </button>
@@ -2913,13 +2918,13 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                 <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
                   {isDisablingActive ? (
                     <>
-                      你正在禁用当前激活的 OpenCode Go 账号 <strong style={{ color: "var(--text)" }}>{disableConfirm.displayName}</strong>。
-                      禁用后该账号不再参与 failover，也不能被激活。
+                      你正在禁用当前激活的 {provider.displayName} 账号 <strong style={{ color: "var(--text)" }}>{disableConfirm.displayName}</strong>。
+                      禁用后该账号不能被激活，直到重新 Enable。
                     </>
                   ) : (
                     <>
                       确定要禁用 &ldquo;{disableConfirm.displayName}&rdquo;？
-                      禁用后该账号不会参与自动 failover，也不能被激活，直到重新 Enable。
+                      禁用后该账号不能被激活，直到重新 Enable。
                     </>
                   )}
                 </div>

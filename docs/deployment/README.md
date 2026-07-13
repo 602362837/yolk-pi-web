@@ -155,7 +155,7 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent-data ypi
 | `settings.json` | pi settings, including default model. |
 | `pi-web.json` | Web UI settings, including Yolk Pi chat defaults, WorkTree defaults, YPI Studio member policies and subagent runner rollout (`studio.subagents.runner`), Usage scope, Web Terminal settings, ChatGPT panel/auto-refresh settings, default-off OpenCode Go auto-failover settings (`opencodeGo.autoFailover`), and Trellis settings. |
 | `chatgpt-usage-refresh.lock` | Backend ChatGPT usage auto-refresh lock file; stale locks can be repaired from the ChatGPT panel fault handler. |
-| `auth-api-key-accounts/` | Managed API-key account storage for multi-account providers (v1: `opencode-go/`). Contains per-provider `accounts.json` (metadata with active account, disabled state, masked previews) and per-account `<accountId>.json` secret files (mode 0600). Old metadata without `disabled` fields is treated as enabled — no migration required. |
+| `auth-api-key-accounts/` | Managed API-key account storage for multi-account providers (`opencode-go/`, `xai/`). Contains per-provider `accounts.json` (metadata with active account, disabled state, masked previews) and per-account `<accountId>.json` secret files (mode 0600). Old metadata without `disabled` fields is treated as enabled — no migration required. Automatic failover remains OpenCode Go–only; xAI uses manual key activation only. |
 
 Session path format:
 
@@ -170,7 +170,7 @@ The `opencodeGo.autoFailover` feature is **disabled by default**. When enabled, 
 ### Deployment checklist
 
 - **No startup migration**: Existing managed account metadata (created before this feature) treats missing `disabled` as enabled. No data migration, no downtime, and no manual intervention required.
-- **Data path**: Managed account metadata and secrets live under `~/.pi/agent/auth-api-key-accounts/opencode-go/`. The feature never writes plaintext API keys to metadata; only masked previews and SHA-256 fingerprints are stored there.
+- **Data path**: OpenCode Go auto-failover reads managed account metadata and secrets under `~/.pi/agent/auth-api-key-accounts/opencode-go/`. Other managed providers (currently `xai/`) use the same layout under their own provider directory for manual multi-key management only. The feature never writes plaintext API keys to metadata; only masked previews and SHA-256 fingerprints are stored there.
 - **Single-process safe**: The failover lock is process-level (`globalThis.__piOpencodeGoFailover`). Single-process deployments (default `next start`, `ypi`) are fully safe. Multi-process deployments (PM2 cluster mode, load-balanced instances) may experience cross-process race conditions; see `docs/operations/troubleshooting.md` for mitigation.
 
 ### Rollback
