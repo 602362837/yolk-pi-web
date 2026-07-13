@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T01:46:02.392Z",
+  "updatedAt": "2026-07-13T03:37:11.744Z",
   "entries": [
+    {
+      "id": "20260713-113711-修复侧栏宽度-ssr-客户端-hydration-mismatch",
+      "title": "修复侧栏宽度 SSR/客户端 hydration mismatch",
+      "taskId": "20260713-110634-修复侧栏宽度-ssr-客户端-hydration-mismatch",
+      "taskKey": "archived:2026-07:20260713-110634-修复侧栏宽度-ssr-客户端-hydration-mismatch",
+      "workflowId": "feature-dev",
+      "summary": "修复 AppShell 侧栏/右面板/Explorer 布局 localStorage 状态的 SSR hydration mismatch：用 createPersistentLayoutStore + useSyncExternalStore 提供稳定 getServerSnapshot，显式 setValue 持久化，禁止 mount 时默认值抢写。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-110634-修复侧栏宽度-ssr-客户端-hydration-mismatch",
+      "knowledgePath": ".ypi/knowledge/20260713-113711-修复侧栏宽度-ssr-客户端-hydration-mismatch.md",
+      "createdAt": "2026-07-13T03:37:11.744Z",
+      "archivedAt": "2026-07-13T03:37:11.744Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-094602-修复全量会话扫描导致的高内存占用",
       "title": "修复全量会话扫描导致的高内存占用",
