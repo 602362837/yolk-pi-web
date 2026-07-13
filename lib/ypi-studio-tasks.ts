@@ -1653,16 +1653,73 @@ function loadTaskRecord(ctx: TaskContext, taskIdOrKey: string): TaskRecordOnDisk
   return scanTaskDirectory(ctx, dirPath, parsed.archived ? parsed.archiveMonth : undefined);
 }
 
-function writeRuntimePointer(ctx: TaskContext, contextId: string, taskId: string): void {
-  if (!contextId.trim()) return;
-  ensureTaskRoots(ctx);
+/**
+ * Known session-class Studio context ids.
+ * Exact forms only: raw `pi_<sessionId>`, `pi_transcript_<hash>`, `pi_process_<hash>`.
+ * Unknown / non-session contexts (including non-`pi_*` metadata) are not classified as session owners.
+ */
+export function isYpiStudioSessionContextId(id: string): boolean {
+  if (typeof id !== "string" || !id) return false;
+  if (id.startsWith("pi_transcript_")) return id.length > "pi_transcript_".length;
+  if (id.startsWith("pi_process_")) return id.length > "pi_process_".length;
+  // Raw session id form: pi_<sessionId>, excluding the transcript/process prefixes above.
+  if (id.startsWith("pi_")) return id.length > "pi_".length;
+  return false;
+}
+
+/**
+ * Replace all known session-class context ids with a single next owner while preserving non-session metadata.
+ * Used by exclusive bind/transfer; pure helper safe to call inside withTaskMutationLock.
+ */
+export function replaceTaskSessionContext(contextIds: string[], next: string): string[] {
+  const nextId = typeof next === "string" ? next.trim() : "";
+  const result: string[] = [];
+  for (const id of contextIds) {
+    if (typeof id !== "string" || !id) continue;
+    if (isYpiStudioSessionContextId(id)) continue;
+    if (!result.includes(id)) result.push(id);
+  }
+  if (nextId && !result.includes(nextId)) result.push(nextId);
+  return result;
+}
+
+/**
+ * Guard for ordinary active-task mutations: the request context must already be bound.
+ * Does not append or transfer ownership; exclusive rebind belongs to bindYpiStudioTaskToContext.
+ */
+export function assertTaskBoundToContext(record: Pick<YpiStudioTaskRecord, "contextIds">, contextId: string | undefined): void {
+  if (!contextId || !contextId.trim()) {
+    throw new Error("This Studio task mutation requires a bound session context. Bind/resume the task in this chat first.");
+  }
+  if (!record.contextIds.includes(contextId)) {
+    throw new Error("Studio task is not bound to this session context. Bind/resume the task before mutating it from this chat.");
+  }
+}
+
+function safeRuntimeContextFileName(contextId: string): string | null {
+  if (!contextId.trim()) return null;
   const safeContext = contextId.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180);
+  return safeContext || null;
+}
+
+function runtimePointerMatchesTaskId(currentTask: string, taskId: string): boolean {
+  if (currentTask === taskId) return true;
+  try {
+    return parseTaskKey(currentTask).id === parseTaskKey(taskId).id;
+  } catch {
+    return false;
+  }
+}
+
+function writeRuntimePointer(ctx: TaskContext, contextId: string, taskId: string): void {
+  const safeContext = safeRuntimeContextFileName(contextId);
   if (!safeContext) return;
+  ensureTaskRoots(ctx);
   writeFileSync(path.join(ctx.runtimeSessionsRoot, `${safeContext}.json`), `${JSON.stringify({ currentTask: taskId, updatedAt: nowIso() }, null, 2)}\n`, "utf8");
 }
 
 function readRuntimePointer(ctx: TaskContext, contextId: string): string | null {
-  const safeContext = contextId.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 180);
+  const safeContext = safeRuntimeContextFileName(contextId);
   if (!safeContext) return null;
   const filePath = path.join(ctx.runtimeSessionsRoot, `${safeContext}.json`);
   if (!existsSync(filePath)) return null;
@@ -1673,6 +1730,35 @@ function readRuntimePointer(ctx: TaskContext, contextId: string): string | null 
   } catch {
     return null;
   }
+}
+
+/**
+ * Compare-before-unlink helper for exclusive session transfer.
+ * Removes a context runtime pointer only when it still points at the given task id/key.
+ * Safe to call inside withTaskMutationLock; returns true when a file was removed.
+ */
+function removeRuntimePointerIfMatches(ctx: TaskContext, contextId: string, taskId: string): boolean {
+  const safeContext = safeRuntimeContextFileName(contextId);
+  if (!safeContext || !taskId) return false;
+  if (!existsSync(ctx.runtimeSessionsRoot)) return false;
+  const filePath = path.join(ctx.runtimeSessionsRoot, `${safeContext}.json`);
+  if (!existsSync(filePath)) return false;
+  try {
+    safeStatFile(filePath, ctx.workspaceRoot);
+    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
+    const currentTask = isRecord(parsed) ? optionalString(parsed.currentTask) : undefined;
+    if (!currentTask || !runtimePointerMatchesTaskId(currentTask, taskId)) return false;
+    unlinkSync(filePath);
+    return true;
+  } catch {
+    // Ignore malformed/racy pointer files; transfer still treats task.json contextIds as authority.
+    return false;
+  }
+}
+
+/** Public wrapper for focused tests and callers that only have cwd (OWN-2 uses the ctx form in-file). */
+export function removeYpiStudioRuntimePointerIfMatches(cwd: string, contextId: string, taskId: string): boolean {
+  return removeRuntimePointerIfMatches(createContext(cwd), contextId, taskId);
 }
 
 function placeholderContent(fileName: string): string {
@@ -1968,9 +2054,7 @@ export function createYpiStudioImprovement(taskIdOrKey: string, body: YpiStudioI
     }
 
     record.raw.updatedAt = now;
-    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) {
-      record.raw.contextIds.push(body.contextId);
-    }
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
 
     writeTaskJson(record.dirPath, record.raw);
     appendTaskEvent(record.dirPath, {
@@ -2126,6 +2210,7 @@ export function transitionYpiStudioImprovement(taskIdOrKey: string, body: YpiStu
     if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
 
     const instance = improvements.instances[index];
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
     const allowedTargets = IMPROVEMENT_TRANSITIONS.get(instance.status);
     if (!allowedTargets) throw new Error(`Unknown improvement status: ${instance.status}`);
     if (!allowedTargets.has(body.to)) {
@@ -2209,6 +2294,7 @@ export function resolveYpiStudioImprovementDisposition(taskIdOrKey: string, body
     if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
 
     const instance = improvements.instances[index];
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
 
     // Disposition is only meaningful on terminal unresolved statuses (cancelled, failed)
     if (!isImprovementUnresolved(instance.status)) {
@@ -2319,7 +2405,7 @@ export function updateYpiStudioImprovementArtifact(taskIdOrKey: string, body: Yp
 
     instance.updatedAt = now;
     record.raw.updatedAt = now;
-    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
 
     writeTaskJson(record.dirPath, record.raw);
     appendTaskEvent(record.dirPath, {
@@ -2379,7 +2465,7 @@ export function updateYpiStudioImprovementPlan(taskIdOrKey: string, body: YpiStu
 
     instance.updatedAt = now;
     record.raw.updatedAt = now;
-    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
 
     writeTaskJson(record.dirPath, record.raw);
     appendTaskEvent(record.dirPath, {
@@ -2504,7 +2590,7 @@ export function recordYpiStudioImprovementApproval(cwd: string, taskIdOrKey: str
     };
     instance.updatedAt = now;
     record.raw.updatedAt = now;
-    if (contextId && !record.raw.contextIds.includes(contextId)) record.raw.contextIds.push(contextId);
+    assertTaskBoundToContext(record.raw, contextId);
 
     writeTaskJson(record.dirPath, record.raw);
     appendTaskEvent(record.dirPath, {
@@ -2573,7 +2659,7 @@ export function reviseYpiStudioImprovementPlan(
       }
     }
 
-    if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
 
     writeTaskJson(record.dirPath, record.raw);
     appendTaskEvent(record.dirPath, {
@@ -2703,20 +2789,70 @@ export function createYpiStudioTask(body: YpiStudioTaskCreateBody): YpiStudioTas
 }
 
 export function bindYpiStudioTaskToContext(cwd: string, taskIdOrKey: string, contextId: string): YpiStudioTaskDetail {
-  const ctx = createContext(cwd);
-  const record = loadTaskRecord(ctx, taskIdOrKey);
-  if (!record?.raw) throw new Error("Task not found");
-  if (record.archived) throw new Error("Archived tasks cannot be rebound");
-  if (!record.raw.contextIds.includes(contextId)) {
-    record.raw.contextIds.push(contextId);
-    record.raw.updatedAt = nowIso();
-    writeTaskJson(record.dirPath, record.raw);
-    appendTaskEvent(record.dirPath, { type: "note", at: record.raw.updatedAt, taskId: record.raw.id, message: "Bound task to Studio context", data: { contextId } });
+  const nextContextId = typeof contextId === "string" ? contextId.trim() : "";
+  if (!nextContextId) throw new Error("contextId is required to bind a Studio task");
+  if (!isYpiStudioSessionContextId(nextContextId)) {
+    throw new YpiStudioTaskSecurityError("contextId must be a known session context (pi_<sessionId>, pi_transcript_<hash>, or pi_process_<hash>)");
   }
-  writeRuntimePointer(ctx, contextId, record.raw.id);
-  const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
-  if (!detail) throw new Error("Task not found after binding");
-  return detail;
+  const ctx = createContext(cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot be rebound");
+
+    const previousContextIds = [...record.raw.contextIds];
+    const previousSessionContextIds = previousContextIds.filter(isYpiStudioSessionContextId);
+    // Idempotent when next is already the sole session-class owner: only refresh pointer, no revision/event.
+    const alreadyExclusiveOwner =
+      previousSessionContextIds.length === 1 && previousSessionContextIds[0] === nextContextId;
+
+    if (alreadyExclusiveOwner) {
+      writeRuntimePointer(ctx, nextContextId, record.raw.id);
+      const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+      if (!detail) throw new Error("Task not found after binding");
+      return detail;
+    }
+
+    const nextContextIds = replaceTaskSessionContext(previousContextIds, nextContextId);
+    const removedSessionContextIds = previousSessionContextIds.filter((id) => id !== nextContextId);
+
+    let approvalGrantCleared = false;
+    const grant = isApprovalGrant(record.raw.meta.approvalGrant) ? record.raw.meta.approvalGrant : null;
+    if (grant && grant.contextId !== nextContextId) {
+      record.raw.meta = { ...record.raw.meta, approvalGrant: undefined };
+      approvalGrantCleared = true;
+    }
+
+    const updatedAt = nowIso();
+    record.raw.contextIds = nextContextIds;
+    record.raw.updatedAt = updatedAt;
+    // Authority first: task.json owns binding; pointers/events are best-effort side effects.
+    writeTaskJson(record.dirPath, record.raw);
+
+    let removedPointerCount = 0;
+    for (const removedId of removedSessionContextIds) {
+      if (removeRuntimePointerIfMatches(ctx, removedId, record.raw.id)) removedPointerCount += 1;
+    }
+    writeRuntimePointer(ctx, nextContextId, record.raw.id);
+
+    appendTaskEvent(record.dirPath, {
+      type: "note",
+      at: updatedAt,
+      taskId: record.raw.id,
+      message: "Transferred Studio task session ownership",
+      data: {
+        context_transfer: true,
+        fromContextIds: previousSessionContextIds,
+        toContextId: nextContextId,
+        removedPointerCount,
+        approvalGrantCleared,
+      },
+    });
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after binding");
+    return detail;
+  });
 }
 
 function findAwaitingApprovalTaskForContext(ctx: TaskContext, contextId: string): TaskRecordOnDisk | null {
@@ -2734,28 +2870,35 @@ function findAwaitingApprovalTaskForContext(ctx: TaskContext, contextId: string)
 export function recordYpiStudioUserApproval(cwd: string, contextId: string, inputText: string): YpiStudioTaskDetail | null {
   if (!contextId || !isExplicitYpiStudioApprovalText(inputText)) return null;
   const ctx = createContext(cwd);
-  const record = findAwaitingApprovalTaskForContext(ctx, contextId);
-  if (!record?.raw || record.archived || record.raw.status !== "awaiting_approval") return null;
-  const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, "unknown", contextId);
-  const approvedAt = isoAfter(existingGate.enteredAt);
-  record.raw.meta = {
-    ...record.raw.meta,
-    approvalGate: existingGate,
-    approvalGrant: approvalGrant(approvedAt, contextId, inputText),
-  };
-  if (!record.raw.contextIds.includes(contextId)) record.raw.contextIds.push(contextId);
-  record.raw.updatedAt = approvedAt;
-  writeTaskJson(record.dirPath, record.raw);
-  appendTaskEvent(record.dirPath, { type: "note", at: approvedAt, taskId: record.raw.id, message: "User approved Studio plan", data: { contextId, approvalGate: existingGate } });
-  writeRuntimePointer(ctx, contextId, record.raw.id);
-  return getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+  const preliminary = findAwaitingApprovalTaskForContext(ctx, contextId);
+  if (!preliminary?.raw || preliminary.archived || preliminary.raw.status !== "awaiting_approval") return null;
+  return withTaskMutationLock(ctx, preliminary.raw.id, () => {
+    // Re-resolve under the task lock so concurrent transfer cannot race the grant write.
+    const record = findAwaitingApprovalTaskForContext(ctx, contextId);
+    if (!record?.raw || record.archived || record.raw.status !== "awaiting_approval") return null;
+    assertTaskBoundToContext(record.raw, contextId);
+    const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, "unknown", contextId);
+    const approvedAt = isoAfter(existingGate.enteredAt);
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGate: existingGate,
+      approvalGrant: approvalGrant(approvedAt, contextId, inputText),
+    };
+    record.raw.updatedAt = approvedAt;
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, { type: "note", at: approvedAt, taskId: record.raw.id, message: "User approved Studio plan", data: { contextId, approvalGate: existingGate } });
+    writeRuntimePointer(ctx, contextId, record.raw.id);
+    return getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+  });
 }
 
 export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTaskTransitionBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
   const record = loadTaskRecord(ctx, taskIdOrKey);
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Archived tasks cannot transition");
+  if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
 
   // Block completed/archived when improvements are unresolved
   if (body.to === "completed") {
@@ -2792,7 +2935,6 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   record.raw.updatedAt = updatedAt;
   record.raw.currentMember = workflow.states[body.to]?.owner;
   if (workflow.terminalStatuses.includes(body.to)) record.raw.completedAt = updatedAt;
-  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
   if (body.to === "awaiting_approval") {
     record.raw.meta = {
       ...record.raw.meta,
@@ -2811,13 +2953,16 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after transition");
   return detail;
+  });
 }
 
 export function updateYpiStudioTaskArtifact(taskIdOrKey: string, body: YpiStudioTaskArtifactUpdateBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
   const record = loadTaskRecord(ctx, taskIdOrKey);
   if (!record?.raw) throw new Error("Task not found");
   if (record.archived) throw new Error("Archived tasks cannot update artifacts");
+  if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
   if (record.raw.status === "awaiting_approval") {
     // Any artifact change during approval invalidates the old approval grant and bumps the plan revision.
     const revision = (record.raw.meta.planRevision ?? 1) + 1;
@@ -2828,13 +2973,13 @@ export function updateYpiStudioTaskArtifact(taskIdOrKey: string, body: YpiStudio
   writeFileSync(filePath, body.content, "utf8");
   const updatedAt = nowIso();
   record.raw.updatedAt = updatedAt;
-  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "artifact", at: updatedAt, taskId: record.raw.id, artifact: body.artifact, message: `Updated ${body.artifact}` });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
   const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
   if (!detail) throw new Error("Task not found after artifact update");
   return detail;
+  });
 }
 
 /** Apply a subagent run's status to a single subtask progress entry and refresh the DAG.
@@ -3051,7 +3196,7 @@ export function updateYpiStudioImplementationPlan(taskIdOrKey: string, body: Ypi
     record.raw.meta = { ...record.raw.meta, approvalGate: approvalGate(updatedAt, record.raw.status, body.contextId), approvalGrant: undefined, planRevision: revision };
   }
   record.raw.updatedAt = updatedAt;
-  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+  if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: "Updated implementation plan", data: { subtaskCount: normalizedPlan.subtasks.length, contextId: body.contextId } });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
@@ -3133,7 +3278,7 @@ export function claimYpiStudioImplementationSubtask(taskIdOrKey: string, body: Y
   });
   refreshDerivedImplementation(plan, progress);
   record.raw.updatedAt = updatedAt;
-  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+  if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Claimed implementation subtasks ${claimedIds.join(", ")}`, data: { subtaskIds: claimedIds, status: targetStatus, runIds: requestedRunIds } });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
@@ -3202,7 +3347,7 @@ export function claimYpiStudioImprovementSubtask(taskIdOrKey: string, body: YpiS
   instance.implementationProgress = progress;
   instance.updatedAt = updatedAt;
   record.raw.updatedAt = updatedAt;
-  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+  if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Claimed improvement ${instance.displayId} subtasks ${claimedIds.join(", ")}`, data: { improvementId: instance.id, displayId: instance.displayId, subtaskIds: claimedIds, status: targetStatus, runIds: requestedRunIds } });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
@@ -3273,7 +3418,7 @@ export function updateYpiStudioImplementationSubtask(taskIdOrKey: string, body: 
   progress.history = [...(progress.history ?? []), { at: updatedAt, subtaskId: body.subtaskId, from, to: body.status, runId: body.runId, message: body.message }].slice(-200);
   refreshDerivedImplementation(plan, progress);
   record.raw.updatedAt = updatedAt;
-  if (body.contextId && !record.raw.contextIds.includes(body.contextId)) record.raw.contextIds.push(body.contextId);
+  if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Implementation subtask ${body.subtaskId} -> ${body.status}`, data: { subtaskId: body.subtaskId, from, to: body.status, runId: body.runId, validation: body.validation, localReview: body.localReview } });
   if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);

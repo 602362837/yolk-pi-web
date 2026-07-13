@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T01:46:02.392Z",
+  "updatedAt": "2026-07-13T03:29:39.471Z",
   "entries": [
+    {
+      "id": "20260713-112939-修正-ypi-studio-任务-session-归属-继续任务时独占转移到新-session",
+      "title": "修正 YPI Studio 任务 session 归属：继续任务时独占转移到新 session",
+      "taskId": "20260713-110138-修正-ypi-studio-任务-session-归属-继续任务时独占转移到新-session",
+      "taskKey": "archived:2026-07:20260713-110138-修正-ypi-studio-任务-session-归属-继续任务时独占转移到新-session",
+      "workflowId": "feature-dev",
+      "summary": "YPI Studio 任务 session 归属改为 exclusive transfer：显式 bind/continue 时只保留一个 session owner，旧 session 不再显示浮窗；普通 mutation 不得 append/抢占；跨 session 清 approval grant；runtime pointer compare-before-unlink；存量多 owner 惰性修正。",
+      "tags": [
+        "bugfix",
+        "ypi-studio",
+        "session-binding",
+        "ownership",
+        "feature-dev",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-110138-修正-ypi-studio-任务-session-归属-继续任务时独占转移到新-session",
+      "knowledgePath": ".ypi/knowledge/20260713-112939-修正-ypi-studio-任务-session-归属-继续任务时独占转移到新-session.md",
+      "createdAt": "2026-07-13T03:29:39.471Z",
+      "archivedAt": "2026-07-13T03:29:39.471Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-094602-修复全量会话扫描导致的高内存占用",
       "title": "修复全量会话扫描导致的高内存占用",

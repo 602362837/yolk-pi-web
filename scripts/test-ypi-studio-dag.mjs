@@ -1257,10 +1257,11 @@ function progressFor(implementationPlan, statuses = {}) {
     // Approve with contextId
     recordYpiStudioImprovementApproval(cwd, task.id, impId, contextId, "确认，批准开始实现");
 
-    // Transition with a different contextId should fail
+    // Transition with a different contextId should fail.
+    // Exclusive session ownership rejects non-owner contexts before approval-grant matching.
     assert.throws(
       () => transitionYpiStudioImprovement(task.id, { cwd, action: "transition_improvement", improvementId: impId, to: "implementing", contextId: otherCtx }),
-      /approval was recorded in a different session context/,
+      /not bound to this session context|approval was recorded in a different session context/,
     );
 
     // But transition without providing a contextId should work (already null check passes)
