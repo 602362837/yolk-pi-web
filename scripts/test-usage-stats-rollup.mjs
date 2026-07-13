@@ -24,6 +24,11 @@ const agentDir = mkdtempSync(join(tmpdir(), "pi-usage-rollup-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 
 const { getUsageStats, getUsageStatsForSessionRollup } = await import("../lib/usage-stats.ts");
+const {
+  registerYpiStudioChildRun,
+  unregisterYpiStudioChildRun,
+  updateYpiStudioChildRun,
+} = await import("../lib/ypi-studio-subagent-runtime.ts");
 
 const cwd = "/tmp/usage-rollup-test-cwd";
 const encodedCwd = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
@@ -245,6 +250,81 @@ assert.equal(parentSessionRollup.selectedSessionTotals.cost, 30, "parent selecte
 assert.equal(parentSessionRollup.parentRollupTotals.cost, parentSessionRollup.totals.cost, "parentRollupTotals must equal totals");
 assert.equal(parentSessionRollup.studioChildSessionCount, 3, "parent rollup must report 3 child sessions");
 assert.ok(parentSessionRollup.childSessions.some((child) => child.sessionId === childId), "childSessions must include the child with usage");
+// Additive contextUsage: terminated/history children without runtime sample → explicit unavailable (not 0%).
+for (const child of parentSessionRollup.childSessions) {
+  assert.ok(child.contextUsage, `child ${child.sessionId} must have contextUsage field`);
+  assert.equal(child.contextUsage.availability, "unavailable", `default child ${child.sessionId} context must be unavailable without runtime sample`);
+  assert.equal(child.contextUsage.percent, null, "unavailable percent must be null, never 0");
+  assert.equal(child.contextUsage.tokens, null, "unavailable tokens must be null");
+}
+
+// Live runtime snapshot merge: register a process-local handle for childId.
+const liveRunId = "test-live-context-run";
+registerYpiStudioChildRun({
+  runId: liveRunId,
+  taskId: "task-1",
+  member: "implementer",
+  cwd,
+  parentSessionId: parentId,
+  childSessionId: childId,
+  startedAt: new Date().toISOString(),
+  status: "running",
+  abort: () => {},
+});
+updateYpiStudioChildRun(liveRunId, {
+  contextUsage: {
+    percent: 42.5,
+    contextWindow: 200000,
+    tokens: 85000,
+    availability: "available",
+    source: "live",
+    capturedAt: new Date().toISOString(),
+  },
+});
+const parentWithLiveContext = await getUsageStatsForSessionRollup({ sessionId: parentId, includeArchived: true });
+const liveChild = parentWithLiveContext.childSessions.find((child) => child.sessionId === childId);
+assert.ok(liveChild, "live child row must exist");
+assert.equal(liveChild.contextUsage.availability, "available", "live child context availability must be available");
+assert.equal(liveChild.contextUsage.percent, 42.5, "live child percent must match runtime snapshot");
+assert.equal(liveChild.contextUsage.contextWindow, 200000, "live child contextWindow must match runtime snapshot");
+assert.equal(liveChild.contextUsage.tokens, 85000, "live child tokens must match runtime snapshot");
+// Billing totals must be unchanged by context merge.
+assert.equal(parentWithLiveContext.totals.cost, 54, "context merge must not change parent rollup totals");
+assert.equal(parentWithLiveContext.selectedSessionTotals.cost, 30, "context merge must not change selectedSessionTotals");
+// lastKnown after unregister (process-local).
+unregisterYpiStudioChildRun(liveRunId);
+const parentWithLastKnown = await getUsageStatsForSessionRollup({ sessionId: parentId, includeArchived: true });
+const lastKnownChild = parentWithLastKnown.childSessions.find((child) => child.sessionId === childId);
+assert.equal(lastKnownChild.contextUsage.availability, "available", "lastKnown after unregister should still be available in-process");
+assert.equal(lastKnownChild.contextUsage.percent, 42.5, "lastKnown percent must match final live sample");
+// available-with-null-percent (post-compaction style) must not become 0%.
+registerYpiStudioChildRun({
+  runId: liveRunId,
+  taskId: "task-1",
+  member: "implementer",
+  cwd,
+  parentSessionId: parentId,
+  childSessionId: childId,
+  startedAt: new Date().toISOString(),
+  status: "running",
+  abort: () => {},
+});
+updateYpiStudioChildRun(liveRunId, {
+  contextUsage: {
+    percent: null,
+    contextWindow: 200000,
+    tokens: null,
+    availability: "available",
+    source: "live",
+    capturedAt: new Date().toISOString(),
+  },
+});
+const parentWithNullOccupancy = await getUsageStatsForSessionRollup({ sessionId: parentId, includeArchived: true });
+const nullOccChild = parentWithNullOccupancy.childSessions.find((child) => child.sessionId === childId);
+assert.equal(nullOccChild.contextUsage.availability, "available", "null occupancy remains available");
+assert.equal(nullOccChild.contextUsage.percent, null, "null percent must not be coerced to 0");
+assert.equal(nullOccChild.contextUsage.contextWindow, 200000, "window remains when occupancy unknown");
+unregisterYpiStudioChildRun(liveRunId);
 
 // ---------------------------------------------------------------------------
 // 5. session_rollup(child) — child audit session shows its own usage, tooltip carries parent rollup.
@@ -273,6 +353,7 @@ assert.equal(standaloneSessionRollup.studioChildTotals.cost, 0, "standalone stud
 assert.equal(standaloneSessionRollup.selectedSessionTotals.cost, 3, "standalone selectedSessionTotals must equal totals");
 assert.equal(standaloneSessionRollup.parentRollupTotals.cost, 3, "standalone parentRollupTotals must equal totals");
 assert.equal(standaloneSessionRollup.studioChildSessionCount, 0, "standalone must have zero children");
+assert.equal(standaloneSessionRollup.childSessions.length, 0, "standalone childSessions must be empty");
 
 // ---------------------------------------------------------------------------
 // 7. session_rollup(orphan child) — parent missing, still resolves own usage.
@@ -299,4 +380,5 @@ rmSync(agentDir, { recursive: true, force: true });
 console.log("usage stats rollup regression tests passed");
 console.log("  fixtures: 1 parent + 1 child(usage) + 1 child(no-usage) + 1 standalone + 1 orphan child + 1 archived child");
 console.log("  verified: global totals, bySession, byParentSession (parent/orphan/standalone),");
-console.log("            session_rollup(parent/child/standalone/orphan/archived), includeArchived toggle");
+console.log("            session_rollup(parent/child/standalone/orphan/archived), includeArchived toggle,");
+console.log("            additive child contextUsage (unavailable / live / lastKnown / null-occupancy)");

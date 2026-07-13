@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T05:28:22.705Z",
+  "updatedAt": "2026-07-13T06:50:26.491Z",
   "entries": [
+    {
+      "id": "20260713-145026-优化-chat-顶部-session-速率-计费-上下文为标签化展示-并支持子-session-",
+      "title": "优化 Chat 顶部 session 速率/计费/上下文为标签化展示，并支持子 session 悬停浮窗",
+      "taskId": "20260713-134601-优化-chat-顶部-session-速率-计费-上下文为标签化展示-并支持子-session-",
+      "taskKey": "archived:2026-07:20260713-134601-优化-chat-顶部-session-速率-计费-上下文为标签化展示-并支持子-session-",
+      "workflowId": "feature-dev",
+      "summary": "## SPIKE-01 complete Artifact: [`spike-child-context.md`](spike-child-context.md) ### Decision for DATA-01 - **Path A** only: additive `contextUsage` on existing `GET /api/usage?sessionId=` / `childSessions[]`. - Authoritative live source: SDK child `AgentSession.getContextUsage()` captured into runtime handle (not `__piSessions`). - CLI / terminated / missing snapshot → `availability: \"unavailable\"` + UI “暂无上下文数据”. - Never derive context occupancy from lifetime usage or `progress.tokens/tps`. - Actual runner file: `lib/ypi-studio-child-session-runner.ts` (not `ypi-studio-subagent-sdk-runner.ts`). ### Not done in this subtask - No production DATA-01 / UI-02 implementation. - No live process sampling (worktree has no local `node_modules`). ### Open product choices 1. Accept terminated children as unavailable in v1? 2. Optional process-local lastKnown snapshot before unregister (still los…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-134601-优化-chat-顶部-session-速率-计费-上下文为标签化展示-并支持子-session-",
+      "knowledgePath": ".ypi/knowledge/20260713-145026-优化-chat-顶部-session-速率-计费-上下文为标签化展示-并支持子-session-.md",
+      "createdAt": "2026-07-13T06:50:26.491Z",
+      "archivedAt": "2026-07-13T06:50:26.491Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-132822-任务浮窗在等待审批时支持计划审批书预览",
       "title": "任务浮窗在等待审批时支持计划审批书预览",

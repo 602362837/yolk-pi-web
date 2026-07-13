@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useReducer } from "react";
 import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
 import type { AgentMessage, AssistantMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
-import type { UsageSessionRollupResult, UsageTotals } from "@/lib/usage-stats";
+import type { SessionContextUsageSnapshot, UsageSessionRollupResult, UsageTotals } from "@/lib/usage-stats";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ToolEntry } from "@/components/ToolPanel";
@@ -178,7 +178,18 @@ export interface ToolExecutionProgress {
  *
  * `cost` / `tokens` 字段为 compact 展示值；`own` / `studioChild` 为 parent rollup 拆分（仅 parent 场景有意义）。
  * `selectedSessionTotals` / `parentRollupTotals` 为 additive 透传字段，供 child compact 与 parent/child tooltip 复用。
+ * `childSessions` 为 additive Studio child 摘要（含 optional contextUsage），仅 rollup 源提供；local fallback 无此字段。
  */
+export interface SessionUsageChildTopbarSummary {
+  sessionId: string;
+  member?: string;
+  subtaskId?: string;
+  status?: string;
+  totals: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
+  /** Authoritative context snapshot when available; unavailable ≠ 0%. Never lifetime usage. */
+  contextUsage?: SessionContextUsageSnapshot;
+}
+
 export interface SessionUsageTopbarStats {
   tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
   cost?: number;
@@ -193,6 +204,8 @@ export interface SessionUsageTopbarStats {
   selectedSessionTotals?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
   /** Parent rollup totals（additive），供 studio_child tooltip 与 parent compact 复用。 */
   parentRollupTotals?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number };
+  /** Studio children for context popover (additive). Present only when source is rollup. */
+  childSessions?: SessionUsageChildTopbarSummary[];
 }
 
 export type OnSubagentChange = (runs: SubagentRun[]) => void;
@@ -424,6 +437,15 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           // additive：child compact 展示自身费用，tooltip 附带 parent rollup。
           selectedSessionTotals: statsFromTotals(sessionUsageRollup.rollup.selectedSessionTotals),
           parentRollupTotals: statsFromTotals(sessionUsageRollup.rollup.parentRollupTotals),
+          // additive：Studio child context summaries for topbar context popover (UI-02).
+          childSessions: sessionUsageRollup.rollup.childSessions.map((child) => ({
+            sessionId: child.sessionId,
+            member: child.studioChild?.member,
+            subtaskId: child.studioChild?.subtaskId,
+            status: child.studioChild?.status,
+            totals: statsFromTotals(child.totals),
+            contextUsage: child.contextUsage,
+          })),
         }
         : null;
     })()

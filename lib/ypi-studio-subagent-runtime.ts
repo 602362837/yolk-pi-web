@@ -13,6 +13,24 @@ import {
 
 export type YpiStudioChildRunRegistryStatus = YpiStudioSubagentRunStatus | "runtime_lost";
 
+/**
+ * Bounded context-window occupancy snapshot for a Studio child session.
+ * Numbers only — never includes transcript, prompt, tool results, or paths.
+ *
+ * - `available`: authoritative `getContextUsage()` object was captured; `percent`/`tokens` may still be null (e.g. post-compaction).
+ * - `unknown`: reserved for ambiguous reads.
+ * - `unavailable`: no live AgentSession / CLI child / terminated without snapshot.
+ * Never derive these numbers from lifetime usage or progress.tokens/tps.
+ */
+export interface YpiStudioChildContextUsageSnapshot {
+  percent: number | null;
+  contextWindow: number | null;
+  tokens: number | null;
+  availability: "available" | "unknown" | "unavailable";
+  source: "live" | "persisted";
+  capturedAt?: string;
+}
+
 export interface YpiStudioRuntimeLostProjection {
   runId: string;
   taskId: string;
@@ -37,6 +55,8 @@ export interface YpiStudioChildRunHandle {
   startedAt: string;
   status: YpiStudioChildRunRegistryStatus;
   progress?: YpiStudioSubagentRunProgress;
+  /** Bounded live context occupancy; never lifetime usage. */
+  contextUsage?: YpiStudioChildContextUsageSnapshot;
   promise?: Promise<unknown>;
   result?: unknown;
   abort: (reason: string) => void;
@@ -71,6 +91,8 @@ declare global {
   var __ypiStudioSessionContinuations: Map<string, YpiStudioSessionContinuationCallback> | undefined;
   var __ypiStudioTerminalContinuationKeys: Set<string> | undefined;
   var __ypiStudioPendingContinuations: Map<string, PendingYpiStudioContinuation> | undefined;
+  /** Process-local last known child context snapshots keyed by childSessionId (lost on restart). */
+  var __ypiStudioChildContextLastKnown: Map<string, YpiStudioChildContextUsageSnapshot> | undefined;
 }
 
 function registry(): Map<string, YpiStudioChildRunHandle> {
@@ -99,6 +121,61 @@ function pendingContinuations(): Map<string, PendingYpiStudioContinuation> {
     globalThis.__ypiStudioPendingContinuations = new Map();
   }
   return globalThis.__ypiStudioPendingContinuations;
+}
+
+function childContextLastKnown(): Map<string, YpiStudioChildContextUsageSnapshot> {
+  if (!globalThis.__ypiStudioChildContextLastKnown) {
+    globalThis.__ypiStudioChildContextLastKnown = new Map();
+  }
+  return globalThis.__ypiStudioChildContextLastKnown;
+}
+
+/** Build a bounded snapshot from SDK `getContextUsage()` (or unavailable). */
+export function toYpiStudioChildContextUsageSnapshot(
+  usage: { percent: number | null; contextWindow?: number | null; tokens: number | null } | null | undefined,
+  options?: { source?: YpiStudioChildContextUsageSnapshot["source"]; capturedAt?: string },
+): YpiStudioChildContextUsageSnapshot {
+  const source = options?.source ?? "live";
+  const capturedAt = options?.capturedAt ?? new Date().toISOString();
+  if (!usage) {
+    return {
+      percent: null,
+      contextWindow: null,
+      tokens: null,
+      availability: "unavailable",
+      source,
+      capturedAt,
+    };
+  }
+  const contextWindow =
+    typeof usage.contextWindow === "number" && Number.isFinite(usage.contextWindow) && usage.contextWindow > 0
+      ? usage.contextWindow
+      : null;
+  // Object returned but no usable window/occupancy → still explicit unavailable (not 0%).
+  if (contextWindow === null && usage.percent === null && usage.tokens === null) {
+    return {
+      percent: null,
+      contextWindow: null,
+      tokens: null,
+      availability: "unavailable",
+      source,
+      capturedAt,
+    };
+  }
+  return {
+    percent: usage.percent ?? null,
+    contextWindow,
+    tokens: usage.tokens ?? null,
+    // percent/tokens may be null after compaction; that is available-with-unknown-occupancy, not 0%.
+    availability: "available",
+    source,
+    capturedAt,
+  };
+}
+
+function rememberChildContextUsage(childSessionId: string | undefined, snapshot: YpiStudioChildContextUsageSnapshot | undefined): void {
+  if (!childSessionId || !snapshot) return;
+  childContextLastKnown().set(childSessionId, { ...snapshot });
 }
 
 function continuationKeyFor(payload: Pick<YpiStudioChildRunContinuationPayload, "parentSessionId" | "taskId" | "runId">): string {
@@ -153,11 +230,14 @@ export function registerYpiStudioChildRun(handle: YpiStudioChildRunHandle): void
 
 export function updateYpiStudioChildRun(
   runId: string,
-  patch: Partial<Pick<YpiStudioChildRunHandle, "status" | "progress" | "promise" | "result" | "pid" | "runner" | "childSessionId" | "childSessionFile">>,
+  patch: Partial<Pick<YpiStudioChildRunHandle, "status" | "progress" | "contextUsage" | "promise" | "result" | "pid" | "runner" | "childSessionId" | "childSessionFile">>,
 ): YpiStudioChildRunHandle | undefined {
   const handle = registry().get(runId);
   if (!handle) return undefined;
   Object.assign(handle, patch);
+  if (patch.contextUsage) {
+    rememberChildContextUsage(handle.childSessionId ?? patch.childSessionId, patch.contextUsage);
+  }
   return handle;
 }
 
@@ -166,7 +246,60 @@ export function getYpiStudioChildRun(runId: string): YpiStudioChildRunHandle | u
 }
 
 export function unregisterYpiStudioChildRun(runId: string): void {
+  const handle = registry().get(runId);
+  // Keep process-local lastKnown so parent rollup can still show the final live sample until restart.
+  if (handle?.childSessionId && handle.contextUsage) {
+    rememberChildContextUsage(handle.childSessionId, handle.contextUsage);
+  }
   registry().delete(runId);
+}
+
+/**
+ * Bounded read projection of child context occupancy by child session id.
+ * Prefer live runtime handle, then process-local lastKnown. Never opens JSONL or AgentSession.
+ */
+export function projectYpiStudioChildContextUsageBySessionIds(
+  sessionIds: string[],
+): Map<string, YpiStudioChildContextUsageSnapshot> {
+  const out = new Map<string, YpiStudioChildContextUsageSnapshot>();
+  if (sessionIds.length === 0) return out;
+  const wanted = new Set(sessionIds);
+
+  try {
+    for (const handle of registry().values()) {
+      if (!handle.childSessionId || !wanted.has(handle.childSessionId) || !handle.contextUsage) continue;
+      out.set(handle.childSessionId, { ...handle.contextUsage });
+    }
+  } catch {
+    // best-effort
+  }
+
+  try {
+    const lastKnown = childContextLastKnown();
+    for (const sessionId of sessionIds) {
+      if (out.has(sessionId)) continue;
+      const snapshot = lastKnown.get(sessionId);
+      if (snapshot) out.set(sessionId, { ...snapshot });
+    }
+  } catch {
+    // best-effort
+  }
+
+  return out;
+}
+
+/** Explicit unavailable marker for children with no live/lastKnown snapshot. */
+export function unavailableYpiStudioChildContextUsage(
+  options?: { source?: YpiStudioChildContextUsageSnapshot["source"]; capturedAt?: string },
+): YpiStudioChildContextUsageSnapshot {
+  return {
+    percent: null,
+    contextWindow: null,
+    tokens: null,
+    availability: "unavailable",
+    source: options?.source ?? "live",
+    ...(options?.capturedAt ? { capturedAt: options.capturedAt } : {}),
+  };
 }
 
 export function registerYpiStudioSessionContinuation(

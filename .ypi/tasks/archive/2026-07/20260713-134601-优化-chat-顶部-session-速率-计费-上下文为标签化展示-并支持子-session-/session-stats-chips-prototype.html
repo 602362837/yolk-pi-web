@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>YPI Session Stats Chips Prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #eef1f5;
+      --bg: #ffffff;
+      --bg-panel: #f7f7f8;
+      --bg-hover: #f0f1f3;
+      --bg-subtle: rgba(15, 23, 42, .035);
+      --border: #dedfe3;
+      --border-strong: #c9cbd1;
+      --text: #1a1a1a;
+      --text-muted: #667085;
+      --text-dim: #98a2b3;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --normal: #16835b;
+      --normal-soft: #eaf8f2;
+      --watch: #b26400;
+      --watch-soft: #fff5df;
+      --danger: #d92d20;
+      --danger-soft: #fff0ee;
+      --unknown: #667085;
+      --shadow: 0 12px 32px rgba(16, 24, 40, .14), 0 2px 8px rgba(16, 24, 40, .08);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    body.dark {
+      color-scheme: dark;
+      --page: #101112;
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-subtle: rgba(255, 255, 255, .045);
+      --border: #3a3a3a;
+      --border-strong: #505050;
+      --text: #ededed;
+      --text-muted: #a7adb8;
+      --text-dim: #747b87;
+      --accent: #69a5ff;
+      --accent-soft: rgba(37, 99, 235, .18);
+      --normal: #55c99a;
+      --normal-soft: rgba(22, 131, 91, .18);
+      --watch: #f0b34a;
+      --watch-soft: rgba(178, 100, 0, .2);
+      --danger: #ff746a;
+      --danger-soft: rgba(217, 45, 32, .18);
+      --unknown: #a7adb8;
+      --shadow: 0 16px 40px rgba(0, 0, 0, .45), 0 2px 8px rgba(0, 0, 0, .3);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      background: var(--page);
+      color: var(--text);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      transition: background .2s, color .2s;
+    }
+    button, select { font: inherit; }
+    button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .prototype-toolbar {
+      min-height: 56px;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .prototype-title { display: grid; gap: 1px; }
+    .prototype-title strong { font-size: 14px; }
+    .prototype-title span { color: var(--text-muted); font-size: 11px; }
+    .prototype-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .control, .toggle {
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bg-panel);
+      color: var(--text);
+      padding: 0 9px;
+    }
+    .toggle { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+    .stage { padding: 34px 16px 64px; overflow: auto; }
+    .viewport {
+      width: min(100%, 1440px);
+      min-width: 320px;
+      margin: 0 auto;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: 0 18px 50px rgba(16, 24, 40, .1);
+      overflow: visible;
+      transition: width .25s ease;
+    }
+    .viewport[data-size="900"] { width: min(100%, 900px); }
+    .viewport[data-size="640"] { width: min(100%, 640px); }
+    .viewport-label {
+      height: 25px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-dim);
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      border-radius: 11px 11px 0 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .app-top-bar {
+      height: 44px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: relative;
+      overflow: visible;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .brand-mark {
+      width: 23px; height: 23px; border-radius: 7px;
+      display: grid; place-items: center;
+      color: #fff; font-weight: 750; font-size: 10px;
+      background: linear-gradient(145deg, #f5b941, #ec7b27);
+    }
+    .session-name { max-width: 215px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+    .top-actions { display: flex; gap: 4px; }
+    .icon-button {
+      width: 26px; height: 26px; border: 0; border-radius: 6px;
+      background: transparent; color: var(--text-muted); cursor: pointer;
+    }
+    .icon-button:hover { background: var(--bg-hover); color: var(--text); }
+
+    .stats { margin-left: auto; display: flex; align-items: center; gap: 5px; min-width: 0; font-variant-numeric: tabular-nums; }
+    .chip-wrap { position: relative; flex: 0 0 auto; }
+    .chip {
+      height: 23px;
+      padding: 0 7px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    button.chip { cursor: pointer; }
+    button.chip:hover, button.chip[aria-expanded="true"] { background: var(--bg-hover); border-color: var(--border-strong); color: var(--text); }
+    .chip .label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--text-dim); }
+    .chip.cost { color: var(--text); font-weight: 650; }
+    .chip.context { color: var(--normal); border-color: color-mix(in srgb, var(--normal) 28%, var(--border)); background: var(--normal-soft); }
+    .chip.context.watch { color: var(--watch); border-color: color-mix(in srgb, var(--watch) 35%, var(--border)); background: var(--watch-soft); }
+    .chip.context.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); background: var(--danger-soft); }
+    .compact-mark { font: 9px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--text-muted); }
+    .ring {
+      --pct: 68;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: conic-gradient(currentColor calc(var(--pct) * 1%), color-mix(in srgb, currentColor 17%, transparent) 0);
+      position: relative; flex: 0 0 auto;
+    }
+    .ring::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%; background: var(--bg); }
+    .chip.context .ring::after { background: var(--normal-soft); }
+    .chip.context.watch .ring::after { background: var(--watch-soft); }
+    .chip.context.danger .ring::after { background: var(--danger-soft); }
+
+    .popover {
+      position: absolute;
+      z-index: 30;
+      top: calc(100% + 7px);
+      right: 0;
+      width: 330px;
+      max-width: calc(100vw - 32px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(-3px) scale(.985);
+      transform-origin: top right;
+      transition: opacity .14s ease, transform .14s ease, visibility .14s;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-align: left;
+    }
+    .popover.open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); }
+    .popover-header { padding: 11px 12px 9px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .popover-title { font-size: 12px; font-weight: 700; }
+    .popover-subtitle { font-size: 10px; color: var(--text-muted); }
+    .billing { width: 245px; }
+    .billing-body { padding: 9px 12px 11px; display: grid; gap: 7px; }
+    .billing-row { display: flex; justify-content: space-between; gap: 24px; font-size: 11.5px; }
+    .billing-row span:first-child { color: var(--text-muted); }
+    .billing-row.total { border-top: 1px solid var(--border); padding-top: 7px; font-weight: 700; }
+    .billing-row.total span:first-child { color: var(--text); }
+    .billing-note { padding-top: 2px; color: var(--text-dim); font-size: 10px; line-height: 1.45; }
+
+    .current-card { margin: 10px 10px 7px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); }
+    .context-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+    .context-main { min-width: 0; }
+    .context-name-line { display: flex; align-items: center; gap: 5px; min-width: 0; }
+    .context-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 650; }
+    .role-badge, .status-badge { border-radius: 999px; padding: 1px 5px; font-size: 9px; line-height: 1.5; white-space: nowrap; }
+    .role-badge { background: var(--accent-soft); color: var(--accent); }
+    .status-badge { background: var(--bg-hover); color: var(--text-muted); }
+    .context-detail { margin-top: 3px; color: var(--text-muted); font: 10px/1.4 var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .context-value { display: grid; justify-items: end; gap: 1px; font-variant-numeric: tabular-nums; }
+    .context-value strong { font: 700 12px/1.2 var(--font-mono); }
+    .context-value small { font-size: 9px; color: var(--text-muted); }
+    .state-normal strong, .state-normal small { color: var(--normal); }
+    .state-watch strong, .state-watch small { color: var(--watch); }
+    .state-danger strong, .state-danger small { color: var(--danger); }
+    .state-unknown strong { color: var(--unknown); font-family: inherit; font-size: 10px; }
+    .meter { margin-top: 8px; height: 3px; border-radius: 99px; background: var(--border); overflow: hidden; }
+    .meter > i { display: block; height: 100%; width: var(--value); border-radius: inherit; background: currentColor; transition: width .35s ease; }
+    .state-normal .meter { color: var(--normal); }
+    .state-watch .meter { color: var(--watch); }
+    .state-danger .meter { color: var(--danger); }
+    .children-heading { padding: 3px 12px 6px; display: flex; justify-content: space-between; color: var(--text-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .children-list { max-height: 242px; overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--border); }
+    .child-row { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .child-row:last-child { border-bottom: 0; }
+    .child-row:hover { background: var(--bg-hover); }
+    .unknown-copy { color: var(--text-muted); font-size: 9.5px; }
+    .popover-footer { padding: 7px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 9.5px; }
+
+    .mock-content { min-height: 410px; display: grid; grid-template-columns: 210px 1fr; background: var(--bg); border-radius: 0 0 11px 11px; overflow: hidden; }
+    .mock-sidebar { padding: 12px; border-right: 1px solid var(--border); background: var(--bg-panel); }
+    .skeleton { height: 8px; margin: 8px 0; border-radius: 10px; background: var(--border); opacity: .65; }
+    .mock-chat { padding: 28px clamp(16px, 7vw, 90px); }
+    .message { max-width: 560px; margin: 0 auto 16px; padding: 13px 15px; border-radius: 11px; background: var(--bg-panel); color: var(--text-muted); font-size: 12px; }
+    .design-note { max-width: 1440px; margin: 20px auto 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text-muted); font-size: 11px; }
+    .design-note strong { color: var(--text); }
+
+    .viewport[data-size="900"] .session-name { max-width: 120px; }
+    .viewport[data-size="900"] .stats { gap: 3px; }
+    .viewport[data-size="900"] .chip { padding-inline: 6px; }
+    .viewport[data-size="900"] .compact-mark { display: none; }
+
+    .viewport[data-size="640"] .token-chip { display: none; }
+    .viewport[data-size="640"] .session-name { max-width: 115px; }
+    .viewport[data-size="640"] .mock-content { grid-template-columns: 1fr; }
+    .viewport[data-size="640"] .mock-sidebar { display: none; }
+    .viewport[data-size="640"] .popover { position: fixed; top: 106px; right: 16px; left: 16px; width: auto; max-width: none; transform-origin: top center; }
+    .viewport[data-size="640"] .compact-mark { display: none; }
+
+    body.motion-on .chip.context.watch[aria-expanded="false"] { animation: soft-attention 2.8s ease-in-out 2; }
+    body.motion-on .chip.context.danger[aria-expanded="false"] { animation: soft-attention 2.2s ease-in-out 2; }
+    body.motion-on.data-updated .chip { animation: data-flash .38s ease-out 1; }
+    @keyframes soft-attention { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent); } }
+    @keyframes data-flash { from { transform: translateY(-1px); border-color: var(--accent); } to { transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+    }
+    body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after { animation: none !important; transition: none !important; }
+    @media (max-width: 680px) {
+      .token-chip { display: none; }
+      .prototype-toolbar { position: static; }
+      .stage { padding-inline: 8px; }
+    }
+  </style>
+</head>
+<body class="motion-on">
+  <header class="prototype-toolbar">
+    <div class="prototype-title">
+      <strong>Session 指标 Chips / 双浮窗原型</strong>
+      <span>交互：点击、Hover 或键盘聚焦；Esc / 外部点击关闭；两个浮窗互斥</span>
+    </div>
+    <div class="prototype-controls" aria-label="原型控制">
+      <label>场景
+        <select id="scenario" class="control" aria-label="Session 场景">
+          <option value="parent">Parent + Studio children</option>
+          <option value="standalone">Standalone</option>
+          <option value="studio_child">Studio child</option>
+        </select>
+      </label>
+      <label>宽度
+        <select id="viewportSize" class="control" aria-label="模拟视口宽度">
+          <option value="1440">1440px</option>
+          <option value="900">900px</option>
+          <option value="640">640px</option>
+        </select>
+      </label>
+      <button id="themeToggle" class="toggle" type="button" aria-pressed="false">☾ 深色</button>
+      <button id="motionToggle" class="toggle" type="button" aria-pressed="false">◌ Reduced motion</button>
+      <button id="updateDemo" class="toggle" type="button">↻ 模拟更新</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section id="viewport" class="viewport" data-size="1440" aria-label="YPI Chat 顶栏原型">
+      <div class="viewport-label"><span>Chat / active session</span><span id="viewportCaption">1440px · desktop</span></div>
+      <div class="app-top-bar">
+        <div class="brand">
+          <div class="brand-mark">π</div>
+          <div id="sessionName" class="session-name">优化 Chat 顶部 Session 指标展示</div>
+        </div>
+        <div class="top-actions" aria-label="模拟顶栏操作">
+          <button class="icon-button" type="button" aria-label="分支">⑂</button>
+          <button class="icon-button" type="button" aria-label="终端">〉_</button>
+        </div>
+        <div class="stats" aria-label="Session 指标">
+          <span class="chip token-chip" title="Input tokens"><span aria-hidden="true">↑</span><span class="label">input</span><span id="inputValue">128k</span></span>
+          <span class="chip token-chip" title="Output tokens"><span aria-hidden="true">↓</span><span class="label">output</span><span id="outputValue">9k</span></span>
+          <span class="chip token-chip" title="Cache read tokens"><span aria-hidden="true">↻</span><span class="label">cache</span><span id="cacheValue">1.2M</span></span>
+
+          <div class="chip-wrap" data-popover-wrap="billing">
+            <button id="billingTrigger" class="chip cost" type="button" aria-expanded="false" aria-controls="billingPopover" aria-haspopup="dialog">
+              <span aria-hidden="true">$</span><span class="label">费用</span><span id="costValue">$0.84</span><span id="costMark" class="compact-mark">incl. Studio</span>
+            </button>
+            <section id="billingPopover" class="popover billing" role="dialog" aria-modal="false" aria-labelledby="billingTitle">
+              <div class="popover-header"><div><div id="billingTitle" class="popover-title">计费组成</div><div id="billingSubtitle" class="popover-subtitle">Parent rollup · 费用口径不变</div></div></div>
+              <div id="billingBody" class="billing-body"></div>
+            </section>
+          </div>
+
+          <div class="chip-wrap" data-popover-wrap="context">
+            <button id="contextTrigger" class="chip context watch" type="button" aria-expanded="false" aria-controls="contextPopover" aria-haspopup="dialog">
+              <span class="ring" style="--pct:74" aria-hidden="true"></span><span class="label">上下文</span><span id="contextValue">74%</span>
+            </button>
+            <section id="contextPopover" class="popover context-popover" role="dialog" aria-modal="false" aria-labelledby="contextTitle">
+              <div class="popover-header"><div><div id="contextTitle" class="popover-title">上下文占用</div><div class="popover-subtitle">当前 Session 优先；未知值不会显示为 0%</div></div></div>
+              <div id="contextBody"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div class="mock-content" aria-hidden="true">
+        <aside class="mock-sidebar"><div class="skeleton" style="width:54%"></div><div class="skeleton" style="width:84%"></div><div class="skeleton" style="width:72%"></div><div class="skeleton" style="width:91%"></div></aside>
+        <div class="mock-chat"><div class="message">请优化 Chat 顶部 Session 的速率、计费和上下文展示，并支持 Studio 子 Session 状态。</div><div class="message">当前方案保持顶栏高度不变，将费用与上下文拆成两个独立入口。</div></div>
+      </div>
+    </section>
+    <div class="design-note"><strong>移动策略：</strong>模拟宽度 ≤640px 时隐藏 input / output / cache，保留费用与上下文两个关键 chips；浮窗改为 viewport 内左右 16px 对齐。颜色之外始终提供百分比和“正常 / 关注 / 告警 / 未知”文字。</div>
+  </main>
+
+  <script>
+    const scenarios = {
+      parent: {
+        title: "优化 Chat 顶部 Session 指标展示",
+        input: "128k", output: "9k", cache: "1.2M", cost: "$0.84", mark: "incl. Studio", context: 74,
+        billingSubtitle: "Parent rollup · own + Studio children",
+        billing: [["本会话", "$0.5214"], ["Studio 子会话 (12)", "$0.3218"], ["汇总", "$0.8432", "total"]],
+        current: { name: "当前 Session", role: "本体 · Parent", status: "运行中", pct: 74, tokens: "148k / 200k", state: "watch" },
+        children: [
+          { name: "检查员 · 费用口径与隐私边界独立评审", status: "运行中", pct: 94, tokens: "188k / 200k", state: "danger" },
+          { name: "实现员 · 数据投影与 API additive contract", status: "运行中", pct: 83, tokens: "166k / 200k", state: "watch" },
+          { name: "UI 设计员 · 超长名称用于验证截断以及完整标题提示行为", status: "已完成", pct: 62, tokens: "124k / 200k", state: "normal" },
+          { name: "研究员 · child runtime spike", status: "已结束", pct: null, tokens: "lifetime 88k tokens", state: "unknown" },
+          { name: "文档员 · frontend module", status: "等待中", pct: 48, tokens: "96k / 200k", state: "normal" },
+          { name: "测试员 · 键盘与触屏", status: "排队中", pct: 71, tokens: "142k / 200k", state: "watch" },
+          { name: "检查员 · reduced-motion", status: "已完成", pct: 35, tokens: "70k / 200k", state: "normal" },
+          { name: "实现员 · responsive layout", status: "已完成", pct: 67, tokens: "134k / 200k", state: "normal" },
+          { name: "研究员 · archived snapshot", status: "已结束", pct: null, tokens: "暂无上下文数据", state: "unknown" },
+          { name: "检查员 · dark theme contrast", status: "等待中", pct: 89, tokens: "178k / 200k", state: "watch" },
+          { name: "文档员 · API contract", status: "排队中", pct: 22, tokens: "44k / 200k", state: "normal" },
+          { name: "审阅员 · 最终一致性", status: "未开始", pct: null, tokens: "暂无上下文数据", state: "unknown" }
+        ]
+      },
+      standalone: {
+        title: "Standalone：修复文件预览边界",
+        input: "46k", output: "4k", cache: "320k", cost: "$0.19", mark: "", context: 43,
+        billingSubtitle: "Standalone · 仅本会话",
+        billing: [["本会话", "$0.1942"], ["汇总", "$0.1942", "total"]],
+        current: { name: "当前 Session", role: "Standalone", status: "运行中", pct: 43, tokens: "86k / 200k", state: "normal" }, children: []
+      },
+      studio_child: {
+        title: "Studio child：检查 Context 数据真实性",
+        input: "31k", output: "3k", cache: "184k", cost: "$0.11", mark: "Studio child", context: 91,
+        billingSubtitle: "Studio child · compact 仅本 child",
+        billing: [["本会话（child own）", "$0.1086"], ["父会话汇总（参考）", "$0.8432"], ["Compact 显示", "$0.1086", "total"]],
+        current: { name: "当前 Session", role: "Studio child", status: "运行中", pct: 91, tokens: "182k / 200k", state: "danger" }, children: []
+      }
+    };
+
+    const scenarioSelect = document.querySelector("#scenario");
+    const viewportSelect = document.querySelector("#viewportSize");
+    const viewport = document.querySelector("#viewport");
+    const body = document.body;
+    const triggers = { billing: document.querySelector("#billingTrigger"), context: document.querySelector("#contextTrigger") };
+    const popovers = { billing: document.querySelector("#billingPopover"), context: document.querySelector("#contextPopover") };
+    let closeTimer = null;
+    let keyboardNavigation = false;
+
+    function stateLabel(state) { return ({ normal: "正常", watch: "关注", danger: "告警", unknown: "未知" })[state]; }
+    function rowMarkup(row, current = false) {
+      const unknown = row.pct == null;
+      return `<div class="context-row state-${row.state}">
+        <div class="context-main">
+          <div class="context-name-line"><span class="context-name" title="${row.name}">${row.name}</span>${current ? `<span class="role-badge">${row.role}</span>` : `<span class="status-badge">${row.status}</span>`}</div>
+          <div class="context-detail">${unknown ? `<span class="unknown-copy">${row.tokens}</span>` : row.tokens}${current ? ` · ${row.status}` : ""}</div>
+          ${unknown ? "" : `<div class="meter" aria-hidden="true"><i style="--value:${row.pct}%"></i></div>`}
+        </div>
+        <div class="context-value"><strong>${unknown ? "暂无上下文数据" : `${row.pct}%`}</strong><small>${stateLabel(row.state)}</small></div>
+      </div>`;
+    }
+
+    function render() {
+      const data = scenarios[scenarioSelect.value];
+      document.querySelector("#sessionName").textContent = data.title;
+      document.querySelector("#inputValue").textContent = data.input;
+      document.querySelector("#outputValue").textContent = data.output;
+      document.querySelector("#cacheValue").textContent = data.cache;
+      document.querySelector("#costValue").textContent = data.cost;
+      const mark = document.querySelector("#costMark"); mark.textContent = data.mark; mark.hidden = !data.mark;
+      document.querySelector("#billingSubtitle").textContent = data.billingSubtitle;
+      document.querySelector("#billingBody").innerHTML = data.billing.map(([label, value, cls]) => `<div class="billing-row ${cls || ""}"><span>${label}</span><strong>${value}</strong></div>`).join("") + `<div class="billing-note">费用展示口径沿用现有 parent / standalone / studio_child 规则，不在 UI 内重新计算。</div>`;
+
+      const contextTrigger = triggers.context;
+      contextTrigger.className = `chip context ${data.current.state}`;
+      contextTrigger.querySelector(".ring").style.setProperty("--pct", data.context);
+      document.querySelector("#contextValue").textContent = `${data.context}%`;
+      const childSection = data.children.length ? `<div class="children-heading"><span>Studio children</span><span>${data.children.length} 个 · 风险优先</span></div><div class="children-list">${data.children.map(row => `<div class="child-row">${rowMarkup(row)}</div>`).join("")}</div>` : `<div class="popover-footer">此场景没有 Studio children。</div>`;
+      document.querySelector("#contextBody").innerHTML = `<div class="current-card">${rowMarkup(data.current, true)}</div>${childSection}${data.children.length ? `<div class="popover-footer">快照不可用时明确显示 unknown；lifetime usage 仅作标注，不用于计算上下文百分比。</div>` : ""}`;
+      pulseUpdate();
+    }
+
+    function openPopover(name) {
+      clearTimeout(closeTimer);
+      Object.keys(popovers).forEach(key => {
+        const open = key === name;
+        popovers[key].classList.toggle("open", open);
+        triggers[key].setAttribute("aria-expanded", String(open));
+      });
+    }
+    function closeAll() {
+      clearTimeout(closeTimer);
+      Object.keys(popovers).forEach(key => { popovers[key].classList.remove("open"); triggers[key].setAttribute("aria-expanded", "false"); });
+    }
+    function scheduleClose() { clearTimeout(closeTimer); closeTimer = setTimeout(closeAll, 150); }
+    Object.keys(triggers).forEach(name => {
+      const wrap = triggers[name].closest(".chip-wrap");
+      triggers[name].addEventListener("click", event => { event.stopPropagation(); popovers[name].classList.contains("open") ? closeAll() : openPopover(name); });
+      triggers[name].addEventListener("focus", () => { if (keyboardNavigation) openPopover(name); });
+      wrap.addEventListener("mouseenter", () => openPopover(name));
+      wrap.addEventListener("mouseleave", scheduleClose);
+      wrap.addEventListener("focusout", event => { if (!wrap.contains(event.relatedTarget)) scheduleClose(); });
+      popovers[name].addEventListener("click", event => event.stopPropagation());
+    });
+    document.addEventListener("pointerdown", () => { keyboardNavigation = false; });
+    document.addEventListener("click", closeAll);
+    document.addEventListener("keydown", event => {
+      if (event.key === "Tab") keyboardNavigation = true;
+      if (event.key === "Escape") {
+        const expanded = Object.values(triggers).find(t => t.getAttribute("aria-expanded") === "true");
+        closeAll();
+        if (expanded) expanded.focus();
+      }
+    });
+
+    scenarioSelect.addEventListener("change", () => { closeAll(); render(); });
+    viewportSelect.addEventListener("change", () => {
+      viewport.dataset.size = viewportSelect.value;
+      document.querySelector("#viewportCaption").textContent = `${viewportSelect.value}px · ${viewportSelect.value === "640" ? "mobile priority" : viewportSelect.value === "900" ? "compact" : "desktop"}`;
+      closeAll();
+    });
+    document.querySelector("#themeToggle").addEventListener("click", event => {
+      body.classList.toggle("dark");
+      const on = body.classList.contains("dark"); event.currentTarget.setAttribute("aria-pressed", String(on)); event.currentTarget.textContent = on ? "☀ 浅色" : "☾ 深色";
+    });
+    document.querySelector("#motionToggle").addEventListener("click", event => {
+      body.classList.toggle("reduce-motion");
+      const on = body.classList.contains("reduce-motion"); event.currentTarget.setAttribute("aria-pressed", String(on)); event.currentTarget.textContent = on ? "● Reduced motion" : "◌ Reduced motion";
+    });
+    function pulseUpdate() { body.classList.remove("data-updated"); void body.offsetWidth; body.classList.add("data-updated"); setTimeout(() => body.classList.remove("data-updated"), 500); }
+    document.querySelector("#updateDemo").addEventListener("click", pulseUpdate);
+    render();
+  </script>
+</body>
+</html>
