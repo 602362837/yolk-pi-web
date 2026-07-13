@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YPI Studio Prompt & Alert Dialog 原型图</title>
+  <style>
+    /* CSS 变量，完全贴合项目 globals.css */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f9fafb;
+      --bg-subtle: rgba(0,0,0,0.03);
+      --font-mono: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius: 8px;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --success: #16a34a;
+      --warning: #ca8a04;
+    }
+
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --assistant-bg: #1a1a1a;
+      --tool-bg: #1f2937;
+      --bg-subtle: rgba(255,255,255,0.04);
+      --danger: #ef4444;
+      --danger-hover: #f87171;
+      --success: #4ade80;
+      --warning: #facc15;
+    }
+
+    /* 样式基础 */
+    * {
+      box-sizing: border-box;
+      transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顶部控制栏 */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-title h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .header-title p {
+      margin: 2px 0 0 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      outline: none;
+    }
+    .btn:hover {
+      background: var(--bg-hover);
+    }
+    .btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+    .btn-primary:focus-visible {
+      outline: 2px solid var(--accent);
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #ffffff;
+      border-color: var(--danger);
+    }
+    .btn-danger:hover {
+      background: var(--danger-hover);
+    }
+
+    /* 主布局 */
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 左侧控制面板 */
+    .sidebar {
+      width: 280px;
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebar-section h3 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .demo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* 右侧画布区 */
+    .canvas {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+    }
+
+    /* 移动端视口模拟器 */
+    .canvas.viewport-mobile {
+      background: var(--bg-panel);
+    }
+    .viewport-frame {
+      width: 100%;
+      max-width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .canvas.viewport-mobile .viewport-frame {
+      width: 375px;
+      height: 720px;
+      border: 12px solid #2e2e2e;
+      border-radius: 32px;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    }
+
+    .mobile-screen-content {
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* 对话框遮罩与弹窗设计 */
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1400;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      backdrop-filter: blur(1px);
+    }
+
+    .canvas.viewport-mobile .dialog-overlay {
+      position: absolute;
+    }
+
+    .dialog-container {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: dialog-appear 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes dialog-appear {
+      from {
+        opacity: 0;
+        transform: scale(0.96) translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    /* 移动端特殊布局 */
+    .canvas.viewport-mobile .dialog-container {
+      max-width: calc(100% - 24px);
+    }
+
+    .dialog-header {
+      padding: 16px 20px 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dialog-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .dialog-body {
+      padding: 8px 20px 20px 20px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      overflow-y: auto;
+      max-height: 260px;
+    }
+
+    .dialog-input-wrapper {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .dialog-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-panel);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    .dialog-input:focus {
+      border-color: var(--accent);
+      background: var(--bg);
+    }
+    .dialog-input-error {
+      border-color: var(--danger) !important;
+    }
+    .dialog-error-text {
+      color: var(--danger);
+      font-size: 11.5px;
+      margin: 2px 0 0 0;
+    }
+
+    .dialog-footer {
+      padding: 12px 20px 16px 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: var(--bg-subtle);
+      border-top: 1px solid var(--border);
+    }
+
+    /* 移动端操作按钮在窄屏下可纵向排列或占满宽度 */
+    .canvas.viewport-mobile .dialog-footer {
+      flex-direction: column-reverse;
+      gap: 8px;
+    }
+    .canvas.viewport-mobile .dialog-footer .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* 危险/通知意图辅助样式 */
+    .dialog-title-danger {
+      color: var(--danger);
+    }
+
+    /* Toast 浮动容器 */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1500;
+      pointer-events: none;
+    }
+    .canvas.viewport-mobile .toast-container {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      align-items: center;
+    }
+
+    .toast {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 280px;
+      max-width: 380px;
+      pointer-events: auto;
+      animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .canvas.viewport-mobile .toast {
+      min-width: 0;
+      width: 100%;
+    }
+
+    @keyframes toast-in {
+      from { transform: translateY(8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .toast-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+    .toast-status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .toast-success .toast-status-indicator { background: var(--success); }
+    .toast-error .toast-status-indicator { background: var(--danger); }
+    .toast-info .toast-status-indicator { background: var(--accent); }
+
+    .toast-close {
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 2px;
+      font-size: 14px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .toast-close:hover {
+      color: var(--text-muted);
+    }
+
+    /* 状态指示区 */
+    .status-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 300px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    .canvas.viewport-mobile ~ .status-panel {
+      left: calc(50% - 187px + 12px);
+    }
+
+    /* reduced-motion 支持 */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部控制栏 -->
+  <header>
+    <div class="header-title">
+      <h1>YPI Studio Prompt & Alert Dialog 原型</h1>
+      <p>用于审查 notice / confirm / prompt / toast 在桌面与移动端的展示与交互状态</p>
+    </div>
+    <div class="controls">
+      <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="切换深色/浅色主题">
+        <span id="theme-icon">🌙</span> <span id="theme-text">深色模式</span>
+      </button>
+      <button class="btn" id="view-toggle" onclick="toggleViewport()" title="切换桌面/375px视口">
+        📱 <span id="view-text">视口: 桌面</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主布局 -->
+  <div class="container">
+    
+    <!-- 左侧控制面板 -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <h3>交互演示</h3>
+        <div class="demo-list">
+          <button class="btn btn-primary" onclick="showNotice()">1. 默认通知 (Notice)</button>
+          <button class="btn btn-primary" onclick="showConfirmDefault()">2. 默认确认 (Confirm)</button>
+          <button class="btn btn-primary" onclick="showConfirmDanger()">3. 危险操作确认</button>
+          <button class="btn btn-primary" onclick="showPromptDefault()">4. 单行输入 (Prompt)</button>
+          <button class="btn btn-primary" onclick="showPromptPrepopulated()">5. 账户备注 (带预填)</button>
+          <button class="btn btn-primary" onclick="showPromptValidationError()">6. 输入校验错误示范</button>
+          <button class="btn btn-primary" onclick="showPromptLongMessage()">7. 超长文本滚动</button>
+          <button class="btn btn-primary" onclick="showPromptBusy()">8. 提交繁忙态/禁用交互</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>反馈类 Toast</h3>
+        <div class="demo-list">
+          <button class="btn" onclick="triggerToast('success', '操作成功完成')">成功 Toast</button>
+          <button class="btn" onclick="triggerToast('error', '操作失败，请检查设置')">错误 Toast</button>
+          <button class="btn" onclick="triggerToast('info', '正在读取会话配置...')">信息 Toast</button>
+        </div>
+      </div>
+      
+      <div class="sidebar-section" style="margin-top: auto; font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+        <strong>交互规范设计：</strong><br>
+        - 焦点控制：Confirm 初始聚焦于取消按钮；Prompt 聚焦于输入框；Notice 聚焦于确认按钮。<br>
+        - 键盘支持：Tab / Shift+Tab 保持焦点循环；Escape 退出；Enter 直接提交。<br>
+        - 移动端：视口小于 375px 时，底部按钮自动转换为纵向占满布局。
+      </div>
+    </aside>
+
+    <!-- 右侧画布区 -->
+    <main class="canvas" id="canvas">
+      <div class="viewport-frame" id="viewport-frame">
+        <!-- 如果是移动端，内容会在此滚动显示，模拟页面背景 -->
+        <div class="mobile-screen-content" style="display: none;" id="mobile-bg-content">
+          <div style="height: 40px; display: flex; align-items: center; border-bottom: 1px solid var(--border); font-weight: bold;">
+            YPI Studio Workspace
+          </div>
+          <p style="color: var(--text-muted); font-size: 12px;">这里模拟背景业务界面，当弹窗打开时应被 inert 阻断，并且页面滚动锁定。</p>
+          <div style="background: var(--bg-panel); height: 120px; border-radius: 6px; padding: 12px; font-size: 11px;">
+            系统状态: Active<br>
+            CWD: /Users/zyj/projects/yolk-pi-web
+          </div>
+        </div>
+
+        <!-- 默认在中央展示的弹出对话框 (Notice) -->
+        <div class="dialog-overlay" id="active-overlay" style="display: none;" onclick="handleBackdropClick(event)">
+          <div class="dialog-container" id="active-dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-body">
+            
+            <div class="dialog-header">
+              <h2 class="dialog-title" id="dialog-title">确认执行操作</h2>
+            </div>
+            
+            <div class="dialog-body" id="dialog-body">
+              这里是消息提示的内容。
+              
+              <!-- 输入框容器 -->
+              <div class="dialog-input-wrapper" id="dialog-input-container" style="display: none;">
+                <input type="text" class="dialog-input" id="dialog-input-field" placeholder="请输入...">
+                <p class="dialog-error-text" id="dialog-error-msg" style="display: none;"></p>
+              </div>
+            </div>
+            
+            <div class="dialog-footer" id="dialog-footer">
+              <button class="btn" id="dialog-cancel-btn" onclick="closeActiveDialog(false)">取消</button>
+              <button class="btn btn-primary" id="dialog-confirm-btn" onclick="closeActiveDialog(true)">确认</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Toast 容器 -->
+      <div class="toast-container" id="toast-container"></div>
+    </main>
+
+    <!-- 交互提示面板 -->
+    <div class="status-panel" id="status-panel">
+      状态: 就绪. 点击左侧按钮以运行不同场景的原型。
+    </div>
+
+  </div>
+
+  <script>
+    // 当前全局状态
+    let currentTheme = 'light';
+    let currentViewport = 'desktop';
+    let activeScenario = null;
+    let focusedElementBeforeOpen = null;
+
+    // 状态记录
+    function setStatus(text) {
+      document.getElementById('status-panel').textContent = text;
+    }
+
+    // 切换主题
+    function toggleTheme() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        currentTheme = 'light';
+        document.getElementById('theme-icon').textContent = '🌙';
+        document.getElementById('theme-text').textContent = '深色模式';
+      } else {
+        html.classList.add('dark');
+        currentTheme = 'dark';
+        document.getElementById('theme-icon').textContent = '☀️';
+        document.getElementById('theme-text').textContent = '浅色模式';
+      }
+      setStatus(`已切换至 ${currentTheme === 'light' ? '浅色' : '深色'} 主题`);
+    }
+
+    // 切换视口
+    function toggleViewport() {
+      const canvas = document.getElementById('canvas');
+      const mobileBg = document.getElementById('mobile-bg-content');
+      const text = document.getElementById('view-text');
+      
+      if (currentViewport === 'desktop') {
+        currentViewport = 'mobile';
+        canvas.classList.add('viewport-mobile');
+        mobileBg.style.display = 'flex';
+        text.textContent = '视口: 375px 移动端';
+      } else {
+        currentViewport = 'desktop';
+        canvas.classList.remove('viewport-mobile');
+        mobileBg.style.display = 'none';
+        text.textContent = '视口: 桌面';
+      }
+      setStatus(`已切换至 ${currentViewport === 'mobile' ? '375px 移动端' : '桌面'} 视口`);
+    }
+
+    // 点击 backdrop 行为
+    function handleBackdropClick(event) {
+      if (event.target === event.currentTarget) {
+        // 依照 PRD, confirm/prompt 不允许 backdrop 点击取消
+        if (activeScenario === 'notice') {
+          closeActiveDialog(false);
+          setStatus('Notice 点击背景关闭');
+        } else {
+          setStatus('根据 PRD 约定：confirm / prompt 对话框不允许点击背景取消。');
+        }
+      }
+    }
+
+    // 关闭对话框逻辑
+    function closeActiveDialog(confirmed) {
+      const overlay = document.getElementById('active-overlay');
+      overlay.style.display = 'none';
+      activeScenario = null;
+      
+      // 恢复焦点
+      if (focusedElementBeforeOpen) {
+        focusedElementBeforeOpen.focus();
+      }
+      
+      setStatus(confirmed ? 'Promise Resolved: confirmed / submitted' : 'Promise Resolved: cancelled (false / null)');
+    }
+
+    // 显示弹窗基础骨架并接管键盘焦点循环
+    function openDialog(config) {
+      activeScenario = config.type;
+      focusedElementBeforeOpen = document.activeElement;
+      
+      const overlay = document.getElementById('active-overlay');
+      const title = document.getElementById('dialog-title');
+      const body = document.getElementById('dialog-body');
+      const footer = document.getElementById('dialog-footer');
+      const inputContainer = document.getElementById('dialog-input-container');
+      const inputField = document.getElementById('dialog-input-field');
+      const errorMsg = document.getElementById('dialog-error-msg');
+      const cancelBtn = document.getElementById('dialog-cancel-btn');
+      const confirmBtn = document.getElementById('dialog-confirm-btn');
+
+      // 初始化显示
+      overlay.style.display = 'flex';
+      inputContainer.style.display = 'none';
+      inputField.classList.remove('dialog-input-error');
+      errorMsg.style.display = 'none';
+      cancelBtn.style.display = 'inline-block';
+      cancelBtn.disabled = false;
+      confirmBtn.disabled = false;
+
+      // 文案与定制化样式
+      title.textContent = config.title;
+      title.className = config.intent === 'danger' ? 'dialog-title dialog-title-danger' : 'dialog-title';
+      
+      // 保持正文结构
+      const textNode = document.createTextNode(config.message || '');
+      // 清空除了 input-container 外的内容并插入
+      Array.from(body.childNodes).forEach(node => {
+        if (node.id !== 'dialog-input-container') body.removeChild(node);
+      });
+      body.insertBefore(textNode, inputContainer);
+
+      // 按钮定制
+      cancelBtn.textContent = config.cancelLabel || '取消';
+      confirmBtn.textContent = config.confirmLabel || '确认';
+      confirmBtn.className = config.intent === 'danger' ? 'btn btn-danger' : 'btn btn-primary';
+
+      // 按类型定制
+      if (config.type === 'notice') {
+        cancelBtn.style.display = 'none';
+      } else if (config.type === 'prompt') {
+        inputContainer.style.display = 'flex';
+        inputField.value = config.initialValue || '';
+        inputField.placeholder = config.placeholder || '';
+        if (config.showError) {
+          inputField.classList.add('dialog-input-error');
+          errorMsg.textContent = config.showError;
+          errorMsg.style.display = 'block';
+        }
+      }
+
+      if (config.busy) {
+        cancelBtn.disabled = true;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = '提交中...';
+      }
+
+      // 设定焦点逻辑
+      setTimeout(() => {
+        if (config.type === 'prompt') {
+          inputField.focus();
+          if (config.initialValue) {
+            inputField.setSelectionRange(0, config.initialValue.length);
+          }
+        } else if (config.type === 'notice') {
+          confirmBtn.focus();
+        } else {
+          // confirm 初始焦点在“取消”按钮以防误触
+          cancelBtn.focus();
+        }
+      }, 50);
+
+      // 接管 Tab 键盘焦点循环和 Escape / Enter 交互
+      setupKeyboardTrap(cancelBtn, confirmBtn, inputField, config);
+    }
+
+    function setupKeyboardTrap(cancelBtn, confirmBtn, inputField, config) {
+      const overlay = document.getElementById('active-overlay');
+      
+      overlay.onkeydown = function(e) {
+        if (e.key === 'Escape') {
+          if (config.busy) return; // busy 时禁用关闭
+          closeActiveDialog(false);
+          setStatus('通过 Escape 按键取消');
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          if (config.type === 'prompt') {
+            if (config.validateErrorTrigger && inputField.value.trim() === '') {
+              inputField.classList.add('dialog-input-error');
+              const errorMsg = document.getElementById('dialog-error-msg');
+              errorMsg.textContent = '输入不能为空 (必填校验示例)';
+              errorMsg.style.display = 'block';
+              setStatus('输入格式错误，回车提交已阻止');
+              return;
+            }
+          }
+          closeActiveDialog(true);
+          setStatus('通过 Enter 按键确认提交');
+          return;
+        }
+
+        if (e.key === 'Tab') {
+          const focusables = Array.from(overlay.querySelectorAll('button:not([disabled]), input')).filter(
+            el => el.style.display !== 'none'
+          );
+          if (focusables.length === 0) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              last.focus();
+              e.preventDefault();
+            }
+          } else {
+            if (document.activeElement === last) {
+              first.focus();
+              e.preventDefault();
+            }
+          }
+        }
+      };
+    }
+
+    // 场景 1: Notice
+    function showNotice() {
+      openDialog({
+        type: 'notice',
+        title: '已读取会话缓存',
+        message: '上一次的本地开发会话已成功恢复，所有数据同步锁已解锁。',
+        confirmLabel: '知道了'
+      });
+      setStatus('Scenario: Notice 演示');
+    }
+
+    // 场景 2: Confirm Default
+    function showConfirmDefault() {
+      openDialog({
+        type: 'confirm',
+        title: '覆盖默认模板',
+        message: '发现已存在的自定义任务模板。选择“确认”将使用当前工作室任务的新模板覆盖它，原模板内容将被丢弃。',
+        confirmLabel: '覆盖写入',
+        cancelLabel: '保留现有'
+      });
+      setStatus('Scenario: Confirm Default 演示（初始焦点在取消按钮）');
+    }
+
+    // 场景 3: Danger Confirm
+    function showConfirmDanger() {
+      openDialog({
+        type: 'confirm',
+        title: '删除会话',
+        intent: 'danger',
+        message: '您正准备删除会话。此操作将彻底销毁该 JSONL 历史文件与相关的 workspace changed-file overlay，且不可撤销。',
+        confirmLabel: '删除文件',
+        cancelLabel: '保留会话'
+      });
+      setStatus('Scenario: Danger Confirm 危险确认演示（红色危险主操作位于右侧，初始焦点在取消）');
+    }
+
+    // 场景 4: Prompt Default
+    function showPromptDefault() {
+      openDialog({
+        type: 'prompt',
+        title: '关联新的跳板机配置',
+        message: '请输入您需要绑定的 SSH 代理服务名称：',
+        placeholder: '例如 my-jump-host',
+        confirmLabel: '绑定',
+        cancelLabel: '取消'
+      });
+      setStatus('Scenario: Prompt Default 演示 (初始聚焦于输入框)');
+    }
+
+    // 场景 5: Prompt Prepopulated
+    function showPromptPrepopulated() {
+      openDialog({
+        type: 'prompt',
+        title: '修改账户备注',
+        message: '设置该 ChatGPT / OpenAI 凭据的可读别名，允许输入空以清除备注：',
+        initialValue: '开发测试-备用Key',
+        placeholder: '输入别名...',
+        confirmLabel: '修改备注',
+        cancelLabel: '取消'
+      });
+      setStatus('Scenario: Prompt Prepopulated 演示 (带预填且自动选中文案)');
+    }
+
+    // 场景 6: Prompt Validation Error
+    function showPromptValidationError() {
+      openDialog({
+        type: 'prompt',
+        title: '设置单日最大额度',
+        message: '请输入本次 OpenAI 接口调用限制额度，必须为正整数且不能超过 50.00：',
+        initialValue: '',
+        placeholder: '正数，单位 USD',
+        showError: '输入格式不正确，必须是小于等于 50 的数字',
+        validateErrorTrigger: true,
+        confirmLabel: '应用限额',
+        cancelLabel: '返回'
+      });
+      setStatus('Scenario: Prompt Validation Error 演示 (展示静态格式错误及回车拦截)');
+    }
+
+    // 场景 7: Prompt Long Message
+    function showPromptLongMessage() {
+      const longText = Array(15).fill("这是模拟的超长文本段落，主要用于测试当提示正文太长或屏幕视口太小时，正文区能否独立展示滚动条，避免头部和底部操作按钮被挤出屏幕，确保整体布局和可访问性。").join("\n\n");
+      openDialog({
+        type: 'confirm',
+        title: '重置额度使用记录',
+        message: longText,
+        confirmLabel: '确认重置',
+        cancelLabel: '取消'
+      });
+      setStatus('Scenario: 超长文本滚动与视口锁定测试');
+    }
+
+    // 场景 8: Prompt Busy
+    function showPromptBusy() {
+      openDialog({
+        type: 'confirm',
+        title: '跨工作区启动终端面板',
+        message: '终端正建立 SSH 连接以进行代理绑定，这需要几秒钟。请勿刷新页面。',
+        confirmLabel: '连接中...',
+        cancelLabel: '取消',
+        busy: true
+      });
+      setStatus('Scenario: Busy/Disabled 状态演示 (操作按钮禁用，阻止 Escape 关闭)');
+    }
+
+    // 触发 Toast
+    function triggerToast(tone, message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${tone}`;
+      toast.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+      
+      // 控制最大堆叠 3 条，超出从旧到新移除
+      if (container.children.length >= 3) {
+        container.removeChild(container.firstChild);
+      }
+
+      toast.innerHTML = `
+        <div class="toast-content">
+          <div class="toast-status-indicator"></div>
+          <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+
+      container.appendChild(toast);
+      
+      // 5秒后自动关闭
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, 5000);
+
+      setStatus(`已弹出非阻塞 ${tone} toast: "${message}"`);
+    }
+
+    // 默认展示 Notice 场景
+    window.onload = function() {
+      showNotice();
+    }
+  </script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay, type QuotaDisplayTier } from "@/lib/quota-display";
+import { usePrompt } from "./AppPromptProvider";
 
 type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
 
@@ -107,6 +108,7 @@ function formatTime(value: number | null): string {
 }
 
 export function ChatGptUsagePanel() {
+  const { confirm } = usePrompt();
   const [open, setOpen] = useState(false);
   const [account, setAccount] = useState<OAuthAccountSummary | null>(null);
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
@@ -226,7 +228,12 @@ export function ChatGptUsagePanel() {
 
   const resetQuota = useCallback(async () => {
     if (!account || resetting) return;
-    const ok = window.confirm("将消耗一次 Codex 重置机会，确认继续？");
+    const ok = await confirm({
+      title: "确认重置额度",
+      message: "将消耗一次 Codex 重置机会，确认继续？",
+      confirmLabel: "确认继续",
+      intent: "danger",
+    });
     if (!ok) return;
 
     setResetting(true);
@@ -257,7 +264,7 @@ export function ChatGptUsagePanel() {
     } finally {
       setResetting(false);
     }
-  }, [account, loadAccounts, resetting]);
+  }, [account, confirm, loadAccounts, resetting]);
 
   const activateAccount = useCallback(async (accountId: string) => {
     setActivatingAccountId(accountId);
@@ -281,7 +288,12 @@ export function ChatGptUsagePanel() {
   }, []);
 
   const repairLock = useCallback(async () => {
-    const ok = window.confirm("风险提示：修复会删除当前 ChatGPT 自动刷新锁。如果另一个健康的 yolk pi web 进程仍在运行，可能短时间产生重复刷新。确认只在刷新器明显卡住或锁文件 stale 时继续？");
+    const ok = await confirm({
+      title: "确认修复刷新锁",
+      message: "风险提示：修复会删除当前 ChatGPT 自动刷新锁。如果另一个健康的 yolk pi web 进程仍在运行，可能短时间产生重复刷新。确认只在刷新器明显卡住或锁文件 stale 时继续？",
+      confirmLabel: "继续修复",
+      intent: "danger",
+    });
     if (!ok) return;
     setRepairingLock(true);
     setSchedulerError(null);
@@ -299,7 +311,7 @@ export function ChatGptUsagePanel() {
     } finally {
       setRepairingLock(false);
     }
-  }, []);
+  }, [confirm]);
 
   const quotaCache = account?.quotaCache ?? null;
   const displayedQuota = quotaResult?.success ? quotaResult : quotaCache;

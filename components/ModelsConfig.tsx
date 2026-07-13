@@ -6,6 +6,7 @@ import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, convertOAuthAccountC
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay } from "@/lib/quota-display";
 import { ChatGptWarmupDialog } from "./ChatGptWarmupDialog";
 import { SelectDropdown } from "./SelectDropdown";
+import { usePrompt } from "./AppPromptProvider";
 // Color icons (have their own fill colors — no background needed)
 import AnthropicIcon from "@lobehub/icons/es/Anthropic/components/Mono";
 import OpenAIIcon from "@lobehub/icons/es/OpenAI/components/Mono";
@@ -1417,6 +1418,7 @@ function AddAccountDialog({
 }
 
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
+  const { confirm, prompt } = usePrompt();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
   const [quota, setQuota] = useState<SubscriptionQuota | null>(null);
@@ -1668,7 +1670,12 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   }, [provider.id, onRefresh, loadQuota]);
 
   const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
-    const nextLabel = window.prompt("Account remark (leave empty to clear):", account.label ?? "");
+    const nextLabel = await prompt({
+      title: "Account remark",
+      message: "Leave empty to clear the remark.",
+      initialValue: account.label ?? "",
+      confirmLabel: "Save remark",
+    });
     if (nextLabel === null) return;
 
     setSavingLabelAccountId(account.accountId);
@@ -1690,7 +1697,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setSavingLabelAccountId(null);
     }
-  }, [provider.id]);
+  }, [prompt, provider.id]);
 
   const handleEditAccountExtraInfo = useCallback((account: OAuthAccountSummary) => {
     setEditingExtraInfoAccount(account);
@@ -1742,7 +1749,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const handleResetQuota = useCallback(async () => {
     const quotaAccountId = selectedQuotaAccountId;
     if (!quotaAccountId || quotaResetting) return;
-    const ok = window.confirm("将消耗一次 Codex 重置机会，确认继续？");
+    const ok = await confirm({
+      title: "确认重置额度？",
+      message: "将消耗一次 Codex 重置机会，确认继续？",
+      confirmLabel: "确认继续",
+    });
     if (!ok) return;
 
     setQuotaResetting(true);
@@ -1765,10 +1776,16 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setQuotaResetting(false);
     }
-  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId]);
+  }, [confirm, loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId]);
 
   const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
-    if (!window.confirm(`Delete saved credentials for ${account.displayName}?\n\nThe account must be added again to restore it.`)) return;
+    const confirmed = await confirm({
+      title: "Delete saved credentials?",
+      message: <>Delete saved credentials for {account.displayName}?<br /><br />The account must be added again to restore it.</>,
+      confirmLabel: "Delete credentials",
+      intent: "danger",
+    });
+    if (!confirmed) return;
 
     setDeletingAccountId(account.accountId);
     setAccountsError(null);
@@ -1789,7 +1806,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setDeletingAccountId(null);
     }
-  }, [provider.id]);
+  }, [confirm, provider.id]);
 
   const selectedQuotaAccount = accounts.find((account) => account.accountId === selectedQuotaAccountId)
     ?? accounts.find((account) => account.active)
@@ -2042,6 +2059,7 @@ function formatAccountTime(iso: string | null): string {
 }
 
 function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRefresh: () => void }) {
+  const { toast } = usePrompt();
   const [accounts, setAccounts] = useState<ApiKeyAccountEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2082,9 +2100,6 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   const [disableSaving, setDisableSaving] = useState(false);
   const [disableReplacementId, setDisableReplacementId] = useState<string | null>(null);
 
-  // Success toast
-  const [toast, setToast] = useState<string | null>(null);
-
   // Reset all state when provider changes
   useEffect(() => {
     setAccounts([]);
@@ -2114,7 +2129,6 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     setEditError(null);
     setDeleteConfirm(null);
     setDeleteDeleting(false);
-    setToast(null);
   }, [provider.id]);
 
   const loadAccounts = useCallback(async () => {
@@ -2136,10 +2150,9 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     void loadAccounts();
   }, [loadAccounts]);
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  }, []);
+  const showToast = useCallback((message: string, tone: "success" | "error" = "success") => {
+    toast({ message, tone });
+  }, [toast]);
 
   // Reveal
   const handleReveal = useCallback(async (accountId: string) => {
@@ -2162,7 +2175,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       next.set(accountId, data.apiKey);
       setRevealedKeys(next);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Reveal failed");
+      showToast(e instanceof Error ? e.message : "Reveal failed", "error");
     } finally {
       setRevealingId(null);
     }
@@ -2186,7 +2199,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
         next.set(accountId, data.apiKey);
         setRevealedKeys(next);
       } catch (e) {
-        showToast(e instanceof Error ? e.message : "Copy failed");
+        showToast(e instanceof Error ? e.message : "Copy failed", "error");
         setRevealingId(null);
         return;
       }
@@ -2197,7 +2210,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setTimeout(() => setCopiedId(null), 2000);
       showToast("API key copied to clipboard");
     } catch {
-      showToast("Failed to copy to clipboard");
+      showToast("Failed to copy to clipboard", "error");
     } finally {
       setRevealingId(null);
     }
@@ -2472,18 +2485,6 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <span>Your previous API key has been imported. You can rename it or add additional keys below.</span>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: "fixed", bottom: 24, right: 24, zIndex: 1300,
-          padding: "10px 18px", background: "#16a34a", color: "#fff", borderRadius: 8,
-          fontSize: 13, fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-          animation: "toast-in 0.25s ease",
-        }}>
-          {toast}
         </div>
       )}
 

@@ -29,6 +29,7 @@ import {
 } from "@/lib/ypi-studio-task-preview";
 import { MarkdownBody } from "./MarkdownBody";
 import { TaskWorkflowFlowSection, WorkflowDetailPanel } from "./YpiStudioWorkflowDetail";
+import { usePrompt } from "./AppPromptProvider";
 
 interface Props {
   cwd: string | null;
@@ -137,6 +138,7 @@ function statusTone(status: string): "success" | "warning" | "error" | "neutral"
 }
 
 export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initialTab, initialScope, refreshKey = 0, currentSessionContextId = null, onTaskBound, studioConfig, onOpenStudioMemberSettings }: Props) {
+  const { confirm } = usePrompt();
   const [activeTab, setActiveTab] = useState<StudioTab>(initialTab ?? "members");
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [workflowLoadState, setWorkflowLoadState] = useState<LoadState>("idle");
@@ -246,7 +248,12 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
 
   const handleArchiveTask = useCallback(async (task: YpiStudioTaskSummary) => {
     if (!cwd || task.archived || task.status !== "completed") return;
-    const ok = window.confirm("归档会移动任务目录并生成 .ypi/knowledge 知识条目。页面归档无法调用当前聊天模型，将使用任务产物生成兜底摘要；如需模型整理，请在聊天中执行 /studio-archive。仍要归档吗？");
+    const ok = await confirm({
+      title: "确认归档任务",
+      message: "归档会移动任务目录并生成 .ypi/knowledge 知识条目。页面归档无法调用当前聊天模型，将使用任务产物生成兜底摘要；如需模型整理，请在聊天中执行 /studio-archive。仍要归档吗？",
+      confirmLabel: "归档任务",
+      intent: "danger",
+    });
     if (!ok) return;
     setError(null);
     try {
@@ -262,7 +269,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [cwd, loadTasks]);
+  }, [confirm, cwd, loadTasks]);
 
   useEffect(() => {
     if (!cwd) {
@@ -314,7 +321,12 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     if (!cwd || initBusy) return;
     const overwriteDefaults = !!data?.exists && !!workflowsData?.exists && !needsAgentInit(data) && !needsWorkflowInit(workflowsData);
     if (overwriteDefaults) {
-      const ok = window.confirm("将用当前内置模板覆盖 .ypi/agents 和 .ypi/workflows 中同名默认成员/流程文件；自定义命名文件不会覆盖。继续吗？");
+      const ok = await confirm({
+        title: "确认覆盖默认模板",
+        message: "将用当前内置模板覆盖 .ypi/agents 和 .ypi/workflows 中同名默认成员/流程文件；自定义命名文件不会覆盖。继续吗？",
+        confirmLabel: "继续覆盖",
+        intent: "danger",
+      });
       if (!ok) return;
     }
     setInitBusy(true);
@@ -361,7 +373,7 @@ export function YpiStudioPanel({ cwd, onOpenFile, focusedTaskKey = null, initial
     } finally {
       setInitBusy(false);
     }
-  }, [cwd, data, initBusy, loadTasks, workflowsData]);
+  }, [confirm, cwd, data, initBusy, loadTasks, workflowsData]);
 
   if (!cwd) {
     return <PanelEmpty title="请选择项目空间" description="选择一个会话或工作目录后，可在该项目根目录初始化 .ypi/agents/、.ypi/workflows/ 和工作室任务。" />;

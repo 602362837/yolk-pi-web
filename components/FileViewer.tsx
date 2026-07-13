@@ -8,6 +8,7 @@ import { encodeFilePathForApi, getFileName, getRelativeFilePath } from "@/lib/fi
 import { markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins } from "@/lib/markdown";
 import type { PiWebEditorConfig } from "@/lib/pi-web-config";
 import type { MonacoFileEditorProps } from "./MonacoFileEditor";
+import { usePrompt } from "./AppPromptProvider";
 
 const MonacoFileEditor = dynamic<MonacoFileEditorProps>(
   () => import("./MonacoFileEditor").then((mod) => mod.MonacoFileEditor),
@@ -801,6 +802,7 @@ export function FileViewer({ filePath, cwd, initialLine, editorConfig, onAddChat
 }
 
 function TextFileViewer({ filePath, cwd, initialLine, editorConfig, onAddChat, onOpenFile }: Props) {
+  const { confirm } = usePrompt();
   const { isDark } = useTheme();
   const effectiveEditorConfig = editorConfig ?? DEFAULT_EDITOR_CONFIG;
   const [data, setData] = useState<FileData | null>(null);
@@ -907,11 +909,19 @@ function TextFileViewer({ filePath, cwd, initialLine, editorConfig, onAddChat, o
       .finally(() => setSaving(false));
   }, [data, filePath, saving]);
 
-  const handleReloadFromDisk = useCallback(() => {
-    if (dirtyRef.current && !window.confirm("Discard unsaved edits and reload the file from disk?")) return;
+  const handleReloadFromDisk = useCallback(async () => {
+    if (dirtyRef.current) {
+      const confirmed = await confirm({
+        title: "Discard unsaved edits?",
+        message: "Discard unsaved edits and reload the file from disk?",
+        confirmLabel: "Discard and reload",
+        intent: "danger",
+      });
+      if (!confirmed) return;
+    }
     setLoading(true);
     fetchContent(filePath).finally(() => setLoading(false));
-  }, [fetchContent, filePath]);
+  }, [confirm, fetchContent, filePath]);
 
   const handleEditorChange = useCallback((value: string) => {
     editorContentRef.current = value;
