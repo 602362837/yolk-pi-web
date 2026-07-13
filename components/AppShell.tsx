@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useCallback, useRef, useEffect, useSyncExternalStore, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -40,13 +40,6 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function getInitialSidebarWidth(): number {
-  if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
-  const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-  if (!Number.isFinite(stored)) return DEFAULT_SIDEBAR_WIDTH;
-  return clampNumber(stored, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
-}
-
 // ── Preview panel FileExplorer state ──
 const MIN_EXPLORER_HEIGHT = 120;
 const MIN_PREVIEW_HEIGHT = 120;
@@ -65,39 +58,211 @@ function clampRightPanelWidth(width: number, viewportWidth: number): number {
   return clampNumber(width, RIGHT_PANEL_MIN_WIDTH, maxWidth);
 }
 
-function getInitialRightPanelWidth(): number {
-  if (typeof window === "undefined") return RIGHT_PANEL_MIN_WIDTH;
+/**
+ * Hydration-safe localStorage external store for layout primitives.
+ * Pair with useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).
+ * - SSR / hydration first paint uses getServerSnapshot (stable defaults).
+ * - After hydration, getSnapshot reads localStorage (parse/clamp/migrate).
+ * - setValue writes, updates the cached snapshot, and notifies same-tab listeners.
+ * - storage events cover other tabs; never notify during getSnapshot/read/migrate.
+ */
+type PersistentLayoutPrimitive = string | number | boolean | null;
+
+type PersistentLayoutStoreOptions<T extends PersistentLayoutPrimitive> = {
+  key: string;
+  /** Extra keys that should invalidate the snapshot (e.g. legacy migration keys). */
+  watchKeys?: readonly string[];
+  getServerSnapshot: () => T;
+  /** Client read path: parse, clamp, migrate. Must not notify listeners. */
+  read: () => T;
+  /** Persist a value. Should normalize/clamp. Must not notify listeners. */
+  write: (value: T) => void;
+};
+
+type PersistentLayoutStore<T extends PersistentLayoutPrimitive> = {
+  subscribe: (onStoreChange: () => void) => () => void;
+  getSnapshot: () => T;
+  getServerSnapshot: () => T;
+  setValue: (value: T | ((prev: T) => T)) => void;
+};
+
+function createPersistentLayoutStore<T extends PersistentLayoutPrimitive>(
+  options: PersistentLayoutStoreOptions<T>,
+): PersistentLayoutStore<T> {
+  const listeners = new Set<() => void>();
+  let cachedSnapshot: T | undefined;
+  let hasCache = false;
+
+  const invalidateAndNotify = () => {
+    hasCache = false;
+    cachedSnapshot = undefined;
+    listeners.forEach((listener) => listener());
+  };
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null) {
+      invalidateAndNotify();
+      return;
+    }
+    if (event.key === options.key || options.watchKeys?.includes(event.key)) {
+      invalidateAndNotify();
+    }
+  };
+
+  const subscribe = (onStoreChange: () => void): (() => void) => {
+    listeners.add(onStoreChange);
+    if (typeof window !== "undefined" && listeners.size === 1) {
+      window.addEventListener("storage", onStorage);
+    }
+    return () => {
+      listeners.delete(onStoreChange);
+      if (typeof window !== "undefined" && listeners.size === 0) {
+        window.removeEventListener("storage", onStorage);
+      }
+    };
+  };
+
+  const getSnapshot = (): T => {
+    if (hasCache) return cachedSnapshot as T;
+    let next: T;
+    try {
+      next = options.read();
+    } catch {
+      next = options.getServerSnapshot();
+    }
+    cachedSnapshot = next;
+    hasCache = true;
+    return next;
+  };
+
+  const getServerSnapshot = (): T => options.getServerSnapshot();
+
+  const setValue = (value: T | ((prev: T) => T)) => {
+    const prev =
+      typeof window === "undefined"
+        ? options.getServerSnapshot()
+        : getSnapshot();
+    const next = typeof value === "function" ? (value as (prev: T) => T)(prev) : value;
+
+    try {
+      options.write(next);
+    } catch {
+      // Private mode / quota / disabled storage — still update in-memory snapshot.
+    }
+
+    if (hasCache && Object.is(cachedSnapshot, next)) return;
+    cachedSnapshot = next;
+    hasCache = true;
+    listeners.forEach((listener) => listener());
+  };
+
+  return { subscribe, getSnapshot, getServerSnapshot, setValue };
+}
+
+function readSidebarWidth(): number {
+  try {
+    const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+    if (!Number.isFinite(stored)) return DEFAULT_SIDEBAR_WIDTH;
+    return clampNumber(stored, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH;
+  }
+}
+
+function writeSidebarWidth(value: number): void {
+  const next = clampNumber(value, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+  window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(next));
+}
+
+const sidebarWidthStore = createPersistentLayoutStore<number>({
+  key: SIDEBAR_WIDTH_STORAGE_KEY,
+  getServerSnapshot: () => DEFAULT_SIDEBAR_WIDTH,
+  read: readSidebarWidth,
+  write: writeSidebarWidth,
+});
+
+function readRightPanelWidth(): number {
   try {
     const stored = Number(window.localStorage.getItem(RIGHT_PANEL_WIDTH_STORAGE_KEY));
     if (Number.isFinite(stored) && stored >= RIGHT_PANEL_MIN_WIDTH) {
       return clampRightPanelWidth(stored, window.innerWidth);
     }
-  } catch { /* ignore */ }
+  } catch {
+    // fall through to default
+  }
   const defaultWidth = Math.round(window.innerWidth * 0.42);
   return clampRightPanelWidth(defaultWidth, window.innerWidth);
 }
 
-function getInitialExplorerHeight(): number | null {
-  if (typeof window === "undefined") return null;
-  // Migrate from legacy sidebar explorer key once
-  const legacy = Number(window.localStorage.getItem(EXPLORER_HEIGHT_LEGACY_KEY));
-  if (Number.isFinite(legacy) && legacy > 0) {
-    const clamped = Math.max(MIN_EXPLORER_HEIGHT, legacy);
-    window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(clamped)));
-    window.localStorage.removeItem(EXPLORER_HEIGHT_LEGACY_KEY);
-    return clamped;
-  }
-  const stored = Number(window.localStorage.getItem(EXPLORER_HEIGHT_STORAGE_KEY));
-  if (!Number.isFinite(stored)) return null;
-  return Math.max(MIN_EXPLORER_HEIGHT, stored);
+function writeRightPanelWidth(value: number): void {
+  const next = clampRightPanelWidth(value, typeof window !== "undefined" ? window.innerWidth : 0);
+  window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(next));
 }
 
-function getInitialExplorerOpen(): boolean {
-  if (typeof window === "undefined") return true;
-  const stored = window.localStorage.getItem(EXPLORER_OPEN_STORAGE_KEY);
-  if (stored === null) return true;
-  return stored !== "false";
+const rightPanelWidthStore = createPersistentLayoutStore<number>({
+  key: RIGHT_PANEL_WIDTH_STORAGE_KEY,
+  getServerSnapshot: () => RIGHT_PANEL_MIN_WIDTH,
+  read: readRightPanelWidth,
+  write: writeRightPanelWidth,
+});
+
+function readExplorerHeight(): number | null {
+  try {
+    // Migrate from legacy sidebar explorer key once. Do not notify during read.
+    const legacy = Number(window.localStorage.getItem(EXPLORER_HEIGHT_LEGACY_KEY));
+    if (Number.isFinite(legacy) && legacy > 0) {
+      const clamped = Math.max(MIN_EXPLORER_HEIGHT, legacy);
+      try {
+        window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(clamped)));
+        window.localStorage.removeItem(EXPLORER_HEIGHT_LEGACY_KEY);
+      } catch {
+        // Migration write failed; still return the clamped value for this session.
+      }
+      return clamped;
+    }
+    const stored = Number(window.localStorage.getItem(EXPLORER_HEIGHT_STORAGE_KEY));
+    if (!Number.isFinite(stored)) return null;
+    return Math.max(MIN_EXPLORER_HEIGHT, stored);
+  } catch {
+    return null;
+  }
 }
+
+function writeExplorerHeight(value: number | null): void {
+  // null means "use flex default"; do not persist or clear an existing preference.
+  if (value === null) return;
+  const next = Math.max(MIN_EXPLORER_HEIGHT, value);
+  window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(next)));
+}
+
+const explorerHeightStore = createPersistentLayoutStore<number | null>({
+  key: EXPLORER_HEIGHT_STORAGE_KEY,
+  watchKeys: [EXPLORER_HEIGHT_LEGACY_KEY],
+  getServerSnapshot: () => null,
+  read: readExplorerHeight,
+  write: writeExplorerHeight,
+});
+
+function readExplorerOpen(): boolean {
+  try {
+    const stored = window.localStorage.getItem(EXPLORER_OPEN_STORAGE_KEY);
+    if (stored === null) return true;
+    return stored !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeExplorerOpen(value: boolean): void {
+  window.localStorage.setItem(EXPLORER_OPEN_STORAGE_KEY, String(value));
+}
+
+const explorerOpenStore = createPersistentLayoutStore<boolean>({
+  key: EXPLORER_OPEN_STORAGE_KEY,
+  getServerSnapshot: () => true,
+  read: readExplorerOpen,
+  write: writeExplorerOpen,
+});
 
 function studioContextIdForSession(sessionId: string | null | undefined): string | null {
   if (!sessionId) return null;
@@ -184,10 +349,18 @@ export function AppShell() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [sessionKey, setSessionKey] = useState(0);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
-  // ── Preview panel FileExplorer state ──
-  const [explorerOpen, setExplorerOpen] = useState(getInitialExplorerOpen);
+  // ── Preview panel FileExplorer state (hydration-safe external stores) ──
+  const explorerOpen = useSyncExternalStore(
+    explorerOpenStore.subscribe,
+    explorerOpenStore.getSnapshot,
+    explorerOpenStore.getServerSnapshot,
+  );
   const [explorerKey, setExplorerKey] = useState(0);
-  const [explorerHeight, setExplorerHeight] = useState<number | null>(getInitialExplorerHeight);
+  const explorerHeight = useSyncExternalStore(
+    explorerHeightStore.subscribe,
+    explorerHeightStore.getSnapshot,
+    explorerHeightStore.getServerSnapshot,
+  );
   const [explorerResizing, setExplorerResizing] = useState(false);
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const explorerSectionRef = useRef<HTMLDivElement>(null);
@@ -206,7 +379,12 @@ export function AppShell() {
   const [terminalDockCwd, setTerminalDockCwd] = useState<string | null>(null);
   const [terminalInitialInput, setTerminalInitialInput] = useState<{ id: string; text: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth);
+  // Hydration-safe: SSR + first client paint use DEFAULT_SIDEBAR_WIDTH; then localStorage.
+  const sidebarWidth = useSyncExternalStore(
+    sidebarWidthStore.subscribe,
+    sidebarWidthStore.getSnapshot,
+    sidebarWidthStore.getServerSnapshot,
+  );
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
@@ -228,19 +406,6 @@ export function AppShell() {
     return () => controller.abort();
   }, [loadWebConfig]);
 
-  useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (explorerHeight === null) return;
-    window.localStorage.setItem(EXPLORER_HEIGHT_STORAGE_KEY, String(Math.round(explorerHeight)));
-  }, [explorerHeight]);
-
-  useEffect(() => {
-    window.localStorage.setItem(EXPLORER_OPEN_STORAGE_KEY, String(explorerOpen));
-  }, [explorerOpen]);
-
   // When explorerRefreshKey bumps (agent end, etc.), bump the internal explorer key
   useEffect(() => {
     setExplorerKey((k) => k + 1);
@@ -250,7 +415,8 @@ export function AppShell() {
     if (!sidebarOpen) return;
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = sidebarWidth;
+    // Capture current snapshot once at drag start to avoid stale closure mid-drag.
+    const startWidth = sidebarWidthStore.getSnapshot();
     const maxWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.floor(window.innerWidth * 0.6)));
     const previousCursor = document.body.style.cursor;
     const previousUserSelect = document.body.style.userSelect;
@@ -261,7 +427,7 @@ export function AppShell() {
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const nextWidth = clampNumber(startWidth + moveEvent.clientX - startX, MIN_SIDEBAR_WIDTH, maxWidth);
-      setSidebarWidth(nextWidth);
+      sidebarWidthStore.setValue(nextWidth);
     };
 
     const finishResize = () => {
@@ -276,7 +442,7 @@ export function AppShell() {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", finishResize);
     window.addEventListener("pointercancel", finishResize);
-  }, [sidebarOpen, sidebarWidth]);
+  }, [sidebarOpen]);
 
   // ── Preview panel FileExplorer resize ──
   const handleExplorerResizePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -299,7 +465,7 @@ export function AppShell() {
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const nextHeight = clampNumber(startHeight + (moveEvent.clientY - startY), MIN_EXPLORER_HEIGHT, maxHeight);
-      setExplorerHeight(nextHeight);
+      explorerHeightStore.setValue(nextHeight);
     };
 
     const finishResize = () => {
@@ -385,20 +551,18 @@ export function AppShell() {
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelMode, setRightPanelMode] = useState<"files" | "studio" | "trellis">("files");
-  const [rightPanelWidth, setRightPanelWidth] = useState(getInitialRightPanelWidth);
+  // Hydration-safe: SSR + first client paint use RIGHT_PANEL_MIN_WIDTH; then localStorage.
+  const rightPanelWidth = useSyncExternalStore(
+    rightPanelWidthStore.subscribe,
+    rightPanelWidthStore.getSnapshot,
+    rightPanelWidthStore.getServerSnapshot,
+  );
   const [rightPanelResizing, setRightPanelResizing] = useState(false);
 
-  // Persist right panel width
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(rightPanelWidth));
-    } catch { /* ignore */ }
-  }, [rightPanelWidth]);
-
-  // Clamp right panel width on window resize
+  // Clamp right panel width on window resize (write-back through store setter).
   useEffect(() => {
     const handleResize = () => {
-      setRightPanelWidth((prev) => clampRightPanelWidth(prev, window.innerWidth));
+      rightPanelWidthStore.setValue((prev) => clampRightPanelWidth(prev, window.innerWidth));
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -410,7 +574,8 @@ export function AppShell() {
     event.preventDefault();
     event.stopPropagation();
     const startX = event.clientX;
-    const startWidth = rightPanelWidth;
+    // Capture current snapshot once at drag start to avoid stale closure mid-drag.
+    const startWidth = rightPanelWidthStore.getSnapshot();
     const previousCursor = document.body.style.cursor;
     const previousUserSelect = document.body.style.userSelect;
 
@@ -421,7 +586,7 @@ export function AppShell() {
     const handlePointerMove = (moveEvent: PointerEvent) => {
       // Dragging left (decreasing clientX) → wider panel
       const nextWidth = clampRightPanelWidth(startWidth - (moveEvent.clientX - startX), window.innerWidth);
-      setRightPanelWidth(nextWidth);
+      rightPanelWidthStore.setValue(nextWidth);
     };
 
     const finishResize = () => {
@@ -436,7 +601,7 @@ export function AppShell() {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", finishResize);
     window.addEventListener("pointercancel", finishResize);
-  }, [rightPanelOpen, rightPanelWidth]);
+  }, [rightPanelOpen]);
 
   const [focusedTrellisTaskKey, setFocusedTrellisTaskKey] = useState<string | null>(null);
   const [trellisSessionTask, setTrellisSessionTask] = useState<TrellisSessionTaskLinkResult | null>(null);
@@ -1661,7 +1826,7 @@ export function AppShell() {
                 >
                   <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                     <button
-                      onClick={() => setExplorerOpen((v) => !v)}
+                      onClick={() => explorerOpenStore.setValue((v) => !v)}
                       style={{
                         display: "flex",
                         alignItems: "center",
