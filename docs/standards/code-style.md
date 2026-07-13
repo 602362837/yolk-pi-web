@@ -36,7 +36,9 @@ Current lightweight scripts:
 ```bash
 npm run test:studio-policy
 npm run test:studio-dag
+npm run test:session-title
+npm run test:studio-sdk-runner
 npm run test:terminal-ssh
 ```
 
-`test:studio-policy` exercises the pure YPI Studio member model/thinking policy resolver. `test:studio-dag` exercises YPI Studio implementation DAG readiness, approval gating, runtime waiting/needs-user projection, and terminal continuation idempotency without introducing a test framework. `test:terminal-ssh` runs dry-run Web Terminal SSH security/config checks for non-secret config defaults, redaction boundaries, HostKeyAlias generation, ProxyCommand gates, proxy command secret handling, and temp cleanup assumptions. If a broader test framework is introduced later, document it here and update `AGENTS.md`.
+`test:studio-policy` exercises the pure YPI Studio member model/thinking policy resolver. `test:studio-dag` exercises YPI Studio implementation DAG readiness, approval gating, runtime waiting/needs-user projection, and terminal continuation idempotency without introducing a test framework. `test:session-title` covers Studio child step-title formatting, ordinary-session fallbacks, and same-task projection cache isolation. `test:studio-sdk-runner` covers child JSONL header writes and shared title helper contract for durable `session_info` names. `test:terminal-ssh` runs dry-run Web Terminal SSH security/config checks for non-secret config defaults, redaction boundaries, HostKeyAlias generation, ProxyCommand gates, proxy command secret handling, and temp cleanup assumptions. If a broader test framework is introduced later, document it here and update `AGENTS.md`.

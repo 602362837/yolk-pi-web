@@ -258,15 +258,20 @@ function studioChildDetailText(session: SessionInfo): string | null {
   const child = session.studioChild;
   if (!child) return null;
   const run = child.runId ? child.runId.slice(0, 8) : undefined;
-  return [session.studioChildDisplay?.subtaskTitle ?? child.subtaskId, run ? `run ${run}` : undefined].filter(Boolean).join(" · ") || null;
+  const subtaskId = session.studioChildDisplay?.subtaskId ?? child.subtaskId;
+  // Detail keeps subtask label + run short id; main title owns the step-id formatting rule.
+  return [session.studioChildDisplay?.subtaskTitle ?? subtaskId, run ? `run ${run}` : undefined].filter(Boolean).join(" · ") || null;
 }
 
 function studioChildTitleTooltip(session: SessionInfo, title: string): string {
   const child = session.studioChild;
   if (!child) return title;
+  const subtaskId = session.studioChildDisplay?.subtaskId ?? child.subtaskId;
+  const subtaskTitle = session.studioChildDisplay?.subtaskTitle;
   return [
     title,
-    session.studioChildDisplay?.subtaskTitle ? `Subtask: ${session.studioChildDisplay.subtaskTitle}` : child.subtaskId ? `Subtask: ${child.subtaskId}` : undefined,
+    subtaskTitle ? `Subtask: ${subtaskTitle}` : subtaskId ? `Subtask: ${subtaskId}` : undefined,
+    subtaskId && subtaskTitle ? `Step: ${subtaskId}` : undefined,
     `Member: ${child.member}`,
     `Status: ${child.status ?? "audit"}`,
     child.runId ? `Run: ${child.runId}` : undefined,

@@ -154,9 +154,11 @@ const studioDisplayCache = new Map<string, { expiresAt: number; value?: StudioCh
 
 export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChildSessionInfo): StudioChildSessionDisplay | undefined {
   if (!studioChild?.taskId) return undefined;
-  const cacheKey = `${canonicalizeCwd(cwd)}:${studioChild.taskId}`;
+  // Isolate by subtask/run: title/summary depend on both, not only the parent task.
+  const cacheKey = `${canonicalizeCwd(cwd)}:${studioChild.taskId}:${studioChild.subtaskId ?? ""}:${studioChild.runId ?? ""}`;
   const cached = studioDisplayCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const headerSubtaskId = firstNonEmpty(studioChild.subtaskId);
   try {
     let detail = getYpiStudioTaskDetail(cwd, studioChild.taskId);
     if (!detail) {
@@ -164,8 +166,10 @@ export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChild
       if (match) detail = getYpiStudioTaskDetail(cwd, match.key);
     }
     if (!detail) {
-      studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS });
-      return undefined;
+      // Header-only projection still exposes stable step id for legacy children.
+      const value = headerSubtaskId ? { subtaskId: headerSubtaskId } : undefined;
+      studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
+      return value;
     }
     const run = detail.subagents.find((item) => item.id === studioChild.runId);
     const subtaskTitle = studioChild.subtaskId
@@ -173,16 +177,18 @@ export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChild
         ?? detail.implementationPlan?.subtasks.find((item) => item.id === studioChild.subtaskId)?.title
       : undefined;
     const runSummary = firstNonEmpty(run?.summary, run?.progress?.lastTextPreview);
-    const value = {
+    const value: StudioChildSessionDisplay = {
       taskTitle: firstNonEmpty(detail.title),
+      subtaskId: headerSubtaskId,
       subtaskTitle,
       runSummary,
     };
     studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
     return value;
   } catch {
-    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS });
-    return undefined;
+    const value = headerSubtaskId ? { subtaskId: headerSubtaskId } : undefined;
+    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
+    return value;
   }
 }
 
