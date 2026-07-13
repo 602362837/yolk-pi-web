@@ -43,12 +43,22 @@ Use this skill for project releases of `@alan-zhao/yolk-pi-web` (`ypi`). Follow 
    git add package.json package-lock.json docs/deployment/README.md .pi/skills/yolk-release-publish/SKILL.md
    git commit -m "chore: release <version>"
    ```
-6. Push and tag the release commit:
+6. Push and tag the release commit with an **annotated** tag that describes the changes:
    ```bash
    git push origin main
-   git tag v<version> <release-commit>
+   git tag -a v<version> <release-commit> -m "$(cat <<'EOF'
+   release v<version>: <short summary of this release>
+
+   - <change 1>
+   - <change 2>
+   - <change 3>
+   EOF
+   )"
    git push origin v<version>
    ```
+   - Do **not** create lightweight tags (`git tag v<version>` without `-a`/`-m`).
+   - The tag message must explain **what changed** in this release, not only the version number.
+   - Prefer a one-line subject plus bullet points for notable fixes/features.
 7. Publish and verify:
    ```bash
    npm publish --access public
@@ -58,7 +68,17 @@ Use this skill for project releases of `@alan-zhao/yolk-pi-web` (`ypi`). Follow 
 
 - Prefer a manual version edit when the working tree is dirty; `npm version` expects a clean worktree and can accidentally mix unrelated bookkeeping.
 - Keep `package.json` and `package-lock.json` in sync.
-- Use tag format `v<version>` such as `v0.7.4`.
+- Use annotated tag format `v<version>` such as `v0.7.4`.
+- Tag messages are required and must describe the release content, for example:
+  ```text
+  release v0.7.4: fix session list memory and studio session ownership
+
+  - bound JSONL metadata scanner to reduce session-list memory
+  - exclusive transfer for YPI Studio task session ownership
+  - fix sidebar layout SSR hydration mismatch
+  ```
+- Derive the tag body from the actual release commit range / changelog of this version; do not invent unrelated notes.
+- Reject or rewrite tags that only contain the bare version (e.g. message is just `v0.7.4` or empty).
 
 ## Stop Conditions
 
@@ -68,3 +88,4 @@ Stop and report the blocker without publishing when:
 - `npm view @alan-zhao/yolk-pi-web version --prefer-online` already returns the intended version.
 - `git push origin main` or `git push origin v<version>` fails.
 - The working tree includes unrelated dirty files that would be swept into the release commit.
+- The release tag would be lightweight, or its message is empty / only the bare version with no change description.
