@@ -1,7 +1,40 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-12T05:20:28.709Z",
+  "updatedAt": "2026-07-13T11:38:50.008Z",
   "entries": [
+    {
+      "id": "20260713-193850-统一项目提示窗组件并迁移-alert-调用",
+      "title": "统一项目提示窗组件并迁移 alert 调用",
+      "taskId": "20260712-150809-统一项目提示窗组件并迁移-alert-调用",
+      "taskKey": "archived:2026-07:20260712-150809-统一项目提示窗组件并迁移-alert-调用",
+      "workflowId": "feature-dev",
+      "summary": "统一项目提示窗组件并迁移原生 alert/confirm/prompt：新增 AppPromptProvider、AppPromptDialog、AppToastViewport，提供 FIFO Promise API、exactly-once settlement、卸载取消、焦点管理、Escape/IME、scroll lock、inert 和 Toast；迁移 14 处原生调用，保留 confirm false、prompt null/空字符串语义；更新 frontend 文档。实现后需运行 lint、tsc、原生调用扫描和 diff check，并记录 UI 人工验收。",
+      "tags": [
+        "ui",
+        "prompt",
+        "dialog",
+        "toast",
+        "accessibility",
+        "migration",
+        "completed",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260712-150809-统一项目提示窗组件并迁移-alert-调用",
+      "knowledgePath": ".ypi/knowledge/20260713-193850-统一项目提示窗组件并迁移-alert-调用.md",
+      "createdAt": "2026-07-13T11:38:50.008Z",
+      "archivedAt": "2026-07-13T11:38:50.008Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260712-132028-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件",
       "title": "新增内存诊断快照能力：采集进程/AgentSession/Studio运行时状态并写入诊断文件",
