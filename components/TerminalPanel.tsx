@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { TerminalSshProfilePicker } from "./TerminalSshProfilePicker";
+import { usePrompt } from "./AppPromptProvider";
 import type { TerminalSshProfile } from "@/lib/terminal-ssh-types";
 
 interface Props {
@@ -572,6 +573,7 @@ function TerminalSessionView({ tab, visible, layoutVersion, onTabUpdate, initial
 }
 
 export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, initialInput }: Props) {
+  const { confirm } = usePrompt();
   const [state, dispatch] = useReducer(terminalReducer, cwd, createInitialState);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
@@ -614,11 +616,17 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
     for (const tab of Object.values(state.tabs)) deleteTerminalSession(tab.sessionId);
   }, [state.tabs]);
 
-  const handleCloseDock = useCallback(() => {
-    if (!window.confirm("Close the terminal dock and terminate all running terminal sessions? This cannot be restored.")) return;
+  const handleCloseDock = useCallback(async () => {
+    const confirmed = await confirm({
+      title: "Close terminal dock?",
+      message: "Close the terminal dock and terminate all running terminal sessions? This cannot be restored.",
+      confirmLabel: "Close dock",
+      intent: "danger",
+    });
+    if (!confirmed) return;
     closeAllSessions();
     onClose();
-  }, [closeAllSessions, onClose]);
+  }, [closeAllSessions, confirm, onClose]);
 
   const addLocalTab = useCallback(() => {
     dispatch({ type: "add_tab", tab: { kind: "local", cwd } });
@@ -640,11 +648,17 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
     requestLayoutFit();
   }, [cwd, requestLayoutFit]);
 
-  const handleCloseTab = useCallback((tabId: string) => {
+  const handleCloseTab = useCallback(async (tabId: string) => {
     const tab = state.tabs[tabId];
     if (!tab) return;
     if (tabCount <= 1) {
-      if (!window.confirm("Close the last terminal tab and terminate its process? This will close the terminal dock.")) return;
+      const confirmed = await confirm({
+        title: "Close last terminal tab?",
+        message: "Close the last terminal tab and terminate its process? This will close the terminal dock.",
+        confirmLabel: "Close terminal",
+        intent: "danger",
+      });
+      if (!confirmed) return;
       closeAllSessions();
       onClose();
       return;
@@ -652,7 +666,7 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
     deleteTerminalSession(tab.sessionId);
     dispatch({ type: "close_tab", tabId });
     requestLayoutFit();
-  }, [closeAllSessions, onClose, requestLayoutFit, state.tabs, tabCount]);
+  }, [closeAllSessions, confirm, onClose, requestLayoutFit, state.tabs, tabCount]);
 
   const handleStartRename = useCallback((tab: TerminalTabState) => {
     setEditingTabId(tab.id);

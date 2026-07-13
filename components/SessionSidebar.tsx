@@ -10,6 +10,7 @@ import { displayTitleForSession } from "@/lib/session-title";
 import { Checkbox } from "./Checkbox";
 
 import { ProjectSpaceSwitchDialog } from "./ProjectSpaceSwitchDialog";
+import { usePrompt } from "./AppPromptProvider";
 
 export interface ProjectSpaceSelectionContext {
   projectId: string;
@@ -318,6 +319,7 @@ function buildSessionTree(sessions: SessionInfo[]): SessionTreeNode[] {
 }
 
 export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onProjectSpaceChange, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, trellisEnabled = false, terminalEnabled = false, onOpenTerminalCommand }: Props) {
+  const { confirm } = usePrompt();
   const [projects, setProjects] = useState<PiWebProjectRecord[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
@@ -524,7 +526,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   const handleDeleteSession = useCallback(async (session: SessionInfo) => {
     const title = displayTitleForSession(session);
-    if (!window.confirm(`删除会话 “${title}”？此操作不可恢复。`)) return;
+    const confirmed = await confirm({
+      title: "确认删除会话",
+      message: `删除会话 “${title}”？此操作不可恢复。`,
+      confirmLabel: "删除会话",
+      intent: "danger",
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" });
       if (res.ok) {
@@ -540,7 +548,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     } catch {
       // ignore
     }
-  }, [loadSessions, onSessionDeleted]);
+  }, [confirm, loadSessions, onSessionDeleted]);
 
   const initialLoadDone = useRef(false);
   useEffect(() => {
@@ -1477,9 +1485,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                             归档当前空间
                           </WorkspaceMenuButton>
                           <WorkspaceMenuButton danger onClick={() => {
-                            if (!window.confirm(`归档项目 “${displayProjectName(selectedProjectSpace.project)}”？项目会从侧边栏隐藏，sessions 不会被删除。`)) return;
-                            setWorkspaceMenuOpen(false);
-                            void patchProjectMetadata(selectedProjectSpace.project.id, { archived: true });
+                            void (async () => {
+                              const confirmed = await confirm({
+                                title: "确认归档项目",
+                                message: `归档项目 “${displayProjectName(selectedProjectSpace.project)}”？项目会从侧边栏隐藏，sessions 不会被删除。`,
+                                confirmLabel: "归档项目",
+                                intent: "danger",
+                              });
+                              if (!confirmed) return;
+                              setWorkspaceMenuOpen(false);
+                              void patchProjectMetadata(selectedProjectSpace.project.id, { archived: true });
+                            })();
                           }}>
                             归档项目
                           </WorkspaceMenuButton>
@@ -1712,9 +1728,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 <button
                   onMouseDown={(e) => {
                     e.preventDefault(); e.stopPropagation();
-                    if (!window.confirm(`归档项目 "${displayProjectName(project)}"？项目会从侧边栏隐藏，sessions 不会被删除。`)) return;
-                    closeMenu();
-                    void patchProjectMetadata(project.id, { archived: true });
+                    void (async () => {
+                      const confirmed = await confirm({
+                        title: "确认归档项目",
+                        message: `归档项目 "${displayProjectName(project)}"？项目会从侧边栏隐藏，sessions 不会被删除。`,
+                        confirmLabel: "归档项目",
+                        intent: "danger",
+                      });
+                      if (!confirmed) return;
+                      closeMenu();
+                      void patchProjectMetadata(project.id, { archived: true });
+                    })();
                   }}
                   style={{ ...btnStyle, color: "#dc2626" }}
                 >

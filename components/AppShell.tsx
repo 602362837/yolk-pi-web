@@ -30,6 +30,7 @@ import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trel
 import type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTasksLinkResult } from "@/lib/ypi-studio-types";
 import { trellisTaskDetailToChatContext, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import type { ChatInputHandle } from "./ChatInput";
+import { AppPromptProvider, usePrompt } from "./AppPromptProvider";
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 220;
@@ -173,9 +174,18 @@ function BillingPopover({ popover, children }: { popover: React.ReactNode; child
 }
 
 export function AppShell() {
+  return (
+    <AppPromptProvider>
+      <AppShellContent />
+    </AppPromptProvider>
+  );
+}
+
+function AppShellContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isDark, toggleTheme } = useTheme();
+  const { confirm } = usePrompt();
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   // When user clicks +, we only store the cwd/project context — no fake session id
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
@@ -1298,7 +1308,7 @@ export function AppShell() {
           )}
           {terminalEnabled && terminalCwd && (
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!terminalOpen) {
                   setTerminalDockCwd(terminalCwd);
                   setTerminalOpen(true);
@@ -1306,7 +1316,13 @@ export function AppShell() {
                   return;
                 }
                 if (terminalDockCwd && terminalDockCwd !== terminalCwd) {
-                  if (!window.confirm("Close the current terminal dock and terminate its sessions before opening a terminal for the selected workspace?")) return;
+                  const confirmed = await confirm({
+                    title: "Close terminal dock?",
+                    message: "Close the current terminal dock and terminate its sessions before opening a terminal for the selected workspace?",
+                    confirmLabel: "Close and open terminal",
+                    intent: "danger",
+                  });
+                  if (!confirmed) return;
                   setTerminalOpen(false);
                   setTerminalCollapsed(false);
                   window.setTimeout(() => {
