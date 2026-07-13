@@ -2,11 +2,15 @@ import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentD
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage, StudioChildSessionInfo, StudioChildSessionDisplay } from "./types";
-import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
+import type { SessionEntry as PiSessionEntry } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
 import { getGitMetadataForCwd } from "./git-worktree";
 import { canonicalizeCwd, expandCwd } from "./cwd";
 import { parseSessionHeaderMetadata } from "./session-header-metadata";
+import {
+  scanSessionInventory,
+  type LightweightSessionMetadata,
+} from "./session-metadata-scanner";
 import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
 import {
   isBudgetExpired,
@@ -76,7 +80,7 @@ function isDeletedWorktreeCwd(cwd: string | undefined): boolean {
   });
 }
 
-function deleteSessionFile(session: Pick<PiSessionInfo, "id" | "path" | "cwd">): DeletedSessionFile | null {
+function deleteSessionFile(session: Pick<LightweightSessionMetadata, "id" | "path" | "cwd">): DeletedSessionFile | null {
   try {
     unlinkSync(session.path);
   } catch (error) {
@@ -89,9 +93,9 @@ function deleteSessionFile(session: Pick<PiSessionInfo, "id" | "path" | "cwd">):
   return { id: session.id, path: session.path, cwd: session.cwd ?? "" };
 }
 
-function pruneDeletedWorktreeSessions(piSessions: PiSessionInfo[]): Set<string> {
+function pruneDeletedWorktreeSessions(sessions: LightweightSessionMetadata[]): Set<string> {
   const prunedSessionIds = new Set<string>();
-  for (const session of piSessions) {
+  for (const session of sessions) {
     if (!isDeletedWorktreeCwd(session.cwd)) continue;
     prunedSessionIds.add(session.id);
     deleteSessionFile(session);
@@ -106,8 +110,9 @@ export async function deleteSessionsForCwd(cwd: string, aliases: string[] = []):
   }
 
   const deleted: DeletedSessionFile[] = [];
-  const piSessions: PiSessionInfo[] = await SessionManager.listAll();
-  for (const session of piSessions) {
+  // Lightweight inventory only — never SessionManager.listAll() (retains allMessagesText).
+  const sessions = await scanSessionInventory();
+  for (const session of sessions) {
     if (!cwdMatchesAny(session.cwd, targets)) continue;
     const deletedSession = deleteSessionFile(session);
     if (deletedSession) deleted.push(deletedSession);
@@ -116,12 +121,12 @@ export async function deleteSessionsForCwd(cwd: string, aliases: string[] = []):
 }
 
 export async function listSessionCwdsForAllowedRoots(): Promise<string[]> {
-  let piSessions: PiSessionInfo[] = await SessionManager.listAll();
-  const prunedSessionIds = pruneDeletedWorktreeSessions(piSessions);
+  let sessions = await scanSessionInventory();
+  const prunedSessionIds = pruneDeletedWorktreeSessions(sessions);
   if (prunedSessionIds.size > 0) {
-    piSessions = piSessions.filter((session) => !prunedSessionIds.has(session.id));
+    sessions = sessions.filter((session) => !prunedSessionIds.has(session.id));
   }
-  return [...new Set(piSessions.map((session) => session.cwd).filter((cwd): cwd is string => Boolean(cwd)))];
+  return [...new Set(sessions.map((session) => session.cwd).filter((cwd): cwd is string => Boolean(cwd)))];
 }
 
 export interface ListAllSessionsOptions {
@@ -228,19 +233,20 @@ export async function listAllSessions(options: ListAllSessionsOptions = {}): Pro
 
 async function listAllSessionsUncached(options: ListAllSessionsOptions = {}): Promise<SessionInfo[]> {
   const timing = options.timing;
-  let piSessions: PiSessionInfo[] = timing
-    ? await timing.measureAsync("inventory", () => SessionManager.listAll())
-    : await SessionManager.listAll();
-  if (timing) timing.addCount("activeSessions", piSessions.length);
-  const prunedSessionIds = pruneDeletedWorktreeSessions(piSessions);
+  // Bounded metadata inventory (no allMessagesText). Do not call SessionManager.listAll().
+  let inventory: LightweightSessionMetadata[] = timing
+    ? await timing.measureAsync("inventory", () => scanSessionInventory())
+    : await scanSessionInventory();
+  if (timing) timing.addCount("activeSessions", inventory.length);
+  const prunedSessionIds = pruneDeletedWorktreeSessions(inventory);
   if (prunedSessionIds.size > 0) {
-    piSessions = piSessions.filter((session) => !prunedSessionIds.has(session.id));
+    inventory = inventory.filter((session) => !prunedSessionIds.has(session.id));
   }
   const pathToId = new Map<string, string>();
-  for (const s of piSessions) pathToId.set(s.path, s.id);
+  for (const s of inventory) pathToId.set(s.path, s.id);
 
   const canonicalCwdBySessionId = new Map<string, string>();
-  for (const s of piSessions) {
+  for (const s of inventory) {
     if (s.cwd) canonicalCwdBySessionId.set(s.id, canonicalizeCwd(s.cwd));
   }
 
@@ -269,7 +275,7 @@ async function listAllSessionsUncached(options: ListAllSessionsOptions = {}): Pr
   }
 
   const cache = getPathCache();
-  const result = piSessions.map((s) => {
+  const result = inventory.map((s) => {
     const cwd = canonicalCwdBySessionId.get(s.id) ?? s.cwd;
     // Populate path cache so resolveSessionPath works without a full scan
     cache.set(s.id, s.path);
@@ -563,7 +569,7 @@ function updateParentSessionRefs(dirPath: string, oldPath: string, newPath: stri
 
 /**
  * Scan the archive directory and return which cwds have archived sessions.
- * Reads the first session file's header to extract the actual cwd path.
+ * Reads only the first header line of one session file per archive cwd dir.
  */
 let archivedCwdsCache: { expiresAt: number; value: { cwds: string[]; counts: Record<string, number> } } | undefined;
 const ARCHIVE_SCAN_CACHE_TTL_MS = 1000;
@@ -587,9 +593,9 @@ export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, num
     const dirPath = join(archiveDir, entry.name);
     const jsonlFiles = readdirSync(dirPath).filter((f) => f.endsWith(".jsonl"));
     if (jsonlFiles.length === 0) continue;
-    // Read first session file to extract cwd from header
+    // Bounded header-only read — never load full archive JSONL bodies.
     try {
-      const firstLine = readFileSync(join(dirPath, jsonlFiles[0]), "utf8").split("\n")[0];
+      const firstLine = readFirstLineSync(join(dirPath, jsonlFiles[0]));
       const header = JSON.parse(firstLine) as { type?: string; cwd?: string };
       if (header.type === "session" && header.cwd) {
         const cwd = canonicalizeCwd(header.cwd);
@@ -607,8 +613,7 @@ export function scanArchivedCwds(): { cwds: string[]; counts: Record<string, num
 
 /**
  * List archived sessions for a specific cwd.
- * Parses JSONL files in the archive directory matching the given cwd.
- * Uses SessionManager.open() for efficient metadata extraction.
+ * Uses the bounded JSONL metadata scanner — never SessionManager.getEntries().
  */
 export interface ListArchivedSessionsOptions {
   /** Include YPI Studio child audit sessions as archived list roots. Defaults to false so archived history stays focused on user chats. */
@@ -617,7 +622,48 @@ export interface ListArchivedSessionsOptions {
   includeStudioChildDisplay?: boolean;
 }
 
+function mapArchivedLightweightSession(
+  meta: LightweightSessionMetadata,
+  options: ListArchivedSessionsOptions,
+  fallbackCwd?: string,
+): SessionInfo | null {
+  let projectLink: { legacyUnassigned: boolean; projectId?: string; spaceId?: string } = { legacyUnassigned: true };
+  let studioChild: StudioChildSessionInfo | undefined;
+  try {
+    const metadata = parseSessionHeaderMetadata(readFirstLineSync(meta.path));
+    projectLink = metadata.projectLink;
+    studioChild = metadata.studioChild;
+  } catch {
+    // Keep archive listing tolerant of malformed/missing headers.
+  }
+  if (studioChild && !options.includeStudioChildren) return null;
+
+  const sessionCwd = meta.cwd ? canonicalizeCwd(meta.cwd) : fallbackCwd ?? "";
+  getPathCache().set(meta.id, meta.path);
+
+  return {
+    path: meta.path,
+    id: meta.id,
+    cwd: sessionCwd,
+    name: meta.name,
+    projectId: projectLink.projectId,
+    spaceId: projectLink.spaceId,
+    legacyUnassigned: studioChild ? false : projectLink.legacyUnassigned,
+    studioChild,
+    studioChildDisplay: options.includeStudioChildDisplay
+      ? projectStudioChildDisplay(sessionCwd, studioChild)
+      : undefined,
+    created: meta.created instanceof Date ? meta.created.toISOString() : String(meta.created),
+    modified: meta.modified instanceof Date ? meta.modified.toISOString() : String(meta.modified),
+    messageCount: meta.messageCount,
+    firstMessage: meta.firstMessage || "(no messages)",
+    archived: true,
+  };
+}
+
 async function listArchivedSessionMetadata(cwd?: string, options: ListArchivedSessionsOptions = {}): Promise<SessionInfo[]> {
+  // Header-only inventory for callers that only need id/path/cwd/studioChild
+  // (e.g. usage session rollup). Does not stream full message bodies.
   const archiveDir = getSessionsArchiveDir();
   if (!existsSync(archiveDir)) return [];
 
@@ -681,79 +727,14 @@ async function listArchivedSessions(cwd?: string, options: ListArchivedSessionsO
   if (!existsSync(archiveDir)) return [];
 
   const targets = cwd ? cwdKeys(cwd) : null;
-  const cache = getPathCache();
+  // Bounded concurrent stream scan — never open SessionManager / getEntries for list metadata.
+  const scanned = await scanSessionInventory({ rootDir: archiveDir });
   const sessions: SessionInfo[] = [];
 
-  const dirs = readdirSync(archiveDir, { withFileTypes: true });
-  for (const dir of dirs) {
-    if (!dir.isDirectory()) continue;
-    const dirPath = join(archiveDir, dir.name);
-    const jsonlFiles = readdirSync(dirPath).filter((f) => f.endsWith(".jsonl"));
-
-    for (const file of jsonlFiles) {
-      const filePath = join(dirPath, file);
-      try {
-        // Use SessionManager for header + entry parsing. Match by header cwd instead
-        // of archive directory name because historic sessions may use cwd aliases.
-        const sm = SessionManager.open(filePath);
-        const header = sm.getHeader();
-        if (!header?.id) continue;
-        if (targets && !cwdMatchesAny(header.cwd, targets)) continue;
-
-        const metadata = parseSessionHeaderMetadata(readFirstLineSync(filePath));
-        if (metadata.studioChild && !options.includeStudioChildren) continue;
-
-        const sessionCwd = header.cwd ? canonicalizeCwd(header.cwd) : cwd ?? "";
-        // Cache the path so resolveSessionPath can find it
-        cache.set(header.id, filePath);
-
-        const entries = sm.getEntries();
-        let messageCount = 0;
-        let firstMessage = "(no messages)";
-        for (const entry of entries) {
-          if (entry.type === "message") {
-            messageCount++;
-            if (messageCount === 1) {
-              const msg = entry as unknown as { message?: { content?: unknown } };
-              const content = msg.message?.content;
-              if (typeof content === "string") {
-                firstMessage = content.slice(0, 100);
-              } else if (Array.isArray(content)) {
-                const textBlock = content.find((b: { type: string }) => b.type === "text");
-                if (textBlock) firstMessage = (textBlock as { text: string }).text.slice(0, 100);
-              }
-            }
-          }
-        }
-
-        // Get modified time from file system
-        let modified = header.timestamp ?? new Date().toISOString();
-        try {
-          modified = statSync(filePath).mtime.toISOString();
-        } catch {
-          // use header timestamp
-        }
-
-        sessions.push({
-          path: filePath,
-          id: header.id,
-          cwd: sessionCwd,
-          name: sm.getSessionName(),
-          projectId: metadata.projectLink.projectId,
-          spaceId: metadata.projectLink.spaceId,
-          legacyUnassigned: metadata.studioChild ? false : metadata.projectLink.legacyUnassigned,
-          studioChild: metadata.studioChild,
-          studioChildDisplay: options.includeStudioChildDisplay ? projectStudioChildDisplay(sessionCwd, metadata.studioChild) : undefined,
-          created: header.timestamp ?? modified,
-          modified,
-          messageCount,
-          firstMessage: firstMessage || "(no messages)",
-          archived: true,
-        });
-      } catch {
-        // skip malformed files
-      }
-    }
+  for (const meta of scanned) {
+    if (targets && !cwdMatchesAny(meta.cwd, targets)) continue;
+    const session = mapArchivedLightweightSession(meta, options, cwd);
+    if (session) sessions.push(session);
   }
 
   return sessions.sort((a, b) => b.modified.localeCompare(a.modified));

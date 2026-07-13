@@ -40,8 +40,8 @@ export async function GET(req: Request, context: RouteContext) {
     const includeLegacy = new URL(req.url).searchParams.get("includeLegacy") === "1";
 
     // Route-level `listAll` wraps the entire `listAllSessions` call; the reader
-    // records finer-grained `inventory` (SessionManager.listAll), `header`, and
-    // `studioProjection` sub-stages on the same collector for attribution.
+    // records finer-grained `inventory` (lightweight scanSessionInventory),
+    // `header`, and `studioProjection` sub-stages on the same collector.
     const sessions = await timing.measureAsync("listAll", () =>
       listAllSessions({
         includeStudioChildren: true,

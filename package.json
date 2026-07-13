@@ -47,6 +47,8 @@
     "test:opencode-go-failover-detect": "npx tsx lib/opencode-go-account-failover.test.ts",
     "test:opencode-go-failover-behavior": "node scripts/test-opencode-go-failover-behavior.mjs",
     "test:usage-rollup": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-usage-stats-rollup.mjs",
+    "test:session-metadata": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-metadata-scanner.mjs",
+    "test:session-list-performance": "node --expose-gc --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-list-performance.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
     "release:patch": "npm version patch && npm publish --access public",
     "release": "npm run release:patch"

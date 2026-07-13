@@ -4,8 +4,24 @@ import {
   invalidateSessionPathCache,
 } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
-import { canonicalizeCwd } from "@/lib/cwd";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { canonicalizeCwd, expandCwd } from "@/lib/cwd";
+import { scanSessionInventory } from "@/lib/session-metadata-scanner";
+
+function cwdKeys(cwd: string | undefined): Set<string> {
+  const keys = new Set<string>();
+  if (!cwd) return keys;
+  for (const candidate of [cwd, expandCwd(cwd), canonicalizeCwd(cwd)]) {
+    if (candidate) keys.add(candidate.replace(/[\\/]+$/, ""));
+  }
+  return keys;
+}
+
+function cwdMatchesAny(cwd: string | undefined, targets: Set<string>): boolean {
+  for (const key of cwdKeys(cwd)) {
+    if (targets.has(key)) return true;
+  }
+  return false;
+}
 
 export async function POST(req: Request) {
   try {
@@ -14,17 +30,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
     }
 
-    const resolvedCwd = canonicalizeCwd(cwd);
-    // List all sessions and filter by cwd
-    const allSessions = await SessionManager.listAll();
-    const targetSessions = allSessions.filter((s) => {
-      if (!s.cwd) return false;
-      try {
-        return canonicalizeCwd(s.cwd) === resolvedCwd;
-      } catch {
-        return false;
-      }
-    });
+    const targets = cwdKeys(cwd);
+    // Lightweight inventory — do not call SessionManager.listAll() (retains full message text).
+    const allSessions = await scanSessionInventory();
+    const targetSessions = allSessions.filter((session) => cwdMatchesAny(session.cwd, targets));
 
     const archived: Array<{ id: string; path: string }> = [];
     const errors: Array<{ id: string; error: string }> = [];

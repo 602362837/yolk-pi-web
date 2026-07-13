@@ -117,7 +117,22 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd
 
 ## Session List Performance
 
-Project-space session responses keep the existing wire shape. The reader uses a bounded, one-second single-flight snapshot for repeated list requests and invalidates it on session deletion/archive/unarchive. JSONL remains authoritative; any sidecar index is only an optimization candidate and must reconcile against session inventory before filtering.
+Project-space and global session list responses keep the existing wire shape (id/cwd/name/messageCount/firstMessage/modified, Studio child nesting, project/space link, archive flags). Inventory is produced by `lib/session-metadata-scanner.ts` via `lib/session-reader.ts` — not Pi SDK `SessionManager.listAll()` / `buildSessionInfo()`, which accumulate `allMessages[]` and `allMessagesText` for every session.
+
+| Path | Inventory source |
+| --- | --- |
+| `GET /api/sessions`, project-space sessions | `listAllSessions()` → `scanSessionInventory()` |
+| Allowed-roots cwd discovery | `listSessionCwdsForAllowedRoots()` → `scanSessionInventory()` |
+| WorkTree session delete-by-cwd | `deleteSessionsForCwd()` → `scanSessionInventory()` |
+| `POST /api/sessions/archive-all` | direct `scanSessionInventory()` then cwd filter + move |
+| Archived session lists | `scanSessionInventory({ rootDir: sessions-archive })` |
+| `archivedCwds` / counts for picker | `scanArchivedCwds()` header-only per archive dir |
+
+List reads use a bounded one-second single-flight snapshot and invalidate it on session deletion/archive/unarchive. JSONL remains authoritative; any sidecar index is only an optimization candidate and must reconcile against session inventory before filtering. Scanner concurrency is fixed (default 8); `firstMessage` is bounded (default 100 chars; UI still shows 50 normalized chars). Results and caches must not retain full message bodies, tool results, or `allMessagesText`.
+
+Studio child and Usage boundaries are unchanged: lists hide Studio children by default (`includeStudioChildren` opt-in); Usage precise totals still open selected JSONL files for assistant `usage` only after lightweight inventory. Detail/context/branch/export routes may still call `SessionManager.open(...).getEntries()` for a single target session.
+
+Regression helpers: `npm run test:session-metadata`, `npm run test:session-list-performance` (prefer `node --expose-gc`). Rollback is code-only at the inventory call sites; do not reintroduce SDK full-text list scans as the default.
 
 ## Implementation Pointers
 

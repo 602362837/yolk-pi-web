@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-12T05:20:28.709Z",
+  "updatedAt": "2026-07-13T01:46:02.392Z",
   "entries": [
+    {
+      "id": "20260713-094602-修复全量会话扫描导致的高内存占用",
+      "title": "修复全量会话扫描导致的高内存占用",
+      "taskId": "20260713-091704-修复全量会话扫描导致的高内存占用",
+      "taskKey": "archived:2026-07:20260713-091704-修复全量会话扫描导致的高内存占用",
+      "workflowId": "feature-dev",
+      "summary": "确认蛋黄派高内存根因是会话列表调用 Pi SDK `SessionManager.listAll()`，其 `buildSessionInfo()` 会扫描全部 JSONL 并累积 `allMessages/allMessagesText`；当历史会话目录约447MB、单文件约214MB时，V8 heap 可升至约941MiB。修复新增 chunk 级、有界 JSONL 元数据扫描器，仅提取 header、name、计数、首条用户文本前缀和活动时间，不整行 JSON.parse、不读取全文、不保留正文。active/archive/archive-all/allowed-roots/delete-by-cwd 均改用轻量 scanner；详情、上下文、分支、Usage 仍按需读取完整单文件。新增 scanner、内存/兼容性/API 回归测试，lint、tsc、diff check 全部通过。",
+      "tags": [
+        "memory",
+        "session-list",
+        "jsonl",
+        "performance",
+        "bounded-scanner",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260713-091704-修复全量会话扫描导致的高内存占用",
+      "knowledgePath": ".ypi/knowledge/20260713-094602-修复全量会话扫描导致的高内存占用.md",
+      "createdAt": "2026-07-13T01:46:02.392Z",
+      "archivedAt": "2026-07-13T01:46:02.392Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260712-132028-新增内存诊断快照能力-采集进程-agentsession-studio运行时状态并写入诊断文件",
       "title": "新增内存诊断快照能力：采集进程/AgentSession/Studio运行时状态并写入诊断文件",
