@@ -2,6 +2,14 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { listAllArchivedSessionMetadata, listAllArchivedSessions, listAllSessions } from "@/lib/session-reader";
 import { canonicalizeCwd, expandCwd } from "@/lib/cwd";
 import type { SessionEntry, SessionInfo, SessionMessageEntry, AssistantMessage, StudioChildSessionInfo } from "@/lib/types";
+import {
+  projectYpiStudioChildContextUsageBySessionIds,
+  unavailableYpiStudioChildContextUsage,
+  type YpiStudioChildContextUsageSnapshot,
+} from "@/lib/ypi-studio-subagent-runtime";
+
+/** Additive child context occupancy snapshot (API alias of runtime projection type). */
+export type SessionContextUsageSnapshot = YpiStudioChildContextUsageSnapshot;
 
 export interface UsageTotals {
   input: number;
@@ -44,6 +52,12 @@ export interface UsageSessionSummary {
   kind?: UsageSessionKind;
   parentSessionId?: string;
   studioChild?: UsageStudioChildSummary;
+  /**
+   * Additive context-window occupancy for this child session.
+   * Only populated on session_rollup `childSessions[]` (not global bySession).
+   * Never derived from lifetime usage; missing/unavailable ≠ 0%.
+   */
+  contextUsage?: SessionContextUsageSnapshot;
 }
 
 export interface UsageParentSessionSummary {
@@ -496,10 +510,19 @@ export async function getUsageStatsForSessionRollup(options: UsageSessionRollupO
   const selectedSessionTotals = cloneTotals(bySession.get(options.sessionId)?.totals ?? createTotals());
   // parentRollupTotals = parent rollup（父自身 + 所有 Studio child），恒等于 totals，命名上明确口径。
   const parentRollupTotals = cloneTotals(totals);
-  const childSessions = relatedSessions
+  const childSessionsBase = relatedSessions
     .filter((session) => session.studioChild?.parentSessionId === parentSessionId)
     .map((session) => sessionSummary(session, cloneTotals(bySession.get(session.id)?.totals ?? createTotals())))
     .sort((a, b) => b.totals.cost - a.totals.cost);
+
+  // Merge process-local live/lastKnown context snapshots only (Path A). No lifetime-usage math.
+  const contextByChildId = projectYpiStudioChildContextUsageBySessionIds(
+    childSessionsBase.map((child) => child.sessionId),
+  );
+  const childSessions = childSessionsBase.map((child) => ({
+    ...child,
+    contextUsage: contextByChildId.get(child.sessionId) ?? unavailableYpiStudioChildContextUsage(),
+  }));
 
   return {
     kind: "session_rollup",

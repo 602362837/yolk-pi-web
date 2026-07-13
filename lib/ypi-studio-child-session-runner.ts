@@ -8,7 +8,14 @@ import {
   previewYpiStudioTranscriptText,
   type YpiStudioSubagentTranscriptWriter,
 } from "./ypi-studio-transcripts";
-import { registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
+import {
+  registerYpiStudioChildRun,
+  scheduleYpiStudioChildRunContinuation,
+  toYpiStudioChildContextUsageSnapshot,
+  unregisterYpiStudioChildRun,
+  updateYpiStudioChildRun,
+  type YpiStudioChildContextUsageSnapshot,
+} from "./ypi-studio-subagent-runtime";
 import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
 import { studioChildSessionTitle } from "./session-title";
 import type { SessionHeader, StudioChildSessionInfo } from "./types";
@@ -243,10 +250,24 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
   let terminationReason: string | undefined;
   let childSessionId: string | undefined;
   let childSessionFile: string | undefined;
-  let session: { prompt: (text: string, options?: unknown) => Promise<void>; abort: () => Promise<void>; dispose: () => void; subscribe?: (listener: (event: unknown) => void) => () => void; sessionId?: string; sessionFile?: string; messages?: unknown[] } | undefined;
+  let session: {
+    prompt: (text: string, options?: unknown) => Promise<void>;
+    abort: () => Promise<void>;
+    dispose: () => void;
+    subscribe?: (listener: (event: unknown) => void) => () => void;
+    sessionId?: string;
+    sessionFile?: string;
+    messages?: unknown[];
+    /** Authoritative context occupancy; present on pi AgentSession. */
+    getContextUsage?: () => { percent: number | null; contextWindow: number; tokens: number | null } | undefined;
+  } | undefined;
   let unsubscribe: (() => void) | undefined;
   let promptStarted = false;
   let settled = false;
+  let lastContextUsage: YpiStudioChildContextUsageSnapshot | undefined;
+  let lastContextCaptureMs = 0;
+  /** Throttle live context sampling along progress events; force on finish. */
+  const CONTEXT_CAPTURE_MIN_INTERVAL_MS = 2_000;
 
   const addWarning = (warning: string): void => {
     if (!warnings.includes(warning)) warnings.push(warning);
@@ -342,10 +363,33 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
     transcript: writer ? { ...writer.ref, runner: "sdk" as const, childSessionId, childSessionFile, status: transcriptStatus(runStatus) } : undefined,
   });
 
+  const captureContextUsage = (force = false): YpiStudioChildContextUsageSnapshot | undefined => {
+    const now = Date.now();
+    if (!force && lastContextUsage && now - lastContextCaptureMs < CONTEXT_CAPTURE_MIN_INTERVAL_MS) {
+      return lastContextUsage;
+    }
+    if (!session?.getContextUsage) return lastContextUsage;
+    try {
+      const usage = session.getContextUsage();
+      lastContextUsage = toYpiStudioChildContextUsageSnapshot(usage, { source: "live" });
+      lastContextCaptureMs = now;
+      return lastContextUsage;
+    } catch {
+      // Keep previous sample if a transient read fails.
+      return lastContextUsage;
+    }
+  };
+
   const emitProgress = (force = false): void => {
-    void force;
     const progress = progressSnapshot();
-    updateYpiStudioChildRun(meta.runId, { status, progress, childSessionId, childSessionFile });
+    const contextUsage = captureContextUsage(force);
+    updateYpiStudioChildRun(meta.runId, {
+      status,
+      progress,
+      childSessionId,
+      childSessionFile,
+      ...(contextUsage ? { contextUsage } : {}),
+    });
     const run = runSnapshot(status);
     try { persistence?.onProgress?.(run); } catch (error) { addWarning(`Progress persistence failed: ${error instanceof Error ? error.message : String(error)}`); }
     try {
@@ -463,7 +507,16 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
     finalRun.finishedAt = new Date().toISOString();
     finalRun.progress = result.progress;
     finalRun.transcript = transcript;
-    updateYpiStudioChildRun(meta.runId, { status, progress: result.progress, result, childSessionId, childSessionFile });
+    // Final forced capture before dispose so process-local lastKnown retains the last live sample.
+    const contextUsage = captureContextUsage(true);
+    updateYpiStudioChildRun(meta.runId, {
+      status,
+      progress: result.progress,
+      result,
+      childSessionId,
+      childSessionFile,
+      ...(contextUsage ? { contextUsage } : {}),
+    });
     try { persistence?.onFinal?.(finalRun, result); } catch (error) { addWarning(`Final run persistence failed: ${error instanceof Error ? error.message : String(error)}`); }
     if (meta.continuationOnFinal && meta.parentSessionId) {
       scheduleYpiStudioChildRunContinuation({ runId: meta.runId, taskId: meta.taskId, subtaskId: meta.subtaskId, member: meta.member, cwd: root, parentSessionId: meta.parentSessionId, status, summary: finalRun.summary, finishedAt: finalRun.finishedAt });

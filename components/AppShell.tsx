@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
 import type { SessionUsageTopbarStats } from "@/hooks/useAgentSession";
+import { SessionStatsChips } from "./SessionStatsChips";
 import { FileViewer } from "./FileViewer";
 import { FileExplorer } from "./FileExplorer";
 import { TabBar, type Tab } from "./TabBar";
@@ -284,57 +285,6 @@ function projectContextMatchesBrowserTitle(
     return newSessionProjectContext.projectId === context.projectId && newSessionProjectContext.spaceId === context.spaceId;
   }
   return sameWorkspacePathForTitle(context.cwd, cwd);
-}
-
-/** Minimal hover popover for billing breakdown in the top bar. */
-function BillingPopover({ popover, children }: { popover: React.ReactNode; children: React.ReactNode }) {
-  const [show, setShow] = useState(false);
-  const timerRef = useRef<number | null>(null);
-
-  const handleEnter = useCallback(() => {
-    if (timerRef.current !== null) { clearTimeout(timerRef.current); timerRef.current = null; }
-    setShow(true);
-  }, []);
-
-  const handleLeave = useCallback(() => {
-    timerRef.current = window.setTimeout(() => setShow(false), 120);
-  }, []);
-
-  useEffect(() => () => { if (timerRef.current !== null) clearTimeout(timerRef.current); }, []);
-
-  return (
-    <div
-      style={{ position: "relative" }}
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-    >
-      {children}
-      {show && (
-        <div
-          onMouseEnter={handleEnter}
-          onMouseLeave={handleLeave}
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            zIndex: 1000,
-            background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "10px 14px",
-            fontSize: 12,
-            whiteSpace: "nowrap",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-            marginTop: 4,
-            lineHeight: 1.8,
-            minWidth: 170,
-          }}
-        >
-          {popover}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function AppShell() {
@@ -1504,147 +1454,15 @@ export function AppShell() {
               <span className="app-top-label">Terminal</span>
             </button>
           )}
-          {/* Session stats — right-aligned in top bar.
-           * 费用展示口径（见 lib/usage-stats.ts UsageSessionRollupResult /
-           * hooks/useAgentSession.ts SessionUsageTopbarStats，由主会话确认）：
-           * - parent：compact 显示 parent rollup（parent own + Studio children），
-           *   存在真实 child usage（child token/cost totals > 0）时追加 `incl. Studio`；
-           *   tooltip 拆分 own cost / Studio children cost。child 仅数量无 usage 时不显示 child 标记。
-           * - standalone：compact 显示该 session 自身 usage，无 child 标记。
-           * - studio_child：compact 只显示该 child 自身 usage（selectedSessionTotals），
-           *   tooltip 附带 parent rollup（parentRollupTotals）与 parent id。
-           * local 源（无 rollup）按 standalone 口径处理，且无 child 标记。 */}
-          {showChat && (sessionStats || contextUsage) && (() => {
-            const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
-
-            // 选中 session 的展示口径与 totals。local 源无 selectedSessionKind → standalone。
-            const kind = sessionStats?.selectedSessionKind ?? "standalone";
-            const selectedTotals = sessionStats?.selectedSessionTotals;
-            // studio_child compact 展示该 child 自身 usage；其余使用 rollup/own totals。
-            const t = kind === "studio_child" && selectedTotals ? selectedTotals.tokens : sessionStats?.tokens;
-            const c = kind === "studio_child" && selectedTotals ? (selectedTotals.cost ?? 0) : (sessionStats?.cost ?? 0);
-            const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
-
-            let ctxColor = "var(--text-muted)";
-            let ctxStr: string | null = null;
-            if (contextUsage?.contextWindow) {
-              const pct = contextUsage.percent;
-              if (pct !== null && pct > 90) ctxColor = "#ef4444";
-              else if (pct !== null && pct > 70) ctxColor = "rgba(234,179,8,0.95)";
-              ctxStr = pct !== null ? `${pct.toFixed(0)}% / ${fmt(contextUsage.contextWindow)}` : `? / ${fmt(contextUsage.contextWindow)}`;
-            }
-
-            const childCount = sessionStats?.studioChildSessionCount ?? 0;
-            const ownCost = sessionStats?.own?.cost ?? 0;
-            const studioChild = sessionStats?.studioChild;
-            const childCost = studioChild?.cost ?? 0;
-            const childTokenTotal = studioChild
-              ? studioChild.tokens.input + studioChild.tokens.output + studioChild.tokens.cacheRead + studioChild.tokens.cacheWrite
-              : 0;
-            // 真实 child usage = child token/cost totals > 0，不再因 child 数量误判。
-            const hasChildUsage = kind === "parent" && (childTokenTotal > 0 || childCost > 0);
-            const parentRollupCost = sessionStats?.parentRollupTotals?.cost ?? 0;
-            // compact 追加标记：parent 显示 `incl. Studio`，studio_child 显示 `Studio child`。
-            const compactMark = kind === "studio_child"
-              ? "Studio child"
-              : hasChildUsage
-                ? "incl. Studio"
-                : null;
-            const popoverContent = (
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--text)", fontSize: 11, letterSpacing: 0.3 }}>
-                  计费组成
-                </div>
-                {kind === "studio_child" ? (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text)" }}>
-                      <span>本会话</span>
-                      <span style={{ fontWeight: 600 }}>${(c || 0).toFixed(4)}</span>
-                    </div>
-                    {parentRollupCost > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text-muted)" }}>
-                        <span>父会话汇总</span>
-                        <span>${parentRollupCost.toFixed(4)}</span>
-                      </div>
-                    )}
-                  </>
-                ) : hasChildUsage ? (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text)" }}>
-                      <span>本会话</span>
-                      <span style={{ fontWeight: 600 }}>{(ownCost > 0 ? `$${ownCost.toFixed(4)}` : costStr ?? "-")}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text-muted)" }}>
-                      <span>Studio 子会话{childCount > 1 ? ` (${childCount})` : ""}</span>
-                      <span>${childCost.toFixed(4)}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 12, color: "var(--text)" }}>
-                    <span>本会话</span>
-                    <span style={{ fontWeight: 600 }}>{costStr ?? "-"}</span>
-                  </div>
-                )}
-              </div>
-            );
-
-            return (
-              <BillingPopover popover={popoverContent}>
-                <div
-                  className="app-top-stats"
-                  style={{
-                  marginLeft: "auto",
-                  display: "flex", alignItems: "center", gap: 10,
-                  paddingLeft: 12,
-                  paddingRight: webConfig?.chatgpt.usagePanelEnabled ? 12 : rightPanelTogglePadding,
-                  height: "100%",
-                  fontSize: 11, color: "var(--text-muted)",
-                  whiteSpace: "nowrap", cursor: "default",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-                >
-                {t && t.input > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="8.5" x2="5" y2="1.5" /><polyline points="2 4 5 1.5 8 4" />
-                    </svg>
-                    {fmt(t.input)}
-                  </span>
-                )}
-                {t && t.output > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
-                    </svg>
-                    {fmt(t.output)}
-                  </span>
-                )}
-                {t && t.cacheRead > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M8.5 5a3.5 3.5 0 1 1-1-2.45" /><polyline points="6.5 1.5 8.5 2.5 7.5 4.5" />
-                    </svg>
-                    {fmt(t.cacheRead)}
-                  </span>
-                )}
-                {costStr && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", fontWeight: 500 }}>
-                    {costStr}
-                    {compactMark && <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>{compactMark}</span>}
-                  </span>
-                )}
-                {ctxStr && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 9 L1 5 Q1 1 5 1 Q9 1 9 5 L9 9" /><line x1="1" y1="9" x2="9" y2="9" />
-                    </svg>
-                    {ctxStr}
-                  </span>
-                )}
-                </div>
-              </BillingPopover>
-            );
-          })()}
+          {/* Session stats chips — billing + context popovers.
+           * 费用口径见 SessionStatsChips / usage-stats SessionUsageTopbarStats。 */}
+          {showChat && (sessionStats || contextUsage) && (
+            <SessionStatsChips
+              sessionStats={sessionStats}
+              contextUsage={contextUsage}
+              paddingRight={webConfig?.chatgpt.usagePanelEnabled ? 12 : rightPanelTogglePadding}
+            />
+          )}
           {webConfig?.chatgpt.usagePanelEnabled && (
             <div className="app-top-usage-panel" style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelTogglePadding, height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
               <ChatGptUsagePanel />
