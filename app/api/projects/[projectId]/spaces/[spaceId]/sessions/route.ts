@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProjectSpace, ProjectRegistryError } from "@/lib/project-registry";
-import { listAllSessions, scanArchivedCwds } from "@/lib/session-reader";
+import { listAllSessions } from "@/lib/session-reader";
 import { sessionCwdMatchesPathKey } from "@/lib/session-project-link";
 import {
   SessionListTimingCollector,
@@ -85,15 +85,6 @@ export async function GET(req: Request, context: RouteContext) {
       : [];
     timing.addCount("legacyUnassigned", legacyUnassigned.length);
 
-    const archived = await timing.measureAsync("archive", () => scanArchivedCwds());
-    timing.addCount("archiveCwds", Object.keys(archived.counts).length);
-    const archivedCount = (await Promise.all(
-      Object.entries(archived.counts).map(async ([cwd, count]) =>
-        (await sessionCwdMatchesPathKey(cwd, space.pathKey)) ? count : 0,
-      ),
-    )).reduce((sum, count) => sum + count, 0);
-    const archivedCounts = archivedCount > 0 ? { [space.path]: archivedCount } : {};
-
     const studioChildrenByParentSessionId = studioChildren.reduce<Record<string, typeof studioChildren>>(
       (acc, session) => {
         const parentId = session.studioChild?.parentSessionId;
@@ -104,7 +95,9 @@ export async function GET(req: Request, context: RouteContext) {
       {},
     );
 
-    const body = { sessions: linked, legacyUnassigned, archivedCounts, studioChildrenByParentSessionId };
+    // Active hot path only: no sessions-archive scan or archivedCounts.
+    // Explicit archived list / detail / Usage paths remain independent.
+    const body = { sessions: linked, legacyUnassigned, studioChildrenByParentSessionId };
     response = NextResponse.json(body);
 
     // The serialization probe is gated behind the debug switch so production

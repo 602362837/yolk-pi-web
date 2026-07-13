@@ -356,10 +356,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [projectSpaceContextMenu, setProjectSpaceContextMenu] = useState<ProjectSpaceContextMenuState | null>(null);
   const [removedWorktreeCwds, setRemovedWorktreeCwds] = useState<string[]>([]);
   const [selectedCwdGit, setSelectedCwdGit] = useState<GitInfo | undefined>(undefined);
-  const [archivedCounts, setArchivedCounts] = useState<Record<string, number>>({});
-  const [, setArchivedCwds] = useState<string[]>([]);
-  const [archivedSessions, setArchivedSessions] = useState<SessionInfo[]>([]);
-  const [archivedExpanded, setArchivedExpanded] = useState(false);
   const [trellisSetupStatus, setTrellisSetupStatus] = useState<TrellisSetupStatus | null>(null);
   const [trellisStatusRefreshKey, setTrellisStatusRefreshKey] = useState(0);
   const [sessionsSwitching, setSessionsSwitching] = useState(false);
@@ -418,20 +414,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           setLoading(true);
           setAllSessions([]);
           setSelectedForArchive(new Set());
-          setArchivedExpanded(false);
-          setArchivedSessions([]);
         }
       }
       const res = await fetch(`/api/projects/${encodeURIComponent(selected.project.id)}/spaces/${encodeURIComponent(selected.space.id)}/sessions`, {
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { sessions?: SessionInfo[]; archivedCounts?: Record<string, number>; error?: string };
+      const data = await res.json() as { sessions?: SessionInfo[]; error?: string };
       if (data.error) throw new Error(data.error);
       if (token !== loadSessionsTokenRef.current) return;
       setAllSessions(data.sessions ?? []);
-      setArchivedCwds([]);
-      setArchivedCounts(data.archivedCounts ?? {});
       setError(null);
       if (!showLoading) {
         setSessionRefreshDone(true);
@@ -450,17 +442,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     }
   }, [selectedProjectId, selectedSpaceId]);
 
-  const loadArchivedSessions = useCallback(async (cwd: string) => {
-    try {
-      const res = await fetch(`/api/sessions/archived?cwd=${encodeURIComponent(cwd)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { sessions: SessionInfo[] };
-      setArchivedSessions(data.sessions);
-    } catch {
-      // ignore
-    }
-  }, []);
-
   const handleArchiveSession = useCallback(async (sessionId: string) => {
     try {
       const res = await fetch("/api/sessions/archive", {
@@ -475,24 +456,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           return next;
         });
         void loadSessions(false);
-        setArchivedExpanded(false);
-        setArchivedSessions([]);
-      }
-    } catch {
-      // ignore
-    }
-  }, [loadSessions]);
-
-  const handleUnarchiveSession = useCallback(async (sessionId: string) => {
-    try {
-      const res = await fetch("/api/sessions/unarchive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionIds: [sessionId] }),
-      });
-      if (res.ok) {
-        void loadSessions(false);
-        setArchivedSessions((prev) => prev.filter((s) => s.id !== sessionId));
       }
     } catch {
       // ignore
@@ -549,7 +512,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           next.delete(session.id);
           return next;
         });
-        setArchivedSessions((prev) => prev.filter((s) => s.id !== session.id));
         void loadSessions(false);
       }
     } catch {
@@ -592,11 +554,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     lastSessionRefreshKeyRef.current = refreshKey;
     void loadSessions(false);
   }, [refreshKey, loadSessions]);
-
-  useEffect(() => {
-    if (!archivedExpanded || !selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) return;
-    void loadArchivedSessions(selectedCwd);
-  }, [archivedExpanded, selectedCwd, archivedCounts, loadArchivedSessions]);
 
   useEffect(() => {
     fetch("/api/home").then((r) => r.json()).then((d: { home?: string }) => {
@@ -1894,8 +1851,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               归档所有会话
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 16 }}>
-              确认归档 <strong>{(archivedCounts[selectedCwd] ?? 0) + filteredSessions.length}</strong> 个会话？
-              归档后可随时取消归档恢复。
+              确认归档 <strong>{filteredSessions.length}</strong> 个当前会话？
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button
@@ -1971,7 +1927,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             No registered projects yet. Add a project path from the selector above to start.
           </div>
         )}
-        {!sessionsSwitching && !loading && !error && activeProjects.length > 0 && filteredSessions.length === 0 && (!selectedCwd || (archivedCounts[selectedCwd] ?? 0) === 0) && (
+        {!sessionsSwitching && !loading && !error && activeProjects.length > 0 && filteredSessions.length === 0 && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             No sessions found in this space
           </div>
@@ -2002,7 +1958,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           />
         ))}
 
-        {/* Archived sessions section */}
         {/* Batch archive action bar — appears as soon as any sessions are checked */}
         {selectedForArchive.size > 0 && (
           <div style={{
@@ -2040,64 +1995,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 归档 {selectedForArchive.size > 0 ? `(${selectedForArchive.size})` : ""}
               </button>
             </div>
-          </div>
-        )}
-
-        {selectedCwd && !loading && !error && (archivedCounts[selectedCwd] ?? 0) > 0 && (
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 4 }}>
-            <button
-              onClick={() => {
-                if (!archivedExpanded) {
-                  setArchivedExpanded(true);
-                  loadArchivedSessions(selectedCwd);
-                } else {
-                  setArchivedExpanded(false);
-                }
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                width: "100%",
-                padding: "10px 14px",
-                background: "none",
-                border: "none",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-              }}
-            >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 10 10"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ transform: archivedExpanded ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }}
-              >
-                <polyline points="2 3.5 5 6.5 8 3.5" />
-              </svg>
-              <span>已归档 ({archivedCounts[selectedCwd]})</span>
-            </button>
-            {archivedExpanded && archivedSessions.length > 0 && (
-              <div>
-                {archivedSessions.map((archivedSession) => (
-                  <ArchivedSessionItem
-                    key={archivedSession.id}
-                    session={archivedSession}
-                    onSelect={() => onSelectSession(archivedSession)}
-                    onUnarchive={handleUnarchiveSession}
-                    onDelete={(id) => onSessionDeleted?.(id)}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -2609,198 +2506,6 @@ function SessionItem({
                   borderRadius: 7, color: "var(--text-muted)",
                   cursor: "pointer", flexShrink: 0,
                   transition: "background 0.12s, color 0.12s, border-color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-                  e.currentTarget.style.color = "#ef4444";
-                  e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                  e.currentTarget.style.borderColor = "var(--border)";
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  <path d="M10 11v6M14 11v6" />
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                </svg>
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-/**
- * ArchivedSessionItem — renders a muted archived session row
- * with Unarchive and Delete actions on hover.
- */
-function ArchivedSessionItem({
-  session,
-  onSelect,
-  onUnarchive,
-  onDelete,
-}: {
-  session: SessionInfo;
-  onSelect: () => void;
-  onUnarchive: (id: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const title = displayTitleForSession(session);
-
-  const handleUnarchiveClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onUnarchive(session.id);
-  }, [session.id, onUnarchive]);
-
-  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete(true);
-  }, []);
-
-  const handleDeleteConfirm = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete(false);
-    setDeleting(true);
-    try {
-      fetch(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" })
-        .then(() => onDelete(session.id))
-        .catch(() => setDeleting(false));
-    } catch {
-      setDeleting(false);
-    }
-  }, [session.id, onDelete]);
-
-  const handleDeleteCancel = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete(false);
-  }, []);
-
-  const ITEM_HEIGHT = 54;
-
-  return (
-    <div
-      onClick={confirmDelete ? undefined : onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        height: ITEM_HEIGHT,
-        display: "flex",
-        alignItems: "center",
-        paddingLeft: 14,
-        paddingRight: 8,
-        cursor: confirmDelete ? "default" : "pointer",
-        background: confirmDelete
-          ? "rgba(239,68,68,0.06)"
-          : hovered ? "var(--bg-hover)" : "transparent",
-        borderLeft: confirmDelete ? "2px solid #ef4444" : "2px solid transparent",
-        opacity: deleting ? 0.5 : 1,
-        gap: 6,
-        minWidth: 0,
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        flexWrap: "nowrap",
-      }}
-    >
-      {confirmDelete ? (
-        <>
-          <div style={{ flex: "1 1 auto", minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            Delete <span style={{ fontWeight: 600 }}>&ldquo;{title.slice(0, 22)}{title.length > 22 ? "…" : ""}&rdquo;</span>?
-          </div>
-          <div style={{ display: "flex", gap: 5, flexShrink: 0, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
-            <button onClick={handleDeleteConfirm} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 30, padding: "0 11px", background: "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6M14 11v6" />
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-              </svg>
-              Delete
-            </button>
-            <button onClick={handleDeleteCancel} style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 30, padding: "0 11px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap" }}>
-              Cancel
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          <div style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", fontStyle: "italic" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", flexWrap: "nowrap" }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 400,
-                  lineHeight: 1.4,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  color: "var(--text-dim)",
-                  flex: "1 1 auto",
-                  minWidth: 0,
-                }}
-                title={title}
-              >
-                {title}
-              </div>
-            </div>
-            <div style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", flexWrap: "nowrap", color: "var(--text-dim)", fontSize: 11 }}>
-              <span title={session.modified} style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatRelativeTime(session.modified)}</span>
-              <span style={{ flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.messageCount} msgs</span>
-            </div>
-          </div>
-          {hovered && (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
-              <button
-                onClick={handleUnarchiveClick}
-                title="Unarchive"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  gap: 4, height: 30, padding: "0 10px",
-                  background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  borderRadius: 7, color: "var(--text-muted)",
-                  cursor: "pointer", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(37,99,235,0.08)";
-                  e.currentTarget.style.color = "var(--accent)";
-                  e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                  e.currentTarget.style.borderColor = "var(--border)";
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                恢复
-              </button>
-              <button
-                onClick={handleDeleteClick}
-                title="Delete"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 32, height: 32, padding: 0,
-                  background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  borderRadius: 7, color: "var(--text-muted)",
-                  cursor: "pointer", flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(239,68,68,0.08)";
