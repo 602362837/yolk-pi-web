@@ -22,6 +22,11 @@ import type {
   YpiStudioWorkflowsInitResponse,
   YpiStudioWorkflowsResponse,
 } from "@/lib/ypi-studio-types";
+import {
+  openImprovementRelativeLink,
+  openTaskRelativeLink,
+  taskRelativeFilePath,
+} from "@/lib/ypi-studio-task-preview";
 import { MarkdownBody } from "./MarkdownBody";
 import { TaskWorkflowFlowSection, WorkflowDetailPanel } from "./YpiStudioWorkflowDetail";
 
@@ -54,42 +59,6 @@ function workflowFilePath(cwd: string, workflow: YpiStudioWorkflowFile): string 
 
 function taskFilePath(cwd: string, task: YpiStudioTaskSummary): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/task.json`;
-}
-
-function taskRelativeFilePath(cwd: string, task: YpiStudioTaskSummary, relativePath: string): string {
-  return `${cwd.replace(/[\\/]+$/, "")}/${task.pathLabel.replace(/^\/+/, "")}/${relativePath.replace(/^\/+/, "")}`;
-}
-
-type TaskRelativeHrefResult =
-  | { ok: true; path: string; fileName: string; isHtml: boolean }
-  | { ok: false; message: string };
-
-function resolveTaskRelativeHref(href: string): TaskRelativeHrefResult {
-  const rawHref = href.trim();
-  if (!rawHref) return { ok: false, message: "❌ 安全阻止：链接路径为空" };
-  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(rawHref) || rawHref.startsWith("//") || rawHref.startsWith("/")) {
-    return { ok: false, message: "❌ 安全阻止：拒绝访问外部或绝对路径" };
-  }
-  if (/^[A-Za-z]:[\\/]/.test(rawHref)) return { ok: false, message: "❌ 安全阻止：拒绝访问外部或绝对路径" };
-
-  const withoutQueryHash = rawHref.split(/[?#]/, 1)[0];
-  let decodedPath = withoutQueryHash;
-  try {
-    decodedPath = decodeURIComponent(withoutQueryHash);
-  } catch {
-    return { ok: false, message: "❌ 安全阻止：链接路径编码无效" };
-  }
-
-  if (!decodedPath || decodedPath.includes("\0")) return { ok: false, message: "❌ 安全阻止：链接路径无效" };
-  if (decodedPath.includes("\\") || decodedPath.includes("..")) return { ok: false, message: "❌ 安全阻止：路径包含 \"..\" 越权逃逸风险" };
-  if (decodedPath.startsWith("/")) return { ok: false, message: "❌ 安全阻止：拒绝访问外部或绝对路径" };
-
-  const segments = decodedPath.split("/").filter((segment) => segment && segment !== ".");
-  if (segments.length === 0) return { ok: false, message: "❌ 安全阻止：链接路径为空" };
-  if (decodedPath.endsWith("/")) return { ok: false, message: "❌ 安全阻止：目录链接不可直接打开" };
-  const normalizedPath = segments.join("/");
-  const fileName = segments[segments.length - 1];
-  return { ok: true, path: normalizedPath, fileName, isHtml: /\.html?$/i.test(fileName) };
 }
 
 function shortCwd(cwd: string): string {
@@ -1481,55 +1450,6 @@ function buildStudioArtifactItems(task: YpiStudioTaskDetail): StudioArtifactItem
       sourceRefs: item.sourceRefs,
       order: item.order,
     }));
-}
-
-function openTaskRelativeLink({ cwd, task, href, label, onOpenFile, setNotice }: {
-  cwd: string;
-  task: YpiStudioTaskDetail;
-  href: string;
-  label: string;
-  onOpenFile?: (filePath: string, fileName: string) => void;
-  setNotice: (notice: { tone: "info" | "warning" | "error" | "success"; text: string }) => void;
-}): boolean {
-  const resolved = resolveTaskRelativeHref(href);
-  if (!resolved.ok) {
-    setNotice({ tone: "error", text: resolved.message });
-    return false;
-  }
-  setNotice({ tone: "info", text: `正在打开：${label || resolved.fileName}` });
-  if (resolved.isHtml) {
-    const url = `/api/studio/tasks/${encodeURIComponent(task.key)}/files?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(resolved.path)}&mode=preview`;
-    const opened = window.open(url, "_blank", "noopener,noreferrer");
-    if (!opened) onOpenFile?.(taskRelativeFilePath(cwd, task, resolved.path), resolved.fileName);
-    return false;
-  }
-  onOpenFile?.(taskRelativeFilePath(cwd, task, resolved.path), resolved.fileName);
-  return false;
-}
-
-function openImprovementRelativeLink({ cwd, task, instance, href, label, onOpenFile, setNotice }: {
-  cwd: string;
-  task: YpiStudioTaskDetail;
-  instance: YpiStudioImprovementInstance;
-  href: string;
-  label: string;
-  onOpenFile?: (filePath: string, fileName: string) => void;
-  setNotice: (notice: { tone: "info" | "warning" | "error" | "success"; text: string }) => void;
-}): boolean {
-  const resolved = resolveTaskRelativeHref(href);
-  if (!resolved.ok) {
-    setNotice({ tone: "error", text: resolved.message });
-    return false;
-  }
-  setNotice({ tone: "info", text: `正在打开：${label || resolved.fileName}` });
-  if (resolved.isHtml) {
-    const url = `/api/studio/tasks/${encodeURIComponent(task.key)}/files?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(resolved.path)}&mode=preview&improvementId=${encodeURIComponent(instance.id)}`;
-    const opened = window.open(url, "_blank", "noopener,noreferrer");
-    if (!opened) onOpenFile?.(taskRelativeFilePath(cwd, task, `improvements/${instance.id}/${resolved.path}`), resolved.fileName);
-    return false;
-  }
-  onOpenFile?.(taskRelativeFilePath(cwd, task, `improvements/${instance.id}/${resolved.path}`), resolved.fileName);
-  return false;
 }
 
 // ── Improvement flow helpers ──
