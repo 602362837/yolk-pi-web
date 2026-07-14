@@ -11,6 +11,15 @@ import { recordObservedUsage } from "./llm-usage-recorder";
 import type { Usage } from "@earendil-works/pi-ai/compat";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
 import { createBrowserShareExtension } from "./browser-share-extension";
+import { webExtensionFactories } from "./pi-provider-extensions";
+import {
+  bindGrokSessionAccount,
+  getActiveGrokAccountId,
+  restoreGrokSessionAccountBinding,
+  getGrokSessionAccount,
+  readGrokSessionAccountFromHeader,
+  unbindGrokSessionAccount,
+} from "./grok-session-account";
 import {
   abortYpiStudioChildRunsForSession,
   countActiveYpiStudioChildRunsForSession,
@@ -718,6 +727,14 @@ export class AgentSessionWrapper {
         const model = registry.find(provider, modelId);
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         await this.inner.setModel(model);
+        // Auto-bind Grok account: when a session first selects a grok-cli model
+        // and does not already have a binding, pin the current active account.
+        if (provider === "grok-cli" && !getGrokSessionAccount(this.sessionId)) {
+          const activeId = await getActiveGrokAccountId();
+          if (activeId) {
+            bindGrokSessionAccount(this.sessionId, activeId, this.sessionFile);
+          }
+        }
         return { id: model.id, provider: model.provider };
       }
 
@@ -759,6 +776,15 @@ export class AgentSessionWrapper {
             projectId: sourceHeader.projectId,
             spaceId: sourceHeader.spaceId,
           });
+        }
+        // Preserve Grok session-account binding: write the parent's binding
+        // into the forked session file header so the new session restores it on start.
+        const parentGrokStorageId = getGrokSessionAccount(this.sessionId)
+          ?? readGrokSessionAccountFromHeader(currentSessionFile);
+        if (parentGrokStorageId) {
+          bindGrokSessionAccount(newSessionId, parentGrokStorageId, newSessionFile);
+          // Clean up the temporary binding; the new session's startRpcSession will restore it.
+          unbindGrokSessionAccount(newSessionId);
         }
         cacheSessionPath(newSessionId, newSessionFile);
         invalidateSessionListSnapshots();
@@ -858,6 +884,7 @@ export class AgentSessionWrapper {
       unregisterYpiStudioSessionContinuation(key);
     }
     abortYpiStudioChildRunsForSession(this.sessionId, "session_destroy");
+    unbindGrokSessionAccount(this.sessionId);
     this.unsubscribe?.();
     try {
       this.inner.dispose?.();
@@ -1039,10 +1066,10 @@ export async function startRpcSession(
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir,
-      extensionFactories: [createYpiStudioExtension(cwd, {
+      extensionFactories: webExtensionFactories([createYpiStudioExtension(cwd, {
         sessionId: sessionManager.getSessionId(),
         sessionFile: sessionManager.getSessionFile() ?? undefined,
-      }), createBrowserShareExtension()],
+      }), createBrowserShareExtension()]),
     });
     await resourceLoader.reload();
 
@@ -1076,6 +1103,12 @@ export async function startRpcSession(
     const realSessionId = inner.sessionId as string;
     const realSessionFile = inner.sessionFile as string | undefined;
     if (realSessionFile) cacheSessionPath(realSessionId, realSessionFile);
+
+    // Restore Grok session-account binding from the session header (resume / fork).
+    // New sessions have no binding until the first Grok model selection.
+    if (realSessionFile) {
+      restoreGrokSessionAccountBinding(realSessionId, realSessionFile);
+    }
 
     wrapper.onDestroy(() => registry.delete(realSessionId));
     registry.set(realSessionId, wrapper);

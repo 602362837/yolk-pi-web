@@ -112,8 +112,8 @@ async function main(): Promise<void> {
 
   console.log("OAuth account storage identity and CPA import tests passed");
   } finally {
-    await rm(agentDir, { recursive: true, force: true });
+    await rm(agentDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
-void main();
+await main();

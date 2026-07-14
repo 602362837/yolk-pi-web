@@ -85,6 +85,7 @@ const PROVIDER_ICONS: Record<string, { Icon: IconComponent; hasColor: boolean }>
   "perplexity":             { Icon: PerplexityColorIcon,  hasColor: true },
   "together":               { Icon: TogetherColorIcon,    hasColor: true },
   "grok":                   { Icon: GrokIcon,             hasColor: false },
+  "grok-cli":               { Icon: GrokIcon,             hasColor: false },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -94,6 +95,9 @@ interface OAuthProvider {
   name: string;
   usesCallbackServer: boolean;
   loggedIn: boolean;
+  authMode?: "managed_accounts";
+  accountCount?: number;
+  activeAccountDisplayName?: string | null;
 }
 
 interface OAuthAccountQuotaCache {
@@ -954,6 +958,150 @@ function AccountQuotaMiniCharts({ account }: { account: OAuthAccountSummary }) {
   );
 }
 
+// ── Grok Quota View ──────────────────────────────────────────────────────────
+
+/**
+ * Render Grok subscription quota (monthly + optional weekly) with cache state,
+ * reauth, and error projections.  Uses the safe GrokQuotaResultV1 wire schema
+ * from grok-subscription-quota.ts.
+ */
+function GrokQuotaView({
+  quota,
+  loading,
+  account,
+  onRefresh,
+}: {
+  quota: import("@/lib/grok-subscription-quota").GrokQuotaResultV1 | null;
+  loading: boolean;
+  account: OAuthAccountSummary | null;
+  onRefresh: () => void;
+}) {
+  if (!quota && !loading && !account) return null;
+
+  const cacheDot = (state: string) => {
+    const map: Record<string, string> = { live: "#4ade80", fresh: "#4ade80", stale: "#eab308", none: "var(--text-dim)" };
+    return map[state] ?? "var(--text-dim)";
+  };
+  const cacheLabel = (state: string) => {
+    const map: Record<string, string> = { live: "实时", fresh: "数据新鲜", stale: "缓存已过期", none: "无缓存" };
+    return map[state] ?? state;
+  };
+  const formatTime = (iso: string | null): string => {
+    if (!iso) return "N/A";
+    return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+  const utilizationColor = (pct: number): string => {
+    if (pct >= 95) return "#ef4444";
+    if (pct >= 80) return "#eab308";
+    return "var(--accent)";
+  };
+
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Usage</span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+            {loading ? "Refreshing…" : quota?.cache.queriedAt ? `Updated ${formatTime(quota.cache.queriedAt)}` : "No data"}
+          </span>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh usage"
+          aria-label="Refresh usage"
+          style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+            <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+            <path d="M3 4v8h8" />
+            <path d="M21 20v-8h-8" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Account badge */}
+      {account && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, minWidth: 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: account.active ? "#4ade80" : "var(--border)", flexShrink: 0 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
+            <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
+          </div>
+          <span style={{ fontSize: 11, color: account.active ? "#4ade80" : "var(--text-dim)", fontWeight: 600, flexShrink: 0 }}>
+            {account.active ? "Active / 新会话默认" : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Reauth required */}
+      {quota?.reauthRequired && (
+        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5, padding: "8px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 5 }}>
+          ⚠️ 凭证失效，请重新登录此账号。
+        </div>
+      )}
+
+      {/* Error (non-reauth) */}
+      {quota?.error && !quota.reauthRequired && !quota.success && (
+        <div style={{ fontSize: 12, color: "#fb923c", lineHeight: 1.5, padding: "8px 10px", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.15)", borderRadius: 5 }}>
+          ⚠️ 额度加载失败: {quota.error.message}
+        </div>
+      )}
+
+      {/* Quota tiers */}
+      {quota?.monthly && (
+        <>
+          {/* Monthly */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 500 }}>月度使用额度</span>
+              <span style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: utilizationColor(quota.monthly.utilization) }}>
+                {quota.monthly.used} <span style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 400 }}>/ {quota.monthly.limit} 次</span>
+              </span>
+            </div>
+            <div style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.min(quota.monthly.utilization, 100)}%`, background: utilizationColor(quota.monthly.utilization), borderRadius: 99 }} />
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
+              {quota.monthly.remaining} 剩余 · 重置于 {formatTime(quota.monthly.resetsAt)}
+            </div>
+          </div>
+
+          {/* Weekly */}
+          {quota.weekly ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 500 }}>每周动态额度使用率</span>
+                <span style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: quota.weekly.usedPercent > 80 ? "#eab308" : "var(--accent)" }}>
+                  {Math.round(quota.weekly.usedPercent)}%
+                </span>
+              </div>
+              <div style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${Math.min(quota.weekly.usedPercent, 100)}%`, background: quota.weekly.usedPercent > 80 ? "#eab308" : "var(--accent)", borderRadius: 99 }} />
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>重置于 {formatTime(quota.weekly.resetsAt)}</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: "var(--text-dim)", opacity: 0.7, fontStyle: "italic" }}>
+              该订阅计划不含额外周额度权益
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Cache state badge */}
+      {quota && (
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--text-muted)" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: cacheDot(quota.cache.state), flexShrink: 0 }} />
+          <span>{cacheLabel(quota.cache.state)}{quota.cache.ageMs !== null ? ` · ${Math.round(quota.cache.ageMs / 1000)}s ago` : ""}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OAuthAccountsView({
   accounts,
   loading,
@@ -991,7 +1139,7 @@ function OAuthAccountsView({
   onEditExtraInfo: (account: OAuthAccountSummary) => void;
   onRefreshQuota: (account: OAuthAccountSummary) => void;
   onDelete: (account: OAuthAccountSummary) => void;
-  onWarmup: () => void;
+  onWarmup?: () => void;
 }) {
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1001,13 +1149,15 @@ function OAuthAccountsView({
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{loading ? "Loading…" : `${accounts.length} saved`}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button
-            onClick={onWarmup}
-            disabled={loading || accounts.length === 0}
-            style={{ padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading || accounts.length === 0 ? "var(--text-dim)" : "var(--accent)", cursor: loading || accounts.length === 0 ? "not-allowed" : "pointer", fontSize: 11, fontWeight: 700 }}
-          >
-            Warm up
-          </button>
+          {onWarmup && (
+            <button
+              onClick={onWarmup}
+              disabled={loading || accounts.length === 0}
+              style={{ padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading || accounts.length === 0 ? "var(--text-dim)" : "var(--accent)", cursor: loading || accounts.length === 0 ? "not-allowed" : "pointer", fontSize: 11, fontWeight: 700 }}
+            >
+              Warm up
+            </button>
+          )}
           <button
             onClick={onRefresh}
             disabled={loading}
@@ -1417,11 +1567,112 @@ function AddAccountDialog({
   );
 }
 
+// ── Grok Delete Confirmation Dialog ──────────────────────────────────────────
+
+function GrokDeleteConfirmDialog({
+  account,
+  allAccounts,
+  deleting,
+  onConfirm,
+  onClose,
+}: {
+  account: OAuthAccountSummary;
+  allAccounts: OAuthAccountSummary[];
+  deleting: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const isActive = account.active;
+  const replacement = allAccounts.find((a) => a.accountId !== account.accountId);
+
+  let title: string;
+  let body: React.ReactNode;
+  let footer: React.ReactNode;
+
+  if (isActive) {
+    title = "⚠️ 无法直接删除 Active 账号";
+    body = (
+      <>
+        <p style={{ marginBottom: 12, color: "var(--danger)", fontWeight: 600 }}>
+          账号「{account.label || account.displayName}」当前处于活动激活状态。
+        </p>
+        <p style={{ lineHeight: 1.6 }}>
+          删除此账号前，系统将自动激活另一个可用账号作为默认。
+          {replacement ? (
+            <> 将激活「{replacement.label || replacement.displayName}」。</>
+          ) : (
+            <> 但当前没有其他可用账号，删除后将恢复为未连接状态。</>
+          )}
+        </p>
+      </>
+    );
+    footer = (
+      <>
+        <button onClick={onClose} disabled={deleting} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleting ? "not-allowed" : "pointer", fontSize: 12 }}>关闭</button>
+        <button onClick={onConfirm} disabled={deleting} style={{ padding: "6px 14px", background: deleting ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: deleting ? "var(--text-dim)" : "#fff", cursor: deleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>
+          {deleting ? "删除中…" : "自动切号并删除"}
+        </button>
+      </>
+    );
+  } else {
+    title = "⚠️ 确定删除此账号？";
+    body = (
+      <>
+        <p style={{ marginBottom: 12, lineHeight: 1.6 }}>
+          确定要永久删除账号「{account.label || account.displayName}」（{account.maskedAccountId}）吗？此操作无法撤销。
+        </p>
+        <div style={{ background: "var(--bg-panel)", padding: "10px 12px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}>
+          <strong style={{ display: "block", marginBottom: 6, color: "var(--text)" }}>系统提示：</strong>
+          <p style={{ margin: 0, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            删除后，已绑定该账号的会话会在下次请求时自动使用当前 Active 账号的凭证。
+            不会导致会话数据丢失。
+          </p>
+        </div>
+      </>
+    );
+    footer = (
+      <>
+        <button onClick={onClose} disabled={deleting} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleting ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+        <button onClick={onConfirm} disabled={deleting} style={{ padding: "6px 14px", background: deleting ? "var(--bg-panel)" : "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, color: deleting ? "var(--text-dim)" : "#ef4444", cursor: deleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>
+          {deleting ? "删除中…" : "确认删除"}
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <div
+      className="pi-modal-overlay"
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !deleting) onClose(); }}
+    >
+      <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 460, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: isActive ? "var(--danger)" : "var(--text)" }}>{title}</div>
+          <button type="button" disabled={deleting} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: deleting ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+        </div>
+        <div style={{ padding: 14, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+          {body}
+        </div>
+        <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          {footer}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
   const { confirm, prompt } = usePrompt();
+  const isManagedAccounts = provider.authMode === "managed_accounts";
+  const isGrok = provider.id === "grok-cli";
+  const isCodex = provider.id === "openai-codex";
+
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
+  // Shared quota state — Codex uses SubscriptionQuota, Grok uses GrokQuotaResultV1
   const [quota, setQuota] = useState<SubscriptionQuota | null>(null);
+  const [grokQuota, setGrokQuota] = useState<import("@/lib/grok-subscription-quota").GrokQuotaResultV1 | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
   const [quotaResetting, setQuotaResetting] = useState(false);
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
@@ -1436,6 +1687,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [addAccountDialogView, setAddAccountDialogView] = useState<"method" | "json" | null>(null);
   const [warmupDialogOpen, setWarmupDialogOpen] = useState(false);
+  // Grok login method selection
+  const [showGrokLoginMethods, setShowGrokLoginMethods] = useState(false);
+  // Grok delete dialog states
+  const [grokDeleteAccount, setGrokDeleteAccount] = useState<OAuthAccountSummary | null>(null);
+  const [grokDeleteDeleting, setGrokDeleteDeleting] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1450,6 +1706,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setLoginState({ phase: "idle" });
     setInputValue("");
     setQuota(null);
+    setGrokQuota(null);
     setQuotaLoading(false);
     setQuotaResetting(false);
     setAccounts([]);
@@ -1464,6 +1721,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setDeletingAccountId(null);
     setAddAccountDialogView(null);
     setWarmupDialogOpen(false);
+    setShowGrokLoginMethods(false);
+    setGrokDeleteAccount(null);
+    setGrokDeleteDeleting(false);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
   }, [provider.id]);
@@ -1473,7 +1733,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   }, []);
 
   const loadAccounts = useCallback(async () => {
-    if (provider.id !== "openai-codex") return;
+    if (!isManagedAccounts) return;
     setAccountsLoading(true);
     setAccountsError(null);
     try {
@@ -1486,23 +1746,24 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setAccountsLoading(false);
     }
-  }, [provider.id]);
+  }, [provider.id, isManagedAccounts]);
 
   useEffect(() => {
-    if (provider.id === "openai-codex") {
+    if (isManagedAccounts) {
       void loadAccounts();
     }
-  }, [provider.id, provider.loggedIn, loadAccounts]);
+  }, [provider.id, provider.loggedIn, loadAccounts, isManagedAccounts]);
 
   useEffect(() => {
-    if (provider.id !== "openai-codex") return;
+    if (!isManagedAccounts) return;
     setSelectedQuotaAccountId((current) => {
       if (accounts.length === 0) return null;
       if (current && accounts.some((account) => account.accountId === current)) return current;
       return accounts.find((account) => account.active)?.accountId ?? null;
     });
-  }, [accounts, provider.id]);
+  }, [accounts, provider.id, isManagedAccounts]);
 
+  // Codex quota loader
   const loadQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
     if (provider.id !== "openai-codex" || (!provider.loggedIn && !force)) return;
     const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
@@ -1531,11 +1792,37 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts]);
 
+  // Grok quota loader
+  const loadGrokQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
+    if (!isGrok || (!provider.loggedIn && !force)) return;
+    const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
+    setQuotaLoading(true);
+    try {
+      const refreshParam = force ? "&refresh=1" : "";
+      const accountQuery = quotaAccountId ? `?accountId=${encodeURIComponent(quotaAccountId)}${refreshParam}` : refreshParam ? `?refresh=1` : "";
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`);
+      const data = await res.json() as import("@/lib/grok-subscription-quota").GrokQuotaResultV1;
+      setGrokQuota(data);
+      void loadAccounts();
+    } catch (error) {
+      setGrokQuota(null);
+      setAccountsError(error instanceof Error ? error.message : "Failed to load Grok quota");
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isGrok]);
+
   useEffect(() => {
     if (provider.id === "openai-codex" && provider.loggedIn) {
       void loadQuota();
     }
   }, [provider.id, provider.loggedIn, loadQuota]);
+
+  useEffect(() => {
+    if (isGrok && provider.loggedIn) {
+      void loadGrokQuota();
+    }
+  }, [provider.id, provider.loggedIn, isGrok, loadGrokQuota]);
 
   const handleLogin = useCallback((accountMode: "login" | "add" = "login") => {
     eventSourceRef.current?.close();
@@ -1577,7 +1864,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         setLoginState({ phase: "success", message: data.message ?? (accountMode === "add" ? "Account saved successfully." : "Connected successfully.") });
         onRefresh();
         void loadAccounts();
-        if (provider.loggedIn) void loadQuota();
+        if (provider.loggedIn) {
+          if (isGrok) void loadGrokQuota(true);
+          else void loadQuota();
+        }
       } else if (data.type === "error") {
         es.close();
         setLoginState({ phase: "error", message: data.message! });
@@ -1590,12 +1880,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       es.close();
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "Connection lost" });
     };
-  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota]);
+  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, isGrok]);
 
   const handleLogout = useCallback(async () => {
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     setQuota(null);
+    setGrokQuota(null);
     setSelectedQuotaAccountId(null);
     onRefresh();
     void loadAccounts();
@@ -1641,8 +1932,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   const handleSelectQuotaAccount = useCallback((account: OAuthAccountSummary) => {
     setSelectedQuotaAccountId(account.accountId);
-    void loadQuota(true, account.accountId);
-  }, [loadQuota]);
+    if (isGrok) void loadGrokQuota(true, account.accountId);
+    else void loadQuota(true, account.accountId);
+  }, [loadQuota, loadGrokQuota, isGrok]);
 
   const handleActivateAccount = useCallback(async (accountId: string) => {
     setActivatingAccountId(accountId);
@@ -1659,7 +1951,8 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       setSelectedQuotaAccountId(accountId);
       setLoginState({ phase: "success", message: "Account activated." });
       onRefresh();
-      await loadQuota(true, accountId);
+      if (isGrok) await loadGrokQuota(true, accountId);
+      else await loadQuota(true, accountId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to activate account";
       setAccountsError(message);
@@ -1667,7 +1960,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setActivatingAccountId(null);
     }
-  }, [provider.id, onRefresh, loadQuota]);
+  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, isGrok]);
 
   const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
     const nextLabel = await prompt({
@@ -1731,12 +2024,20 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setRefreshingQuotaAccountId(account.accountId);
     setAccountsError(null);
     try {
-      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}?accountId=${encodeURIComponent(account.accountId)}`);
-      const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setQuota(data);
-      await loadAccounts();
-      setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error ?? "Quota query failed.") });
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}?accountId=${encodeURIComponent(account.accountId)}&refresh=1`);
+      if (isGrok) {
+        const data = await res.json().catch(() => ({})) as import("@/lib/grok-subscription-quota").GrokQuotaResultV1;
+        if (!res.ok && !data.success) throw new Error(data.error?.message ?? `HTTP ${res.status}`);
+        if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setGrokQuota(data);
+        await loadAccounts();
+        setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error?.message ?? "Quota query failed.") });
+      } else {
+        const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
+        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+        if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setQuota(data);
+        await loadAccounts();
+        setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error ?? "Quota query failed.") });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to refresh account quota";
       setAccountsError(message);
@@ -1744,7 +2045,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setRefreshingQuotaAccountId(null);
     }
-  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId]);
+  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok]);
 
   const handleResetQuota = useCallback(async () => {
     const quotaAccountId = selectedQuotaAccountId;
@@ -1778,7 +2079,57 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [confirm, loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId]);
 
+  // Grok delete flow: opens a custom dialog with active/pin protection
+  const handleGrokDeleteClick = useCallback((account: OAuthAccountSummary) => {
+    setGrokDeleteAccount(account);
+    setGrokDeleteDeleting(false);
+  }, []);
+
+  const handleGrokDeleteConfirm = useCallback(async () => {
+    if (!grokDeleteAccount) return;
+    setGrokDeleteDeleting(true);
+    setAccountsError(null);
+    try {
+      if (grokDeleteAccount.active) {
+        // Must activate another account first
+        const replacement = accounts.find((a) => a.accountId !== grokDeleteAccount.accountId);
+        if (replacement) {
+          const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}/activate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accountId: replacement.accountId }),
+          });
+          const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+          if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+          setAccounts(data.accounts ?? []);
+        }
+      }
+      // Now delete
+      const deleteRes = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: grokDeleteAccount.accountId }),
+      });
+      const deleteData = await deleteRes.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
+      if (!deleteRes.ok) throw new Error(deleteData.error ?? `HTTP ${deleteRes.status}`);
+      setAccounts(deleteData.accounts ?? []);
+      if (deleteData.activeAccountId) setSelectedQuotaAccountId(deleteData.activeAccountId);
+      else if (selectedQuotaAccountId === grokDeleteAccount.accountId) setSelectedQuotaAccountId(null);
+      setLoginState({ phase: "success", message: "Account deleted." });
+      setGrokDeleteAccount(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete account";
+      setAccountsError(message);
+    } finally {
+      setGrokDeleteDeleting(false);
+    }
+  }, [grokDeleteAccount, accounts, provider.id, selectedQuotaAccountId]);
+
   const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
+    if (isGrok) {
+      handleGrokDeleteClick(account);
+      return;
+    }
     const confirmed = await confirm({
       title: "Delete saved credentials?",
       message: <>Delete saved credentials for {account.displayName}?<br /><br />The account must be added again to restore it.</>,
@@ -1806,7 +2157,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setDeletingAccountId(null);
     }
-  }, [confirm, provider.id]);
+  }, [confirm, provider.id, isGrok, handleGrokDeleteClick]);
 
   const selectedQuotaAccount = accounts.find((account) => account.accountId === selectedQuotaAccountId)
     ?? accounts.find((account) => account.active)
@@ -1816,6 +2167,20 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     loginState.phase === "auth" || loginState.phase === "device_code" ||
     loginState.phase === "prompt" || loginState.phase === "select";
 
+  // Grok login: start with method selection, then call handleLogin("add")
+  const handleGrokLoginStart = useCallback(() => {
+    setShowGrokLoginMethods(true);
+  }, []);
+
+  const handleGrokLoginMethod = useCallback((method: "browser" | "device" | "grok_build") => {
+    setShowGrokLoginMethods(false);
+    if (method === "grok_build") {
+      // Grok Build existing credential — handled by the SSE flow picking up ~/.grok/auth.json
+    }
+    // Both browser and device code flow through the SSE login; Grok always uses add mode
+    handleLogin("add");
+  }, [handleLogin]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1823,18 +2188,69 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : "var(--border)", display: "inline-block" }} />
           <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
-            {provider.loggedIn ? "connected" : "not connected"}
+            {provider.loggedIn
+              ? `connected${provider.accountCount ? ` (${provider.accountCount})` : ""}`
+              : "not connected"}
           </span>
         </div>
       </div>
 
+      {/* Active semantics for Grok */}
+      {isGrok && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-panel)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", lineHeight: 1.5 }}>
+          <strong style={{ color: "var(--text)" }}>账号激活说明：</strong>
+          激活某个账号只将其设为后续<strong>新建会话的默认账号</strong>。已有 Grok 会话在创建时便与其所用账号绑定（Session Pinning），之后不受 active 账号切换影响，从而支持多账号并发会话隔离。
+        </div>
+      )}
+
       {/* Status */}
       <div style={{ minHeight: 48 }}>
-        {loginState.phase === "idle" && (
+        {loginState.phase === "idle" && !showGrokLoginMethods && (
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            {provider.loggedIn ? "Already connected. You can re-login or disconnect." : `Connect your ${provider.name} account.`}
+            {provider.loggedIn
+              ? (isGrok
+                ? `已连接 ${accounts.length} 个 Grok 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
+                : "Already connected. You can re-login or disconnect.")
+              : `Connect your ${provider.name} account.`}
           </p>
         )}
+
+        {/* Grok login method selection */}
+        {isGrok && showGrokLoginMethods && loginState.phase === "idle" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 2 }}>选择连接方式</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 8 }}>
+              <button
+                onClick={() => handleGrokLoginMethod("browser")}
+                style={{ padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700 }}>🌐 浏览器登录 (推荐)</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)" }}>OAuth PKCE 安全回调授权</span>
+              </button>
+              <button
+                onClick={() => handleGrokLoginMethod("device")}
+                style={{ padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700 }}>📺 设备验证码登录</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)" }}>无浏览器或远程服务器环境</span>
+              </button>
+              <button
+                onClick={() => handleGrokLoginMethod("grok_build")}
+                style={{ padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700 }}>📂 复用本地 Grok Build</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)" }}>读取 ~/.grok/auth.json</span>
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", background: "rgba(234,179,8,0.05)", borderLeft: "3px solid var(--warning)", padding: "6px 10px", borderRadius: "0 4px 4px 0", lineHeight: 1.5 }}>
+              若设置了 <code style={{ fontFamily: "var(--font-mono)" }}>GROK_CLI_OAUTH_TOKEN</code> 环境变量，系统将使用只读凭证，但不支持多账号隔离管理及自动 Token 刷新。
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => setShowGrokLoginMethods(false)} style={{ padding: "4px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>取消</button>
+            </div>
+          </div>
+        )}
+
         {loginState.phase === "connecting" && (
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Opening browser…</p>
         )}
@@ -1929,19 +2345,31 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           </button>
         ) : (
           <>
-            <button
-              onClick={() => handleLogin()}
-              style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-            >
-              {provider.loggedIn ? "Re-login" : "Login"}
-            </button>
-            {provider.id === "openai-codex" && provider.loggedIn && (
+            {/* Grok-specific: Show "添加账号" as primary, login method selection on click */}
+            {isGrok ? (
               <button
-                onClick={() => setAddAccountDialogView("method")}
-                style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                onClick={handleGrokLoginStart}
+                style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               >
-                Add Account
+                ➕ 添加账号
               </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleLogin()}
+                  style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                >
+                  {provider.loggedIn ? "Re-login" : "Login"}
+                </button>
+                {provider.id === "openai-codex" && provider.loggedIn && (
+                  <button
+                    onClick={() => setAddAccountDialogView("method")}
+                    style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                  >
+                    Add Account
+                  </button>
+                )}
+              </>
             )}
             {provider.loggedIn && (
               <button
@@ -1955,11 +2383,22 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         )}
       </div>
 
+      {/* Quota display */}
+      {isGrok && provider.loggedIn && (
+        <GrokQuotaView
+          quota={grokQuota}
+          loading={quotaLoading}
+          account={selectedQuotaAccount}
+          onRefresh={() => loadGrokQuota(true)}
+        />
+      )}
+
       {provider.id === "openai-codex" && provider.loggedIn && (
         <OAuthQuotaView quota={quota} loading={quotaLoading} account={selectedQuotaAccount} resetting={quotaResetting} onRefresh={loadQuota} onReset={handleResetQuota} />
       )}
 
-      {provider.id === "openai-codex" && (
+      {/* Accounts — shared for both managed-account providers */}
+      {isManagedAccounts && (
         <OAuthAccountsView
           accounts={accounts}
           loading={accountsLoading}
@@ -1978,10 +2417,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           onEditExtraInfo={handleEditAccountExtraInfo}
           onRefreshQuota={handleRefreshAccountQuota}
           onDelete={handleDeleteAccount}
-          onWarmup={() => setWarmupDialogOpen(true)}
+          onWarmup={isCodex ? (() => setWarmupDialogOpen(true)) : undefined}
         />
       )}
 
+      {/* Codex-specific dialogs */}
       {provider.id === "openai-codex" && warmupDialogOpen && (
         <ChatGptWarmupDialog
           accounts={accounts}
@@ -1990,7 +2430,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         />
       )}
 
-      {provider.id === "openai-codex" && editingExtraInfoAccount && (
+      {isManagedAccounts && editingExtraInfoAccount && (
         <ExtraInfoDialog
           account={editingExtraInfoAccount}
           saving={savingExtraInfoAccountId === editingExtraInfoAccount.accountId}
@@ -2012,6 +2452,17 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             if (provider.loggedIn) void loadQuota();
           }}
           onClose={() => setAddAccountDialogView(null)}
+        />
+      )}
+
+      {/* Grok delete confirmation dialog */}
+      {isGrok && grokDeleteAccount && (
+        <GrokDeleteConfirmDialog
+          account={grokDeleteAccount}
+          allAccounts={accounts}
+          deleting={grokDeleteDeleting}
+          onConfirm={handleGrokDeleteConfirm}
+          onClose={() => { if (!grokDeleteDeleting) setGrokDeleteAccount(null); }}
         />
       )}
     </div>

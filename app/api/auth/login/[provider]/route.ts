@@ -1,6 +1,7 @@
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
-import { OPENAI_CODEX_PROVIDER_ID, saveOAuthAccountCredential, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
+import { AuthStorage, createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { isSupportedOAuthAccountProvider, saveOAuthAccountCredential, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
+import { webExtensionFactories } from "@/lib/pi-provider-extensions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,13 +67,24 @@ export async function GET(
         controller.close();
         return;
       }
-      if (addAccountMode && provider !== OPENAI_CODEX_PROVIDER_ID) {
-        send(controller, { type: "error", message: `Account add mode is only supported for ${OPENAI_CODEX_PROVIDER_ID}` });
+      if (addAccountMode && !isSupportedOAuthAccountProvider(provider)) {
+        send(controller, { type: "error", message: `Account add mode is not supported for ${provider}` });
         controller.close();
         return;
       }
 
-      const authStorage = addAccountMode ? AuthStorage.inMemory() : AuthStorage.create();
+      // Bootstrap Grok provider so it is visible in the global OAuth registry
+      // regardless of whether a chat session has been opened.
+      const agentDir = getAgentDir();
+      const cwd = process.cwd();
+      const baseAuth = addAccountMode ? AuthStorage.inMemory() : AuthStorage.create();
+      const services = await createAgentSessionServices({
+        cwd,
+        agentDir,
+        authStorage: baseAuth,
+        resourceLoaderOptions: { extensionFactories: webExtensionFactories() },
+      });
+      const authStorage = services.authStorage;
       const providers = authStorage.getOAuthProviders();
       const providerInfo = providers.find((p) => p.id === provider);
       if (!providerInfo) {
@@ -189,7 +201,7 @@ export async function GET(
           const account = await saveOAuthAccountCredential(provider, authStorage.get(provider));
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {
-          if (provider === OPENAI_CODEX_PROVIDER_ID) {
+          if (isSupportedOAuthAccountProvider(provider)) {
             await syncActiveOAuthAccountCredential(provider, authStorage).catch(() => {});
           }
           reloadRpcAuthState();

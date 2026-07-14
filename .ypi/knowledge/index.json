@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T11:38:50.008Z",
+  "updatedAt": "2026-07-14T04:00:10.222Z",
   "entries": [
+    {
+      "id": "20260714-120010-集成-supergrok-oauth-与多账号额度管理",
+      "title": "集成 SuperGrok OAuth 与多账号额度管理",
+      "taskId": "20260714-090413-集成-supergrok-oauth-与多账号额度管理",
+      "taskKey": "archived:2026-07:20260714-090413-集成-supergrok-oauth-与多账号额度管理",
+      "workflowId": "feature-dev",
+      "summary": "已完成 SuperGrok OAuth 与多账号额度管理。核心做法：固定集成 pi-grok-cli@0.4.1，通过统一 provider bootstrap 覆盖主 Chat、Studio child、Models/Auth API；因 pi-grok-cli 发布为带 .js ESM 引用的 TypeScript 源码，Next/Turbopack 不能静态打包，最终使用服务端 jiti 异步加载，并将 jiti/pi-grok-cli 外部化。OAuth 账号使用 opaque storage id、独立 0600 secret/0700 目录、active mirror；新会话绑定 active，旧会话/fork/resume/Studio child 保持账号隔离；额度通过 /billing 读取 monthly/optional weekly，60s fresh、24h stale、401 retry 和安全白名单投影。lint、tsc、provider/account/quota 测试及 checker 均通过。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260714-090413-集成-supergrok-oauth-与多账号额度管理",
+      "knowledgePath": ".ypi/knowledge/20260714-120010-集成-supergrok-oauth-与多账号额度管理.md",
+      "createdAt": "2026-07-14T04:00:10.222Z",
+      "archivedAt": "2026-07-14T04:00:10.222Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-193850-统一项目提示窗组件并迁移-alert-调用",
       "title": "统一项目提示窗组件并迁移 alert 调用",

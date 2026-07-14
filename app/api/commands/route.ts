@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { DefaultResourceLoader, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { grokCliExtension } from "@/lib/pi-provider-extensions";
 import { YPI_STUDIO_SLASH_COMMANDS } from "@/lib/ypi-studio-extension";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   if (!cwd) return NextResponse.json({ error: "cwd required" }, { status: 400 });
 
   try {
-    const loader = new DefaultResourceLoader({ cwd, agentDir: getAgentDir() });
+    const loader = new DefaultResourceLoader({ cwd, agentDir: getAgentDir(), extensionFactories: [grokCliExtension] });
     await loader.reload();
 
     const { skills, diagnostics: skillDiagnostics } = loader.getSkills();
