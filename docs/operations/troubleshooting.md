@@ -105,6 +105,55 @@ The failover lock is **process-level** (`globalThis.__piOpencodeGoFailover`). In
 - Use `npm run test:studio-dag` for DAG scheduling regressions and `npm run test:studio-policy` for approval/policy regressions.
 - UI truncation flags on subagent transcripts are display limits, not failure signals; use run status, `result.isError`, and termination reason for severity.
 
+## Model Price Configuration
+
+### Pricing data flow
+
+1. Users open Settings → 模型价格 to see all models with price status (缺价/已配置/内置/免费).
+2. For missing-price models, users can hand-edit prices in a drawer (input/output/cache-read in USD/1M tokens), optionally mark as explicitly free, and save.
+3. **Intelligent suggestions** (智能填写): select target models → `POST /api/model-prices/suggest` fetches OpenRouter catalog → deterministic matching first, then AI-assisted extraction for remaining models → users review evidence, confidence, and warnings → explicit confirm → `PATCH /api/model-prices` writes to `models.json`.
+
+### Write target
+
+Prices are saved directly to `~/.pi/agent/models.json`:
+- Built-in/extension models: `providers.<p>.modelOverrides.<model>.cost`
+- Custom models: `providers.<p>.models[<match>].cost`
+- Explicit free: writes `cost.{input,output,cacheRead}=0` + records in `pi-web.json` `usage.explicitFreeModels[]`
+
+### Concurrency
+
+The PATCH API uses an opaque revision hash derived from the file content. If two concurrent saves race, one will get HTTP 409 and the UI will prompt to reload and re-apply changes (user draft is preserved).
+
+### Backup and rollback
+
+Before every write, the existing `models.json` is copied to `models.json.backup`. If a write fails mid-operation, the original file is preserved and the temp file is cleaned up. To restore the previous configuration:
+
+```bash
+cp ~/.pi/agent/models.json.backup ~/.pi/agent/models.json
+```
+
+Then reload Settings to pick up the restored prices.
+
+### JSONC comments
+
+If `~/.pi/agent/models.json` contains JSONC comments (`// ...`), they will be **lost on the first write** because the service writes clean JSON. A backup is always saved beforehand. If preserving comments is critical, avoid using the model price settings page on a commented file until the JSONC round-trip issue is resolved.
+
+### Suggest API failure modes
+
+- OpenRouter catalog fetch fails → only AI-assisted matching attempted (if evidence exists from other sources)
+- AI assistant fails → only deterministic matches returned; unresolved targets listed explicitly
+- No default model configured → AI-assisted phase skipped with warning
+- All sources fail → `unresolved` array contains all targets; manual entry remains available
+- Network timeout/oversized response → per-source graceful degradation; partial results returned
+
+### Price source allowlist
+
+The only currently allowed price source is `https://openrouter.ai/api/v1/models`. Arbitrary URL fetch, proxy, or browser-based scraping is not supported. To add a new source, update `ALLOWLIST_URLS` and `ALLOWED_SOURCE_HOSTS` in `lib/model-price-sources.ts`.
+
+### Test
+
+Run `node scripts/test-model-prices.mjs` for focused validation of price config, merge, revision, JSONC strip, suggest validation, and PATCH batch limits.
+
 ## Memory Diagnostic Snapshots
 
 When the Yolk Pi Web process memory grows (potentially to multiple GiB after days of uptime), generate a bounded read-only diagnostic snapshot to gather evidence for offline analysis. This is a diagnosis tool only; it does **not** fix or clean up leaks, abort sessions, force GC, or take heap snapshots.

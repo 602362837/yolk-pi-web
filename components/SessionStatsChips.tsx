@@ -109,7 +109,7 @@ function childDisplayName(child: SessionUsageChildTopbarSummary): string {
 
 function childLifetimeTokens(child: SessionUsageChildTopbarSummary): number {
   const t = child.totals.tokens;
-  return (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0) + (t.cacheWrite ?? 0);
+  return (t.input ?? 0) + (t.output ?? 0) + (t.cacheRead ?? 0);
 }
 
 function snapshotPressure(snapshot: SessionContextUsageSnapshot | undefined): ContextPressure {
@@ -417,8 +417,7 @@ export function SessionStatsChips({
   const childTokenTotal = studioChild
     ? studioChild.tokens.input +
       studioChild.tokens.output +
-      studioChild.tokens.cacheRead +
-      studioChild.tokens.cacheWrite
+      studioChild.tokens.cacheRead
     : 0;
   const hasChildUsage = kind === "parent" && (childTokenTotal > 0 || childCost > 0);
   const parentRollupCost = sessionStats?.parentRollupTotals?.cost ?? 0;

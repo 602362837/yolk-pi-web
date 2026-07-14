@@ -26,6 +26,16 @@ When changing pi SDK usage, read the installed package documentation first:
 
 YPI Studio subagents support an in-process SDK runner selected by `studio.subagents.runner` (`auto`/`sdk`/`cli`). SDK child sessions use the same installed `@earendil-works/pi-coding-agent` dependency and auth/model configuration path as main Chat sessions, but they receive their own persistent child session id for provider request affinity. The legacy CLI runner remains as rollback and resolves the bundled package CLI before consulting `PATH`.
 
+## Model Price Sources
+
+The model price suggestion feature (`/api/model-prices/suggest`) fetches public pricing data from curated HTTPS allowlist sources. The only current source is the OpenRouter public model catalog at `https://openrouter.ai/api/v1/models`. Fetches enforce:
+- HTTPS only; redirects only to hosts on the same allowlist
+- Response size cap at 512 KB
+- Timeout and MIME type validation
+- No API keys, session tokens, or user credentials sent
+
+AI-assisted extraction uses the configured model from `usage.pricingAssistant` / `usage.pricingAssistantFallback` (default `followMain` → `piDefault`). The AI receives only bounded pre-fetched evidence excerpts and has no network/file/tool access. See `lib/model-price-sources.ts` and `lib/model-price-assistant.ts` for complete adapter and extraction contracts.
+
 ## Auth Providers
 
 Auth-related API routes live under `app/api/auth/`. Provider tokens and API-key status are stored/read through the pi configuration mechanisms; keep provider-specific network calls isolated in `lib/` helpers.

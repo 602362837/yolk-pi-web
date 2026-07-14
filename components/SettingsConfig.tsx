@@ -7,6 +7,7 @@ import { TerminalKnownHostsPanel } from "./TerminalKnownHostsPanel";
 import { TerminalSshCredentialEditor } from "./TerminalSshCredentialEditor";
 import { TerminalSshProfileEditor } from "./TerminalSshProfileEditor";
 import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
+import { ModelPricesConfig } from "./ModelPricesConfig";
 import type {
   PiWebChatGptConfig,
   PiWebConfig,
@@ -84,7 +85,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "terminal" | "chatgpt" | "opencodeGo" | "editor" | "trellis" | "diagnostics";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "editor" | "trellis" | "diagnostics";
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -1335,6 +1336,7 @@ export function SettingsConfig({
             {renderSectionButton("worktree", "WorkTree", "New WorkTree 默认配置")}
             {renderSectionButton("studio", "Studio", "YPI Studio 成员模型")}
             {renderSectionButton("usage", "Usage", "Usage 统计范围")}
+            {renderSectionButton("modelPrices", "模型价格", "模型价格配置与智能填写")}
             {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
             {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量与自动切换")}
             {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
@@ -1540,6 +1542,8 @@ export function SettingsConfig({
                       onChange={(includeArchived) => updateUsage({ includeArchived })}
                     />
                   </div>
+                ) : section === "modelPrices" ? (
+                  <ModelPricesConfig cwd={cwd} />
                 ) : section === "terminal" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>

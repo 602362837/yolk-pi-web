@@ -182,12 +182,54 @@ Archive-all matches target sessions by canonical cwd against the lightweight **a
 ### Usage accounting
 
 - `GET /api/usage` is a read-only reporting path. It scans active sessions and, when `pi-web.json` `usage.includeArchived` is enabled, archived sessions; usage scans explicitly opt in to YPI Studio child audit sessions so Studio SDK child JSONL costs are visible in totals.
+- All token aggregation (legacy and ledger) excludes `cacheWrite` per the cache-write removal decision; deprecated fields stay at 0 for wire compatibility. See "Usage accounting — cache-write removal" above.
 - Global usage responses keep the legacy `bySession` dimension as individual JSONL files and add `byParentSession` for parent-chat rollups. Ordinary sessions roll up to themselves; Studio child sessions roll up by `studioChild.parentSessionId`; unresolved/deleted parents still produce `parentFound=false` rows so child usage is not dropped.
 - `GET /api/usage?sessionId=<id>` returns a lightweight lifetime `session_rollup` for the selected session: parent own totals, Studio child totals, combined totals, child count, and child session summaries. If the selected session is itself a Studio child, the rollup resolves back to its parent id when possible. The result also exposes additive `selectedSessionTotals` (the selected session's own usage), `parentRollupTotals` (parent own + Studio children, equal to `totals`), and `childSessions[].contextUsage` so the top bar can render confirmed values without guessing from generic totals. Old fields keep their semantics; callers that ignore additive fields continue to work.
 - Child `contextUsage` is a bounded numeric-only projection (`percent`, `contextWindow`, `tokens`, availability/source, optional capture time). The SDK child runner samples authoritative `AgentSession.getContextUsage()` at low frequency and once before teardown; the runtime can retain that sample process-locally after unregister. CLI, historical/restarted, and never-sampled children return explicit null-valued `unavailable`. It never derives occupancy from lifetime usage or progress tokens/tps, never changes JSONL headers, and never returns child transcript, prompt, output, tool result, artifact, or path data.
 - Chat top-bar usage display口径 (confirmed): a `parent` session compact shows the parent rollup total and appends `incl. Studio` only when Studio children have real usage (child token total or child cost > 0, not merely child count > 0); a `standalone` session compact shows its own usage with no child marker; a `studio_child` audit session compact shows only that child's own usage (`selectedSessionTotals`) and must not show a bare `+child` or a parent-rollup placeholder, while its tooltip may include the parent rollup total and parent id. The top bar must not mutate the parent session file or append child content to the React message list.
 - Usage totals come only from standard assistant message `usage` fields persisted in session JSONL. The reporting path does not parse `.ypi/.runtime/studio-subagents/*.jsonl` sidecars, does not estimate CLI `--no-session` runner cost, and does not return transcript, prompt/output, or artifact bodies.
 - Chat top-bar usage prefers the `session_rollup` API result and falls back to local parent-session `messages` usage while loading or after API failure. This is a display-only enhancement and must not mutate the parent session file or append child content to the React message list.
+
+### Model price configuration
+
+Model pricing is configured by writing directly to Pi's single source of truth: `~/.pi/agent/models.json`. The web UI never creates a separate price file.
+
+**Write paths by model kind:**
+- **Built-in / extension models**: prices are saved under `providers.<provider>.modelOverrides.<model>.cost.{input,output,cacheRead}`.
+- **Custom models**: prices are saved on the matching `providers.<provider>.models[].cost` entry.
+- **Explicit free models**: user marks a model as free. `cost` is written as 0 in `models.json` and the model is recorded in `pi-web.json` `usage.explicitFreeModels[]` so the UI can distinguish "missing price" from "intentionally free" without relying on zero-matches.
+
+**Safety invariants:**
+- The config service (`lib/model-price-config.ts`) never touches `apiKey`, `baseUrl`, `headers`, `compat`, `tiers`, or `cost.cacheWrite` fields. It does a minimal deep-merge of only the `cost.input/output/cacheRead` fields.
+- Writes use atomic `tmp + rename`, best-effort `0600` permissions, and an opaque revision hash for concurrency control (409 on stale revision).
+- Before and after each write, the service verifies the file can be read back and loads a fresh `ModelRegistry` to confirm resolved prices match expectations. Partial failures roll back to the pre-write backup.
+- JSONC comments are stripped with `stripJsonComments()` on read and lost on write (clean JSON output). A backup file (`models.json.backup`) is saved before every write.
+- The API projection (`ModelPriceListResponse`) never exposes `apiKey`, full `baseUrl`, headers, auth/account data, absolute paths, or the raw `models.json` content.
+
+**Intelligent price suggestions** (suggest API) follow a two-phase pipeline:
+1. **Phase 1 — deterministic matching**: Fetches the OpenRouter public model catalog (`GET https://openrouter.ai/api/v1/models`, HTTPS-only allowlist) and performs exact model-id matching with price extraction. Alias/near-match results carry lower confidence.
+2. **Phase 2 — AI-assisted extraction**: For remaining unresolved models, bounded evidence excerpts are passed to the configured pricing assistant model (from `usage.pricingAssistant` / `usage.pricingAssistantFallback`). The AI receives only pre-fetched text excerpts, never network/file/tool access, and must return valid structured JSON. Hallucinated or malformed output is rejected.
+
+Suggestions always carry per-field evidence URLs, confidence scores, match method, and warnings. They are never auto-applied: the user must review each suggestion in the Settings UI and explicitly confirm before the PATCH API writes anything to `models.json`. The suggest API accepts at most 20 targets per request and rejects URL/prompt/path/key injection fields.
+
+### Usage accounting — cache-write removal
+
+Per the cache-write removal decision, new usage events no longer collect `cacheWrite` or `cacheWrite1h` from the SDK. The v1 ledger types (`LlmUsageTokens`, `LlmUsageTotals`) retain `cacheWrite` as a deprecated numeric field fixed at 0 for backward compatibility; aggregators (`addLlmUsageToTotals`, legacy `addTotals`/`addUsage`) no longer accumulate it.
+
+Key invariants:
+- Historical usage event files under `usage-events/v1/` are never rewritten or migrated.
+- `cost.total` remains the SDK authoritative total and is not recalculated.
+- SDK `totalTokens` may still include cache-write tokens internally; the project uses the provider's authoritative total without attempting to decompose it.
+- Legacy `/api/usage` aggregation also excludes cache-write; `UsageTotals.cacheWrite` stays at 0.
+- All UI surfaces (Usage modal, ledger table, session stats chips, message footer, chat top bar) have removed cache-write rows, columns, tooltips, and local fallback accumulations.
+- Cache Read remains displayed independently; the cache-hit ratio formula is `cacheRead / (input + cacheRead)`.
+
+### Exact token + M display
+
+All token values in Usage, ledger, topbar, and message footers follow these conventions (implemented by `lib/token-format.ts`):
+- **Exact**: full locale-grouped integer (e.g., `1,234,567 tokens`). This is the primary display value.
+- **M**: derived `tokens / 1_000_000`, at most 6 decimal places with trailing zeros stripped (e.g., `1.234567 M`). Displayed as secondary visual text, not a replacement for the exact value. Never used as storage or aggregation input.
+- **Compact**: for tight spaces like chips and chart axes (≥1M → `1.2M`, ≥1k → `1k`, otherwise exact). Callers must include the exact value in a tooltip or secondary text.
 
 ### Models and tools
 

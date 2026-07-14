@@ -144,6 +144,7 @@ export interface LlmUsageTotals {
   input: number;
   output: number;
   cacheRead: number;
+  /** @deprecated Always 0 — cache-write is no longer aggregated. */
   cacheWrite: number;
   /** Subset of output, only present when reasoning was recorded. */
   reasoning?: number;
@@ -262,7 +263,8 @@ export function addLlmUsageToTotals(
   totals.input += u.input;
   totals.output += u.output;
   totals.cacheRead += u.cacheRead;
-  totals.cacheWrite += u.cacheWrite;
+  // cacheWrite: no longer aggregated (per cw-removal decision).
+  // Field stays at 0 for backward compatibility.
   totals.totalTokens += u.totalTokens;
   totals.cost += u.cost.total;
   totals.calls += 1;

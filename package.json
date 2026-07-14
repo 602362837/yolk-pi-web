@@ -53,6 +53,7 @@
     "test:llm-usage-store": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-llm-usage-store.mjs",
     "test:session-metadata": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-metadata-scanner.mjs",
     "test:session-list-performance": "node --expose-gc --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-list-performance.mjs",
+    "test:model-prices": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-model-prices.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
     "release:patch": "npm version patch && npm publish --access public",
     "release": "npm run release:patch"
@@ -91,6 +92,6 @@
     "eslint-config-next": "16.2.9",
     "postcss": "^8",
     "tailwindcss": "^4.2.2",
-    "typescript": "5.9.3"
+    "typescript": "^5.9.3"
   }
 }

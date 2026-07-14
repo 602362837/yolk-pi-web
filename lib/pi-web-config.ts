@@ -105,6 +105,12 @@ export interface PiWebUsageConfig {
   includeArchived: boolean;
   /** Which data source the Usage modal uses: "legacy" (session scan) or "ledger" (independent event store). Default "ledger". */
   statsSource: "legacy" | "ledger";
+  /** Models explicitly marked as free by the user. Stored as provider:model pairs. */
+  explicitFreeModels: Array<{ provider: string; model: string }>;
+  /** AI assistant policy for model price suggestion (structured extraction from bounded evidence). */
+  pricingAssistant: PiWebSubagentRunPolicy;
+  /** Fallback AI assistant policy when the primary fails. */
+  pricingAssistantFallback: PiWebSubagentRunPolicy;
 }
 
 export interface PiWebChatGptWarmupConfig {
@@ -236,6 +242,15 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   usage: {
     includeArchived: true,
     statsSource: "ledger" as const,
+    explicitFreeModels: [],
+    pricingAssistant: {
+      model: { mode: "followMain" },
+      thinking: "minimal",
+    },
+    pricingAssistantFallback: {
+      model: { mode: "piDefault" },
+      thinking: "minimal",
+    },
   },
   terminal: {
     enabled: false,
@@ -731,6 +746,9 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     usage: {
       includeArchived: readBoolean(usage.includeArchived, defaults.usage.includeArchived),
       statsSource: readStatsSource(usage.statsSource, defaults.usage.statsSource),
+      explicitFreeModels: readExplicitFreeModels(usage.explicitFreeModels),
+      pricingAssistant: readSubagentPolicy(usage.pricingAssistant, defaults.usage.pricingAssistant),
+      pricingAssistantFallback: readSubagentPolicy(usage.pricingAssistantFallback, defaults.usage.pricingAssistantFallback),
     },
     terminal: {
       enabled: readBoolean(terminal.enabled, defaults.terminal.enabled),
@@ -1020,6 +1038,23 @@ export function validatePiWebStudioConfig(value: unknown): PiWebStudioConfig {
   };
 }
 
+function readExplicitFreeModels(value: unknown): Array<{ provider: string; model: string }> {
+  if (!Array.isArray(value)) return [];
+  const result: Array<{ provider: string; model: string }> = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) continue;
+    const provider = typeof (item as Record<string, unknown>).provider === "string" ? ((item as Record<string, unknown>).provider as string).trim() : "";
+    const model = typeof (item as Record<string, unknown>).model === "string" ? ((item as Record<string, unknown>).model as string).trim() : "";
+    if (!provider || !model) continue;
+    const key = `${provider}:${model}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ provider, model });
+  }
+  return result;
+}
+
 export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("usage config must be an object");
@@ -1027,6 +1062,13 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
   return {
     includeArchived: requireBoolean(value.includeArchived, "usage.includeArchived"),
     statsSource: readStatsSource(value.statsSource, "ledger"),
+    explicitFreeModels: readExplicitFreeModels(value.explicitFreeModels),
+    pricingAssistant: value.pricingAssistant === undefined
+      ? DEFAULT_PI_WEB_CONFIG.usage.pricingAssistant
+      : validateSubagentPolicy(value.pricingAssistant, "usage.pricingAssistant"),
+    pricingAssistantFallback: value.pricingAssistantFallback === undefined
+      ? DEFAULT_PI_WEB_CONFIG.usage.pricingAssistantFallback
+      : validateSubagentPolicy(value.pricingAssistantFallback, "usage.pricingAssistantFallback"),
   };
 }
 

@@ -110,7 +110,7 @@ await test("createLlmUsageTotals returns zero totals", () => {
   assert.equal(t.reasoning, undefined);
 });
 
-await test("addLlmUsageToTotals accumulates correctly", () => {
+await test("addLlmUsageToTotals accumulates correctly (cacheWrite ignored)", () => {
   const totals = createLlmUsageTotals();
   const evt = {
     status: "success",
@@ -118,6 +118,10 @@ await test("addLlmUsageToTotals accumulates correctly", () => {
   };
   addLlmUsageToTotals(totals, evt);
   assert.equal(totals.input, 10);
+  assert.equal(totals.output, 20);
+  assert.equal(totals.cacheRead, 5);
+  assert.equal(totals.cacheWrite, 0, "cacheWrite must stay 0 — no longer aggregated");
+  assert.equal(totals.totalTokens, 38);
   assert.equal(totals.calls, 1);
   assert.equal(totals.successCalls, 1);
   assert.equal(totals.errorCalls, 0);
@@ -149,14 +153,17 @@ await test("addLlmUsageToTotals handles reasoning (subset of output)", () => {
 // llm-usage-normalize
 // ---------------------------------------------------------------------------
 
-await test("normalizeSdkUsage maps all fields", () => {
+await test("normalizeSdkUsage maps all fields (cacheWrite zeroed)", () => {
   const result = normalizeSdkUsage(usage());
   assert.equal(result.input, 100);
   assert.equal(result.output, 200);
   assert.equal(result.cacheRead, 50);
-  assert.equal(result.cacheWrite, 30);
+  assert.equal(result.cacheWrite, 0, "cacheWrite must be 0 — no longer collected");
   assert.equal(result.totalTokens, 380);
+  assert.equal(result.cost.input, 0.01);
+  assert.equal(result.cost.cacheWrite, 0, "cost.cacheWrite must be 0 — no longer collected");
   assert.equal(result.cost.total, 0.033);
+  assert.equal(result.cacheWrite1h, undefined, "cacheWrite1h must not be emitted");
 });
 
 await test("normalizeSdkUsage prefers SDK totalTokens", () => {
@@ -164,10 +171,11 @@ await test("normalizeSdkUsage prefers SDK totalTokens", () => {
   assert.equal(result.totalTokens, 999);
 });
 
-await test("normalizeSdkUsage falls back to sum when totalTokens missing", () => {
+await test("normalizeSdkUsage falls back to sum when totalTokens missing (cacheWrite excluded)", () => {
   const result = normalizeSdkUsage(usage({ totalTokens: undefined }));
-  // 100+200+50+30 = 380
-  assert.equal(result.totalTokens, 380);
+  // 100+200+50 = 350 (cacheWrite no longer included in fallback sum)
+  assert.equal(result.totalTokens, 350);
+  assert.equal(result.cacheWrite, 0);
 });
 
 await test("normalizeSdkUsage clamps NaN/Infinity/negative to 0", () => {
@@ -179,9 +187,9 @@ await test("normalizeSdkUsage clamps NaN/Infinity/negative to 0", () => {
   assert.equal(result.totalTokens, 0); // b/c totalTokens was -1 → falls to sum (0)
 });
 
-await test("normalizeSdkUsage preserves cacheWrite1h when valid", () => {
+await test("normalizeSdkUsage never emits cacheWrite1h", () => {
   const result = normalizeSdkUsage(usage({ cacheWrite1h: 15 }));
-  assert.equal(result.cacheWrite1h, 15);
+  assert.equal(result.cacheWrite1h, undefined, "cacheWrite1h must not be emitted");
 });
 
 await test("normalizeSdkUsage omits cacheWrite1h when NaN", () => {

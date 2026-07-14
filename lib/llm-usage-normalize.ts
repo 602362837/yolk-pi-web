@@ -17,7 +17,9 @@ import type { LlmUsageTokens } from "./llm-usage-types";
  * Rules (per design):
  * - `reasoning` is a subset of `output`; do NOT add it to `totalTokens`.
  * - `totalTokens` is the authoritative total from the SDK (preferred over manual sum).
- * - `cacheWrite1h` is optional (Anthropic-only) and preserved when present.
+ * - `cacheWrite` and `cacheWrite1h` are **no longer collected** from the SDK.
+ *   Both fields are always zeroed / omitted in new events. Historical events
+ *   in the ledger retain their original values but are ignored during aggregation.
  * - All numbers must be finite and non-negative; invalid inputs produce a
  *   normalized zero or are clamped.
  *
@@ -28,14 +30,21 @@ export function normalizeSdkUsage(usage: Usage): LlmUsageTokens {
   const input = clampNonNegativeFinite(usage.input);
   const output = clampNonNegativeFinite(usage.output);
   const cacheRead = clampNonNegativeFinite(usage.cacheRead);
-  const cacheWrite = clampNonNegativeFinite(usage.cacheWrite);
 
-  // totalTokens: prefer SDK total; fall back to sum when missing/invalid
+  // cacheWrite: no longer collected from SDK (per cw-removal decision).
+  // Always zero for new events; historical events may retain their original
+  // values in the ledger file but are ignored during aggregation.
+  const cacheWrite = 0;
+
+  // totalTokens: prefer SDK total; fall back to sum when missing/invalid.
+  // Note: SDK totalTokens may include cache-write tokens internally.
+  // We use the provider's authoritative total and do NOT attempt to
+  // decompose or subtract cache-write from it.
   let totalTokens: number;
   if (typeof usage.totalTokens === "number" && Number.isFinite(usage.totalTokens) && usage.totalTokens >= 0) {
     totalTokens = usage.totalTokens;
   } else {
-    totalTokens = input + output + cacheRead + cacheWrite;
+    totalTokens = input + output + cacheRead;
   }
 
   const normalized: LlmUsageTokens = {
@@ -48,15 +57,15 @@ export function normalizeSdkUsage(usage: Usage): LlmUsageTokens {
       input: clampNonNegativeFinite(usage.cost?.input),
       output: clampNonNegativeFinite(usage.cost?.output),
       cacheRead: clampNonNegativeFinite(usage.cost?.cacheRead),
-      cacheWrite: clampNonNegativeFinite(usage.cost?.cacheWrite),
+      // cache-write cost fraction: always 0 for new events.
+      // cost.total is the SDK authoritative total and is NOT recalculated.
+      cacheWrite: 0,
       total: clampNonNegativeFinite(usage.cost?.total),
     },
   };
 
-  // Optional fields: only include when the provider actually reports them
-  if (typeof usage.cacheWrite1h === "number" && Number.isFinite(usage.cacheWrite1h) && usage.cacheWrite1h >= 0) {
-    normalized.cacheWrite1h = usage.cacheWrite1h;
-  }
+  // cacheWrite1h: no longer collected (Anthropic-only sub-split).
+  // Omitted entirely from new events.
 
   if (typeof usage.reasoning === "number" && Number.isFinite(usage.reasoning)) {
     // reasoning can be 0 when provider reports it but none was used

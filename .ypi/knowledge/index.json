@@ -1,7 +1,42 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13T11:38:50.008Z",
+  "updatedAt": "2026-07-14T05:08:18.423Z",
   "entries": [
+    {
+      "id": "20260714-130818-完善计费模块与模型价格配置",
+      "title": "完善计费模块与模型价格配置",
+      "taskId": "20260714-100411-完善计费模块与模型价格配置",
+      "taskKey": "archived:2026-07:20260714-100411-完善计费模块与模型价格配置",
+      "workflowId": "feature-dev",
+      "summary": "完善计费与模型价格：停采 cache-write（历史不改写）、token 精确+M 展示、models.json 安全 merge 价格、智能建议需证据且用户确认；第三方别名经 identity 标准化匹配 OpenRouter，大响应限额与 per-token→USD/1M 换算；子 agent succeeded≠代码落地，须 diff/实测验收。",
+      "tags": [
+        "feature-dev",
+        "billing",
+        "model-prices",
+        "usage",
+        "cache-write",
+        "token-display",
+        "openrouter",
+        "identity-matching",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置",
+      "knowledgePath": ".ypi/knowledge/20260714-130818-完善计费模块与模型价格配置.md",
+      "createdAt": "2026-07-14T05:08:18.423Z",
+      "archivedAt": "2026-07-14T05:08:18.423Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260713-193850-统一项目提示窗组件并迁移-alert-调用",
       "title": "统一项目提示窗组件并迁移 alert 调用",

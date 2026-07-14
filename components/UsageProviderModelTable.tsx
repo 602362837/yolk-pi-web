@@ -475,7 +475,7 @@ export function UsageProviderModelTable({ cwd, onClose, onSwitchToLegacy }: Usag
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 12 }}>
                 <Metric label="预估费用" value={formatCost(t?.cost ?? 0)} highlight title="预估费用 = 各模型调用量 × 对应单价" />
                 <Metric label="调用次数" value={formatTokens(t?.calls ?? 0)} title={`成功 ${formatTokens(t?.successCalls ?? 0)} / 失败 ${formatTokens(t?.errorCalls ?? 0)} / 中断 ${formatTokens(t?.abortedCalls ?? 0)}`} />
-                <Metric label="总 Token" value={formatTokens(t?.totalTokens ?? 0)} title={`Input: ${formatTokens(t?.input ?? 0)} / Output: ${formatTokens(t?.output ?? 0)} / Cache R: ${formatTokens(t?.cacheRead ?? 0)} / Cache W: ${formatTokens(t?.cacheWrite ?? 0)}`} />
+                <Metric label="总 Token" value={formatTokens(t?.totalTokens ?? 0)} title={`Input: ${formatTokens(t?.input ?? 0)} / Output: ${formatTokens(t?.output ?? 0)} / Cache Read: ${formatTokens(t?.cacheRead ?? 0)}`} />
                 <Metric label="成功率" value={t ? successRate(t) : "--"} success={t ? t.successCalls / Math.max(1, t.calls) >= 0.95 : false} title={`${formatTokens(t?.successCalls ?? 0)} / ${formatTokens(t?.calls ?? 0)}`} />
               </div>
 
@@ -637,7 +637,7 @@ export function UsageProviderModelTable({ cwd, onClose, onSwitchToLegacy }: Usag
                       <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">成功率</th>
                       <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">Input</th>
                       <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">Output</th>
-                      <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">Cache R/W</th>
+                      <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">Cache Read</th>
                       <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">缓存命中率</th>
                       <th style={{ ...thStyle, textAlign: "right" }}>费用</th>
                       <th style={{ ...thStyle, textAlign: "right" }} className="hide-mobile">占比</th>
@@ -770,9 +770,8 @@ function TokenRows({ totals }: { totals: LlmUsageTotals }) {
     ["Input", totals.input],
     ["Output", totals.output],
     ["Cache Read", totals.cacheRead],
-    ["Cache Write", totals.cacheWrite],
   ] as const;
-  const sum = totals.input + totals.output + totals.cacheRead + totals.cacheWrite;
+  const sum = totals.input + totals.output + totals.cacheRead;
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {rows.map(([label, value]) => (
@@ -858,8 +857,8 @@ function ProviderRow({
             <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }} className="hide-mobile" title={`Output: ${formatTokens(m.totals.output)} tokens`}>
               {formatTokens(m.totals.output)}
             </td>
-            <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }} className="hide-mobile" title={`Cache Read: ${formatTokens(m.totals.cacheRead)} / Cache Write: ${formatTokens(m.totals.cacheWrite)} tokens`}>
-              {formatTokens(m.totals.cacheRead)} / {formatTokens(m.totals.cacheWrite)}
+            <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }} className="hide-mobile" title={`Cache Read: ${formatTokens(m.totals.cacheRead)} tokens`}>
+              {formatTokens(m.totals.cacheRead)}
             </td>
             <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }} className="hide-mobile" title={chRateExact}>
               <span style={{ color: m.totals.cacheRead > 0 ? "#10b981" : "var(--text-muted)" }}>
