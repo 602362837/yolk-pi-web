@@ -2484,31 +2484,79 @@ export function updateYpiStudioImprovementPlan(taskIdOrKey: string, body: YpiStu
   });
 }
 
-/** Regex matching HTML prototype file names inside the improvement instance directory. */
-const IMPROVEMENT_HTML_PROTOTYPE_RE = /\.html?$/i;
+/** Regex matching HTML prototype file names inside task / improvement directories. */
+const HTML_PROTOTYPE_FILE_RE = /\.html?$/i;
+/** Basename-only safety for task-local HTML prototypes (mirrors relative file path rules). */
+const SAFE_HTML_PROTOTYPE_FILE_RE = /^[A-Za-z0-9._-]+\.html?$/i;
 
-/** Checks whether an improvement instance has a readable HTML prototype file in its
- *  instance directory.  Does not validate the HTML content itself. */
-function improvementHasHtmlPrototype(instanceDir: string, workspaceRoot: string): boolean {
-  if (!existsSync(instanceDir)) return false;
+/** List non-empty, basename-safe HTML prototype files under a task-local directory. Filenames only. */
+function listHtmlPrototypeFileNames(dirPath: string, workspaceRoot: string): string[] {
+  if (!existsSync(dirPath)) return [];
+  const names: string[] = [];
   try {
-    const entries = readdirSync(instanceDir, { withFileTypes: true });
+    const entries = readdirSync(dirPath, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      if (!IMPROVEMENT_HTML_PROTOTYPE_RE.test(entry.name)) continue;
-      const filePath = path.join(instanceDir, entry.name);
+      if (!HTML_PROTOTYPE_FILE_RE.test(entry.name)) continue;
+      if (!SAFE_HTML_PROTOTYPE_FILE_RE.test(entry.name)) continue;
+      const filePath = path.join(dirPath, entry.name);
       if (!safeFileExists(filePath, workspaceRoot)) continue;
       try {
         const stat = statSync(filePath);
-        if (stat.size > 0) return true;
+        if (stat.size > 0) names.push(entry.name);
       } catch {
         // skip unreadable files
       }
     }
   } catch {
-    // If the instance directory cannot be read, treat as no prototype.
+    return [];
   }
-  return false;
+  return names.sort((a, b) => a.localeCompare(b));
+}
+
+/** Checks whether an improvement instance has a readable HTML prototype file in its
+ *  instance directory.  Does not validate the HTML content itself. */
+function improvementHasHtmlPrototype(instanceDir: string, workspaceRoot: string): boolean {
+  return listHtmlPrototypeFileNames(instanceDir, workspaceRoot).length > 0;
+}
+
+/**
+ * Bounded filename-only HTML prototype listing for widget quick-preview projection.
+ * Does not read or return file bodies. Returns [] when the task or instance is missing.
+ */
+export function listYpiStudioTaskHtmlPrototypeFileNames(
+  cwd: string,
+  taskIdOrKey: string,
+  options: { improvementId?: string } = {},
+): string[] {
+  const ctx = createContext(cwd);
+  const record = loadTaskRecord(ctx, taskIdOrKey);
+  if (!record?.raw || record.readError) return [];
+  if (options.improvementId) {
+    const instance = record.raw.improvements?.instances?.find((inst) => inst.id === options.improvementId);
+    if (!instance) return [];
+    const instanceDir = improvementInstanceDir(record.dirPath, instance.id);
+    return listHtmlPrototypeFileNames(instanceDir, ctx.workspaceRoot);
+  }
+  return listHtmlPrototypeFileNames(record.dirPath, ctx.workspaceRoot);
+}
+
+/** True when the mapped plan-review artifact file exists on disk (content may still be TBD). */
+export function ypiStudioTaskPlanReviewFileExists(cwd: string, taskIdOrKey: string, options: { improvementId?: string } = {}): boolean {
+  const ctx = createContext(cwd);
+  const record = loadTaskRecord(ctx, taskIdOrKey);
+  if (!record?.raw || record.readError) return false;
+  if (options.improvementId) {
+    const instance = record.raw.improvements?.instances?.find((inst) => inst.id === options.improvementId);
+    if (!instance) return false;
+    const fileName = instance.artifacts?.["plan-review"] ?? "plan-review.md";
+    if (!isSafeArtifactFileName(fileName)) return false;
+    const filePath = path.join(improvementInstanceDir(record.dirPath, instance.id), fileName);
+    return safeFileExists(filePath, ctx.workspaceRoot);
+  }
+  const fileName = artifactFileName(record.raw, "plan-review") ?? "plan-review.md";
+  if (!isSafeArtifactFileName(fileName)) return false;
+  return safeFileExists(path.join(record.dirPath, fileName), ctx.workspaceRoot);
 }
 
 /** Determine whether the improvement's ui.md artifact signals that a UI change is needed.

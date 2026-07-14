@@ -1,6 +1,12 @@
 import { createHash } from "crypto";
 import type { SessionEntry, AgentMessage, ToolResultMessage, AssistantMessage, ToolCallContent } from "./types";
-import { getYpiStudioTaskDetail, getYpiStudioTaskIdForContext, listYpiStudioTasks } from "./ypi-studio-tasks";
+import {
+  getYpiStudioTaskDetail,
+  getYpiStudioTaskIdForContext,
+  listYpiStudioTaskHtmlPrototypeFileNames,
+  listYpiStudioTasks,
+  ypiStudioTaskPlanReviewFileExists,
+} from "./ypi-studio-tasks";
 import { readYpiStudioSubagentTranscriptPreview } from "./ypi-studio-transcripts";
 import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import { orderYpiStudioWorkflowStates } from "./ypi-studio-workflow-flow";
@@ -12,6 +18,8 @@ import type {
   YpiStudioTaskDetail,
   YpiStudioTaskSummary,
   YpiStudioTaskWidgetProjection,
+  YpiStudioWidgetQuickPreview,
+  YpiStudioWidgetQuickPreviewApprovalState,
   YpiStudioWorkflowState,
   YpiStudioTaskWidgetSubagentRun,
   YpiStudioSubagentRunStatus,
@@ -300,6 +308,99 @@ function widgetArtifactEvidence(detail: YpiStudioTaskDetail): Pick<YpiStudioTask
   return { available, completed: [...completed] };
 }
 
+/**
+ * Map main-task approval evidence to a quick-preview tone.
+ * Uses only current meta.approvalGrant / planRevision — never "opened" or file existence.
+ * After a successful grant, the grant remains while status leaves awaiting_approval (approved).
+ * When grant is cleared and planRevision advanced, treat as revision_changed unless still pending first review.
+ */
+function mainPlanApprovalState(detail: YpiStudioTaskDetail): YpiStudioWidgetQuickPreviewApprovalState {
+  if (detail.archived) return "readonly";
+  if (detail.meta.approvalGrant) return "approved";
+  const revision = typeof detail.meta.planRevision === "number" ? detail.meta.planRevision : undefined;
+  if (revision !== undefined && revision >= 2) return "revision_changed";
+  return "pending";
+}
+
+/** Map improvement instance approval evidence to a quick-preview tone. */
+function improvementPlanApprovalState(
+  detail: YpiStudioTaskDetail,
+  instance: NonNullable<YpiStudioTaskDetail["improvements"]>["instances"][number],
+): YpiStudioWidgetQuickPreviewApprovalState {
+  if (detail.archived) return "readonly";
+  if (instance.approval?.approvedAt) return "approved";
+  const revision = typeof instance.approval?.revision === "number" ? instance.approval.revision : undefined;
+  if (revision !== undefined && revision >= 2) return "revision_changed";
+  return "pending";
+}
+
+/**
+ * Build additive, filename-only quick-preview descriptors from the full artifact registry
+ * and improvement mappings. Presence does NOT depend on awaiting_approval / waiting_plan_approval.
+ * Never reads or returns Markdown/HTML bodies.
+ */
+function buildWidgetQuickPreviews(cwd: string, detail: YpiStudioTaskDetail): YpiStudioWidgetQuickPreview[] {
+  const previews: YpiStudioWidgetQuickPreview[] = [];
+  const mainApproval = mainPlanApprovalState(detail);
+
+  // Main plan-review: registry mapping or on-disk plan-review.md (archived included).
+  const mainPlanFile =
+    (typeof detail.artifacts["plan-review"] === "string" && detail.artifacts["plan-review"].trim()
+      ? detail.artifacts["plan-review"].trim()
+      : undefined)
+    ?? (ypiStudioTaskPlanReviewFileExists(cwd, detail.key) ? "plan-review.md" : undefined);
+  if (mainPlanFile) {
+    previews.push({
+      kind: "plan-review",
+      fileName: mainPlanFile,
+      label: "计划审批书",
+      approvalState: mainApproval,
+    });
+  }
+
+  // Main-task HTML prototypes (task root only).
+  for (const fileName of listYpiStudioTaskHtmlPrototypeFileNames(cwd, detail.key)) {
+    previews.push({
+      kind: "prototype",
+      fileName,
+      label: "HTML 原型",
+      approvalState: mainApproval,
+    });
+  }
+
+  for (const instance of detail.improvements?.instances ?? []) {
+    const displayId = instance.displayId || instance.id;
+    const approval = improvementPlanApprovalState(detail, instance);
+    const planFile =
+      (typeof instance.artifacts?.["plan-review"] === "string" && instance.artifacts["plan-review"].trim()
+        ? instance.artifacts["plan-review"].trim()
+        : undefined)
+      ?? (ypiStudioTaskPlanReviewFileExists(cwd, detail.key, { improvementId: instance.id }) ? "plan-review.md" : undefined);
+    if (planFile) {
+      previews.push({
+        kind: "improvement-plan",
+        fileName: planFile,
+        label: `改进计划 · ${displayId}`,
+        approvalState: approval,
+        improvementId: instance.id,
+        displayId,
+      });
+    }
+    for (const fileName of listYpiStudioTaskHtmlPrototypeFileNames(cwd, detail.key, { improvementId: instance.id })) {
+      previews.push({
+        kind: "prototype",
+        fileName,
+        label: `HTML 原型 · ${displayId}`,
+        approvalState: approval,
+        improvementId: instance.id,
+        displayId,
+      });
+    }
+  }
+
+  return previews;
+}
+
 function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioTaskWidgetProjection | null {
   const detail = getYpiStudioTaskDetail(cwd, summary.key);
   if (!detail) return null;
@@ -366,9 +467,13 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
         status: inst.status,
         owner: inst.owner,
         updatedAt: inst.updatedAt,
+        // Server status remains authoritative; canAccept is a convenience flag for UI.
+        canAccept: !detail.archived && inst.status === "waiting_user_acceptance" ? true : undefined,
       })),
     };
   })() : undefined;
+
+  const quickPreviews = buildWidgetQuickPreviews(cwd, detail);
 
   return {
     key: detail.key,
@@ -391,6 +496,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
       ...widgetArtifactEvidence(detail),
       missing: detail.progress.missingArtifacts,
     },
+    quickPreviews: quickPreviews.length > 0 ? quickPreviews : undefined,
     steps,
     subagents: buildSubagents(cwd, detail),
     events: detail.events.slice(-5).reverse().map((event) => ({ type: event.type, at: event.at, message: event.message, from: event.from, to: event.to, member: event.member, artifact: event.artifact })),

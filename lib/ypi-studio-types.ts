@@ -815,6 +815,33 @@ export interface YpiStudioTaskWidgetEvent {
   artifact?: string;
 }
 
+/** Bounded widget quick-preview kinds. Never carries artifact body content. */
+export type YpiStudioWidgetQuickPreviewKind = "plan-review" | "prototype" | "improvement-plan";
+
+/**
+ * Approval/confirmation tone for a quick-preview entry.
+ * Derived only from current server-side grant/approval evidence for the active plan revision.
+ */
+export type YpiStudioWidgetQuickPreviewApprovalState =
+  | "pending"
+  | "approved"
+  | "revision_changed"
+  | "readonly";
+
+/**
+ * Filename-only descriptor for session-widget / task-detail quick previews.
+ * taskKey is implied by the parent widget projection; improvement scope is explicit when present.
+ */
+export interface YpiStudioWidgetQuickPreview {
+  kind: YpiStudioWidgetQuickPreviewKind;
+  fileName: string;
+  label: string;
+  approvalState: YpiStudioWidgetQuickPreviewApprovalState;
+  /** Required for improvement-plan and improvement-scoped prototypes. Never inferred by consumers. */
+  improvementId?: string;
+  displayId?: string;
+}
+
 export interface YpiStudioTaskWidgetProjection {
   key: string;
   id: string;
@@ -839,6 +866,12 @@ export interface YpiStudioTaskWidgetProjection {
     available: string[];
     missing: string[];
   };
+  /**
+   * Additive, filename-only quick-preview descriptors for plan-review / HTML prototypes.
+   * Built from the full artifact registry (and improvement mappings), not from awaiting_approval alone.
+   * Never includes Markdown/HTML bodies, feedback, or transcript content.
+   */
+  quickPreviews?: YpiStudioWidgetQuickPreview[];
   steps: YpiStudioTaskWidgetStep[];
   subagents: YpiStudioTaskWidgetSubagentRun[];
   events?: YpiStudioTaskWidgetEvent[];
@@ -858,6 +891,8 @@ export interface YpiStudioTaskWidgetProjection {
       status: string;
       owner: string;
       updatedAt: string;
+      /** True only when status is waiting_user_acceptance and the task is not archived. Server status remains authoritative. */
+      canAccept?: boolean;
     }>;
   };
 }

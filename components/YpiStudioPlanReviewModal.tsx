@@ -61,11 +61,15 @@ function planReviewContentIsMeaningful(content: string): boolean {
   return !/(^|\b)(?:_?TBD(?: by YPI Studio workflow)?_?|待填写|YPI Studio workflow)(\b|$)/i.test(trimmed);
 }
 
-function describePlanReviewError(status: number | null, raw: string | null): string {
-  if (status === 404) return "找不到 plan-review.md，文件可能尚未创建。";
+function describePlanReviewError(
+  status: number | null,
+  raw: string | null,
+  labels: { shortName: string; fileName: string },
+): string {
+  if (status === 404) return `找不到 ${labels.fileName}，文件可能尚未创建。`;
   if (status === 403) return "无权访问该任务文件。";
   if (status === 400) return "安全规则拒绝了该文件访问。";
-  if (status === 413) return "计划审批书过大，无法在预览中读取。";
+  if (status === 413) return `${labels.shortName}过大，无法在预览中读取。`;
   if (status == null) return "网络连接失败，请稍后重试。";
 
   const cleaned = (raw ?? "")
@@ -75,7 +79,7 @@ function describePlanReviewError(status: number | null, raw: string | null): str
   if (cleaned && cleaned.length > 0 && cleaned.length < 140 && !cleaned.includes("/")) {
     return cleaned;
   }
-  return "计划审批书读取失败。";
+  return `${labels.shortName}读取失败。`;
 }
 
 function sourceRelativePath(target: YpiStudioPlanReviewTarget): string {
@@ -104,6 +108,8 @@ export function YpiStudioPlanReviewModal({
   const targetTaskKey = target?.taskKey ?? "";
   const targetImprovementId = target?.improvementId ?? "";
   const targetFileName = target?.fileName?.trim() || PLAN_REVIEW_FILE;
+  const isImprovement = Boolean(target?.improvementId);
+  const shortName = isImprovement ? "改进计划" : "计划审批书";
   const canFetch = open && Boolean(target) && Boolean(cwd.trim());
 
   useEffect(() => {
@@ -175,7 +181,10 @@ export function YpiStudioPlanReviewModal({
           setLoadState({
             kind: "error",
             status: res.status || null,
-            message: describePlanReviewError(res.status || null, body.error ?? null),
+            message: describePlanReviewError(res.status || null, body.error ?? null, {
+              shortName,
+              fileName: targetFileName,
+            }),
           });
           return;
         }
@@ -193,7 +202,10 @@ export function YpiStudioPlanReviewModal({
         setLoadState({
           kind: "error",
           status: null,
-          message: describePlanReviewError(null, err instanceof Error ? err.message : String(err)),
+          message: describePlanReviewError(null, err instanceof Error ? err.message : String(err), {
+            shortName,
+            fileName: targetFileName,
+          }),
         });
       }
     })();
@@ -202,7 +214,7 @@ export function YpiStudioPlanReviewModal({
       active = false;
       controller.abort();
     };
-  }, [canFetch, cwd, targetTaskKey, targetImprovementId, targetFileName, retryToken]);
+  }, [canFetch, cwd, targetTaskKey, targetImprovementId, targetFileName, shortName, retryToken]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -276,13 +288,23 @@ export function YpiStudioPlanReviewModal({
   if (!mounted || !open || !target) return null;
 
   const fileName = target.fileName?.trim() || PLAN_REVIEW_FILE;
-  const isImprovement = Boolean(target.improvementId);
+  const displayId = target.improvementDisplayId || target.improvementId;
   const planKindLabel = isImprovement
-    ? `只读 · 改进计划${target.improvementDisplayId ? ` · ${target.improvementDisplayId}` : ""}`
+    ? `只读 · 改进计划${displayId ? ` · ${displayId}` : ""}`
     : "只读 · 主计划";
   const planMetaLabel = isImprovement
-    ? `计划审批书 · improvements/${target.improvementId}/${fileName}`
-    : `计划审批书 · ${fileName}`;
+    ? `${shortName} · improvements/${target.improvementId}/${fileName}`
+    : `${shortName} · ${fileName}`;
+  const closeAriaLabel = isImprovement ? "关闭改进计划预览" : "关闭计划审批书预览";
+  const loadingTitle = isImprovement ? "正在读取改进计划…" : "正在读取计划审批书…";
+  const errorTitle = isImprovement ? "改进计划读取失败" : "计划审批书读取失败";
+  const emptyTitle = isImprovement ? "改进计划尚未准备好" : "计划审批书尚未准备好";
+  const emptyBody = isImprovement
+    ? `${fileName} 为空或仍为 TBD，暂不能作为可审批材料。`
+    : `${fileName} 为空或仍为 TBD，暂不能作为可审批材料。`;
+  const readonlyBody = isImprovement
+    ? "预览不会修改或批准改进计划；修改请在绑定聊天中进行，批准仍需在聊天中明确回复。"
+    : "预览不会自动批准计划，仍需在绑定聊天中明确回复确认或提出修改。";
 
   const dialog = (
     <div
@@ -313,7 +335,7 @@ export function YpiStudioPlanReviewModal({
             ref={closeButtonRef}
             type="button"
             className="ypi-studio-plan-review-icon-btn"
-            aria-label="关闭计划审批书预览"
+            aria-label={closeAriaLabel}
             title="关闭（Esc）"
             onClick={handleClose}
           >
@@ -323,7 +345,7 @@ export function YpiStudioPlanReviewModal({
 
         <div className="ypi-studio-plan-review-readonly" role="note">
           <strong>只读预览：</strong>
-          预览不会自动批准计划，仍需在绑定聊天中明确回复确认或提出修改。
+          {readonlyBody}
         </div>
 
         {linkNotice && (
@@ -347,15 +369,15 @@ export function YpiStudioPlanReviewModal({
                 <div className="ypi-studio-plan-review-state-icon" aria-hidden="true">
                   <span className="ypi-studio-plan-review-spinner" />
                 </div>
-                <h3>正在读取计划审批书…</h3>
-                <p>正文仅在你打开预览后按需读取。</p>
+                <h3>{loadingTitle}</h3>
+                <p>正文仅在你打开预览后按需读取。预览不会批准或写入状态。</p>
               </div>
             </div>
           ) : loadState.kind === "error" ? (
             <div className="ypi-studio-plan-review-state-center is-error">
               <div className="ypi-studio-plan-review-state-card">
                 <div className="ypi-studio-plan-review-state-icon" aria-hidden="true">!</div>
-                <h3>计划审批书读取失败</h3>
+                <h3>{errorTitle}</h3>
                 <p>{loadState.message}</p>
                 <button type="button" className="ypi-studio-plan-review-retry" onClick={handleRetry}>
                   重试
@@ -366,8 +388,8 @@ export function YpiStudioPlanReviewModal({
             <div className="ypi-studio-plan-review-state-center">
               <div className="ypi-studio-plan-review-state-card">
                 <div className="ypi-studio-plan-review-state-icon" aria-hidden="true">▤</div>
-                <h3>计划审批书尚未准备好</h3>
-                <p>plan-review.md 为空或仍为 TBD，暂不能作为可审批材料。</p>
+                <h3>{emptyTitle}</h3>
+                <p>{emptyBody}</p>
                 <button type="button" className="ypi-studio-plan-review-secondary-btn" onClick={handleRetry}>
                   重新读取
                 </button>
@@ -386,7 +408,7 @@ export function YpiStudioPlanReviewModal({
         </div>
 
         <footer className="ypi-studio-plan-review-dialog-foot">
-          <span>安全读取 · 任务目录内相对链接</span>
+          <span>安全读取 · 任务目录内相对链接 · 无批准控件</span>
           <button
             type="button"
             className="ypi-studio-plan-review-source-link"

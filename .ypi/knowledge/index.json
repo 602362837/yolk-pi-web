@@ -1,7 +1,32 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-14T08:22:48.320Z",
+  "updatedAt": "2026-07-14T09:50:52.946Z",
   "entries": [
+    {
+      "id": "20260714-175052-优化-ypi-studio-浮窗计划-原型入口-状态站点图与改进验收",
+      "title": "优化 YPI Studio 浮窗计划/原型入口、状态站点图与改进验收",
+      "taskId": "20260714-165219-优化-ypi-studio-浮窗计划-原型入口-状态站点图与改进验收",
+      "taskKey": "archived:2026-07:20260714-165219-优化-ypi-studio-浮窗计划-原型入口-状态站点图与改进验收",
+      "workflowId": "feature-dev",
+      "summary": "已完成：YPI Studio 浮窗/弹窗计划审批书与 HTML 原型常驻入口、改进计划只读预览、完整八站状态图（含动效）、浮窗改进结果验收。入口消失主因是审批态门控而非截断；预览只读不写 grant；widget 有界投影；验收走 transition_improvement→accepted。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260714-165219-优化-ypi-studio-浮窗计划-原型入口-状态站点图与改进验收",
+      "knowledgePath": ".ypi/knowledge/20260714-175052-优化-ypi-studio-浮窗计划-原型入口-状态站点图与改进验收.md",
+      "createdAt": "2026-07-14T09:50:52.946Z",
+      "archivedAt": "2026-07-14T09:50:52.946Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "design.md",
+        "implement.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260714-162248-完善-grok-cli-限额自动切号与运行中-session-账号切换",
       "title": "完善 Grok CLI 限额自动切号与运行中 Session 账号切换",

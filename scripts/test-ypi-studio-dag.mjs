@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  archiveYpiStudioTask,
   bindYpiStudioTaskToContext,
   claimYpiStudioImprovementSubtask,
   claimYpiStudioImplementationSubtask,
@@ -11,6 +12,7 @@ import {
   getNextYpiStudioImplementationSubtask,
   getYpiStudioTaskDetail,
   implementationCounts,
+  listYpiStudioTaskHtmlPrototypeFileNames,
   normalizeImplementationPlan,
   propagateBlockedDependents,
   reconcileYpiStudioImprovements,
@@ -30,6 +32,7 @@ import {
   updateYpiStudioImprovementArtifact,
   updateYpiStudioImprovementPlan,
   updateYpiStudioTaskArtifact,
+  ypiStudioTaskPlanReviewFileExists,
   YpiStudioTaskSecurityError,
 } from "../lib/ypi-studio-tasks.ts";
 import { resolveYpiStudioTaskForSession } from "../lib/ypi-studio-session-link.ts";
@@ -1917,6 +1920,282 @@ function setupImprovementImplementing(cwd, contextId, title, instancePlan, mainP
     const claimed = claimYpiStudioImprovementSubtask(task.id, { cwd, action: "claim_improvement_subtask", improvementId: instance.id, subtaskId: "A", status: "running", contextId });
     const claimedInstance = claimed.improvements.instances.find((item) => item.id === instance.id);
     assert.equal(claimedInstance.implementationProgress.subtasks.A.status, "running");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+// --- Widget quickPreviews projection (DATA-01): permanent plan/prototype descriptors ---
+
+/** Resolve widget projection while keeping the existing session context exclusive owner. */
+function bindSessionProjection(cwd, taskId, contextId) {
+  if (!contextId.startsWith("pi_")) throw new Error(`expected pi_ contextId, got ${contextId}`);
+  const sessionId = contextId.slice("pi_".length);
+  const sessionFilePath = join(cwd, ".ypi", ".runtime", "sessions", `${contextId}.json`);
+  // Refresh pointer under the same context used for create/mutations (exclusive bind is idempotent).
+  bindYpiStudioTaskToContext(cwd, taskId, contextId);
+  return resolveYpiStudioTaskForSession({
+    cwd,
+    sessionId,
+    sessionFilePath,
+    entries: [],
+  });
+}
+
+function assertBoundedQuickPreviews(projection) {
+  assert.ok(Array.isArray(projection.quickPreviews), "quickPreviews must be an array when descriptors exist");
+  for (const preview of projection.quickPreviews) {
+    assert.ok(["plan-review", "prototype", "improvement-plan"].includes(preview.kind), `unexpected kind ${preview.kind}`);
+    assert.equal(typeof preview.fileName, "string");
+    assert.ok(preview.fileName.length > 0);
+    assert.equal(typeof preview.label, "string");
+    assert.ok(["pending", "approved", "revision_changed", "readonly"].includes(preview.approvalState));
+    // Bounded: no bodies, feedback, or transcript on descriptors.
+    assert.ok(!("content" in preview));
+    assert.ok(!("body" in preview));
+    assert.ok(!("markdown" in preview));
+    assert.ok(!("html" in preview));
+    assert.ok(!("feedback" in preview));
+    assert.ok(!("transcript" in preview));
+    if (preview.kind === "improvement-plan" || (preview.kind === "prototype" && preview.improvementId)) {
+      assert.equal(typeof preview.improvementId, "string");
+      assert.ok(preview.improvementId.length > 0, "improvement-scoped previews must carry explicit improvementId");
+    }
+  }
+  const serialized = JSON.stringify(projection);
+  assert.ok(!serialized.includes("<html"), "projection must not embed HTML body");
+  assert.ok(!serialized.includes("# 蛋黄派计划审批书"), "projection must not embed plan-review body");
+}
+
+{
+  // Main plan-review persists after approval and into implementing; HTML appears only when present.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-quick-preview-main-"));
+  try {
+    const contextId = "pi_widget_quick_main";
+    const task = createYpiStudioTask({ cwd, title: "Quick preview main", workflowId: "feature-dev", contextId });
+    // Default artifact registry creates plan-review.md placeholders; descriptors must not wait for awaiting_approval.
+    assert.equal(ypiStudioTaskPlanReviewFileExists(cwd, task.id), true);
+    assert.deepEqual(listYpiStudioTaskHtmlPrototypeFileNames(cwd, task.id), []);
+
+    let result = bindSessionProjection(cwd, task.id, contextId);
+    let projection = result.task;
+    assert.ok(projection);
+    assertBoundedQuickPreviews(projection);
+    const mainPlanPending = projection.quickPreviews.find((item) => item.kind === "plan-review" && !item.improvementId);
+    assert.ok(mainPlanPending, "plan-review descriptor exists before awaiting_approval");
+    assert.equal(mainPlanPending.fileName, "plan-review.md");
+    assert.equal(mainPlanPending.approvalState, "pending");
+    assert.ok(!projection.quickPreviews.some((item) => item.kind === "prototype"), "no HTML mapping => no prototype button");
+
+    writePlanReview(cwd, task.id, contextId);
+    assert.equal(ypiStudioTaskPlanReviewFileExists(cwd, task.id), true);
+
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    result = bindSessionProjection(cwd, task.id, contextId);
+    projection = result.task;
+    assert.equal(projection.status, "awaiting_approval");
+    assert.equal(projection.quickPreviews.find((item) => item.kind === "plan-review").approvalState, "pending");
+
+    // Write a main-task HTML prototype while still awaiting approval.
+    writeFileSync(
+      join(cwd, ".ypi", "tasks", task.id, "ypi-studio-widget-state-prototype.html"),
+      "<!DOCTYPE html><html><body>Main prototype body must not leak</body></html>\n",
+      "utf8",
+    );
+    assert.deepEqual(
+      listYpiStudioTaskHtmlPrototypeFileNames(cwd, task.id),
+      ["ypi-studio-widget-state-prototype.html"],
+    );
+
+    recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
+    transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
+    result = bindSessionProjection(cwd, task.id, contextId);
+    projection = result.task;
+    assert.equal(projection.status, "implementing");
+    assertBoundedQuickPreviews(projection);
+    const mainPlanApproved = projection.quickPreviews.find((item) => item.kind === "plan-review" && !item.improvementId);
+    assert.ok(mainPlanApproved, "plan-review remains after leaving awaiting_approval");
+    assert.equal(mainPlanApproved.approvalState, "approved");
+    const mainProto = projection.quickPreviews.find((item) => item.kind === "prototype" && !item.improvementId);
+    assert.ok(mainProto, "HTML prototype descriptor present after file appears");
+    assert.equal(mainProto.fileName, "ypi-studio-widget-state-prototype.html");
+    assert.equal(mainProto.approvalState, "approved");
+    assert.ok(!JSON.stringify(projection).includes("Main prototype body must not leak"));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // Revision clear: updating plan during awaiting_approval clears grant and projects revision_changed.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-quick-preview-revision-"));
+  try {
+    const contextId = "pi_widget_quick_revision";
+    const task = createYpiStudioTask({ cwd, title: "Quick preview revision", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
+    let result = bindSessionProjection(cwd, task.id, contextId);
+    assert.equal(result.task.quickPreviews.find((item) => item.kind === "plan-review").approvalState, "approved");
+
+    updateYpiStudioTaskArtifact(task.id, {
+      cwd,
+      action: "update_artifact",
+      artifact: "plan-review",
+      content: "# 蛋黄派计划审批书\n\n## 审批请求\n计划已变更，请重审。\n",
+      contextId,
+    });
+    result = bindSessionProjection(cwd, task.id, contextId);
+    const plan = result.task.quickPreviews.find((item) => item.kind === "plan-review");
+    assert.ok(plan, "descriptor remains after revision");
+    assert.equal(plan.approvalState, "revision_changed");
+    assert.ok(!JSON.stringify(result.task).includes("计划已变更，请重审"));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // Multi-improvement: each improvement-plan carries its own improvementId; statuses independent.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-quick-preview-multi-"));
+  try {
+    const contextId = "pi_widget_quick_multi";
+    const { task, instance } = setupImprovementTask(cwd, contextId, "Multi quick preview");
+    const second = createYpiStudioImprovement(task.id, {
+      cwd,
+      action: "create_improvement",
+      title: "Second improvement",
+      feedback: "Second feedback stays out of widget",
+      contextId,
+    });
+    const secondInstance = second.improvements.instances.find((item) => item.id !== instance.id);
+    assert.ok(secondInstance);
+
+    const firstDir = join(cwd, ".ypi", "tasks", task.id, "improvements", instance.id);
+    const secondDir = join(cwd, ".ypi", "tasks", task.id, "improvements", secondInstance.id);
+    writeFileSync(join(firstDir, "plan-review.md"), "# Imp plan one\n\nMeaningful.\n", "utf8");
+    writeFileSync(join(secondDir, "plan-review.md"), "# Imp plan two\n\nMeaningful.\n", "utf8");
+    writeFileSync(join(firstDir, "imp-one.html"), "<!DOCTYPE html><html><body>IMP1 body</body></html>\n", "utf8");
+
+    // Advance first improvement through plan approval so its approvalState becomes approved.
+    transitionYpiStudioImprovement(task.id, {
+      cwd, action: "transition_improvement", improvementId: instance.id, to: "waiting_plan_approval", contextId, reason: "Plan ready",
+    });
+    recordYpiStudioImprovementApproval(cwd, task.id, instance.id, contextId, "确认，批准开始实现");
+    transitionYpiStudioImprovement(task.id, {
+      cwd, action: "transition_improvement", improvementId: instance.id, to: "implementing", contextId, reason: "Approved",
+    });
+    transitionYpiStudioImprovement(task.id, {
+      cwd, action: "transition_improvement", improvementId: instance.id, to: "checking", contextId, reason: "Done impl",
+    });
+    transitionYpiStudioImprovement(task.id, {
+      cwd, action: "transition_improvement", improvementId: instance.id, to: "waiting_user_acceptance", contextId, reason: "Checks ok",
+    });
+
+    const result = bindSessionProjection(cwd, task.id, contextId);
+    const projection = result.task;
+    assert.ok(projection);
+    assertBoundedQuickPreviews(projection);
+
+    const mainPlan = projection.quickPreviews.find((item) => item.kind === "plan-review" && !item.improvementId);
+    assert.ok(mainPlan, "main plan remains while improvements are open");
+    assert.equal(mainPlan.approvalState, "approved");
+
+    const impPlans = projection.quickPreviews.filter((item) => item.kind === "improvement-plan");
+    assert.equal(impPlans.length, 2);
+    const firstPlan = impPlans.find((item) => item.improvementId === instance.id);
+    const secondPlan = impPlans.find((item) => item.improvementId === secondInstance.id);
+    assert.ok(firstPlan);
+    assert.ok(secondPlan);
+    assert.equal(firstPlan.displayId, instance.displayId);
+    assert.equal(secondPlan.displayId, secondInstance.displayId);
+    assert.equal(firstPlan.approvalState, "approved");
+    assert.equal(secondPlan.approvalState, "pending");
+    assert.notEqual(firstPlan.improvementId, secondPlan.improvementId);
+
+    const firstProto = projection.quickPreviews.find(
+      (item) => item.kind === "prototype" && item.improvementId === instance.id,
+    );
+    assert.ok(firstProto);
+    assert.equal(firstProto.fileName, "imp-one.html");
+    assert.ok(!projection.quickPreviews.some(
+      (item) => item.kind === "prototype" && item.improvementId === secondInstance.id,
+    ), "second improvement without HTML has no prototype descriptor");
+
+    // canAccept only for waiting_user_acceptance instances.
+    const projectedFirst = projection.improvements.instances.find((item) => item.id === instance.id);
+    const projectedSecond = projection.improvements.instances.find((item) => item.id === secondInstance.id);
+    assert.equal(projectedFirst.status, "waiting_user_acceptance");
+    assert.equal(projectedFirst.canAccept, true);
+    assert.equal(projectedSecond.canAccept, undefined);
+    assert.ok(!("feedback" in projectedFirst));
+    assert.ok(!JSON.stringify(projection).includes("Second feedback stays out of widget"));
+    assert.ok(!JSON.stringify(projection).includes("IMP1 body"));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // Completed + archived tasks still project readonly plan descriptors; no canAccept.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-quick-preview-archive-"));
+  try {
+    const contextId = "pi_widget_quick_archive";
+    const task = createYpiStudioTask({ cwd, title: "Quick preview archive", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    writeFileSync(
+      join(cwd, ".ypi", "tasks", task.id, "archive-proto.html"),
+      "<!DOCTYPE html><html><body>archive</body></html>\n",
+      "utf8",
+    );
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
+    transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "checking", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "review", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "user_acceptance", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "completed", override: true, contextId });
+
+    let result = bindSessionProjection(cwd, task.id, contextId);
+    let projection = result.task;
+    assert.equal(projection.status, "completed");
+    assertBoundedQuickPreviews(projection);
+    assert.equal(projection.quickPreviews.find((item) => item.kind === "plan-review").approvalState, "approved");
+    assert.ok(projection.quickPreviews.some((item) => item.kind === "prototype" && item.fileName === "archive-proto.html"));
+
+    const archived = archiveYpiStudioTask(task.id, {
+      cwd,
+      reason: "archive quick preview fixture",
+      contextId,
+      allowFallbackKnowledge: true,
+      knowledgeSummary: "Archived for quick preview coverage.",
+      knowledgeMarkdown: "# Archive\n\n## Summary\nArchived for quick preview coverage.\n",
+    });
+    assert.ok(archived.task.key.startsWith("archived:"));
+    assert.equal(archived.task.archived, true);
+
+    // Archive clears session runtime pointers and forbids rebinding; helpers still resolve archived path.
+    assert.equal(ypiStudioTaskPlanReviewFileExists(cwd, archived.task.key), true);
+    assert.deepEqual(listYpiStudioTaskHtmlPrototypeFileNames(cwd, archived.task.key), ["archive-proto.html"]);
+
+    // Archived tasks keep contextIds, so session-link can still project readonly quickPreviews.
+    const sessionId = contextId.slice("pi_".length);
+    const sessionFilePath = join(cwd, ".ypi", ".runtime", "sessions", `${contextId}.json`);
+    result = resolveYpiStudioTaskForSession({ cwd, sessionId, sessionFilePath, entries: [] });
+    projection = result.task
+      ?? result.tasks.find((item) => item.task.key === archived.task.key)?.task
+      ?? null;
+    assert.ok(projection, "archived bound task still projects readonly descriptors");
+    assert.equal(projection.archived, true);
+    assertBoundedQuickPreviews(projection);
+    assert.equal(projection.quickPreviews.find((item) => item.kind === "plan-review").approvalState, "readonly");
+    assert.ok(projection.quickPreviews.some((item) => item.kind === "prototype" && item.fileName === "archive-proto.html"));
+    if (projection.improvements?.instances?.length) {
+      assert.ok(projection.improvements.instances.every((item) => item.canAccept !== true));
+    }
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
