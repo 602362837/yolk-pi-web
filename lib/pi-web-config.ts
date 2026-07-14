@@ -140,6 +140,19 @@ export interface PiWebOpencodeGoConfig {
   autoFailover: PiWebOpencodeGoAutoFailoverConfig;
 }
 
+export interface PiWebGrokAutoFailoverConfig {
+  enabled: boolean;
+  maxAttemptsPerTurn: number;
+  maxAccountSwitchesPerTurn: number;
+  quotaCacheMaxAgeMs: number;
+  exhaustedCooldownMs: number;
+  minSwitchIntervalMs: number;
+}
+
+export interface PiWebGrokConfig {
+  autoFailover: PiWebGrokAutoFailoverConfig;
+}
+
 export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "cmd" | "powershell" | "pwsh" | "custom";
 
 export interface PiWebTerminalConfig {
@@ -190,6 +203,7 @@ export interface PiWebConfig {
   terminal: PiWebTerminalConfig;
   chatgpt: PiWebChatGptConfig;
   opencodeGo: PiWebOpencodeGoConfig;
+  grok: PiWebGrokConfig;
   editor: PiWebEditorConfig;
 }
 
@@ -202,6 +216,7 @@ export interface PiWebConfigPatch {
   terminal?: unknown;
   chatgpt?: unknown;
   opencodeGo?: unknown;
+  grok?: unknown;
   editor?: unknown;
 }
 
@@ -301,6 +316,16 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
       enabled: false,
       maxAttemptsPerTurn: 1,
       maxAccountSwitchesPerTurn: 1,
+      exhaustedCooldownMs: 30 * 60 * 1000,
+      minSwitchIntervalMs: 10 * 1000,
+    },
+  },
+  grok: {
+    autoFailover: {
+      enabled: false,
+      maxAttemptsPerTurn: 1,
+      maxAccountSwitchesPerTurn: 1,
+      quotaCacheMaxAgeMs: 5 * 60 * 1000,
       exhaustedCooldownMs: 30 * 60 * 1000,
       minSwitchIntervalMs: 10 * 1000,
     },
@@ -712,6 +737,18 @@ function readOpencodeGoAutoFailoverConfig(value: unknown, fallback: PiWebOpencod
   };
 }
 
+function readGrokAutoFailoverConfig(value: unknown, fallback: PiWebGrokAutoFailoverConfig): PiWebGrokAutoFailoverConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    maxAttemptsPerTurn: readInteger(root.maxAttemptsPerTurn, fallback.maxAttemptsPerTurn),
+    maxAccountSwitchesPerTurn: readInteger(root.maxAccountSwitchesPerTurn, fallback.maxAccountSwitchesPerTurn),
+    quotaCacheMaxAgeMs: readInteger(root.quotaCacheMaxAgeMs, fallback.quotaCacheMaxAgeMs),
+    exhaustedCooldownMs: readInteger(root.exhaustedCooldownMs, fallback.exhaustedCooldownMs),
+    minSwitchIntervalMs: readInteger(root.minSwitchIntervalMs, fallback.minSwitchIntervalMs),
+  };
+}
+
 function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const defaults = DEFAULT_PI_WEB_CONFIG;
   const root = isRecord(raw) ? raw : {};
@@ -723,6 +760,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const terminal = isRecord(root.terminal) ? root.terminal : {};
   const chatgpt = isRecord(root.chatgpt) ? root.chatgpt : {};
   const opencodeGo = isRecord(root.opencodeGo) ? root.opencodeGo : {};
+  const grok = isRecord(root.grok) ? root.grok : {};
   const editor = isRecord(root.editor) ? root.editor : {};
   const editorShortcuts = isRecord(editor.shortcuts) ? editor.shortcuts : {};
   const terminalEnv: Record<string, string> = {};
@@ -773,6 +811,9 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     },
     opencodeGo: {
       autoFailover: readOpencodeGoAutoFailoverConfig(opencodeGo.autoFailover, defaults.opencodeGo.autoFailover),
+    },
+    grok: {
+      autoFailover: readGrokAutoFailoverConfig(grok.autoFailover, defaults.grok.autoFailover),
     },
     editor: {
       kind: editor.kind === "monaco" ? "monaco" : defaults.editor.kind,
@@ -1309,6 +1350,28 @@ export function validatePiWebOpencodeGoConfig(value: unknown): PiWebOpencodeGoCo
   };
 }
 
+function validateGrokAutoFailoverConfig(value: unknown): PiWebGrokAutoFailoverConfig {
+  if (value === undefined) return DEFAULT_PI_WEB_CONFIG.grok.autoFailover;
+  if (!isRecord(value)) throw new PiWebConfigValidationError("grok.autoFailover must be an object");
+  return {
+    enabled: requireBoolean(value.enabled, "grok.autoFailover.enabled"),
+    maxAttemptsPerTurn: requireIntegerInRange(value.maxAttemptsPerTurn, "grok.autoFailover.maxAttemptsPerTurn", 0, 3),
+    maxAccountSwitchesPerTurn: requireIntegerInRange(value.maxAccountSwitchesPerTurn, "grok.autoFailover.maxAccountSwitchesPerTurn", 0, 3),
+    quotaCacheMaxAgeMs: requireIntegerInRange(value.quotaCacheMaxAgeMs, "grok.autoFailover.quotaCacheMaxAgeMs", 0, 24 * 60 * 60 * 1000),
+    exhaustedCooldownMs: requireIntegerInRange(value.exhaustedCooldownMs, "grok.autoFailover.exhaustedCooldownMs", 0, 24 * 60 * 60 * 1000),
+    minSwitchIntervalMs: requireIntegerInRange(value.minSwitchIntervalMs, "grok.autoFailover.minSwitchIntervalMs", 0, 60 * 60 * 1000),
+  };
+}
+
+export function validatePiWebGrokConfig(value: unknown): PiWebGrokConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("grok config must be an object");
+  }
+  return {
+    autoFailover: validateGrokAutoFailoverConfig(value.autoFailover),
+  };
+}
+
 export function validatePiWebEditorConfig(value: unknown): PiWebEditorConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("editor config must be an object");
@@ -1368,8 +1431,9 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasTerminal = Object.prototype.hasOwnProperty.call(patch, "terminal");
   const hasChatGpt = Object.prototype.hasOwnProperty.call(patch, "chatgpt");
   const hasOpencodeGo = Object.prototype.hasOwnProperty.call(patch, "opencodeGo");
+  const hasGrok = Object.prototype.hasOwnProperty.call(patch, "grok");
   const hasEditor = Object.prototype.hasOwnProperty.call(patch, "editor");
-  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasEditor) {
+  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasGrok && !hasEditor) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
@@ -1401,6 +1465,13 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
       ? (patch.opencodeGo as Record<string, unknown>).autoFailover
       : currentConfig.opencodeGo.autoFailover,
   } : patch.opencodeGo) : undefined;
+  const normalizedGrok = hasGrok ? validatePiWebGrokConfig(isRecord(patch.grok) ? {
+    ...currentConfig.grok,
+    ...patch.grok,
+    autoFailover: Object.prototype.hasOwnProperty.call(patch.grok, "autoFailover")
+      ? (patch.grok as Record<string, unknown>).autoFailover
+      : currentConfig.grok.autoFailover,
+  } : patch.grok) : undefined;
   const normalizedEditor = hasEditor ? validatePiWebEditorConfig(patch.editor) : undefined;
   const nextRaw: Record<string, unknown> = { ...raw };
 
@@ -1465,6 +1536,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.opencodeGo = {
       ...previousOpencodeGo,
       ...normalizedOpencodeGo,
+    };
+  }
+
+  if (normalizedGrok) {
+    const previousGrok = isRecord(raw.grok) ? raw.grok : {};
+    nextRaw.grok = {
+      ...previousGrok,
+      ...normalizedGrok,
     };
   }
 

@@ -482,10 +482,10 @@ async function queryGrokBilling(
       // 3. Fetch billing
       let result = await fetchBillingData(accessToken);
 
-      // 4. 401/403 → refresh credential + retry once
-      if (result.error?.code === "unauthorized" && result.statusCode === 401 || result.statusCode === 403) {
+      // 4. 401/403 → force-refresh credential + retry once (parenthesized condition).
+      if (result.error?.code === "unauthorized" && (result.statusCode === 401 || result.statusCode === 403)) {
         try {
-          const refreshed = await getGrokAccessToken(accountId, { minValidityMs: 0 }); // force refresh
+          const refreshed = await getGrokAccessToken(accountId, { forceRefresh: true });
           if (refreshed.accessToken !== accessToken) {
             accessToken = refreshed.accessToken;
             result = await fetchBillingData(accessToken);

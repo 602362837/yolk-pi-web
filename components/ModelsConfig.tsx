@@ -1031,7 +1031,7 @@ function GrokQuotaView({
             <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
           </div>
           <span style={{ fontSize: 11, color: account.active ? "#4ade80" : "var(--text-dim)", fontWeight: 600, flexShrink: 0 }}>
-            {account.active ? "Active / 新会话默认" : ""}
+            {account.active ? "Active / 全局当前" : ""}
           </span>
         </div>
       )}
@@ -1624,7 +1624,7 @@ function GrokDeleteConfirmDialog({
         <div style={{ background: "var(--bg-panel)", padding: "10px 12px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}>
           <strong style={{ display: "block", marginBottom: 6, color: "var(--text)" }}>系统提示：</strong>
           <p style={{ margin: 0, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            删除后，已绑定该账号的会话会在下次请求时自动使用当前 Active 账号的凭证。
+            删除后，Grok 请求会继续使用当前全局 Active 账号的凭证。
             不会导致会话数据丢失。
           </p>
         </div>
@@ -2079,7 +2079,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [confirm, loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId]);
 
-  // Grok delete flow: opens a custom dialog with active/pin protection
+  // Grok delete flow: opens a custom dialog with active-account protection
   const handleGrokDeleteClick = useCallback((account: OAuthAccountSummary) => {
     setGrokDeleteAccount(account);
     setGrokDeleteDeleting(false);
@@ -2199,7 +2199,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       {isGrok && (
         <div style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-panel)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", lineHeight: 1.5 }}>
           <strong style={{ color: "var(--text)" }}>账号激活说明：</strong>
-          激活某个账号只将其设为后续<strong>新建会话的默认账号</strong>。已有 Grok 会话在创建时便与其所用账号绑定（Session Pinning），之后不受 active 账号切换影响，从而支持多账号并发会话隔离。
+          Activate 只设置 Grok 的<strong>全局当前 Active</strong>，不是锁定账号。切换后，所有普通运行中 Session 和新 Session 的<strong>后续请求</strong>都会使用该账号；已经发出的 in-flight 请求不会中途更换 token。手动 Active 的账号若返回明确限额或限流，且 Settings 中开启了自动切号，仍会自动轮换到可用账号并重试。
         </div>
       )}
 

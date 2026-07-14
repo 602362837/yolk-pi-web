@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grok Session 账号切换 · YPI UI Prototype</title>
+  <style>
+    :root {
+      --bg: #fff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eee;
+      --bg-selected: #e8e8e8;
+      --bg-subtle: rgba(0,0,0,.035);
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --success: #16835b;
+      --success-bg: #eaf8f2;
+      --warning: #b26400;
+      --warning-bg: #fff5df;
+      --danger: #d92d20;
+      --danger-bg: #fff0ee;
+      --info-bg: #eff6ff;
+      --shadow: 0 18px 50px rgba(16,24,40,.14), 0 2px 8px rgba(16,24,40,.08);
+    }
+    body.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --bg-subtle: rgba(255,255,255,.045);
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --success: #55c99a;
+      --success-bg: rgba(22,131,91,.18);
+      --warning: #f0b34a;
+      --warning-bg: rgba(178,100,0,.2);
+      --danger: #ff746a;
+      --danger-bg: rgba(217,45,32,.18);
+      --info-bg: rgba(37,99,235,.18);
+      --shadow: 0 20px 55px rgba(0,0,0,.48), 0 2px 9px rgba(0,0,0,.3);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #eef1f5;
+      color: var(--text);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body.dark { background: #101112; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .proto-toolbar {
+      position: sticky; top: 0; z-index: 20; padding: 12px 18px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      background: color-mix(in srgb, var(--bg) 94%, transparent);
+      border-bottom: 1px solid var(--border); backdrop-filter: blur(14px);
+    }
+    .proto-title { display: flex; align-items: center; gap: 8px; font-weight: 800; margin-right: auto; }
+    .proto-title svg { color: var(--accent); }
+    .toolbar-group { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+    .toolbar-label { font-size: 11px; color: var(--text-dim); margin-right: 2px; }
+    .tool-btn, .tab-btn {
+      min-height: 28px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text-muted); background: var(--bg); font-size: 11px;
+    }
+    .tool-btn:hover, .tab-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .tool-btn.active, .tab-btn.active { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--info-bg); color: var(--accent); font-weight: 700; }
+    .state-strip { width: 100%; display: flex; gap: 5px; overflow-x: auto; padding-top: 1px; scrollbar-width: thin; }
+    .state-strip .tool-btn { white-space: nowrap; }
+    .prototype-main { width: min(1180px, calc(100% - 28px)); margin: 22px auto 40px; }
+    .app-frame {
+      width: 100%; min-height: 760px; overflow: hidden; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow); transition: width .2s, min-height .2s;
+    }
+    .app-frame.mobile { width: min(390px, 100%); margin-inline: auto; min-height: 760px; }
+    .app-topbar { height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--bg-panel); }
+    .window-dots { display: flex; gap: 5px; }
+    .window-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+    .app-topbar strong { font-size: 12px; }
+    .top-meta { color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .top-actions { margin-left: auto; display: flex; gap: 5px; }
+    .icon-btn { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: 7px; color: var(--text-muted); background: transparent; }
+    .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .screen { display: none; min-height: 716px; }
+    .screen.active { display: block; }
+    .chat-screen { position: relative; display: none; flex-direction: column; min-height: 716px; }
+    .chat-screen.active { display: flex; }
+    .chat-content { flex: 1; width: min(820px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 16px; }
+    .chat-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 24px; color: var(--text-muted); font-size: 12px; }
+    .grok-mark { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-weight: 900; }
+    .message { max-width: 710px; padding: 13px 15px; border: 1px solid var(--border); border-radius: 11px; background: var(--bg-panel); color: var(--text); }
+    .message p { margin: 0 0 8px; }
+    .message p:last-child { margin-bottom: 0; }
+    .message .muted { color: var(--text-muted); font-size: 12px; }
+    .chat-empty { min-height: 330px; display: grid; place-items: center; color: var(--text-dim); text-align: center; }
+    .chat-empty strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 5px; }
+    .chat-input-area { width: min(820px, calc(100% - 32px)); margin: auto auto 0; padding-bottom: 16px; }
+    .notice-stack { display: flex; flex-direction: column; gap: 7px; margin-bottom: 8px; }
+    .notice { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; line-height: 1.45; }
+    .notice strong { display: block; margin-bottom: 2px; }
+    .notice.info { background: var(--info-bg); border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); }
+    .notice.success { background: var(--success-bg); border-color: color-mix(in srgb, var(--success) 38%, var(--border)); color: var(--success); }
+    .notice.warning { background: var(--warning-bg); border-color: color-mix(in srgb, var(--warning) 38%, var(--border)); color: var(--warning); }
+    .notice.error { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 38%, var(--border)); color: var(--danger); }
+    .input-shell { position: relative; padding: 10px 10px 10px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); box-shadow: 0 8px 24px -12px rgba(15,23,42,.25); }
+    .input-row { min-height: 50px; display: flex; align-items: flex-end; gap: 10px; }
+    .fake-editor { flex: 1; min-height: 26px; color: var(--text-dim); padding: 4px 0; }
+    .send-btn { flex: none; padding: 7px 13px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 700; }
+    .send-btn.disabled { background: var(--bg-panel); color: var(--text-dim); cursor: not-allowed; }
+    .control-row { display: flex; gap: 5px; align-items: center; margin-top: 8px; min-width: 0; }
+    .control-row .spacer { flex: 1; }
+    .model-trigger, .account-trigger {
+      display: inline-flex; align-items: center; gap: 6px; min-height: 32px; max-width: 245px; padding: 6px 9px;
+      border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-muted); font-size: 12px; text-align: left;
+    }
+    .model-trigger:hover, .account-trigger:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+    .account-trigger { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, transparent); color: var(--text); }
+    .account-trigger .account-trigger-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .account-trigger .account-trigger-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .account-trigger .account-trigger-subtitle { color: var(--text-dim); font-size: 10px; }
+    .account-trigger.disabled, .account-trigger:disabled { opacity: .62; cursor: not-allowed; }
+    .account-trigger .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--success); }
+    .small-control { min-height: 32px; padding: 6px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--text-muted); font-size: 11px; }
+    .small-control:hover { background: var(--bg-hover); color: var(--text); }
+    .selector {
+      position: absolute; left: 0; bottom: calc(100% + 9px); z-index: 8; width: min(450px, 100%);
+      border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden;
+    }
+    .selector-head { padding: 12px 13px 10px; border-bottom: 1px solid var(--border); }
+    .selector-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .selector-title { font-weight: 800; font-size: 13px; }
+    .selector-caption { margin-top: 3px; color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+    .selector-close { border: 0; background: transparent; color: var(--text-muted); font-size: 18px; padding: 0 3px; }
+    .account-list { display: flex; flex-direction: column; gap: 6px; padding: 9px; max-height: 350px; overflow-y: auto; }
+    .account-option { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
+    .account-option:hover { background: var(--bg-hover); }
+    .account-option.selected { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); background: var(--info-bg); }
+    .account-option.disabled { opacity: .62; cursor: not-allowed; }
+    .account-option .account-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .account-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-meta { color: var(--text-muted); font-size: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+    .account-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; min-height: 18px; padding: 2px 6px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .badge.default { color: var(--accent); background: var(--info-bg); }
+    .badge.current { color: var(--success); background: var(--success-bg); }
+    .badge.good { color: var(--success); background: var(--success-bg); }
+    .badge.warn { color: var(--warning); background: var(--warning-bg); }
+    .badge.danger { color: var(--danger); background: var(--danger-bg); }
+    .badge.neutral { color: var(--text-muted); background: var(--bg-panel); }
+    .selector-footer { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .selector-footer small { color: var(--text-dim); font-size: 10px; line-height: 1.35; }
+    .primary-btn, .secondary-btn, .danger-btn { min-height: 31px; padding: 6px 11px; border-radius: 7px; font-size: 11px; font-weight: 700; }
+    .primary-btn { border: 0; background: var(--accent); color: #fff; }
+    .primary-btn:hover { background: var(--accent-hover); }
+    .primary-btn:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+    .secondary-btn { border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); }
+    .secondary-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .danger-btn { border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--border)); background: transparent; color: var(--danger); }
+    .danger-btn:hover { background: var(--danger-bg); }
+    .screen-panel { width: min(860px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 36px; }
+    .panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 18px; }
+    .panel-heading h2 { margin: 0; font-size: 17px; }
+    .panel-heading p { margin: 5px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; max-width: 660px; }
+    .provider-chip { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); white-space: nowrap; }
+    .provider-logo { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; background: var(--text); color: var(--bg); font-size: 11px; font-weight: 900; }
+    .info-card, .setting-card { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-subtle); }
+    .info-card { margin-bottom: 15px; color: var(--text-muted); line-height: 1.55; font-size: 12px; }
+    .info-card strong { color: var(--text); }
+    .models-list { display: flex; flex-direction: column; gap: 8px; }
+    .models-account-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-panel); }
+    .models-account-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .models-account-title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 800; }
+    .models-account-meta { color: var(--text-muted); font-size: 11px; }
+    .models-account-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .quota-line { display: flex; align-items: center; gap: 8px; margin-top: 3px; color: var(--text-dim); font-size: 10px; }
+    .quota-bar { width: 110px; height: 5px; overflow: hidden; border: 1px solid var(--border); border-radius: 99px; background: var(--bg); }
+    .quota-bar i { display: block; height: 100%; background: var(--success); }
+    .quota-bar i.warn { background: var(--warning); }
+    .settings-layout { display: grid; grid-template-columns: 156px minmax(0, 1fr); gap: 18px; }
+    .settings-nav { padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-subtle); align-self: start; }
+    .settings-nav button { display: block; width: 100%; padding: 8px 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text-muted); text-align: left; font-size: 12px; }
+    .settings-nav button.active { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: var(--info-bg); color: var(--accent); font-weight: 700; }
+    .setting-card { display: flex; flex-direction: column; gap: 14px; background: var(--bg-panel); }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
+    .toggle-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .toggle-copy strong { font-size: 13px; }
+    .toggle-copy span { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+    .toggle { position: relative; width: 42px; height: 23px; flex: none; padding: 0; border: 0; border-radius: 99px; background: var(--border); }
+    .toggle i { position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); transition: left .15s; }
+    .toggle.on { background: var(--accent); }
+    .toggle.on i { left: 22px; }
+    .rule-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .rule { padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+    .rule strong { display: block; font-size: 11px; margin-bottom: 3px; }
+    .rule span { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+    .limitation { padding: 9px 10px; border-left: 3px solid var(--warning); border-radius: 5px; background: var(--warning-bg); color: var(--warning); font-size: 11px; line-height: 1.5; }
+    .setting-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 3px; }
+    .kbd-help { width: min(860px, calc(100% - 32px)); margin: 14px auto 0; padding: 9px 11px; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-dim); font-size: 10px; }
+    kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-panel); color: var(--text-muted); font-family: var(--font-mono); }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 30; max-width: min(360px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); box-shadow: var(--shadow); color: var(--text); opacity: 0; transform: translateY(8px); pointer-events: none; transition: .16s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .modal-layer { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .15s; }
+    .modal-layer.open { opacity: 1; pointer-events: auto; }
+    .modal { width: min(460px, 100%); border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: var(--shadow); overflow: hidden; }
+    .modal-head, .modal-foot { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); }
+    .modal-foot { justify-content: flex-end; border-top: 1px solid var(--border); border-bottom: 0; }
+    .modal-head strong { font-size: 14px; }
+    .modal-body { padding: 14px; color: var(--text-muted); line-height: 1.55; font-size: 12px; }
+    .modal-body h3 { margin: 0 0 8px; color: var(--danger); font-size: 13px; }
+    .modal-body .block-code { display: inline-block; padding: 2px 5px; border-radius: 4px; background: var(--danger-bg); color: var(--danger); font-family: var(--font-mono); font-size: 11px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .hidden { display: none !important; }
+    @media (max-width: 640px) {
+      .proto-toolbar { padding: 10px; gap: 8px; }
+      .proto-title { width: 100%; margin-right: 0; }
+      .prototype-main { width: 100%; margin: 0; }
+      .app-frame, .app-frame.mobile { width: 100%; min-height: 100dvh; border-radius: 0; border-left: 0; border-right: 0; }
+      .chat-content, .chat-input-area, .screen-panel, .kbd-help { width: calc(100% - 20px); }
+      .selector { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; border-radius: 16px 16px 0 0; max-height: min(78dvh, 620px); }
+      .account-list { max-height: 48dvh; }
+      .selector-footer { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+      .control-row { overflow-x: auto; scrollbar-width: none; }
+      .control-row::-webkit-scrollbar { display: none; }
+      .control-row .spacer { display: none; }
+      .model-trigger { max-width: 165px; }
+      .account-trigger { max-width: 215px; }
+      .settings-layout { grid-template-columns: 1fr; gap: 10px; }
+      .settings-nav { display: flex; overflow-x: auto; gap: 4px; scrollbar-width: none; }
+      .settings-nav button { width: auto; flex: 0 0 auto; white-space: nowrap; }
+      .rule-grid { grid-template-columns: 1fr; }
+      .models-account-row { grid-template-columns: 1fr; }
+      .models-account-actions { justify-content: flex-start; }
+      .toast { right: 10px; bottom: 10px; }
+      .modal-layer { align-items: end; padding: 0; }
+      .modal { width: 100%; border-radius: 16px 16px 0 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="proto-toolbar" aria-label="原型控制">
+    <div class="proto-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+      <span>Grok Session 账号切换 · HTML 原型</span>
+    </div>
+    <div class="toolbar-group" aria-label="主题与视口">
+      <button class="tool-btn" id="themeBtn" type="button">切换深色</button>
+      <button class="tool-btn" id="viewportBtn" type="button">窄屏 ≤640px</button>
+    </div>
+    <div class="toolbar-group" aria-label="页面">
+      <span class="toolbar-label">页面</span>
+      <button class="tab-btn active" data-screen="chat" type="button">Chat</button>
+      <button class="tab-btn" data-screen="models" type="button">Models</button>
+      <button class="tab-btn" data-screen="settings" type="button">Settings</button>
+    </div>
+    <div class="state-strip" id="stateStrip" aria-label="状态仿真">
+      <span class="toolbar-label">Chat 状态</span>
+      <button class="tool-btn" data-state="new" type="button">新 Session</button>
+      <button class="tool-btn active" data-state="idle" type="button">空闲</button>
+      <button class="tool-btn" data-state="selector" type="button">选择浮层</button>
+      <button class="tool-btn" data-state="streaming" type="button">生成中禁用</button>
+      <button class="tool-btn" data-state="loading" type="button">加载中</button>
+      <button class="tool-btn" data-state="error" type="button">加载失败</button>
+      <button class="tool-btn" data-state="success" type="button">自动切号成功</button>
+      <button class="tool-btn" data-state="none" type="button">无可用账号</button>
+      <button class="tool-btn" data-state="reauth" type="button">需重新登录</button>
+      <button class="tool-btn" data-state="budget" type="button">重试预算耗尽</button>
+    </div>
+  </header>
+
+  <main class="prototype-main">
+    <section class="app-frame" id="appFrame">
+      <div class="app-topbar">
+        <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong>yolk pi web</strong>
+        <span class="top-meta">api-gateway · Session Grok 主推理</span>
+        <div class="top-actions"><button class="icon-btn" type="button" title="设置" aria-label="设置">⚙</button><button class="icon-btn" type="button" title="更多" aria-label="更多">⋯</button></div>
+      </div>
+
+      <section class="screen chat-screen active" id="screen-chat" aria-label="Chat 原型">
+        <div class="chat-content">
+          <div class="chat-heading"><span class="grok-mark">G</span><span>Grok CLI · <span id="sessionLabel">Session S-042</span></span><span class="badge neutral">主推理绑定</span></div>
+          <div id="chatBody">
+            <div class="message">
+              <p>我会按当前 Session 的账号绑定发送这轮请求。</p>
+              <p class="muted">全局 Active 只决定新 Session 默认；当前 Session 可从输入栏旁的账号入口显式切换。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <div class="notice-stack" id="feedback" aria-live="polite"></div>
+          <div class="input-shell" id="inputShell">
+            <div class="selector hidden" id="selector" role="dialog" aria-modal="true" aria-labelledby="selectorTitle">
+              <div class="selector-head">
+                <div class="selector-head-row">
+                  <div><div class="selector-title" id="selectorTitle">选择当前 Session 账号</div><div class="selector-caption">仅影响 Session S-042，不会修改“新 Session 默认”。</div></div>
+                  <button class="selector-close" id="selectorClose" type="button" aria-label="关闭账号选择器">×</button>
+                </div>
+              </div>
+              <div class="account-list" id="accountList"></div>
+              <div class="selector-footer">
+                <small id="selectorHint">按 Tab 遍历，Enter 确认，Escape 关闭；不可在生成中途换 token。</small>
+                <button class="primary-btn" id="switchAccountBtn" type="button">用于当前 Session</button>
+              </div>
+            </div>
+            <div class="input-row">
+              <div class="fake-editor" id="editorText">输入消息…</div>
+              <button class="send-btn" type="button" id="sendBtn">发送</button>
+            </div>
+            <div class="control-row">
+              <button class="small-control" type="button" title="添加图片">▧</button>
+              <button class="small-control" type="button" title="添加文件">⌁</button>
+              <button class="model-trigger" type="button" title="模型选择器"><span>Grok CLI</span><span style="color:var(--text-dim);font-family:var(--font-mono);font-size:10px">grok-3</span><span>⌄</span></button>
+              <button class="account-trigger" id="accountTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+                <span class="status-dot"></span><span class="account-trigger-copy"><span class="account-trigger-title" id="accountTriggerTitle">当前 Session：工作号 A</span><span class="account-trigger-subtitle" id="accountTriggerSubtitle">也是新 Session 默认 · 月度额度 68% 可用</span></span><span>⌃</span>
+              </button>
+              <span class="spacer"></span>
+              <button class="small-control" type="button">auto</button><button class="small-control" type="button">default</button><button class="small-control" type="button" title="自动吸底">↓</button>
+            </div>
+          </div>
+          <div class="kbd-help">账号入口只对 <b>grok-cli</b> 有意义。当前 selector 打开后：<kbd>Tab</kbd> 聚焦移动 · <kbd>Enter</kbd> 确认 · <kbd>Esc</kbd> 关闭并恢复触发按钮焦点。</div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-models" aria-label="Models 原型">
+        <div class="screen-panel">
+          <div class="panel-heading"><div><h2>Models · Grok CLI</h2><p>管理保存的 Grok OAuth 账号。这里的主动作只改变后续新 Session 默认，不承担当前 Session 重绑。</p></div><div class="provider-chip"><span class="provider-logo">G</span><span><b>Grok CLI</b><br><small style="color:var(--text-dim)">3 个已保存账号</small></span></div></div>
+          <div class="info-card"><strong>Active / 新 Session 默认</strong>：工作号 A。已有 Session 保留创建时的绑定；请在 Chat 输入栏使用“用于当前 Session”切换。账号额度只展示安全摘要，不显示 token 或凭证路径。</div>
+          <div class="models-list">
+            <article class="models-account-row"><div class="models-account-main"><div class="models-account-title">工作号 A <span class="badge default">新 Session 默认</span><span class="badge good">可用</span></div><div class="models-account-meta">grok…7d2 · 被 2 个 Session 引用</div><div class="quota-line"><span>月度 68% 可用</span><span class="quota-bar"><i style="width:32%"></i></span><span>约 42 次剩余</span></div></div><div class="models-account-actions"><button class="secondary-btn" type="button" disabled>已是新 Session 默认</button><button class="danger-btn delete-account" type="button">删除</button></div></article>
+            <article class="models-account-row"><div class="models-account-main"><div class="models-account-title">工作号 B <span class="badge good">可用</span></div><div class="models-account-meta">grok…91a · 被 1 个 Session 引用</div><div class="quota-line"><span>月度 91% 可用</span><span class="quota-bar"><i style="width:9%"></i></span><span>约 11 次剩余</span></div></div><div class="models-account-actions"><button class="primary-btn set-default" type="button">设为新 Session 默认</button><button class="danger-btn delete-account" type="button">删除</button></div></article>
+            <article class="models-account-row"><div class="models-account-main"><div class="models-account-title">旧工作号 <span class="badge warn">额度耗尽</span></div><div class="models-account-meta">grok…c44 · 被 0 个 Session 引用</div><div class="quota-line"><span>月度额度已用尽</span><span class="badge neutral">候选排除</span></div></div><div class="models-account-actions"><button class="secondary-btn" type="button">重新登录</button><button class="danger-btn delete-account" type="button">删除</button></div></article>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px"><button class="secondary-btn" type="button">＋ 添加 Grok 账号</button><span style="color:var(--text-dim);font-size:11px;align-self:center">引用计数为有界安全摘要</span></div>
+          <div class="kbd-help">删除被 Session 引用的账号不会自动回退 Active：后端返回 <kbd>409</kbd>，用户需先在相关 Session 显式切换或处理引用。</div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-settings" aria-label="Settings 原型">
+        <div class="screen-panel">
+          <div class="panel-heading"><div><h2>Settings</h2><p>配置 yolk pi web 行为。保存后动态生效，无需重启。</p></div><span class="badge neutral">pi-web.json</span></div>
+          <div class="settings-layout">
+            <nav class="settings-nav" aria-label="设置分区"><button type="button">蛋黄𝝅</button><button type="button">ChatGPT</button><button class="active" type="button">Grok CLI</button><button type="button">Editor</button></nav>
+            <div class="setting-card">
+              <div><h3 style="margin:0;font-size:15px">Grok CLI</h3><p style="margin:5px 0 0;color:var(--text-muted);font-size:12px">当前 Session 账号策略与额度错误处理。</p></div>
+              <div class="toggle-row"><div class="toggle-copy"><strong>额度耗尽时自动切换当前 Session 账号</strong><span>默认关闭。开启后只处理明确的 quota / usage / billing exhaustion，不改变新 Session 默认账号。</span></div><button class="toggle" id="autoToggle" type="button" role="switch" aria-checked="false" aria-label="额度耗尽时自动切换当前 Session 账号"><i></i></button></div>
+              <div class="rule-grid"><div class="rule"><strong>明确额度错误</strong><span>最多实际切号 1 次，并安全重试 1 次。</span></div><div class="rule"><strong>不触发切号</strong><span>普通 429、网络、timeout、5xx 不自动换号。</span></div><div class="rule"><strong>并发保护</strong><span>按 Session CAS；手动切换优先，避免覆盖。</span></div></div>
+              <div class="limitation"><b>已知限制：</b>主推理请求使用当前 Session 绑定。pi-grok-cli@0.4.1 的 Vision / Imagine 辅助请求仍读取全局 Active token，本原型不承诺所有 Grok 工具请求都已切换。</div>
+              <div class="setting-footer"><button class="secondary-btn" type="button">恢复默认</button><button class="primary-btn" id="saveSettings" type="button">保存</button></div>
+              <div class="kbd-help" style="width:100%;margin:0">开关关闭时，额度耗尽仅展示失败反馈；账号选择仍可在 Session 空闲时手动使用。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="modal-layer" id="deleteModal" role="presentation"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle"><div class="modal-head"><strong id="deleteTitle">无法删除账号</strong><button class="icon-btn" id="closeDelete" type="button" aria-label="关闭">×</button></div><div class="modal-body"><h3>409 · Session 引用阻断</h3><p>账号「工作号 A」仍被 <b>2 个 Session</b> 引用，当前不能删除。</p><p>请先打开相关 Session，在空闲状态下显式切换到其他已保存账号；切换完成后再回到 Models 重试。系统不会静默回退到 Active 凭证。</p></div><div class="modal-foot"><button class="secondary-btn" id="cancelDelete" type="button">知道了</button><button class="primary-btn" id="openSessions" type="button">查看相关 Session</button></div></div></div>
+
+  <script>
+    (function () {
+      const body = document.body;
+      const frame = document.getElementById('appFrame');
+      const selector = document.getElementById('selector');
+      const accountTrigger = document.getElementById('accountTrigger');
+      const switchBtn = document.getElementById('switchAccountBtn');
+      const accountList = document.getElementById('accountList');
+      const feedback = document.getElementById('feedback');
+      const toast = document.getElementById('toast');
+      const deleteModal = document.getElementById('deleteModal');
+      let selectedAccount = 'a';
+      let currentAccount = 'a';
+      let lastFocus = accountTrigger;
+      let chatState = 'idle';
+      const accounts = [
+        { id:'a', name:'工作号 A', meta:'grok…7d2', status:'usable', statusLabel:'可用', quota:'月度 68% 可用', default:true },
+        { id:'b', name:'工作号 B', meta:'grok…91a', status:'usable', statusLabel:'可用', quota:'月度 91% 可用', default:false },
+        { id:'c', name:'旧工作号', meta:'grok…c44', status:'exhausted', statusLabel:'额度耗尽', quota:'月度额度已用尽', default:false },
+        { id:'d', name:'备用号（未知）', meta:'grok…5f0', status:'unknown', statusLabel:'额度未知', quota:'尚无新鲜额度缓存', default:false },
+        { id:'e', name:'设计号', meta:'grok…1b8', status:'reauth', statusLabel:'需重新登录', quota:'凭证不可用', default:false }
+      ];
+      const statusBadge = (a) => {
+        const cls = a.status === 'usable' ? 'good' : a.status === 'exhausted' ? 'warn' : a.status === 'reauth' ? 'danger' : 'neutral';
+        return `<span class="badge ${cls}">${a.statusLabel}</span>`;
+      };
+      function showToast(text) { toast.textContent = text; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove('show'), 2600); }
+      function setScreen(screen) {
+        document.querySelectorAll('[data-screen]').forEach((b) => b.classList.toggle('active', b.dataset.screen === screen));
+        document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === 'screen-' + screen));
+        if (screen !== 'chat') closeSelector();
+        document.getElementById('stateStrip').style.display = screen === 'chat' ? 'flex' : 'none';
+      }
+      function badgeForAccount(a) {
+        const tags = [];
+        if (a.id === currentAccount) tags.push('<span class="badge current">当前 Session</span>');
+        if (a.default) tags.push('<span class="badge default">新 Session 默认</span>');
+        return tags.join('');
+      }
+      function renderAccounts() {
+        accountList.innerHTML = accounts.map((a) => {
+          const disabled = a.status === 'exhausted' || a.status === 'reauth';
+          return `<button type="button" class="account-option ${selectedAccount === a.id ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-account="${a.id}" ${disabled ? 'aria-disabled="true"' : ''}>
+            <span class="status-dot" style="background:${a.status === 'usable' ? 'var(--success)' : a.status === 'exhausted' ? 'var(--warning)' : a.status === 'reauth' ? 'var(--danger)' : 'var(--text-dim)'}"></span>
+            <span class="account-copy"><span class="account-name">${a.name}</span><span class="account-badges">${badgeForAccount(a)} ${statusBadge(a)}</span><span class="account-meta">${a.meta} · ${a.quota}</span></span>
+            <span style="color:var(--accent);font-size:15px">${selectedAccount === a.id ? '✓' : ''}</span>
+          </button>`;
+        }).join('');
+        accountList.querySelectorAll('[data-account]').forEach((el) => el.addEventListener('click', () => {
+          const a = accounts.find((x) => x.id === el.dataset.account);
+          if (!a || a.status === 'exhausted' || a.status === 'reauth') return;
+          selectedAccount = a.id; renderAccounts(); switchBtn.focus();
+        }));
+      }
+      function updateTrigger() {
+        const a = accounts.find((x) => x.id === currentAccount) || accounts[0];
+        const isNew = chatState === 'new';
+        document.getElementById('accountTriggerTitle').textContent = isNew ? '将使用默认账号：工作号 A' : '当前 Session：' + a.name;
+        document.getElementById('accountTriggerSubtitle').textContent = isNew ? '尚未发送消息 · 首次使用时绑定' : (a.default ? '也是新 Session 默认 · 月度额度 68% 可用' : '与默认账号不同 · 本 Session 独立绑定');
+      }
+      function openSelector() {
+        if (chatState === 'streaming') { showToast('本轮生成中，等待结束或停止后切换账号'); return; }
+        lastFocus = document.activeElement || accountTrigger;
+        selectedAccount = currentAccount;
+        selector.classList.remove('hidden');
+        accountTrigger.setAttribute('aria-expanded', 'true');
+        renderAccounts();
+        const state = chatState;
+        switchBtn.disabled = state === 'loading' || state === 'error';
+        if (state === 'loading') accountList.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">正在读取保存的 Grok 账号…</div>';
+        if (state === 'error') accountList.innerHTML = '<div class="notice error" style="margin:4px">账号列表加载失败，请稍后重试。<button class="secondary-btn" type="button" style="margin-left:auto">重试</button></div>';
+        setTimeout(() => (state === 'loading' || state === 'error' ? document.getElementById('selectorClose') : accountList.querySelector('[data-account]'))?.focus(), 20);
+      }
+      function closeSelector() {
+        selector.classList.add('hidden'); accountTrigger.setAttribute('aria-expanded', 'false');
+        if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+      }
+      function setFeedback(type, title, body) { feedback.innerHTML = title ? `<div class="notice ${type}"><span aria-hidden="true">${type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}</span><div><strong>${title}</strong>${body || ''}</div></div>` : ''; }
+      function setChatState(state) {
+        chatState = state;
+        document.querySelectorAll('[data-state]').forEach((b) => b.classList.toggle('active', b.dataset.state === state));
+        closeSelector();
+        setFeedback('', '', '');
+        const shell = document.getElementById('inputShell');
+        const send = document.getElementById('sendBtn');
+        const editor = document.getElementById('editorText');
+        accountTrigger.disabled = state === 'streaming'; accountTrigger.classList.toggle('disabled', state === 'streaming');
+        if (state === 'new') { currentAccount = 'a'; editor.textContent = '新 Session：输入第一条消息…'; document.getElementById('sessionLabel').textContent = '新 Session（未绑定）'; }
+        else { editor.textContent = state === 'streaming' ? 'Agent 正在运行…' : '输入消息…'; document.getElementById('sessionLabel').textContent = 'Session S-042'; }
+        if (state === 'streaming') { setFeedback('warning', '本轮生成中', '等待本轮结束或先停止后再切换账号；当前请求不会中途换 token。'); send.textContent = '停止'; send.classList.add('disabled'); }
+        else if (state === 'success') { currentAccount = 'b'; setFeedback('success', 'Grok 额度耗尽，已为当前 Session 切换账号并重试', '已切换到工作号 B。新 Session 默认仍是工作号 A。'); send.textContent = '发送'; send.classList.remove('disabled'); }
+        else if (state === 'none') { setFeedback('error', '没有可用的 Grok 账号', '候选账号均额度耗尽、需重新登录或暂不可用；本轮不会继续重试。'); }
+        else if (state === 'reauth') { setFeedback('error', '当前账号需要重新登录', '绑定凭证不可用。请重新登录此账号，或在 Session 空闲时显式选择其他账号。'); }
+        else if (state === 'budget') { setFeedback('warning', '自动切号重试次数已用尽', '本轮最多切换 1 次并重试 1 次；请检查额度或手动切换账号。'); }
+        else if (state === 'new') { setFeedback('info', '新 Session 默认', '当前尚未绑定账号；首次使用 Grok 时会绑定当时的新 Session 默认。'); }
+        updateTrigger();
+        if (state === 'selector' || state === 'loading' || state === 'error') openSelector();
+      }
+      accountTrigger.addEventListener('click', openSelector);
+      selector.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        const focusable = [document.getElementById('selectorClose'), ...accountList.querySelectorAll('button:not([aria-disabled="true"])'), switchBtn].filter((el) => el && !el.disabled);
+        if (!focusable.length) return;
+        const index = focusable.indexOf(document.activeElement);
+        const next = e.shiftKey ? (index <= 0 ? focusable.length - 1 : index - 1) : (index === focusable.length - 1 ? 0 : index + 1);
+        e.preventDefault();
+        focusable[next].focus();
+      });
+      document.getElementById('selectorClose').addEventListener('click', closeSelector);
+      switchBtn.addEventListener('click', () => {
+        const a = accounts.find((x) => x.id === selectedAccount);
+        if (!a || a.status === 'exhausted' || a.status === 'reauth') return;
+        currentAccount = a.id; closeSelector(); updateTrigger(); setFeedback('success', '当前 Session 账号已更新', `下一次 Grok 主推理将使用 ${a.name}。新 Session 默认未改变。`); showToast('已切换当前 Session 账号');
+      });
+      document.querySelectorAll('[data-state]').forEach((b) => b.addEventListener('click', () => setChatState(b.dataset.state)));
+      document.querySelectorAll('[data-screen]').forEach((b) => b.addEventListener('click', () => setScreen(b.dataset.screen)));
+      document.getElementById('themeBtn').addEventListener('click', () => { body.classList.toggle('dark'); document.getElementById('themeBtn').textContent = body.classList.contains('dark') ? '切换浅色' : '切换深色'; });
+      document.getElementById('viewportBtn').addEventListener('click', () => { frame.classList.toggle('mobile'); document.getElementById('viewportBtn').textContent = frame.classList.contains('mobile') ? '恢复桌面视口' : '窄屏 ≤640px'; });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !selector.classList.contains('hidden')) { e.preventDefault(); closeSelector(); } });
+      document.querySelectorAll('.delete-account').forEach((b) => b.addEventListener('click', () => deleteModal.classList.add('open')));
+      document.getElementById('closeDelete').addEventListener('click', () => deleteModal.classList.remove('open'));
+      document.getElementById('cancelDelete').addEventListener('click', () => deleteModal.classList.remove('open'));
+      document.getElementById('openSessions').addEventListener('click', () => { deleteModal.classList.remove('open'); setScreen('chat'); setChatState('idle'); showToast('请在相关 Session 空闲后切换账号'); });
+      deleteModal.addEventListener('mousedown', (e) => { if (e.target === deleteModal) deleteModal.classList.remove('open'); });
+      document.querySelector('.set-default').addEventListener('click', (e) => { e.currentTarget.textContent = '已是新 Session 默认'; e.currentTarget.disabled = true; showToast('工作号 B 已设为新 Session 默认；已有 Session 不受影响'); });
+      const toggle = document.getElementById('autoToggle');
+      toggle.addEventListener('click', () => { const on = !toggle.classList.contains('on'); toggle.classList.toggle('on', on); toggle.setAttribute('aria-checked', String(on)); showToast(on ? '自动切号已开启（仍需保存）' : '自动切号已关闭（仍需保存）'); });
+      document.getElementById('saveSettings').addEventListener('click', () => showToast('设置已保存，Grok 自动切号配置立即生效'));
+      renderAccounts(); updateTrigger(); setChatState('idle');
+    })();
+  </script>
+</body>
+</html>

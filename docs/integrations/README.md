@@ -8,7 +8,7 @@ See `package.json` for exact versions.
 | --- | --- |
 | `next`, `react`, `react-dom` | Web application framework/runtime. |
 | `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai` | In-process pi AgentSession and AI provider integration. |
-| `pi-grok-cli` | SuperGrok / X Premium OAuth provider, model catalog, inference, and request adapter. Integrated as a fixed, full extension; Web adds multi-account storage, session-account isolation, and quota management on top. |
+| `pi-grok-cli` | SuperGrok / X Premium OAuth provider, model catalog, inference, and request adapter. Integrated as a fixed, full extension; Web adds multi-account storage, global Active live reload, optional auto-failover, and quota management on top. |
 | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-raw`, `rehype-sanitize`, `rehype-katex`, `katex` | Markdown, raw HTML sanitization, and math rendering. |
 | `react-syntax-highlighter` | Code block highlighting. |
 | `mermaid` | Diagram rendering. |
@@ -47,7 +47,7 @@ Auth-related API routes live under `app/api/auth/`. Provider tokens and API-key 
 
 - **Provider bootstrap** (`lib/pi-provider-extensions.ts`): Single entry point for Grok extension factories injected into every ResourceLoader, `createAgentSessionServices`, and Auth bootstrap path. Prevents registry-reset from dropping Grok from the global provider set.
 - **OAuth saved-account store** (`lib/oauth-accounts.ts` + `lib/oauth-account-providers.ts`): Provider-adapter architecture supporting `openai-codex` and `grok-cli`. Each login creates an opaque storage id; credentials are stored in per-account `0600` files under `~/.pi/agent/auth-accounts/<provider>/`.
-- **Session-account isolation** (`lib/grok-session-account.ts`, `lib/grok-account-token.ts`): Active account only sets the default for new Grok sessions. Each Grok session pins its own opaque storage id in the JSONL header (`grokAccountStorageId`). A `before_provider_headers` extension injects the session-bound Bearer token per request, so concurrent sessions with different accounts never share credentials.
+- **Global Active + auto-failover** (`lib/grok-account-failover.ts`, `lib/grok-session-account.ts`, `lib/grok-account-token.ts`): Models Activate updates the provider-global Active account and reloads live wrappers. Session Authorization pin is retired; historical `grokAccountStorageId` is parse-only/ignored. Optional `grok.autoFailover` (default off) rotates Active on explicit quota/rate-limit errors with GPT-aligned lock/budget/retry semantics (Path B independent controller). Token resolver supports true `forceRefresh` for billing 401/403 retry.
 - **Quota service** (`lib/grok-subscription-quota.ts`): Reads monthly/optional weekly usage from the Grok CLI billing endpoint with 60s fresh / 24h stale TTL, single-flight, 401 refresh+retry, and strict allowlist projection. See `GET /api/auth/quota/grok-cli`.
 - **ModelsConfig UI** (`components/ModelsConfig.tsx`): Provider-capability-driven OAuth detail renders Grok login methods, multi-account list, active/default-session semantics, session-reference delete protection, and quota cards with fresh/stale/error/reauth states.
 

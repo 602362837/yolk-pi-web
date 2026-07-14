@@ -1,18 +1,17 @@
 /**
- * grok-session-account — session-account binding management
+ * grok-session-account — deprecated session pin helpers + active account lookup
  *
- * Maintains a runtime registry of which Grok saved account is bound to each
- * active session, and persists the binding as a non-secret additive field in
- * session JSONL headers for resume/fork/Studio child inheritance.
+ * Session Authorization pinning is retired. Main inference uses the global
+ * Active Grok account via auth.json and live reload after Activate/failover.
  *
- * ## Semantics
+ * Kept for compatibility:
+ * - `getActiveGrokAccountId()` — used by quota and failover adapters
+ * - `readGrokSessionAccountFromHeader()` — historical header parsing only
+ * - bind/unbind/restore helpers remain callable but are no longer wired into
+ *   main inference / resume / fork / Studio child paths
  *
- * - New session + Grok model → bind the active account id.
- * - Resume → restore binding from the session header.
- * - Fork → inherit parent binding into the new session file header.
- * - Studio child / Grok → inherit parent binding.
- * - Non-Grok model → keep binding (lazily applied only when Grok is used).
- * - Active account switch → existing sessions keep their binding.
+ * Historical `SessionHeader.grokAccountStorageId` is deprecated and ignored
+ * at runtime; JSONL files are never rewritten.
  *
  * ## Security
  *

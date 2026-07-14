@@ -1,0 +1,1331 @@
+{
+  "schemaVersion": 1,
+  "id": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+  "title": "完善 Grok CLI 限额自动切号与运行中 Session 账号切换",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260714-133529",
+  "createdAt": "2026-07-14T05:37:04.228Z",
+  "updatedAt": "2026-07-14T08:22:48.320Z",
+  "completedAt": "2026-07-14T08:19:34.392Z",
+  "contextIds": [
+    "pi_019f5f20-c987-7dd8-b362-8553f5820ba9"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-bb1184db2cfc6d0b29b6abc7",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T05:37:09.622Z",
+      "finishedAt": "2026-07-14T05:47:06.724Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f21-0e02-7600-94b2-ce3f8381be1e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T05-37-09-634Z_019f5f21-0e02-7600-94b2-ce3f8381be1e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f21-0e02-7600-94b2-ce3f8381be1e",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "规划产物已写入：\n\n`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 6 个子任务的 `ypi-implementation-plan`）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `review.md`\n- `summary.md`\n\n核心结论：\n\n- Grok 额度服务未接入 Agent 失败重试生命周期，因此自动切号缺失。\n- Activate 只改变新 Session 默认账号；已有 Session 由 header pinning 隔离。\n- 当前绑定凭证失败会静默回退全局 Active，需改为 fail-closed。\n- 推荐自动/手动切换都只重绑当前 Session，不改变全局默认。\n- Fork、Studio child 创建时快照继承；Resume 恢复原绑定；树内分支共享绑定。\n\n验证已通过：\n\n- 10 个 artifact 均非 TBD。\n- Implementation Plan JSON 可解析，6 个子任务依赖合法。\n- `plan-review.md` 链接均可解析。\n- 未修改生产代码。\n\n阻塞：当前成员环境没有 Studio 调度工具，无法实际派发 `ui-designer`。主会话需按 `ui.md` 派发并取得 HTML 原型审批，审批前不得实现。\n\n待确认：自动切号默认开关、streaming 切换策略、Studio child 联动语义、删除引用账号是否批量迁移，以及 Vision/Imagine 仍使用全局 Active token 的限制。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T05:37:09.622Z",
+        "updatedAt": "2026-07-14T05:47:06.724Z",
+        "eventCount": 7584,
+        "lastTextPreview": "规划产物已写入：\n\n`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 6 个子任务的 `ypi-implementation-plan`）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `review.md`\n- `summary.md`\n\n核心结论：\n\n- Grok 额度服务未接入 Agent 失败重试生命周期，因此自动切号缺失。\n- Activate 只改变新 Session 默认账号；已有 Session 由 header pinning 隔离。\n- 当前绑定凭证失败会静默回退全局 Active，需改为 fail-closed。\n- 推荐自动/手动切换都只重绑当前 Session，不改变全局默认。\n- Fork、Studio child 创建时快照继承；Resume 恢复原绑定；树内分支共享绑定。\n\n验证已通过：\n\n- 10 个 artifact 均非 TBD。\n- Implementation Plan JSON 可解析，6 个子任务依赖合法。\n- `plan-review.md` 链接均可解析。\n- 未修改生产代码。\n\n阻塞：当前成员环境没有 Studio 调度工具，无法实际派发 `ui-designer`。主会话需按 `ui.md` 派发并取得 HTML 原型审批，审批前不得实现。\n\n待确认：自动切号默认开关、streaming 切换策略、Studio child 联动语义、删除引用账号是否批量迁移，以及 Vision/Imagine 仍使用全局 Active token 的限制。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T05:46:47.048Z",
+            "toolCallId": "call_OFNHHBRE8mHBW3UWTBsqqtjn|fc_0754b3859497d6fd016a55cd4716d08196b19321952e0e5db5",
+            "toolName": "bash",
+            "text": ".ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/brief.md:57:本任务改变账号选择、当前 Session 切换、自动切号反馈和设置项，明确触发 UI 原型门禁。需要 UI 设计员基于现有 `ChatInput`、`ModelsConfig`、`SettingsConfig` 产出任务目录内自包含 HTML 原型并由用户审批。当前 delegated member 环境未暴露 `ypi_studio_subagent`/subagent 调度工具，无法实际启动 UI 设计员；已在 [`ui.md`](ui.md) 写明可直接派发的设计任务。**HTML 原型和用户审批缺失前不得进入实现。**\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:5:**触发 UI 原型门禁。** 本任务改变 Chat 输入区账号信息、账号切换交互、Models 中 Active 文案、Settings 自动切号开关和 failover 反馈。必须由 UI 设计员产出 HTML 原型并经用户审批后才能实现。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:19:- 自包含 HTML 原型文件：\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:78:- HTML 原型：**缺失**\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/plan-review.md:3:> 当前状态：**规划已完成，但尚不具备审批进入实现的条件。** UI 设计员 HTML 原型和用户审批仍缺失。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/plan-review.md:40:实施分为：绑定核心与 API、自动 failover/config、生命周期与删除安全、UI、测试文档。UI 子任务必须依赖已批准 HTML 原型；在批准前不得 claim implementer。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/plan-review.md:60:进入 `awaiting_approval` 前必须同时满足：\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/plan-review.md:62:- [ ] UI 设计员 HTML 原型已保存到当前任务目录。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:5:1. 主会话已派发 UI 设计员并取得任务目录内 HTML 原型。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:6:2. 用户已批准 HTML 原型和 [`plan-review.md`](plan-review.md)。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:29:18. 已批准 HTML 原型\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:77:- 严格按批准 HTML 原型实现。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:272:        \"只在用户批准任务目录内 HTML 原型后实施。\",\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:278:        \"UI 与批准 HTML 原型一致。\",\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/implement.md:402:- UI review：逐项对照批准 HTML 原型。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T05:46:47.070Z",
+            "toolCallId": "call_k1mkirx4RcpA2bOhNWN6gwdq|fc_0754b3859497d6fd016a55cd4716c08196ba26c4d6e16b9eaf",
+            "toolName": "bash",
+            "text": "PASS: 10 meaningful artifacts; 6 valid plan subtasks; local links resolve",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T05:46:47.077Z",
+            "toolCallId": "call_gsigi7JWO3phlEM0xQXdXEEW|fc_0754b3859497d6fd016a55cd4716cc8196a0752833d5ff3721",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260714-133704-\\345\\256\\214\\345\\226\\204-grok-cli-\\351\\231\\220\\351\\242\\235\\350\\207\\252\\345\\212\\250\\345\\210\\207\\345\\217\\267\\344\\270\\216\\350\\277\\220\\350\\241\\214\\344\\270\\255-session-\\350\\264\\246\\345\\217\\267\\345\\210\\207\\346\\215\\242/\"\n\nProduction source changes outside task dir:",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T05:47:06.713Z",
+            "text": "规划产物已写入：\n\n`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`（含 6 个子任务的 `ypi-implementation-plan`）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `review.md`\n- `summary.md`\n\n核心结论：\n\n- Grok 额度服务未接入 Agent 失败重试生命周期，因此自动切号缺失。\n- Activate 只改变新 Session 默认账号；已有 Session 由 header pinning 隔离。\n- 当前绑定凭证失败会静默回退全局 Active，需改为 fail-closed。\n- 推荐自动/手动切换都只重绑当前 Session，不改变全局默认。\n- Fork、Studio child 创建时快照继承；Resume 恢复原绑定；树内分支共享绑定。\n\n验证已通过：\n\n- 10 个 artifact 均非 TBD。\n- Implementation Plan JSON 可解析，6 个子任务依赖合法。\n- `plan-review.md` 链接均可解析。\n- 未修改生产代码。\n\n阻塞：当前成员环境没有 Studio 调度工具，无法实际派发 `ui-designer`。主会话需按 `ui.md` 派发并取得 HTML 原型审批，审批前不得实现。\n\n待确认：自动切号默认开关、streaming 切换策略、Studio child 联动语义、删除引用账号是否批量迁移，以及 Vision/Imagine 仍使用全局 Active token 的限制。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T05:47:06.715Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 793,
+        "tokens": 607,
+        "tokenSource": "usage",
+        "tps": 141.43,
+        "firstTokenAt": "2026-07-14T05:46:59.304Z",
+        "lastTokenAt": "2026-07-14T05:47:03.596Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-bb1184db2cfc6d0b29b6abc7",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/architect-bb1184db2cfc6d0b29b6abc7.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T05:37:09.622Z",
+        "finishedAt": "2026-07-14T05:47:06.717Z",
+        "updatedAt": "2026-07-14T05:47:06.717Z",
+        "itemCount": 233,
+        "messageCount": 1,
+        "toolCallCount": 114,
+        "stderrBytes": 0,
+        "bytes": 814162,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f21-0e02-7600-94b2-ce3f8381be1e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T05-37-09-634Z_019f5f21-0e02-7600-94b2-ce3f8381be1e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-ad47e05288b3f0f37e663e48",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T05:47:21.839Z",
+      "finishedAt": "2026-07-14T05:54:01.123Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f2a-6586-7c94-8b2c-5146f421168f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T05-47-21-862Z_019f5f2a-6586-7c94-8b2c-5146f421168f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f2a-6586-7c94-8b2c-5146f421168f",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成 UI 原型交付。\n\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\n  - 覆盖 Chat、Models、Settings\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\n- 更新：同目录 `ui.md`\n  - 添加原型链接\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\n\n验证：\n\n- `node --check /tmp/grok-session-prototype.js` 通过\n- 未运行 lint/typecheck：未修改生产代码\n\n待主会话/用户决定：\n\n1. 默认关闭自动切号\n2. streaming 时禁用账号切换\n3. Studio child 仅自身切换\n4. 删除引用账号采用 409 阻断\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\n\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T05:47:21.839Z",
+        "updatedAt": "2026-07-14T05:54:01.123Z",
+        "eventCount": 16328,
+        "lastTextPreview": "已完成 UI 原型交付。\n\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\n  - 覆盖 Chat、Models、Settings\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\n- 更新：同目录 `ui.md`\n  - 添加原型链接\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\n\n验证：\n\n- `node --check /tmp/grok-session-prototype.js` 通过\n- 未运行 lint/typecheck：未修改生产代码\n\n待主会话/用户决定：\n\n1. 默认关闭自动切号\n2. streaming 时禁用账号切换\n3. Studio child 仅自身切换\n4. 删除引用账号采用 409 阻断\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\n\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T05:53:42.788Z",
+            "toolCallId": "call_zGJ7vWu3RuSVXKzOfrcqtU9a|fc_00c7ce8f3dddba2d016a55cee60d3481998b5dce4679810eae",
+            "toolName": "read",
+            "text": "# UI：Grok 当前 Session 账号切换与自动切号反馈\n\n## 门禁判断\n\n**触发 UI 原型门禁。** 本任务改变 Chat 输入区账号信息、账号切换交互、Models 中 Active 文案、Settings 自动切号开关和 failover 反馈。必须由 UI 设计员产出 HTML 原型并经用户审批后才能实现。\n\n## 派发状态\n\n当前 architect delegated member 环境没有暴露 `ypi_studio_subagent` 或其他 Studio 调度工具，无法安全启动 `ui-designer` run；不得用架构师自制原型冒充 UI 设计员交付。请主会话派发 `ui-designer`，使用下述任务说明。\n\n## 给 UI 设计员的任务说明\n\n### 目标\n\n基于现有 `components/ChatInput.tsx`、`components/ModelsConfig.tsx`、`components/SettingsConfig.tsx` 与 `app/globals.css`，设计 Grok 当前 Session 账号可见/切换、自动 failover 反馈及设置入口。不要引入新视觉体系。\n\n### 必须交付\n\n- 自包含 HTML 原型文件：\n  - [打开 Grok Session 账号切换原型](grok-session-account-switch-prototype.html)\n- `ui.md` 中补充原型链接、交互状态表和用户审批请求。\n- 纯 Markdown 不满足门禁。\n\n### 本次 UI 设计交付\n\n原型已保存为 [`grok-session-account-switch-prototype.html`](grok-session-account-switch-prototype.html)。它使用现有 `--bg` / `--bg-panel` / `--border` / `--text-*` / `--accent` 变量语言，自包含 CSS 与 JavaScript，不依赖生产代码或外部资源。\n\n原型顶部提供可操作的页面与状态仿真：\n\n- `Chat`：新 Session、空闲、账号选择浮层、生成中禁用、加载中、加载失败、自动切号成功、无可用账号、需重新登录、重试预算耗尽。\n- `Models`：Grok 账号列表、额度安全摘要、Session 引用计数、“设为新 Session 默认”、引用账号删除 `409` 阻断。\n- `Settings`：默认关闭的 Grok 自动切号开关、保存反馈、策略边界和 Vision/Imagine 已知限制。\n- 深浅色主题、桌面/窄屏视口切换；账号浮层在 `≤640px` 变为底部 sheet。\n\n### 原型至少覆盖\n\n1. **Chat 空闲态 / Grok 模型**\n   - 模型选择器旁的账号 chip/入口。\n   - 当前 Session 账号名。\n   - “也是新 Session 默认”或“与默认不同”的次要状态。\n2. **账号选择浮层**\n   - 保存账号列表、当前 Session 标记、Default 标记、额度可用/耗尽/未知/需重登状态。\n   - 主动作使用“用于当前 Session”，不要使用容易混淆的“Activate”。\n   - 明确说明不会修改新 Session 默认。\n3. **正在生成态**\n   - 账号入口不可切换，并提示“等待本轮结束或先停止”。\n   - 不能让用户误以为点击后会改变正在进行的请求。\n4. **自动切号反馈**\n   - 成功并重试。\n   - 无其他可用账号。\n   - 账号需重新登录。\n   - 自动切号关闭/重试预算耗尽。\n   - 文案不得显示 opaque account id、token 或路径。\n5. **Models → Grok 账号管理**\n   - “设为新 Session 默认”替换含糊的 Activate 语义。\n   - 展示当前被多少 Session 引用（有界计数即可）。\n   - 删除有引用账号时的 409 阻断状态；不要再写“自动使用 Active 凭证”。\n6. **Settings → Grok CLI**\n   - 默认关闭的“额度耗尽时自动切换当前 Session 账号”开关。\n   - 策略说明：明确额度错误、最多重试一次、不改变新 Session 默认、普通 429/网络/5xx 不切号。\n7. **窄屏与键盘状态**\n   - `≤640px` 浮层/底部 sheet。\n   - Tab、Escape、焦点恢复、loading/disabled/error。\n\n## 推荐信息架构\n\n- Chat 入口应贴近模型选择器，因为账号只对 `grok-cli` 模型有意义。\n- Models 保留账号管理和“新 Session 默认”操作，不承担当前 Session 切换。\n- Settings 承担自动切号总开关。\n- 账号 selector 与现有 `ModelSelect` / `SelectDropdown` / App Prompt 视觉语言保持一致，可独立组件化为 `GrokSessionAccountSelect`。\n\n## 文案建议\n\n- `当前 Session：工作号 A`\n- `新 Session 默认`\n- `与默认账号不同`\n- `用于当前 Session`\n- `设为新 Session 默认`\n- `本轮生成中，等待结束或停止后切换账号`\n- `Grok 额度耗尽，已为当前 Session 切换账号并重试`\n- `没有可用的 Grok 账号，请检查额度或重新登录`\n\n## 已知产品限制必须在设计中处理\n\n`pi-grok-cli@0.4.1` 的 Vision/Imagine 辅助请求仍读取全局 Active token，不经过 Session header hook。若本期接受主推理限定，UI 帮助文案需避免承诺“所有 Grok 工具请求都已切换”；若不接受，应先扩大技术范围并等待上游能力。\n\n## 交互状态\n\n| 场景 | 展示 | 用户操作 | 反馈 / 约束 |\n| --- | --- | --- | --- |\n| 新 Session、尚未发送 Grok | 账号入口显示“将使用默认账号：工作号 A”与“尚未发送消息 · 首次使用时绑定” | 可打开账号入口查看说明；本期不预选非默认账号 | 首次使用时绑定当时的新 Session 默认 |\n| Chat 空闲、当前绑定等于默认 | 模型选择器旁显示“当前 Session：工作号 A”与“也是新 Session 默认” | 点击 chip 打开账号选择浮层；Tab/Enter/Escape 可操作 | 选择器说明“只影响当前 Session，不修改新 Session 默认” |\n| Chat 空闲、当前绑定不同于默认 | 显示当前账号与“与默认账号不同” | 选择可用账号后点击“用于当前 Session” | 成功提示下一次主推理使用新账号；默认账号不变 |\n| 账号选择浮层 | 列表展示当前 Session、新 Session 默认、可用/额度耗尽/额度未知/需重新登录徽标 | 可选中可用账号；耗尽/需重登项禁用 | 主动作禁止使用含糊的 `Activate` 文案 |\n| 账号列表加载中 / 加载失败 | 浮层内 loading 文案或错误提示与“重试” | 等待或重试；Escape 可关闭 | 不修改原绑定；不泄露 token、路径、opaque id |\n| 正在 streaming / compacting | 账号 chip 保留可见但 disabled；上方提示“等待本轮结束或先停止后再切换” | 用户先等待或点击 Stop | 不在同一 provider request 中途换 token |\n| 自动切号成功 | Chat 输入区上方 success notice：“Grok 额度耗尽，已为当前 Session 切换账号并重试” | 继续聊天或打开账号入口查看当前绑定 | 只切换触发错误的 Session；每 turn 最多 1 次切换 / 1 次重试 |\n| 无其他可用账号 | error notice：“没有可用的 Grok 账号” | 检查额度、重新登录或手动选择账号 | 不因普通 429、网络、timeout、5xx 触发自动切号 |\n| 绑定账号需重新登录 | error notice：“当前账号需要重新登录” | 重新登录该账号，或空闲时显式切换 | fail-closed，不静默借用 Active 凭证 |\n| 自动切号关闭 / 预算耗尽 | warning notice，说明自动切号关闭或重试次数已用尽 | 手动切换或重试 | 不留下伪成功消息，不级联切换 |\n| Models 账号管理 | `Active` 改为“新 Session 默认”；列表展示有界 Session 引用计数 | 点击“设为新 Session 默认”或管理账号 | 已有 Session 不追随 Active 变化 |\n| 删除仍被引用账号 | Modal 显示 `409 · Session 引用阻断` 与有界引用数 | 关闭，先查看/恢复相关 Session 并切换账号 | 不再承诺自动回退 Active；不静默制造悬空绑定 |\n| Settings → Grok CLI | 默认关闭的“额度耗尽时自动切换当前 Session 账号”开关 | 切换并点击保存 | 说明明确额度 allowlist、单次重试、普通 transient 错误不切号 |\n| 窄屏 / 键盘 | `≤640px` 浮层变底部 sheet；焦点环和键盘帮助可见 | Tab/Shift+Tab 遍历，Enter 确认，Escape 关闭 | 关闭后焦点恢复到账号 chip；支持 reduced motion |\n\n## 实现备注与验收清单\n\n- Chat 入口建议复用现有 `ModelSelect` / compact control 视觉语言，新增独立 `GrokSessionAccountSelect`；账号状态编排留在 session hook。\n- Models 只负责 OAuth 账号管理和“设为新 Session 默认”，不把当前 Session 切换塞入全局 Activate API。\n- Settings 新增 Grok CLI 分区，开关默认 `false`；保存状态、loading、错误和 disabled 文案应与现有 `ToggleField` / `AppPrompt` 一致。\n- 所有反馈均使用 display-safe 文案；不显示 token、credential 路径、完整 opaque storage id 或原始 billing body。\n- Vision / Imagine 限制必须保持原型中的谨慎表述，不能暗示所有 Grok 辅助请求都已使用 Session-bound token。\n\n## 审批请求\n\n请主会话 / 用户审阅 [HTML 原型](grok-session-account-switch-prototype.html)，重点确认：\n\n1. Chat 账号 chip 放在模型选择器旁、并用“用于当前 Session”与“设为新 Session 默认”区分两类动作。\n2. streaming/compacting 时禁用切换并提示先等待或停止；自动切号只修改触发错误的 Session。\n3. 默认关闭自动切号、每 turn 最多一次切号和一次重试、普通 429/网络/5xx 不触发。\n4. Models 删除引用账号采用 `409` 阻断，不自动回退 Active；Models 的 Active 文案改为“新 Session 默认”。\n5. 是否接受主推理 Session 级绑定、Vision/Imagine 仍使用全局 Active token 的已知限制。\n\n**请明确回复“批准原型”或提出修改意见。获得批准前不得进入实现阶段。**\n\n## 审批状态\n\n- HTML 原型：**已交付**（[`grok-session-account-switch-prototype.html`](grok-session-account-switch-prototype.html)）\n- UI 设计员交付：**已完成**\n- 用户审批：**待用户审阅**\n- 实现许可：**禁止进入实现**",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-14T05:53:49.517Z",
+            "toolCallId": "call_8RXwEFfUjxtFGXqDt85QpZE8|fc_00c7ce8f3dddba2d016a55ceea60908199893e70ef3091ed05",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"## 派发状态\\n\\n当前 architect delegated member 环境没有暴露 `ypi_studio_subagent` 或其他 Studio 调度工具，无法安全启动 `ui-designer` run；不得用架构师自制原型冒充 UI 设计员交付。请主会话派发 `ui-designer`，使用下述任务说明。\",\n      \"newText\": \"## 派发状态\\n\\n已由主会话委托 `ui-designer` 完成本次 UI 原型设计；HTML 原型与交互状态说明已交付。用户审批仍未完成，审批前不得进入实现阶段。\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T05:53:49.523Z",
+            "toolCallId": "call_8RXwEFfUjxtFGXqDt85QpZE8|fc_00c7ce8f3dddba2d016a55ceea60908199893e70ef3091ed05",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T05:54:01.100Z",
+            "text": "已完成 UI 原型交付。\n\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\n  - 覆盖 Chat、Models、Settings\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\n- 更新：同目录 `ui.md`\n  - 添加原型链接\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\n\n验证：\n\n- `node --check /tmp/grok-session-prototype.js` 通过\n- 未运行 lint/typecheck：未修改生产代码\n\n待主会话/用户决定：\n\n1. 默认关闭自动切号\n2. streaming 时禁用账号切换\n3. Studio child 仅自身切换\n4. 删除引用账号采用 409 阻断\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\n\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。",
+            "model": "cpa/gemini-3.5-flash-low",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T05:54:01.106Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "Configured Studio child model cpa/gemini-3.5-flash-low was not found; using Pi default model."
+        ],
+        "outputChars": 529,
+        "tokens": 499,
+        "tokenSource": "usage",
+        "tps": 86.92,
+        "firstTokenAt": "2026-07-14T05:53:55.181Z",
+        "lastTokenAt": "2026-07-14T05:54:00.922Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-ad47e05288b3f0f37e663e48",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/ui-designer-ad47e05288b3f0f37e663e48.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T05:47:21.839Z",
+        "finishedAt": "2026-07-14T05:54:01.108Z",
+        "updatedAt": "2026-07-14T05:54:01.108Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 263624,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f2a-6586-7c94-8b2c-5146f421168f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T05-47-21-862Z_019f5f2a-6586-7c94-8b2c-5146f421168f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-bf330a01eb535e010a9c2f98",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T06:12:54.609Z",
+      "finishedAt": "2026-07-14T06:24:38.571Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f41-c8e6-722a-b023-b8de407a5abe",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T06-12-54-631Z_019f5f41-c8e6-722a-b023-b8de407a5abe.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f41-c8e6-722a-b023-b8de407a5abe",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成规划返工，未修改生产代码。\n\n### 更新产物\n\n任务目录 `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/`：\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `implement.md`（6 个子任务的新 Implementation Plan）\n- `checks.md`\n- `plan-review.md`\n- `ui.md`\n- `handoff.md`\n- `summary.md`\n- `review.md`\n\n旧原型已保留为：\n\n- `grok-session-account-switch-prototype.superseded.html`\n\n它不得再用于审批或实现。\n\n### 核心修订\n\n- Grok 改为与 ChatGPT 一致的**全局 Active** 语义。\n- Models `Activate` 影响所有普通 live/new Grok Session 的后续请求；in-flight 请求不变。\n- 撤销 Chat Session 账号 selector、Session API、header CAS、fork/child 快照及引用删除保护。\n- 规划抽取共享 OAuth failover engine；Grok 仅适配错误识别、monthly/weekly quota、token force-refresh 和动态 provider refresh。\n- 历史 `grokAccountStorageId` 保留为 deprecated ignored metadata，不迁移。\n\n### 验证\n\n- Implementation Plan JSON 解析通过：6 个子任务，依赖合法。\n- 规划产物非空、无 TBD。\n- artifact 相对链接检查通过。\n- 未运行 lint/typecheck/runtime tests，因为没有生产代码改动。\n\n### 主会话待办\n\n1. 派发 UI 设计员提交 `grok-global-account-failover-prototype.html` 并取得用户批准。\n2. 确认：\n   - Studio child 保持 GPT 当前边界；\n   - `GROK_CLI_OAUTH_TOKEN` 存在时禁用 managed failover；\n   - 批准抽取共享 OAuth core。\n3. 保存 `implement.md` 中的 implementationPlan。\n4. 审批前不要进入 implementing。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T06:12:54.609Z",
+        "updatedAt": "2026-07-14T06:24:38.571Z",
+        "eventCount": 7403,
+        "lastTextPreview": "已完成规划返工，未修改生产代码。\n\n### 更新产物\n\n任务目录 `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/`：\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `implement.md`（6 个子任务的新 Implementation Plan）\n- `checks.md`\n- `plan-review.md`\n- `ui.md`\n- `handoff.md`\n- `summary.md`\n- `review.md`\n\n旧原型已保留为：\n\n- `grok-session-account-switch-prototype.superseded.html`\n\n它不得再用于审批或实现。\n\n### 核心修订\n\n- Grok 改为与 ChatGPT 一致的**全局 Active** 语义。\n- Models `Activate` 影响所有普通 live/new Grok Session 的后续请求；in-flight 请求不变。\n- 撤销 Chat Session 账号 selector、Session API、header CAS、fork/child 快照及引用删除保护。\n- 规划抽取共享 OAuth failover engine；Grok 仅适配错误识别、monthly/weekly quota、token force-refresh 和动态 provider refresh。\n- 历史 `grokAccountStorageId` 保留为 deprecated ignored metadata，不迁移。\n\n### 验证\n\n- Implementation Plan JSON 解析通过：6 个子任务，依赖合法。\n- 规划产物非空、无 TBD。\n- artifact 相对链接检查通过。\n- 未运行 lint/typecheck/runtime tests，因为没有生产代码改动。\n\n### 主会话待办\n\n1. 派发 UI 设计员提交 `grok-global-account-failover-prototype.html` 并取得用户批准。\n2. 确认：\n   - Studio child 保持 GPT 当前边界；\n   - `GROK_CLI_OAUTH_TOKEN` 存在时禁用 managed failover；\n   - 批准抽取共享 OAuth core。\n3. 保存 `implement.md` 中的 implementationPlan。\n4. 审批前不要进入 implementing。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T06:23:52.172Z",
+            "toolCallId": "call_nn2US5MCUB3L6Fov84lPs9Og|fc_071188df33a12fbe016a55d5f8266481998f72939af601a4d9",
+            "toolName": "bash",
+            "text": "plan ok: 6 subtasks",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-14T06:24:19.412Z",
+            "toolCallId": "call_BqxwZ7TpnAaIXn3EtiGQi1xf|fc_071188df33a12fbe016a55d6126f6c819996eef8043298ee6a",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"grok-session-account-switch-prototype|grok-global-account\\\" '.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/task.json' '.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/events.jsonl' | head -100\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T06:24:19.442Z",
+            "toolCallId": "call_BqxwZ7TpnAaIXn3EtiGQi1xf|fc_071188df33a12fbe016a55d6126f6c819996eef8043298ee6a",
+            "toolName": "bash",
+            "text": ".ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/task.json:208:      \"summary\": \"已完成 UI 原型交付。\\n\\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\\n  - 覆盖 Chat、Models、Settings\\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\\n- 更新：同目录 `ui.md`\\n  - 添加原型链接\\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\\n\\n验证：\\n\\n- `node --check /tmp/grok-session-prototype.js` 通过\\n- 未运行 lint/typecheck：未修改生产代码\\n\\n待主会话/用户决定：\\n\\n1. 默认关闭自动切号\\n2. streaming 时禁用账号切换\\n3. Studio child 仅自身切换\\n4. 删除引用账号采用 409 阻断\\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\\n\\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。\",\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/task.json:262:        \"lastTextPreview\": \"已完成 UI 原型交付。\\n\\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\\n  - 覆盖 Chat、Models、Settings\\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\\n- 更新：同目录 `ui.md`\\n  - 添加原型链接\\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\\n\\n验证：\\n\\n- `node --check /tmp/grok-session-prototype.js` 通过\\n- 未运行 lint/typecheck：未修改生产代码\\n\\n待主会话/用户决定：\\n\\n1. 默认关闭自动切号\\n2. streaming 时禁用账号切换\\n3. Studio child 仅自身切换\\n4. 删除引用账号采用 409 阻断\\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\\n\\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。\",\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/task.json:269:            \"text\": \"# UI：Grok 当前 Session 账号切换与自动切号反馈\\n\\n## 门禁判断\\n\\n**触发 UI 原型门禁。** 本任务改变 Chat 输入区账号信息、账号切换交互、Models 中 Active 文案、Settings 自动切号开关和 failover 反馈。必须由 UI 设计员产出 HTML 原型并经用户审批后才能实现。\\n\\n## 派发状态\\n\\n当前 architect delegated member 环境没有暴露 `ypi_studio_subagent` 或其他 Studio 调度工具，无法安全启动 `ui-designer` run；不得用架构师自制原型冒充 UI 设计员交付。请主会话派发 `ui-designer`，使用下述任务说明。\\n\\n## 给 UI 设计员的任务说明\\n\\n### 目标\\n\\n基于现有 `components/ChatInput.tsx`、`components/ModelsConfig.tsx`、`components/SettingsConfig.tsx` 与 `app/globals.css`，设计 Grok 当前 Session 账号可见/切换、自动 failover 反馈及设置入口。不要引入新视觉体系。\\n\\n### 必须交付\\n\\n- 自包含 HTML 原型文件：\\n  - [打开 Grok Session 账号切换原型](grok-session-account-switch-prototype.html)\\n- `ui.md` 中补充原型链接、交互状态表和用户审批请求。\\n- 纯 Markdown 不满足门禁。\\n\\n### 本次 UI 设计交付\\n\\n原型已保存为 [`grok-session-account-switch-prototype.html`](grok-session-account-switch-prototype.html)。它使用现有 `--bg` / `--bg-panel` / `--border` / `--text-*` / `--accent` 变量语言，自包含 CSS 与 JavaScript，不依赖生产代码或外部资源。\\n\\n原型顶部提供可操作的页面与状态仿真：\\n\\n- `Chat`：新 Session、空闲、账号选择浮层、生成中禁用、加载中、加载失败、自动切号成功、无可用账号、需重新登录、重试预算耗尽。\\n- `Models`：Grok 账号列表、额度安全摘要、Session 引用计数、“设为新 Session 默认”、引用账号删除 `409` 阻断。\\n- `Settings`：默认关闭的 Grok 自动切号开关、保存反馈、策略边界和 Vision/Imagine 已知限制。\\n- 深浅色主题、桌面/窄屏视口切换；账号浮层在 `≤640px` 变为底部 sheet。\\n\\n### 原型至少覆盖\\n\\n1. **Chat 空闲态 / Grok 模型**\\n   - 模型选择器旁的账号 chip/入口。\\n   - 当前 Session 账号名。\\n   - “也是新 Session 默认”或“与默认不同”的次要状态。\\n2. **账号选择浮层**\\n   - 保存账号列表、当前 Session 标记、Default 标记、额度可用/耗尽/未知/需重登状态。\\n   - 主动作使用“用于当前 Session”，不要使用容易混淆的“Activate”。\\n   - 明确说明不会修改新 Session 默认。\\n3. **正在生成态**\\n   - 账号入口不可切换，并提示“等待本轮结束或先停止”。\\n   - 不能让用户误以为点击后会改变正在进行的请求。\\n4. **自动切号反馈**\\n   - 成功并重试。\\n   - 无其他可用账号。\\n   - 账号需重新登录。\\n   - 自动切号关闭/重试预算耗尽。\\n   - 文案不得显示 opaque account id、token 或路径。\\n5. **Models → Grok 账号管理**\\n   - “设为新 Session 默认”替换含糊的 Activate 语义。\\n   - 展示当前被多少 Session 引用（有界计数即可）。\\n   - 删除有引用账号时的 409 阻断状态；不要再写“自动使用 Active 凭证”。\\n6. **Settings → Grok CLI**\\n   - 默认关闭的“额度耗尽时自动切换当前 Session 账号”开关。\\n   - 策略说明：明确额度错误、最多重试一次、不改变新 Session 默认、普通 429/网络/5xx 不切号。\\n7. **窄屏与键盘状态**\\n   - `≤640px` 浮层/底部 sheet。\\n   - Tab、Escape、焦点恢复、loading/disabled/error。\\n\\n## 推荐信息架构\\n\\n- Chat 入口应贴近模型选择器，因为账号只对 `grok-cli` 模型有意义。\\n- Models 保留账号管理和“新 Session 默认”操作，不承担当前 Session 切换。\\n- Settings 承担自动切号总开关。\\n- 账号 selector 与现有 `ModelSelect` / `SelectDropdown` / App Prompt 视觉语言保持一致，可独立组件化为 `GrokSessionAccountSelect`。\\n\\n## 文案建议\\n\\n- `当前 Session：工作号 A`\\n- `新 Session 默认`\\n- `与默认账号不同`\\n- `用于当前 Session`\\n- `设为新 Session 默认`\\n- `本轮生成中，等待结束或停止后切换账号`\\n- `Grok 额度耗尽，已为当前 Session 切换账号并重试`\\n- `没有可用的 Grok 账号，请检查额度或重新登录`\\n\\n## 已知产品限制必须在设计中处理\\n\\n`pi-grok-cli@0.4.1` 的 Vision/Imagine 辅助请求仍读取全局 Active token，不经过 Session header hook。若本期接受主推理限定，UI 帮助文案需避免承诺“所有 Grok 工具请求都已切换”；若不接受，应先扩大技术范围并等待上游能力。\\n\\n## 交互状态\\n\\n| 场景 | 展示 | 用户操作 | 反馈 / 约束 |\\n| --- | --- | --- | --- |\\n| 新 Session、尚未发送 Grok | 账号入口显示“将使用默认账号：工作号 A”与“尚未发送消息 · 首次使用时绑定” | 可打开账号入口查看说明；本期不预选非默认账号 | 首次使用时绑定当时的新 Session 默认 |\\n| Chat 空闲、当前绑定等于默认 | 模型选择器旁显示“当前 Session：工作号 A”与“也是新 Session 默认” | 点击 chip 打开账号选择浮层；Tab/Enter/Escape 可操作 | 选择器说明“只影响当前 Session，不修改新 Session 默认” |\\n| Chat 空闲、当前绑定不同于默认 | 显示当前账号与“与默认账号不同” | 选择可用账号后点击“用于当前 Session” | 成功提示下一次主推理使用新账号；默认账号不变 |\\n| 账号选择浮层 | 列表展示当前 Session、新 Session 默认、可用/额度耗尽/额度未知/需重新登录徽标 | 可选中可用账号；耗尽/需重登项禁用 | 主动作禁止使用含糊的 `Activate` 文案 |\\n| 账号列表加载中 / 加载失败 | 浮层内 loading 文案或错误提示与“重试” | 等待或重试；Escape 可关闭 | 不修改原绑定；不泄露 token、路径、opaque id |\\n| 正在 streaming / compacting | 账号 chip 保留可见但 disabled；上方提示“等待本轮结束或先停止后再切换” | 用户先等待或点击 Stop | 不在同一 provider request 中途换 token |\\n| 自动切号成功 | Chat 输入区上方 success notice：“Grok 额度耗尽，已为当前 Session 切换账号并重试” | 继续聊天或打开账号入口查看当前绑定 | 只切换触发错误的 Session；每 turn 最多 1 次切换 / 1 次重试 |\\n| 无其他可用账号 | error notice：“没有可用的 Grok 账号” | 检查额度、重新登录或手动选择账号 | 不因普通 429、网络、timeout、5xx 触发自动切号 |\\n| 绑定账号需重新登录 | error notice：“当前账号需要重新登录” | 重新登录该账号，或空闲时显式切换 | fail-closed，不静默借用 Active 凭证 |\\n| 自动切号关闭 / 预算耗尽 | warning notice，说明自动切号关闭或重试次数已用尽 | 手动切换或重试 | 不留下伪成功消息，不级联切换 |\\n| Models 账号管理 | `Active` 改为“新 Session 默认”；列表展示有界 Session 引用计数 | 点击“设为新 Session 默认”或管理账号 | 已有 Session 不追随 Active 变化 |\\n| 删除仍被引用账号 | Modal 显示 `409 · Session 引用阻断` 与有界引用数 | 关闭，先查看/恢复相关 Session 并切换账号 | 不再承诺自动回退 Active；不静默制造悬空绑定 |\\n| Settings → Grok CLI | 默认关闭的“额度耗尽时自动切换当前 Session 账号”开关 | 切换并点击保存 | 说明明确额度 allowlist、单次重试、普通 transient 错误不切号 |\\n| 窄屏 / 键盘 | `≤640px` 浮层变底部 sheet；焦点环和键盘帮助可见 | Tab/Shift+Tab 遍历，Enter 确认，Escape 关闭 | 关闭后焦点恢复到账号 chip；支持 reduced motion |\\n\\n## 实现备注与验收清单\\n\\n- Chat 入口建议复用现有 `ModelSelect` / compact control 视觉语言，新增独立 `GrokSessionAccountSelect`；账号状态编排留在 session hook。\\n- Models 只负责 OAuth 账号管理和“设为新 Session 默认”，不把当前 Session 切换塞入全局 Activate API。\\n- Settings 新增 Grok CLI 分区，开关默认 `false`；保存状态、loading、错误和 disabled 文案应与现有 `ToggleField` / `AppPrompt` 一致。\\n- 所有反馈均使用 display-safe 文案；不显示 token、credential 路径、完整 opaque storage id 或原始 billing body。\\n- Vision / Imagine 限制必须保持原型中的谨慎表述，不能暗示所有 Grok 辅助请求都已使用 Session-bound token。\\n\\n## 审批请求\\n\\n请主会话 / 用户审阅 [HTML 原型](grok-session-account-switch-prototype.html)，重点确认：\\n\\n1. Chat 账号 chip 放在模型选择器旁、并用“用于当前 Session”与“设为新 Session 默认”区分两类动作。\\n2. streaming/compacting 时禁用切换并提示先等待或停止；自动切号只修改触发错误的 Session。\\n3. 默认关闭自动切号、每 turn 最多一次切号和一次重试、普通 429/网络/5xx 不触发。\\n4. Models 删除引用账号采用 `409` 阻断，不自动回退 Active；Models 的 Active 文案改为“新 Session 默认”。\\n5. 是否接受主推理 Session 级绑定、Vision/Imagine 仍使用全局 Active token 的已知限制。\\n\\n**请明确回复“批准原型”或提出修改意见。获得批准前不得进入实现阶段。**\\n\\n## 审批状态\\n\\n- HTML 原型：**已交付**（[`grok-session-account-switch-prototype.html`](grok-session-account-switch-prototype.html)）\\n- UI 设计员交付：**已完成**\\n- 用户审批：**待用户审阅**\\n- 实现许可：**禁止进入实现**\",\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/task.json:293:            \"text\": \"已完成 UI 原型交付。\\n\\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\\n  - 覆盖 Chat、Models、Settings\\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\\n- 更新：同目录 `ui.md`\\n  - 添加原型链接\\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\\n\\n验证：\\n\\n- `node --check /tmp/grok-session-prototype.js` 通过\\n- 未运行 lint/typecheck：未修改生产代码\\n\\n待主会话/用户决定：\\n\\n1. 默认关闭自动切号\\n2. streaming 时禁用账号切换\\n3. Studio child 仅自身切换\\n4. 删除引用账号采用 409 阻断\\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\\n\\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。\",\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/events.jsonl:5:{\"type\":\"subagent\",\"at\":\"2026-07-14T05:54:01.125Z\",\"taskId\":\"20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换\",\"member\":\"ui-designer\",\"message\":\"已完成 UI 原型交付。\\n\\n- 新增：`.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-session-account-switch-prototype.html`\\n  - 覆盖 Chat、Models、Settings\\n  - 支持账号选择、streaming 禁用、failover 成功/失败、409 删除阻断、窄屏 sheet、主题与键盘交互仿真\\n- 更新：同目录 `ui.md`\\n  - 添加原型链接\\n  - 补充完整交互状态表、实现备注、UI 验收清单和审批请求\\n\\n验证：\\n\\n- `node --check /tmp/grok-session-prototype.js` 通过\\n- 未运行 lint/typecheck：未修改生产代码\\n\\n待主会话/用户决定：\\n\\n1. 默认关闭自动切号\\n2. streaming 时禁用账号切换\\n3. Studio child 仅自身切换\\n4. 删除引用账号采用 409 阻断\\n5. 接受 Vision/Imagine 仍使用全局 Active token 的限制\\n\\n当前仍需用户批准 HTML 原型，批准前不得进入实现阶段。\",\"data\":{\"runId\":\"ui-designer-ad47e05288b3f0f37e663e48\",\"status\":\"succeeded\",\"transcript\":{\"schemaVersion\":1,\"format\":\"ypi-studio-subagent-transcript\",\"runId\":\"ui-designer-ad47e05288b3f0f37e663e48\",\"taskId\":\"20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换\",\"member\":\"ui-designer\",\"pathLabel\":\".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/ui-designer-ad47e05288b3f0f37e663e48.jsonl\",\"status\":\"succeeded\",\"startedAt\":\"2026-07-14T05:47:21.839Z\",\"updatedAt\":\"2026-07-14T05:54:01.108Z\",\"itemCount\":57,\"messageCount\":1,\"toolCallCount\":26,\"stderrBytes\":0,\"bytes\":263624,\"truncated\":true,\"truncation\":{\"bytesLimit\":5242880,\"itemBytesLimit\":16384,\"itemTruncated\":true},\"runner\":\"sdk\",\"childSessionId\":\"019f5f2a-6586-7c94-8b2c-5146f421168f\",\"childSessionFile\":\"/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T05-47-21-862Z_019f5f2a-6586-7c94-8b2c-5146f421168f.jsonl\",\"finishedAt\":\"2026-07-14T05:54:01.108Z\"}}}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T06:24:38.542Z",
+            "text": "已完成规划返工，未修改生产代码。\n\n### 更新产物\n\n任务目录 `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/`：\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `implement.md`（6 个子任务的新 Implementation Plan）\n- `checks.md`\n- `plan-review.md`\n- `ui.md`\n- `handoff.md`\n- `summary.md`\n- `review.md`\n\n旧原型已保留为：\n\n- `grok-session-account-switch-prototype.superseded.html`\n\n它不得再用于审批或实现。\n\n### 核心修订\n\n- Grok 改为与 ChatGPT 一致的**全局 Active** 语义。\n- Models `Activate` 影响所有普通 live/new Grok Session 的后续请求；in-flight 请求不变。\n- 撤销 Chat Session 账号 selector、Session API、header CAS、fork/child 快照及引用删除保护。\n- 规划抽取共享 OAuth failover engine；Grok 仅适配错误识别、monthly/weekly quota、token force-refresh 和动态 provider refresh。\n- 历史 `grokAccountStorageId` 保留为 deprecated ignored metadata，不迁移。\n\n### 验证\n\n- Implementation Plan JSON 解析通过：6 个子任务，依赖合法。\n- 规划产物非空、无 TBD。\n- artifact 相对链接检查通过。\n- 未运行 lint/typecheck/runtime tests，因为没有生产代码改动。\n\n### 主会话待办\n\n1. 派发 UI 设计员提交 `grok-global-account-failover-prototype.html` 并取得用户批准。\n2. 确认：\n   - Studio child 保持 GPT 当前边界；\n   - `GROK_CLI_OAUTH_TOKEN` 存在时禁用 managed failover；\n   - 批准抽取共享 OAuth core。\n3. 保存 `implement.md` 中的 implementationPlan。\n4. 审批前不要进入 implementing。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T06:24:38.547Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1127,
+        "tokens": 895,
+        "tokenSource": "usage",
+        "tps": 117.21,
+        "firstTokenAt": "2026-07-14T06:24:30.573Z",
+        "lastTokenAt": "2026-07-14T06:24:38.209Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-bf330a01eb535e010a9c2f98",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/architect-bf330a01eb535e010a9c2f98.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T06:12:54.609Z",
+        "finishedAt": "2026-07-14T06:24:38.549Z",
+        "updatedAt": "2026-07-14T06:24:38.549Z",
+        "itemCount": 229,
+        "messageCount": 1,
+        "toolCallCount": 112,
+        "stderrBytes": 0,
+        "bytes": 931724,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f41-c8e6-722a-b023-b8de407a5abe",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T06-12-54-631Z_019f5f41-c8e6-722a-b023-b8de407a5abe.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-41ff0f7d543f121c5a9c77c6",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T06:24:49.945Z",
+      "finishedAt": "2026-07-14T06:29:12.100Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f4c-b33a-7c69-8776-c333e3527b9e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T06-24-49-978Z_019f5f4c-b33a-7c69-8776-c333e3527b9e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f4c-b33a-7c69-8776-c333e3527b9e",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Handoff\n\n已产出：\n\n- `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html`\n- `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md`\n\n内容覆盖 Models 全局 Active、Settings 默认关闭自动切号、Chat retry banner、in-flight、无候选、需重登、重试耗尽、env bypass、窄屏和键盘状态。未修改生产代码。\n\n验证：\n\n- HTML 解析通过\n- JavaScript `node --check` 通过\n- 原型需求断言通过\n\n剩余风险/待决策：\n\n- 尚未进行浏览器截图验收。\n- 需主会话/用户批准新版 HTML 原型。\n- 需确认 Studio child 边界、env bypass 策略及共享 OAuth core 重构。",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T06:24:49.945Z",
+        "updatedAt": "2026-07-14T06:29:12.100Z",
+        "eventCount": 10903,
+        "lastTextPreview": "## Handoff\n\n已产出：\n\n- `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html`\n- `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md`\n\n内容覆盖 Models 全局 Active、Settings 默认关闭自动切号、Chat retry banner、in-flight、无候选、需重登、重试耗尽、env bypass、窄屏和键盘状态。未修改生产代码。\n\n验证：\n\n- HTML 解析通过\n- JavaScript `node --check` 通过\n- 原型需求断言通过\n\n剩余风险/待决策：\n\n- 尚未进行浏览器截图验收。\n- 需主会话/用户批准新版 HTML 原型。\n- 需确认 Studio child 边界、env bypass 策略及共享 OAuth core 重构。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T06:28:46.076Z",
+            "toolCallId": "call_Noj1xNlCTUHpqjIhnJLkBoNK|fc_04bd935006598ec0016a55d71de1008198a3c530a17c48b4ee",
+            "toolName": "bash",
+            "text": "HTML parsed: .ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html (26752 bytes)\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:141:    <div class=\"prototype-note\"><strong>设计门禁：</strong>新版全局 Active 语义。Models 的 Activate 不绑定当前 Session；它更新 Grok 全局 Active，所有普通运行中/新 Session 的<strong>后续</strong>请求使用新账号。已发出的请求不会中途替换 token。Chat 仅展示 retry/failover 反馈，不提供账号 selector。</div>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:145:        <div class=\"control-group\"><label for=\"scenario\">状态场景</label><select id=\"scenario\"><option value=\"default\">默认 / Active A</option><option value=\"activating\">手动 Activate B 中</option><option value=\"switched\">自动切号成功 A → B</option><option value=\"no-candidate\">无可用账号</option><option value=\"reauth\">候选需重新登录</option><option value=\"exhausted\">本 turn 重试耗尽</option><option value=\"bypass\">环境变量 bypass</option><option value=\"inflight\">请求进行中（in-flight）</option></select></div>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:159:              <article class=\"account-row\"><div class=\"account-main\"><div class=\"account-line\"><span class=\"account-name\">Grok 备用账号 C</span><span class=\"status warning\">需重新登录</span></div><div class=\"account-meta\">凭证不可用 · 不参与自动切号候选</div></div><div class=\"account-actions\"><button>重新登录</button><button class=\"danger\">删除</button></div></article>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:167:            <div class=\"toggle-row\"><div class=\"toggle-copy\"><strong>额度耗尽时自动切换可用账号</strong><p>默认关闭。仅在明确的额度/用量耗尽错误时触发全局 Active 切换并重试同一 turn 一次；普通 429、rate limit、网络错误、timeout、5xx、认证错误不会触发。</p></div><button class=\"switch\" role=\"switch\" aria-checked=\"false\" aria-label=\"额度耗尽时自动切换可用账号\" id=\"failover-toggle\"><span></span></button></div>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:168:            <div class=\"rules\"><div class=\"rule\"><b>全局 Active</b>影响所有普通 live/new Session 的后续请求。</div><div class=\"rule\"><b>每 turn 一次</b>最多 1 次切号与 1 次安全重试。</div><div class=\"rule\"><b>不替换 in-flight</b>已发出的请求继续使用原 token。</div></div>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:171:          <div class=\"state-banner warning\"><div class=\"state-icon\">!</div><div><strong>环境变量 bypass</strong><p><code>GROK_CLI_OAUTH_TOKEN</code> 存在时，Vision/Imagine 等路径优先使用固定 token；按批准策略，managed-account 自动轮换不可用。请移除 bypass 或在 Models 管理 OAuth 账号。</p></div></div>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:175:          <div class=\"card chat-shell\"><div class=\"chat-toolbar\"><span class=\"model-pill\">Grok CLI / grok-3-latest</span><span class=\"status info\"><i class=\"status-dot\"></i>全局 Active：Grok 主账号 A</span></div><div class=\"chat-messages\"><div class=\"bubble user\">继续检查这个改动，并告诉我风险。</div><div class=\"bubble assistant\">我正在读取工作区并准备下一步。</div></div><div id=\"chat-state\"></div><div class=\"chat-input\"><strong>输入消息</strong><br>这里没有“当前 Session 账号”selector；账号切换统一从 Models → Activate 完成。</div></div>\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:188:      activating: { models:['info','正在激活 Grok 备用账号 B…','按钮已禁用，完成后刷新账号与额度；当前 in-flight 请求仍使用 A。'], settings:null, chat:null },\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:189:      switched: { models:['success','已切换全局 Active：A → B','所有普通 live/new Session 的后续请求使用 B；当前 turn 将安全重试一次。'], settings:null, chat:['success','Grok 额度耗尽，已切换全局账号并重试…','这是全局 Active 反馈，不是当前 Session 独立绑定。'] },\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:190:      'no-candidate': { models:['warning','没有可用候选账号','请在 Models 检查额度或登录状态；不会声称正在重试。'], settings:null, chat:['danger','Grok 额度耗尽，但没有可用账号','请检查 Models 中的额度、凭证和重新登录状态。'] },\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:191:      reauth: { models:['danger','候选账号需要重新登录','该账号不参与自动切号；可在账号行点击“重新登录”。'], settings:null, chat:['danger','Grok 账号需要重新登录，未自动切号','请前往 Models → Grok CLI 重新登录。'] },\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:192:      exhausted: { models:['warning','本 turn 重试预算已耗尽','最多 1 次切号与 1 次重试；请重新发送消息或检查账号。'], settings:null, chat:['danger','Grok 重试次数已用尽','本 turn 不再继续切号；可重新发送消息。'] },\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:193:      bypass: { models:['warning','检测到环境变量 bypass','managed accounts 自动轮换不可用；固定 token 不显示、不参与账号列表。'], settings:['warning','GROK_CLI_OAUTH_TOKEN 已启用','managed-account 自动轮换不可用；请移除环境变量后再使用 OAuth 账号。'], chat:['warning','Grok 使用环境变量 token，未执行 managed-account 切号','固定 token 路径不参与全局 OAuth Active 轮换。'] },\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html:211:      const labels = {models:['Models','账号、额度与全局 Active'], settings:['Settings','Grok CLI 自动切号'], chat:['Chat','仅显示自动重试 / 切号反馈']};\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:11:> 旧的 Session selector 原型若存在，应标记为 `grok-session-account-switch-prototype.superseded.html`，仅作历史对照，不得作为审批或实现依据。本版没有复用其“当前 Session 账号”“新 Session 默认”“Session 引用迁移”等语义。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:19:- 明确 in-flight 边界：已经发出的请求继续使用原 token，不中途换号。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:20:- 让自动 failover 复用现有 Chat retry banner，不增加当前 Session 账号 selector。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:25:2. **自动切号设置**：Settings → Grok CLI → `额度耗尽时自动切换可用账号`，默认关闭；开启后只对明确额度耗尽生效，每 turn 最多一次切号/重试。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:26:3. **自动反馈**：Chat 只显示 `Grok 额度耗尽，已切换全局账号并重试…`、已被其他 Session 切换、无候选、需重登、重试耗尽或 bypass 状态；不出现账号选择器。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:30:- Models：provider 状态 → 全局 Active 语义 → 账号列表 → monthly/weekly quota → Activate / active / 重新登录 / 刷新额度。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:31:- Settings：默认关闭 toggle → 触发条件与排除项 → 全局作用域、单次预算、in-flight 规则 → env bypass 说明。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:41:- 无可用账号\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:42:- 候选需重新登录\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:43:- 本 turn 重试耗尽\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:44:- `GROK_CLI_OAUTH_TOKEN` 环境变量 bypass\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:45:- 请求进行中（in-flight）\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:54:| 手动切换中 | Activate 按钮禁用，状态提示切换中 | 可等待，不重复点击 | 当前 in-flight 请求仍使用 A；完成后刷新账号/额度 |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:55:| in-flight | 信息 banner | 继续等待或发送下一次请求 | 已发出的请求不换 token；下一次 provider call 使用新 Active |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:56:| 自动切号成功 | Chat retry banner | 不需要选择账号 | “已切换全局账号并重试”，同一 turn 只重试一次 |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:57:| 另一 Session 已先切号 | Chat retry banner | 不操作账号 selector | “其他会话已切换…使用当前 Active 重试”，不级联切 C |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:58:| 无可用账号 | warning/terminal banner | 前往 Models 检查额度/账号 | 不伪称正在重试，不显示敏感候选信息 |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:59:| 需重新登录 | danger 状态、账号行 `需重新登录` | 点击 `重新登录` | 该账号不参与候选；引导回 Models 完成登录 |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:60:| 重试耗尽 | terminal 状态 | 重新发送或检查账号 | 明确本 turn 不再继续切号 |\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:68:- 复用 `ModelsConfig` 现有 OAuth account row、Grok monthly/weekly quota card、`Activate / active` action 和刷新/重新登录反馈。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:72:- 文案必须使用“全局 Active”“所有普通运行中 Session 的后续请求”，不得使用“当前 Session 账号”“新 Session 默认账号”作为产品语义。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:73:- `GROK_CLI_OAUTH_TOKEN` bypass 说明只表达 managed-account failover 不可用，不显示 token 内容。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:81:2. Chat 是否确认不提供当前 Session selector，只展示自动重试/切号 banner；\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:82:3. 是否确认默认关闭、明确额度错误才触发、每 turn 最多一次切号/重试；\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:83:4. 是否确认 in-flight 请求不更换 token；\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:91:- [x] Models 有 `Activate / active`、global Active 文案、in-flight 文案。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:92:- [x] Chat 无当前 Session 账号 selector/chip。\n.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md:94:- [x] 自动成功、无候选、需重登、重试耗尽、env bypass 状态均有可见反馈。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-14T06:29:05.999Z",
+            "toolCallId": "call_96RT7ZE8SHbuFzpIY1f6Yq6R|fc_04bd935006598ec0016a55d72f632481988477cf6b58504b2e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\np=Path('.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html')\\ns=p.read_text()\\nrequired=['Activate','active','全局 Active','in-flight','GROK_CLI_OAUTH_TOKEN','无可用账号','需重新登录','重试次数已用尽','@media (max-width:640px)','role=\\\"switch\\\"','aria-live=\\\"polite\\\"']\\nmissing=[x for x in required if x not in s]\\nassert not missing, missing\\nprint('Prototype requirement assertions: PASS')\\nPY\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T06:29:06.043Z",
+            "toolCallId": "call_96RT7ZE8SHbuFzpIY1f6Yq6R|fc_04bd935006598ec0016a55d72f632481988477cf6b58504b2e",
+            "toolName": "bash",
+            "text": "Prototype requirement assertions: PASS",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T06:29:12.090Z",
+            "text": "## Handoff\n\n已产出：\n\n- `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/grok-global-account-failover-prototype.html`\n- `.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/ui.md`\n\n内容覆盖 Models 全局 Active、Settings 默认关闭自动切号、Chat retry banner、in-flight、无候选、需重登、重试耗尽、env bypass、窄屏和键盘状态。未修改生产代码。\n\n验证：\n\n- HTML 解析通过\n- JavaScript `node --check` 通过\n- 原型需求断言通过\n\n剩余风险/待决策：\n\n- 尚未进行浏览器截图验收。\n- 需主会话/用户批准新版 HTML 原型。\n- 需确认 Studio child 边界、env bypass 策略及共享 OAuth core 重构。",
+            "model": "cpa/gemini-3.5-flash-low",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T06:29:12.094Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "Configured Studio child model cpa/gemini-3.5-flash-low was not found; using Pi default model."
+        ],
+        "outputChars": 475,
+        "tokens": 219,
+        "tokenSource": "usage",
+        "tps": 56.87,
+        "firstTokenAt": "2026-07-14T06:29:08.061Z",
+        "lastTokenAt": "2026-07-14T06:29:11.912Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-41ff0f7d543f121c5a9c77c6",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/ui-designer-41ff0f7d543f121c5a9c77c6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T06:24:49.945Z",
+        "finishedAt": "2026-07-14T06:29:12.095Z",
+        "updatedAt": "2026-07-14T06:29:12.095Z",
+        "itemCount": 53,
+        "messageCount": 1,
+        "toolCallCount": 24,
+        "stderrBytes": 0,
+        "bytes": 173693,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f4c-b33a-7c69-8776-c333e3527b9e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T06-24-49-978Z_019f5f4c-b33a-7c69-8776-c333e3527b9e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-e28ed8b43c3c425dd7494073",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T07:05:39.167Z",
+      "finishedAt": "2026-07-14T07:14:28.663Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f72-1272-71a2-92ba-92b4cc88010a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-05-39-186Z_019f5f72-1272-71a2-92ba-92b4cc88010a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f72-1272-71a2-92ba-92b4cc88010a",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成规划修订，未修改生产代码，任务保持 `awaiting_approval`。\n\n### 已更新产物\n\n任务目录下：\n\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- 同步更新：`brief.md`、`ui.md`、`handoff.md`、`summary.md`\n\n### 核心结论\n\n- GPT 手动 Activate 仅设置全局 Active，不会锁定账号。\n- 命中现有 GPT detector 后，手动激活账号仍会自动轮换。\n- 默认每 turn 最多 1 次切号、1 次重试；具备进程锁、Active 双检和 live auth reload。\n- Grok 增加 provider-specific 限额/限流 classifier、quota 和 token 适配。\n- 共享重构必须通过 GPT contract/regression；无法证明零影响时采用 Grok 独立接入。\n\n### 验证\n\n- Implementation Plan JSON 可解析，6 个子任务依赖合法。\n- 任务内相对链接全部有效。\n- 状态仍为 `awaiting_approval`。\n- 任务目录外无源码修改。\n- 未运行 lint/typecheck/runtime tests，因为本轮仅修改规划产物。\n\n### 主会话待处理\n\n1. 让 UI 设计员修订现有 HTML 中“普通 rate limit 不触发”的冲突文案。\n2. 向用户展示 `plan-review.md` 及修订原型请求审批。\n3. 保存 `implement.md` 中的 implementationPlan；审批前不得实现。\n\n主要剩余风险是缺少脱敏 Grok 限流错误 fixture；不能以宽泛正则替代真实错误契约。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T07:05:39.167Z",
+        "updatedAt": "2026-07-14T07:14:28.663Z",
+        "eventCount": 2027,
+        "lastTextPreview": "已完成规划修订，未修改生产代码，任务保持 `awaiting_approval`。\n\n### 已更新产物\n\n任务目录下：\n\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- 同步更新：`brief.md`、`ui.md`、`handoff.md`、`summary.md`\n\n### 核心结论\n\n- GPT 手动 Activate 仅设置全局 Active，不会锁定账号。\n- 命中现有 GPT detector 后，手动激活账号仍会自动轮换。\n- 默认每 turn 最多 1 次切号、1 次重试；具备进程锁、Active 双检和 live auth reload。\n- Grok 增加 provider-specific 限额/限流 classifier、quota 和 token 适配。\n- 共享重构必须通过 GPT contract/regression；无法证明零影响时采用 Grok 独立接入。\n\n### 验证\n\n- Implementation Plan JSON 可解析，6 个子任务依赖合法。\n- 任务内相对链接全部有效。\n- 状态仍为 `awaiting_approval`。\n- 任务目录外无源码修改。\n- 未运行 lint/typecheck/runtime tests，因为本轮仅修改规划产物。\n\n### 主会话待处理\n\n1. 让 UI 设计员修订现有 HTML 中“普通 rate limit 不触发”的冲突文案。\n2. 向用户展示 `plan-review.md` 及修订原型请求审批。\n3. 保存 `implement.md` 中的 implementationPlan；审批前不得实现。\n\n主要剩余风险是缺少脱敏 Grok 限流错误 fixture；不能以宽泛正则替代真实错误契约。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:14:00.335Z",
+            "toolCallId": "call_fGcBKmnqYcKQxxRS0PglscXB|fc_0393595ff55b3175016a55e1b72b60819a8d7231dd3dc8cd61",
+            "toolName": "read",
+            "text": "const hasBindings = this._extensionUIContext ||\n            this._extensionCommandContextActions ||\n            this._extensionShutdownHandler ||\n            this._extensionErrorListener;\n        if (hasBindings) {\n            await options?.beforeSessionStart?.();\n            await this._extensionRunner.emit({ type: \"session_start\", reason: \"reload\" });\n            await this.extendResourcesFromExtensions(\"reload\");\n        }\n    }\n    // =========================================================================\n    // Auto-Retry\n    // =========================================================================\n    /**\n     * Check if an error is retryable (overloaded, rate limit, server errors).\n     * Context overflow errors are NOT retryable (handled by compaction instead).\n     */\n    _isRetryableError(message) {\n        // Context overflow is handled by compaction, not retry.\n        if (isContextOverflow(message, this.model?.contextWindow ?? 0))\n            return false;\n        return isRetryableAssistantError(message);\n    }\n    /**\n     * Prepare a retryable error for continuation with exponential backoff.\n     * @returns true if the caller should continue the agent, false otherwise\n     */\n    async _prepareRetry(message) {\n        const settings = this.settingsManager.getRetrySettings();\n        if (!settings.enabled) {\n            return false;\n        }\n        this._retryAttempt++;\n        if (this._retryAttempt > settings.maxRetries) {\n            // Preserve the completed attempt count so post-run handling can emit the final failure.\n            this._retryAttempt--;\n            return false;\n        }\n        const delayMs = settings.baseDelayMs * 2 ** (this._retryAttempt - 1);\n        this._emit({\n            type: \"auto_retry_start\",\n            attempt: this._retryAttempt,\n            maxAttempts: settings.maxRetries,\n            delayMs,\n            errorMessage: message.errorMessage || \"Unknown error\",\n        });\n        // Remove error message from agent state (keep in session for history)\n        const messages = this.agent.state.messages;\n        if (messages.length > 0 && messages[messages.length - 1].role === \"assistant\") {\n            this.agent.state.messages = messages.slice(0, -1);\n        }\n        // Wait with exponential backoff (abortable)\n        this._retryAbortController = new AbortController();\n        try {\n            await sleep(delayMs, this._retryAbortController.signal);\n        }\n        catch {\n            // Aborted during sleep - emit end event so UI can clean up\n            const attempt = this._retryAttempt;\n            this._retryAttempt = 0;\n            this._emit({\n                type: \"auto_retry_end\",\n                success: false,\n                attempt,\n                finalError: \"Retry cancelled\",\n            });\n            return false;\n        }\n        finally {\n            this._retryAbortController = undefined;\n        }\n        return true;\n    }\n    /**\n     * Cancel in-progress retry.\n\n[524 more lines in file. Use offset=2110 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-14T07:14:14.577Z",
+            "toolCallId": "call_dfkJVoY414feSJ0h7wStB9ck|fc_0393595ff55b3175016a55e1c12e54819a827b604f9b2ae9f8",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport json,re\\nroot=Path('.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换')\\nplan_text=(root/'implement.md').read_text()\\nplan=json.loads(re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```',plan_text,re.S).group(1))\\nids={s['id'] for s in plan['subtasks']}\\nassert all(set(s['dependsOn']) <= ids for s in plan['subtasks'])\\nfor name in ['plan-review.md','prd.md','ui.md','design.md','implement.md','checks.md']:\\n text=(root/name).read_text()\\n assert 'TBD' not in text\\n for href in re.findall(r'\\\\[[^\\\\]]+\\\\]\\\\(([^)]+)\\\\)',text):\\n  if href.startswith(('#','http://','https://')): continue\\n  assert (root/href.split('#',1)[0]).resolve().exists(), (name,href)\\nstatus=json.loads((root/'task.json').read_text())['status']\\nassert status=='awaiting_approval'\\nprint('PASS: artifacts meaningful; plan JSON/dependencies valid; links resolve; status awaiting_approval')\\nPY\\ngit status --short\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:14:14.731Z",
+            "toolCallId": "call_dfkJVoY414feSJ0h7wStB9ck|fc_0393595ff55b3175016a55e1c12e54819a827b604f9b2ae9f8",
+            "toolName": "bash",
+            "text": "PASS: artifacts meaningful; plan JSON/dependencies valid; links resolve; status awaiting_approval\n?? \".ypi/tasks/20260714-133704-\\345\\256\\214\\345\\226\\204-grok-cli-\\351\\231\\220\\351\\242\\235\\350\\207\\252\\345\\212\\250\\345\\210\\207\\345\\217\\267\\344\\270\\216\\350\\277\\220\\350\\241\\214\\344\\270\\255-session-\\350\\264\\246\\345\\217\\267\\345\\210\\207\\346\\215\\242/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T07:14:28.640Z",
+            "text": "已完成规划修订，未修改生产代码，任务保持 `awaiting_approval`。\n\n### 已更新产物\n\n任务目录下：\n\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- 同步更新：`brief.md`、`ui.md`、`handoff.md`、`summary.md`\n\n### 核心结论\n\n- GPT 手动 Activate 仅设置全局 Active，不会锁定账号。\n- 命中现有 GPT detector 后，手动激活账号仍会自动轮换。\n- 默认每 turn 最多 1 次切号、1 次重试；具备进程锁、Active 双检和 live auth reload。\n- Grok 增加 provider-specific 限额/限流 classifier、quota 和 token 适配。\n- 共享重构必须通过 GPT contract/regression；无法证明零影响时采用 Grok 独立接入。\n\n### 验证\n\n- Implementation Plan JSON 可解析，6 个子任务依赖合法。\n- 任务内相对链接全部有效。\n- 状态仍为 `awaiting_approval`。\n- 任务目录外无源码修改。\n- 未运行 lint/typecheck/runtime tests，因为本轮仅修改规划产物。\n\n### 主会话待处理\n\n1. 让 UI 设计员修订现有 HTML 中“普通 rate limit 不触发”的冲突文案。\n2. 向用户展示 `plan-review.md` 及修订原型请求审批。\n3. 保存 `implement.md` 中的 implementationPlan；审批前不得实现。\n\n主要剩余风险是缺少脱敏 Grok 限流错误 fixture；不能以宽泛正则替代真实错误契约。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T07:14:28.645Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 810,
+        "tokens": 475,
+        "tokenSource": "usage",
+        "tps": 63.78,
+        "firstTokenAt": "2026-07-14T07:14:21.088Z",
+        "lastTokenAt": "2026-07-14T07:14:28.535Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-e28ed8b43c3c425dd7494073",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/architect-e28ed8b43c3c425dd7494073.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T07:05:39.167Z",
+        "finishedAt": "2026-07-14T07:14:28.648Z",
+        "updatedAt": "2026-07-14T07:14:28.648Z",
+        "itemCount": 99,
+        "messageCount": 1,
+        "toolCallCount": 47,
+        "stderrBytes": 0,
+        "bytes": 334597,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f72-1272-71a2-92ba-92b4cc88010a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-05-39-186Z_019f5f72-1272-71a2-92ba-92b4cc88010a.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-25f5c04a70794523e71a92f6",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T07:14:38.913Z",
+      "finishedAt": "2026-07-14T07:17:20.926Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f7a-4ee6-7f07-9291-822fa5c9442d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-14-38-950Z_019f5f7a-4ee6-7f07-9291-822fa5c9442d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f7a-4ee6-7f07-9291-822fa5c9442d",
+        "model": "cpa/gemini-3.5-flash-low",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Handoff\n\n已完成：\n\n- 修改 `.ypi/tasks/.../grok-global-account-failover-prototype.html`\n  - 明确手动 Activate 不是锁定。\n  - 增加明确限额、明确限流、并发不级联状态。\n  - 保留模糊状态、网络/timeout/5xx/auth 等不触发。\n  - Chat 文案覆盖限额/限流。\n  - 无 Session selector。\n- 更新 `.ypi/tasks/.../ui.md`\n  - 链接最终 HTML。\n  - 列出完整状态演示与审批请求。\n\n验证：\n\n- Node 静态文本及 HTML 外壳校验通过。\n- 未运行 lint/typecheck；未修改生产代码。\n\n剩余风险/决策：\n\n- 需主会话进行浏览器视觉验收。\n- 需用户批准最终 HTML 及计划；批准前不得进入 UI 实现。",
+      "model": "cpa/gemini-3.5-flash-low",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "cpa/gemini-3.5-flash-low",
+          "arg": "cpa/gemini-3.5-flash-low",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T07:14:38.913Z",
+        "updatedAt": "2026-07-14T07:17:20.926Z",
+        "eventCount": 4596,
+        "lastTextPreview": "## Handoff\n\n已完成：\n\n- 修改 `.ypi/tasks/.../grok-global-account-failover-prototype.html`\n  - 明确手动 Activate 不是锁定。\n  - 增加明确限额、明确限流、并发不级联状态。\n  - 保留模糊状态、网络/timeout/5xx/auth 等不触发。\n  - Chat 文案覆盖限额/限流。\n  - 无 Session selector。\n- 更新 `.ypi/tasks/.../ui.md`\n  - 链接最终 HTML。\n  - 列出完整状态演示与审批请求。\n\n验证：\n\n- Node 静态文本及 HTML 外壳校验通过。\n- 未运行 lint/typecheck；未修改生产代码。\n\n剩余风险/决策：\n\n- 需主会话进行浏览器视觉验收。\n- 需用户批准最终 HTML 及计划；批准前不得进入 UI 实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:17:00.813Z",
+            "toolCallId": "call_ol7wSbcTaj5FkNYv7Wg2Vp0B|fc_086aee024d37f344016a55e26ccc84819aab48e390ccd62bcb",
+            "toolName": "bash",
+            "text": "113:    .rules { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }\n130:    @media (max-width:760px) { .stage { grid-template-columns:1fr; } .controls { position:static; display:grid; grid-template-columns:1fr 1fr; gap:12px; } .controls .key-help { grid-column:1/-1; } .control-group { margin:0; } .rules { grid-template-columns:repeat(2,1fr); } }\n131:    @media (max-width:640px) { .appbar { padding:0 12px; } .brand p { display:none; } .workspace { width:100%; margin:0 auto 28px; } .prototype-note { border-radius:0; border-left:0; border-right:0; margin:0; } .controls, .screen { border-radius:0; box-shadow:none; } .controls { padding:11px 12px; } .screen-head { padding:14px 13px 0; } .content { padding:13px; } .screen-title h2 { font-size:16px; } .account-row { grid-template-columns:1fr; } .account-actions { justify-content:flex-start; } .account-actions button { flex:1; min-width:84px; } .quota-grid, .rules { grid-template-columns:1fr; } .toggle-row { gap:10px; } .bubble { max-width:94%; } }\n141:    <div class=\"prototype-note\"><strong>设计门禁：</strong>新版全局 Active 语义。Models 的 Activate 只是设置当前全局 Active，不是锁定账号；所有普通运行中/新 Session 的<strong>后续</strong>请求使用新账号。手动 Active 的账号后续出现明确 Grok 限额或限流时，仍可自动轮换并重试。已发出的请求不会中途替换 token。Chat 仅展示 retry/failover 反馈，不提供账号 selector。</div>\n145:        <div class=\"control-group\"><label for=\"scenario\">状态场景</label><select id=\"scenario\"><option value=\"default\">默认 / Active A</option><option value=\"activating\">手动 Activate B 中</option><option value=\"switched\">自动切号成功 A → B</option><option value=\"manual-quota\">手动 Active B · 明确限额 B → C</option><option value=\"manual-rate\">手动 Active B · 明确限流 B → C</option><option value=\"other-session\">另一 Session 已先切号</option><option value=\"no-candidate\">无可用账号</option><option value=\"reauth\">候选需重新登录</option><option value=\"exhausted\">本 turn 重试耗尽</option><option value=\"bypass\">环境变量 bypass</option><option value=\"inflight\">请求进行中（in-flight）</option></select></div>\n154:            <div class=\"semantic-callout\"><strong>Active 是 Grok 全局当前账号，不是锁定</strong><span>切换后，所有普通运行中 Grok Session 的后续请求以及新 Session 都使用该账号。手动 Activate 的账号若返回明确限额或限流，开启自动切号后仍会轮换到可用账号并重试；已经发出的请求不会中途更换账号。</span></div>\n167:            <div class=\"toggle-row\"><div class=\"toggle-copy\"><strong>明确限额或限流时自动切换可用账号</strong><p>默认关闭。仅在 provider code/type 或已确认错误文案明确识别为 quota、usage、credits、monthly、weekly exhaustion，或 rate-limit / too-many-requests 时触发全局 Active 切换并重试同一 turn 一次。裸/模糊状态、网络错误、timeout、5xx、auth/reauth、context、content 或 model 错误不会触发。</p></div><button class=\"switch\" role=\"switch\" aria-checked=\"false\" aria-label=\"明确限额或限流时自动切换可用账号\" id=\"failover-toggle\"><span></span></button></div>\n168:            <div class=\"rules\"><div class=\"rule\"><b>全局 Active</b>影响所有普通 live/new Session 的后续请求。</div><div class=\"rule\"><b>每 turn 一次</b>最多 1 次切号与 1 次安全重试。</div><div class=\"rule\"><b>不替换 in-flight</b>已发出的请求继续使用原 token。</div><div class=\"rule\"><b>并发不级联</b>另一 Session 已先切换时复用当前 Active，不切第三账号。</div></div>\n175:          <div class=\"card chat-shell\"><div class=\"chat-toolbar\"><span class=\"model-pill\">Grok CLI / grok-3-latest</span><span class=\"status info\"><i class=\"status-dot\"></i>全局 Active：Grok 主账号 A</span></div><div class=\"chat-messages\"><div class=\"bubble user\">继续检查这个改动，并告诉我风险。</div><div class=\"bubble assistant\">我正在读取工作区并准备下一步。</div></div><div id=\"chat-state\"></div><div class=\"chat-input\"><strong>输入消息</strong><br>这里没有“当前 Session 账号”selector；账号切换统一从 Models → Activate 完成。</div></div>\n190:      'manual-quota': { models:['success','手动 Active B 触发明确限额，已切换 B → C','手动 Activate 不是锁定；明确限额命中后，所有普通 live/new Session 的后续请求使用 C，并只重试当前 turn 一次。'], settings:null, chat:['success','Grok 明确限额已触发，已从 B 切换到 C 并重试…','手动 Active 账号同样参与自动轮换；这是全局 Active 反馈。'] },\n191:      'manual-rate': { models:['success','手动 Active B 触发明确限流，已切换 B → C','手动 Activate 不是锁定；明确限流命中后，所有普通 live/new Session 的后续请求使用 C，并只重试当前 turn 一次。'], settings:null, chat:['success','Grok 明确限流已触发，已从 B 切换到 C 并重试…','手动 Active 账号同样参与自动轮换；这是全局 Active 反馈。'] },\n192:      'other-session': { models:['info','另一 Session 已先切换全局 Active：B → C','当前 Session 复用 C 并最多重试一次，不会继续级联切换第三个账号。'], settings:null, chat:['info','另一 Session 已完成切号，当前请求复用全局 Active C','不会再次切换账号；当前 turn 最多安全重试一次。'] },\n193:      'no-candidate': { models:['warning','没有可用候选账号','明确限额/限流已触发，但没有可用候选；请在 Models 检查额度或登录状态，不会声称正在重试。'], settings:null, chat:['danger','Grok 限额/限流已触发，但没有可用账号','请检查 Models 中的额度、凭证和重新登录状态。'] },",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:17:00.818Z",
+            "toolCallId": "call_omWfyW0WS1UVAax9rc0NQHeQ|fc_086aee024d37f344016a55e26ccc6c819a91774560a3b3e354",
+            "toolName": "read",
+            "text": "# UI：Grok 全局 Active 与明确限额/限流自动切号\n\n## 原型门禁状态\n\n本任务改变 Models/Settings/Chat 的用户可见语义，继续触发 UI HTML 原型门禁。最终修订、自包含原型为：\n\n- [`grok-global-account-failover-prototype.html`](./grok-global-account-failover-prototype.html)\n\n本版本已按最新要求完成最小修订：明确手动 Activate 只是全局当前 Active、不是锁定；命中明确 Grok 限额或限流时仍可自动轮换并重试；保留模糊状态、网络/timeout/5xx/auth 等非限额故障不触发，并保持全局 Active、in-flight 不变、单次重试和无 Session selector。\n\n旧 [`grok-session-account-switch-prototype.superseded.html`](./grok-session-account-switch-prototype.superseded.html) 仍只作历史对照，不得实现。\n\n## UI 设计员修订结果\n\n已在不新增页面/selector的前提下完成 [`grok-global-account-failover-prototype.html`](./grok-global-account-failover-prototype.html) 的最小修订：\n\n1. Settings 开关标题为“明确限额或限流时自动切换可用账号”。\n2. Models 与顶部设计说明明确：手动 Activate 只是当前全局 Active，不是锁定；后续明确限额/限流仍可自动轮换。\n3. 触发条件展示 provider code/type 或确认错误文案识别的 quota/usage/credits/monthly/weekly exhaustion 与 rate-limit/too-many-requests。\n4. 排除条件保留裸/模糊状态、network、timeout、5xx、auth/reauth、context/content/model 错误，不再绝对排除所有 rate limit。\n5. Chat 的成功、无候选、重试耗尽状态统一覆盖“限额/限流”，且 terminal 状态不伪称正在重试。\n6. Settings 保留全局范围、in-flight 不变、每 turn 最多一次切号/重试和并发不级联说明。\n7. 未展示 token、credential 路径、完整 opaque id 或 raw upstream body；固定凭据 bypass 仅给出面向用户的处理提示。\n\n## 页面与交互要点\n\n### Models\n\n- 账号行保留 `Activate / active`。\n- 全局说明：所有普通运行中 Session和新 Session的后续请求使用当前 Active。\n- 补充：manual Active不是 lock，开启自动切号后仍可能因明确限额/限流被轮换。\n- loading期间禁止重复 Activate；in-flight请求不换 token。\n\n### Settings\n\n- Grok自动切号默认关闭。\n- 开启后只处理明确限额/限流，每 turn最多一次 switch/retry。\n- 文案区分“确认的 provider limit error”和“裸/模糊/非限额故障”。\n\n### Chat\n\n- 不新增账号 chip、selector或绑定提示。\n- 复用 retry/notice banner。\n- `switched`、other-session-switched可显示正在重试；no candidate、budget exhausted、failed为终态提示，不伪称 retry。\n\n## 状态演示\n\n原型左侧“状态场景”可与 Models/Chat 页面组合查看以下状态：\n\n| 状态 | 原型反馈 |\n| --- | --- |\n| 默认 Active A | 展示全局当前账号与后续请求范围 |\n| 手动 Activate B 中 | 禁用 Activate，说明 in-flight 仍使用 A |\n| 手动 Active B 触发明确限额 | B → C，明确说明不是锁定并只重试一次 |\n| 手动 Active B 触发明确限流 | B → C，明确说明不是锁定并只重试一次 |\n| 另一 Session 已先切号 | 复用新 Active，不级联切第三账号 |\n| 无可用账号 | 限额/限流终态，不显示正在重试 |\n| 候选需重新登录 | 候选排除并引导 Models 重新登录 |\n| 本 turn 重试耗尽 | 限额/限流终态，不继续切号 |\n| 固定凭据 bypass | display-safe 提示，不显示 token |\n| 请求进行中（in-flight） | 当前请求保持旧账号，下一请求使用新 Active |\n\n另有 Settings 文案明确展示：裸/模糊状态、网络、timeout、5xx、auth/reauth、context/content/model 错误不会触发自动切号。\n\n## 可访问性与响应式\n\n- banner使用 `role=\"status\"` / `aria-live`；终态错误按现有组件语义处理。\n- toggle使用 `role=\"switch\"` / `aria-checked`；loading按钮disabled。\n- 键盘、焦点样式、reduced motion、明暗主题保持现有原型能力。\n- ≤640px账号行、quota、Settings说明、Chat banner不横向溢出。\n\n## 用户审批请求\n\n请主会话将最终原型 [`grok-global-account-failover-prototype.html`](./grok-global-account-failover-prototype.html) 作为审批入口，请用户只确认：\n\n1. 手动 Active 非锁定，明确限额/限流会自动轮换并重试，表达是否清楚；\n2. 全局生效范围与 in-flight 边界是否清楚；\n3. Chat 不提供当前 Session selector，只显示自动处理反馈；\n4. 默认关闭、每 turn 最多一次切号/重试、并发不级联是否清楚。\n\n**用户批准该 HTML 前，不得进入 UI 生产实现。**\n\n## UI Checks\n\n- [x] Settings 已改为明确限额/限流，不再绝对排除所有 rate limit。\n- [x] manual Active 非锁定语义可见。\n- [x] 明确 quota 与明确 rate-limit 成功状态均有演示。\n- [x] Chat 无 current Session selector/chip。\n- [x] global/in-flight/single-retry/并发不级联边界保留。\n- [x] terminal notice 不显示 Retrying。\n- [x] 原型保留窄屏、键盘、读屏、主题和 reduced-motion 设计。\n- [x] 示例不含真实账号/凭据/token/path/raw body。\n- [ ] 用户批准最终 HTML 后，才可进入 UI 生产实现。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:17:00.837Z",
+            "toolCallId": "call_syMygmM4xUq7FPGpfILtHQpa|fc_086aee024d37f344016a55e26ccc8c819a9d3c4004646e872b",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260714-133704-\\345\\256\\214\\345\\226\\204-grok-cli-\\351\\231\\220\\351\\242\\235\\350\\207\\252\\345\\212\\250\\345\\210\\207\\345\\217\\267\\344\\270\\216\\350\\277\\220\\350\\241\\214\\344\\270\\255-session-\\350\\264\\246\\345\\217\\267\\345\\210\\207\\346\\215\\242/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T07:17:20.918Z",
+            "text": "## Handoff\n\n已完成：\n\n- 修改 `.ypi/tasks/.../grok-global-account-failover-prototype.html`\n  - 明确手动 Activate 不是锁定。\n  - 增加明确限额、明确限流、并发不级联状态。\n  - 保留模糊状态、网络/timeout/5xx/auth 等不触发。\n  - Chat 文案覆盖限额/限流。\n  - 无 Session selector。\n- 更新 `.ypi/tasks/.../ui.md`\n  - 链接最终 HTML。\n  - 列出完整状态演示与审批请求。\n\n验证：\n\n- Node 静态文本及 HTML 外壳校验通过。\n- 未运行 lint/typecheck；未修改生产代码。\n\n剩余风险/决策：\n\n- 需主会话进行浏览器视觉验收。\n- 需用户批准最终 HTML 及计划；批准前不得进入 UI 实现。",
+            "model": "cpa/gemini-3.5-flash-low",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T07:17:20.922Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "warnings": [
+          "Configured Studio child model cpa/gemini-3.5-flash-low was not found; using Pi default model."
+        ],
+        "outputChars": 399,
+        "tokens": 1074,
+        "tokenSource": "usage",
+        "tps": 560.25,
+        "firstTokenAt": "2026-07-14T07:17:18.845Z",
+        "lastTokenAt": "2026-07-14T07:17:20.762Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-25f5c04a70794523e71a92f6",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/ui-designer-25f5c04a70794523e71a92f6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T07:14:38.913Z",
+        "finishedAt": "2026-07-14T07:17:20.923Z",
+        "updatedAt": "2026-07-14T07:17:20.923Z",
+        "itemCount": 35,
+        "messageCount": 1,
+        "toolCallCount": 15,
+        "stderrBytes": 0,
+        "bytes": 92084,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f7a-4ee6-7f07-9291-822fa5c9442d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-14-38-950Z_019f5f7a-4ee6-7f07-9291-822fa5c9442d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-8834524316307d1504cf39bc",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T07:44:31.824Z",
+      "finishedAt": "2026-07-14T07:59:20.175Z",
+      "runner": "sdk",
+      "childSessionId": "019f5f95-aa79-78fa-a280-eea560a77f1b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-44-31-865Z_019f5f95-aa79-78fa-a280-eea560a77f1b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5f95-aa79-78fa-a280-eea560a77f1b",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Decision\n**Path B（Grok 独立 controller）**  \n未抽 shared core：GPT 生产路径保持原样；新增 `lib/grok-account-failover.ts` + `patchGrokAccountFailover()`，链顺序：\n\n`grok → opencode-go → chatgpt → pi native`\n\n#### Files Changed\n- `lib/grok-account-failover.ts` — 新建 Grok classifier / 候选 / lock / Activate+reload\n- `lib/chatgpt-account-failover.ts` — 未改生产逻辑（仅被 contract 测试锁定）\n- `lib/rpc-manager.ts` — 退役 pin 生命周期；Grok patch；reload same-identity model 刷新\n- `lib/pi-provider-extensions.ts` — main inference 去掉 session Authorization pin\n- `lib/grok-session-account.ts` / `lib/types.ts` — pin 退役文档；header 兼容保留\n- `lib/grok-account-token.ts` / `lib/grok-subscription-quota.ts` — 真 `forceRefresh` + 401/403 括号修复\n- `lib/pi-web-config.ts` / `app/api/web-config/route.ts` — `grok.autoFailover` 默认关闭\n- `lib/ypi-studio-child-session-runner.ts` — 去掉 pin inherit/unbind\n- `hooks/useAgentSession.ts` / `components/ChatInput.tsx` / `ChatWindow.tsx` — `grok_account_failover` 反馈\n- `components/SettingsConfig.tsx` / `ModelsConfig.tsx` — 全局 Active 非锁定 + 明确限额/限流开关\n- 测试：`scripts/test-chatgpt-failover-contract.mjs` 等 + `package.json` scripts\n- 文档：architecture / modules / integrations / troubleshooting\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:chatgpt-failover-contract` | 25 passed |\n| `npm run test:grok-global-auth` | 7 passed |\n| `npm run test:grok-failover-adapter` | 29 passed |\n| `npm run test:grok-failover-runtime` | 9 passed |\n| `npm run test:grok-provider` / `accounts` / `quota` / `session-isolation` / `oauth-accounts` | pass |\n| `npm run test:opencode-go-failover-behavior` | 54 passed |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | 0 |\n| `npm run lint` | 0 errors（6 既有 warnings，非本任务） |\n\n#### Notes / Risks\n1. **Path B**：未共享 orchestration，GPT 行为零漂移证据来自 characterization tests。\n2. **Classifier**：基于 allowlist fixture；缺真实脱敏 rate-limit 上游 shape 时仍可能漏报，禁止用宽泛 `/limit|rate/` 补洞。\n3. **In-process 锁**：与 GPT 一样是进程内 mutex，非跨进程分布式锁。\n4. **浏览器人工验收**（Activate → 明确限流 → 自动切号、并发、无候选、in-flight）未在本环境跑 Playwright。\n5. 未 commit / push。\n\n#### 主会话后续\n- 派检查员按 `checks.md` 反证“手动 Activate A 后明确限额/限流仍可 A→B”。\n- 需要时可补浏览器验收截图。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T07:44:31.824Z",
+        "updatedAt": "2026-07-14T07:59:20.175Z",
+        "eventCount": 4223,
+        "lastTextPreview": "### Implementation Complete\n\n#### Decision\n**Path B（Grok 独立 controller）**  \n未抽 shared core：GPT 生产路径保持原样；新增 `lib/grok-account-failover.ts` + `patchGrokAccountFailover()`，链顺序：\n\n`grok → opencode-go → chatgpt → pi native`\n\n#### Files Changed\n- `lib/grok-account-failover.ts` — 新建 Grok classifier / 候选 / lock / Activate+reload\n- `lib/chatgpt-account-failover.ts` — 未改生产逻辑（仅被 contract 测试锁定）\n- `lib/rpc-manager.ts` — 退役 pin 生命周期；Grok patch；reload same-identity model 刷新\n- `lib/pi-provider-extensions.ts` — main inference 去掉 session Authorization pin\n- `lib/grok-session-account.ts` / `lib/types.ts` — pin 退役文档；header 兼容保留\n- `lib/grok-account-token.ts` / `lib/grok-subscription-quota.ts` — 真 `forceRefresh` + 401/403 括号修复\n- `lib/pi-web-config.ts` / `app/api/web-config/route.ts` — `grok.autoFailover` 默认关闭\n- `lib/ypi-studio-child-session-runner.ts` — 去掉 pin inherit/unbind\n- `hooks/useAgentSession.ts` / `components/ChatInput.tsx` / `ChatWindow.tsx` — `grok_account_failover` 反馈\n- `components/SettingsConfig.tsx` / `ModelsConfig.tsx` — 全局 Active 非锁定 + 明确限额/限流开关\n- 测试：`scripts/test-chatgpt-failover-contract.mjs` 等 + `package.json` scripts\n- 文档：architecture / modules / integrations / troubleshooting\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:chatgpt-failover-contract` | 25 passed |\n| `npm run test:grok-global-auth` | 7 passed |\n| `npm run test:grok-failover-adapter` | 29 passed |\n| `npm run test:grok-failover-runtime` | 9 passed |\n| `npm run test:grok-provider` / `accounts` / `quota` / `session-isolation` / `oauth-accounts` | pass |\n| `npm run test:opencode-go-failover-behavior` | 54 passed |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | 0 |\n| `npm run lint` | 0 errors（6 既有 warnings，非本任务） |\n\n#### Notes / Risks\n1. **Path B**：未共享 orchestration，GPT 行为零漂移证据来自 characterization tests。\n2. **Classifier**：基于 allowlist fixture；缺真实脱敏 rate-limit 上游 shape 时仍可能漏报，禁止用宽泛 `/limit|rate/` 补洞。\n3. **In-process 锁**：与 GPT 一样是进程内 mutex，非跨进程分布式锁。\n4. **浏览器人工验收**（Activate → 明确限流 → 自动切号、并发、无候选、in-flight）未在本环境跑 Playwright。\n5. 未 commit / push。\n\n#### 主会话后续\n- 派检查员按 `checks.md` 反证“手动 Activate A 后明确限额/限流仍可 A→B”。\n- 需要时可补浏览器验收截图。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:58:50.012Z",
+            "toolCallId": "call-e6d2e11d-20b3-43b1-8dd4-0d9eaa93949a-177|fc_00373d15-8ce9-91e2-853e-0961d17e17d4_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 2 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260714-133529/components/ModelsConfig.tsx.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-14T07:58:54.677Z",
+            "toolCallId": "call-3c717c57-c020-4403-94b5-d7b696d67d62-178|fc_697c11c0-cec9-9473-b3f9-b8d3c917c06d_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit 2>&1 | tail -10; echo TSC:$?; npm run test:chatgpt-failover-contract >/tmp/gpt-c.out 2>&1; npm run test:grok-global-auth >/tmp/g-auth.out 2>&1; npm run test:grok-failover-adapter >/tmp/g-ad.out 2>&1; npm run test:grok-failover-runtime >/tmp/g-rt.out 2>&1; npm run test:grok-provider >/tmp/g-pr.out 2>&1; npm run test:grok-accounts >/tmp/g-ac.out 2>&1; npm run test:opencode-go-failover-behavior >/tmp/og.out 2>&1; for f in /tmp/gpt-c.out /tmp/g-auth.out /tmp/g-ad.out /tmp/g-rt.out /tmp/g-pr.out /tmp/g-ac.out /tmp/og.out; do echo \\\"== $f\\\"; tail -3 $f; done; npm run lint 2>&1 | tail -15\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T07:59:10.235Z",
+            "toolCallId": "call-3c717c57-c020-4403-94b5-d7b696d67d62-178|fc_697c11c0-cec9-9473-b3f9-b8d3c917c06d_0",
+            "toolName": "bash",
+            "text": "TSC:0\n== /tmp/gpt-c.out\n  \u001b[32m✓\u001b[0m manual Activate A eligible error still has failover path (no lock gate)\n\n25 passed, 0 failed\n== /tmp/g-auth.out\n  \u001b[32m✓\u001b[0m Models UI describes global Active, not session pin\n\n7 passed, 0 failed\n== /tmp/g-ad.out\n  \u001b[32m✓\u001b[0m bypass detects env token without leaking it\n\n29 passed, 0 failed\n== /tmp/g-rt.out\n  \u001b[32m✓\u001b[0m Chat handles grok_account_failover with terminal vs retrying\n\n9 passed, 0 failed\n== /tmp/g-pr.out\n\n────────────────────────────────────────\nPassed: 36  Failed: 0\n== /tmp/g-ac.out\n\n────────────────────────────────────────\nPassed: 70  Failed: 0\n== /tmp/og.out\n  \u001b[32m✓\u001b[0m PATCH disable passes disabledBy from body\n\n54 passed, 0 failed\n> eslint .\n\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260714-133529/.ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置/pre01-verification.mjs\n  14:33  warning  'readFileSync' is defined but never used  @typescript-eslint/no-unused-vars\n  87:12  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260714-133529/scripts/test-model-prices.mjs\n  17:22  warning  'mkdirSync' is defined but never used                         @typescript-eslint/no-unused-vars\n  35:3   warning  'MODEL_PRICE_MAX_VALUE' is assigned a value but never used    @typescript-eslint/no-unused-vars\n  46:3   warning  'getModelsJsonBackupPath' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  73:10  warning  'assertStringNotContains' is defined but never used           @typescript-eslint/no-unused-vars\n\n✖ 6 problems (0 errors, 6 warnings)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T07:59:20.164Z",
+            "text": "### Implementation Complete\n\n#### Decision\n**Path B（Grok 独立 controller）**  \n未抽 shared core：GPT 生产路径保持原样；新增 `lib/grok-account-failover.ts` + `patchGrokAccountFailover()`，链顺序：\n\n`grok → opencode-go → chatgpt → pi native`\n\n#### Files Changed\n- `lib/grok-account-failover.ts` — 新建 Grok classifier / 候选 / lock / Activate+reload\n- `lib/chatgpt-account-failover.ts` — 未改生产逻辑（仅被 contract 测试锁定）\n- `lib/rpc-manager.ts` — 退役 pin 生命周期；Grok patch；reload same-identity model 刷新\n- `lib/pi-provider-extensions.ts` — main inference 去掉 session Authorization pin\n- `lib/grok-session-account.ts` / `lib/types.ts` — pin 退役文档；header 兼容保留\n- `lib/grok-account-token.ts` / `lib/grok-subscription-quota.ts` — 真 `forceRefresh` + 401/403 括号修复\n- `lib/pi-web-config.ts` / `app/api/web-config/route.ts` — `grok.autoFailover` 默认关闭\n- `lib/ypi-studio-child-session-runner.ts` — 去掉 pin inherit/unbind\n- `hooks/useAgentSession.ts` / `components/ChatInput.tsx` / `ChatWindow.tsx` — `grok_account_failover` 反馈\n- `components/SettingsConfig.tsx` / `ModelsConfig.tsx` — 全局 Active 非锁定 + 明确限额/限流开关\n- 测试：`scripts/test-chatgpt-failover-contract.mjs` 等 + `package.json` scripts\n- 文档：architecture / modules / integrations / troubleshooting\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:chatgpt-failover-contract` | 25 passed |\n| `npm run test:grok-global-auth` | 7 passed |\n| `npm run test:grok-failover-adapter` | 29 passed |\n| `npm run test:grok-failover-runtime` | 9 passed |\n| `npm run test:grok-provider` / `accounts` / `quota` / `session-isolation` / `oauth-accounts` | pass |\n| `npm run test:opencode-go-failover-behavior` | 54 passed |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | 0 |\n| `npm run lint` | 0 errors（6 既有 warnings，非本任务） |\n\n#### Notes / Risks\n1. **Path B**：未共享 orchestration，GPT 行为零漂移证据来自 characterization tests。\n2. **Classifier**：基于 allowlist fixture；缺真实脱敏 rate-limit 上游 shape 时仍可能漏报，禁止用宽泛 `/limit|rate/` 补洞。\n3. **In-process 锁**：与 GPT 一样是进程内 mutex，非跨进程分布式锁。\n4. **浏览器人工验收**（Activate → 明确限流 → 自动切号、并发、无候选、in-flight）未在本环境跑 Playwright。\n5. 未 commit / push。\n\n#### 主会话后续\n- 派检查员按 `checks.md` 反证“手动 Activate A 后明确限额/限流仍可 A→B”。\n- 需要时可补浏览器验收截图。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T07:59:20.166Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2746,
+        "tokens": 806,
+        "tokenSource": "usage",
+        "tps": 0.91,
+        "firstTokenAt": "2026-07-14T07:44:37.937Z",
+        "lastTokenAt": "2026-07-14T07:59:20.163Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-8834524316307d1504cf39bc",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/implementer-8834524316307d1504cf39bc.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T07:44:31.824Z",
+        "finishedAt": "2026-07-14T07:59:20.166Z",
+        "updatedAt": "2026-07-14T07:59:20.166Z",
+        "itemCount": 381,
+        "messageCount": 13,
+        "toolCallCount": 179,
+        "stderrBytes": 0,
+        "bytes": 692199,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5f95-aa79-78fa-a280-eea560a77f1b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-44-31-865Z_019f5f95-aa79-78fa-a280-eea560a77f1b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-979601ab65295f19b5071ff1",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-14T07:59:31.148Z",
+      "finishedAt": "2026-07-14T08:04:18.840Z",
+      "runner": "sdk",
+      "childSessionId": "019f5fa3-6368-77da-a2d9-7febc931c0eb",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-59-31-176Z_019f5fa3-6368-77da-a2d9-7febc931c0eb.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f5f20-c987-7dd8-b362-8553f5820ba9",
+        "childSessionId": "019f5fa3-6368-77da-a2d9-7febc931c0eb",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "toolInput",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- `components/SettingsConfig.tsx`：共用 `ToggleField` 补上 `role=\"switch\"` / `aria-checked` / `aria-label`（对齐批准原型 a11y）\n\n#### Remaining Findings\n- **非阻塞**：自动测试以 source/fixture 契约为主，真实双 Session 并发 / 真实 Grok rate-limit 仍建议人工走查\n- **非阻塞**：Grok 文本限流匹配比 GPT 更宽（符合本任务产品要求），需继续靠负例约束，禁止宽泛 `/limit|rate/`\n\n#### Verification（实跑）\n| 命令 | 结果 |\n| --- | --- |\n| `test:chatgpt-failover-contract` | 25 passed |\n| `test:grok-global-auth` | 7 passed |\n| `test:grok-failover-adapter` | 29 passed |\n| `test:grok-failover-runtime` | 9 passed |\n| `test:opencode-go-failover-behavior` | 54 passed |\n| `test:opencode-go-failover-detect` | 59 passed |\n| `test:studio-sdk-runner` | passed |\n| `test:grok-provider/accounts/quota/session-isolation/oauth-accounts` | all passed |\n| `npm run lint` | 0 errors |\n| `tsc --noEmit` | clean |\n\n#### Verdict\n**Pass**\n\n1. **手动 Active 后明确限额/限流可切号重试**：Path B `lib/grok-account-failover.ts` 无 lock/pin 门禁；run 前快照 Active；`switched`/`already_switched_by_other_session` 才 retry  \n2. **GPT 生产逻辑**：`lib/chatgpt-account-failover.ts` 与 HEAD MD5 一致；contract 全绿  \n3. **OpenCode Go / Studio runner**：无回归  \n4. **classifier 负例**：network/timeout/5xx/auth/裸 429/模糊 rate 文本不触发  \n5. **pin 退役**：main inference / resume / fork / Studio child 已断开  \n\n产物：`review.md` / `checks.md` / `summary.md` / `handoff.md` 已更新。\n\n#### 主会话决策\n1. 可选：按 checks 人工清单做浏览器验收（双 Session / 限额 / 限流 / 并发 / in-flight / 旧 header）  \n2. 用户确认后收尾归档；检查员未 commit/push",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "toolInput",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "toolInput",
+          "configuredSource": "toolInput",
+          "configuredMode": "thinking",
+          "requested": "high",
+          "fallbackChain": [
+            "toolInput"
+          ],
+          "warnings": [
+            {
+              "code": "tool_thinking_overrides_settings",
+              "message": "Tool input thinking overrides Studio Settings for this member run."
+            }
+          ]
+        },
+        "warnings": [
+          {
+            "code": "tool_thinking_overrides_settings",
+            "message": "Tool input thinking overrides Studio Settings for this member run."
+          }
+        ]
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-14T07:59:31.148Z",
+        "updatedAt": "2026-07-14T08:04:18.840Z",
+        "eventCount": 1593,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- `components/SettingsConfig.tsx`：共用 `ToggleField` 补上 `role=\"switch\"` / `aria-checked` / `aria-label`（对齐批准原型 a11y）\n\n#### Remaining Findings\n- **非阻塞**：自动测试以 source/fixture 契约为主，真实双 Session 并发 / 真实 Grok rate-limit 仍建议人工走查\n- **非阻塞**：Grok 文本限流匹配比 GPT 更宽（符合本任务产品要求），需继续靠负例约束，禁止宽泛 `/limit|rate/`\n\n#### Verification（实跑）\n| 命令 | 结果 |\n| --- | --- |\n| `test:chatgpt-failover-contract` | 25 passed |\n| `test:grok-global-auth` | 7 passed |\n| `test:grok-failover-adapter` | 29 passed |\n| `test:grok-failover-runtime` | 9 passed |\n| `test:opencode-go-failover-behavior` | 54 passed |\n| `test:opencode-go-failover-detect` | 59 passed |\n| `test:studio-sdk-runner` | passed |\n| `test:grok-provider/accounts/quota/session-isolation/oauth-accounts` | all passed |\n| `npm run lint` | 0 errors |\n| `tsc --noEmit` | clean |\n\n#### Verdict\n**Pass**\n\n1. **手动 Active 后明确限额/限流可切号重试**：Path B `lib/grok-account-failover.ts` 无 lock/pin 门禁；run 前快照 Active；`switched`/`already_switched_by_other_session` 才 retry  \n2. **GPT 生产逻辑**：`lib/chatgpt-account-failover.ts` 与 HEAD MD5 一致；contract 全绿  \n3. **OpenCode Go / Studio runner**：无回归  \n4. **classifier 负例**：network/timeout/5xx/auth/裸 429/模糊 rate 文本不触发  \n5. **pin 退役**：main inference / resume / fork / Studio child 已断开  \n\n产物：`review.md` / `checks.md` / `summary.md` / `handoff.md` 已更新。\n\n#### 主会话决策\n1. 可选：按 checks 人工清单做浏览器验收（双 Session / 限额 / 限流 / 并发 / in-flight / 旧 header）  \n2. 用户确认后收尾归档；检查员未 commit/push",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T08:04:11.204Z",
+            "toolCallId": "call-6ea25c64-da9a-496f-b960-de4256f89683-27|fc_0731cbde-265a-9d08-bc53-2cdf7807f9c2_1",
+            "toolName": "write",
+            "text": "Successfully wrote 440 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260714-133529/.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/summary.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T08:04:11.204Z",
+            "toolCallId": "call-6ea25c64-da9a-496f-b960-de4256f89683-28|fc_0731cbde-265a-9d08-bc53-2cdf7807f9c2_2",
+            "toolName": "write",
+            "text": "Successfully wrote 1090 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260714-133529/.ypi/tasks/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-14T08:04:11.267Z",
+            "toolCallId": "call-6ea25c64-da9a-496f-b960-de4256f89683-29|fc_0731cbde-265a-9d08-bc53-2cdf7807f9c2_3",
+            "toolName": "bash",
+            "text": "inserted checker section\n# Checks：Grok 全局 Active 自动切号与 GPT 零回归\n\n\n## 检查员执行记录\n\n检查时间：2026-07-14（检查员 delegated review）\n\n### 前置门禁（实现阶段回顾）\n\n- [x] UI 设计员已修订 HTML（明确限额/限流，manual Active 非锁定）\n- [x] 用户已批准计划与最终 HTML（events: User approved Studio plan）\n- [x] 主会话进入 implementing 并按 Path B 实现\n- [x] 实现未改 GPT 生产 controller（`lib/chatgpt-account-failover.ts` MD5 与 HEAD 一致）\n\n### 自动验证（检查员实跑）\n\n- [x] `npm run test:chatgpt-failover-contract`（25 passed）\n- [x] `npm run test:grok-global-auth`（7 passed）\n- [x] `npm run test:grok-failover-adapter`（29 passed）\n- [x] `npm run test:grok-failover-runtime`（9 passed）\n- [x] `npm run test:opencode-go-failover-behavior`（54 passed）\n- [x] `npm run test:opencode-go-failover-detect`（59 passed）\n- [x] `npm run test:studio-sdk-runner`\n- [x] `npm run test:grok-provider` / `accounts` / `quota` / `session-isolation` / `oauth-accounts`\n- [x] `npm run lint`（0 errors）\n- [x] `node_modules/.bin/tsc --noEmit`\n\n### 静态反证重点\n\n- [x] 手动 Activate 无 lock 字段；Grok failover 无 `manuallySelected`/`pinned`/`locked` 门禁\n- [x] 明确 quota + rate-limit fixture 触发；network/timeout/5xx/auth/裸 429/模糊文本不触发\n- [x] Path B：独立 `__piGrokFailover`；链 grok→opencode-go→chatgpt→pi\n- [x] pin 退役：webExtensionFactories 仅 grokCli；rpc/studio 无 bind/restore/unbind\n- [x] SSE 不投影 account id；Settings/Models/Chat 文案对齐批准原型\n- [x] 检查员修复 Settings `ToggleField` switch a11y\n\n### 仍待人工（主会话/用户）\n\n- [ ] 真实双 Session 手动 Activate / 限额 / 限流 / 并发 / in-flight 浏览器走查\n- [ ] 恢复带旧 `grokAccountStorageId` 的 Session 使用当前全局 Active\n- [ ] ChatGPT 手动 Activate + eligible error 与改动前行为一致（自动化已锁，建议抽查 UI）\n\n## 前置门禁\n\n- [ ] UI 设计员已修订 `grok-global-account-failover-prototype.html`，不再排除所有 rate limit。\n- [ ] 用户已批准修订 HTML；旧 `.superseded.html` 未被使用。\n- [ ] 用户已批准 [`plan-review.md`](plan-review.md)。\n- [ ] 主会话已保存 implementationPlan并显式进入 implementing。\n- [ ] 未满足以上条件不得实现或声称审批完成。\n\n## GPT 源码基准确认\n\n- [ ] `activateOAuthAccount()` 无 manual lock/pin字段，只更新 Active与 `auth.json`。\n- [ ] `_runAgentPrompt` 前快照当前 Active，不区分手动/自动来源。\n- [ ] Pi original `_handlePostAgentRun()` 的 retry/compaction先于 Web failover。\n- [ ] 当前 GPT detector golden fixtures与源码 regex一致。\n- [ ] 默认 1 attempt / 1 switch，成功非 error turn重置。\n- [ ] process lock、trigger cooldown、min interval、锁内 Active check、Activate前 double-check被测试覆盖。\n- [ ] Activate后调用 `reloadRpcAuthState()`；所有 normal live wrappers reload auth/refresh registry并 cleanup provider resources。\n- [ ] retry只移除 identity一致的最后失败 assistant，再由 Pi `agent.continue()`继续。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-14T08:04:18.833Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- `components/SettingsConfig.tsx`：共用 `ToggleField` 补上 `role=\"switch\"` / `aria-checked` / `aria-label`（对齐批准原型 a11y）\n\n#### Remaining Findings\n- **非阻塞**：自动测试以 source/fixture 契约为主，真实双 Session 并发 / 真实 Grok rate-limit 仍建议人工走查\n- **非阻塞**：Grok 文本限流匹配比 GPT 更宽（符合本任务产品要求），需继续靠负例约束，禁止宽泛 `/limit|rate/`\n\n#### Verification（实跑）\n| 命令 | 结果 |\n| --- | --- |\n| `test:chatgpt-failover-contract` | 25 passed |\n| `test:grok-global-auth` | 7 passed |\n| `test:grok-failover-adapter` | 29 passed |\n| `test:grok-failover-runtime` | 9 passed |\n| `test:opencode-go-failover-behavior` | 54 passed |\n| `test:opencode-go-failover-detect` | 59 passed |\n| `test:studio-sdk-runner` | passed |\n| `test:grok-provider/accounts/quota/session-isolation/oauth-accounts` | all passed |\n| `npm run lint` | 0 errors |\n| `tsc --noEmit` | clean |\n\n#### Verdict\n**Pass**\n\n1. **手动 Active 后明确限额/限流可切号重试**：Path B `lib/grok-account-failover.ts` 无 lock/pin 门禁；run 前快照 Active；`switched`/`already_switched_by_other_session` 才 retry  \n2. **GPT 生产逻辑**：`lib/chatgpt-account-failover.ts` 与 HEAD MD5 一致；contract 全绿  \n3. **OpenCode Go / Studio runner**：无回归  \n4. **classifier 负例**：network/timeout/5xx/auth/裸 429/模糊 rate 文本不触发  \n5. **pin 退役**：main inference / resume / fork / Studio child 已断开  \n\n产物：`review.md` / `checks.md` / `summary.md` / `handoff.md` 已更新。\n\n#### 主会话决策\n1. 可选：按 checks 人工清单做浏览器验收（双 Session / 限额 / 限流 / 并发 / in-flight / 旧 header）  \n2. 用户确认后收尾归档；检查员未 commit/push",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-14T08:04:18.836Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1718,
+        "tokens": 753,
+        "tokenSource": "usage",
+        "tps": 2.65,
+        "firstTokenAt": "2026-07-14T07:59:34.380Z",
+        "lastTokenAt": "2026-07-14T08:04:18.817Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-979601ab65295f19b5071ff1",
+        "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260714-133704-_-grok-cli-_-session-/checker-979601ab65295f19b5071ff1.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-14T07:59:31.148Z",
+        "finishedAt": "2026-07-14T08:04:18.837Z",
+        "updatedAt": "2026-07-14T08:04:18.837Z",
+        "itemCount": 70,
+        "messageCount": 6,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 247355,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f5fa3-6368-77da-a2d9-7febc931c0eb",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260714-133529--/2026-07-14T07-59-31-176Z_019f5fa3-6368-77da-a2d9-7febc931c0eb.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-14T05:54:30.770Z",
+      "contextId": "pi_019f5f20-c987-7dd8-b362-8553f5820ba9",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-14T07:37:16.224Z",
+      "contextId": "pi_019f5f20-c987-7dd8-b362-8553f5820ba9",
+      "inputHash": "fb7b6b0e5deb3c9de42cc959",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-14T08:22:48.320Z",
+    "archiveReason": "用户请求归档。",
+    "knowledgeEntryId": "20260714-162248-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+    "knowledgePath": ".ypi/knowledge/20260714-162248-完善-grok-cli-限额自动切号与运行中-session-账号切换.md"
+  }
+}

@@ -13,14 +13,6 @@ import { createYpiStudioExtension } from "./ypi-studio-extension";
 import { createBrowserShareExtension } from "./browser-share-extension";
 import { webExtensionFactories } from "./pi-provider-extensions";
 import {
-  bindGrokSessionAccount,
-  getActiveGrokAccountId,
-  restoreGrokSessionAccountBinding,
-  getGrokSessionAccount,
-  readGrokSessionAccountFromHeader,
-  unbindGrokSessionAccount,
-} from "./grok-session-account";
-import {
   abortYpiStudioChildRunsForSession,
   countActiveYpiStudioChildRunsForSession,
   registerYpiStudioSessionContinuation,
@@ -29,6 +21,7 @@ import {
 } from "./ypi-studio-subagent-runtime";
 import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
 import { attemptOpencodeGoAccountFailover, getActiveOpencodeGoAccountId, type OpencodeGoFailoverTurnBudget } from "./opencode-go-account-failover";
+import { attemptGrokAccountFailover, getActiveGrokFailoverAccountId, type GrokAccountFailoverTurnBudget } from "./grok-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 import {
   isBudgetExpired,
@@ -243,6 +236,7 @@ export class AgentSessionWrapper {
   constructor(public readonly inner: AgentSessionLike, public readonly cwd: string) {
     this.patchChatGptAccountFailover();
     this.patchOpencodeGoAccountFailover();
+    this.patchGrokAccountFailover();
   }
 
   get sessionId(): string {
@@ -433,6 +427,110 @@ export class AgentSessionWrapper {
         budget.attempts = 0;
         budget.switches = 0;
         budget.attemptedAccountIds = [];
+      }
+
+      return false;
+    };
+  }
+
+  /**
+   * Path B: Grok-only outer patch. Chain order:
+   *   grok → opencode-go → chatgpt → original pi SDK
+   * Non-grok providers pass through without mutating ChatGPT/OpenCode results.
+   */
+  private patchGrokAccountFailover(): void {
+    const inner = this.inner as AgentSessionLike & {
+      _handlePostAgentRun?: () => Promise<boolean>;
+      _runAgentPrompt?: (...args: unknown[]) => Promise<void>;
+      _lastAssistantMessage?: unknown;
+      _piWebGrokFailoverPatched?: boolean;
+    };
+    const innerAny = inner as unknown as {
+      agent?: { state?: { messages?: unknown[] } };
+      model?: { provider?: string; id?: string };
+    };
+    if (inner._piWebGrokFailoverPatched || typeof inner._handlePostAgentRun !== "function") return;
+    inner._piWebGrokFailoverPatched = true;
+
+    const originalPostRun = inner._handlePostAgentRun.bind(inner);
+    const originalRunAgentPrompt =
+      typeof inner._runAgentPrompt === "function"
+        ? inner._runAgentPrompt.bind(inner)
+        : null;
+
+    const budget: GrokAccountFailoverTurnBudget = { attempts: 0, switches: 0 };
+    let runTriggerAccountId: string | null = null;
+
+    if (originalRunAgentPrompt) {
+      inner._runAgentPrompt = async (...args: unknown[]) => {
+        runTriggerAccountId =
+          innerAny.model?.provider === "grok-cli"
+            ? await getActiveGrokFailoverAccountId().catch(() => null)
+            : null;
+        try {
+          await originalRunAgentPrompt(...args);
+        } finally {
+          runTriggerAccountId = null;
+        }
+      };
+    }
+
+    inner._handlePostAgentRun = async () => {
+      const assistantMessage = inner._lastAssistantMessage as
+        | { role?: string; stopReason?: string }
+        | undefined;
+
+      const shouldContinue = await originalPostRun();
+      if (shouldContinue) return true;
+
+      if (
+        assistantMessage?.role === "assistant"
+        && assistantMessage.stopReason === "error"
+      ) {
+        const result = await attemptGrokAccountFailover({
+          provider: innerAny.model?.provider,
+          message: assistantMessage,
+          budget,
+          reloadAuthState: reloadRpcAuthState,
+          triggerAccountId: runTriggerAccountId,
+        });
+
+        if (
+          result.status !== "not_grok_cli"
+          && result.status !== "not_eligible"
+          && result.status !== "disabled"
+        ) {
+          this.emitEvent({
+            type: "grok_account_failover",
+            sessionId: this.sessionId,
+            status: result.status,
+            reason: result.reason,
+            provider: result.provider,
+            retry: result.retry,
+            message: result.message,
+            // Never project account ids / tokens / paths to the client.
+          });
+        }
+
+        if (result.retry) {
+          const messages = innerAny.agent?.state?.messages;
+          if (
+            Array.isArray(messages)
+            && messages[messages.length - 1] === assistantMessage
+            && innerAny.agent?.state
+          ) {
+            innerAny.agent.state.messages = messages.slice(0, -1);
+          }
+          return true;
+        }
+      }
+
+      if (
+        assistantMessage?.stopReason
+        && assistantMessage.stopReason !== "error"
+      ) {
+        budget.attempts = 0;
+        budget.switches = 0;
       }
 
       return false;
@@ -727,14 +825,8 @@ export class AgentSessionWrapper {
         const model = registry.find(provider, modelId);
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         await this.inner.setModel(model);
-        // Auto-bind Grok account: when a session first selects a grok-cli model
-        // and does not already have a binding, pin the current active account.
-        if (provider === "grok-cli" && !getGrokSessionAccount(this.sessionId)) {
-          const activeId = await getActiveGrokAccountId();
-          if (activeId) {
-            bindGrokSessionAccount(this.sessionId, activeId, this.sessionFile);
-          }
-        }
+        // Grok session pin is retired: model selection no longer binds a
+        // per-session account. Requests use the global Active account.
         return { id: model.id, provider: model.provider };
       }
 
@@ -777,15 +869,8 @@ export class AgentSessionWrapper {
             spaceId: sourceHeader.spaceId,
           });
         }
-        // Preserve Grok session-account binding: write the parent's binding
-        // into the forked session file header so the new session restores it on start.
-        const parentGrokStorageId = getGrokSessionAccount(this.sessionId)
-          ?? readGrokSessionAccountFromHeader(currentSessionFile);
-        if (parentGrokStorageId) {
-          bindGrokSessionAccount(newSessionId, parentGrokStorageId, newSessionFile);
-          // Clean up the temporary binding; the new session's startRpcSession will restore it.
-          unbindGrokSessionAccount(newSessionId);
-        }
+        // Grok session pin is retired: forks no longer inherit/write
+        // grokAccountStorageId. Historical headers remain readable but ignored.
         cacheSessionPath(newSessionId, newSessionFile);
         invalidateSessionListSnapshots();
         this.destroy();
@@ -884,7 +969,6 @@ export class AgentSessionWrapper {
       unregisterYpiStudioSessionContinuation(key);
     }
     abortYpiStudioChildRunsForSession(this.sessionId, "session_destroy");
-    unbindGrokSessionAccount(this.sessionId);
     this.unsubscribe?.();
     try {
       this.inner.dispose?.();
@@ -1005,8 +1089,38 @@ export function reloadRpcAuthState(): number {
   for (const wrapper of getRegistry().values()) {
     if (!wrapper.isAlive()) continue;
     try {
+      const currentModel = wrapper.inner.model as
+        | { id?: string; provider?: string; [key: string]: unknown }
+        | undefined;
+      const provider = currentModel?.provider;
+      const modelId = currentModel?.id;
+
       wrapper.inner.modelRegistry.authStorage?.reload?.();
       wrapper.inner.modelRegistry.refresh?.();
+
+      // After registry refresh, Grok (and other dynamic) model descriptors may
+      // have updated baseUrl/headers. Replace the live in-memory model object
+      // for the same provider/id identity without calling setModel() so we do
+      // not persist a model_change entry or alter user defaults.
+      if (provider && modelId && currentModel) {
+        try {
+          const refreshed = wrapper.inner.modelRegistry.find(provider, modelId) as
+            | { id?: string; provider?: string; [key: string]: unknown }
+            | undefined;
+          if (
+            refreshed
+            && refreshed.provider === provider
+            && refreshed.id === modelId
+            && refreshed !== currentModel
+          ) {
+            const live = wrapper.inner as unknown as { model?: unknown };
+            live.model = refreshed;
+          }
+        } catch {
+          // Descriptor refresh is best-effort; auth reload already succeeded.
+        }
+      }
+
       count += 1;
     } catch {
       // Keep account activation best-effort for live wrappers; new requests/sessions
@@ -1104,11 +1218,8 @@ export async function startRpcSession(
     const realSessionFile = inner.sessionFile as string | undefined;
     if (realSessionFile) cacheSessionPath(realSessionId, realSessionFile);
 
-    // Restore Grok session-account binding from the session header (resume / fork).
-    // New sessions have no binding until the first Grok model selection.
-    if (realSessionFile) {
-      restoreGrokSessionAccountBinding(realSessionId, realSessionFile);
-    }
+    // Historical grokAccountStorageId headers are ignored; sessions always use
+    // the current global Active Grok account after auth reload.
 
     wrapper.onDestroy(() => registry.delete(realSessionId));
     registry.set(realSessionId, wrapper);

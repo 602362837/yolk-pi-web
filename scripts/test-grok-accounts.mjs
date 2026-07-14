@@ -318,10 +318,11 @@ test("restoreGrokSessionAccountBinding only reads, does not write", () => {
   assertIncludes(sessionSource, "sessionBindings.set", "updates runtime only");
 });
 
-test("Fork/resume/Studio child inheritance documented", () => {
-  assertIncludes(sessionSource, "Fork → inherit parent binding", "fork inheritance documented");
-  assertIncludes(sessionSource, "Resume → restore binding", "resume documented");
-  assertIncludes(sessionSource, "Studio child / Grok → inherit parent", "Studio child documented");
+test("Session pin retirement and historical header compatibility documented", () => {
+  assertIncludes(sessionSource, "Session Authorization pinning is retired", "pin retirement documented");
+  assertIncludes(sessionSource, "historical header parsing only", "header parse-only documented");
+  assertIncludes(sessionSource, "no longer wired into", "lifecycle unbind documented");
+  assertIncludes(sessionSource, "getActiveGrokAccountId", "active helper retained");
 });
 
 // ============================================================================
@@ -486,7 +487,7 @@ test("SessionHeader includes grokAccountStorageId field", () => {
   const typesSource = read("lib/types.ts");
   assertIncludes(typesSource, "grokAccountStorageId?: string", "types include grok field");
   assertIncludes(typesSource, "Non-secret", "documents non-secret nature");
-  assertIncludes(typesSource, "Opaque Grok saved-account storage id", "describes field purpose");
+  assertIncludes(typesSource, "Historical Grok session pin field", "describes deprecated field purpose");
 });
 
 // ============================================================================
