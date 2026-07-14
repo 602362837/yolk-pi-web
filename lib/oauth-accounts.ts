@@ -1,33 +1,46 @@
+/**
+ * oauth-accounts — generic OAuth saved-account store
+ *
+ * Manages multiple saved OAuth accounts per provider.  Provider-specific
+ * behaviour (credential shape, account-id derivation, label backfill, import)
+ * lives in `oauth-account-providers.ts`; this module only implements the
+ * shared storage, metadata, activation, and lifecycle logic.
+ */
+
 import { createHash, randomUUID } from "node:crypto";
 import { access, chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AuthStorage, getAgentDir, type OAuthCredential } from "@earendil-works/pi-coding-agent";
+import { AuthStorage, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
+
+import {
+  getOAuthAccountAdapter,
+  maskAccountId,
+  type OAuthAccountProviderAdapter,
+} from "./oauth-account-providers";
+
+// Re-export for backward compatibility
+export {
+  OPENAI_CODEX_PROVIDER_ID,
+  GROK_CLI_PROVIDER_ID,
+  getOAuthAccountAdapter,
+  isSupportedOAuthAccountProvider,
+  maskAccountId,
+} from "./oauth-account-providers";
+export { extractOpenAICodexAccountId } from "./oauth-account-providers";
+export type { OAuthAccountProviderAdapter } from "./oauth-account-providers";
+
 import { convertOAuthAccountCredentialWithWarnings, type OAuthAccountImportMode, type OAuthAccountImportWarning } from "@/lib/oauth-account-converters";
 
-export const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const ACCOUNT_STORE_DIR = "auth-accounts";
 const METADATA_FILE = "accounts.json";
 const JSON_FILE_MODE = 0o600;
 const ACCOUNT_DIR_MODE = 0o700;
 const DELETED_ACCOUNT_DIR = "deleted";
-const OPENAI_USERINFO_URLS = [
-  "https://auth.openai.com/oauth/userinfo",
-  "https://auth.openai.com/userinfo",
-  "https://chatgpt.com/backend-api/me",
-];
 
-interface StoredOpenAICodexCredential extends OAuthCredential {
-  type: "oauth";
-  access: string;
-  refresh: string;
-  expires: number;
-  accountId?: string;
-  [key: string]: unknown;
-}
-
-type NormalizedOpenAICodexCredential = StoredOpenAICodexCredential & { accountId: string };
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface OAuthAccountQuotaCacheTier {
   name: string;
@@ -53,9 +66,9 @@ export interface OAuthAccountQuotaCache {
 }
 
 interface OAuthAccountMetadataEntry {
-  /** Stable saved-account storage id; v1 entries use the legacy real account id. */
+  /** Opaque storage id used as the file-system key. */
   accountId: string;
-  /** Real ChatGPT account id retained for diagnostics and outbound OpenAI requests. */
+  /** Real/provider-native account identifier retained for diagnostics and outbound API calls. */
   chatgptAccountId?: string;
   label?: string;
   extraInfo?: string;
@@ -96,6 +109,20 @@ export interface OAuthAccountImportResult extends OAuthAccountsList {
   warnings: OAuthAccountImportWarning[];
 }
 
+/**
+ * A saved OAuth credential returned by `readOAuthAccountCredential`.
+ *
+ * The `accountId` field is the provider-native real account id (ChatGPT account
+ * id for openai-codex, refresh-derived hash for grok-cli).  The opaque storage
+ * id is exposed as the non-enumerable `storageId` property.
+ */
+export interface SavedOAuthCredential extends Record<string, unknown> {
+  access: string;
+  refresh: string;
+  expires: number;
+  accountId: string;
+}
+
 interface SaveAccountOptions {
   markActive?: boolean;
   recordActivation?: boolean;
@@ -103,12 +130,16 @@ interface SaveAccountOptions {
   storageId?: string;
 }
 
+// ─── Error ───────────────────────────────────────────────────────────────────
+
 export class OAuthAccountStoreError extends Error {
   constructor(message: string, public readonly status = 400) {
     super(message);
     this.name = "OAuthAccountStoreError";
   }
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -118,14 +149,19 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
 }
 
-function assertSupportedProvider(provider: string): void {
-  if (provider !== OPENAI_CODEX_PROVIDER_ID) {
-    throw new OAuthAccountStoreError(`OAuth account switching is only supported for ${OPENAI_CODEX_PROVIDER_ID}`, 400);
+function getAdapter(provider: string): OAuthAccountProviderAdapter {
+  try {
+    return getOAuthAccountAdapter(provider);
+  } catch (error) {
+    throw new OAuthAccountStoreError(
+      error instanceof Error ? error.message : `OAuth account management is unsupported for ${provider}`,
+      400,
+    );
   }
 }
 
 function accountStorePath(provider: string): string {
-  assertSupportedProvider(provider);
+  getAdapter(provider); // validate provider
   return join(getAgentDir(), ACCOUNT_STORE_DIR, provider);
 }
 
@@ -186,6 +222,8 @@ async function writeJsonFile(provider: string, path: string, value: unknown): Pr
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: JSON_FILE_MODE });
   await chmod(path, JSON_FILE_MODE).catch(() => {});
 }
+
+// ─── Metadata normalization ──────────────────────────────────────────────────
 
 function normalizeQuotaResetCredit(value: unknown): OAuthAccountQuotaResetCredit | null {
   if (!isRecord(value)) return null;
@@ -263,138 +301,7 @@ async function writeMetadata(provider: string, metadata: OAuthAccountStoreMetada
   await writeJsonFile(provider, metadataPath(provider), metadata);
 }
 
-function isStoredOpenAICodexCredential(value: unknown): value is StoredOpenAICodexCredential {
-  return isRecord(value)
-    && value.type === "oauth"
-    && typeof value.access === "string"
-    && typeof value.refresh === "string"
-    && typeof value.expires === "number";
-}
-
-function decodeJwtPayload(accessToken: string): Record<string, unknown> | null {
-  const [, payload] = accessToken.split(".");
-  if (!payload) return null;
-
-  try {
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const decoded = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as unknown;
-    return isRecord(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const email = value.trim();
-  return email.includes("@") ? email : null;
-}
-
-function normalizePhone(value: unknown): string | null {
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  const phone = String(value).trim();
-  const digitCount = phone.replace(/\D/g, "").length;
-  return digitCount >= 6 ? phone : null;
-}
-
-const EMAIL_KEYS = ["email", "email_address", "emailAddress"];
-const PHONE_KEYS = ["phone", "phone_number", "phoneNumber", "mobile", "mobile_number", "mobileNumber"];
-const NESTED_ACCOUNT_INFO_KEYS = ["https://api.openai.com/profile", "https://api.openai.com/auth", "user", "account", "profile"];
-
-function findEmailInRecord(value: unknown): string | null {
-  if (!isRecord(value)) return null;
-
-  for (const key of EMAIL_KEYS) {
-    const email = normalizeEmail(value[key]);
-    if (email) return email;
-  }
-
-  for (const key of NESTED_ACCOUNT_INFO_KEYS) {
-    const nestedEmail = findEmailInRecord(value[key]);
-    if (nestedEmail) return nestedEmail;
-  }
-
-  return null;
-}
-
-function findPhoneInRecord(value: unknown): string | null {
-  if (!isRecord(value)) return null;
-
-  for (const key of PHONE_KEYS) {
-    const phone = normalizePhone(value[key]);
-    if (phone) return phone;
-  }
-
-  for (const key of NESTED_ACCOUNT_INFO_KEYS) {
-    const nestedPhone = findPhoneInRecord(value[key]);
-    if (nestedPhone) return nestedPhone;
-  }
-
-  return null;
-}
-
-export function extractOpenAICodexAccountId(accessToken: string): string | null {
-  const decoded = decodeJwtPayload(accessToken) as { "https://api.openai.com/auth"?: { chatgpt_account_id?: unknown } } | null;
-  const accountId = decoded?.["https://api.openai.com/auth"]?.chatgpt_account_id;
-  return typeof accountId === "string" && accountId.length > 0 ? accountId : null;
-}
-
-async function fetchOpenAICodexAccountLabel(accessToken: string, accountId: string): Promise<string | null> {
-  const claims = decodeJwtPayload(accessToken);
-  const claimsEmail = findEmailInRecord(claims);
-  if (claimsEmail) return claimsEmail;
-  const claimsPhone = findPhoneInRecord(claims);
-  if (claimsPhone) return claimsPhone;
-
-  const results = await Promise.all(OPENAI_USERINFO_URLS.map(async (url) => {
-    try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-          "ChatGPT-Account-Id": accountId,
-          "User-Agent": "yolk-pi-web",
-        },
-        signal: AbortSignal.timeout(4000),
-      });
-      if (!response.ok) return null;
-
-      const body = await response.json().catch(() => null) as unknown;
-      return { email: findEmailInRecord(body), phone: findPhoneInRecord(body) };
-    } catch {
-      // Best-effort label backfill must not make account listing fail.
-      return null;
-    }
-  }));
-
-  return results.find((result): result is { email: string; phone: string | null } => Boolean(result?.email))?.email
-    ?? results.find((result): result is { email: string | null; phone: string } => Boolean(result?.phone))?.phone
-    ?? null;
-}
-
-async function resolveOpenAICodexAccountLabel(credential: NormalizedOpenAICodexCredential): Promise<string | null> {
-  return fetchOpenAICodexAccountLabel(credential.access, credential.accountId);
-}
-
-function deriveAccountId(credential: StoredOpenAICodexCredential): string {
-  if (typeof credential.accountId === "string" && credential.accountId.trim()) return credential.accountId.trim();
-
-  const tokenAccountId = extractOpenAICodexAccountId(credential.access);
-  if (tokenAccountId) return tokenAccountId;
-
-  const hash = createHash("sha256")
-    .update(credential.refresh)
-    .update("\0")
-    .update(credential.access)
-    .digest("hex")
-    .slice(0, 16);
-  return `unknown-${hash}`;
-}
-
-function normalizeCredentialAccountId(credential: StoredOpenAICodexCredential): NormalizedOpenAICodexCredential {
-  return { ...credential, accountId: deriveAccountId(credential) };
-}
+// ─── Credential identity helpers ─────────────────────────────────────────────
 
 function createStorageId(): string {
   try {
@@ -416,28 +323,30 @@ function normalizeStorageId(value: string | undefined): string | undefined {
   return storageId || undefined;
 }
 
-/** The property is non-enumerable so it is never written to Pi's OAuth credential format. */
-function withStorageId(credential: NormalizedOpenAICodexCredential, storageId: string): NormalizedOpenAICodexCredential {
+/** Attach a non-enumerable `storageId` property so it never leaks into serialized credential JSON. */
+function withStorageId(credential: Record<string, unknown>, storageId: string): SavedOAuthCredential {
   Object.defineProperty(credential, "storageId", { value: storageId, enumerable: false });
-  return credential;
+  return credential as SavedOAuthCredential;
 }
 
-function credentialStorageId(credential: NormalizedOpenAICodexCredential): string | undefined {
-  const candidate = (credential as NormalizedOpenAICodexCredential & { storageId?: unknown }).storageId;
+function credentialStorageId(credential: SavedOAuthCredential): string | undefined {
+  const candidate = (credential as SavedOAuthCredential & { storageId?: unknown }).storageId;
   return typeof candidate === "string" ? normalizeStorageId(candidate) : undefined;
 }
+
+// ─── Metadata management ─────────────────────────────────────────────────────
 
 function upsertMetadataAccount(
   metadata: OAuthAccountStoreMetadata,
   storageId: string,
-  chatgptAccountId: string,
+  realAccountId: string,
   options: SaveAccountOptions,
 ): OAuthAccountStoreMetadata {
   const now = new Date().toISOString();
   const existing = metadata.accounts.find((entry) => entry.accountId === storageId);
   const nextEntry: OAuthAccountMetadataEntry = existing
-    ? { ...existing, chatgptAccountId, updatedAt: now }
-    : { accountId: storageId, chatgptAccountId, createdAt: now, updatedAt: now };
+    ? { ...existing, chatgptAccountId: realAccountId, updatedAt: now }
+    : { accountId: storageId, chatgptAccountId: realAccountId, createdAt: now, updatedAt: now };
 
   if (options.markActive && (options.recordActivation || !nextEntry.lastActivatedAt)) {
     nextEntry.lastActivatedAt = now;
@@ -454,22 +363,16 @@ function upsertMetadataAccount(
   };
 }
 
-function maskAccountId(accountId: string): string {
-  if (accountId.length <= 10) return accountId;
-  return `${accountId.slice(0, 6)}…${accountId.slice(-4)}`;
-}
-
 function accountSummary(metadata: OAuthAccountStoreMetadata, entry: OAuthAccountMetadataEntry): OAuthAccountSummary {
   const realAccountId = entry.chatgptAccountId ?? entry.accountId;
-  const maskedAccountId = maskAccountId(realAccountId);
+  const masked = maskAccountId(realAccountId);
   return {
-    // Public API field remains named accountId for route compatibility, but is the storage id.
     accountId: entry.accountId,
     label: entry.label,
     extraInfo: entry.extraInfo,
     quotaCache: entry.quotaCache,
-    displayName: entry.label ?? maskedAccountId,
-    maskedAccountId,
+    displayName: entry.label ?? masked,
+    maskedAccountId: masked,
     active: metadata.activeAccountId === entry.accountId,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
@@ -486,7 +389,15 @@ function sortAccountSummaries(accounts: OAuthAccountSummary[]): OAuthAccountSumm
   });
 }
 
-async function backfillMissingAccountLabels(provider: string, accounts: OAuthAccountMetadataEntry[]): Promise<{ accounts: OAuthAccountMetadataEntry[]; changed: boolean }> {
+// ─── Label backfill ──────────────────────────────────────────────────────────
+
+async function backfillMissingAccountLabels(
+  provider: string,
+  adapter: OAuthAccountProviderAdapter,
+  accounts: OAuthAccountMetadataEntry[],
+): Promise<{ accounts: OAuthAccountMetadataEntry[]; changed: boolean }> {
+  if (!adapter.backfillLabel) return { accounts, changed: false };
+
   let changed = false;
   const nextAccounts: OAuthAccountMetadataEntry[] = [];
 
@@ -497,12 +408,16 @@ async function backfillMissingAccountLabels(provider: string, accounts: OAuthAcc
     }
 
     const credential = await readJsonFile(credentialPath(provider, entry.accountId), "OAuth account credential");
-    if (!isStoredOpenAICodexCredential(credential)) {
+    if (!adapter.isCredential(credential)) {
       nextAccounts.push(entry);
       continue;
     }
 
-    const label = await resolveOpenAICodexAccountLabel(normalizeCredentialAccountId(credential));
+    const cred = credential as Record<string, unknown>;
+    const label = await adapter.backfillLabel(
+      typeof cred.access === "string" ? cred.access : "",
+      entry.chatgptAccountId ?? entry.accountId,
+    );
     if (!label) {
       nextAccounts.push(entry);
       continue;
@@ -525,48 +440,78 @@ async function clearActiveAccount(provider: string): Promise<void> {
   await writeMetadata(provider, { ...metadata, activeAccountId: undefined });
 }
 
-export async function readOAuthAccountCredential(provider: string, storageId: string): Promise<NormalizedOpenAICodexCredential> {
+// ─── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Read a saved OAuth credential by its opaque storage id.
+ *
+ * The returned credential has `accountId` set to the provider-native real
+ * account id (ChatGPT account id for openai-codex, refresh-derived hash for
+ * grok-cli) and a non-enumerable `storageId` property for the opaque key.
+ */
+export async function readOAuthAccountCredential(
+  provider: string,
+  storageId: string,
+): Promise<SavedOAuthCredential> {
   if (!storageId.trim()) throw new OAuthAccountStoreError("accountId is required", 400);
 
+  const adapter = getAdapter(provider);
   const credential = await readJsonFile(credentialPath(provider, storageId), "OAuth account credential");
   if (!credential) throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
-  if (!isStoredOpenAICodexCredential(credential)) {
+  if (!adapter.isCredential(credential)) {
     throw new OAuthAccountStoreError("Saved OAuth account credential is invalid", 500);
   }
-  // `accountId` remains the real ChatGPT id used by Pi/OpenAI, never the storage id.
-  return withStorageId(normalizeCredentialAccountId(credential), storageId);
+  const cred = credential as Record<string, unknown>;
+  const accountId = adapter.deriveRealAccountId(cred);
+  return withStorageId({ ...cred, accountId }, storageId);
 }
 
-export async function getOAuthAccountAccessToken(provider: string, credential: NormalizedOpenAICodexCredential): Promise<string | undefined> {
-  assertSupportedProvider(provider);
+/**
+ * Resolve an active access token for a saved account, refreshing through
+ * Pi's registered OAuth provider when necessary.
+ */
+export async function getOAuthAccountAccessToken(
+  provider: string,
+  credential: SavedOAuthCredential,
+): Promise<string | undefined> {
+  getAdapter(provider); // validate provider
   if (Date.now() >= credential.expires && !credential.refresh.trim()) {
     throw new Error("OAuth access token expired and no refresh token is available. Please re-import the credential or log in again.");
   }
-  const result = await getOAuthApiKey(OPENAI_CODEX_PROVIDER_ID, { [OPENAI_CODEX_PROVIDER_ID]: credential });
+  const result = await getOAuthApiKey(provider, { [provider]: credential });
   if (!result?.apiKey) return undefined;
   // Refreshes must overwrite the credential's originating saved-account path.
-  await saveOAuthAccountCredential(provider, { type: "oauth", ...result.newCredentials, accountId: credential.accountId }, {
+  await saveOAuthAccountCredential(provider, { ...credential, ...result.newCredentials }, {
     storageId: credentialStorageId(credential),
   }).catch(() => {});
   return result.apiKey;
 }
 
+/**
+ * Save an OAuth credential as a managed saved account.
+ *
+ * Each call allocates an opaque storage id (unless `options.storageId`
+ * overrides it for in-place refresh updates).  The adapter validates the
+ * credential shape and derives the real account id for metadata.
+ */
 export async function saveOAuthAccountCredential(
   provider: string,
   credential: unknown,
   options: SaveAccountOptions = {},
 ): Promise<OAuthAccountSummary> {
-  assertSupportedProvider(provider);
-  if (!isStoredOpenAICodexCredential(credential)) {
+  const adapter = getAdapter(provider);
+  if (!adapter.isCredential(credential)) {
     throw new OAuthAccountStoreError("Expected an OAuth credential for the account store", 400);
   }
 
-  const normalizedCredential = normalizeCredentialAccountId(credential);
+  const cred = credential as Record<string, unknown>;
+  const realAccountId = adapter.deriveRealAccountId(cred);
   const storageId = normalizeStorageId(options.storageId) ?? await allocateStorageId(provider);
-  // Deliberately serialize only the Pi-compatible credential; storage identity stays in path/metadata.
-  await writeJsonFile(provider, credentialPath(provider, storageId), normalizedCredential);
+  // Write the credential as-is — the adapter's real account id is stored in
+  // metadata only, never injected into the credential file.
+  await writeJsonFile(provider, credentialPath(provider, storageId), cred);
 
-  const metadata = upsertMetadataAccount(await readMetadata(provider), storageId, normalizedCredential.accountId, options);
+  const metadata = upsertMetadataAccount(await readMetadata(provider), storageId, realAccountId, options);
   await writeMetadata(provider, metadata);
 
   const entry = metadata.accounts.find((account) => account.accountId === storageId);
@@ -574,18 +519,23 @@ export async function saveOAuthAccountCredential(
   return accountSummary(metadata, entry);
 }
 
+/**
+ * Sync the active credential from `authStorage` (auth.json) into the
+ * saved-account store.  Returns the active account summary, or null if
+ * no valid credential exists.
+ */
 export async function syncActiveOAuthAccountCredential(
   provider: string,
   authStorage = AuthStorage.create(),
 ): Promise<OAuthAccountSummary | null> {
-  assertSupportedProvider(provider);
+  const adapter = getAdapter(provider);
   const credential = authStorage.get(provider);
-  if (!isStoredOpenAICodexCredential(credential)) {
+  if (!adapter.isCredential(credential)) {
     await clearActiveAccount(provider);
     return null;
   }
 
-  // AuthStorage deliberately holds a plain Pi credential and therefore has no storage id.
+  // AuthStorage deliberately holds a plain Pi credential without a storage id.
   // The active metadata pointer is authoritative for an existing managed account.
   const metadata = await readMetadata(provider);
   const activeStorageId = metadata.activeAccountId && await pathExists(credentialPath(provider, metadata.activeAccountId))
@@ -594,12 +544,24 @@ export async function syncActiveOAuthAccountCredential(
   return saveOAuthAccountCredential(provider, credential, { markActive: true, storageId: activeStorageId });
 }
 
+/**
+ * Import one or more OAuth credentials from external formats (raw / CPA / sub2api).
+ *
+ * Only providers whose adapter declares `supportsCredentialImport: true` accept
+ * this operation; grok-cli returns a client error.
+ */
 export async function importOAuthAccountCredential(
   provider: string,
   mode: OAuthAccountImportMode,
   credential: unknown,
 ): Promise<OAuthAccountImportResult> {
-  assertSupportedProvider(provider);
+  const adapter = getAdapter(provider);
+  if (!adapter.supportsCredentialImport) {
+    throw new OAuthAccountStoreError(
+      `Credential import is not supported for ${provider}. Use OAuth login instead.`,
+      400,
+    );
+  }
 
   let rawCredentials: Record<string, unknown>[];
   let warnings: OAuthAccountImportWarning[];
@@ -613,26 +575,24 @@ export async function importOAuthAccountCredential(
 
   // Validate every item before allocating paths or creating any files.
   const normalizedCredentials = rawCredentials.map((rawCredential, index) => {
-    if (!isStoredOpenAICodexCredential(rawCredential)) {
+    if (!adapter.isCredential(rawCredential)) {
       throw new OAuthAccountStoreError(`Expected OAuth credential JSON with type, access, refresh, and expires at account ${index + 1}`, 400);
     }
-    return normalizeCredentialAccountId(rawCredential);
+    return { credential: rawCredential, realAccountId: adapter.deriveRealAccountId(rawCredential) };
   });
 
   const storageIds = await Promise.all(normalizedCredentials.map(() => allocateStorageId(provider)));
   const writtenPaths: string[] = [];
   try {
-    // All storage ids are newly allocated, so even identical imports and credentials with a
-    // shared real ChatGPT account id remain independent saved-account entries.
     for (let index = 0; index < normalizedCredentials.length; index += 1) {
       const path = credentialPath(provider, storageIds[index]);
-      await writeJsonFile(provider, path, normalizedCredentials[index]);
+      await writeJsonFile(provider, path, normalizedCredentials[index].credential);
       writtenPaths.push(path);
     }
 
     let metadata = await readMetadata(provider);
     for (let index = 0; index < normalizedCredentials.length; index += 1) {
-      metadata = upsertMetadataAccount(metadata, storageIds[index], normalizedCredentials[index].accountId, {});
+      metadata = upsertMetadataAccount(metadata, storageIds[index], normalizedCredentials[index].realAccountId, {});
     }
     await writeMetadata(provider, metadata);
   } catch (error) {
@@ -643,8 +603,12 @@ export async function importOAuthAccountCredential(
   return { ...await listOAuthAccounts(provider), warnings };
 }
 
+/**
+ * List all saved OAuth accounts for a provider, sorted active-first then by
+ * last-activated / updated-at descending.
+ */
 export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {
-  assertSupportedProvider(provider);
+  const adapter = getAdapter(provider);
   await syncActiveOAuthAccountCredential(provider);
 
   const metadata = await readMetadata(provider);
@@ -659,7 +623,7 @@ export async function listOAuthAccounts(provider: string): Promise<OAuthAccounts
     }
   }
 
-  const backfilled = await backfillMissingAccountLabels(provider, existingAccounts);
+  const backfilled = await backfillMissingAccountLabels(provider, adapter, existingAccounts);
   if (backfilled.changed) changed = true;
 
   const activeAccountId = metadata.activeAccountId && backfilled.accounts.some((entry) => entry.accountId === metadata.activeAccountId)
@@ -677,12 +641,15 @@ export async function listOAuthAccounts(provider: string): Promise<OAuthAccounts
   };
 }
 
+/**
+ * Update mutable metadata (label, extraInfo) for a saved account.
+ */
 export async function updateOAuthAccountMetadata(
   provider: string,
   accountId: string,
   updates: { label?: unknown; extraInfo?: unknown },
 ): Promise<OAuthAccountsList> {
-  assertSupportedProvider(provider);
+  getAdapter(provider);
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
   if (!(await pathExists(credentialPath(provider, normalizedAccountId)))) {
@@ -723,12 +690,16 @@ export async function updateOAuthAccountLabel(provider: string, accountId: strin
   return updateOAuthAccountMetadata(provider, accountId, { label });
 }
 
+/**
+ * Persist quota cache for a specific saved account.  No-op if the account
+ * does not exist.
+ */
 export async function updateOAuthAccountQuotaCache(
   provider: string,
   accountId: string,
   quotaCache: OAuthAccountQuotaCache,
 ): Promise<void> {
-  assertSupportedProvider(provider);
+  getAdapter(provider);
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) return;
   const metadata = await readMetadata(provider);
@@ -742,8 +713,15 @@ export async function updateOAuthAccountQuotaCache(
   if (changed) await writeMetadata(provider, { ...metadata, accounts });
 }
 
+/**
+ * Delete a saved account.
+ *
+ * The active account cannot be deleted — callers must activate a different
+ * account or disconnect the provider first.  The credential file is moved to
+ * a `deleted/` subdirectory for recovery.
+ */
 export async function deleteOAuthAccount(provider: string, accountId: string): Promise<OAuthAccountsList> {
-  assertSupportedProvider(provider);
+  getAdapter(provider);
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
 
@@ -764,8 +742,12 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P
   return listOAuthAccounts(provider);
 }
 
+/**
+ * Activate a saved account so it becomes the default for new sessions and
+ * is mirrored to `auth.json` for Pi's model availability checks.
+ */
 export async function activateOAuthAccount(provider: string, accountId: string): Promise<OAuthAccountsList> {
-  assertSupportedProvider(provider);
+  getAdapter(provider);
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
 
@@ -773,7 +755,13 @@ export async function activateOAuthAccount(provider: string, accountId: string):
   await syncActiveOAuthAccountCredential(provider, authStorage);
 
   const credential = await readOAuthAccountCredential(provider, normalizedAccountId);
-  authStorage.set(provider, credential);
+  // AuthStorage.set expects AuthCredential (which requires type:"oauth" for
+  // OAuth entries).  grok-cli credentials from pi-grok-cli lack this sentinel
+  // but are otherwise compatible with Pi's OAuth credential contract.
+  const authCredential = (credential as Record<string, unknown>).type
+    ? credential
+    : { ...credential, type: "oauth" as const };
+  authStorage.set(provider, authCredential as unknown as import("@earendil-works/pi-coding-agent").OAuthCredential);
   if (authStorage.drainErrors().length > 0) {
     throw new OAuthAccountStoreError("Failed to update active OAuth credential", 500);
   }

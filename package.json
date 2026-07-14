@@ -48,7 +48,13 @@
     "test:terminal-ssh": "node scripts/test-terminal-ssh-config.mjs",
     "test:opencode-go-failover-detect": "npx tsx lib/opencode-go-account-failover.test.ts",
     "test:opencode-go-failover-behavior": "node scripts/test-opencode-go-failover-behavior.mjs",
+    "test:grok-quota": "node scripts/test-grok-quota.mjs",
+    "test:grok-provider": "node scripts/test-grok-provider.mjs",
+    "test:grok-accounts": "node scripts/test-grok-accounts.mjs",
+    "test:grok-all": "npm run test:grok-provider && npm run test:grok-accounts && npm run test:grok-quota && npm run test:grok-session-isolation && npm run test:oauth-accounts",
     "test:api-key-accounts": "node scripts/run-api-key-accounts-test.mjs",
+    "test:oauth-accounts": "node scripts/run-oauth-account-tests.mjs",
+    "test:grok-session-isolation": "npx tsx lib/grok-session-isolation.test.ts",
     "test:usage-rollup": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-usage-stats-rollup.mjs",
     "test:llm-usage-store": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-llm-usage-store.mjs",
     "test:session-metadata": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-session-metadata-scanner.mjs",
@@ -58,6 +64,7 @@
     "release": "npm run release:patch"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.80.6",
     "@earendil-works/pi-ai": "^0.80.6",
     "@earendil-works/pi-coding-agent": "^0.80.6",
     "@lobehub/icons": "^5.6.0",
@@ -67,11 +74,13 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "diff": "^8.0.4",
+    "jiti": "^2.7.0",
     "katex": "^0.16.47",
     "mammoth": "^1.12.0",
     "mermaid": "^11.14.0",
     "monaco-editor": "^0.55.1",
     "next": "16.2.9",
+    "pi-grok-cli": "^0.4.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
@@ -86,11 +95,11 @@
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25",
     "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react-dom": "^19.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "postcss": "^8",
     "tailwindcss": "^4.2.2",
-    "typescript": "5.9.3"
+    "typescript": "^5.9.3"
   }
 }

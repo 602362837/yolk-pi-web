@@ -11,6 +11,8 @@ try {
 
 const nextConfig: NextConfig = {
   serverExternalPackages: [
+    "jiti",
+    "pi-grok-cli",
     "@earendil-works/pi-coding-agent",
     "@earendil-works/pi-ai",
     "@earendil-works/pi-agent-core",

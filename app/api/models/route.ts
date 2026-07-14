@@ -1,6 +1,7 @@
 import { stat } from "fs/promises";
 import { createAgentSessionServices, getAgentDir, type SettingsManager } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+import { webExtensionFactories } from "@/lib/pi-provider-extensions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
 
   try {
     const agentDir = getAgentDir();
-    const services = await createAgentSessionServices({ cwd, agentDir });
+    const services = await createAgentSessionServices({ cwd, agentDir, resourceLoaderOptions: { extensionFactories: webExtensionFactories() } });
     const registry = services.modelRegistry;
     const available = registry.getAvailable();
     modelList = available.map((m: { id: string; name: string; provider: string }) => {

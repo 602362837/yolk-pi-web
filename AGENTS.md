@@ -28,6 +28,7 @@ npm run dev     # http://localhost:30141
 | Change API behavior | `docs/modules/api.md` | Relevant `app/api/**/route.ts`, then `lib/rpc-manager.ts` or `lib/session-reader.ts` |
 | Change UI behavior | `docs/modules/frontend.md` | Relevant file in `components/` or `hooks/` |
 | Change shared logic | `docs/modules/library.md` | Relevant file in `lib/` and all callers |
+| Change Grok OAuth, accounts, or quota | `docs/integrations/README.md` | `lib/pi-provider-extensions.ts`, `lib/grok-*.ts`, `lib/oauth-account-providers.ts`, `app/api/auth/quota/[provider]/route.ts` |
 | Change session lifecycle, branching, JSONL, or SSE | `docs/architecture/overview.md` | `lib/rpc-manager.ts`, `lib/session-reader.ts`, `hooks/useAgentSession.ts` |
 | Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code |
 | Deploy, publish, or debug runtime | `docs/deployment/README.md` | `docs/operations/troubleshooting.md`, `ecosystem.config.cjs`, proxy scripts |
@@ -41,7 +42,7 @@ npm run dev     # http://localhost:30141
 | `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, Git/worktrees, and config. | `docs/modules/api.md` |
 | `components/` | React UI components. | `docs/modules/frontend.md` |
 | `hooks/` | Client hooks for session state, theme, drag/drop, audio. | `docs/modules/frontend.md` |
-| `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers. | `docs/modules/library.md` |
+| `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers, and Grok OAuth/accounts/quota modules. | `docs/modules/library.md` |
 | `bin/` | npm-published `ypi` entrypoint. | `docs/deployment/README.md` |
 | `scripts/` | Build and operational helpers. | `docs/deployment/README.md` |
 | `public/` | Static assets. | Inspect files directly. |

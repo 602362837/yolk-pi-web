@@ -1,4 +1,5 @@
-import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { AuthStorage } from "@earendil-works/pi-coding-agent";
+import { createGrokAwareModelRegistry } from "@/lib/pi-provider-extensions";
 import { NextResponse } from "next/server";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import {
@@ -23,7 +24,7 @@ type Params = { params: Promise<{ provider: string }> };
 export async function GET(_req: Request, { params }: Params) {
   const { provider } = await params;
   const authStorage = AuthStorage.create();
-  const registry = ModelRegistry.create(authStorage);
+  const registry = await createGrokAwareModelRegistry(authStorage);
   const status = registry.getProviderAuthStatus(provider);
   const displayName = registry.getProviderDisplayName(provider);
   const models = registry.getAll().filter((m) => m.provider === provider).length;
