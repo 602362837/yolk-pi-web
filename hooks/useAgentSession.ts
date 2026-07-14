@@ -143,6 +143,15 @@ export interface OpencodeGoFailoverNotice {
   showEnableGuidance: boolean;
 }
 
+/** Display-safe Grok global Active failover notice (no account ids / tokens). */
+export interface GrokFailoverNotice {
+  status: string;
+  reason?: "quota_exhausted" | "rate_limited";
+  message: string;
+  /** When true, the banner may say "Retrying"; terminal statuses must not. */
+  retrying: boolean;
+}
+
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_tools"; tools: { id: string; name: string }[] }
@@ -356,6 +365,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [sessionUsageRollup, setSessionUsageRollup] = useState<{ sessionId: string; rollup: UsageSessionRollupResult } | null>(null);
   const [opencodeGoFailoverNotice, setOpencodeGoFailoverNotice] = useState<OpencodeGoFailoverNotice | null>(null);
   const opencodeGoFailoverNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [grokFailoverNotice, setGrokFailoverNotice] = useState<GrokFailoverNotice | null>(null);
+  const grokFailoverNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
@@ -697,6 +708,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           clearTimeout(opencodeGoFailoverNoticeTimerRef.current);
           opencodeGoFailoverNoticeTimerRef.current = null;
         }
+        setGrokFailoverNotice(null);
+        if (grokFailoverNoticeTimerRef.current) {
+          clearTimeout(grokFailoverNoticeTimerRef.current);
+          grokFailoverNoticeTimerRef.current = null;
+        }
         dispatch({ type: "start" });
         break;
       case "agent_end": {
@@ -901,6 +917,61 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }, 12_000);
         break;
       }
+      case "grok_account_failover": {
+        const status = String(event.status ?? "");
+        const reason = event.reason === "quota_exhausted" || event.reason === "rate_limited"
+          ? event.reason as "quota_exhausted" | "rate_limited"
+          : undefined;
+        const serverMessage = typeof event.message === "string" && event.message.trim()
+          ? event.message.trim()
+          : undefined;
+        const isSwitched = status === "switched";
+        const isAlreadySwitched = status === "already_switched_by_other_session";
+        const isNoUsable = status === "no_usable_account";
+        const isBudget = status === "retry_budget_exhausted";
+        const isBypass = status === "fixed_token_bypass";
+        const isFailed = status === "failed" || status === "no_active_account";
+        const retrying = isSwitched || isAlreadySwitched;
+
+        let message = serverMessage ?? "Grok 账号自动切换。";
+        if (isSwitched) {
+          message = serverMessage
+            ?? (reason === "rate_limited"
+              ? "Grok 明确限流已触发，已切换全局 Active 并重试…"
+              : "Grok 明确限额已触发，已切换全局 Active 并重试…");
+        } else if (isAlreadySwitched) {
+          message = serverMessage ?? "其他会话已切换 Grok 全局 Active，正在用新账号重试…";
+        } else if (isNoUsable) {
+          message = serverMessage ?? "Grok 限额/限流已触发，但没有可用账号。";
+        } else if (isBudget) {
+          message = serverMessage ?? "Grok 限额/限流已触发，本 turn 重试预算已用尽。";
+        } else if (isBypass) {
+          message = serverMessage ?? "Grok 使用了固定环境凭据，无法通过托管账号自动切换。";
+        } else if (isFailed) {
+          message = serverMessage ?? "Grok 账号自动切换失败。";
+        }
+
+        setGrokFailoverNotice({
+          status,
+          reason,
+          message,
+          retrying,
+        });
+
+        if (retrying) {
+          setRetryInfo({
+            attempt: 1,
+            maxAttempts: 1,
+            errorMessage: message,
+          });
+        }
+
+        if (grokFailoverNoticeTimerRef.current) clearTimeout(grokFailoverNoticeTimerRef.current);
+        grokFailoverNoticeTimerRef.current = setTimeout(() => {
+          setGrokFailoverNotice(null);
+        }, 12_000);
+        break;
+      }
       case "auto_retry_start":
         setRetryInfo({ attempt: event.attempt as number, maxAttempts: event.maxAttempts as number, errorMessage: event.errorMessage as string | undefined });
         break;
@@ -929,6 +1000,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return () => {
       if (opencodeGoFailoverNoticeTimerRef.current) {
         clearTimeout(opencodeGoFailoverNoticeTimerRef.current);
+      }
+      if (grokFailoverNoticeTimerRef.current) {
+        clearTimeout(grokFailoverNoticeTimerRef.current);
       }
     };
   }, []);
@@ -1336,7 +1410,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
-    agentPhase, subagentRuns, toolProgressById, opencodeGoFailoverNotice,
+    agentPhase, subagentRuns, toolProgressById, opencodeGoFailoverNotice, grokFailoverNotice,
     isNew, precreatedSessionId, effectiveSessionId,
     // Refs
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,

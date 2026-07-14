@@ -61,52 +61,33 @@ const peSource = read("lib/pi-provider-extensions.ts");
 
 test("exports grokCliExtension with factory from pi-grok-cli", () => {
   assertIncludes(peSource, "export const grokCliExtension", "exports grokCliExtension");
-  assertIncludes(peSource, 'from "pi-grok-cli"', "imports from pi-grok-cli");
+  assertIncludes(peSource, 'import("pi-grok-cli")', "loads pi-grok-cli via jiti");
   assertIncludes(peSource, 'name: "pi-grok-cli"', "extension name is pi-grok-cli");
-  assertIncludes(peSource, "factory: grokCliFactory", "factory references grokCliFactory");
+  assertIncludes(peSource, "await factory(api)", "invokes extension factory");
 });
 
-test("exports grokSessionAccountExtension", () => {
+test("exports grokSessionAccountExtension as retired no-op", () => {
   assertIncludes(peSource, "export const grokSessionAccountExtension", "exports session-account extension");
   assertIncludes(peSource, 'name: "grok-session-account"', "extension name is grok-session-account");
+  assertIncludes(peSource, "Session Authorization pin is retired", "documents retirement");
+  assertIncludes(peSource, "Intentionally empty", "empty factory");
 });
 
-test("grokSessionAccountExtension checks provider === grok-cli", () => {
-  assertIncludes(peSource, 'ctx.model?.provider !== "grok-cli"', "checks grok-cli provider");
-  assertIncludes(peSource, "before_provider_headers", "hooks before_provider_headers");
+test("retired pin extension no longer overrides Authorization", () => {
+  assertNotIncludes(peSource, 'event.headers["authorization"]', "no authorization override");
+  assertNotIncludes(peSource, "before_provider_headers", "no header hook");
+  assertNotIncludes(peSource, 'await import("./grok-session-account")', "no session-account import");
 });
 
-test("grokSessionAccountExtension uses lazy imports to avoid cycles", () => {
-  assertIncludes(peSource, 'await import("./grok-session-account")', "lazy-imports session-account");
-  assertIncludes(peSource, 'await import("./grok-account-token")', "lazy-imports account-token");
-});
-
-test("grokSessionAccountExtension sets Authorization header", () => {
-  assertIncludes(peSource, 'event.headers["authorization"]', "sets authorization header with session token");
-  assertIncludes(peSource, "Bearer ${token.accessToken}", "uses Bearer token format");
-});
-
-test("grokSessionAccountExtension gracefully handles missing session", () => {
-  assertIncludes(peSource, "if (!sessionId) return", "returns early without session id");
-  assertIncludes(peSource, "if (!storageId) return", "returns early without storage id");
-});
-
-test("grokSessionAccountExtension catches errors without breaking request", () => {
-  // The catch block lets the request proceed with default auth
-  assertIncludes(peSource, "catch {", "has error handler");
-  assertIncludes(peSource, "// If we can't resolve", "graceful degradation comment");
-});
-
-test("exports webExtensionFactories() helper", () => {
+test("exports webExtensionFactories() helper without session pin", () => {
   assertIncludes(peSource, "export function webExtensionFactories", "exports webExtensionFactories");
-  assertIncludes(peSource, "[grokCliExtension, grokSessionAccountExtension", "prepends grok + session extensions");
-  assertIncludes(peSource, "...extra", "spreads extra factories");
+  assertIncludes(peSource, "return [grokCliExtension, ...extra]", "prepends only grokCliExtension");
+  assertNotIncludes(peSource, "[grokCliExtension, grokSessionAccountExtension", "session pin not wired");
 });
 
-test("webExtensionFactories order: grok → session-account → extra", () => {
-  // The order determines which extension's before_provider_headers runs first
-  // We already verified the array construction above; also check the comment
-  assertIncludes(peSource, "Grok session-account runs after provider", "order documented");
+test("webExtensionFactories documents global Active auth path", () => {
+  assertIncludes(peSource, "global Active account from auth.json", "global Active documented");
+  assertIncludes(peSource, "Main inference no longer injects a session-bound Authorization header", "pin retired documented");
 });
 
 test("exports ensureGrokBootstrapped() for cold-start safety", () => {
@@ -137,10 +118,11 @@ test("pi-provider-extensions does not deep-import pi-grok-cli/src", () => {
   assertNotIncludes(peSource, "pi-grok-cli/dist", "no deep import of dist");
 });
 
-test("pi-provider-extensions imports only default export", () => {
-  // The only import should be the default factory
-  const importMatches = peSource.match(/from\s+["']pi-grok-cli["']/g) || [];
-  assert.strictEqual(importMatches.length, 1, "exactly one import from pi-grok-cli");
+test("pi-provider-extensions loads pi-grok-cli only via jiti dynamic import", () => {
+  // Static ESM import is avoided; jiti.import("pi-grok-cli") is the only load site.
+  const staticImports = peSource.match(/from\s+["']pi-grok-cli["']/g) || [];
+  assert.strictEqual(staticImports.length, 0, "no static import from pi-grok-cli");
+  assertIncludes(peSource, 'import("pi-grok-cli")', "jiti dynamic import of pi-grok-cli");
 });
 
 test("grok-account-token does not deep-import pi-grok-cli", () => {
@@ -290,11 +272,9 @@ test("pi-provider-extensions documents full-extension scope", () => {
   assertIncludes(peSource, "Imagine, and request hooks", "documents Imagine and request hooks");
 });
 
-test("grokSessionAccountExtension docs note vision/Imagine risk", () => {
-  // This was a decision in the design doc — the session-account extension
-  // may not cover vision/Imagine which use different request paths.
-  // The comment should acknowledge the limitation.
-  assertIncludes(peSource, "before_provider_headers", "token injection mechanism is documented");
+test("session pin retirement is documented for main inference", () => {
+  assertIncludes(peSource, "Session Authorization pin is retired", "retirement documented");
+  assertIncludes(peSource, "global Active account", "global Active path documented");
 });
 
 // ============================================================================
@@ -375,9 +355,9 @@ test("ensureGrokBootstrapped survives missing dependency gracefully", () => {
   assertIncludes(peSource, "// Best-effort only", "bootstrap is best-effort");
 });
 
-test("grokSessionAccountExtension does not break non-grok providers", () => {
-  // The first check in before_provider_headers returns early for non-grok
-  assertIncludes(peSource, 'if (ctx.model?.provider !== "grok-cli") return', "early return for non-grok");
+test("retired pin extension is a no-op factory and cannot break non-grok providers", () => {
+  assertIncludes(peSource, "Intentionally empty", "empty factory");
+  assertNotIncludes(peSource, "before_provider_headers", "no header hook remains");
 });
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

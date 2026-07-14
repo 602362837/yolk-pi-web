@@ -94,6 +94,31 @@ The failover lock is **process-level** (`globalThis.__piOpencodeGoFailover`). In
 - Disable auto failover if cross-process race conditions become a practical issue.
 - A future v2 may add file-system or external locking for multi-process deployments.
 
+## Grok Global Active Auto Failover
+
+Optional Grok failover (`grok.autoFailover` in `~/.pi/agent/pi-web.json`, default off) rotates the **global Active** Grok OAuth account when an assistant error is an explicit quota/usage/credits/monthly/weekly exhaustion or an explicit rate-limit / too-many-requests shape. Manual Models Activate is **not** a lock: a manually activated account can still be rotated when eligible. Historical session header `grokAccountStorageId` is ignored at runtime.
+
+### Expected behavior
+
+- Activate B in Models: ordinary live/new Grok sessions use B on the **next** provider request; in-flight requests keep their original token.
+- With auto-failover enabled, an eligible limit error on B switches Active to C once, reloads live wrappers, and retries the same turn once.
+- Concurrent sessions: at most one actual switch; the other session retries with the new Active and does not cascade to a third account.
+- Chat shows a sanitized notice. Only `switched` / `already_switched_by_other_session` may say Retrying; no-candidate / budget / fixed-token bypass are terminal.
+
+### Does **not** trigger
+
+Bare HTTP status alone, fuzzy help text that merely mentions limit/rate, network/timeout/5xx, auth/reauth, context overflow, content filter, or model unavailable.
+
+### Rollback
+
+1. Settings → Grok → turn off **明确限额或限流时自动切换可用账号**, or set `grok.autoFailover.enabled` to `false` in `pi-web.json`.
+2. Takes effect on the next turn; no restart required.
+3. ChatGPT/OpenCode Go failover state is independent (`__piChatGptFailover` / `__piOpencodeGoFailover` vs `__piGrokFailover`).
+
+### Fixed token bypass
+
+If `GROK_CLI_OAUTH_TOKEN` (or related fixed env tokens) override managed OAuth for actual requests, auto-failover refuses to report a fake switch and surfaces a display-safe notice without leaking the token.
+
 
 ## YPI Studio DAG and Async Runs
 

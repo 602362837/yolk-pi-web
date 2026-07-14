@@ -36,6 +36,8 @@ export interface GrokAccessToken {
 export interface GrokAccessTokenOptions {
   /** Minimum remaining validity in ms before a refresh is triggered. Default 120_000 (2 min). */
   minValidityMs?: number;
+  /** When true, always refresh even if the token is still within minValidityMs. */
+  forceRefresh?: boolean;
   /** AbortSignal to cancel a long-running refresh. */
   signal?: AbortSignal;
 }
@@ -193,7 +195,7 @@ export async function getGrokAccessToken(
   storageId: string,
   opts: GrokAccessTokenOptions = {},
 ): Promise<GrokAccessToken> {
-  const { minValidityMs = 120_000, signal } = opts;
+  const { minValidityMs = 120_000, forceRefresh = false, signal } = opts;
 
   if (!storageId.trim()) {
     throw new Error("grokAccountStorageId is required");
@@ -220,7 +222,9 @@ export async function getGrokAccessToken(
 
       const access = typeof raw.access === "string" ? raw.access.trim() : "";
       const expires = typeof raw.expires === "number" ? raw.expires : 0;
-      const needsRefresh = !access || epochNow() >= expires - minValidityMs;
+      // forceRefresh must refresh even when the token is still far from expiry.
+      // Do not fake this with minValidityMs:0 alone — that only refreshes expired tokens.
+      const needsRefresh = forceRefresh || !access || epochNow() >= expires - minValidityMs;
 
       if (!needsRefresh) {
         return { accessToken: access, refreshed: false, expiresAt: expires };

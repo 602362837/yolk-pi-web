@@ -1,7 +1,42 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-14T05:08:18.423Z",
+  "updatedAt": "2026-07-14T08:22:48.320Z",
   "entries": [
+    {
+      "id": "20260714-162248-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+      "title": "完善 Grok CLI 限额自动切号与运行中 Session 账号切换",
+      "taskId": "20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+      "taskKey": "archived:2026-07:20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+      "workflowId": "feature-dev",
+      "summary": "Grok CLI 自动切号采用独立 controller（Path B），不修改 GPT 生产切号逻辑。手动 Activate 只是全局 Active，不锁定账号；开启自动切号后，明确 quota/rate-limit 错误会轮换可用账号并在同一 turn 重试一次。使用锁、Active 二次检查和预算避免并发级联；in-flight 请求保持原 token，后续普通 Session 使用新 Active。Grok 仅扩展 provider-specific classifier、monthly/weekly quota candidate、token force refresh 和 UI 配置；网络、超时、5xx、认证、上下文及模糊错误不触发。通过 GPT contract、Grok adapter/runtime/global-auth、lint、tsc 验证。",
+      "tags": [
+        "grok",
+        "自动切号",
+        "限额",
+        "多账号",
+        "gpt兼容",
+        "oauth",
+        "failover",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260714-133704-完善-grok-cli-限额自动切号与运行中-session-账号切换",
+      "knowledgePath": ".ypi/knowledge/20260714-162248-完善-grok-cli-限额自动切号与运行中-session-账号切换.md",
+      "createdAt": "2026-07-14T08:22:48.320Z",
+      "archivedAt": "2026-07-14T08:22:48.320Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260714-130818-完善计费模块与模型价格配置",
       "title": "完善计费模块与模型价格配置",

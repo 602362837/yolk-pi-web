@@ -4,11 +4,6 @@ import { writeSessionHeader } from "./ypi-studio-child-session-header";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
 import { webExtensionFactories } from "./pi-provider-extensions";
 import {
-  bindGrokSessionAccount,
-  readGrokSessionAccountFromHeader,
-  unbindGrokSessionAccount,
-} from "./grok-session-account";
-import {
   appendYpiStudioSubagentTranscriptItem,
   finalizeYpiStudioSubagentTranscript,
   previewYpiStudioTranscriptText,
@@ -557,7 +552,6 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
     }
     unregisterYpiStudioChildRun(meta.runId);
     try { unsubscribe?.(); } catch {}
-    if (childSessionId) unbindGrokSessionAccount(childSessionId);
     try { session?.dispose(); } catch {}
     return result;
   };
@@ -603,15 +597,8 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
       writer.ref.childSessionFile = childSessionFile;
     }
 
-    // Inherit Grok session-account binding from parent session.
-    // Studio children using grok-cli inherit the parent's pinned account
-    // so they do not flip to the current active account mid-task.
-    if (meta.parentSessionFile && childSessionFile) {
-      const parentGrokStorageId = readGrokSessionAccountFromHeader(meta.parentSessionFile);
-      if (parentGrokStorageId) {
-        bindGrokSessionAccount(childSessionId, parentGrokStorageId, childSessionFile);
-      }
-    }
+    // Grok session pin is retired. Studio children use the global Active
+    // account via auth.json like normal sessions.
 
     const services = await pi.createAgentSessionServices({
       cwd: root,
@@ -683,7 +670,6 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
     }
   } catch (error) {
     try { unsubscribe?.(); } catch {}
-    if (childSessionId) unbindGrokSessionAccount(childSessionId);
     try { session?.dispose(); } catch {}
     unregisterYpiStudioChildRun(meta.runId);
     const message = error instanceof Error ? error.message : String(error);

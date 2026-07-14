@@ -40,84 +40,30 @@ export const grokCliExtension: InlineExtension = {
 };
 
 /**
- * Inline extension that overrides the Authorization header for grok-cli
- * requests with the session-bound account's access token.
- *
- * On every provider request, it looks up the session's bound Grok account
- * in the runtime registry, resolves the access token (with single-flight
- * refresh), and overrides the authorization header.  This is the mechanism
- * that ensures concurrent Grok sessions use their own account's token
- * regardless of which account is currently active in auth.json.
- *
- * Requests for non-grok-cli providers pass through unchanged.
+ * @deprecated Session Authorization pin is retired. Grok main inference now
+ * uses the global Active account via auth.json + live reload. This export is
+ * kept only so historical tests can assert the pin path is no longer wired
+ * into `webExtensionFactories()`.
  */
 export const grokSessionAccountExtension: InlineExtension = {
   name: "grok-session-account",
-  factory: (api) => {
-    // Lazy-import to avoid module-level cycles with grok-session-account ↔ pi-provider-extensions
-    let _resolver: {
-      getGrokSessionAccount: (sessionId: string) => string | undefined;
-      getGrokAccessToken: (storageId: string, opts?: { minValidityMs?: number; signal?: AbortSignal }) => Promise<{ accessToken: string; refreshed: boolean; expiresAt: number }>;
-    } | null = null;
-
-    const ensureResolver = async () => {
-      if (_resolver) return _resolver;
-      const mod = await import("./grok-session-account");
-      const tok = await import("./grok-account-token");
-      _resolver = {
-        getGrokSessionAccount: mod.getGrokSessionAccount,
-        getGrokAccessToken: tok.getGrokAccessToken,
-      };
-      return _resolver;
-    };
-
-    api.on("before_provider_headers", async (event, ctx) => {
-      // Only override for grok-cli provider requests
-      if (ctx.model?.provider !== "grok-cli") return;
-
-      let sessionId: string | undefined;
-      try {
-        sessionId = ctx.sessionManager?.getSessionId?.();
-      } catch {
-        return;
-      }
-      if (!sessionId) return;
-
-      const resolver = await ensureResolver();
-      const storageId = resolver.getGrokSessionAccount(sessionId);
-      if (!storageId) return;
-
-      try {
-        const token = await resolver.getGrokAccessToken(storageId, {
-          minValidityMs: 120_000,
-          signal: ctx.signal,
-        });
-        if (token.accessToken) {
-          // Override the authorization header set by the SDK's default
-          // auth resolution (which uses the global active account).
-          event.headers["authorization"] = `Bearer ${token.accessToken}`;
-        }
-      } catch {
-        // If we can't resolve the session-bound token, let the request
-        // proceed with the default auth (active account).  The upstream
-        // provider will 401 and the SDK's normal error path handles it.
-      }
-    });
+  factory: () => {
+    // Intentionally empty — session pin no longer overrides Authorization.
   },
 };
 
 /**
  * Return the standard Web extension factory list with Grok prepended.
  *
- * Order: Grok provider registration → Grok session-account token injection
- * → `extra` factories (YPI Studio, Browser Share, Studio child guard, etc.).
+ * Order: Grok provider registration → `extra` factories (YPI Studio,
+ * Browser Share, Studio child guard, etc.).
  *
- * Grok session-account runs after provider registration so the OAuth
- * provider is available for token refresh, and before other extensions
- * so they see the session-bound Authorization header.
+ * Main inference no longer injects a session-bound Authorization header;
+ * Grok requests use the global Active account from auth.json, reloaded into
+ * live wrappers after Activate / auto-failover.
  */
 export function webExtensionFactories(extra: InlineExtension[] = []): InlineExtension[] {
-  return [grokCliExtension, grokSessionAccountExtension, ...extra];
+  return [grokCliExtension, ...extra];
 }
 
 // ---------------------------------------------------------------------------

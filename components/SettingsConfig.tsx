@@ -12,6 +12,7 @@ import type {
   PiWebChatGptConfig,
   PiWebConfig,
   PiWebEditorConfig,
+  PiWebGrokConfig,
   PiWebOpencodeGoConfig,
   PiWebSubagentAgentConfig,
   PiWebSubagentDifficultyTier,
@@ -85,7 +86,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "editor" | "trellis" | "diagnostics";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "grok" | "editor" | "trellis" | "diagnostics";
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -293,6 +294,9 @@ function ToggleField({
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       disabled={disabled}
       onClick={() => {
         if (!disabled) onChange(!checked);
@@ -735,6 +739,11 @@ function opencodeGoConfigsEqual(a: PiWebOpencodeGoConfig | null, b: PiWebOpencod
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function grokConfigsEqual(a: PiWebGrokConfig | null, b: PiWebGrokConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function editorConfigsEqual(a: PiWebEditorConfig | null, b: PiWebEditorConfig | null): boolean {
   if (!a || !b) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);
@@ -784,6 +793,8 @@ export function SettingsConfig({
   const [savedChatgpt, setSavedChatgpt] = useState<PiWebChatGptConfig | null>(null);
   const [opencodeGo, setOpencodeGo] = useState<PiWebOpencodeGoConfig | null>(null);
   const [savedOpencodeGo, setSavedOpencodeGo] = useState<PiWebOpencodeGoConfig | null>(null);
+  const [grok, setGrok] = useState<PiWebGrokConfig | null>(null);
+  const [savedGrok, setSavedGrok] = useState<PiWebGrokConfig | null>(null);
   const [editor, setEditor] = useState<PiWebEditorConfig | null>(null);
   const [savedEditor, setSavedEditor] = useState<PiWebEditorConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -801,8 +812,8 @@ export function SettingsConfig({
 
 
   const dirty = useMemo(
-    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !editorConfigsEqual(editor, savedEditor),
-    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, editor, savedEditor],
+    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !grokConfigsEqual(grok, savedGrok) || !editorConfigsEqual(editor, savedEditor),
+    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, grok, savedGrok, editor, savedEditor],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -830,6 +841,8 @@ export function SettingsConfig({
       setSavedChatgpt(data.config.chatgpt);
       setOpencodeGo(data.config.opencodeGo);
       setSavedOpencodeGo(data.config.opencodeGo);
+      setGrok(data.config.grok);
+      setSavedGrok(data.config.grok);
       setEditor(data.config.editor);
       setSavedEditor(data.config.editor);
       setConfigPath(data.path);
@@ -971,6 +984,11 @@ export function SettingsConfig({
 
   const updateOpencodeGo = useCallback((patch: Partial<PiWebOpencodeGoConfig>) => {
     setOpencodeGo((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
+  const updateGrok = useCallback((patch: Partial<PiWebGrokConfig>) => {
+    setGrok((prev) => prev ? { ...prev, ...patch } : prev);
     setNotice(null);
   }, []);
 
@@ -1159,6 +1177,8 @@ export function SettingsConfig({
     setSavedChatgpt(config.chatgpt);
     setOpencodeGo(config.opencodeGo);
     setSavedOpencodeGo(config.opencodeGo);
+    setGrok(config.grok);
+    setSavedGrok(config.grok);
     setEditor(config.editor);
     setSavedEditor(config.editor);
     setConfigPath(path);
@@ -1167,7 +1187,7 @@ export function SettingsConfig({
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor) return false;
+    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -1175,7 +1195,7 @@ export function SettingsConfig({
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, editor }),
+        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, editor }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -1188,10 +1208,10 @@ export function SettingsConfig({
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, editor]);
+  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, editor]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Grok/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -1204,6 +1224,7 @@ export function SettingsConfig({
     setTerminal(defaults.terminal);
     setChatgpt(defaults.chatgpt);
     setOpencodeGo(defaults.opencodeGo);
+    setGrok(defaults.grok);
     setEditor(defaults.editor);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
@@ -1340,6 +1361,7 @@ export function SettingsConfig({
             {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
             {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量与自动切换")}
             {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
+            {renderSectionButton("grok", "Grok", "Grok 全局 Active 与自动切号")}
             {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
             {renderSectionButton("diagnostics", "诊断", "内存诊断快照")}
@@ -1348,7 +1370,7 @@ export function SettingsConfig({
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && editor ? (
+            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && grok && editor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -1800,6 +1822,26 @@ export function SettingsConfig({
                       只有 enabled 账号才会参与 failover。disabled 账号不会作为候选，也不能被激活。被自动禁用的账号可在 Models 中 Enable 恢复，但不会自动重新激活。
                     </div>
                   </div>
+                ) : section === "grok" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Grok</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制 Grok CLI 全局 Active 账号的自动轮换。Models 的 Activate 只设置当前全局 Active，不是锁定；账号管理仍在 Models 中完成。
+                        保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="明确限额或限流时自动切换可用账号"
+                      description="默认关闭。开启后仅对 grok-cli 生效：当 provider code/type 或已确认错误文案明确识别为 quota、usage、credits、monthly、weekly exhaustion，或 rate-limit / too-many-requests 时，后端会在进程锁内切换全局 Active 并安全重试同一 turn 一次。手动 Activate 的账号同样参与自动轮换。裸/模糊状态、网络错误、timeout、5xx、auth/reauth、context、content 或 model 错误不会触发。切换影响所有普通 live/new Session 的后续请求；已发出的 in-flight 请求不换 token。每 turn 默认最多 1 次切号 / 1 次重试；并发时后进入者复用新 Active，不级联切第三账号。"
+                      checked={grok.autoFailover.enabled}
+                      onChange={(enabled) => updateGrok({ autoFailover: { ...grok.autoFailover, enabled } })}
+                    />
+                    <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
+                      候选账号需要有效凭证，且 monthly remaining &gt; 0；若存在 weekly 则 usedPercent &lt; 100，且额度缓存/查询结果在允许新鲜度内、无需 reauth。固定环境 token 覆盖托管 OAuth 时不会伪称切换成功。
+                    </div>
+                  </div>
                 ) : section === "editor" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
@@ -2205,8 +2247,8 @@ export function SettingsConfig({
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>

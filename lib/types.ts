@@ -41,7 +41,11 @@ export interface SessionHeader {
   spaceId?: string;
   /** YPI Studio audit metadata for persistent child sessions. Task/run state remains authoritative in task.json. */
   studioChild?: StudioChildSessionInfo;
-  /** Opaque Grok saved-account storage id pinned to this session. Non-secret; only the opaque storage key, never a credential. */
+  /**
+   * @deprecated Ignored at runtime. Historical Grok session pin field retained
+   * for JSONL parse compatibility only; main inference uses global Active.
+   * Non-secret opaque storage key, never a credential.
+   */
   grokAccountStorageId?: string;
 }
 
