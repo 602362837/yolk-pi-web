@@ -742,10 +742,16 @@ function normalizeSubagentInput(value: unknown): StudioSubagentInput {
   };
 }
 
+/** Floor for ypi_studio_wait.timeoutMs — models often invent 120s/1s; child work must not be sliced that short. */
+const YPI_STUDIO_WAIT_MIN_TIMEOUT_MS = 30 * 60_000;
+const YPI_STUDIO_WAIT_MAX_TIMEOUT_MS = 60 * 60_000;
+const YPI_STUDIO_WAIT_DEFAULT_TIMEOUT_MS = YPI_STUDIO_WAIT_MIN_TIMEOUT_MS;
+
 function normalizeWaitInput(value: unknown): StudioWaitInput {
   const raw = isObj(value) ? value : {};
+  // Allow longer waits; never accept below 30 minutes (short values are raised, not rejected).
   const timeoutMs = typeof raw.timeoutMs === "number" && Number.isFinite(raw.timeoutMs)
-    ? Math.min(60 * 60_000, Math.max(1_000, Math.floor(raw.timeoutMs)))
+    ? Math.min(YPI_STUDIO_WAIT_MAX_TIMEOUT_MS, Math.max(YPI_STUDIO_WAIT_MIN_TIMEOUT_MS, Math.floor(raw.timeoutMs)))
     : undefined;
   const pollIntervalMs = typeof raw.pollIntervalMs === "number" && Number.isFinite(raw.pollIntervalMs)
     ? Math.min(15_000, Math.max(500, Math.floor(raw.pollIntervalMs)))
@@ -2678,7 +2684,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
     promptGuidelines: [
       "After ypi_studio_subagent(action=start, mode=async), call ypi_studio_wait with the returned runId(s) unless you are explicitly only reporting that background work has started.",
       "ypi_studio_wait streams compact progress via onUpdate and returns terminal run summaries; continue orchestration from its result.",
-      "If wait returns still_running due to timeout, tell the user Studio is still working or call ypi_studio_wait again with an appropriate timeout.",
+      "Prefer omitting timeoutMs so the default 30-minute wait applies. If you pass timeoutMs, values below 30 minutes are raised to 30 minutes; max is 60 minutes. Never invent short waits such as 120s or 1s for member work.",
+      "If wait returns still_running due to timeout, tell the user Studio is still working or call ypi_studio_wait again (omit timeoutMs or use >= 30 minutes).",
     ],
     parameters: {
       type: "object",
@@ -2687,7 +2694,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
         runId: { type: "string" },
         runIds: { type: "array", items: { type: "string" } },
         until: { type: "string", enum: ["child_terminal", "next_orchestration_step"], description: "Defaults to child_terminal; next_orchestration_step currently waits for child terminal and returns orchestration hints." },
-        timeoutMs: { type: "number", description: "Maximum wait time. Defaults to 30 minutes, capped at 60 minutes." },
+        timeoutMs: { type: "number", description: "Maximum wait time in ms. Defaults to 30 minutes. Minimum 30 minutes (shorter values are raised); maximum 60 minutes." },
         pollIntervalMs: { type: "number", description: "Polling interval. Defaults to 2000ms." },
       },
     },
@@ -2696,7 +2703,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
       const key = getKey(input, ctx);
       const taskId = currentTaskIdOrThrow(root, key, input.taskId);
       const requestedRunIds = input.runIds?.length ? input.runIds : input.runId ? [input.runId] : [];
-      const timeoutMs = input.timeoutMs ?? 30 * 60_000;
+      const timeoutMs = input.timeoutMs ?? YPI_STUDIO_WAIT_DEFAULT_TIMEOUT_MS;
       const pollIntervalMs = input.pollIntervalMs ?? 2_000;
       const startedAt = Date.now();
       const terminalStatuses = new Set<YpiStudioTaskSubagentRun["status"]>(["succeeded", "failed", "cancelled", "waiting_for_user"]);
