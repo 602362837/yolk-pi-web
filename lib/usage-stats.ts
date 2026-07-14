@@ -210,7 +210,8 @@ function addTotals(target: UsageTotals, source: UsageTotals): void {
   target.input += source.input;
   target.output += source.output;
   target.cacheRead += source.cacheRead;
-  target.cacheWrite += source.cacheWrite;
+  // cacheWrite: no longer aggregated (per cw-removal decision).
+  // Field stays at 0 for backward compatibility.
   target.cost += source.cost;
   target.calls += source.calls;
 }
@@ -226,7 +227,8 @@ function addUsage(totals: UsageTotals, usage: AssistantMessage["usage"]): void {
   totals.input += usage.input ?? 0;
   totals.output += usage.output ?? 0;
   totals.cacheRead += usage.cacheRead ?? 0;
-  totals.cacheWrite += usage.cacheWrite ?? 0;
+  // cacheWrite: no longer aggregated (per cw-removal decision).
+  // Field stays at 0 for backward compatibility.
   totals.cost += usage.cost?.total ?? 0;
   totals.calls += 1;
 }

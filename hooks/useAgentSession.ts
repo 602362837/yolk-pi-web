@@ -403,10 +403,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       tokens.input += u.input ?? 0;
       tokens.output += u.output ?? 0;
       tokens.cacheRead += u.cacheRead ?? 0;
-      tokens.cacheWrite += u.cacheWrite ?? 0;
+      // cacheWrite: no longer aggregated (per cw-removal decision).
+      // Field stays at 0 in tokens object for backward compatibility.
       cost += u.cost?.total ?? 0;
     }
-    const total = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite;
+    // cacheWrite excluded from total per cw-removal decision
+    const total = tokens.input + tokens.output + tokens.cacheRead;
     return total > 0 ? { tokens, cost, source: "local" as const, studioChildSessionCount: 0 } : null;
   })();
 
@@ -423,7 +425,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const rollupSessionStats = sessionUsageRollup?.sessionId === effectiveSessionId
     ? (() => {
       const base = statsFromTotals(sessionUsageRollup.rollup.totals);
-      const tokenTotal = base.tokens.input + base.tokens.output + base.tokens.cacheRead + base.tokens.cacheWrite;
+      // cacheWrite excluded per cw-removal decision
+      const tokenTotal = base.tokens.input + base.tokens.output + base.tokens.cacheRead;
       return tokenTotal > 0 || base.cost > 0 || sessionUsageRollup.rollup.studioChildSessionCount > 0
         ? {
           ...base,

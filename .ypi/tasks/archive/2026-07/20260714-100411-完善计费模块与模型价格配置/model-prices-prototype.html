@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Y yolk-pi-web: 模型价格配置与计费模块原型</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: 'var(--bg)',
+            'bg-panel': 'var(--bg-panel)',
+            'bg-hover': 'var(--bg-hover)',
+            'bg-selected': 'var(--bg-selected)',
+            border: 'var(--border)',
+            text: 'var(--text)',
+            'text-muted': 'var(--text-muted)',
+            'text-dim': 'var(--text-dim)',
+            accent: 'var(--accent)',
+            'accent-hover': 'var(--accent-hover)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --assistant-bg: #ffffff;
+      --tool-bg: #f9fafb;
+      --bg-subtle: rgba(0,0,0,0.03);
+    }
+
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --assistant-bg: #1a1a1a;
+      --tool-bg: #1f2937;
+      --bg-subtle: rgba(255,255,255,0.04);
+    }
+
+    body {
+      background-color: var(--bg-panel); /* Outer environment fallback */
+      color: var(--text); /* Default text color fallback to prevent black-on-black */
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    /* ==================== TAILWIND FALLBACK STYLES (In case CDN is blocked/offline) ==================== */
+    .bg-bg { background-color: var(--bg) !important; }
+    .bg-bg-panel { background-color: var(--bg-panel) !important; }
+    .bg-bg-hover:hover { background-color: var(--bg-hover) !important; }
+    .bg-bg-selected { background-color: var(--bg-selected) !important; }
+    .bg-accent { background-color: var(--accent) !important; }
+    .bg-slate-900 { background-color: #0f172a !important; }
+    html.dark .bg-slate-900 { background-color: #0b0f19 !important; }
+    .bg-red-500\/10 { background-color: rgba(239, 68, 68, 0.1) !important; }
+    .bg-yellow-500\/10 { background-color: rgba(234, 179, 8, 0.1) !important; }
+    .bg-green-500\/10 { background-color: rgba(34, 197, 94, 0.1) !important; }
+    .bg-blue-500\/10 { background-color: rgba(59, 130, 246, 0.1) !important; }
+
+    .text-text { color: var(--text) !important; }
+    .text-text-muted { color: var(--text-muted) !important; }
+    .text-text-dim { color: var(--text-dim) !important; }
+    .text-accent { color: var(--accent) !important; }
+    .text-slate-200 { color: var(--text) !important; }
+    .text-slate-400 { color: var(--text-muted) !important; }
+    .text-red-500 { color: #ef4444 !important; }
+    .text-green-500 { color: #22c55e !important; }
+    .text-yellow-500 { color: #eab308 !important; }
+    .text-blue-500 { color: #3b82f6 !important; }
+
+    .border-border { border-color: var(--border) !important; }
+    .border-slate-800 { border-color: rgba(30, 41, 59, 0.5) !important; }
+    html.dark .border-slate-800 { border-color: #1e293b !important; }
+    .border { border: 1px solid var(--border) !important; }
+    .border-b { border-bottom: 1px solid var(--border) !important; }
+    .border-t { border-top: 1px solid var(--border) !important; }
+    .border-l { border-left: 1px solid var(--border) !important; }
+    .border-r { border-right: 1px solid var(--border) !important; }
+
+    /* Basic layout fallbacks */
+    .flex { display: flex !important; }
+    .flex-col { flex-direction: column !important; }
+    .flex-row { flex-direction: row !important; }
+    .flex-wrap { flex-wrap: wrap !important; }
+    .flex-1 { flex: 1 1 0% !important; }
+    .flex-shrink-0 { flex-shrink: 0 !important; }
+    .hidden { display: none !important; }
+    .inline-block { display: inline-block !important; }
+    .w-full { width: 100% !important; }
+    .h-full { height: 100% !important; }
+    .min-h-screen { min-height: 100vh !important; }
+    .grid { display: grid !important; }
+    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+    
+    @media (min-width: 768px) {
+      .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+      .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    }
+
+    /* Padding & sizing fallbacks */
+    .p-4 { padding: 1rem !important; }
+    .p-3 { padding: 0.75rem !important; }
+    .p-2 { padding: 0.5rem !important; }
+    .px-4 { padding-left: 1rem !important; padding-right: 1rem !important; }
+    .py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    .gap-2 { gap: 0.5rem !important; }
+    .gap-3 { gap: 0.75rem !important; }
+    .gap-4 { gap: 1rem !important; }
+    .rounded-xl { border-radius: 0.75rem !important; }
+    .rounded-lg { border-radius: 0.5rem !important; }
+    .rounded-md { border-radius: 0.375rem !important; }
+    .rounded { border-radius: 0.25rem !important; }
+    .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important; }
+    .font-mono { font-family: monospace !important; }
+    .font-semibold { font-weight: 600 !important; }
+    .font-bold { font-weight: 700 !important; }
+    .text-xs { font-size: 0.75rem !important; }
+    .text-sm { font-size: 0.875rem !important; }
+    .text-xl { font-size: 1.25rem !important; }
+    .text-right { text-align: right !important; }
+    .text-center { text-align: center !important; }
+
+    /* Forms & Interactive fallbacks */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+    input[type="text"], input[type="number"], select {
+      background-color: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+    }
+    button {
+      cursor: pointer;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-dim);
+    }
+
+    /* ==================== INTERACTIVE / LAYOUT FALLBACKS (no Tailwind CDN) ==================== */
+    /* Transform utilities — critical for drawer, toasts, modals */
+    .translate-x-full { transform: translateX(100%) !important; }
+    .-translate-x-full { transform: translateX(-100%) !important; }
+    .translate-y-2 { transform: translateY(0.5rem) !important; }
+    .-translate-y-2 { transform: translateY(-0.5rem) !important; }
+    .translate-y-0 { transform: translateY(0) !important; }
+
+    /* Opacity utilities */
+    .opacity-0 { opacity: 0 !important; }
+    .opacity-40 { opacity: 0.4 !important; }
+    .opacity-70 { opacity: 0.7 !important; }
+    .opacity-100 { opacity: 1 !important; }
+    .pointer-events-none { pointer-events: none !important; }
+    .pointer-events-auto { pointer-events: auto !important; }
+
+    /* Transition utilities */
+    .transition-transform { transition-property: transform !important; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; transition-duration: 150ms !important; }
+    .transition-colors { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke !important; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; transition-duration: 150ms !important; }
+    .transition-all { transition-property: all !important; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; transition-duration: 150ms !important; }
+    .transition { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter !important; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; transition-duration: 150ms !important; }
+    .duration-300 { transition-duration: 300ms !important; }
+    .duration-150 { transition-duration: 150ms !important; }
+    .ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; }
+
+    /* Animation utilities */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .5; }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; }
+    .animate-spin { animation: spin 1s linear infinite !important; }
+
+    /* Backdrop blur for modals */
+    .backdrop-blur-sm { backdrop-filter: blur(4px) !important; -webkit-backdrop-filter: blur(4px) !important; }
+
+    /* Z-index stack */
+    .z-10 { z-index: 10 !important; }
+    .z-20 { z-index: 20 !important; }
+    .z-50 { z-index: 50 !important; }
+
+    /* Overflow utilities */
+    .overflow-hidden { overflow: hidden !important; }
+    .overflow-auto { overflow: auto !important; }
+    .overflow-y-auto { overflow-y: auto !important; }
+    .overflow-x-auto { overflow-x: auto !important; }
+
+    /* Whitespace & truncation */
+    .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+    .whitespace-nowrap { white-space: nowrap !important; }
+    .break-all { word-break: break-all !important; }
+
+    /* Sizing utilities used in JS toggles */
+    .max-w-\[240px\] { max-width: 240px !important; }
+    .max-w-\[150px\] { max-width: 150px !important; }
+    .w-80 { width: 20rem !important; }
+    .w-52 { width: 13rem !important; }
+    .h-12 { height: 3rem !important; }
+    .h-5 { height: 1.25rem !important; }
+
+    /* Position utilities */
+    .relative { position: relative !important; }
+    .absolute { position: absolute !important; }
+    .fixed { position: fixed !important; }
+    .sticky { position: sticky !important; }
+    .inset-0 { inset: 0 !important; }
+    .inset-y-0 { top: 0 !important; bottom: 0 !important; }
+    .right-0 { right: 0 !important; }
+    .right-1 { right: 0.25rem !important; }
+    .top-0 { top: 0 !important; }
+    .top-1 { top: 0.25rem !important; }
+    .top-2\.5 { top: 0.625rem !important; }
+    .left-2\.5 { left: 0.625rem !important; }
+    .bottom-4 { bottom: 1rem !important; }
+    .right-4 { right: 1rem !important; }
+
+    /* Select-none utility */
+    .select-none { user-select: none !important; -webkit-user-select: none !important; }
+
+    /* Cursor utilities */
+    .cursor-pointer { cursor: pointer !important; }
+    .cursor-help { cursor: help !important; }
+
+    /* Ring/shadow utilities */
+    .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; }
+    .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important; }
+    .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important; }
+    .focus\:outline-none:focus { outline: 2px solid transparent !important; outline-offset: 2px !important; }
+
+    /* Peer / group modifiers for toggle switch */
+    .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border-width: 0 !important; }
+    .peer:checked ~ .peer-checked\:bg-accent { background-color: var(--accent) !important; }
+
+    /* Object-fit */
+    .object-cover { object-fit: cover !important; }
+
+    /* Table fallback (reinforced) */
+    .border-collapse { border-collapse: collapse !important; }
+    .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 1px !important; border-bottom-width: 0 !important; }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen p-4 flex flex-col items-center justify-start overflow-y-auto">
+
+  <!-- Top Controller / Metabar -->
+  <div class="w-full max-w-6xl mb-4 bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+      <span class="font-bold text-slate-100">YPI Studio UI Prototype - 模型价格配置与计费模块</span>
+      <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400">Ver 2.0</span>
+    </div>
+
+    <!-- Interactive simulation controls -->
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Dark/Light toggle -->
+      <button onclick="toggleTheme()" class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 transition">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        <span>主题切换</span>
+      </button>
+
+      <!-- Viewport switch -->
+      <div class="flex items-center bg-slate-800 rounded p-0.5 border border-slate-700">
+        <button id="btn-desktop" onclick="setViewport('desktop')" class="px-2.5 py-1 rounded bg-blue-600 text-white font-medium">
+          桌面模式
+        </button>
+        <button id="btn-mobile" onclick="setViewport('mobile')" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200">
+          移动端 (390px)
+        </button>
+      </div>
+
+      <!-- State shortcuts for reviews -->
+      <div class="h-4 w-px bg-slate-800"></div>
+      <span class="text-slate-400">快捷调试模拟:</span>
+      <button onclick="trigger409Conflict()" class="px-2 py-0.5 bg-red-950/40 text-red-400 border border-red-900/50 hover:bg-red-900/30 rounded">
+        409 并发冲突
+      </button>
+      <button onclick="triggerSmartFailed()" class="px-2 py-0.5 bg-yellow-950/40 text-yellow-400 border border-yellow-900/50 hover:bg-yellow-900/30 rounded">
+        智能推荐失败
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Viewport Container -->
+  <div id="viewport-container" class="w-full max-w-6xl bg-bg text-text border border-border rounded-xl shadow-2xl overflow-hidden transition-all duration-300 flex flex-col" style="height: 760px;">
+    
+    <!-- Title Bar Mock of pi-web UI -->
+    <div class="h-12 border-b border-border bg-bg px-4 flex items-center justify-between flex-shrink-0 select-none">
+      <div class="flex items-center gap-3">
+        <!-- Window decorations -->
+        <div class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-red-500/80 inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-yellow-500/80 inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-green-500/80 inline-block"></span>
+        </div>
+        <div class="h-4 w-px bg-border"></div>
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <span class="font-semibold text-sm">Yolk Pi — 工作室管理面板</span>
+        </div>
+      </div>
+
+      <!-- Compact session stats in header showing "Exact + M" formatting and NO Cache Write -->
+      <div class="flex items-center gap-3 text-xs text-text-muted">
+        <div class="px-2 py-1 rounded bg-bg-panel border border-border flex items-center gap-1.5 cursor-help" title="当前会话实时消耗。点按查看详细账本。">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+          <span>会话费用:</span>
+          <span class="font-mono text-text font-semibold">$0.34</span>
+          <span class="text-text-dim">/</span>
+          <span class="font-mono text-text">24,539 <span class="text-text-muted text-[10px]">tokens</span> <span class="text-accent">(0.024539 M)</span></span>
+        </div>
+        <div class="h-4 w-px bg-border"></div>
+        <div class="flex items-center gap-1">
+          <span class="px-2 py-0.5 rounded bg-bg-panel text-xs text-text border border-border">local:pi-agnet-web</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workspace Area (Sidebar + Content Panel) -->
+    <div class="flex flex-1 overflow-hidden relative">
+      
+      <!-- Sidebar (Navigation) -->
+      <div id="settings-sidebar" class="w-52 border-r border-border bg-bg-panel flex flex-col flex-shrink-0">
+        <div class="p-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">设置选项</div>
+        <nav class="flex-1 px-2 space-y-1">
+          <button onclick="switchTab('yolk')" class="w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center gap-2 text-text-muted hover:bg-bg-hover hover:text-text">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+            <span>基础设置</span>
+          </button>
+          <button onclick="switchTab('usage')" id="nav-usage" class="w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center justify-between text-text-muted hover:bg-bg-hover hover:text-text">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <span>使用量与账本</span>
+            </div>
+          </button>
+          <button onclick="switchTab('prices')" id="nav-prices" class="w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center justify-between bg-bg-selected text-accent font-medium">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>模型价格配置</span>
+            </div>
+            <span id="missing-count-badge" class="bg-red-500/25 text-red-500 dark:text-red-400 px-1.5 py-0.5 rounded-full text-[9px] font-bold">3 缺价</span>
+          </button>
+          <button onclick="switchTab('diagnostics')" class="w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center gap-2 text-text-muted hover:bg-bg-hover hover:text-text">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span>诊断快照</span>
+          </button>
+        </nav>
+        <div class="p-3 border-t border-border bg-bg text-[10px] text-text-muted flex flex-col gap-1">
+          <div>配置文件路径:</div>
+          <div class="font-mono text-text-dim break-all text-[9px]">~/.pi/agent/models.json</div>
+        </div>
+      </div>
+
+      <!-- Main Panel (Tab Contents) -->
+      <div class="flex-1 flex flex-col overflow-hidden bg-bg relative">
+        
+        <!-- ==================== TAB 1: MODEL PRICES CONFIG (ACTIVE BY DEFAULT) ==================== -->
+        <div id="tab-prices" class="flex-1 flex flex-col overflow-hidden">
+          <!-- Sub-header toolbar -->
+          <div class="p-3 border-b border-border bg-bg-panel flex flex-col sm:flex-row sm:items-center justify-between gap-2 flex-shrink-0">
+            <div class="flex items-center gap-2 flex-1">
+              <!-- Search -->
+              <div class="relative w-full max-w-[240px]">
+                <input type="text" id="search-input" oninput="filterModels()" placeholder="搜索提供商或模型 ID..." class="w-full bg-bg border border-border text-text text-xs rounded py-1.5 pl-7 pr-3 focus:outline-none focus:border-accent">
+                <svg class="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              
+              <!-- Filter Tabs -->
+              <div class="flex bg-bg border border-border rounded p-0.5 text-xs">
+                <button onclick="setFilter('all')" id="filter-all" class="px-2.5 py-1 rounded bg-bg-selected text-text font-medium">全部</button>
+                <button onclick="setFilter('missing')" id="filter-missing" class="px-2.5 py-1 rounded text-text-muted hover:text-text">缺少价格</button>
+                <button onclick="setFilter('configured')" id="filter-configured" class="px-2.5 py-1 rounded text-text-muted hover:text-text">已配置</button>
+                <button onclick="setFilter('free')" id="filter-free" class="px-2.5 py-1 rounded text-text-muted hover:text-text">免费</button>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-2">
+              <button onclick="openSmartSuggestModal()" class="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded shadow-sm flex items-center gap-1.5 transition">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                <span>智能填写</span>
+              </button>
+              <button onclick="simulateSaveAll()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded shadow-sm flex items-center gap-1.5 transition">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                <span>保存配置</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Desktop Table -->
+          <div id="desktop-table-container" class="flex-1 overflow-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-bg-panel text-text-muted font-medium sticky top-0 border-b border-border z-10 select-none">
+                <tr>
+                  <th class="p-3 w-48">提供商 / 模型 ID</th>
+                  <th class="p-3 w-28">状态 / 类型</th>
+                  <th class="p-3 w-24 text-right">输入单价<br><span class="text-[10px] font-normal font-sans text-text-dim">(USD/1M)</span></th>
+                  <th class="p-3 w-24 text-right">输出单价<br><span class="text-[10px] font-normal font-sans text-text-dim">(USD/1M)</span></th>
+                  <th class="p-3 w-24 text-right">缓存读取单价<br><span class="text-[10px] font-normal font-sans text-text-dim">(USD/1M)</span></th>
+                  <th class="p-3 w-28 text-center">缓存写入单价</th>
+                  <th class="p-3 w-36">来源 / 备注</th>
+                  <th class="p-3 w-16 text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody id="model-table-body" class="divide-y divide-border">
+                <!-- Javascript will render rows here -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile View Card List (Visible when viewport state is mobile) -->
+          <div id="mobile-card-container" class="flex-1 overflow-auto p-3 space-y-2 hidden">
+            <!-- Javascript will render mobile cards here -->
+          </div>
+
+          <!-- Table footer statistics -->
+          <div class="px-4 py-2 border-t border-border bg-bg-panel text-xs text-text-muted flex justify-between flex-shrink-0 select-none">
+            <div class="flex gap-4">
+              <span>总模型: <strong class="text-text" id="stat-total">6</strong></span>
+              <span>已配价: <strong class="text-green-500" id="stat-configured">2</strong></span>
+              <span>缺价: <strong class="text-red-500" id="stat-missing">3</strong></span>
+              <span>显式免费: <strong class="text-accent" id="stat-free">1</strong></span>
+            </div>
+            <div>
+              <span>当前修订版 (Revision): <span class="font-mono text-text" id="current-revision-label">rev_9f2a71c</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 2: USAGE & LEDGER (EXACT + M DEMO) ==================== -->
+        <div id="tab-usage" class="flex-1 flex flex-col overflow-hidden hidden p-4 space-y-4">
+          <div class="flex items-center justify-between border-b border-border pb-2 flex-shrink-0">
+            <h2 class="text-sm font-semibold">使用量账本分析 (移除 Cache Write & Token 格式升级示范)</h2>
+            <button onclick="switchTab('prices')" class="text-xs text-accent hover:underline flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              <span>返回价格配置</span>
+            </button>
+          </div>
+
+          <!-- Top usage overview stats widgets -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 flex-shrink-0">
+            <div class="p-3 bg-bg-panel border border-border rounded-lg">
+              <div class="text-xs text-text-muted mb-1">总计费金额</div>
+              <div class="text-xl font-bold font-mono">$18.42</div>
+              <div class="text-[10px] text-text-dim mt-1">只包含已计费调用金额，不追溯重算历史</div>
+            </div>
+
+            <!-- exact + M suffix tokens -->
+            <div class="p-3 bg-bg-panel border border-border rounded-lg">
+              <div class="text-xs text-text-muted mb-1">总 Token 数量 (含 precise + M 并列)</div>
+              <div class="text-xl font-bold font-mono text-text">
+                12,584,291 <span class="text-xs font-normal text-text-muted">tokens</span>
+              </div>
+              <div class="text-xs text-accent font-semibold mt-1 flex items-center gap-1">
+                <span>(12.584291 M)</span>
+                <span class="text-[10px] text-text-muted font-normal">(精确度达 6 位小数，去尾零)</span>
+              </div>
+            </div>
+
+            <div class="p-3 bg-bg-panel border border-border rounded-lg">
+              <div class="text-xs text-text-muted mb-1">缓存读取 (Cache Read)</div>
+              <div class="text-xl font-bold font-mono text-text">
+                4,291,000 <span class="text-xs font-normal text-text-muted">tokens</span>
+              </div>
+              <div class="text-xs text-text-muted mt-1">(4.291 M)</div>
+            </div>
+
+            <!-- Removed Cache Write, showing Cache Read independently and hit-rate -->
+            <div class="p-3 bg-bg-panel border border-border rounded-lg relative overflow-hidden">
+              <div class="text-xs text-text-muted mb-1">缓存命中率 (Cache Hit Rate)</div>
+              <div class="text-xl font-bold font-mono text-green-500">34.1%</div>
+              <div class="text-[10px] text-text-muted mt-1">公式: cacheRead / (input + cacheRead)</div>
+              
+              <!-- Indicator that cacheWrite is removed -->
+              <span class="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 text-[8px] font-semibold border border-red-500/20">
+                Cache Write 已移除
+              </span>
+            </div>
+          </div>
+
+          <!-- Token breakdown list -->
+          <div class="flex-1 bg-bg-panel border border-border rounded-lg p-3 overflow-y-auto space-y-3">
+            <h3 class="text-xs font-semibold text-text">Token 消耗详情 (精确值为主，M 换算为次)</h3>
+            
+            <div class="space-y-2">
+              <!-- Item 1 -->
+              <div class="p-2 bg-bg border border-border rounded flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-medium text-text">输入 (Prompt Input)</div>
+                  <div class="text-[10px] text-text-dim">用户 prompt 与系统指令发送</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-mono font-semibold text-text">8,293,291 <span class="text-text-muted text-[10px]">tokens</span></div>
+                  <div class="text-[10px] text-accent font-semibold">(8.293291 M)</div>
+                </div>
+              </div>
+              
+              <!-- Item 2 -->
+              <div class="p-2 bg-bg border border-border rounded flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-medium text-text">输出 (Completion Output)</div>
+                  <div class="text-[10px] text-text-dim">模型生成内容消耗</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-mono font-semibold text-text">2,100,000 <span class="text-text-muted text-[10px]">tokens</span></div>
+                  <div class="text-[10px] text-accent font-semibold">(2.1 M)</div>
+                </div>
+              </div>
+
+              <!-- Item 3 -->
+              <div class="p-2 bg-bg border border-border rounded flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-medium text-text">缓存读取 (Cache Read / Hit)</div>
+                  <div class="text-[10px] text-text-dim">复用 Prompt Cache 命中的 token</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-mono font-semibold text-text">4,291,000 <span class="text-text-muted text-[10px]">tokens</span></div>
+                  <div class="text-[10px] text-accent font-semibold">(4.291 M)</div>
+                </div>
+              </div>
+
+              <!-- Item 4: Legacy alert or note -->
+              <div class="p-2.5 rounded bg-bg border-l-4 border-yellow-500/80 text-[11px] text-text-muted flex gap-2">
+                <svg class="w-4 h-4 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <div>
+                  <strong>Cache Write (缓存写入) 用量说明:</strong> 
+                  从新数据采集、聚合和所有 UI 中已被完全隐藏移除。旧账本 API 中仅以 deprecated 的 <code class="px-1 py-0.5 rounded bg-bg-panel text-text font-mono">cacheWrite = 0</code> 零值形式维持输出，不影响历史账本完整性。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 3: DIAGNOSTICS & BASE ==================== -->
+        <div id="tab-diagnostics" class="flex-1 flex flex-col items-center justify-center text-xs text-text-muted hidden p-4">
+          <svg class="w-8 h-8 text-text-dim mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <p>诊断配置与快照功能处于原型展示之外。请返回“模型价格配置”或“使用量与账本”选项卡。</p>
+        </div>
+
+      </div>
+
+      <!-- ==================== DRAWER: HAND-FILL PRICE EDITOR ==================== -->
+      <div id="drawer-container" class="absolute inset-y-0 right-0 w-80 bg-bg border-l border-border shadow-2xl z-20 flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="p-4 border-b border-border bg-bg-panel flex items-center justify-between flex-shrink-0 select-none">
+          <h3 class="text-xs font-semibold text-text flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            <span id="drawer-title">编辑模型价格</span>
+          </h3>
+          <button onclick="closeDrawer()" class="text-text-muted hover:text-text">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+          <!-- Model identification -->
+          <div class="space-y-1">
+            <label class="text-text-muted text-[10px] font-medium uppercase tracking-wider block">所属提供商</label>
+            <div id="drawer-provider" class="font-semibold text-text bg-bg-panel px-2.5 py-1.5 rounded border border-border font-mono text-[11px]">openai</div>
+          </div>
+          <div class="space-y-1">
+            <label class="text-text-muted text-[10px] font-medium uppercase tracking-wider block">模型 ID</label>
+            <div id="drawer-model-id" class="font-semibold text-text bg-bg-panel px-2.5 py-1.5 rounded border border-border font-mono text-[11px]">gpt-4o</div>
+          </div>
+
+          <div class="h-px bg-border"></div>
+
+          <!-- Explicit free switch -->
+          <div class="bg-bg-panel p-3 rounded-lg border border-border space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-text">显式免费模型 (Free)</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="edit-free-switch" onchange="toggleDrawerFreeState()" class="sr-only peer">
+                <div class="w-9 h-5 bg-border rounded-full peer peer-focus:ring-0 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:height-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
+              </label>
+            </div>
+            <p class="text-[10px] text-text-muted">开启后将保存 explicit-free 标记，单价设为 0。免除无价格告警。</p>
+          </div>
+
+          <!-- Prices input grid -->
+          <div id="drawer-price-inputs" class="space-y-3">
+            <div class="space-y-1 relative">
+              <label class="text-text font-medium flex items-center justify-between">
+                <span>输入 Token 单价 <span class="text-red-500">*</span></span>
+                <span class="text-[10px] text-text-muted">USD / 1M tokens</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-2.5 top-2.5 text-text-dim text-[11px]">$</span>
+                <input type="number" step="any" min="0" id="price-input" oninput="validateInput(this)" class="w-full bg-bg border border-border text-text font-mono text-xs rounded pl-6 pr-3 py-2 focus:outline-none focus:border-accent" placeholder="例如 5.00">
+              </div>
+              <span class="text-[10px] text-red-500 hidden" id="price-input-error">输入非法！单价必须是非负十进制数。</span>
+            </div>
+
+            <div class="space-y-1 relative">
+              <label class="text-text font-medium flex items-center justify-between">
+                <span>输出 Token 单价 <span class="text-red-500">*</span></span>
+                <span class="text-[10px] text-text-muted">USD / 1M tokens</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-2.5 top-2.5 text-text-dim text-[11px]">$</span>
+                <input type="number" step="any" min="0" id="price-output" oninput="validateInput(this)" class="w-full bg-bg border border-border text-text font-mono text-xs rounded pl-6 pr-3 py-2 focus:outline-none focus:border-accent" placeholder="例如 15.00">
+              </div>
+              <span class="text-[10px] text-red-500 hidden" id="price-output-error">输入非法！单价必须是非负十进制数。</span>
+            </div>
+
+            <div class="space-y-1 relative">
+              <label class="text-text font-medium flex items-center justify-between">
+                <span>缓存读取单价 (Cache Read)</span>
+                <span class="text-[10px] text-text-muted">USD / 1M tokens</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-2.5 top-2.5 text-text-dim text-[11px]">$</span>
+                <input type="number" step="any" min="0" id="price-cache-read" oninput="validateInput(this)" class="w-full bg-bg border border-border text-text font-mono text-xs rounded pl-6 pr-3 py-2 focus:outline-none focus:border-accent" placeholder="例如 2.50">
+              </div>
+              <p class="text-[9px] text-text-muted">留空表示无 Prompt Cache 缓存优惠折扣费率。</p>
+            </div>
+            
+            <div class="bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded text-[10px] text-yellow-600 dark:text-yellow-400">
+              提示: 本模块不提供 <strong>缓存写入 (Cache Write)</strong> 价格配置，因新计费规则已废弃该价格指标。
+            </div>
+          </div>
+
+          <!-- Citation Source/Remarks -->
+          <div class="space-y-1">
+            <label class="text-text font-medium block">价格数据来源说明 (仅做记录备注)</label>
+            <input type="text" id="price-source" class="w-full bg-bg border border-border text-text text-xs rounded px-2 py-1.5 focus:outline-none focus:border-accent" placeholder="例如 官方 API 定价页面 / 手工录入">
+          </div>
+        </div>
+
+        <!-- Action Drawer Footer -->
+        <div class="p-4 border-t border-border bg-bg-panel flex items-center gap-2 flex-shrink-0 select-none">
+          <button onclick="saveDrawerData()" class="flex-1 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded shadow transition">
+            确认修改
+          </button>
+          <button onclick="closeDrawer()" class="flex-1 py-2 bg-bg border border-border text-text hover:bg-bg-hover text-xs font-medium rounded transition">
+            取消
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ==================== MODAL: SMART SUGGEST (AI / ALLOWLIST) ==================== -->
+  <div id="modal-suggest" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-bg text-text border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <!-- Modal header -->
+      <div class="p-4 border-b border-border bg-bg-panel flex items-center justify-between flex-shrink-0">
+        <h3 class="text-sm font-semibold text-text flex items-center gap-2">
+          <span class="p-1 rounded bg-accent/10 text-accent">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          </span>
+          <span>智能查价与推荐建议 (受控 Allowlist 抓取)</span>
+        </h3>
+        <button onclick="closeSmartSuggestModal()" class="text-text-muted hover:text-text">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Simulated Loader -->
+      <div id="suggest-loading" class="flex-1 p-8 flex flex-col items-center justify-center space-y-4">
+        <div class="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
+        <div class="text-center">
+          <p class="text-xs font-semibold">正在抓取官方 OpenRouter 目录及 Provider 注册表数据...</p>
+          <p class="text-[10px] text-text-muted mt-1">仅基于受限 HTTPS 官方白名单，禁止抓取任意自定义 URL，保障凭据安全。</p>
+        </div>
+      </div>
+
+      <!-- Loaded Suggestions Content -->
+      <div id="suggest-content" class="flex-1 overflow-y-auto p-4 space-y-4 text-xs hidden">
+        <div class="bg-accent/5 border border-accent/15 rounded-lg p-3 text-[11px] text-text-muted flex gap-2">
+          <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>
+            AI 计费小助手已抓取公开定价源。以下为别名匹配出的最新建议，<strong>需由您逐行确认并手动保存勾选的改动</strong>，我们绝不会未经批准直接写入 models.json。
+          </div>
+        </div>
+
+        <!-- Simulated suggestion items list -->
+        <div class="space-y-3">
+          <!-- Suggestion item 1: High confidence -->
+          <div class="border border-border rounded-lg overflow-hidden bg-bg-panel/40">
+            <div class="p-3 bg-bg-panel border-b border-border flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="chk-suggest-1" checked class="w-3.5 h-3.5 text-accent border-border rounded focus:ring-0">
+                <span class="font-semibold text-text font-mono">google / gemini-1.5-pro</span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-green-500/10 text-green-500 text-[10px] font-bold">高置信度 (High) - 精确匹配</span>
+            </div>
+            <div class="p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <span class="text-[10px] text-text-muted">输入费用/1M</span>
+                <div class="font-mono text-text text-xs mt-0.5">$0.00 → <strong class="text-green-500">$1.25</strong></div>
+              </div>
+              <div>
+                <span class="text-[10px] text-text-muted">输出费用/1M</span>
+                <div class="font-mono text-text text-xs mt-0.5">$0.00 → <strong class="text-green-500">$5.00</strong></div>
+              </div>
+              <div>
+                <span class="text-[10px] text-text-muted">缓存读取费用/1M</span>
+                <div class="font-mono text-text text-xs mt-0.5">$0.00 → <strong class="text-green-500">$0.31</strong></div>
+              </div>
+            </div>
+            <div class="px-3 pb-3 pt-1 border-t border-border/40 text-[10px] text-text-muted flex justify-between items-center bg-bg/20">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                <span>数据源: <a href="https://openrouter.ai/models/google/gemini-1.5-pro" target="_blank" class="text-accent hover:underline">OpenRouter API Catalog</a></span>
+              </span>
+              <span>拉取时间: 2026-07-14 10:11</span>
+            </div>
+          </div>
+
+          <!-- Suggestion item 2: Low confidence / warning / conflict -->
+          <div class="border border-red-500/20 rounded-lg overflow-hidden bg-bg-panel/40">
+            <div class="p-3 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <!-- Unchecked by default due to warning -->
+                <input type="checkbox" id="chk-suggest-2" class="w-3.5 h-3.5 text-accent border-border rounded focus:ring-0">
+                <span class="font-semibold text-text font-mono">deepseek / deepseek-chat</span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-500 dark:text-yellow-400 text-[10px] font-bold">低置信度 (Low) - 存在定价冲突</span>
+            </div>
+            <div class="p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <span class="text-[10px] text-text-muted">输入费用/1M</span>
+                <div class="font-mono text-text text-xs mt-0.5">$0.00 → <strong class="text-yellow-500">$0.14</strong></div>
+              </div>
+              <div>
+                <span class="text-[10px] text-text-muted">输出费用/1M</span>
+                <div class="font-mono text-text text-xs mt-0.5">$0.00 → <strong class="text-yellow-500">$0.28</strong></div>
+              </div>
+              <div>
+                <span class="text-[10px] text-text-muted">缓存读取费用/1M</span>
+                <div class="font-mono text-text text-xs mt-0.5">$0.00 → <strong class="text-yellow-500">$0.07</strong></div>
+              </div>
+            </div>
+            <!-- Warning block inside conflict suggest -->
+            <div class="mx-3 p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded text-[10px] flex items-start gap-1">
+              <svg class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <span>警告: 官方 DeepSeek 定价为 $0.14 / $0.28 (1M)，但所配路由代理源展示为 $0.20 / $0.40。已默认取消勾选。请手动审查差异。</span>
+            </div>
+            <div class="px-3 pb-3 pt-1 mt-2 border-t border-border/40 text-[10px] text-text-muted flex justify-between items-center bg-bg/20">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                <span>数据源: <a href="https://deepseek.com/pricing" target="_blank" class="text-accent hover:underline">DeepSeek Pricing Page</a></span>
+              </span>
+              <span>拉取时间: 2026-07-14 10:12</span>
+            </div>
+          </div>
+
+          <!-- Suggestion item 3: No Match -->
+          <div class="border border-border/60 rounded-lg overflow-hidden bg-bg-panel/40 opacity-70">
+            <div class="p-3 bg-bg-panel border-b border-border flex items-center justify-between">
+              <span class="font-semibold text-text-muted font-mono">custom / my-local-llama</span>
+              <span class="px-2 py-0.5 rounded bg-bg text-text-muted text-[10px]">未找到定价 (No Results)</span>
+            </div>
+            <div class="p-3 text-[11px] text-text-muted">
+              该模型未在任何公开 Allowlist 定价源中匹配。AI 拒绝为此模型猜测价格。请使用手工单体价格编辑功能进行配置。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-border bg-bg-panel flex items-center justify-end gap-2 flex-shrink-0 select-none">
+        <button onclick="closeSmartSuggestModal()" class="px-3 py-1.5 bg-bg border border-border text-text hover:bg-bg-hover text-xs font-medium rounded transition">
+          取消
+        </button>
+        <button id="btn-apply-suggest" onclick="applySmartSuggestions()" class="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded shadow transition hidden">
+          应用所选建议
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: DIFF CONFIRMATION ==================== -->
+  <div id="modal-diff" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-bg text-text border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+      <!-- Modal header -->
+      <div class="p-4 border-b border-border bg-bg-panel flex items-center justify-between flex-shrink-0">
+        <h3 class="text-sm font-semibold text-text flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          <span>确认修改差异 (Save Diff Preview)</span>
+        </h3>
+        <button onclick="closeDiffModal()" class="text-text-muted hover:text-text">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        <div class="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded text-[11px] text-yellow-600 dark:text-yellow-400">
+          <strong>变更生效声明:</strong> 写入新价格配置仅影响后续运行发生的调用费用，<strong>不会对已录入的历史账本文件进行追溯性重算</strong>。
+        </div>
+
+        <div class="space-y-1">
+          <span class="text-[10px] text-text-muted uppercase tracking-wider block font-medium">即将写入的文件位置:</span>
+          <span class="font-mono text-text bg-bg-panel px-2.5 py-1 rounded border border-border inline-block break-all w-full text-[10px]">~/.pi/agent/models.json</span>
+        </div>
+
+        <!-- Diff Changes Table -->
+        <div class="space-y-2">
+          <span class="text-[10px] text-text-muted uppercase tracking-wider block font-medium">配置对比差异明细 (Diff Changes):</span>
+          <div class="border border-border rounded overflow-hidden">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-bg-panel text-text-muted border-b border-border font-medium">
+                <tr>
+                  <th class="p-2">模型</th>
+                  <th class="p-2">项目</th>
+                  <th class="p-2 text-right">旧值</th>
+                  <th class="p-2 text-right">新值</th>
+                </tr>
+              </thead>
+              <tbody id="diff-rows" class="divide-y divide-border font-mono">
+                <!-- Javascript will load diff here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- revision comparison -->
+        <div class="p-2.5 rounded bg-bg-panel text-[10px] text-text-muted space-y-1 font-mono">
+          <div>当前修订基线: <span class="text-text">rev_9f2a71c</span></div>
+          <div>保存合并模式: <span class="text-green-500">原子性最小节点 Merge (仅修改 prices/explicitFree，保留 tiers / 注释)</span></div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-border bg-bg-panel flex items-center justify-end gap-2 flex-shrink-0 select-none">
+        <button onclick="closeDiffModal()" class="px-3 py-1.5 bg-bg border border-border text-text hover:bg-bg-hover text-xs font-medium rounded transition">
+          取消返回
+        </button>
+        <button id="btn-confirm-save-action" onclick="executeSaveAction()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded shadow transition flex items-center gap-1">
+          <span>确认合并写入</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: 409 CONFLICT SIMULATION ==================== -->
+  <div id="modal-conflict" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-bg text-text border border-red-500/30 rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+      <div class="p-4 border-b border-border bg-red-500/5 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-red-500 flex items-center gap-2">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span>409 并发版本冲突 (Revision Conflict)</span>
+        </h3>
+        <button onclick="closeConflictModal()" class="text-text-muted hover:text-text">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-4 text-xs space-y-3">
+        <p class="font-medium text-text">无法完成保存！您尝试写入的基线版本已被外部修改或重置。</p>
+        <div class="p-2.5 bg-bg-panel border border-border rounded font-mono text-[10px] space-y-1 text-text-muted">
+          <div>您的本地修订: <span class="text-red-500">rev_9f2a71c</span></div>
+          <div>服务端的最新: <span class="text-green-500">rev_e83bb0f</span> (刚刚由外部进程写入)</div>
+        </div>
+        <p class="text-text-muted text-[11px] leading-relaxed">
+          点击“重新读取与合并”，我们将获取远端最新配置，并在保留您本地草稿的情况下重新比对。
+        </p>
+      </div>
+      <div class="p-4 border-t border-border bg-bg-panel flex items-center justify-end gap-2">
+        <button onclick="closeConflictModal()" class="px-3 py-1.5 bg-bg border border-border text-text hover:bg-bg-hover text-xs font-medium rounded transition">
+          放弃修改
+        </button>
+        <button onclick="resolveConflict()" class="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded shadow transition">
+          重新读取与合并
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast-box" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <!-- Toast items dynamically added -->
+  </div>
+
+  <!-- Documentation Section below the interactive preview -->
+  <div class="w-full max-w-6xl mt-6 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 text-xs leading-relaxed text-slate-300">
+    <h2 class="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+      <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      <span>UI 交互设计与状态定义说明</span>
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="space-y-2">
+        <h3 class="font-semibold text-blue-400">1. 精确值 + M 派生并列展示规范</h3>
+        <p>
+          在全部 Usage 用户界面中，为了兼顾<strong>可复制的精确数据审计</strong>和<strong>直观的百万量级 M 单位概览</strong>，遵循如下并列显示模式：
+        </p>
+        <ul class="list-disc pl-4 space-y-1 text-slate-400">
+          <li><strong>主值</strong>: 始终为精确的完整整数格式并带千分位号（例: <code class="text-slate-200">1,234,567 tokens</code>）。</li>
+          <li><strong>派生值</strong>: 并列或在紧随括号中以 M 单位显示，最多保留 6 位小数，且自动去除无意义的尾部零（例: <code class="text-slate-200">(1.234567 M)</code>）。</li>
+          <li><strong>去尾零规则</strong>: 对于正好整数倍，显示 <code class="text-slate-200">(2.1 M)</code> 而非 <code class="text-slate-200">(2.100000 M)</code>，0 tokens 明确显示为 <code class="text-slate-200">0 M</code>。</li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h3 class="font-semibold text-blue-400">2. Cache-Write 用量退役兼容规则</h3>
+        <p>
+          为遵循 prd.md 要求，从所有用户交互中抹除 Cache Write 痕迹：
+        </p>
+        <ul class="list-disc pl-4 space-y-1 text-slate-400">
+          <li><strong>配置排除</strong>: 模型价格配置页表格与抽屉中<strong>不配置、不展示</strong> Cache Write，彻底将其排除在外。</li>
+          <li><strong>计算公式</strong>: 缓存命中率更新为独立公式：<code class="text-slate-200">Cache Read / (Input + Cache Read)</code>。</li>
+          <li><strong>兼容API</strong>: 后端账本保持历史不可变性，新产生的数据中 cache-write 均以 0 返回（Deprecated）。</li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h3 class="font-semibold text-blue-400">3. 智能填写与来源安全防护</h3>
+        <ul class="list-disc pl-4 space-y-1 text-slate-400">
+          <li><strong>抓取限制</strong>: 抓取流程由后端发起，采用固定域名 allowlist 过滤器，防范 SSRF 或凭据外泄。</li>
+          <li><strong>低置信度防御</strong>: 对别名、路由代理或来源存在明显单价差异的条目（如 deepseek 聚合价格不一致），进行黄色高亮预警，并<strong>默认处于不勾选状态</strong>，要求人脑判断。</li>
+          <li><strong>非侵入性</strong>: AI 仅分析抓取的文本片段得出建议，无文件写入权，用户必须在弹框中点击“确认修改”才会计入暂存，然后再次在 Diff 确认中提交才会写入磁盘。</li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h3 class="font-semibold text-blue-400">4. Concurrency 409 写入容错</h3>
+        <p>
+          多租户/多终端使用时，`models.json` 可能在配置期间被外部写入改变。
+        </p>
+        <ul class="list-disc pl-4 space-y-1 text-slate-400">
+          <li><strong>Revision ETag校验</strong>: 保存时伴随 GET 得到的版本号。如果服务端返回 409 冲突，系统将截获并弹出冲突对话框。</li>
+          <li><strong>草稿暂存保留</strong>: 本地输入的暂存数值不丢失，点击“重新读取与合并”拉取新 revision 字段后，可在保留编辑项的前提下，重新展示 Diff 进行二次提交。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== FRONTEND SIMULATION JAVASCRIPT ==================== -->
+  <script>
+    // In-memory Database of Models
+    let modelsData = [
+      { provider: 'openai', modelId: 'gpt-4o', displayName: 'GPT-4o', status: 'configured', type: 'builtin_or_extension', prices: { input: 5.00, output: 15.00, cacheRead: 2.50 }, source: 'models_json_override', updatedAt: '2026-07-13 14:22' },
+      { provider: 'anthropic', modelId: 'claude-3-5-sonnet', displayName: 'Claude 3.5 Sonnet', status: 'configured', type: 'builtin_or_extension', prices: { input: 3.00, output: 15.00, cacheRead: 1.50 }, source: 'models_json_override', updatedAt: '2026-07-11 09:12' },
+      { provider: 'google', modelId: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro', status: 'missing', type: 'builtin_or_extension', prices: { input: 0.00, output: 0.00, cacheRead: 0.00 }, source: 'builtin', updatedAt: '—' },
+      { provider: 'deepseek', modelId: 'deepseek-chat', displayName: 'DeepSeek Chat (V3)', status: 'missing', type: 'builtin_or_extension', prices: { input: 0.00, output: 0.00, cacheRead: 0.00 }, source: 'builtin', updatedAt: '—' },
+      { provider: 'custom', modelId: 'my-local-llama', displayName: 'My Local Llama 3', status: 'missing', type: 'custom', prices: { input: 0.00, output: 0.00, cacheRead: 0.00 }, source: 'custom_model', updatedAt: '—' },
+      { provider: 'meta', modelId: 'llama-3-8b-instruct', displayName: 'Llama 3 8B Instruct', status: 'free', type: 'custom', prices: { input: 0.00, output: 0.00, cacheRead: 0.00 }, source: 'explicit_free', updatedAt: '2026-07-12 18:30' }
+    ];
+
+    let currentFilter = 'all';
+    let currentSearch = '';
+    let currentRevision = 'rev_9f2a71c';
+    let viewportMode = 'desktop';
+
+    // Track unsaved local edits
+    let unsavedChanges = {}; // key: 'provider/modelId', value: { input, output, cacheRead, free, source }
+
+    // Init Page
+    window.onload = function() {
+      renderTable();
+      updateBadgeCounts();
+    };
+
+    // Theme toggle helper
+    function toggleTheme() {
+      const htmlEl = document.documentElement;
+      if (htmlEl.classList.contains('dark')) {
+        htmlEl.classList.remove('dark');
+      } else {
+        htmlEl.classList.add('dark');
+      }
+    }
+
+    // Viewport layout switch mockup
+    function setViewport(mode) {
+      viewportMode = mode;
+      const container = document.getElementById('viewport-container');
+      const sidebar = document.getElementById('settings-sidebar');
+      const btnDesktop = document.getElementById('btn-desktop');
+      const btnMobile = document.getElementById('btn-mobile');
+      const desktopTable = document.getElementById('desktop-table-container');
+      const mobileCards = document.getElementById('mobile-card-container');
+
+      if (mode === 'mobile') {
+        container.style.maxWidth = '390px';
+        container.style.height = '680px';
+        sidebar.classList.add('hidden'); // Mobile hide sidebar navigation
+        btnMobile.className = "px-2.5 py-1 rounded bg-blue-600 text-white font-medium";
+        btnDesktop.className = "px-2.5 py-1 rounded text-slate-400 hover:text-slate-200";
+        desktopTable.classList.add('hidden');
+        mobileCards.classList.remove('hidden');
+      } else {
+        container.style.maxWidth = '1152px'; // 6xl
+        container.style.height = '760px';
+        sidebar.classList.remove('hidden');
+        btnDesktop.className = "px-2.5 py-1 rounded bg-blue-600 text-white font-medium";
+        btnMobile.className = "px-2.5 py-1 rounded text-slate-400 hover:text-slate-200";
+        desktopTable.classList.remove('hidden');
+        mobileCards.classList.add('hidden');
+      }
+      renderTable();
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      document.getElementById('tab-prices').classList.add('hidden');
+      document.getElementById('tab-usage').classList.add('hidden');
+      document.getElementById('tab-diagnostics').classList.add('hidden');
+
+      document.getElementById('nav-prices').className = "w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center justify-between text-text-muted hover:bg-bg-hover hover:text-text";
+      document.getElementById('nav-usage').className = "w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center justify-between text-text-muted hover:bg-bg-hover hover:text-text";
+
+      if (tabId === 'prices') {
+        document.getElementById('tab-prices').classList.remove('hidden');
+        document.getElementById('nav-prices').className = "w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center justify-between bg-bg-selected text-accent font-medium";
+      } else if (tabId === 'usage') {
+        document.getElementById('tab-usage').classList.remove('hidden');
+        document.getElementById('nav-usage').className = "w-full text-left px-3 py-2 text-xs rounded-md transition flex items-center justify-between bg-bg-selected text-accent font-medium";
+      } else if (tabId === 'diagnostics') {
+        document.getElementById('tab-diagnostics').classList.remove('hidden');
+      }
+    }
+
+    // Filters and Search logic
+    function setFilter(filterType) {
+      currentFilter = filterType;
+      // Reset filter tabs styles
+      ['all', 'missing', 'configured', 'free'].forEach(t => {
+        const el = document.getElementById(`filter-${t}`);
+        if (t === filterType) {
+          el.className = "px-2.5 py-1 rounded bg-bg-selected text-text font-medium";
+        } else {
+          el.className = "px-2.5 py-1 rounded text-text-muted hover:text-text";
+        }
+      });
+      renderTable();
+    }
+
+    function filterModels() {
+      currentSearch = document.getElementById('search-input').value.toLowerCase();
+      renderTable();
+    }
+
+    // Badge update
+    function updateBadgeCounts() {
+      const missingCount = modelsData.filter(m => m.status === 'missing' && !unsavedChanges[`${m.provider}/${m.modelId}`]).length;
+      const missingBadge = document.getElementById('missing-count-badge');
+      if (missingCount > 0) {
+        missingBadge.textContent = `${missingCount} 缺价`;
+        missingBadge.classList.remove('hidden');
+      } else {
+        missingBadge.classList.add('hidden');
+      }
+
+      document.getElementById('stat-total').textContent = modelsData.length;
+      document.getElementById('stat-configured').textContent = modelsData.filter(m => m.status === 'configured' || (unsavedChanges[`${m.provider}/${m.modelId}`] && !unsavedChanges[`${m.provider}/${m.modelId}`].free)).length;
+      document.getElementById('stat-missing').textContent = missingCount;
+      document.getElementById('stat-free').textContent = modelsData.filter(m => m.status === 'free' || (unsavedChanges[`${m.provider}/${m.modelId}`] && unsavedChanges[`${m.provider}/${m.modelId}`].free)).length;
+    }
+
+    // Render Table and Mobile Cards
+    function renderTable() {
+      const tbody = document.getElementById('model-table-body');
+      const mobileContainer = document.getElementById('mobile-card-container');
+      
+      tbody.innerHTML = '';
+      mobileContainer.innerHTML = '';
+
+      const filtered = modelsData.filter(m => {
+        // Apply Search
+        const matchesSearch = m.provider.toLowerCase().includes(currentSearch) || m.modelId.toLowerCase().includes(currentSearch);
+        if (!matchesSearch) return false;
+
+        // Overlay draft data for filters
+        const draft = unsavedChanges[`${m.provider}/${m.modelId}`];
+        const status = draft ? (draft.free ? 'free' : 'configured') : m.status;
+
+        // Apply Tab Filter
+        if (currentFilter === 'all') return true;
+        return status === currentFilter;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-text-muted">没有找到匹配的模型。</td></tr>`;
+        mobileContainer.innerHTML = `<div class="p-8 text-center text-text-muted">没有找到匹配的模型。</div>`;
+        return;
+      }
+
+      filtered.forEach(m => {
+        const draft = unsavedChanges[`${m.provider}/${m.modelId}`];
+        const isDraft = !!draft;
+        const prices = draft ? draft.prices : m.prices;
+        const isFree = draft ? draft.free : (m.status === 'free');
+        const sourceVal = draft ? draft.source : m.source;
+        
+        let statusBadge = '';
+        if (isFree) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20">免费 (Explicit Free)</span>`;
+        } else if (prices.input > 0 || prices.output > 0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/10 text-green-500 border border-green-500/20">已配置价格</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/10 text-red-500 border border-red-500/20 animate-pulse">缺失价格配置</span>`;
+        }
+
+        const sourceLabel = sourceVal === 'models_json_override' ? '文件覆盖重写' :
+                            sourceVal === 'custom_model' ? '自定义配置' :
+                            sourceVal === 'explicit_free' ? '用户标记免费' : 'SDK 内置默认值';
+
+        // Render Desktop Row
+        const tr = document.createElement('tr');
+        if (isDraft) {
+          tr.className = "bg-yellow-500/[0.03] hover:bg-yellow-500/[0.06] transition-colors";
+        } else {
+          tr.className = "hover:bg-bg-hover transition-colors";
+        }
+
+        tr.innerHTML = `
+          <td class="p-3">
+            <div class="font-semibold text-text font-mono">${m.provider} / ${m.modelId}</div>
+            <div class="text-[10px] text-text-muted">${m.displayName || ''}</div>
+          </td>
+          <td class="p-3">
+            <div class="flex flex-col gap-1 items-start">
+              ${statusBadge}
+              <span class="text-[9px] px-1 bg-bg-panel text-text-dim rounded">${m.type === 'custom' ? '自定义模型' : '内置扩展'}</span>
+            </div>
+          </td>
+          <td class="p-3 text-right font-mono font-semibold ${isFree ? 'text-text-dim' : 'text-text'}">
+            $${isFree ? '0.00' : prices.input.toFixed(4)}
+          </td>
+          <td class="p-3 text-right font-mono font-semibold ${isFree ? 'text-text-dim' : 'text-text'}">
+            $${isFree ? '0.00' : prices.output.toFixed(4)}
+          </td>
+          <td class="p-3 text-right font-mono text-text-muted">
+            ${isFree ? '$0.00' : (prices.cacheRead > 0 ? `$${prices.cacheRead.toFixed(4)}` : '—')}
+          </td>
+          <td class="p-3 text-center text-text-dim select-none">
+            <span class="px-1.5 py-0.5 rounded bg-red-500/5 text-red-500/60 border border-red-500/10 text-[9px]">已废弃移除</span>
+          </td>
+          <td class="p-3">
+            <div class="text-text max-w-[150px] truncate" title="${sourceLabel}">${sourceLabel}</div>
+            <div class="text-[9px] text-text-muted">更新于: ${m.updatedAt}</div>
+          </td>
+          <td class="p-3 text-center">
+            <button onclick="openDrawer('${m.provider}', '${m.modelId}')" class="px-2 py-1 bg-bg-panel hover:bg-bg-selected text-accent font-medium rounded border border-border transition">
+              编辑
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // Render Mobile Cards
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-lg border ${isDraft ? 'bg-yellow-500/[0.02] border-yellow-500/30' : 'bg-bg-panel border-border'} text-xs space-y-2`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-mono font-bold text-text">${m.provider}/${m.modelId}</span>
+            ${statusBadge}
+          </div>
+          <div class="grid grid-cols-3 gap-1 py-1 border-t border-b border-border/40 font-mono text-[10px] text-text-muted">
+            <div>输入: <strong class="text-text">$${isFree ? '0.00' : prices.input.toFixed(3)}</strong></div>
+            <div>输出: <strong class="text-text">$${isFree ? '0.00' : prices.output.toFixed(3)}</strong></div>
+            <div>缓存读: <strong class="text-text">${isFree ? '$0.00' : (prices.cacheRead > 0 ? `$${prices.cacheRead.toFixed(3)}` : '—')}</strong></div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] pt-1">
+            <span class="text-text-dim">来源: ${sourceLabel}</span>
+            <button onclick="openDrawer('${m.provider}', '${m.modelId}')" class="px-2.5 py-1 bg-accent text-white font-medium rounded">
+              编辑详情
+            </button>
+          </div>
+        `;
+        mobileContainer.appendChild(card);
+      });
+    }
+
+    // Drawer manual edit operations
+    let activeEditKey = null;
+
+    function openDrawer(provider, modelId) {
+      activeEditKey = `${provider}/${modelId}`;
+      const m = modelsData.find(x => x.provider === provider && x.modelId === modelId);
+      const draft = unsavedChanges[activeEditKey];
+      
+      document.getElementById('drawer-provider').textContent = provider;
+      document.getElementById('drawer-model-id').textContent = modelId;
+
+      const isFree = draft ? draft.free : (m.status === 'free');
+      const prices = draft ? draft.prices : m.prices;
+      const source = draft ? draft.source : m.source;
+
+      document.getElementById('edit-free-switch').checked = isFree;
+      document.getElementById('price-input').value = prices.input || '';
+      document.getElementById('price-output').value = prices.output || '';
+      document.getElementById('price-cache-read').value = prices.cacheRead || '';
+      document.getElementById('price-source').value = source === 'builtin' ? '官方定价' : source;
+
+      // Handle validation clean
+      document.getElementById('price-input-error').classList.add('hidden');
+      document.getElementById('price-output-error').classList.add('hidden');
+
+      toggleDrawerFreeState();
+
+      // Open drawer
+      const drawer = document.getElementById('drawer-container');
+      drawer.classList.remove('translate-x-full');
+    }
+
+    function closeDrawer() {
+      const drawer = document.getElementById('drawer-container');
+      drawer.classList.add('translate-x-full');
+      activeEditKey = null;
+    }
+
+    function toggleDrawerFreeState() {
+      const isFree = document.getElementById('edit-free-switch').checked;
+      const inputs = document.getElementById('drawer-price-inputs');
+      if (isFree) {
+        inputs.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        inputs.classList.remove('opacity-40', 'pointer-events-none');
+      }
+    }
+
+    function validateInput(el) {
+      const val = parseFloat(el.value);
+      const errEl = document.getElementById(`${el.id}-error`);
+      if (errEl) {
+        if (el.value !== '' && (isNaN(val) || val < 0)) {
+          errEl.classList.remove('hidden');
+          return false;
+        } else {
+          errEl.classList.add('hidden');
+          return true;
+        }
+      }
+      return true;
+    }
+
+    function saveDrawerData() {
+      if (!activeEditKey) return;
+      const isFree = document.getElementById('edit-free-switch').checked;
+      
+      let inputVal = 0;
+      let outputVal = 0;
+      let cacheReadVal = 0;
+
+      if (!isFree) {
+        const inpEl = document.getElementById('price-input');
+        const outEl = document.getElementById('price-output');
+        const crEl = document.getElementById('price-cache-read');
+
+        if (!validateInput(inpEl) || !validateInput(outEl) || !validateInput(crEl)) {
+          showToast('输入格式错误，单价不能为负数！', 'error');
+          return;
+        }
+
+        inputVal = parseFloat(inpEl.value) || 0;
+        outputVal = parseFloat(outEl.value) || 0;
+        cacheReadVal = parseFloat(crEl.value) || 0;
+      }
+
+      unsavedChanges[activeEditKey] = {
+        free: isFree,
+        prices: {
+          input: inputVal,
+          output: outputVal,
+          cacheRead: cacheReadVal
+        },
+        source: document.getElementById('price-source').value || '手动编辑覆盖'
+      };
+
+      closeDrawer();
+      renderTable();
+      updateBadgeCounts();
+      showToast('草稿已修改 (本地暂存，请在右上角保存或提审)', 'info');
+    }
+
+
+    // Smart suggestion mockup pipeline
+    function openSmartSuggestModal() {
+      document.getElementById('modal-suggest').classList.remove('hidden');
+      document.getElementById('suggest-loading').classList.remove('hidden');
+      document.getElementById('suggest-content').classList.add('hidden');
+      document.getElementById('btn-apply-suggest').classList.add('hidden');
+
+      setTimeout(() => {
+        document.getElementById('suggest-loading').classList.add('hidden');
+        document.getElementById('suggest-content').classList.remove('hidden');
+        document.getElementById('btn-apply-suggest').classList.remove('hidden');
+      }, 1500); // simulation fetch delay
+    }
+
+    function closeSmartSuggestModal() {
+      document.getElementById('modal-suggest').classList.add('hidden');
+    }
+
+    function applySmartSuggestions() {
+      // Google suggestion
+      if (document.getElementById('chk-suggest-1').checked) {
+        unsavedChanges['google/gemini-1.5-pro'] = {
+          free: false,
+          prices: { input: 1.25, output: 5.00, cacheRead: 0.3125 },
+          source: 'OpenRouter 抓取建议'
+        };
+      }
+      // Deepseek suggestion
+      if (document.getElementById('chk-suggest-2').checked) {
+        unsavedChanges['deepseek/deepseek-chat'] = {
+          free: false,
+          prices: { input: 0.14, output: 0.28, cacheRead: 0.07 },
+          source: 'Deepseek 官方建议'
+        };
+      }
+
+      closeSmartSuggestModal();
+      renderTable();
+      updateBadgeCounts();
+      showToast('智能定价建议已填入表格草稿中！', 'success');
+    }
+
+    // Save configuration -> opens Diff
+    function simulateSaveAll() {
+      const diffRows = document.getElementById('diff-rows');
+      diffRows.innerHTML = '';
+      
+      const keys = Object.keys(unsavedChanges);
+      if (keys.length === 0) {
+        showToast('配置未发生任何更改。无需保存。', 'info');
+        return;
+      }
+
+      keys.forEach(k => {
+        const [prov, modId] = k.split('/');
+        const original = modelsData.find(x => x.provider === prov && x.modelId === modId);
+        const draft = unsavedChanges[k];
+
+        const oldFree = original.status === 'free';
+        const newFree = draft.free;
+
+        // Input row diff
+        const r1 = document.createElement('tr');
+        r1.innerHTML = `
+          <td class="p-2 text-text font-semibold">${prov}/${modId}</td>
+          <td class="p-2 text-text-muted">Input Price</td>
+          <td class="p-2 text-right text-red-400 font-mono">$${oldFree ? '0.00' : original.prices.input.toFixed(4)}</td>
+          <td class="p-2 text-right text-green-400 font-mono">$${newFree ? '0.00' : draft.prices.input.toFixed(4)}</td>
+        `;
+        diffRows.appendChild(r1);
+
+        // Output row diff
+        const r2 = document.createElement('tr');
+        r2.innerHTML = `
+          <td class="p-2 text-text font-semibold">${prov}/${modId}</td>
+          <td class="p-2 text-text-muted">Output Price</td>
+          <td class="p-2 text-right text-red-400 font-mono">$${oldFree ? '0.00' : original.prices.output.toFixed(4)}</td>
+          <td class="p-2 text-right text-green-400 font-mono">$${newFree ? '0.00' : draft.prices.output.toFixed(4)}</td>
+        `;
+        diffRows.appendChild(r2);
+      });
+
+      document.getElementById('modal-diff').classList.remove('hidden');
+    }
+
+    function closeDiffModal() {
+      document.getElementById('modal-diff').classList.add('hidden');
+    }
+
+    // Confirm merging save to db mock
+    function executeSaveAction() {
+      closeDiffModal();
+      
+      // Simulate slow saving process
+      showToast('正在原子写入 models.json 并重载 Registry...', 'loading');
+      
+      setTimeout(() => {
+        // Commit draft updates into database
+        Object.keys(unsavedChanges).forEach(k => {
+          const [prov, modId] = k.split('/');
+          const idx = modelsData.findIndex(x => x.provider === prov && x.modelId === modId);
+          if (idx !== -1) {
+            const draft = unsavedChanges[k];
+            modelsData[idx].prices = draft.prices;
+            modelsData[idx].status = draft.free ? 'free' : 'configured';
+            modelsData[idx].source = draft.source;
+            modelsData[idx].updatedAt = '2026-07-14 10:15';
+          }
+        });
+
+        // clear drafts
+        unsavedChanges = {};
+        
+        // update revision hash
+        currentRevision = 'rev_b83ee82';
+        document.getElementById('current-revision-label').textContent = currentRevision;
+        
+        renderTable();
+        updateBadgeCounts();
+        
+        // Success Toast
+        showToast('价格配置保存成功！已更新至 models.json', 'success');
+      }, 1200);
+    }
+
+    // Simulated 409 conflict
+    function trigger409Conflict() {
+      // Preset edit state to prevent saving
+      unsavedChanges['openai/gpt-4o'] = {
+        free: false,
+        prices: { input: 6.00, output: 18.00, cacheRead: 3.00 },
+        source: '手动调价'
+      };
+      renderTable();
+      updateBadgeCounts();
+      
+      document.getElementById('modal-conflict').classList.remove('hidden');
+    }
+
+    function closeConflictModal() {
+      document.getElementById('modal-conflict').classList.add('hidden');
+    }
+
+    function resolveConflict() {
+      closeConflictModal();
+      showToast('拉取服务端新 revision 成功！正在重构草稿差异...', 'loading');
+      
+      setTimeout(() => {
+        // Assume revision bumped, we reload the database without wiping our unsaved changes
+        currentRevision = 'rev_e83bb0f';
+        document.getElementById('current-revision-label').textContent = currentRevision;
+        showToast('基线更新完成，您可以重新提交合并配置。', 'success');
+      }, 1000);
+    }
+
+    // Simulated Smart suggestions loading failed / empty state
+    function triggerSmartFailed() {
+      document.getElementById('modal-suggest').classList.remove('hidden');
+      document.getElementById('suggest-loading').classList.remove('hidden');
+      document.getElementById('suggest-content').classList.add('hidden');
+      document.getElementById('btn-apply-suggest').classList.add('hidden');
+
+      setTimeout(() => {
+        document.getElementById('suggest-loading').classList.add('hidden');
+        const content = document.getElementById('suggest-content');
+        content.classList.remove('hidden');
+        
+        // inject network error UI
+        content.innerHTML = `
+          <div class="p-6 border border-red-500/20 bg-red-500/5 rounded-lg text-center space-y-3">
+            <svg class="w-10 h-10 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+              <p class="font-bold text-text">抓取官方定价失败 (502 Gateway Timeout)</p>
+              <p class="text-[11px] text-text-muted mt-1">原因: 网络请求超时，远端 allowlist 适配器 API 无法访问或 AI 服务暂不可用。</p>
+            </div>
+            <button onclick="openSmartSuggestModal()" class="px-3 py-1.5 bg-bg border border-border hover:bg-bg-hover text-text font-medium rounded mx-auto block">
+              重新尝试连接
+            </button>
+          </div>
+        `;
+      }, 1200);
+    }
+
+    // Toast Notification helper
+    function showToast(message, type) {
+      const toastBox = document.getElementById('toast-box');
+      const toast = document.createElement('div');
+      
+      let borderCol = 'border-border';
+      let icon = '';
+      if (type === 'success') {
+        borderCol = 'border-green-500/30 bg-green-500/10 text-green-500';
+        icon = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>';
+      } else if (type === 'error') {
+        borderCol = 'border-red-500/30 bg-red-500/10 text-red-500';
+        icon = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+      } else if (type === 'loading') {
+        borderCol = 'border-accent/30 bg-accent/10 text-accent';
+        icon = '<div class="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>';
+      } else {
+        borderCol = 'border-border bg-bg-panel text-text';
+        icon = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+      }
+
+      toast.className = `p-3 rounded-lg border ${borderCol} shadow-lg text-xs font-semibold flex items-center gap-2 pointer-events-auto transition-all duration-300 opacity-0 transform translate-y-2`;
+      toast.innerHTML = `
+        ${icon}
+        <span>${message}</span>
+      `;
+      
+      toastBox.appendChild(toast);
+      
+      // trigger transition
+      setTimeout(() => {
+        toast.classList.remove('opacity-0', 'translate-y-2');
+      }, 50);
+
+      // destroy
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

@@ -76,17 +76,20 @@ function formatTokens(value: number): string {
 }
 
 function formatTokensM(value: number): string {
-  return `${Math.round(value / 1_000_000).toLocaleString()}M`;
+  if (value <= 0) return "0 M";
+  const m = value / 1_000_000;
+  const fixed = m.toFixed(6);
+  return `${fixed.replace(/\.?0+$/, "")} M`;
 }
 
 /**
- * 计算 token 汇总总数。
+ * 计算 token 汇总总数（不含 cache-write，已退役）。
  *
  * @param totals token 和费用汇总对象。
- * @returns input、output、cacheRead、cacheWrite 的总和。
+ * @returns input + output + cacheRead 的总和。
  */
 function totalTokens(totals: UsageTotals): number {
-  return totals.input + totals.output + totals.cacheRead + totals.cacheWrite;
+  return totals.input + totals.output + totals.cacheRead;
 }
 
 /**
@@ -468,14 +471,13 @@ function TokenRows({ totals }: { totals: UsageTotals }) {
     ["Input", totals.input],
     ["Output", totals.output],
     ["Cache read", totals.cacheRead],
-    ["Cache write", totals.cacheWrite],
   ] as const;
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {rows.map(([label, value]) => (
         <div key={label} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 96px 54px", gap: 8, alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--border)", fontSize: 12 }}>
           <span style={{ color: "var(--text-muted)" }}>{label}</span>
-          <span style={{ color: "var(--text)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatTokens(value)}</span>
+          <span style={{ color: "var(--text)", textAlign: "right", fontVariantNumeric: "tabular-nums" }} title={`${formatTokens(value)} tokens`}>{formatTokens(value)}</span>
           <span style={{ color: "var(--text-dim)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatTokensM(value)}</span>
         </div>
       ))}

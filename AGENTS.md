@@ -39,7 +39,7 @@ npm run dev     # http://localhost:30141
 | Path | Purpose | Details |
 | --- | --- | --- |
 | `app/` | Next.js app routes, layout, global styles. | `README.md`, `docs/modules/api.md` |
-| `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, Git/worktrees, and config. | `docs/modules/api.md` |
+| `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, model prices, Git/worktrees, and config. | `docs/modules/api.md` |
 | `components/` | React UI components. | `docs/modules/frontend.md` |
 | `hooks/` | Client hooks for session state, theme, drag/drop, audio. | `docs/modules/frontend.md` |
 | `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers, and Grok OAuth/accounts/quota modules. | `docs/modules/library.md` |
@@ -62,6 +62,8 @@ npm run dev     # http://localhost:30141
 | Workspace files and Git context | `app/api/files/**`, `app/api/git/**`, `lib/file-paths.ts`, `lib/git-worktree.ts`, `lib/workspace-title.ts` | `docs/modules/api.md`, `docs/modules/library.md` |
 | YPI Studio members/workflows/tasks | `components/YpiStudioPanel.tsx`, `app/api/studio/**`, `lib/ypi-studio-*`, `lib/rpc-manager.ts` | `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Models, skills, auth, usage | `app/api/models*`, `app/api/skills/**`, `app/api/auth/**`, `app/api/usage/route.ts` | `docs/modules/api.md`, `docs/integrations/README.md` |
+| Usage token display & cache-write removal | `lib/token-format.ts`, `lib/llm-usage-normalize.ts`, `lib/llm-usage-types.ts`, `lib/usage-stats.ts`, `components/UsageStatsModal.tsx`, `components/UsageProviderModelTable.tsx`, `components/SessionStatsChips.tsx` | `docs/architecture/overview.md`, `docs/modules/library.md`, `docs/modules/frontend.md` |
+| Model price configuration | `app/api/model-prices/**`, `lib/model-price-*.ts`, `lib/token-format.ts`, `components/ModelPricesConfig.tsx`, `components/SettingsConfig.tsx` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md`, `docs/integrations/README.md`, `docs/operations/troubleshooting.md` |
 | Memory diagnostic snapshots | `lib/memory-diagnostics.ts`, `lib/memory-diagnostics-types.ts`, `app/api/diagnostics/memory-snapshot/route.ts`, `components/SettingsConfig.tsx` (diagnostics section) | `docs/modules/api.md`, `docs/modules/library.md`, `docs/modules/frontend.md`, `docs/operations/troubleshooting.md` |
 
 ## Project Invariants
@@ -77,6 +79,8 @@ Keep this section short and operational; detailed rationale belongs in `docs/arc
 - Treat Project Registry as the project list source; sessions are space history and must not be scanned to synthesize top-level projects.
 - Keep project/space path comparisons on canonical `pathKey` values so symlink/display paths do not duplicate projects.
 - When changing event kinds, JSONL records, RPC payloads, config fields, or shared constants, search for all consumers first and update docs/tests/validation notes.
+- cacheWrite is deprecated: new events and aggregators zero it; wire types retain the field; historical ledger/session files are never rewritten.
+- Model prices are written only to `~/.pi/agent/models.json`; no separate price source. Use `lib/token-format.ts` for all token display; do not hand-roll locale/M formatting in UI components.
 - Do not reset or overwrite unrelated user changes.
 
 ## Standards and Validation
