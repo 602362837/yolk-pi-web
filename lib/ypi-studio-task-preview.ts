@@ -140,3 +140,37 @@ export function openImprovementRelativeLink(options: {
     improvementId: options.instance.id,
   });
 }
+
+/**
+ * Open a task/improvement-scoped HTML prototype via the existing files API
+ * (`mode=preview`) in a new tab. Never injects HTML into the app DOM.
+ * Returns false when the popup is blocked; callers may fall back to the file viewer.
+ */
+export function openStudioTaskHtmlPrototype(options: {
+  taskKey: string;
+  cwd: string;
+  fileName: string;
+  improvementId?: string;
+  onBlocked?: () => void;
+}): boolean {
+  const fileName = options.fileName.trim();
+  if (!fileName || !options.cwd.trim() || !options.taskKey.trim()) {
+    options.onBlocked?.();
+    return false;
+  }
+  const url = buildStudioTaskFileApiUrl({
+    taskKey: options.taskKey,
+    cwd: options.cwd,
+    path: fileName,
+    mode: "preview",
+    improvementId: options.improvementId,
+  });
+  const opened = typeof window !== "undefined"
+    ? window.open(url, "_blank", "noopener,noreferrer")
+    : null;
+  if (!opened) {
+    options.onBlocked?.();
+    return false;
+  }
+  return true;
+}

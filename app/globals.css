@@ -1162,13 +1162,46 @@ html.dark .usage-chart-tooltip {
   text-overflow: ellipsis;
 }
 
+.ypi-studio-widget-plan-review-btn.is-pending,
+.ypi-studio-widget-plan-review-btn.is-revision_changed {
+  border-color: color-mix(in srgb, #f59e0b 48%, var(--border));
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+}
+
+.ypi-studio-widget-plan-review-btn.is-approved {
+  border-color: color-mix(in srgb, #16a34a 45%, var(--border));
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+}
+
+.ypi-studio-widget-plan-review-btn.is-readonly {
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+  color: var(--text-muted);
+}
+
+.ypi-studio-widget-plan-review-btn.is-prototype .ypi-studio-widget-plan-review-btn-icon {
+  font-size: 11px;
+}
+
 .ypi-studio-widget-plan-review-btn:hover {
+  filter: brightness(0.98);
+}
+
+.ypi-studio-widget-plan-review-btn.is-pending:hover,
+.ypi-studio-widget-plan-review-btn.is-revision_changed:hover {
   border-color: #f59e0b;
   background: color-mix(in srgb, #f59e0b 16%, var(--bg));
 }
 
+.ypi-studio-widget-plan-review-btn.is-approved:hover {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 14%, var(--bg));
+}
+
 .ypi-studio-widget-plan-review-btn:focus-visible {
-  outline: 2px solid #f59e0b;
+  outline: 2px solid currentColor;
   outline-offset: 2px;
 }
 
@@ -1178,12 +1211,92 @@ html.dark .usage-chart-tooltip {
   line-height: 1;
 }
 
+.ypi-studio-widget-plan-review-btn-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ypi-studio-widget-plan-review-btn-state {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.92;
+}
+
+/* Task-detail quick preview (improvements tab): peer plan-review / improvement-plan entries. */
+.ypi-studio-quick-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 7px;
+}
+
+.ypi-studio-quick-preview-link {
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--bg-panel);
+  cursor: pointer;
+  text-align: left;
+}
+
+.ypi-studio-quick-preview-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-panel));
+}
+
+.ypi-studio-quick-preview-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ypi-studio-quick-preview-link strong {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ypi-studio-quick-preview-link span {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.ypi-studio-quick-preview-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .ypi-studio-workflow-rail {
   display: flex;
   align-items: flex-start;
   width: 100%;
   min-width: 0;
   margin: 1px 0 7px;
+}
+
+/* Eight stations in two rows within the fixed 360px card; no horizontal page scroll.
+   overflow stays visible so current-node halo rings are not clipped. */
+.ypi-studio-workflow-rail.is-eight-station {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 0;
+  margin: 2px 0 8px;
+  padding: 10px 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bg-panel) 72%, transparent);
+  overflow: visible;
 }
 
 .ypi-studio-workflow-rail-segment {
@@ -1197,11 +1310,34 @@ html.dark .usage-chart-tooltip {
   flex: 0 1 auto;
 }
 
+/* In the 2×4 rail each segment is a grid cell: station + optional in-row connector. */
+.ypi-studio-workflow-rail.is-eight-station .ypi-studio-workflow-rail-segment {
+  flex: initial;
+  width: 100%;
+  min-width: 0;
+}
+
 .ypi-studio-workflow-rail-station {
   display: grid;
   justify-items: center;
   gap: 2px;
   min-width: 0;
+}
+
+.ypi-studio-workflow-rail.is-eight-station .ypi-studio-workflow-rail-station {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.ypi-studio-workflow-rail.is-eight-station .ypi-studio-workflow-rail-line {
+  flex: 1 1 auto;
+  min-width: 6px;
+  margin: 7px 2px 0 3px;
+}
+
+.ypi-studio-workflow-rail.is-eight-station .ypi-studio-workflow-rail-line.is-flowing {
+  margin-top: 6px;
 }
 
 .ypi-studio-workflow-rail-node {
@@ -1219,21 +1355,44 @@ html.dark .usage-chart-tooltip {
   line-height: 1;
 }
 
+.ypi-studio-workflow-rail.is-eight-station .ypi-studio-workflow-rail-node {
+  width: 15px;
+  height: 15px;
+  font-size: 9px;
+}
+
 .ypi-studio-workflow-rail-node.is-done { border-color: #16a34a; background: #16a34a; color: white; }
-.ypi-studio-workflow-rail-node.is-current { border-color: var(--accent); background: var(--accent); color: white; }
-.ypi-studio-workflow-rail-node.is-attention { border-color: #d97706; background: #f59e0b; color: #1f2937; }
+.ypi-studio-workflow-rail-node.is-current { border-color: var(--accent); background: var(--accent); color: white; box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.ypi-studio-workflow-rail-node.is-attention { border-color: #d97706; background: #f59e0b; color: #1f2937; box-shadow: 0 0 0 1px color-mix(in srgb, #f59e0b 40%, transparent); }
 .ypi-studio-workflow-rail-node.is-failed { border-color: #dc2626; background: #dc2626; color: white; }
 .ypi-studio-workflow-rail-node.is-blocked { border-color: #b45309; background: #b45309; color: white; }
 
+/* Soft expanding ring on the active cursor (current / attention / failed / blocked). */
 .ypi-studio-workflow-rail-node.is-halo::after {
   position: absolute;
-  inset: -5px;
-  border: 2px solid color-mix(in srgb, var(--accent) 74%, transparent);
+  inset: -6px;
+  border: 2px solid color-mix(in srgb, var(--accent) 82%, white);
   border-radius: inherit;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent);
   content: "";
   opacity: 0;
   pointer-events: none;
-  animation: ypi-studio-workflow-rail-halo 2s ease-in-out infinite;
+  animation: ypi-studio-workflow-rail-halo 1.7s ease-in-out infinite;
+}
+
+.ypi-studio-workflow-rail-node.is-attention.is-halo::after {
+  border-color: color-mix(in srgb, #f59e0b 88%, white);
+  box-shadow: 0 0 10px color-mix(in srgb, #f59e0b 55%, transparent);
+}
+
+.ypi-studio-workflow-rail-node.is-failed.is-halo::after {
+  border-color: color-mix(in srgb, #dc2626 88%, white);
+  box-shadow: 0 0 10px color-mix(in srgb, #dc2626 50%, transparent);
+}
+
+.ypi-studio-workflow-rail-node.is-blocked.is-halo::after {
+  border-color: color-mix(in srgb, #b45309 88%, white);
+  box-shadow: 0 0 10px color-mix(in srgb, #b45309 50%, transparent);
 }
 
 .ypi-studio-workflow-rail-label {
@@ -1248,6 +1407,18 @@ html.dark .usage-chart-tooltip {
   white-space: nowrap;
 }
 
+.ypi-studio-workflow-rail.is-eight-station .ypi-studio-workflow-rail-label {
+  max-width: 100%;
+  font-size: 7.5px;
+  line-height: 1.05;
+}
+
+.ypi-studio-workflow-rail-station.is-done .ypi-studio-workflow-rail-label { color: #16a34a; }
+.ypi-studio-workflow-rail-station.is-current .ypi-studio-workflow-rail-label { color: var(--accent); font-weight: 800; }
+.ypi-studio-workflow-rail-station.is-attention .ypi-studio-workflow-rail-label { color: #b45309; font-weight: 800; }
+.ypi-studio-workflow-rail-station.is-failed .ypi-studio-workflow-rail-label { color: #dc2626; }
+.ypi-studio-workflow-rail-station.is-blocked .ypi-studio-workflow-rail-label { color: #b45309; }
+
 .ypi-studio-workflow-rail-line {
   position: relative;
   height: 1px;
@@ -1259,7 +1430,7 @@ html.dark .usage-chart-tooltip {
 }
 
 .ypi-studio-workflow-rail-line.is-done { background: #16a34a; }
-.ypi-studio-workflow-rail-line.is-current { background: color-mix(in srgb, var(--accent) 52%, var(--border)); }
+.ypi-studio-workflow-rail-line.is-current { background: color-mix(in srgb, var(--accent) 62%, var(--border)); }
 .ypi-studio-workflow-rail-line.is-attention { background: #f59e0b; }
 .ypi-studio-workflow-rail-line.is-failed { background: #dc2626; }
 .ypi-studio-workflow-rail-line.is-blocked { background: #b45309; }
@@ -1269,18 +1440,126 @@ html.dark .usage-chart-tooltip {
   margin-top: 5px;
 }
 
+/* Traveling highlight on the outbound edge of the active station. */
 .ypi-studio-workflow-rail-line.is-flowing::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 20%, color-mix(in srgb, white 78%, var(--accent)) 50%, transparent 80%);
-  background-size: 200% 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, white 88%, var(--accent)) 42%,
+    color-mix(in srgb, var(--accent) 70%, white) 50%,
+    color-mix(in srgb, white 88%, var(--accent)) 58%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
   content: "";
-  animation: ypi-studio-workflow-rail-shimmer 2.8s linear infinite;
+  opacity: 0.95;
+  animation: ypi-studio-workflow-rail-shimmer 1.8s linear infinite;
+}
+
+.ypi-studio-workflow-rail-line.is-attention.is-flowing::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, white 90%, #f59e0b) 42%,
+    #fbbf24 50%,
+    color-mix(in srgb, white 90%, #f59e0b) 58%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+}
+
+.ypi-studio-workflow-rail-line.is-failed.is-flowing::after,
+.ypi-studio-workflow-rail-line.is-blocked.is-flowing::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, white 88%, #dc2626) 42%,
+    #f87171 50%,
+    color-mix(in srgb, white 88%, #dc2626) 58%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
 }
 
 .ypi-studio-widget-improvement {
   /* Bounded improvement summary; status text is announced via aria-live on the element. */
   container-type: inline-size;
+}
+
+.ypi-studio-widget-accept-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.ypi-studio-widget-accept-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ypi-studio-widget-accept-meta {
+  overflow: hidden;
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ypi-studio-widget-accept-btn {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid #c96d00;
+  border-radius: 7px;
+  background: #b86400;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.ypi-studio-widget-accept-btn:hover:not(:disabled) {
+  background: #9b5300;
+}
+
+.ypi-studio-widget-accept-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ypi-studio-widget-accept-btn:disabled,
+.ypi-studio-widget-accept-btn.is-busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.ypi-studio-widget-reaccept-notice {
+  min-width: 0;
+}
+
+.ypi-studio-widget-archived-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-dim) 16%, transparent);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ypi-studio-task-card.is-archived {
+  opacity: 0.96;
 }
 
 /* The panel shell keeps drag positioning; only rail presentation freezes while it moves. */
@@ -1387,13 +1666,13 @@ html.dark .usage-chart-tooltip {
 }
 
 @keyframes ypi-studio-workflow-rail-halo {
-  0%, 100% { opacity: 0.28; transform: scale(0.92); }
-  50% { opacity: 0.8; transform: scale(1.12); }
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 0.95; transform: scale(1.22); }
 }
 
 @keyframes ypi-studio-workflow-rail-shimmer {
-  from { background-position: -100% 0; }
-  to { background-position: 100% 0; }
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
 }
 
 @keyframes ypi-studio-widget-enter {

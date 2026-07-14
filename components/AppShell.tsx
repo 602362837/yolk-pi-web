@@ -1597,6 +1597,8 @@ function AppShellContent() {
               onOpenTask={(taskKey) => handleOpenStudioSessionTask(taskKey)}
               primaryTaskKey={studioPrimaryTaskKey ?? undefined}
               cwd={studioCwd ?? undefined}
+              contextId={studioContextIdForSession(selectedSession?.id) ?? undefined}
+              onTaskChanged={() => setStudioSessionTaskRefreshKey((key) => key + 1)}
               onOpenFile={handleOpenFile}
             />
           )}

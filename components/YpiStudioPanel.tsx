@@ -28,6 +28,10 @@ import {
   taskRelativeFilePath,
 } from "@/lib/ypi-studio-task-preview";
 import { MarkdownBody } from "./MarkdownBody";
+import {
+  YpiStudioPlanReviewModal,
+  type YpiStudioPlanReviewTarget,
+} from "./YpiStudioPlanReviewModal";
 import { TaskWorkflowFlowSection, WorkflowDetailPanel } from "./YpiStudioWorkflowDetail";
 import { usePrompt } from "./AppPromptProvider";
 
@@ -1600,13 +1604,67 @@ function TaskImprovementStatusSection({ task }: { task: YpiStudioTaskDetail }) {
   );
 }
 
+function improvementHasPlanReview(instance: YpiStudioImprovementInstance): boolean {
+  const mapped = instance.artifacts?.["plan-review"];
+  if (typeof mapped === "string" && mapped.trim()) return true;
+  // Registry may omit plan-review until written; still expose a stable entry for instances that
+  // already entered plan/approval/implementation phases where the file is expected.
+  return [
+    "waiting_plan_approval",
+    "waiting_prototype",
+    "implementing",
+    "checking",
+    "waiting_user_acceptance",
+    "accepted",
+    "accepted_not_doing",
+  ].includes(instance.status);
+}
+
 function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void }) {
   const instances = useMemo(() => task.improvements?.instances ?? [], [task.improvements]);
   const [activeImprovementId, setActiveImprovementId] = useState<string | null>(null);
+  const [planReviewTarget, setPlanReviewTarget] = useState<YpiStudioPlanReviewTarget | null>(null);
 
   useEffect(() => {
     setActiveImprovementId((current) => current && instances.some((inst) => inst.id === current) ? current : null);
   }, [instances]);
+
+  useEffect(() => {
+    setPlanReviewTarget((current) => {
+      if (!current) return null;
+      if (current.taskKey !== task.key) return null;
+      if (current.improvementId && !instances.some((inst) => inst.id === current.improvementId)) return null;
+      return current;
+    });
+  }, [instances, task.key]);
+
+  const mainPlanFileName = task.artifacts["plan-review"]?.trim() || "plan-review.md";
+  const hasMainPlan =
+    Boolean(task.artifacts["plan-review"]?.trim())
+    || Boolean(task.documents["plan-review"] || task.documents[mainPlanFileName])
+    || Object.values(task.documents).some((doc) => doc.fileName === "plan-review.md" || doc.artifact === "plan-review");
+
+  const improvementPlanEntries = useMemo(() => {
+    return instances
+      .filter((instance) => improvementHasPlanReview(instance))
+      .map((instance) => {
+        const displayId = instance.displayId || instance.id;
+        const fileName = instance.artifacts?.["plan-review"]?.trim() || "plan-review.md";
+        return {
+          key: instance.id,
+          label: `改进计划 · ${displayId}`,
+          subtitle: `改进项 · ${fileName}`,
+          target: {
+            taskKey: task.key,
+            taskTitle: task.title,
+            pathLabel: task.pathLabel,
+            improvementId: instance.id,
+            improvementDisplayId: displayId,
+            fileName,
+          } satisfies YpiStudioPlanReviewTarget,
+        };
+      });
+  }, [instances, task.key, task.pathLabel, task.title]);
 
   if (instances.length === 0) {
     return <PanelEmpty title="还没有改进项" description="在主任务验收时确认用户反馈后，改进项会显示在这里。改进项属于当前主任务，不会出现在顶层 Tasks 列表。" />;
@@ -1624,6 +1682,48 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
         <span style={{ color: "var(--text-muted)", fontSize: 11 }}>改进项属于当前主任务，不会出现在顶层 Tasks 列表。</span>
       </div>
       {unresolved > 0 && <Notice tone="warning" text={`仍有 ${unresolved} 个改进项未解决。完成和归档控件保持禁用。`} />}
+
+      {(hasMainPlan || improvementPlanEntries.length > 0) && (
+        <SectionCard title="快速预览">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span className="ypi-studio-quick-preview-readonly" role="note">◉ 只读 · 不批准 · 不 transition</span>
+              <span style={{ color: "var(--text-dim)", fontSize: 11 }}>修改计划请在绑定聊天中进行。</span>
+            </div>
+            <div className="ypi-studio-quick-preview-grid" role="group" aria-label="计划快速预览">
+              {hasMainPlan && (
+                <button
+                  type="button"
+                  className="ypi-studio-quick-preview-link"
+                  aria-label={`预览《${task.title}》主计划审批书`}
+                  onClick={() => setPlanReviewTarget({
+                    taskKey: task.key,
+                    taskTitle: task.title,
+                    pathLabel: task.pathLabel,
+                    fileName: mainPlanFileName,
+                  })}
+                >
+                  <strong>▤ 计划审批书</strong>
+                  <span>主任务 · {mainPlanFileName}</span>
+                </button>
+              )}
+              {improvementPlanEntries.map((entry) => (
+                <button
+                  key={entry.key}
+                  type="button"
+                  className="ypi-studio-quick-preview-link"
+                  aria-label={`预览《${task.title}》${entry.label}`}
+                  onClick={() => setPlanReviewTarget(entry.target)}
+                >
+                  <strong>▤ {entry.label}</strong>
+                  <span>{entry.subtitle}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
       {activeInstance ? (
         <ImprovementDetail cwd={cwd} task={task} instance={activeInstance} onOpenFile={onOpenFile} onBack={() => setActiveImprovementId(null)} />
       ) : (
@@ -1633,6 +1733,14 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
           ))}
         </div>
       )}
+
+      <YpiStudioPlanReviewModal
+        open={Boolean(planReviewTarget)}
+        cwd={cwd}
+        target={planReviewTarget}
+        onClose={() => setPlanReviewTarget(null)}
+        onOpenFile={onOpenFile}
+      />
     </div>
   );
 }
