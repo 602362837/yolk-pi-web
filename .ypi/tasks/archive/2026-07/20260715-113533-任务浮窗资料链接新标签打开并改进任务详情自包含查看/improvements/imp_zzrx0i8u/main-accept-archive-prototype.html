@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-004 主任务确认并归档按钮原型</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #eef2f7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
+    .dialog { width: 480px; max-width: calc(100vw - 32px); border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgba(15,23,42,.28); overflow: hidden; }
+    .body { padding: 22px; }
+    h1 { margin: 0 0 14px; font-size: 18px; }
+    p { margin: 0 0 12px; color: #4b5563; line-height: 1.55; font-size: 13px; }
+    .box { margin-top: 12px; padding: 10px; border-radius: 8px; border: 1px solid rgba(34,197,94,.45); background: rgba(34,197,94,.1); color: #166534; font-size: 12px; line-height: 1.6; }
+    .archive { margin-top: 8px; padding: 10px; border-radius: 8px; border: 1px solid rgba(37,99,235,.35); background: rgba(59,130,246,.08); color: #1d4ed8; font-size: 12px; line-height: 1.6; }
+    .footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; background: #f8fafc; border-top: 1px solid #e5e7eb; }
+    button { border: 1px solid #d1d5db; background: #fff; border-radius: 7px; padding: 9px 14px; font-weight: 700; cursor: default; }
+    .complete { color: #fff; border-color: #2563eb; background: #2563eb; }
+    .archive-btn { color: #fff; border-color: #15803d; background: #16a34a; }
+  </style>
+</head>
+<body>
+  <section class="dialog" role="dialog" aria-labelledby="title">
+    <div class="body">
+      <h1 id="title">确认主任务已验收完成？</h1>
+      <p>这是<strong>主任务结果验收</strong>，不是计划审批，也不是改进验收。你可以只完成任务，或完成后立即归档。</p>
+      <div class="box">
+        <div><strong>确认对象：</strong>主任务「任务浮窗资料链接新标签打开并改进任务详情自包含查看」</div>
+        <div><strong>普通确认：</strong>状态变为 completed；不自动归档。</div>
+      </div>
+      <div class="archive">
+        <div><strong>确认并归档：</strong>先变为 completed，再移动到归档区并生成知识条目。</div>
+        <div>如归档失败，保留 completed 并提示错误。</div>
+      </div>
+    </div>
+    <footer class="footer">
+      <button>暂不验收</button>
+      <button class="complete">确认主任务已完成</button>
+      <button class="archive-btn">确认并归档</button>
+    </footer>
+  </section>
+</body>
+</html>

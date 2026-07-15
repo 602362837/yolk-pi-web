@@ -13,6 +13,13 @@ export type BasePromptOptions = {
   intent?: PromptIntent;
 };
 
+export type ConfirmChoiceOptions = BasePromptOptions & {
+  secondaryConfirmLabel: string;
+  secondaryIntent?: "default" | "success" | "danger";
+};
+
+export type ConfirmChoiceResult = "confirm" | "secondary" | null;
+
 export type PromptInputOptions = BasePromptOptions & {
   initialValue?: string;
   placeholder?: string;
@@ -29,6 +36,7 @@ export type ToastOptions = {
 export type AppPromptApi = {
   notice(options: Omit<BasePromptOptions, "cancelLabel">): Promise<void>;
   confirm(options: BasePromptOptions): Promise<boolean>;
+  confirmChoice(options: ConfirmChoiceOptions): Promise<ConfirmChoiceResult>;
   prompt(options: PromptInputOptions): Promise<string | null>;
   toast(options: ToastOptions): string;
   dismissToast(id: string): void;
@@ -91,6 +99,20 @@ export function AppPromptProvider({ children }: { children: ReactNode }) {
     cancelLabel: options.cancelLabel ?? "取消",
     intent: options.intent ?? "default",
   })), [enqueue]);
+
+  const confirmChoice = useCallback(async (options: ConfirmChoiceOptions): Promise<ConfirmChoiceResult> => {
+    const result = await enqueue({
+      kind: "confirm",
+      title: options.title,
+      message: options.message,
+      confirmLabel: options.confirmLabel ?? "确认",
+      cancelLabel: options.cancelLabel ?? "取消",
+      intent: options.intent ?? "default",
+      secondaryConfirmLabel: options.secondaryConfirmLabel,
+      secondaryIntent: options.secondaryIntent ?? "default",
+    });
+    return result === "secondary" ? "secondary" : result === true ? "confirm" : null;
+  }, [enqueue]);
 
   const prompt = useCallback(async (options: PromptInputOptions) => {
     const result = await enqueue({
@@ -159,7 +181,7 @@ export function AppPromptProvider({ children }: { children: ReactNode }) {
     };
   }, [active]);
 
-  const api: AppPromptApi = { notice, confirm, prompt, toast, dismissToast };
+  const api: AppPromptApi = { notice, confirm, confirmChoice, prompt, toast, dismissToast };
 
   return (
     <PromptContext.Provider value={api}>
@@ -170,6 +192,7 @@ export function AppPromptProvider({ children }: { children: ReactNode }) {
             <AppPromptDialog
               request={active}
               onConfirm={(value) => settle(active, active.kind === "prompt" ? value ?? "" : active.kind === "confirm" ? true : undefined)}
+              onSecondaryConfirm={() => settle(active, "secondary")}
               onCancel={() => settle(active, active.kind === "confirm" ? false : active.kind === "prompt" ? null : undefined)}
             />
           )}

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 export type PromptIntent = "default" | "danger";
+export type PromptSecondaryIntent = "default" | "success" | "danger";
 
 export type PromptDialogRequest = {
   id: number;
@@ -12,6 +13,8 @@ export type PromptDialogRequest = {
   confirmLabel: string;
   cancelLabel?: string;
   intent: PromptIntent;
+  secondaryConfirmLabel?: string;
+  secondaryIntent?: PromptSecondaryIntent;
   initialValue?: string;
   placeholder?: string;
   required?: boolean;
@@ -21,6 +24,7 @@ export type PromptDialogRequest = {
 interface AppPromptDialogProps {
   request: PromptDialogRequest;
   onConfirm(value?: string): void;
+  onSecondaryConfirm(): void;
   onCancel(): void;
 }
 
@@ -30,7 +34,7 @@ function focusableElements(container: HTMLElement): HTMLElement[] {
   )).filter((element) => element.offsetParent !== null);
 }
 
-export function AppPromptDialog({ request, onConfirm, onCancel }: AppPromptDialogProps) {
+export function AppPromptDialog({ request, onConfirm, onSecondaryConfirm, onCancel }: AppPromptDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -146,6 +150,15 @@ export function AppPromptDialog({ request, onConfirm, onCancel }: AppPromptDialo
           <button ref={confirmRef} type="button" className={`app-prompt-button app-prompt-button-primary${request.intent === "danger" ? " is-danger" : ""}`} onClick={submit}>
             {request.confirmLabel}
           </button>
+          {request.kind === "confirm" && request.secondaryConfirmLabel && (
+            <button
+              type="button"
+              className={`app-prompt-button app-prompt-button-secondary${request.secondaryIntent === "success" ? " is-success" : request.secondaryIntent === "danger" ? " is-danger" : ""}`}
+              onClick={onSecondaryConfirm}
+            >
+              {request.secondaryConfirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

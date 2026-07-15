@@ -29,7 +29,9 @@ import type {
   PiWebUsageConfig,
   PiWebWorktreeConfig,
   PiWebYolkConfig,
+  PiWebYolkDefaultModel,
 } from "@/lib/pi-web-config";
+import { clampThinkingLevelToSupported } from "@/lib/session-model-pin";
 import type { TerminalCredentialSummary } from "@/lib/terminal-ssh-types";
 import type { TrellisCommandResponse, TrellisSetupStatus } from "@/lib/trellis-setup-types";
 
@@ -61,6 +63,7 @@ interface ModelListItem {
 interface ModelsResponse {
   modelList?: ModelListItem[];
   defaultModel?: { provider: string; modelId: string } | null;
+  thinkingLevels?: Record<string, string[]>;
   error?: string;
 }
 
@@ -694,9 +697,18 @@ function formatRecommendedAction(status: TrellisSetupStatus): string {
   return "请选择工作区。";
 }
 
+function yolkDefaultModelsEqual(a: PiWebYolkDefaultModel, b: PiWebYolkDefaultModel): boolean {
+  if (a.mode !== b.mode) return false;
+  if (a.mode === "piDefault" || b.mode === "piDefault") return true;
+  return a.provider === b.provider
+    && a.modelId === b.modelId
+    && (a.thinking ?? "auto") === (b.thinking ?? "auto");
+}
+
 function yolkConfigsEqual(a: PiWebYolkConfig | null, b: PiWebYolkConfig | null): boolean {
   if (!a || !b) return a === b;
   return a.defaultToolPreset === b.defaultToolPreset
+    && yolkDefaultModelsEqual(a.defaultModel, b.defaultModel)
     && a.defaultThinkingLevel === b.defaultThinkingLevel;
 }
 
@@ -806,6 +818,7 @@ export function SettingsConfig({
   const [trellisOutput, setTrellisOutput] = useState<string | null>(null);
   const [trellisWorkflowOpen, setTrellisWorkflowOpen] = useState(false);
   const [modelList, setModelList] = useState<ModelListItem[]>([]);
+  const [modelThinkingLevels, setModelThinkingLevels] = useState<Record<string, string[]>>({});
   const [modelsError, setModelsError] = useState<string | null>(null);
   const studioMemberRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightedStudioMember, setHighlightedStudioMember] = useState<string | null>(studioFocusMember?.id ?? null);
@@ -865,10 +878,12 @@ export function SettingsConfig({
       const data = await res.json() as ModelsResponse;
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
       setModelList(data.modelList ?? []);
+      setModelThinkingLevels(data.thinkingLevels ?? {});
     } catch (err) {
       if ((err as { name?: string }).name === "AbortError") return;
       setModelsError(err instanceof Error ? err.message : String(err));
       setModelList([]);
+      setModelThinkingLevels({});
     }
   }, []);
 
@@ -925,7 +940,7 @@ export function SettingsConfig({
   }, [cwd]);
 
   useEffect(() => {
-    if (section !== "trellis" && section !== "terminal" && section !== "studio") return;
+    if (section !== "trellis" && section !== "terminal" && section !== "studio" && section !== "yolk") return;
     const controller = new AbortController();
     if (section === "trellis") void loadTrellisStatus(controller.signal);
     void loadModels(controller.signal);
@@ -933,9 +948,120 @@ export function SettingsConfig({
   }, [section, loadModels, loadTrellisStatus]);
 
   const updateYolk = useCallback((patch: Partial<PiWebYolkConfig>) => {
-    setYolk((prev) => prev ? { ...prev, ...patch } : prev);
+    setYolk((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      // Keep derived defaultThinkingLevel aligned with specific defaultModel.thinking.
+      if (next.defaultModel.mode === "specific" && next.defaultModel.thinking) {
+        next.defaultThinkingLevel = next.defaultModel.thinking;
+      }
+      return next;
+    });
     setNotice(null);
   }, []);
+
+  const yolkDefaultModelOptions = useMemo<ModelSelectOption[]>(() => [
+    { value: "piDefault", label: "跟随 Pi 默认", detail: "settings.json", group: "模式", keywords: ["pi", "default", "follow"] },
+    ...modelList.map((model) => {
+      const providerLabel = model.providerDisplayName || model.provider;
+      return {
+        value: `specific:${model.provider}/${model.id}`,
+        label: model.name,
+        detail: model.providerDisplayName ? `${model.providerDisplayName} · ${model.provider}/${model.id}` : `${model.provider}/${model.id}`,
+        provider: model.provider,
+        modelId: model.id,
+        group: providerLabel,
+        keywords: [
+          model.name,
+          model.provider,
+          model.id,
+          `${model.provider}/${model.name}`,
+          `${model.provider}/${model.id}`,
+          model.providerDisplayName,
+          model.providerDisplayName ? `${model.providerDisplayName}/${model.name}` : undefined,
+          model.providerDisplayName ? `${model.providerDisplayName}/${model.id}` : undefined,
+        ].filter((keyword): keyword is string => Boolean(keyword)),
+      };
+    }),
+  ], [modelList]);
+
+  const yolkDefaultModelValue = yolk?.defaultModel.mode === "specific"
+    ? `specific:${yolk.defaultModel.provider}/${yolk.defaultModel.modelId}`
+    : "piDefault";
+
+  const yolkSelectedThinkingLevels = useMemo(() => {
+    if (!yolk || yolk.defaultModel.mode !== "specific") return MAIN_THINKING_OPTIONS.map((opt) => opt.value);
+    const key = `${yolk.defaultModel.provider}:${yolk.defaultModel.modelId}`;
+    return modelThinkingLevels[key] ?? MAIN_THINKING_OPTIONS.map((opt) => opt.value);
+  }, [modelThinkingLevels, yolk]);
+
+  const yolkThinkingOptions = useMemo<SelectDropdownOption[]>(() => {
+    const supported = new Set(yolkSelectedThinkingLevels);
+    const filtered = MAIN_THINKING_OPTIONS.filter((opt) => supported.has(opt.value));
+    return filtered.length > 0 ? filtered : MAIN_THINKING_OPTIONS;
+  }, [yolkSelectedThinkingLevels]);
+
+  const handleYolkDefaultModelChange = useCallback((value: string) => {
+    if (value === "piDefault") {
+      updateYolk({ defaultModel: { mode: "piDefault" } });
+      return;
+    }
+    if (!value.startsWith("specific:")) return;
+    const [provider, modelId] = value.slice("specific:".length).split("/");
+    if (!provider || !modelId) return;
+    const currentThinking = yolk?.defaultModel.mode === "specific"
+      ? (yolk.defaultModel.thinking ?? yolk.defaultThinkingLevel)
+      : (yolk?.defaultThinkingLevel ?? "auto");
+    const key = `${provider}:${modelId}`;
+    const supported = modelThinkingLevels[key] ?? MAIN_THINKING_OPTIONS.map((opt) => opt.value);
+    const thinking = clampThinkingLevelToSupported(currentThinking, supported);
+    updateYolk({
+      defaultModel: { mode: "specific", provider, modelId, thinking },
+      defaultThinkingLevel: thinking,
+    });
+  }, [modelThinkingLevels, updateYolk, yolk]);
+
+  const handleYolkDefaultThinkingChange = useCallback((thinking: string) => {
+    if (!yolk || yolk.defaultModel.mode !== "specific") return;
+    const nextThinking = thinking as PiWebThinkingLevel;
+    updateYolk({
+      defaultModel: {
+        mode: "specific",
+        provider: yolk.defaultModel.provider,
+        modelId: yolk.defaultModel.modelId,
+        thinking: nextThinking,
+      },
+      defaultThinkingLevel: nextThinking,
+    });
+  }, [updateYolk, yolk]);
+
+  // After thinkingLevels load, clamp the Settings draft so unsupported values are not kept/saved.
+  useEffect(() => {
+    if (!yolk || yolk.defaultModel.mode !== "specific") return;
+    const selected = yolk.defaultModel;
+    const key = `${selected.provider}:${selected.modelId}`;
+    const supported = modelThinkingLevels[key];
+    if (!supported || supported.length === 0) return;
+    const current = selected.thinking ?? yolk.defaultThinkingLevel;
+    const clamped = clampThinkingLevelToSupported(current, supported);
+    if (clamped === current) return;
+    setYolk((prev) => {
+      if (!prev || prev.defaultModel.mode !== "specific") return prev;
+      if (prev.defaultModel.provider !== selected.provider || prev.defaultModel.modelId !== selected.modelId) {
+        return prev;
+      }
+      return {
+        ...prev,
+        defaultModel: {
+          mode: "specific",
+          provider: prev.defaultModel.provider,
+          modelId: prev.defaultModel.modelId,
+          thinking: clamped,
+        },
+        defaultThinkingLevel: clamped,
+      };
+    });
+  }, [modelThinkingLevels, yolk]);
 
   const updateWorktree = useCallback((patch: Partial<PiWebWorktreeConfig>) => {
     setWorktree((prev) => prev ? { ...prev, ...patch } : prev);
@@ -1392,13 +1518,38 @@ export function SettingsConfig({
                         ariaLabel="选择默认工具预设"
                       />
                     </Field>
-                    <Field label="默认思考等级" description="新建会话时默认选中的思考强度。仍可在输入框右下角随时手动切换；已有会话会保留当前思考设置。">
-                      <SelectDropdown
-                        value={yolk.defaultThinkingLevel}
-                        options={MAIN_THINKING_OPTIONS}
-                        onChange={(defaultThinkingLevel) => updateYolk({ defaultThinkingLevel: defaultThinkingLevel as PiWebThinkingLevel })}
-                        ariaLabel="选择默认思考等级"
-                      />
+                    <Field
+                      label="新建会话默认模型与思考等级"
+                      description="仅用于新建空会话的初始模型与思考等级。思考等级选项按所选模型能力裁剪。Chat 内切换只影响当前会话，不会写回这里，也不会写 Pi settings.json 全局 default。"
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <ModelSelect
+                          value={yolkDefaultModelValue}
+                          options={yolkDefaultModelOptions}
+                          onChange={handleYolkDefaultModelChange}
+                          ariaLabel="选择新建会话默认模型"
+                          placeholder="选择默认模型"
+                          fallbackLabel={yolk.defaultModel.mode === "specific" ? `${yolk.defaultModel.provider}/${yolk.defaultModel.modelId}` : "跟随 Pi 默认"}
+                        />
+                        {yolk.defaultModel.mode === "specific" ? (
+                          <SelectDropdown
+                            value={clampThinkingLevelToSupported(
+                              yolk.defaultModel.thinking ?? yolk.defaultThinkingLevel,
+                              yolkSelectedThinkingLevels,
+                            )}
+                            options={yolkThinkingOptions}
+                            onChange={handleYolkDefaultThinkingChange}
+                            ariaLabel="选择新建会话默认思考等级（跟随模型）"
+                          />
+                        ) : (
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                            当前跟随 Pi <code style={{ fontFamily: "var(--font-mono)" }}>settings.json</code> 的 defaultProvider/defaultModel 与 defaultThinkingLevel。
+                          </div>
+                        )}
+                        {modelsError ? (
+                          <div style={{ fontSize: 12, color: "#f87171" }}>模型列表加载失败：{modelsError}</div>
+                        ) : null}
+                      </div>
                     </Field>
                   </div>
                 ) : section === "worktree" ? (

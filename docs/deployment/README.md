@@ -99,9 +99,11 @@ and `/quit`.
 | `/model thinking <level>` | Set thinking level only (`off`/`auto`/`low`/`medium`/`high`/`xhigh`). |
 
 Switching a model sends `set_model` and `set_thinking_level` commands via
-`POST /api/agent/[id]`, updating server-side session state. The Web UI sees the
-same change when opening the session. Model switching is blocked while the agent
-is running (`/abort` first).
+`POST /api/agent/[id]`, updating server-side session state (runtime model +
+JSONL `model_change`). Chat `set_model` is session-scoped and does not rewrite
+`~/.pi/agent/settings.json` global `defaultProvider`/`defaultModel`. The Web UI
+sees the same change when opening the session. Model switching is blocked while
+the agent is running (`/abort` first).
 
 #### TTY bottom input area and status bar
 

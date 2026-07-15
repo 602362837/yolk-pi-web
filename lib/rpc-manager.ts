@@ -32,6 +32,7 @@ import {
   type RpcRuntimeDiagnostic,
 } from "./memory-diagnostics-types";
 import { getOpenAICodexWebSocketDebugStats } from "@earendil-works/pi-ai/api/openai-codex-responses";
+import { withSessionScopedSettingsDefaults } from "./session-model-pin";
 
 // ============================================================================
 // Types
@@ -824,7 +825,12 @@ export class AgentSessionWrapper {
         const registry = this.inner.modelRegistry;
         const model = registry.find(provider, modelId);
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
-        await this.inner.setModel(model);
+        // Session-scoped Chat switch (IMP-002 plan A / MODEL-PIN-3):
+        // SDK setModel still updates runtime model + JSONL model_change (and may
+        // re-clamp thinking), but must not rewrite settings.json defaults.
+        await withSessionScopedSettingsDefaults(this.inner.settingsManager, () =>
+          this.inner.setModel(model),
+        );
         // Grok session pin is retired: model selection no longer binds a
         // per-session account. Requests use the global Active account.
         return { id: model.id, provider: model.provider };

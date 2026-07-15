@@ -1559,6 +1559,58 @@ html.dark .usage-chart-tooltip {
   cursor: wait;
 }
 
+/* Main-task result acceptance — success/accent solid; distinct from improvement orange. */
+.ypi-studio-widget-main-accept {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.12);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08) inset;
+}
+
+.ypi-studio-widget-main-accept-meta {
+  overflow: hidden;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ypi-studio-widget-main-accept-btn {
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #15803d;
+  border-radius: 8px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.ypi-studio-widget-main-accept-btn:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.ypi-studio-widget-main-accept-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ypi-studio-widget-main-accept-btn:disabled,
+.ypi-studio-widget-main-accept-btn.is-busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+
 .ypi-studio-widget-reaccept-notice {
   min-width: 0;
 }
@@ -1716,6 +1768,296 @@ html.dark .usage-chart-tooltip {
 /* Runtime notices are finite too; task state and text remain after the ring stops. */
 .ypi-studio-widget-pulse {
   animation: ypi-studio-widget-pulse 750ms ease-in-out 2;
+}
+
+/* YPI Studio shared task document page / embedded detail viewer.
+   Body is the sole vertical scroller: page/embedded roots use a bounded flex height chain. */
+.ypi-studio-task-document-page {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ypi-studio-task-document {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--text);
+}
+
+.ypi-studio-task-document.is-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 18px 18px 0;
+  overflow: hidden;
+}
+
+.ypi-studio-task-document.is-embedded {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ypi-studio-task-document-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ypi-studio-task-document.is-embedded .ypi-studio-task-document-head {
+  padding: 0 0 12px;
+}
+
+.ypi-studio-task-document-back {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ypi-studio-task-document-back:hover {
+  background: var(--bg-hover);
+}
+
+.ypi-studio-task-document-title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+
+.ypi-studio-task-document-eyebrow {
+  margin-bottom: 3px;
+  color: #16a34a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ypi-studio-task-document-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ypi-studio-task-document-subtitle {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ypi-studio-task-document-path {
+  color: var(--text-dim);
+  font-family: var(--font-noto-mono), ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.ypi-studio-task-document-readonly-badge {
+  flex: none;
+  align-self: flex-start;
+  border: 1px solid color-mix(in srgb, #16a34a 40%, var(--border));
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ypi-studio-task-document-readonly {
+  flex: none;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, #d97706 35%, transparent);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ypi-studio-task-document-notice {
+  flex: none;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ypi-studio-task-document-notice.is-error {
+  border-color: color-mix(in srgb, #dc2626 40%, var(--border));
+  background: rgba(239, 68, 68, 0.09);
+  color: #dc2626;
+}
+
+.ypi-studio-task-document-notice.is-warning {
+  border-color: color-mix(in srgb, #d97706 40%, var(--border));
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.ypi-studio-task-document-notice.is-success {
+  border-color: color-mix(in srgb, #16a34a 40%, var(--border));
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.ypi-studio-task-document-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 12px;
+  padding-bottom: 20px;
+  outline: none;
+}
+
+.ypi-studio-task-document-state-center {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.ypi-studio-task-document-state-card {
+  max-width: 430px;
+  color: var(--text-muted);
+}
+
+.ypi-studio-task-document-state-icon {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.ypi-studio-task-document-state-card h2 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.ypi-studio-task-document-state-card p {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ypi-studio-task-document-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ypi-studio-task-document-spin 0.8s linear infinite;
+}
+
+.ypi-studio-task-document-retry {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ypi-studio-task-document-secondary-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ypi-studio-task-document-secondary-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ypi-studio-task-document-state-center.is-error .ypi-studio-task-document-state-icon {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.09);
+}
+
+.ypi-studio-task-document-markdown-wrap {
+  min-width: 0;
+}
+
+.ypi-studio-task-document-truncated-note {
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, #d97706 35%, transparent);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  font-size: 12px;
+}
+
+.ypi-studio-task-document-back:focus-visible,
+.ypi-studio-task-document-retry:focus-visible,
+.ypi-studio-task-document-secondary-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes ypi-studio-task-document-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .ypi-studio-task-document.is-page {
+    padding: 12px 12px 20px;
+  }
+
+  .ypi-studio-task-document-head {
+    flex-wrap: wrap;
+  }
+
+  .ypi-studio-task-document-back {
+    order: -1;
+    width: 100%;
+  }
+
+  .ypi-studio-task-document-readonly-badge {
+    margin-left: auto;
+  }
 }
 
 /* YPI Studio plan-review modal: read-only on-demand preview from session widget. */
@@ -2019,7 +2361,8 @@ html.dark .usage-chart-tooltip {
     transition: none !important;
   }
 
-  .ypi-studio-plan-review-spinner {
+  .ypi-studio-plan-review-spinner,
+  .ypi-studio-task-document-spinner {
     animation-duration: 1.6s;
   }
 
@@ -2586,6 +2929,10 @@ button.session-stats-chip:focus-visible {
 .app-prompt-button-primary:hover { background: var(--accent-hover); }
 .app-prompt-button-primary.is-danger { border-color: #dc2626; background: #dc2626; }
 .app-prompt-button-primary.is-danger:hover { background: #b91c1c; }
+.app-prompt-button-secondary.is-success { border-color: #15803d; background: #16a34a; color: white; }
+.app-prompt-button-secondary.is-success:hover { background: #15803d; }
+.app-prompt-button-secondary.is-danger { border-color: #dc2626; background: #dc2626; color: white; }
+.app-prompt-button-secondary.is-danger:hover { background: #b91c1c; }
 
 @keyframes app-prompt-enter {
   from { opacity: 0; transform: translateY(4px); }

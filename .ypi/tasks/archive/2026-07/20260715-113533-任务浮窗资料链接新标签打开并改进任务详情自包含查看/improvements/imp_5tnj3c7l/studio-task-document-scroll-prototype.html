@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-001 任务资料滚动原型</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121a27;
+      --line: #2a3a52;
+      --text: #e7eef9;
+      --muted: #9aabbf;
+      --accent: #3b82f6;
+      --green: #34d399;
+      --amber: #f59e0b;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; min-height: 100dvh; }
+    .topbar {
+      flex: none;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--line); background: #0e1624;
+    }
+    .topbar h1 { margin: 0; font-size: 15px; }
+    .topbar p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+    .modes { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      border: 1px solid var(--line); background: #182334; color: var(--text);
+      border-radius: 9px; padding: 7px 11px; cursor: pointer; font-weight: 700;
+    }
+    button.active { border-color: var(--accent); background: #17345b; }
+    button.good { border-color: #2f6f55; background: #123226; color: #b7f0d3; }
+    button.bad { border-color: #7f3b3b; background: #2a1515; color: #ffd0d0; }
+    .stage {
+      flex: 1 1 auto; min-height: 0; display: grid;
+      grid-template-columns: 1.1fr 0.9fr; gap: 0; overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      .stage { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    }
+    .pane {
+      min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid var(--line);
+    }
+    .pane:last-child { border-right: 0; border-left: 1px solid var(--line); }
+    .pane-label {
+      flex: none; padding: 8px 12px; font-size: 11px; font-weight: 800;
+      letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+      border-bottom: 1px solid var(--line); background: #0f1724;
+    }
+    .pane-label .tag { margin-left: 8px; padding: 2px 7px; border-radius: 999px; font-size: 10px; }
+    .tag.bad { background: rgba(248,113,113,.15); color: var(--danger); }
+    .tag.good { background: rgba(52,211,153,.12); color: var(--green); }
+
+    /* ===== BEFORE: page broken height chain ===== */
+    .before-page {
+      min-height: 100%;
+      background: var(--bg);
+      /* problem: only min-height, grows with content → window scroll */
+    }
+    .before-page .doc {
+      min-height: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .before-page .body {
+      flex: 1 1 auto;
+      min-height: 240px;
+      overflow: auto; /* ineffective while parent grows */
+      margin-top: 12px;
+      border: 1px dashed #5b3a20;
+      border-radius: 10px;
+      padding: 12px;
+      background: #141c29;
+    }
+
+    /* ===== AFTER: page sole scroller ===== */
+    .after-page {
+      height: 100%;
+      max-height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .after-page .doc {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .after-page .body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      margin-top: 12px;
+      border: 1px solid #245c45;
+      border-radius: 10px;
+      padding: 12px;
+      background: #101a16;
+    }
+
+    /* ===== Embedded shell simulation ===== */
+    .shell {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .before-embed .shell { overflow-y: auto; } /* double scroll */
+    .after-embed .shell {
+      overflow: hidden; /* lock when document open */
+    }
+    .before-embed .doc-embed,
+    .after-embed .doc-embed {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+    .before-embed .doc-embed { /* grows inside scrolling shell */
+      height: auto;
+    }
+    .after-embed .doc-embed {
+      height: 100%;
+      overflow: hidden;
+    }
+    .before-embed .body {
+      flex: 1 1 auto;
+      min-height: 240px;
+      overflow: auto;
+      border: 1px dashed #5b3a20;
+      border-radius: 10px;
+      padding: 12px;
+      background: #141c29;
+    }
+    .after-embed .body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      border: 1px solid #245c45;
+      border-radius: 10px;
+      padding: 12px;
+      background: #101a16;
+    }
+
+    .doc-head {
+      flex: none;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+    .doc-head .meta { min-width: 0; flex: 1; }
+    .doc-head strong { display: block; }
+    .doc-head span { display: block; color: var(--muted); font-size: 12px; }
+    .badge {
+      flex: none;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--green);
+      border: 1px solid color-mix(in srgb, var(--green) 40%, var(--line));
+      background: rgba(52,211,153,.1);
+    }
+    .note {
+      flex: none;
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+      background: rgba(245,158,11,.1);
+      color: #fbbf24;
+      font-size: 12px;
+    }
+    .md h2 { margin: 0 0 8px; font-size: 16px; }
+    .md p { color: #c9d6e8; margin: 0 0 12px; }
+    .hint {
+      flex: none;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      background: #0f1724;
+    }
+    .status {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status.ok { color: var(--green); }
+    .status.warn { color: var(--amber); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>IMP-001 · 任务资料预览滚动</h1>
+      <p>对比 Before（需点击才滚）与 After（sole scroller）。请<strong>不要先点击正文</strong>，直接滚轮/触控板。</p>
+    </div>
+    <div class="modes">
+      <button type="button" id="mode-page" class="active">Page 新标签</button>
+      <button type="button" id="mode-embed">Embedded 详情</button>
+      <span class="status" id="status">模式：Page</span>
+    </div>
+  </header>
+
+  <div class="stage" id="stage-page">
+    <section class="pane before-page-wrap">
+      <div class="pane-label">Before · Page <span class="tag bad">高度链断裂</span></div>
+      <div class="before-page" id="before-page" style="flex:1;min-height:0;overflow:auto">
+        <div class="doc">
+          <div class="doc-head">
+            <div class="meta">
+              <strong>plan-review.md</strong>
+              <span>只读 · 任务资料 · 父级随内容撑开</span>
+            </div>
+            <span class="badge">只读</span>
+          </div>
+          <div class="note">问题：body 设了 overflow:auto，但父级只有 min-height，实际常变成整页滚动；焦点在头/返回时滚轮像失灵。</div>
+          <div class="body" id="before-page-body"></div>
+        </div>
+      </div>
+      <div class="hint">试着不点正文直接滚：滚动目标不稳定（window / 外层）。</div>
+    </section>
+    <section class="pane">
+      <div class="pane-label">After · Page <span class="tag good">100dvh flex + body 唯一滚动</span></div>
+      <div class="after-page" id="after-page">
+        <div class="doc">
+          <div class="doc-head">
+            <div class="meta">
+              <strong>plan-review.md</strong>
+              <span>只读 · 任务资料 · 头固定</span>
+            </div>
+            <span class="badge">只读</span>
+          </div>
+          <div class="note">目标：viewport → page → document 有界高度；仅绿色边框正文区滚动。</div>
+          <div class="body" id="after-page-body" tabindex="0"></div>
+        </div>
+      </div>
+      <div class="hint">不点击也应立即滚动；头与只读条保持可见。</div>
+    </section>
+  </div>
+
+  <div class="stage" id="stage-embed" hidden>
+    <section class="pane before-embed">
+      <div class="pane-label">Before · Embedded <span class="tag bad">Shell + Body 双滚</span></div>
+      <div class="shell">
+        <div class="doc-embed">
+          <div class="doc-head">
+            <button type="button">← 返回计划审批书</button>
+            <div class="meta">
+              <strong>design.md</strong>
+              <span>焦点常在返回按钮上</span>
+            </div>
+            <span class="badge">只读</span>
+          </div>
+          <div class="note">Shell overflowY:auto + body overflow:auto → 需点中 body 才滚对层。</div>
+          <div class="body" id="before-embed-body"></div>
+        </div>
+      </div>
+      <div class="hint">先点返回附近再滚，常出现无响应或只动外层。</div>
+    </section>
+    <section class="pane after-embed">
+      <div class="pane-label">After · Embedded <span class="tag good">Shell lock + body sole scroller</span></div>
+      <div class="shell">
+        <div class="doc-embed">
+          <div class="doc-head">
+            <button type="button">← 返回计划审批书</button>
+            <div class="meta">
+              <strong>design.md</strong>
+              <span>头固定 · 外层 overflow:hidden</span>
+            </div>
+            <span class="badge">只读</span>
+          </div>
+          <div class="note">documentTarget 打开时锁 shell；关闭后恢复普通 Tab 滚动。</div>
+          <div class="body" id="after-embed-body" tabindex="0"></div>
+        </div>
+      </div>
+      <div class="hint">不点击正文即可滚；返回按钮不被滚走。</div>
+    </section>
+  </div>
+
+  <script>
+    function longMarkdown(title) {
+      const paras = [];
+      for (let i = 1; i <= 40; i++) {
+        paras.push(`<p><strong>§${i}</strong> ${title} 示例段落。用于制造超出视口的正文，验证 sole scroller。滚轮应在不点击的情况下驱动带边框的正文容器，而不是错误的祖先层。</p>`);
+      }
+      return `<div class="md"><h2>${title}</h2>${paras.join("")}</div>`;
+    }
+    for (const id of ["before-page-body", "after-page-body", "before-embed-body", "after-embed-body"]) {
+      document.getElementById(id).innerHTML = longMarkdown(id.includes("embed") ? "Embedded 资料" : "Page 资料");
+    }
+
+    const modePage = document.getElementById("mode-page");
+    const modeEmbed = document.getElementById("mode-embed");
+    const stagePage = document.getElementById("stage-page");
+    const stageEmbed = document.getElementById("stage-embed");
+    const status = document.getElementById("status");
+
+    function setMode(mode) {
+      const page = mode === "page";
+      stagePage.hidden = !page;
+      stageEmbed.hidden = page;
+      modePage.classList.toggle("active", page);
+      modeEmbed.classList.toggle("active", !page);
+      status.textContent = page ? "模式：Page 新标签" : "模式：Embedded 详情";
+      status.className = "status ok";
+    }
+    modePage.addEventListener("click", () => setMode("page"));
+    modeEmbed.addEventListener("click", () => setMode("embed"));
+  </script>
+</body>
+</html>

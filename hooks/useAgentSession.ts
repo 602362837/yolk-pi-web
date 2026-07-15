@@ -9,6 +9,14 @@ import { sendAgentCommand } from "@/lib/agent-client";
 import type { ToolEntry } from "@/components/ToolPanel";
 import type { TrellisTaskChatContext } from "@/lib/trellis-chat-context";
 import { sessionTitleSeedFromUserMessage } from "@/lib/session-title";
+import {
+  clampThinkingLevelToSupported,
+  normalizeSessionModelRef,
+  resolveChatDisplayModel,
+  resolveDesiredSessionModel,
+  shouldPinSessionModel,
+  type SessionModelRef,
+} from "@/lib/session-model-pin";
 
 export interface SessionData {
   sessionId: string;
@@ -236,6 +244,8 @@ export interface UseAgentSessionOptions {
   setToolPreset?: (preset: PiWebToolPreset) => void;
   defaultToolPreset?: PiWebToolPreset;
   defaultThinkingLevel?: PiWebThinkingLevel;
+  /** yolk.defaultModel specific seed for new empty sessions (null = follow Pi default). */
+  defaultModel?: SessionModelRef | null;
 }
 
 export type ThinkingLevelOption = PiWebThinkingLevel;
@@ -331,6 +341,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     autoScrollEnabled = true,
     defaultToolPreset = "default",
     defaultThinkingLevel = "auto",
+    defaultModel = null,
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;
@@ -356,6 +367,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [forkingEntryId, setForkingEntryId] = useState<string | null>(null);
   const [currentModelOverride, setCurrentModelOverride] = useState<{ provider: string; modelId: string } | null>(null);
   const [pendingModel, setPendingModel] = useState<{ provider: string; modelId: string } | null>(null);
+  /** Live agent model from get_state (includeState); preferred over path context.model. */
+  const [liveSessionModel, setLiveSessionModel] = useState<SessionModelRef | null>(null);
   const [isCompacting, setIsCompacting] = useState(false);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
@@ -385,14 +398,85 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const autoScrollStickyRef = useRef(true);
   const toolPresetTouchedRef = useRef(false);
   const thinkingLevelTouchedRef = useRef(false);
+  /** Serializes set_model RPCs so switch-then-send cannot race past an in-flight pin. */
+  const modelChangeChainRef = useRef(Promise.resolve());
+  /** Last model successfully applied via set_model / create body in this hook instance. */
+  const lastPinnedModelRef = useRef<SessionModelRef | null>(null);
+  /** Synchronous UI selection (updated in handleModelChange before React re-render). */
+  const selectedModelRef = useRef<SessionModelRef | null>(null);
 
   const setNewSessionModel = opts.setNewSessionModel ?? setNewSessionModelState;
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
 
-  const currentModel = currentModelOverride ?? data?.context.model ?? pendingModel ?? null;
+  const currentModel = resolveChatDisplayModel({
+    override: currentModelOverride,
+    pending: pendingModel,
+    live: liveSessionModel,
+    context: data?.context.model ?? null,
+  });
   const effectiveSessionId = session?.id ?? precreatedSessionId;
   const displayModel = isNew ? newSessionModel : currentModel;
   effectiveSessionIdRef.current = effectiveSessionId;
+  // Keep a sync snapshot of the model the UI currently wants, so send can pin
+  // without waiting for a re-render after handleModelChange.
+  selectedModelRef.current = isNew
+    ? (newSessionModel ?? pendingModel ?? currentModelOverride)
+    : resolveChatDisplayModel({
+      override: currentModelOverride,
+      pending: pendingModel,
+      live: liveSessionModel,
+      context: data?.context.model ?? null,
+    });
+
+  const enqueueModelChange = useCallback(<T,>(op: () => Promise<T>): Promise<T> => {
+    const run = modelChangeChainRef.current.then(op, op);
+    // Keep the chain alive after failures so later switches still serialize.
+    modelChangeChainRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }, []);
+
+  /**
+   * Align live agent model with the UI selection before prompt/steer/follow_up.
+   * Awaits any in-flight set_model; on failure throws so callers abort send.
+   */
+  const ensureSessionModel = useCallback(async (sid: string): Promise<SessionModelRef | null> => {
+    const desired = resolveDesiredSessionModel({
+      override: selectedModelRef.current,
+      newSession: isNew ? newSessionModel : null,
+      pending: pendingModel,
+      live: liveSessionModel,
+      context: data?.context.model ?? null,
+    });
+    if (!shouldPinSessionModel(desired, lastPinnedModelRef.current)) {
+      return desired ?? lastPinnedModelRef.current;
+    }
+    return enqueueModelChange(async () => {
+      // Re-read after waiting for prior chain links (another switch may have finished).
+      const nextDesired = resolveDesiredSessionModel({
+        override: selectedModelRef.current,
+        newSession: isNew ? newSessionModel : null,
+        pending: pendingModel,
+        live: liveSessionModel,
+        context: data?.context.model ?? null,
+      });
+      if (!shouldPinSessionModel(nextDesired, lastPinnedModelRef.current)) {
+        return nextDesired ?? lastPinnedModelRef.current;
+      }
+      await sendAgentCommand(sid, {
+        type: "set_model",
+        provider: nextDesired.provider,
+        modelId: nextDesired.modelId,
+      });
+      lastPinnedModelRef.current = nextDesired;
+      setCurrentModelOverride(nextDesired);
+      setPendingModel(nextDesired);
+      setLiveSessionModel(nextDesired);
+      return nextDesired;
+    });
+  }, [data?.context.model, enqueueModelChange, isNew, liveSessionModel, newSessionModel, pendingModel]);
 
   useEffect(() => {
     if (!isNew || toolPresetTouchedRef.current || messages.length > 0 || agentRunning) return;
@@ -519,16 +603,64 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           setActiveLeafId(null);
           setMessages([]);
           setError(null);
+          setLiveSessionModel(null);
+          setCurrentModelOverride(null);
+          setPendingModel(null);
+          lastPinnedModelRef.current = null;
+          selectedModelRef.current = null;
         }
         return null;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const d = await res.json() as SessionData & { agentState?: { running: boolean; state?: { isStreaming?: boolean; studioChildRunCount?: number; isCompacting?: boolean; contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; thinkingLevel?: string } } };
+      const d = await res.json() as SessionData & {
+        agentState?: {
+          running: boolean;
+          state?: {
+            isStreaming?: boolean;
+            studioChildRunCount?: number;
+            isCompacting?: boolean;
+            contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null;
+            systemPrompt?: string;
+            thinkingLevel?: string;
+            model?: { provider?: string; id?: string; modelId?: string } | null;
+          };
+        };
+      };
       setData(d);
       setActiveLeafId(d.leafId);
       setMessages(d.context.messages);
       setEntryIds(d.context.entryIds ?? []);
-      setCurrentModelOverride(null);
+
+      // Prefer live get_state.model for display/pin baseline. Do not clear
+      // currentModelOverride unconditionally — path context.model can lag or
+      // reflect a historical assistant model and must not clobber UI selection.
+      // Display priority is override > pending > live > context (resolveChatDisplayModel).
+      const liveModel = includeState
+        ? normalizeSessionModelRef(d.agentState?.state?.model)
+        : null;
+      // Only adopt a positive live model. If the wrapper is already gone after
+      // agent_end, keep the previous live/override snapshot rather than nulling
+      // it and falling through to path context (assistant history).
+      if (liveModel) {
+        setLiveSessionModel(liveModel);
+      }
+      const contextModel = normalizeSessionModelRef(d.context.model);
+      // Pin baseline: live agent truth first; never overwrite a confirmed pin with
+      // path context alone (assistant history).
+      if (liveModel) {
+        lastPinnedModelRef.current = liveModel;
+        selectedModelRef.current = resolveChatDisplayModel({
+          override: selectedModelRef.current,
+          live: liveModel,
+          context: contextModel,
+        });
+      } else if (!lastPinnedModelRef.current && contextModel) {
+        lastPinnedModelRef.current = contextModel;
+        if (!selectedModelRef.current) {
+          selectedModelRef.current = contextModel;
+        }
+      }
+
       setError(null);
       // If no live agent state, fall back to thinking level from session file
       if (!d.agentState?.state?.thinkingLevel && d.context.thinkingLevel && d.context.thinkingLevel !== "off") {
@@ -638,6 +770,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         sessionIdRef.current = realId;
         precreatedSessionIdRef.current = realId;
         setPrecreatedSessionId(realId);
+        if (selectedModel) lastPinnedModelRef.current = selectedModel;
         const now = new Date().toISOString();
         onSessionCreated?.({
           id: realId,
@@ -727,12 +860,24 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setRetryInfo(null);
         dispatch({ type: "end" });
         if (sessionIdRef.current) {
-          loadSession(sessionIdRef.current);
+          // includeState so selector restores from live get_state.model, not assistant history.
+          loadSession(sessionIdRef.current, false, true, true);
           fetch(`/api/agent/${encodeURIComponent(sessionIdRef.current)}`)
             .then((r) => r.json())
-            .then((d: { state?: { contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string } }) => {
+            .then((d: { state?: { contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; model?: { provider?: string; id?: string; modelId?: string } | null } }) => {
               if (d.state?.contextUsage !== undefined) setContextUsage(d.state.contextUsage ?? null);
               if (d.state?.systemPrompt !== undefined) setSystemPrompt(d.state.systemPrompt ?? null);
+              const liveModel = normalizeSessionModelRef(d.state?.model);
+              if (liveModel) {
+                setLiveSessionModel(liveModel);
+                lastPinnedModelRef.current = liveModel;
+                // Do not clear/replace explicit UI override; display prefers override > live.
+                selectedModelRef.current = resolveChatDisplayModel({
+                  override: selectedModelRef.current,
+                  live: liveModel,
+                  context: null,
+                });
+              }
             })
             .catch(() => {});
         }
@@ -1054,6 +1199,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const result = await res.json() as { sessionId: string };
         const realId = result.sessionId;
         sessionIdRef.current = realId;
+        if (selectedModel) lastPinnedModelRef.current = selectedModel;
         connectEvents(realId);
         const now = new Date().toISOString();
         onSessionCreated?.({
@@ -1070,6 +1216,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       } else {
         const sid = existingSessionId ?? session?.id;
         if (!sid) return;
+        // Pin UI model before prompt so switch-then-send cannot race past set_model.
+        await ensureSessionModel(sid);
         const wasPrecreated = !!precreatedSessionIdRef.current && sid === precreatedSessionIdRef.current && messages.length === 0;
         connectEvents(sid);
         if (wasPrecreated) {
@@ -1096,11 +1244,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
     } catch (e) {
       console.error("Failed to send message:", e);
+      setError(e instanceof Error ? e.message : String(e));
       setAgentRunning(false);
       setAgentPhase(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, newSessionProjectContext, toolPreset, thinkingLevel, session, agentRunning, connectEvents, onSessionCreated, messages.length]);
+  }, [isNew, newSessionCwd, newSessionModel, newSessionProjectContext, toolPreset, thinkingLevel, session, agentRunning, connectEvents, onSessionCreated, messages.length, ensureSessionModel]);
 
   const handleAbort = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -1151,27 +1300,60 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, [loadContext]);
 
   const handleModelChange = useCallback(async (provider: string, modelId: string) => {
+    const next: SessionModelRef = { provider, modelId };
+    // Optimistic UI + sync snapshot so an immediate send awaits this chain link.
+    selectedModelRef.current = next;
+    setPendingModel(next);
+    setCurrentModelOverride(next);
+    setLiveSessionModel(next);
+
+    // Clamp thinking to the new model's supported set (session-scoped; no Settings write).
+    const supported = modelThinkingLevels[`${provider}:${modelId}`] ?? null;
+    setThinkingLevel((prev) => {
+      const clamped = clampThinkingLevelToSupported(prev, supported);
+      if (clamped !== prev) {
+        thinkingLevelTouchedRef.current = true;
+        const sid = sessionIdRef.current;
+        if (sid && clamped !== "auto") {
+          sendAgentCommand(sid, { type: "set_thinking_level", level: clamped }).catch((e) => {
+            console.error("Failed to clamp thinking level after model change:", e);
+          });
+        }
+      }
+      return clamped;
+    });
+
     if (isNew) {
-      setNewSessionModel({ provider, modelId });
+      setNewSessionModel(next);
       const draftSid = sessionIdRef.current;
       if (!draftSid) return;
       try {
-        await sendAgentCommand(draftSid, { type: "set_model", provider, modelId });
-        setCurrentModelOverride({ provider, modelId });
+        await enqueueModelChange(async () => {
+          await sendAgentCommand(draftSid, { type: "set_model", provider, modelId });
+          lastPinnedModelRef.current = next;
+          setLiveSessionModel(next);
+          return next;
+        });
       } catch (e) {
         console.error("Failed to set model:", e);
+        setError(e instanceof Error ? e.message : String(e));
       }
       return;
     }
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
-      await sendAgentCommand(sid, { type: "set_model", provider, modelId });
-      setCurrentModelOverride({ provider, modelId });
+      await enqueueModelChange(async () => {
+        await sendAgentCommand(sid, { type: "set_model", provider, modelId });
+        lastPinnedModelRef.current = next;
+        setLiveSessionModel(next);
+        return next;
+      });
     } catch (e) {
       console.error("Failed to set model:", e);
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }, [isNew, setNewSessionModel]);
+  }, [enqueueModelChange, isNew, modelThinkingLevels, setNewSessionModel]);
 
   const handleCompact = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -1191,9 +1373,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const handleSteer = useCallback(async (message: string, images?: AttachedImage[]) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    setMessages((prev) => [...prev, { role: "user", content: `[steer] ${message}`, timestamp: Date.now() } as AgentMessage]);
     const piImages = images?.map((img) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType }));
     try {
+      // Steer runs mid-stream; still pin so a model switch during streaming is honored.
+      await ensureSessionModel(sid);
+      setMessages((prev) => [...prev, { role: "user", content: `[steer] ${message}`, timestamp: Date.now() } as AgentMessage]);
       await sendAgentCommand(sid, {
         type: "steer",
         message,
@@ -1201,15 +1385,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       });
     } catch (e) {
       console.error("Failed to steer:", e);
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [ensureSessionModel]);
 
   const handleFollowUp = useCallback(async (message: string, images?: AttachedImage[]) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    setMessages((prev) => [...prev, { role: "user", content: message, timestamp: Date.now() } as AgentMessage]);
     const piImages = images?.map((img) => ({ type: "image" as const, data: img.data, mimeType: img.mimeType }));
     try {
+      await ensureSessionModel(sid);
+      setMessages((prev) => [...prev, { role: "user", content: message, timestamp: Date.now() } as AgentMessage]);
       await sendAgentCommand(sid, {
         type: "follow_up",
         message,
@@ -1217,8 +1403,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       });
     } catch (e) {
       console.error("Failed to follow up:", e);
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [ensureSessionModel]);
 
   const handleAbortCompaction = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -1377,7 +1564,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [hasMessages, messages.length, agentRunning, streamState.isStreaming, streamState.streamingMessage, autoScrollEnabled, scrollToBottom, scrollUserMsgToTop]);
 
-  // Load model list
+  // Load model list and seed new-session model from yolk.defaultModel (specific) or Pi default.
   useEffect(() => {
     fetch("/api/models").then((r) => r.json()).then((d: { models: Record<string, string>; modelList?: { id: string; name: string; provider: string; providerDisplayName?: string }[]; defaultModel?: { provider: string; modelId: string } | null; thinkingLevels?: Record<string, string[]>; thinkingLevelMaps?: Record<string, Record<string, string | null>> }) => {
       setModelNames(d.models);
@@ -1386,16 +1573,34 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (d.modelList) {
         setModelList(d.modelList);
         if (isNew && d.modelList.length > 0) {
-          const def = d.defaultModel;
-          const match = def && d.modelList.find((m) => m.id === def.modelId && m.provider === def.provider);
-          const selected = match
-            ? { provider: match.provider, modelId: match.id }
-            : { provider: d.modelList[0].provider, modelId: d.modelList[0].id };
+          // Prefer yolk.defaultModel (specific); otherwise Pi settings default; else first model.
+          const yolkPref = defaultModel;
+          const yolkMatch = yolkPref
+            && d.modelList.find((m) => m.id === yolkPref.modelId && m.provider === yolkPref.provider);
+          const piDef = d.defaultModel;
+          const piMatch = !yolkMatch && piDef
+            && d.modelList.find((m) => m.id === piDef.modelId && m.provider === piDef.provider);
+          const selected = yolkMatch
+            ? { provider: yolkMatch.provider, modelId: yolkMatch.id }
+            : piMatch
+              ? { provider: piMatch.provider, modelId: piMatch.id }
+              : yolkPref?.provider && yolkPref.modelId
+                // Keep configured ref even if not in list (user may add credentials later).
+                ? { provider: yolkPref.provider, modelId: yolkPref.modelId }
+                : { provider: d.modelList[0].provider, modelId: d.modelList[0].id };
           setNewSessionModel(selected);
+
+          // Clamp default thinking against the selected model's capabilities once levels load.
+          if (!thinkingLevelTouchedRef.current) {
+            const levels = d.thinkingLevels?.[`${selected.provider}:${selected.modelId}`] ?? null;
+            if (levels) {
+              setThinkingLevel((prev) => clampThinkingLevelToSupported(prev, levels));
+            }
+          }
         }
       }
     }).catch(() => {});
-  }, [isNew, modelsRefreshKey, setNewSessionModel]);
+  }, [defaultModel, isNew, modelsRefreshKey, setNewSessionModel]);
 
   // Compact error auto-dismiss
   useEffect(() => {

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-002 · 蛋黄𝝅 默认配置 · 新建会话默认模型</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: var(--font);
+      font-size: 14px;
+      color: var(--text);
+      background: #0f172a;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .frame {
+      width: min(960px, 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--bg);
+      box-shadow: 0 24px 60px rgba(0,0,0,.35);
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+    .top h1 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .top p {
+      margin: 3px 0 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .toggle {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg);
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      min-height: 520px;
+    }
+    nav {
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .nav-btn {
+      text-align: left;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 10px 10px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .nav-btn strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .nav-btn span {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .nav-btn.active {
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+      background: var(--bg-selected);
+      color: var(--accent);
+    }
+    .nav-btn.active strong { color: var(--accent); }
+    main {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 15px;
+    }
+    .desc {
+      margin: 5px 0 0;
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    code {
+      font-family: var(--mono);
+      color: var(--text);
+      font-size: 11px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+    }
+    .field label {
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .field .help {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .control {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    select, button.primary, button.secondary {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    select { min-width: 220px; }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary {
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid color-mix(in srgb, #16a34a 40%, var(--border));
+      background: rgba(22,163,74,.1);
+      color: #16a34a;
+    }
+    .note {
+      border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--border));
+      border-radius: 12px;
+      padding: 12px;
+      background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .note strong { color: var(--text); }
+    .preview-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: var(--bg);
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .model-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: var(--bg-panel);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .hidden { display: none !important; }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { border-right: 0; border-bottom: 1px solid var(--border); }
+      .preview-row { grid-template-columns: 1fr; }
+      select { min-width: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame" id="app">
+    <div class="top">
+      <div>
+        <h1>Settings · 蛋黄𝝅 默认配置（原型）</h1>
+        <p>IMP-002：蛋黄𝝅 下把「新建会话默认模型 + 思考等级」收成一组；思考等级跟随所选模型能力。</p>
+      </div>
+      <button class="toggle" type="button" id="themeBtn">切换深色</button>
+    </div>
+    <div class="layout">
+      <nav aria-label="设置分区">
+        <button class="nav-btn active" type="button">
+          <strong>蛋黄𝝅</strong>
+          <span>新会话默认聊天行为</span>
+        </button>
+        <button class="nav-btn" type="button" disabled>
+          <strong>Studio</strong>
+          <span>成员模型策略（不在本改进改）</span>
+        </button>
+        <button class="nav-btn" type="button" disabled>
+          <strong>Grok</strong>
+          <span>全局 Active / 切号</span>
+        </button>
+      </nav>
+      <main>
+        <div>
+          <h2>蛋黄𝝅 默认配置</h2>
+          <p class="desc">
+            控制新聊天的默认交互行为。保存到
+            <code>~/.pi/agent/pi-web.json</code>
+          </p>
+        </div>
+
+        <div class="field">
+          <label>默认工具预设</label>
+          <div class="help">新建会话时默认选中的工具预设。仍可在输入框右下角随时手动切换。</div>
+          <div class="control">
+            <select aria-label="默认工具预设">
+              <option>default</option>
+              <option>full</option>
+              <option>subagent</option>
+              <option>none</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field" style="border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);">
+          <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap;">
+            <label>新建会话默认模型与思考等级</label>
+            <span class="badge">yolk.defaultModel · thinking 跟随模型</span>
+          </div>
+          <div class="help">
+            仅用于<strong>新建空会话</strong>的初始模型与思考等级。思考等级选项按所选模型能力裁剪（不支持的等级不可选）。
+            Chat 内切换只影响当前会话，不会写回这里，也不会写 Pi <code>settings.json</code> 全局 default。
+          </div>
+          <div class="control">
+            <select id="mode" aria-label="默认模型模式">
+              <option value="piDefault">跟随 Pi 默认（settings.json）</option>
+              <option value="specific" selected>指定模型</option>
+            </select>
+            <select id="model" aria-label="指定默认模型">
+              <option value="grok-cli/grok-4.5" data-levels="auto,off,minimal,low,medium,high,xhigh" selected>Grok · grok-4.5</option>
+              <option value="openai-codex/gpt-5.6-sol" data-levels="auto,off,minimal,low,medium,high,xhigh">OpenAI Codex · gpt-5.6-sol</option>
+              <option value="cpa/gemini-3.5-flash-low" data-levels="auto,off,low,medium,high">CPA · gemini-3.5-flash-low</option>
+            </select>
+            <select id="thinking" aria-label="默认思考等级（跟随模型）">
+              <option value="auto">auto</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+            </select>
+          </div>
+          <div class="help" id="modeHelp">
+            当前：指定 <code>grok-cli/grok-4.5</code> · thinking <code>medium</code>。新建 session 使用该组合；切换模型时思考等级自动收敛到该模型支持集。
+          </div>
+        </div>
+
+        <div class="preview-row">
+          <div class="card">
+            <h3>新建 Chat 初始选择器</h3>
+            <div class="model-chip" id="chip">grok-cli / grok-4.5 · medium</div>
+            <p class="help" style="margin:10px 0 0">用户可在 Chat 底部再改模型/思考；该次切换不污染全局 default，也不改本设置项。换模型时思考等级按新模型能力重夹紧。</p>
+          </div>
+          <div class="card">
+            <h3>配置落点</h3>
+            <pre id="json" style="margin:0; white-space:pre-wrap; font-family:var(--mono); font-size:11px; line-height:1.5; color:var(--text-muted)"></pre>
+          </div>
+        </div>
+
+        <div class="note">
+          <strong>行为契约：</strong>
+          1) Settings 保存 → <code>pi-web.json → yolk.defaultModel</code>（含 thinking）；独立的顶层 <code>yolk.defaultThinkingLevel</code> 可废弃/兼容迁移进该组；
+          2) Chat 下拉只 pin 当前 session 的模型与思考；
+          3) 发送前 ensureSessionModel（及必要的 thinking pin）；
+          4) 结束后选择器不因 assistant 消息反写。
+        </div>
+
+        <div class="control">
+          <button class="primary" type="button">保存设置（原型示意）</button>
+          <button class="secondary" type="button">恢复默认</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const mode = document.getElementById("mode");
+    const model = document.getElementById("model");
+    const thinking = document.getElementById("thinking");
+    const chip = document.getElementById("chip");
+    const help = document.getElementById("modeHelp");
+    const json = document.getElementById("json");
+    const themeBtn = document.getElementById("themeBtn");
+
+    function levelsForSelectedModel() {
+      const opt = model.selectedOptions[0];
+      const raw = (opt && opt.dataset.levels) || "auto,off,minimal,low,medium,high,xhigh";
+      return raw.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+
+    function syncThinkingOptions() {
+      const levels = levelsForSelectedModel();
+      const prev = thinking.value;
+      thinking.innerHTML = levels.map((level) =>
+        "<option value=\"" + level + "\">" + level + "</option>"
+      ).join("");
+      thinking.value = levels.includes(prev) ? prev : (levels.includes("medium") ? "medium" : levels[0]);
+    }
+
+    function render() {
+      const specific = mode.value === "specific";
+      model.classList.toggle("hidden", !specific);
+      thinking.classList.toggle("hidden", !specific);
+      if (specific) {
+        syncThinkingOptions();
+        const [provider, modelId] = model.value.split("/");
+        const th = thinking.value;
+        chip.textContent = provider + " / " + modelId + " · " + th;
+        help.innerHTML = "当前：指定 <code>" + model.value + "</code> · thinking <code>" + th + "</code>。切换模型时思考等级自动收敛到该模型支持集。";
+        json.textContent = JSON.stringify({
+          yolk: {
+            defaultToolPreset: "default",
+            defaultModel: {
+              mode: "specific",
+              provider,
+              modelId,
+              thinking: th
+            }
+          }
+        }, null, 2);
+      } else {
+        chip.textContent = "Pi default model · Pi/default thinking";
+        help.textContent = "当前：跟随 Pi settings.json 的 defaultProvider/defaultModel 与 defaultThinkingLevel。Chat 切换仍不会写回该文件。";
+        json.textContent = JSON.stringify({
+          yolk: {
+            defaultToolPreset: "default",
+            defaultModel: { mode: "piDefault" }
+          }
+        }, null, 2);
+      }
+    }
+
+    mode.addEventListener("change", render);
+    model.addEventListener("change", render);
+    thinking.addEventListener("change", render);
+    themeBtn.addEventListener("click", () => {
+      document.documentElement.classList.toggle("dark");
+      themeBtn.textContent = document.documentElement.classList.contains("dark") ? "切换浅色" : "切换深色";
+    });
+    render();
+  </script>
+</body>
+</html>

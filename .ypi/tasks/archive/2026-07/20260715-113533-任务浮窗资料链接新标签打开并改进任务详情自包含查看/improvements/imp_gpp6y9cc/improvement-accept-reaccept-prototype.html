@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-005 浮窗改进验收后进入主任务验收</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#eef2ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827}.card{width:360px;border-radius:12px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.22);overflow:hidden;border:1px solid #dbeafe}.head{padding:12px 14px;border-bottom:1px solid #e5e7eb;font-weight:800}.body{padding:14px}.step{padding:10px;border-radius:9px;margin-bottom:10px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;font-size:13px}.step.warn{border-color:#fed7aa;background:#fff7ed;color:#9a3412}.btn{display:block;width:100%;border:1px solid #15803d;border-radius:8px;background:#16a34a;color:white;font-weight:800;padding:10px;margin-top:10px}.note{font-size:12px;color:#64748b;line-height:1.5}</style>
+</head>
+<body>
+  <section class="card" aria-label="YPI Studio 浮窗原型">
+    <div class="head">YPI Studio · 改进验收后</div>
+    <div class="body">
+      <div class="step">✓ IMP-005 已验收完成</div>
+      <div class="step">✓ 所有改进已解决</div>
+      <div class="step warn">状态自动进入：用户验收（user_acceptance）</div>
+      <button class="btn">确认主任务已验收完成</button>
+      <p class="note">修复点：最后一个改进验收成功后，不停在 review；只进入等待用户验收，不自动 completed。</p>
+    </div>
+  </section>
+</body>
+</html>

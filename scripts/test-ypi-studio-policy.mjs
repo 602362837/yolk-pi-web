@@ -5,7 +5,7 @@ import { DEFAULT_PI_WEB_CONFIG, PI_WEB_STUDIO_DEFAULT_MEMBERS, validatePiWebStud
 const policy = (model, thinking = "inherit") => ({ model, thinking });
 const configResult = (studio, extra = {}) => ({
   config: {
-    yolk: { defaultToolPreset: "default", defaultThinkingLevel: "auto" },
+    yolk: { defaultToolPreset: "default", defaultModel: { mode: "piDefault" }, defaultThinkingLevel: "auto" },
     worktree: { baseRef: "HEAD", branchNameTemplate: "", baseDirTemplate: "", pathTemplate: "", sessionDisplay: "separate" },
     trellis: {},
     studio,

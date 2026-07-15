@@ -857,6 +857,11 @@ export interface YpiStudioTaskWidgetProjection {
   archiveMonth?: string;
   archivedAt?: string;
   pathLabel: string;
+  /**
+   * True only when status is user_acceptance, not archived, and no unresolved improvements.
+   * Convenience flag for the session widget; server transition gates remain authoritative.
+   */
+  canAcceptMain?: boolean;
   artifacts: {
     required: string[];
     optional: string[];

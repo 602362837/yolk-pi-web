@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>YPI Studio 任务资料导航原型</title>
+<style>
+:root{color-scheme:dark;--bg:#090d14;--panel:#111824;--panel2:#161f2d;--line:#293548;--text:#e8eef8;--muted:#93a1b5;--accent:#67a5ff;--green:#48d7a0;--amber:#ffc763}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#17243b 0,transparent 34%),var(--bg);color:var(--text);font:14px/1.55 Inter,ui-sans-serif,system-ui,sans-serif}.app{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) 390px}.workspace{padding:24px;position:relative}.studio{border-left:1px solid var(--line);background:rgba(12,18,28,.94);padding:16px;min-height:100vh}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.brand{font-weight:800;letter-spacing:.08em}.hint{color:var(--muted);font-size:12px}.preview{height:330px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#121a27,#0e141e);padding:18px}.preview h2{font-size:16px;margin:0 0 8px}.preview p{color:var(--muted)}.widget{position:absolute;right:24px;bottom:28px;width:360px;border:1px solid #3a4b66;border-radius:16px;background:rgba(20,29,43,.97);box-shadow:0 22px 70px #0009;padding:14px}.widget-title,.row{display:flex;align-items:center;justify-content:space-between;gap:10px}.widget-title strong{font-size:14px}.chip{font-size:11px;color:var(--amber);border:1px solid #6e5930;border-radius:99px;padding:2px 7px}.actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}button{border:1px solid var(--line);background:#182334;color:var(--text);border-radius:9px;padding:7px 10px;cursor:pointer}button:hover,button:focus-visible{border-color:var(--accent);outline:none}.primary{background:#1d4f91;border-color:#3978c6}.external{color:#d9e9ff}.rail{height:5px;border-radius:9px;background:#263246;margin-top:11px;overflow:hidden}.rail i{display:block;width:45%;height:100%;background:var(--accent)}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}.tabs button.active{border-color:var(--accent);color:#dceaff;background:#17345b}.card{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:14px;margin-top:10px}.card h3{font-size:14px;margin:0 0 8px}.md{color:#cbd5e5}.md a{color:#83b7ff;text-decoration:none}.md a:hover{text-decoration:underline}.doc-head{display:flex;align-items:flex-start;gap:10px;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:12px}.doc-meta{min-width:0}.doc-meta strong{display:block}.doc-meta span{display:block;color:var(--muted);font:11px ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.readonly{color:var(--green);font-size:11px}.notice{margin-top:12px;border:1px solid #395476;background:#13253d;color:#cfe4ff;border-radius:10px;padding:9px 11px}.toast{position:fixed;left:50%;top:22px;transform:translateX(-50%);background:#14263d;border:1px solid #4c78aa;padding:10px 14px;border-radius:10px;box-shadow:0 12px 40px #0009;display:none;z-index:20}.toast.show{display:block}.newtab{display:none;position:fixed;inset:30px;background:#f7f9fc;color:#1c2533;z-index:10;border-radius:14px;box-shadow:0 30px 100px #000d;padding:24px;overflow:auto}.newtab.show{display:block}.newtab .bar{display:flex;justify-content:space-between;border-bottom:1px solid #d9e0e9;padding-bottom:13px}.newtab button{background:#fff;color:#263247;border-color:#ccd6e2}.newtab article{max-width:850px;margin:32px auto}.newtab a{color:#1769c2}.badge{display:inline-block;color:#37705a;background:#dff7ec;border-radius:99px;padding:3px 8px;font-size:12px}.screen-note{margin-top:12px;color:var(--muted);font-size:12px}.hidden{display:none!important}@media(max-width:800px){.app{display:block}.workspace{min-height:440px;padding:14px}.studio{border-left:0;border-top:1px solid var(--line);min-height:560px}.widget{position:relative;inset:auto;width:100%;margin-top:40px}.newtab{inset:8px}.doc-head{flex-direction:column}.doc-head button{order:-1}}
+</style>
+</head>
+<body>
+<div class="toast" id="toast" role="status">已打开浏览器新标签；当前右侧预览保持不变。</div>
+<div class="app">
+  <main class="workspace">
+    <div class="top"><div class="brand">YOLK PI · CHAT</div><div class="hint">原页面 / 主工作区</div></div>
+    <section class="preview"><h2>右侧主预览保持原内容</h2><p>这里模拟当前正在查看的代码或文件。点击任务浮窗资料后，本区域不会被替换。</p><div class="notice">当前文件：components/AppShell.tsx · 未发生变化</div></section>
+    <section class="widget" aria-label="YPI Studio 任务浮窗">
+      <div class="widget-title"><strong>任务资料链接体验改进</strong><span class="chip">等待确认</span></div>
+      <div class="rail"><i></i></div>
+      <div class="screen-note">资料默认在浏览器新标签打开，不再拉起主预览。</div>
+      <div class="actions">
+        <button class="primary external" onclick="openTab('计划审批书','plan-review.md')">计划审批书 ↗</button>
+        <button class="external" onclick="openTab('PRD','prd.md')">PRD ↗</button>
+        <button class="external" onclick="openTab('Design','design.md')">Design ↗</button>
+        <button class="external" onclick="openHtml()">HTML 原型 ↗</button>
+      </div>
+    </section>
+  </main>
+  <aside class="studio">
+    <div class="row"><strong>YPI Studio · 任务详情</strong><span class="readonly">只读</span></div>
+    <div id="detail">
+      <div class="tabs"><button>概览</button><button class="active">计划审批书</button><button>实现</button><button>产物 7</button></div>
+      <section class="card"><h3>蛋黄派计划审批书</h3><div class="md"><p>本计划将资料入口按上下文分流：</p><ul><li>浮窗资料在新标签打开；</li><li>任务详情资料在详情内部查看。</li></ul><p>继续查看 <a href="#" onclick="openInside(event,'Design','design.md')">Design</a>、<a href="#" onclick="openInside(event,'Checks','checks.md')">Checks</a> 或 <a href="#" onclick="openHtml();return false">HTML 原型 ↗</a>。</p></div></section>
+      <section class="card"><h3>关键产物快捷入口</h3><div class="actions"><button onclick="openInside(event,'PRD','prd.md')">PRD</button><button onclick="openInside(event,'Design','design.md')">Design</button><button onclick="openInside(event,'Implement','implement.md')">Implement</button></div></section>
+    </div>
+    <div id="doc" class="hidden">
+      <div class="doc-head"><button id="back" onclick="backDetail()">← 返回计划审批书</button><div class="doc-meta"><strong id="docTitle">Design</strong><span id="docFile">design.md</span></div><span class="readonly">只读资料</span></div>
+      <div class="notice">资料在 Studio 任务详情内部查看；返回不会退出任务详情或改变主预览。</div>
+      <section class="card md"><h2 id="articleTitle">Design</h2><p>任务详情持有局部文档导航状态。非 HTML 链接在此区域继续查看，并始终保留明确返回入口。</p><h3>数据流</h3><p>点击资料 → 校验 task-local 相对路径 → GET <code>mode=read</code> → 内部只读渲染。</p><p><a href="#" onclick="openInside(event,'Checks','checks.md')">继续查看 Checks</a> · <a href="#" onclick="openHtml();return false">打开安全 HTML 原型 ↗</a></p></section>
+    </div>
+  </aside>
+</div>
+<div class="newtab" id="newtab" role="dialog" aria-modal="true">
+  <div class="bar"><div><span class="badge">浏览器新标签 · 只读</span> <strong id="tabName">PRD</strong></div><button onclick="closeTab()">关闭原型标签</button></div>
+  <article><h1 id="tabTitle">PRD</h1><p id="tabFile"></p><p>该页面模拟新的 Studio task document 只读页。正文按需通过 task-local files API 读取；原工作台、浮窗和右侧预览保持原状。</p><h2>安全边界</h2><ul><li>仅允许任务目录内相对路径。</li><li>拒绝 scheme、绝对路径、<code>..</code>、目录和符号链接逃逸。</li><li>查看不写 approval grant，也不触发 workflow transition。</li></ul></article>
+</div>
+<script>
+const toast=document.getElementById('toast'),newtab=document.getElementById('newtab');
+function openTab(name,file){document.getElementById('tabName').textContent=name;document.getElementById('tabTitle').textContent=name;document.getElementById('tabFile').textContent=file+' · task-local read';newtab.classList.add('show');toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2200)}
+function openHtml(){openTab('HTML 安全原型','prototype.html · mode=preview + CSP sandbox')}
+function closeTab(){newtab.classList.remove('show')}
+function openInside(e,name,file){if(e)e.preventDefault();document.getElementById('detail').classList.add('hidden');document.getElementById('doc').classList.remove('hidden');document.getElementById('docTitle').textContent=name;document.getElementById('docFile').textContent=file;document.getElementById('articleTitle').textContent=name;setTimeout(()=>document.getElementById('back').focus(),0)}
+function backDetail(){document.getElementById('doc').classList.add('hidden');document.getElementById('detail').classList.remove('hidden')}
+</script>
+</body>
+</html>

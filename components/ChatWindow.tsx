@@ -32,6 +32,8 @@ interface Props {
   onSessionListRefreshNeeded?: (reason: { source: "studio_tool"; signature: string }) => void;
   defaultToolPreset?: PiWebToolPreset;
   defaultThinkingLevel?: PiWebThinkingLevel;
+  /** New-session model seed from yolk.defaultModel (specific mode only). */
+  defaultModel?: { provider: string; modelId: string } | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -165,7 +167,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel }: Props) {
+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -182,7 +184,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
   } = useAgentSession({
     session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
-    autoScrollEnabled, defaultToolPreset, defaultThinkingLevel,
+    autoScrollEnabled, defaultToolPreset, defaultThinkingLevel, defaultModel,
   });
 
   const { soundEnabled, onSoundToggle, playDoneSound } = useAudio();

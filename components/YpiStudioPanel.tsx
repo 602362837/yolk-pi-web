@@ -23,15 +23,15 @@ import type {
   YpiStudioWorkflowsResponse,
 } from "@/lib/ypi-studio-types";
 import {
-  openImprovementRelativeLink,
-  openTaskRelativeLink,
-  taskRelativeFilePath,
+  openStudioTaskHtmlPrototype,
+  resolveTaskRelativeHref,
+  type TaskRelativeLinkNotice,
 } from "@/lib/ypi-studio-task-preview";
 import { MarkdownBody } from "./MarkdownBody";
 import {
-  YpiStudioPlanReviewModal,
-  type YpiStudioPlanReviewTarget,
-} from "./YpiStudioPlanReviewModal";
+  YpiStudioTaskDocumentView,
+  type YpiStudioTaskDocumentTarget,
+} from "./YpiStudioTaskDocumentView";
 import { TaskWorkflowFlowSection, WorkflowDetailPanel } from "./YpiStudioWorkflowDetail";
 import { usePrompt } from "./AppPromptProvider";
 
@@ -53,6 +53,141 @@ type LoadOptions = { background?: boolean };
 type StudioTab = "members" | "workflows" | "tasks";
 type TaskDetailTab = "approval" | "overview" | "improvements" | "implementation" | "artifacts" | "subagents" | "events" | "metadata";
 type ImprovementDetailTab = "overview" | "artifacts" | "progress" | "runs" | "approval";
+
+/** Detail-local material navigation target (single-level history). */
+type TaskDocumentTarget = {
+  path: string;
+  fileName: string;
+  improvementId?: string;
+  sourceTab: TaskDetailTab;
+  sourceLabel: string;
+};
+
+type OpenTaskDocumentRequest = {
+  path: string;
+  fileName?: string;
+  improvementId?: string;
+  sourceTab: TaskDetailTab;
+  sourceLabel?: string;
+};
+
+const TASK_DETAIL_TAB_BACK_LABEL: Record<TaskDetailTab, string> = {
+  approval: "计划审批书",
+  overview: "概览",
+  improvements: "改进流程",
+  implementation: "实现",
+  artifacts: "产物",
+  subagents: "成员运行",
+  events: "事件",
+  metadata: "元数据",
+};
+
+function fileNameFromRelativePath(path: string): string {
+  const segments = path.split("/").filter(Boolean);
+  return segments[segments.length - 1] || path;
+}
+
+function isHtmlFileName(fileName: string): boolean {
+  return /\.html?$/i.test(fileName);
+}
+
+/** Open a known task-local material path inside the detail document view (or HTML preview tab). */
+function openKnownTaskMaterial(options: {
+  taskKey: string;
+  cwd: string;
+  path: string;
+  fileName?: string;
+  improvementId?: string;
+  sourceTab: TaskDetailTab;
+  sourceLabel?: string;
+  onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void;
+  setNotice?: (notice: TaskRelativeLinkNotice) => void;
+}): void {
+  const path = options.path.trim();
+  if (!path) {
+    options.setNotice?.({ tone: "error", text: "❌ 安全阻止：链接路径为空" });
+    return;
+  }
+  const fileName = options.fileName || fileNameFromRelativePath(path);
+  if (isHtmlFileName(fileName) || isHtmlFileName(path)) {
+    const opened = openStudioTaskHtmlPrototype({
+      taskKey: options.taskKey,
+      cwd: options.cwd,
+      fileName: path,
+      improvementId: options.improvementId,
+      onBlocked: () => {
+        options.setNotice?.({
+          tone: "warning",
+          text: "浏览器阻止了新标签，请允许此站点弹窗后重试",
+        });
+      },
+    });
+    if (opened) {
+      options.setNotice?.({
+        tone: "info",
+        text: `已在新标签打开安全原型：${fileName}`,
+      });
+    }
+    return;
+  }
+  options.setNotice?.({ tone: "info", text: `正在打开：${fileName}` });
+  options.onOpenTaskDocument({
+    path,
+    fileName,
+    improvementId: options.improvementId,
+    sourceTab: options.sourceTab,
+    sourceLabel: options.sourceLabel,
+  });
+}
+
+/** Resolve a Markdown/task-local href and open via internal document view or HTML sandbox. */
+function openTaskMaterialHref(options: {
+  taskKey: string;
+  cwd: string;
+  href: string;
+  label: string;
+  improvementId?: string;
+  sourceTab: TaskDetailTab;
+  sourceLabel?: string;
+  onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void;
+  setNotice: (notice: TaskRelativeLinkNotice) => void;
+}): boolean {
+  const resolved = resolveTaskRelativeHref(options.href);
+  if (!resolved.ok) {
+    options.setNotice({ tone: "error", text: resolved.message });
+    return false;
+  }
+  if (resolved.isHtml) {
+    const opened = openStudioTaskHtmlPrototype({
+      taskKey: options.taskKey,
+      cwd: options.cwd,
+      fileName: resolved.path,
+      improvementId: options.improvementId,
+      onBlocked: () => {
+        options.setNotice({
+          tone: "warning",
+          text: "浏览器阻止了新标签，请允许此站点弹窗后重试",
+        });
+      },
+    });
+    if (opened) {
+      options.setNotice({
+        tone: "info",
+        text: `已在新标签打开安全原型：${options.label || resolved.fileName}`,
+      });
+    }
+    return false;
+  }
+  options.setNotice({ tone: "info", text: `正在打开：${options.label || resolved.fileName}` });
+  options.onOpenTaskDocument({
+    path: resolved.path,
+    fileName: resolved.fileName,
+    improvementId: options.improvementId,
+    sourceTab: options.sourceTab,
+    sourceLabel: options.sourceLabel,
+  });
+  return false;
+}
 
 function agentFilePath(cwd: string, agent: YpiStudioAgent): string {
   return `${cwd.replace(/[\\/]+$/, "")}/${agent.pathLabel.replace(/^\/+/, "")}`;
@@ -515,10 +650,16 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<TaskDetailTab>("overview");
   const lastDefaultedDetailKeyRef = useRef<string | null>(null);
+  const [documentTarget, setDocumentTarget] = useState<TaskDocumentTarget | null>(null);
   const [bindBusyKey, setBindBusyKey] = useState<string | null>(null);
   const [bindMessage, setBindMessage] = useState<string | null>(null);
 
   useEffect(() => { taskDetailRef.current = taskDetail; }, [taskDetail]);
+
+  useEffect(() => {
+    // Clear stale internal document navigation when leaving or switching tasks.
+    setDocumentTarget(null);
+  }, [detailTaskKey]);
 
   useEffect(() => {
     if (!focusedTaskKey || !focusedRef.current) return;
@@ -611,6 +752,15 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
   else if (!data?.exists) content = <PanelEmpty title="还没有工作室任务" description="通过 /studio-start，或直接说“用工作室做这个功能”，会创建结构化任务并在这里显示进度。" />;
   else if (data.tasks.length === 0) content = <PanelEmpty title="任务列表为空" description={scope === "archived" ? "当前没有已归档任务。" : "当前筛选范围没有任务目录。"} />;
   else if (detailTaskKey) content = (
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: documentTarget ? "hidden" : undefined,
+      }}
+    >
     <TaskDetailPanel
       cwd={cwd}
       task={taskDetail}
@@ -618,7 +768,25 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
       error={detailError}
       activeTab={detailTab}
       setActiveTab={setDetailTab}
-      onBack={() => setDetailTaskKey(null)}
+      documentTarget={documentTarget}
+      onOpenTaskDocument={(request) => {
+        const fileName = request.fileName || fileNameFromRelativePath(request.path);
+        setDocumentTarget({
+          path: request.path,
+          fileName,
+          improvementId: request.improvementId,
+          sourceTab: request.sourceTab,
+          sourceLabel: request.sourceLabel || TASK_DETAIL_TAB_BACK_LABEL[request.sourceTab],
+        });
+      }}
+      onCloseTaskDocument={() => {
+        if (documentTarget) setDetailTab(documentTarget.sourceTab);
+        setDocumentTarget(null);
+      }}
+      onBack={() => {
+        setDocumentTarget(null);
+        setDetailTaskKey(null);
+      }}
       onOpenFile={onOpenFile}
       workflow={taskDetail ? workflowsData?.workflows.find((workflow) => workflow.id === taskDetail.workflowId || workflow.key === taskDetail.workflowId) ?? null : null}
       currentSessionContextId={currentSessionContextId}
@@ -626,6 +794,7 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
       bindMessage={bindMessage}
       onBindTask={handleBindTask}
     />
+    </div>
   );
   else content = (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -653,7 +822,17 @@ function TasksTab({ cwd, scope, setScope, loadState, data, workflowsData, onOpen
   );
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: detailTaskKey && documentTarget ? "hidden" : "auto",
+        padding: 12,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
       {!detailTaskKey && scopeControls}
       {!detailTaskKey && bindMessage && <Notice tone="success" text={bindMessage} />}
       {content}
@@ -852,7 +1031,7 @@ function TaskCard({ cwd, task, focused = false, selected = false, onSelect, onOp
   );
 }
 
-function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, setActiveTab, onBack, onOpenFile, currentSessionContextId, bindBusy = false, bindMessage, onBindTask }: {
+function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, setActiveTab, documentTarget, onOpenTaskDocument, onCloseTaskDocument, onBack, onOpenFile, currentSessionContextId, bindBusy = false, bindMessage, onBindTask }: {
   cwd: string;
   task: YpiStudioTaskDetail | null;
   workflow: YpiStudioWorkflowFile | null;
@@ -860,6 +1039,9 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
   error: string | null;
   activeTab: TaskDetailTab;
   setActiveTab: (tab: TaskDetailTab) => void;
+  documentTarget: TaskDocumentTarget | null;
+  onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void;
+  onCloseTaskDocument: () => void;
   onBack: () => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
   currentSessionContextId?: string | null;
@@ -879,6 +1061,34 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
   const improvementInstances = task.improvements?.instances ?? [];
   const improvementUnresolved = improvementInstances.filter((inst) => !["accepted", "accepted_not_doing"].includes(inst.status)).length;
   const improvementAttention = improvementUnresolved > 0;
+
+  if (documentTarget) {
+    const backLabel = documentTarget.sourceLabel || TASK_DETAIL_TAB_BACK_LABEL[documentTarget.sourceTab] || "任务详情";
+    return (
+      <TaskDetailShell onBack={onBack} hideBackButton lockScroll>
+        <YpiStudioTaskDocumentView
+          presentation="embedded"
+          taskKey={task.key}
+          cwd={cwd}
+          path={documentTarget.path}
+          improvementId={documentTarget.improvementId}
+          taskTitle={task.title}
+          backLabel={`返回${backLabel}`}
+          onBack={onCloseTaskDocument}
+          onOpenTaskDocument={(next: YpiStudioTaskDocumentTarget) => {
+            // Nested non-HTML links replace the current document; preserve return source.
+            onOpenTaskDocument({
+              path: next.path,
+              fileName: next.fileName || fileNameFromRelativePath(next.path),
+              improvementId: next.improvementId ?? documentTarget.improvementId,
+              sourceTab: documentTarget.sourceTab,
+              sourceLabel: documentTarget.sourceLabel,
+            });
+          }}
+        />
+      </TaskDetailShell>
+    );
+  }
 
   return (
     <TaskDetailShell onBack={onBack}>
@@ -917,11 +1127,11 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
         <TabButton active={activeTab === "events"} label={`事件 ${task.events.length}`} onClick={() => setActiveTab("events")} />
         <TabButton active={activeTab === "metadata"} label="元数据" onClick={() => setActiveTab("metadata")} />
       </div>
-      {activeTab === "approval" ? <TaskApprovalTab cwd={cwd} task={task} onOpenFile={onOpenFile} currentSessionContextId={currentSessionContextId} />
+      {activeTab === "approval" ? <TaskApprovalTab cwd={cwd} task={task} onOpenTaskDocument={onOpenTaskDocument} currentSessionContextId={currentSessionContextId} />
         : activeTab === "overview" ? <TaskOverviewTab task={task} workflow={workflow} />
-        : activeTab === "improvements" ? <TaskImprovementsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
+        : activeTab === "improvements" ? <TaskImprovementsTab cwd={cwd} task={task} onOpenTaskDocument={onOpenTaskDocument} />
         : activeTab === "implementation" ? <TaskImplementationTab task={task} />
-        : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenFile={onOpenFile} />
+        : activeTab === "artifacts" ? <TaskArtifactsTab cwd={cwd} task={task} onOpenTaskDocument={onOpenTaskDocument} />
         : activeTab === "subagents" ? <TaskSubagentsTab task={task} />
         : activeTab === "events" ? <TaskEventsTab task={task} />
         : <TaskMetadataTab task={task} />}
@@ -929,12 +1139,39 @@ function TaskDetailPanel({ cwd, task, workflow, loadState, error, activeTab, set
   );
 }
 
-function TaskDetailShell({ onBack, children }: { onBack: () => void; children: ReactNode }) {
+function TaskDetailShell({
+  onBack,
+  children,
+  hideBackButton = false,
+  lockScroll = false,
+}: {
+  onBack: () => void;
+  children: ReactNode;
+  hideBackButton?: boolean;
+  /** When true (embedded task document), shell does not scroll; child body is sole scroller. */
+  lockScroll?: boolean;
+}) {
   return (
-    <div style={{ minHeight: 0, flex: 1, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={onBack} style={smallButtonStyle(true)}>← 返回任务列表</button>
-      </div>
+    <div
+      style={{
+        minHeight: 0,
+        flex: 1,
+        overflow: lockScroll ? "hidden" : undefined,
+        overflowY: lockScroll ? "hidden" : "auto",
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "var(--bg-panel)",
+        padding: 12,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      {!hideBackButton && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
+          <button onClick={onBack} style={smallButtonStyle(true)}>← 返回任务列表</button>
+        </div>
+      )}
       {children}
     </div>
   );
@@ -1620,23 +1857,14 @@ function improvementHasPlanReview(instance: YpiStudioImprovementInstance): boole
   ].includes(instance.status);
 }
 
-function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void }) {
+function TaskImprovementsTab({ cwd, task, onOpenTaskDocument }: { cwd: string; task: YpiStudioTaskDetail; onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void }) {
   const instances = useMemo(() => task.improvements?.instances ?? [], [task.improvements]);
   const [activeImprovementId, setActiveImprovementId] = useState<string | null>(null);
-  const [planReviewTarget, setPlanReviewTarget] = useState<YpiStudioPlanReviewTarget | null>(null);
+  const [linkNotice, setLinkNotice] = useState<TaskRelativeLinkNotice | null>(null);
 
   useEffect(() => {
     setActiveImprovementId((current) => current && instances.some((inst) => inst.id === current) ? current : null);
   }, [instances]);
-
-  useEffect(() => {
-    setPlanReviewTarget((current) => {
-      if (!current) return null;
-      if (current.taskKey !== task.key) return null;
-      if (current.improvementId && !instances.some((inst) => inst.id === current.improvementId)) return null;
-      return current;
-    });
-  }, [instances, task.key]);
 
   const mainPlanFileName = task.artifacts["plan-review"]?.trim() || "plan-review.md";
   const hasMainPlan =
@@ -1654,17 +1882,12 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
           key: instance.id,
           label: `改进计划 · ${displayId}`,
           subtitle: `改进项 · ${fileName}`,
-          target: {
-            taskKey: task.key,
-            taskTitle: task.title,
-            pathLabel: task.pathLabel,
-            improvementId: instance.id,
-            improvementDisplayId: displayId,
-            fileName,
-          } satisfies YpiStudioPlanReviewTarget,
+          fileName,
+          improvementId: instance.id,
+          improvementDisplayId: displayId,
         };
       });
-  }, [instances, task.key, task.pathLabel, task.title]);
+  }, [instances]);
 
   if (instances.length === 0) {
     return <PanelEmpty title="还没有改进项" description="在主任务验收时确认用户反馈后，改进项会显示在这里。改进项属于当前主任务，不会出现在顶层 Tasks 列表。" />;
@@ -1682,6 +1905,7 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
         <span style={{ color: "var(--text-muted)", fontSize: 11 }}>改进项属于当前主任务，不会出现在顶层 Tasks 列表。</span>
       </div>
       {unresolved > 0 && <Notice tone="warning" text={`仍有 ${unresolved} 个改进项未解决。完成和归档控件保持禁用。`} />}
+      {linkNotice && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
 
       {(hasMainPlan || improvementPlanEntries.length > 0) && (
         <SectionCard title="快速预览">
@@ -1695,12 +1919,16 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
                 <button
                   type="button"
                   className="ypi-studio-quick-preview-link"
-                  aria-label={`预览《${task.title}》主计划审批书`}
-                  onClick={() => setPlanReviewTarget({
+                  aria-label={`在任务详情内查看《${task.title}》主计划审批书`}
+                  onClick={() => openKnownTaskMaterial({
                     taskKey: task.key,
-                    taskTitle: task.title,
-                    pathLabel: task.pathLabel,
+                    cwd,
+                    path: mainPlanFileName,
                     fileName: mainPlanFileName,
+                    sourceTab: "improvements",
+                    sourceLabel: "改进流程",
+                    onOpenTaskDocument,
+                    setNotice: setLinkNotice,
                   })}
                 >
                   <strong>▤ 计划审批书</strong>
@@ -1712,8 +1940,18 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
                   key={entry.key}
                   type="button"
                   className="ypi-studio-quick-preview-link"
-                  aria-label={`预览《${task.title}》${entry.label}`}
-                  onClick={() => setPlanReviewTarget(entry.target)}
+                  aria-label={`在任务详情内查看《${task.title}》${entry.label}`}
+                  onClick={() => openKnownTaskMaterial({
+                    taskKey: task.key,
+                    cwd,
+                    path: entry.fileName,
+                    fileName: entry.fileName,
+                    improvementId: entry.improvementId,
+                    sourceTab: "improvements",
+                    sourceLabel: "改进流程",
+                    onOpenTaskDocument,
+                    setNotice: setLinkNotice,
+                  })}
                 >
                   <strong>▤ {entry.label}</strong>
                   <span>{entry.subtitle}</span>
@@ -1725,7 +1963,7 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
       )}
 
       {activeInstance ? (
-        <ImprovementDetail cwd={cwd} task={task} instance={activeInstance} onOpenFile={onOpenFile} onBack={() => setActiveImprovementId(null)} />
+        <ImprovementDetail cwd={cwd} task={task} instance={activeInstance} onOpenTaskDocument={onOpenTaskDocument} onBack={() => setActiveImprovementId(null)} />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {instances.map((inst) => (
@@ -1733,14 +1971,6 @@ function TaskImprovementsTab({ cwd, task, onOpenFile }: { cwd: string; task: Ypi
           ))}
         </div>
       )}
-
-      <YpiStudioPlanReviewModal
-        open={Boolean(planReviewTarget)}
-        cwd={cwd}
-        target={planReviewTarget}
-        onClose={() => setPlanReviewTarget(null)}
-        onOpenFile={onOpenFile}
-      />
     </div>
   );
 }
@@ -1773,7 +2003,7 @@ function ImprovementListCard({ instance, onOpen }: { instance: YpiStudioImprovem
   );
 }
 
-function ImprovementDetail({ cwd, task, instance, onOpenFile, onBack }: { cwd: string; task: YpiStudioTaskDetail; instance: YpiStudioImprovementInstance; onOpenFile?: (filePath: string, fileName: string) => void; onBack: () => void }) {
+function ImprovementDetail({ cwd, task, instance, onOpenTaskDocument, onBack }: { cwd: string; task: YpiStudioTaskDetail; instance: YpiStudioImprovementInstance; onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void; onBack: () => void }) {
   const [subTab, setSubTab] = useState<ImprovementDetailTab>("overview");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, border: "1px solid var(--accent)", borderRadius: 12, background: "rgba(37,99,235,0.03)", padding: 12 }}>
@@ -1790,8 +2020,8 @@ function ImprovementDetail({ cwd, task, instance, onOpenFile, onBack }: { cwd: s
         <TabButton active={subTab === "runs"} label="成员运行" onClick={() => setSubTab("runs")} />
         <TabButton active={subTab === "approval"} label="审批与验收" onClick={() => setSubTab("approval")} />
       </div>
-      {subTab === "overview" ? <ImprovementOverviewTab cwd={cwd} task={task} instance={instance} onOpenFile={onOpenFile} />
-        : subTab === "artifacts" ? <ImprovementArtifactsTab cwd={cwd} task={task} instance={instance} onOpenFile={onOpenFile} />
+      {subTab === "overview" ? <ImprovementOverviewTab cwd={cwd} task={task} instance={instance} onOpenTaskDocument={onOpenTaskDocument} />
+        : subTab === "artifacts" ? <ImprovementArtifactsTab cwd={cwd} task={task} instance={instance} onOpenTaskDocument={onOpenTaskDocument} />
         : subTab === "progress" ? <ImprovementProgressTab instance={instance} />
         : subTab === "runs" ? <ImprovementRunsTab task={task} instance={instance} />
         : <ImprovementApprovalTab instance={instance} />}
@@ -1823,12 +2053,22 @@ function ImprovementFlowRail({ instance }: { instance: YpiStudioImprovementInsta
   );
 }
 
-function ImprovementOverviewTab({ cwd, task, instance, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; instance: YpiStudioImprovementInstance; onOpenFile?: (filePath: string, fileName: string) => void }) {
-  const [linkNotice, setLinkNotice] = useState<{ tone: "info" | "warning" | "error" | "success"; text: string } | null>(null);
+function ImprovementOverviewTab({ cwd, task, instance, onOpenTaskDocument }: { cwd: string; task: YpiStudioTaskDetail; instance: YpiStudioImprovementInstance; onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void }) {
+  const [linkNotice, setLinkNotice] = useState<TaskRelativeLinkNotice | null>(null);
   const handleLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    return openImprovementRelativeLink({ cwd, task, instance, href, label, onOpenFile, setNotice: setLinkNotice });
-  }, [cwd, instance, onOpenFile, task]);
+    return openTaskMaterialHref({
+      taskKey: task.key,
+      cwd,
+      href,
+      label,
+      improvementId: instance.id,
+      sourceTab: "improvements",
+      sourceLabel: "改进流程",
+      onOpenTaskDocument,
+      setNotice: setLinkNotice,
+    });
+  }, [cwd, instance.id, onOpenTaskDocument, task.key]);
   const planReviewName = instance.artifacts?.["plan-review"] ?? "plan-review.md";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1855,7 +2095,28 @@ function ImprovementOverviewTab({ cwd, task, instance, onOpenFile }: { cwd: stri
         <div style={{ marginTop: 6, color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5 }}>批准、创建和验收都在绑定聊天中记录；本面板不提供直接写状态的按钮。范围/非目标/风险详见该项的 brief.md 与 design.md。</div>
       </SectionCard>
       {linkNotice && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
-      <SectionCard title="计划审批书预览" action={<button onClick={() => onOpenFile?.(taskRelativeFilePath(cwd, task, `improvements/${instance.id}/${planReviewName}`), planReviewName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开源文件</button>}>
+      <SectionCard
+        title="计划审批书预览"
+        action={
+          <button
+            type="button"
+            onClick={() => openKnownTaskMaterial({
+              taskKey: task.key,
+              cwd,
+              path: planReviewName,
+              fileName: planReviewName,
+              improvementId: instance.id,
+              sourceTab: "improvements",
+              sourceLabel: "改进流程",
+              onOpenTaskDocument,
+              setNotice: setLinkNotice,
+            })}
+            style={smallButtonStyle(true)}
+          >
+            查看资料
+          </button>
+        }
+      >
         <ImprovementPlanReviewPreview cwd={cwd} task={task} instance={instance} onLinkClick={handleLinkClick} />
       </SectionCard>
     </div>
@@ -1912,13 +2173,13 @@ function buildImprovementArtifactItems(instance: YpiStudioImprovementInstance): 
     });
 }
 
-function ImprovementArtifactsTab({ cwd, task, instance, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; instance: YpiStudioImprovementInstance; onOpenFile?: (filePath: string, fileName: string) => void }) {
+function ImprovementArtifactsTab({ cwd, task, instance, onOpenTaskDocument }: { cwd: string; task: YpiStudioTaskDetail; instance: YpiStudioImprovementInstance; onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void }) {
   const items = useMemo(() => buildImprovementArtifactItems(instance), [instance]);
   const [activeFileName, setActiveFileName] = useState<string | null>(items[0]?.fileName ?? null);
   const [doc, setDoc] = useState<{ content: string; truncated: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [linkNotice, setLinkNotice] = useState<{ tone: "info" | "warning" | "error" | "success"; text: string } | null>(null);
+  const [linkNotice, setLinkNotice] = useState<TaskRelativeLinkNotice | null>(null);
 
   useEffect(() => {
     setActiveFileName((current) => current && items.some((item) => item.fileName === current) ? current : items[0]?.fileName ?? null);
@@ -1952,12 +2213,22 @@ function ImprovementArtifactsTab({ cwd, task, instance, onOpenFile }: { cwd: str
 
   const handleLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    return openImprovementRelativeLink({ cwd, task, instance, href, label, onOpenFile, setNotice: setLinkNotice });
-  }, [cwd, instance, onOpenFile, task]);
+    return openTaskMaterialHref({
+      taskKey: task.key,
+      cwd,
+      href,
+      label,
+      improvementId: instance.id,
+      sourceTab: "improvements",
+      sourceLabel: "改进流程",
+      onOpenTaskDocument,
+      setNotice: setLinkNotice,
+    });
+  }, [cwd, instance.id, onOpenTaskDocument, task.key]);
 
   if (items.length === 0) return <PanelEmpty title="没有产物" description="该改进项尚未建立产物映射。" />;
 
-  const isHtml = activeItem ? /\.html?$/i.test(activeItem.fileName) : false;
+  const isHtml = activeItem ? isHtmlFileName(activeItem.fileName) : false;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1969,9 +2240,25 @@ function ImprovementArtifactsTab({ cwd, task, instance, onOpenFile }: { cwd: str
       {activeItem && (
         <SectionCard
           title={activeItem.fileName}
-          action={isHtml
-            ? <button onClick={() => openImprovementRelativeLink({ cwd, task, instance, href: activeItem.fileName, label: activeItem.fileName, onOpenFile, setNotice: setLinkNotice })} style={smallButtonStyle(true)}>预览 HTML</button>
-            : <button onClick={() => onOpenFile?.(taskRelativeFilePath(cwd, task, `improvements/${instance.id}/${activeItem.fileName}`), activeItem.fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开</button>}
+          action={
+            <button
+              type="button"
+              onClick={() => openKnownTaskMaterial({
+                taskKey: task.key,
+                cwd,
+                path: activeItem.fileName,
+                fileName: activeItem.fileName,
+                improvementId: instance.id,
+                sourceTab: "improvements",
+                sourceLabel: "改进流程",
+                onOpenTaskDocument,
+                setNotice: setLinkNotice,
+              })}
+              style={smallButtonStyle(true)}
+            >
+              {isHtml ? "预览 HTML ↗" : "查看资料"}
+            </button>
+          }
         >
           <DetailRow label="相对路径" value={`improvements/${instance.id}/${activeItem.fileName}`} mono />
           {linkNotice && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
@@ -1979,7 +2266,7 @@ function ImprovementArtifactsTab({ cwd, task, instance, onOpenFile }: { cwd: str
           {error && <Notice tone="warning" text={`读取失败：${error}`} />}
           {!loading && !error && doc && (
             isHtml
-              ? <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>HTML 原型可通过“预览 HTML”在沙箱窗口中查看；链接在改进项目录内解析。</div>
+              ? <div style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>HTML 原型可通过“预览 HTML ↗”在沙箱新标签中查看；链接在改进项目录内解析。</div>
               : <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg)" }}><MarkdownBody onLinkClick={handleLinkClick}>{doc.content || "（空文件）"}</MarkdownBody></div>
           )}
         </SectionCard>
@@ -2123,13 +2410,12 @@ function ImprovementApprovalTab({ instance }: { instance: YpiStudioImprovementIn
   );
 }
 
-function TaskApprovalTab({ cwd, task, onOpenFile, currentSessionContextId }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void; currentSessionContextId?: string | null }) {
-  const [linkNotice, setLinkNotice] = useState<{ tone: "info" | "warning" | "error" | "success"; text: string } | null>(null);
+function TaskApprovalTab({ cwd, task, onOpenTaskDocument, currentSessionContextId }: { cwd: string; task: YpiStudioTaskDetail; onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void; currentSessionContextId?: string | null }) {
+  const [linkNotice, setLinkNotice] = useState<TaskRelativeLinkNotice | null>(null);
   const artifacts = useMemo(() => buildStudioArtifactItems(task), [task]);
   const planReview = artifacts.find((item) => item.key === "plan-review" || item.fileName === "plan-review.md");
   const planDocument = planReview?.document;
   const planFileName = planReview?.fileName ?? task.artifacts["plan-review"] ?? "plan-review.md";
-  const planFilePath = taskRelativeFilePath(cwd, task, planFileName);
   const meaningful = artifactDocumentIsMeaningful(planDocument);
   const gate = task.meta.approvalGate;
   const grant = task.meta.approvalGrant;
@@ -2140,8 +2426,17 @@ function TaskApprovalTab({ cwd, task, onOpenFile, currentSessionContextId }: { c
 
   const handleLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    return openTaskRelativeLink({ cwd, task, href, label, onOpenFile, setNotice: setLinkNotice });
-  }, [cwd, onOpenFile, task]);
+    return openTaskMaterialHref({
+      taskKey: task.key,
+      cwd,
+      href,
+      label,
+      sourceTab: "approval",
+      sourceLabel: "计划审批书",
+      onOpenTaskDocument,
+      setNotice: setLinkNotice,
+    });
+  }, [cwd, onOpenTaskDocument, task.key]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2156,7 +2451,27 @@ function TaskApprovalTab({ cwd, task, onOpenFile, currentSessionContextId }: { c
           <DetailRow label="当前聊天匹配" value={grantMatchesCurrentContext ? "已匹配" : grant ? "不匹配或当前聊天未知" : "尚无批准"} />
         </div>
       </SectionCard>
-      <SectionCard title="蛋黄派计划审批书" action={<button onClick={() => onOpenFile?.(planFilePath, planFileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开源文件</button>}>
+      <SectionCard
+        title="蛋黄派计划审批书"
+        action={
+          <button
+            type="button"
+            onClick={() => openKnownTaskMaterial({
+              taskKey: task.key,
+              cwd,
+              path: planFileName,
+              fileName: planFileName,
+              sourceTab: "approval",
+              sourceLabel: "计划审批书",
+              onOpenTaskDocument,
+              setNotice: setLinkNotice,
+            })}
+            style={smallButtonStyle(true)}
+          >
+            查看资料
+          </button>
+        }
+      >
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           <Badge label={meaningful ? "可审阅" : "待补齐"} tone={meaningful ? "success" : "warning"} />
           {planReview?.required && <Badge label="必需" tone="neutral" />}
@@ -2180,8 +2495,22 @@ function TaskApprovalTab({ cwd, task, onOpenFile, currentSessionContextId }: { c
       {quickRefs.length > 0 && <SectionCard title="关键产物快捷入口">
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {quickRefs.map((item) => (
-            <button key={item.fileName} type="button" onClick={() => onOpenFile?.(taskRelativeFilePath(cwd, task, item.fileName), item.fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>
-              {item.label}{item.completed ? " ✓" : ""}
+            <button
+              key={item.fileName}
+              type="button"
+              onClick={() => openKnownTaskMaterial({
+                taskKey: task.key,
+                cwd,
+                path: item.fileName,
+                fileName: item.fileName,
+                sourceTab: "approval",
+                sourceLabel: "计划审批书",
+                onOpenTaskDocument,
+                setNotice: setLinkNotice,
+              })}
+              style={smallButtonStyle(true)}
+            >
+              {item.label}{item.completed ? " ✓" : ""}{isHtmlFileName(item.fileName) ? " ↗" : ""}
             </button>
           ))}
         </div>
@@ -2190,8 +2519,8 @@ function TaskApprovalTab({ cwd, task, onOpenFile, currentSessionContextId }: { c
   );
 }
 
-function TaskArtifactsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStudioTaskDetail; onOpenFile?: (filePath: string, fileName: string) => void }) {
-  const [linkNotice, setLinkNotice] = useState<{ tone: "info" | "warning" | "error" | "success"; text: string } | null>(null);
+function TaskArtifactsTab({ cwd, task, onOpenTaskDocument }: { cwd: string; task: YpiStudioTaskDetail; onOpenTaskDocument: (request: OpenTaskDocumentRequest) => void }) {
+  const [linkNotice, setLinkNotice] = useState<TaskRelativeLinkNotice | null>(null);
   const artifacts = useMemo(() => buildStudioArtifactItems(task), [task]);
   const [activeArtifact, setActiveArtifact] = useState<string | null>(artifacts[0]?.fileName ?? null);
 
@@ -2201,12 +2530,20 @@ function TaskArtifactsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStu
 
   const artifact = artifacts.find((item) => item.fileName === activeArtifact) ?? artifacts[0];
   const fileName = artifact?.fileName ?? "";
-  const filePath = artifact ? taskRelativeFilePath(cwd, task, fileName) : "";
-  const isPlanReview = artifact?.key === "plan-review" || fileName === "plan-review.md";
-  const handlePlanReviewLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
+  const isHtml = isHtmlFileName(fileName);
+  const handleMaterialLinkClick = useCallback((href: string, label: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    return openTaskRelativeLink({ cwd, task, href, label, onOpenFile, setNotice: setLinkNotice });
-  }, [cwd, onOpenFile, task]);
+    return openTaskMaterialHref({
+      taskKey: task.key,
+      cwd,
+      href,
+      label,
+      sourceTab: "artifacts",
+      sourceLabel: "产物",
+      onOpenTaskDocument,
+      setNotice: setLinkNotice,
+    });
+  }, [cwd, onOpenTaskDocument, task.key]);
 
   if (artifacts.length === 0) return <PanelEmpty title="没有定义产物" description="当前任务还没有产物映射或文档内容。" />;
 
@@ -2217,17 +2554,43 @@ function TaskArtifactsTab({ cwd, task, onOpenFile }: { cwd: string; task: YpiStu
           <TabButton key={item.fileName} active={item.fileName === artifact?.fileName} label={`${item.label}${item.completed ? " ✓" : ""}`} onClick={() => setActiveArtifact(item.fileName)} />
         ))}
       </div>
-      {artifact && <SectionCard title={`${artifact.label}${artifact.required ? " · 必需" : artifact.optional ? " · 可选" : " · 其他"}`} action={<button onClick={() => onOpenFile?.(filePath, fileName)} disabled={!onOpenFile} style={smallButtonStyle(Boolean(onOpenFile))}>打开</button>}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-          <Badge label={artifact.completed ? "已完成" : "缺失"} tone={artifact.completed ? "success" : "warning"} />
-          {artifact.required && <Badge label="必需" tone="neutral" />}
-          {artifact.optional && !artifact.required && <Badge label="可选" tone="neutral" />}
-          {artifact.document?.truncated && <Badge label="已截断" tone="warning" />}
-        </div>
-        <DetailRow label="文件" value={fileName} mono />
-        {linkNotice && isPlanReview && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
-        {artifact.document ? <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg)" }}><MarkdownBody onLinkClick={isPlanReview ? handlePlanReviewLinkClick : undefined}>{artifact.document.content || "（空文件）"}</MarkdownBody></div> : <Notice tone="warning" text="产物文件不存在或尚未写入。" />}
-      </SectionCard>}
+      {artifact && (
+        <SectionCard
+          title={`${artifact.label}${artifact.required ? " · 必需" : artifact.optional ? " · 可选" : " · 其他"}`}
+          action={
+            <button
+              type="button"
+              onClick={() => openKnownTaskMaterial({
+                taskKey: task.key,
+                cwd,
+                path: fileName,
+                fileName,
+                sourceTab: "artifacts",
+                sourceLabel: "产物",
+                onOpenTaskDocument,
+                setNotice: setLinkNotice,
+              })}
+              style={smallButtonStyle(true)}
+            >
+              {isHtml ? "预览 HTML ↗" : "查看资料"}
+            </button>
+          }
+        >
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            <Badge label={artifact.completed ? "已完成" : "缺失"} tone={artifact.completed ? "success" : "warning"} />
+            {artifact.required && <Badge label="必需" tone="neutral" />}
+            {artifact.optional && !artifact.required && <Badge label="可选" tone="neutral" />}
+            {artifact.document?.truncated && <Badge label="已截断" tone="warning" />}
+          </div>
+          <DetailRow label="文件" value={fileName} mono />
+          {linkNotice && <Notice tone={linkNotice.tone} text={linkNotice.text} />}
+          {artifact.document ? (
+            isHtml
+              ? <Notice tone="info" text="HTML 原型请通过“预览 HTML ↗”在沙箱新标签中查看。" />
+              : <div style={{ marginTop: 8, border: "1px solid var(--border)", borderRadius: 10, padding: 10, background: "var(--bg)" }}><MarkdownBody onLinkClick={handleMaterialLinkClick}>{artifact.document.content || "（空文件）"}</MarkdownBody></div>
+          ) : <Notice tone="warning" text="产物文件不存在或尚未写入。" />}
+        </SectionCard>
+      )}
     </div>
   );
 }

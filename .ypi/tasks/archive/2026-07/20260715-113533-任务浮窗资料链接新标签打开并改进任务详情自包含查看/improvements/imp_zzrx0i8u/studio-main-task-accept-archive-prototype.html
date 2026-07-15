@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-004 主任务验收 · 确认并归档 交互原型</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: rgba(148, 163, 184, 0.22);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --ok: #15803d;
+      --ok-hover: #166534;
+      --danger: #b91c1c;
+      --danger-hover: #991b1b;
+      --panel: #111827;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1e293b 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    h2 { font-size: 0.95rem; margin: 0 0 10px; color: #cbd5e1; }
+    p.lead { color: var(--muted); margin: 0 0 20px; max-width: 760px; font-size: 0.9rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+    }
+    .scene {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .scene header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .widget {
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+      background: linear-gradient(160deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    .widget-title {
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .widget-status {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .block.main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      background: rgba(34, 197, 94, 0.1);
+    }
+    .block.main .meta {
+      font-size: 10px;
+      font-weight: 800;
+      color: #16a34a;
+    }
+    .btn {
+      width: 100%;
+      min-height: 30px;
+      padding: 6px 8px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      font-size: 10px;
+      font-weight: 800;
+      cursor: pointer;
+      color: #fff;
+      background: var(--ok);
+      border-color: #22c55e;
+    }
+    .btn:hover:not(:disabled) { background: var(--ok-hover); }
+    .btn:disabled { opacity: 0.72; cursor: wait; }
+    .notice {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .notice.ok { color: #4ade80; }
+    .notice.warn { color: #fbbf24; }
+    .rail {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px 2px;
+      margin-bottom: 8px;
+      font-size: 9px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .rail span.on { color: #fbbf24; font-weight: 800; }
+    .rail span.done { color: #4ade80; }
+    .toast {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      min-width: 220px;
+      max-width: 380px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 40;
+    }
+    .toast.show { opacity: 1; }
+    .toast.ok { border-color: rgba(34,197,94,0.5); }
+    .toast.err { border-color: rgba(248,113,113,0.5); }
+    .toast.warn { border-color: rgba(251,191,36,0.55); }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.62);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 30;
+    }
+    .overlay.open { display: flex; }
+    .dialog {
+      width: min(440px, 100%);
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    }
+    .dialog h3 { margin: 0 0 10px; font-size: 15px; }
+    .dialog p { margin: 0 0 8px; font-size: 13px; color: #cbd5e1; }
+    .callout {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      background: rgba(34, 197, 94, 0.1);
+      color: #bbf7d0;
+      font-size: 12px;
+      margin: 10px 0 12px;
+    }
+    .callout.archive {
+      border-color: rgba(248, 113, 113, 0.45);
+      background: rgba(248, 113, 113, 0.08);
+      color: #fecaca;
+    }
+    .dialog-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .dialog-actions button {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #1e293b;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .dialog-actions .primary {
+      background: var(--ok);
+      border-color: #22c55e;
+      color: #fff;
+    }
+    .dialog-actions .primary:hover { background: var(--ok-hover); }
+    .dialog-actions .danger {
+      background: var(--danger);
+      border-color: #ef4444;
+      color: #fff;
+    }
+    .dialog-actions .danger:hover { background: var(--danger-hover); }
+    .legend {
+      max-width: 1100px;
+      margin: 18px auto 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .legend code {
+      font-size: 11px;
+      background: rgba(148,163,184,0.12);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .log {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      min-height: 1.4em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .compare-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .compare-row .fake-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .compare-row .fake-actions button {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #1e293b;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .compare-row .fake-actions .primary {
+      background: var(--ok);
+      border-color: #22c55e;
+      color: #fff;
+    }
+    .compare-row .fake-actions .danger {
+      background: var(--danger);
+      border-color: #ef4444;
+      color: #fff;
+    }
+    @media (max-width: 480px) {
+      .dialog-actions { flex-direction: column-reverse; }
+      .dialog-actions button { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .toast { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>IMP-004 · 主任务验收弹窗「确认并归档」</h1>
+  <p class="lead">
+    交互原型（只读模拟）。在 IMP-003 双按钮确认上增加第三档
+    <strong>确认并归档</strong>：先模拟 <code>completed</code>，再模拟 <code>archive</code>。
+    主路径仍是「只完成」；Enter 默认不触发归档。页面归档使用 fallback knowledge（与 Studio 面板一致）。
+  </p>
+
+  <div class="grid">
+    <!-- Scene A interactive -->
+    <section class="scene">
+      <header>
+        <h2>A. 三档确认（可点）</h2>
+        <span class="badge">user_acceptance · canAcceptMain</span>
+      </header>
+      <div class="widget" id="card-main">
+        <div class="widget-title">示例任务 · 资料链接与详情自包含</div>
+        <div class="widget-status" id="status-line">状态：用户验收 · 进度 97% · 未归档</div>
+        <div class="rail" aria-hidden="true" id="rail">
+          <span class="done">Brief</span><span class="done">Design</span><span class="done">Impl</span><span class="done">Checks</span>
+          <span class="done">Review</span><span class="on" data-ua>User Acc.</span><span data-comp>Completed</span><span data-arch>Archived</span>
+        </div>
+        <div class="block main" id="main-accept-block">
+          <span class="meta">主任务结果待验收</span>
+          <button type="button" class="btn" id="open-dialog" aria-label="确认主任务已验收完成（将打开含归档选项的确认框）">
+            确认主任务已验收完成
+          </button>
+        </div>
+        <div class="notice ok" id="done-notice" hidden>✓ 主任务已 completed（原型模拟）</div>
+        <div class="notice" id="arch-notice" hidden>✓ 主任务已归档（原型模拟）</div>
+        <div class="notice warn" id="partial-notice" hidden>⚠ 已 completed，归档失败（可稍后面板重试）</div>
+        <div class="log" id="net-log">网络：—</div>
+      </div>
+      <p style="margin:10px 0 0;font-size:11px;color:var(--muted);">
+        辅助：
+        <button type="button" id="sim-fail" style="font-size:11px;margin-left:4px;">下次归档模拟失败</button>
+        <button type="button" id="reset" style="font-size:11px;margin-left:4px;">重置场景</button>
+      </p>
+    </section>
+
+    <!-- Scene B layout compare -->
+    <section class="scene">
+      <header>
+        <h2>B. 按钮层级对照（只读）</h2>
+        <span class="badge">layout</span>
+      </header>
+      <div class="compare-row">
+        <div style="font-size:11px;color:var(--muted);">推荐 actions 顺序（右对齐）</div>
+        <div class="fake-actions" aria-hidden="true">
+          <button type="button">暂不验收</button>
+          <button type="button" class="danger">确认并归档</button>
+          <button type="button" class="primary">确认主任务已完成</button>
+        </div>
+        <p style="margin:0;font-size:11px;color:var(--muted);">
+          · 主按钮 = 只完成（success，Enter 默认）<br />
+          · 次按钮 = 完成并归档（danger）<br />
+          · 取消 = 无写
+        </p>
+      </div>
+    </section>
+
+    <!-- Scene C improvement regression -->
+    <section class="scene">
+      <header>
+        <h2>C. 改进验收不受影响</h2>
+        <span class="badge">regression</span>
+      </header>
+      <div class="widget">
+        <div class="widget-title">示例 · 改进结果待验收</div>
+        <div class="widget-status">状态：等待改进完成</div>
+        <div style="padding:6px 8px;border-radius:8px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.08);">
+          <div style="font-size:10px;font-weight:800;color:#b45309;margin-bottom:4px;">IMP-004 改进结果待验收</div>
+          <button type="button" disabled style="width:100%;min-height:30px;border-radius:7px;border:1px solid #c96d00;background:#b86400;color:#fff;font-size:10px;font-weight:800;">
+            确认该改进任务已完成
+          </button>
+        </div>
+        <p style="margin:8px 0 0;font-size:10px;color:var(--muted);">仍为双按钮确认；不出现「确认并归档」。</p>
+      </div>
+    </section>
+
+    <!-- Scene D copy -->
+    <section class="scene">
+      <header>
+        <h2>D. 文案要点</h2>
+        <span class="badge">copy</span>
+      </header>
+      <ul style="margin:0;padding-left:18px;font-size:12px;color:#cbd5e1;">
+        <li>主任务<strong>结果验收</strong>，不是计划审批 / 改进验收。</li>
+        <li>只完成 → <code>completed</code>，不移动目录。</li>
+        <li>确认并归档 → 先完成再归档；fallback knowledge；不调聊天模型。</li>
+        <li>归档失败不回滚 completed。</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="legend">
+    <p>
+      模拟写路径：
+      <code>PATCH to=completed</code>
+      →（可选）
+      <code>PATCH action=archive allowFallbackKnowledge=true</code>。
+      无生产副作用。
+    </p>
+  </div>
+
+  <div class="overlay" id="overlay" role="presentation">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-desc">
+      <h3 id="dlg-title">确认主任务已验收完成？</h3>
+      <div id="dlg-desc">
+        <p>
+          这是<strong>主任务结果验收</strong>，不是计划审批，也不是改进验收。
+        </p>
+        <div class="callout">
+          <div><strong>确认对象：</strong>主任务「示例任务 · 资料链接与详情自包含」</div>
+          <div style="margin-top:4px;"><strong>只完成：</strong>状态变为 <code>completed</code>，不归档。</div>
+        </div>
+        <div class="callout archive">
+          <div><strong>确认并归档：</strong>先 <code>completed</code>，再归档（移动任务目录，用产物生成 knowledge 兜底摘要；页面路径不调用聊天模型）。</div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="act-cancel">暂不验收</button>
+        <button type="button" class="danger" id="act-archive" aria-label="确认主任务验收完成并归档">确认并归档</button>
+        <button type="button" class="primary" id="act-complete" data-default="true">确认主任务已完成</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    (function () {
+      const overlay = document.getElementById("overlay");
+      const openBtn = document.getElementById("open-dialog");
+      const statusLine = document.getElementById("status-line");
+      const mainBlock = document.getElementById("main-accept-block");
+      const doneNotice = document.getElementById("done-notice");
+      const archNotice = document.getElementById("arch-notice");
+      const partialNotice = document.getElementById("partial-notice");
+      const netLog = document.getElementById("net-log");
+      const toastEl = document.getElementById("toast");
+      const rail = document.getElementById("rail");
+      let phase = "accept"; // accept | completed | archived | partial
+      let failNextArchive = false;
+      let toastTimer = 0;
+
+      function showToast(message, kind) {
+        toastEl.textContent = message;
+        toastEl.className = "toast show " + (kind || "ok");
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(function () {
+          toastEl.classList.remove("show");
+        }, 3200);
+      }
+
+      function setLog(text) {
+        netLog.textContent = "网络：" + text;
+      }
+
+      function paint() {
+        doneNotice.hidden = true;
+        archNotice.hidden = true;
+        partialNotice.hidden = true;
+        mainBlock.hidden = true;
+        openBtn.disabled = false;
+        openBtn.textContent = "确认主任务已验收完成";
+
+        const ua = rail.querySelector("[data-ua]");
+        const comp = rail.querySelector("[data-comp]");
+        const arch = rail.querySelector("[data-arch]");
+        ua.className = "";
+        comp.className = "";
+        arch.className = "";
+
+        if (phase === "accept") {
+          mainBlock.hidden = false;
+          statusLine.textContent = "状态：用户验收 · 进度 97% · 未归档";
+          ua.className = "on";
+          setLog("—");
+        } else if (phase === "completed") {
+          doneNotice.hidden = false;
+          statusLine.textContent = "状态：completed · 未归档";
+          ua.className = "done";
+          comp.className = "on";
+        } else if (phase === "partial") {
+          doneNotice.hidden = false;
+          partialNotice.hidden = false;
+          statusLine.textContent = "状态：completed · 归档失败";
+          ua.className = "done";
+          comp.className = "on";
+        } else if (phase === "archived") {
+          archNotice.hidden = false;
+          statusLine.textContent = "状态：archived · 只读";
+          ua.className = "done";
+          comp.className = "done";
+          arch.className = "on";
+        }
+      }
+
+      function openDialog() {
+        if (phase !== "accept") return;
+        overlay.classList.add("open");
+        document.getElementById("act-cancel").focus();
+      }
+
+      function closeDialog() {
+        overlay.classList.remove("open");
+      }
+
+      function runCompleteOnly() {
+        closeDialog();
+        openBtn.disabled = true;
+        openBtn.textContent = "验收中…";
+        setLog("PATCH to=completed");
+        window.setTimeout(function () {
+          phase = "completed";
+          paint();
+          showToast("已确认主任务验收完成（completed，未归档）", "ok");
+        }, 350);
+      }
+
+      function runCompleteAndArchive() {
+        closeDialog();
+        openBtn.disabled = true;
+        openBtn.textContent = "验收中…";
+        setLog("PATCH to=completed → PATCH action=archive allowFallbackKnowledge=true");
+        window.setTimeout(function () {
+          if (failNextArchive) {
+            failNextArchive = false;
+            phase = "partial";
+            paint();
+            showToast("已验收完成（completed），但归档失败：模拟 running subagent", "warn");
+            setLog("PATCH completed OK；PATCH archive FAIL");
+            return;
+          }
+          phase = "archived";
+          paint();
+          showToast("已确认主任务验收完成并归档", "ok");
+        }, 450);
+      }
+
+      openBtn.addEventListener("click", openDialog);
+      document.getElementById("act-cancel").addEventListener("click", function () {
+        closeDialog();
+        setLog("（取消，无请求）");
+        showToast("已取消，未写入", "ok");
+      });
+      document.getElementById("act-complete").addEventListener("click", runCompleteOnly);
+      document.getElementById("act-archive").addEventListener("click", runCompleteAndArchive);
+
+      document.getElementById("sim-fail").addEventListener("click", function () {
+        failNextArchive = true;
+        showToast("已设置：下一次「确认并归档」将模拟归档失败", "warn");
+      });
+      document.getElementById("reset").addEventListener("click", function () {
+        phase = "accept";
+        failNextArchive = false;
+        paint();
+        showToast("场景已重置", "ok");
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (!overlay.classList.contains("open")) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeDialog();
+          setLog("（Escape，无请求）");
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          // Enter 只绑定主完成，不绑定归档
+          runCompleteOnly();
+        }
+      });
+
+      paint();
+    })();
+  </script>
+</body>
+</html>

@@ -234,6 +234,7 @@ All token values in Usage, ledger, topbar, and message footers follow these conv
 ### Models and tools
 
 - `GET /api/models` returns `defaultModel` from `~/.pi/agent/settings.json`.
+- Chat `set_model` is **session-scoped** (IMP-002 plan A): runtime model + JSONL `model_change` update for the open session, but `AgentSession.setModel` must not rewrite `settings.json` `defaultProvider`/`defaultModel`. Isolation is implemented in `lib/rpc-manager.ts` via `withSessionScopedSettingsDefaults` (`lib/session-model-pin.ts`). Explicit Settings/CLI paths that call SettingsManager default writers remain the global-default entry points.
 - New-session tool names are passed to `POST /api/agent/new` as `toolNames[]`.
 - Existing sessions infer presets via `get_tools` and `getPresetFromTools()`.
 - Auth changes call `reloadRpcAuthState()` so live AgentSessions reload auth/model state. The same path also cleans pi-ai session resources because OpenAI Codex keeps reusable WebSockets keyed by session id, and those sockets must reconnect after ChatGPT account activation to pick up new auth headers.

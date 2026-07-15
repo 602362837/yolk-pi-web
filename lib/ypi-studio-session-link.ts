@@ -401,6 +401,21 @@ function buildWidgetQuickPreviews(cwd: string, detail: YpiStudioTaskDetail): Ypi
   return previews;
 }
 
+/**
+ * Convenience gate for main-task result acceptance in the session widget.
+ * Server transition gates (unresolved improvements, archive, requiresUserApproval, binding) remain authoritative.
+ * Does not treat review_ready / review as completable.
+ */
+export function canAcceptMainTask(input: {
+  status: string;
+  archived?: boolean;
+  unresolvedImprovementCount: number;
+}): boolean {
+  return !input.archived
+    && input.status === "user_acceptance"
+    && input.unresolvedImprovementCount === 0;
+}
+
 function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioTaskWidgetProjection | null {
   const detail = getYpiStudioTaskDetail(cwd, summary.key);
   if (!detail) return null;
@@ -474,6 +489,13 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
   })() : undefined;
 
   const quickPreviews = buildWidgetQuickPreviews(cwd, detail);
+  const unresolvedImprovementCount = improvementSummary?.unresolved ?? 0;
+  // Omit false so older clients and sparse JSON stay quiet; UI checks === true.
+  const canAcceptMain = canAcceptMainTask({
+    status: detail.status,
+    archived: detail.archived,
+    unresolvedImprovementCount,
+  }) ? true : undefined;
 
   return {
     key: detail.key,
@@ -490,6 +512,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
     archiveMonth: detail.archiveMonth,
     archivedAt: detail.archivedAt,
     pathLabel: detail.pathLabel,
+    canAcceptMain,
     artifacts: {
       required: detail.progress.requiredArtifacts,
       optional: detail.progress.optionalArtifacts,

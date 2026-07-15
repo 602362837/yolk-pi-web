@@ -23,8 +23,30 @@ export type {
 export type PiWebToolPreset = "none" | "default" | "full" | "subagent";
 export type PiWebThinkingLevel = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
+/** New-session default model from Settings → 蛋黄𝝅 (IMP-002 MODEL-PIN-4). */
+export type PiWebYolkDefaultModel =
+  | { mode: "piDefault" }
+  | {
+      mode: "specific";
+      provider: string;
+      modelId: string;
+      /** Thinking follows the selected model; optional on disk, filled on normalize when missing. */
+      thinking?: PiWebThinkingLevel;
+    };
+
 export interface PiWebYolkConfig {
   defaultToolPreset: PiWebToolPreset;
+  /**
+   * New empty-session initial model (+ thinking when mode is specific).
+   * Chat switches remain session-scoped and do not write this field.
+   */
+  defaultModel: PiWebYolkDefaultModel;
+  /**
+   * Effective new-session thinking default (derived).
+   * Prefer `defaultModel.thinking` when mode is specific.
+   * Legacy files with only `defaultThinkingLevel` still populate this on read;
+   * saves dual-write it for older readers.
+   */
   defaultThinkingLevel: PiWebThinkingLevel;
 }
 
@@ -245,6 +267,7 @@ const DEFAULT_STUDIO_POLICY: PiWebSubagentRunPolicy = {
 export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   yolk: {
     defaultToolPreset: "default",
+    defaultModel: { mode: "piDefault" },
     defaultThinkingLevel: "auto",
   },
   worktree: {
@@ -419,6 +442,52 @@ function readToolPreset(value: unknown, fallback: PiWebToolPreset): PiWebToolPre
 
 function readThinkingLevel(value: unknown, fallback: PiWebThinkingLevel): PiWebThinkingLevel {
   return value === "auto" || value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh" ? value : fallback;
+}
+
+function isPiWebThinkingLevel(value: unknown): value is PiWebThinkingLevel {
+  return value === "auto" || value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh";
+}
+
+function readYolkDefaultModel(value: unknown, fallback: PiWebYolkDefaultModel): PiWebYolkDefaultModel {
+  if (!isRecord(value)) return fallback;
+  if (value.mode === "piDefault") return { mode: "piDefault" };
+  if (value.mode !== "specific") return fallback;
+  const provider = typeof value.provider === "string" ? value.provider.trim() : "";
+  const modelId = typeof value.modelId === "string" ? value.modelId.trim() : "";
+  if (!provider || !modelId) return fallback;
+  if (value.thinking === undefined) {
+    return { mode: "specific", provider, modelId };
+  }
+  if (!isPiWebThinkingLevel(value.thinking)) {
+    return { mode: "specific", provider, modelId };
+  }
+  return { mode: "specific", provider, modelId, thinking: value.thinking };
+}
+
+/**
+ * Normalize yolk defaults: prefer `defaultModel` (+thinking); fall back to legacy
+ * top-level `defaultThinkingLevel` when specific thinking is missing.
+ */
+function readYolkConfig(value: unknown, fallback: PiWebYolkConfig): PiWebYolkConfig {
+  const root = isRecord(value) ? value : {};
+  const defaultToolPreset = readToolPreset(root.defaultToolPreset, fallback.defaultToolPreset);
+  const defaultModelRaw = readYolkDefaultModel(root.defaultModel, fallback.defaultModel);
+  const legacyThinking = readThinkingLevel(root.defaultThinkingLevel, fallback.defaultThinkingLevel);
+
+  if (defaultModelRaw.mode === "specific") {
+    const thinking = defaultModelRaw.thinking ?? legacyThinking;
+    return {
+      defaultToolPreset,
+      defaultModel: { mode: "specific", provider: defaultModelRaw.provider, modelId: defaultModelRaw.modelId, thinking },
+      defaultThinkingLevel: thinking,
+    };
+  }
+
+  return {
+    defaultToolPreset,
+    defaultModel: { mode: "piDefault" },
+    defaultThinkingLevel: legacyThinking,
+  };
 }
 
 function readSessionDisplay(value: unknown, fallback: "separate" | "tag"): "separate" | "tag" {
@@ -770,10 +839,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     }
   }
   return {
-    yolk: {
-      defaultToolPreset: readToolPreset(yolk.defaultToolPreset, defaults.yolk.defaultToolPreset),
-      defaultThinkingLevel: readThinkingLevel(yolk.defaultThinkingLevel, defaults.yolk.defaultThinkingLevel),
-    },
+    yolk: readYolkConfig(yolk, defaults.yolk),
     worktree: {
       baseRef: readString(worktree.baseRef, defaults.worktree.baseRef),
       branchNameTemplate: readString(worktree.branchNameTemplate, defaults.worktree.branchNameTemplate),
@@ -875,6 +941,34 @@ function requireNonEmptyString(value: unknown, field: string): string {
   return value.trim();
 }
 
+function validatePiWebThinkingLevel(value: unknown, field: string): PiWebThinkingLevel {
+  if (!isPiWebThinkingLevel(value)) {
+    throw new PiWebConfigValidationError(`${field} must be auto, off, minimal, low, medium, high, or xhigh`);
+  }
+  return value;
+}
+
+function validatePiWebYolkDefaultModel(value: unknown): PiWebYolkDefaultModel {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("yolk.defaultModel must be an object");
+  }
+  if (value.mode === "piDefault") return { mode: "piDefault" };
+  if (value.mode !== "specific") {
+    throw new PiWebConfigValidationError('yolk.defaultModel.mode must be "piDefault" or "specific"');
+  }
+  const provider = requireNonEmptyString(value.provider, "yolk.defaultModel.provider");
+  const modelId = requireNonEmptyString(value.modelId, "yolk.defaultModel.modelId");
+  if (value.thinking === undefined) {
+    return { mode: "specific", provider, modelId };
+  }
+  return {
+    mode: "specific",
+    provider,
+    modelId,
+    thinking: validatePiWebThinkingLevel(value.thinking, "yolk.defaultModel.thinking"),
+  };
+}
+
 export function validatePiWebYolkConfig(value: unknown): PiWebYolkConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("yolk config must be an object");
@@ -883,11 +977,35 @@ export function validatePiWebYolkConfig(value: unknown): PiWebYolkConfig {
   if (defaultToolPreset !== "none" && defaultToolPreset !== "default" && defaultToolPreset !== "full" && defaultToolPreset !== "subagent") {
     throw new PiWebConfigValidationError("yolk.defaultToolPreset must be none, default, full, or subagent");
   }
-  const defaultThinkingLevel = value.defaultThinkingLevel;
-  if (defaultThinkingLevel !== "auto" && defaultThinkingLevel !== "off" && defaultThinkingLevel !== "minimal" && defaultThinkingLevel !== "low" && defaultThinkingLevel !== "medium" && defaultThinkingLevel !== "high" && defaultThinkingLevel !== "xhigh") {
-    throw new PiWebConfigValidationError("yolk.defaultThinkingLevel must be auto, off, minimal, low, medium, high, or xhigh");
+
+  // Accept missing defaultModel as piDefault so partial UI patches and older clients still validate.
+  const defaultModelRaw = value.defaultModel === undefined
+    ? ({ mode: "piDefault" } as const)
+    : validatePiWebYolkDefaultModel(value.defaultModel);
+
+  const legacyThinking = value.defaultThinkingLevel === undefined
+    ? undefined
+    : validatePiWebThinkingLevel(value.defaultThinkingLevel, "yolk.defaultThinkingLevel");
+
+  if (defaultModelRaw.mode === "specific") {
+    const thinking = defaultModelRaw.thinking ?? legacyThinking ?? "auto";
+    return {
+      defaultToolPreset,
+      defaultModel: {
+        mode: "specific",
+        provider: defaultModelRaw.provider,
+        modelId: defaultModelRaw.modelId,
+        thinking,
+      },
+      defaultThinkingLevel: thinking,
+    };
   }
-  return { defaultToolPreset, defaultThinkingLevel };
+
+  return {
+    defaultToolPreset,
+    defaultModel: { mode: "piDefault" },
+    defaultThinkingLevel: legacyThinking ?? "auto",
+  };
 }
 
 export function validatePiWebWorktreeConfig(value: unknown): PiWebWorktreeConfig {
@@ -1477,9 +1595,12 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
 
   if (normalizedYolk) {
     const previousYolk = isRecord(raw.yolk) ? raw.yolk : {};
+    // Prefer defaultModel (+thinking). Dual-write defaultThinkingLevel for legacy readers.
     nextRaw.yolk = {
       ...previousYolk,
-      ...normalizedYolk,
+      defaultToolPreset: normalizedYolk.defaultToolPreset,
+      defaultModel: normalizedYolk.defaultModel,
+      defaultThinkingLevel: normalizedYolk.defaultThinkingLevel,
     };
   }
 

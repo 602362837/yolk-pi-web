@@ -1,15 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
-import {
-  YpiStudioPlanReviewModal,
-  type YpiStudioPlanReviewTarget,
-} from "@/components/YpiStudioPlanReviewModal";
+import type { YpiStudioPlanReviewTarget } from "@/components/YpiStudioPlanReviewModal";
 import { usePrompt } from "@/components/AppPromptProvider";
 import {
+  openStudioTaskDocumentInNewTab,
   openStudioTaskHtmlPrototype,
-  improvementRelativePath,
-  taskRelativeFilePath,
 } from "@/lib/ypi-studio-task-preview";
 import type {
   YpiStudioImplementationCompactTimelineItem,
@@ -34,7 +30,10 @@ interface Props {
   contextId?: string;
   /** Refresh widget + drawer after a successful mutation (or rejected race). */
   onTaskChanged?: (taskKey: string) => void;
-  /** Optional file viewer opener for Markdown relative links / source. */
+  /**
+   * Retained for AppShell API compatibility. Studio widget materials no longer
+   * open the right-side main preview via this callback (STUDIO-DOC-2).
+   */
   onOpenFile?: (filePath: string, fileName: string) => void;
 }
 
@@ -52,6 +51,8 @@ interface DragState {
 const EXPANDED_POSITION_KEY = "pi-web:ypi-studio-session-widget-position:v2";
 const BALL_POSITION_KEY = "pi-web:ypi-studio-session-widget-ball-position:v1";
 const EXPANDED_STATE_KEY = "pi-web:ypi-studio-session-widget-expanded";
+/** Marker suffix in acceptingKey for main-task accept in-flight state. */
+const MAIN_ACCEPT_KEY = "__main__";
 const DEFAULT_MARGIN = 18;
 const DRAG_THRESHOLD_PX = 4;
 const MOBILE_MEDIA = "(max-width: 640px)";
@@ -526,9 +527,9 @@ type QuickPreviewAction = {
   tone: YpiStudioWidgetQuickPreviewApprovalState;
   ariaLabel: string;
   title: string;
-  /** Markdown plan opens the read-only modal. */
+  /** Markdown/text plan opens the read-only document page in a new tab. */
   planTarget?: YpiStudioPlanReviewTarget;
-  /** HTML prototype opens via files API mode=preview. */
+  /** HTML prototype opens via files API mode=preview in a new tab. */
   prototype?: {
     fileName: string;
     improvementId?: string;
@@ -617,10 +618,10 @@ function quickPreviewActionsForTask(task: YpiStudioTaskWidgetProjection): QuickP
       kind: preview.kind,
       label: preview.label,
       stateWord,
-      icon: "▤",
+      icon: "↗",
       tone: preview.approvalState,
-      ariaLabel: `预览《${task.title}》${scopeLabel} ${preview.label}（${ariaState}）`,
-      title: `${preview.label} ${stateWord} · 只读`,
+      ariaLabel: `在新标签打开《${task.title}》${scopeLabel} ${preview.label}（${ariaState}）`,
+      title: `${preview.label} ${stateWord} · 新标签只读`,
       planTarget: {
         taskKey: task.key,
         taskTitle: task.title,
@@ -673,6 +674,9 @@ function TaskCard({
   onOpenPrototype,
   onAcceptImprovement,
   acceptingImprovementId,
+  onAcceptMainTask,
+  acceptingMainTask = false,
+  acceptWriteBusy = false,
 }: {
   candidate: YpiStudioSessionTaskLinkCandidate;
   runs: YpiStudioTaskWidgetSubagentRun[];
@@ -687,6 +691,10 @@ function TaskCard({
   }) => void;
   onAcceptImprovement?: (improvement: AcceptableImprovement) => void;
   acceptingImprovementId?: string | null;
+  onAcceptMainTask?: () => void;
+  acceptingMainTask?: boolean;
+  /** True while any accept write (improvement or main) is in flight. */
+  acceptWriteBusy?: boolean;
 }) {
   const task = candidate.task;
   const completedCount = task.artifacts.completed.length;
@@ -701,6 +709,17 @@ function TaskCard({
   const quickActions = quickPreviewActionsForTask(task);
   const acceptableImprovements = acceptableImprovementsForTask(task);
   const isArchivedReadOnly = Boolean(task.archived || task.status === "archived");
+  // Prefer server projection; fall back to the pure gate so a sparse/stale
+  // payload without canAcceptMain still shows the main-task accept control.
+  // Keep this client-local (do not import server session-link module here).
+  const showMainTaskAccept = !isArchivedReadOnly && (
+    task.canAcceptMain === true
+    || (
+      task.status === "user_acceptance"
+      && !task.archived
+      && improvementUnresolved === 0
+    )
+  );
 
   return (
     <div
@@ -792,14 +811,14 @@ function TaskCard({
                     <button
                       type="button"
                       className={`ypi-studio-widget-accept-btn${busy ? " is-busy" : ""}`}
-                      disabled={Boolean(acceptingImprovementId)}
+                      disabled={acceptWriteBusy || Boolean(acceptingImprovementId)}
                       aria-busy={busy || undefined}
                       aria-label={`确认改进任务 ${inst.displayId}「${inst.title}」已完成（改进结果验收，不是计划审批）`}
                       title="确认该改进任务已完成 · 这是结果验收，不是计划审批"
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.stopPropagation();
-                        if (acceptingImprovementId) return;
+                        if (acceptWriteBusy || acceptingImprovementId) return;
                         onAcceptImprovement?.(inst);
                       }}
                     >
@@ -812,7 +831,36 @@ function TaskCard({
           )}
         </div>
       )}
-      {improvements && improvements.parentStatus === "review_ready" && improvementUnresolved === 0 && improvements.total > 0 && (
+      {/* When main accept is available, show the action block (not only the review_ready hint). */}
+      {showMainTaskAccept ? (
+        <div
+          className="ypi-studio-widget-main-accept"
+          role="group"
+          aria-label="主任务结果验收"
+        >
+          <span className="ypi-studio-widget-main-accept-meta">
+            {improvements && improvements.total > 0
+              ? "✓ 改进已完成 · 请确认主任务验收"
+              : "主任务结果待验收"}
+          </span>
+          <button
+            type="button"
+            className={`ypi-studio-widget-main-accept-btn${acceptingMainTask ? " is-busy" : ""}`}
+            disabled={acceptWriteBusy || !onAcceptMainTask}
+            aria-busy={acceptingMainTask || undefined}
+            aria-label={`确认主任务「${task.title}」已验收完成（主任务结果验收，将进入 completed）`}
+            title="确认主任务已验收完成 · 这是主任务结果验收，不是计划审批或改进验收"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (acceptWriteBusy || !onAcceptMainTask) return;
+              onAcceptMainTask();
+            }}
+          >
+            {acceptingMainTask ? "验收中…" : "确认主任务已验收完成"}
+          </button>
+        </div>
+      ) : improvements && improvements.parentStatus === "review_ready" && improvementUnresolved === 0 && improvements.total > 0 ? (
         <div
           className="ypi-studio-widget-reaccept-notice"
           style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
@@ -821,7 +869,7 @@ function TaskCard({
         >
           ✓ 改进已完成，主任务需要再次验收
         </div>
-      )}
+      ) : null}
       {isArchivedReadOnly && (
         <div className="ypi-studio-widget-archived-badge" role="status">
           ▣ 已归档 · 只读
@@ -922,10 +970,11 @@ export function YpiStudioSessionWidget({
   cwd,
   contextId,
   onTaskChanged,
-  onOpenFile,
+  onOpenFile: _onOpenFile,
 }: Props) {
+  void _onOpenFile;
   const isMobile = useMobile();
-  const { confirm, toast } = usePrompt();
+  const { confirm, confirmChoice, toast } = usePrompt();
   const [expanded, setExpanded] = useState(() => readExpandedState());
   const [panelPosition, setPanelPosition] = useState<WidgetPosition | null>(null);
   const [ballPosition, setBallPosition] = useState<WidgetPosition | null>(null);
@@ -933,42 +982,58 @@ export function YpiStudioSessionWidget({
   const [ballDragging, setBallDragging] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [attentionSequence, setAttentionSequence] = useState(0);
-  const [planReviewTarget, setPlanReviewTarget] = useState<YpiStudioPlanReviewTarget | null>(null);
   const [acceptingKey, setAcceptingKey] = useState<string | null>(null);
   const acceptingInFlightRef = useRef(false);
 
+  /** Markdown/text plans open the shared document page in a new browser tab. */
   const handlePreviewPlan = useCallback((target: YpiStudioPlanReviewTarget) => {
-    setPlanReviewTarget(target);
-  }, []);
+    if (!cwd?.trim()) {
+      toast({ message: "无法打开资料：缺少工作区 cwd", tone: "error" });
+      return;
+    }
+    const path = target.fileName?.trim() || "plan-review.md";
+    const result = openStudioTaskDocumentInNewTab({
+      taskKey: target.taskKey,
+      cwd,
+      path,
+      improvementId: target.improvementId,
+      title: target.taskTitle,
+    });
+    if (!result.ok) {
+      toast({
+        message: result.message,
+        tone: result.reason === "blocked" ? "info" : "error",
+      });
+    }
+  }, [cwd, toast]);
 
-  const handleClosePlanReview = useCallback(() => {
-    setPlanReviewTarget(null);
-  }, []);
-
-  /** HTML prototypes always open via task-local files API mode=preview in a new tab. */
+  /**
+   * HTML prototypes open via task-local files API mode=preview in a new tab.
+   * Popup blocked only toasts; never falls back to the right-side main preview.
+   */
   const handleOpenPrototype = useCallback((options: {
     taskKey: string;
     fileName: string;
     improvementId?: string;
     label: string;
   }) => {
-    if (!cwd?.trim()) return;
-    const candidate = tasks.find((item) => item.task.key === options.taskKey);
-    const opened = openStudioTaskHtmlPrototype({
+    if (!cwd?.trim()) {
+      toast({ message: "无法打开资料：缺少工作区 cwd", tone: "error" });
+      return;
+    }
+    openStudioTaskHtmlPrototype({
       taskKey: options.taskKey,
       cwd,
       fileName: options.fileName,
       improvementId: options.improvementId,
       onBlocked: () => {
-        if (!candidate || !onOpenFile) return;
-        const relative = options.improvementId
-          ? improvementRelativePath(options.improvementId, options.fileName)
-          : options.fileName;
-        onOpenFile(taskRelativeFilePath(cwd, candidate.task, relative), options.fileName);
+        toast({
+          message: "浏览器阻止了新标签，请允许此站点弹窗后重试",
+          tone: "info",
+        });
       },
     });
-    void opened;
-  }, [cwd, onOpenFile, tasks]);
+  }, [cwd, toast]);
 
   /**
    * Confirm then PATCH transition_improvement → accepted.
@@ -1035,14 +1100,59 @@ export function YpiStudioSessionWidget({
           reason: "User accepted from session widget",
         }),
       });
-      const data = await res.json().catch(() => ({})) as { error?: string };
+      const data = await res.json().catch(() => ({})) as {
+        error?: string;
+        task?: {
+          status?: string;
+          improvements?: {
+            parentStatus?: string;
+            unresolved?: number;
+            instances?: Array<{ status?: string }>;
+          };
+        };
+      };
       if (!res.ok) {
         throw new Error(data.error || `验收失败（HTTP ${res.status}）`);
       }
-      toast({
-        message: `已确认 ${improvement.displayId} 完成；主任务将按状态机 reconcile，不会自动 completed。`,
-        tone: "success",
-      });
+
+      // The generic reconciler intentionally returns the parent to `review`.
+      // From this explicit widget acceptance flow, immediately request the
+      // next user-acceptance step so the main-task accept action is available
+      // without requiring the user to manually push the state.
+      const acceptedTask = data.task;
+      const unresolved = acceptedTask?.improvements?.unresolved
+        ?? acceptedTask?.improvements?.instances?.filter((instance) =>
+          !["accepted", "accepted_not_doing"].includes(instance.status ?? "")
+        ).length;
+      const shouldRequestMainAcceptance = acceptedTask?.status === "review"
+        && acceptedTask.improvements?.parentStatus === "review_ready"
+        && unresolved === 0;
+
+      if (shouldRequestMainAcceptance) {
+        const reacceptRes = await fetch(`/api/studio/tasks/${encodeURIComponent(taskKey)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cwd,
+            to: "user_acceptance",
+            contextId,
+            reason: "Request main-task re-acceptance after final improvement acceptance from session widget",
+          }),
+        });
+        const reacceptData = await reacceptRes.json().catch(() => ({})) as { error?: string };
+        if (!reacceptRes.ok) {
+          throw new Error(`改进已验收，但进入主任务用户验收失败：${reacceptData.error || `HTTP ${reacceptRes.status}`}`);
+        }
+        toast({
+          message: `已确认 ${improvement.displayId} 完成；主任务已进入用户验收。`,
+          tone: "success",
+        });
+      } else {
+        toast({
+          message: `已确认 ${improvement.displayId} 完成；主任务将按状态机继续处理，不会自动 completed。`,
+          tone: "success",
+        });
+      }
       onTaskChanged?.(taskKey);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1055,16 +1165,114 @@ export function YpiStudioSessionWidget({
     }
   }, [confirm, contextId, cwd, onTaskChanged, toast]);
 
-  // Drop stale modal targets when session tasks or authorized cwd change.
-  useEffect(() => {
-    if (!planReviewTarget) return;
+  /**
+   * Confirm then PATCH main task → completed, with an optional complete+archive branch.
+   * Server remains authoritative for unresolved/archive/binding/approval gates.
+   * Never optimistically mark completed/archived; refresh on success and failure.
+   */
+  const handleAcceptMainTask = useCallback(async (taskKey: string, taskTitle: string) => {
+    if (acceptingInFlightRef.current) return;
     if (!cwd?.trim()) {
-      setPlanReviewTarget(null);
+      toast({ message: "无法验收：缺少工作区 cwd", tone: "error" });
       return;
     }
-    const stillVisible = tasks.some((candidate) => candidate.task.key === planReviewTarget.taskKey);
-    if (!stillVisible) setPlanReviewTarget(null);
-  }, [cwd, planReviewTarget, tasks]);
+    if (!contextId?.trim()) {
+      toast({ message: "无法验收：当前会话未绑定 contextId", tone: "error" });
+      return;
+    }
+
+    const choice = await confirmChoice({
+      title: "确认主任务已验收完成？",
+      message: (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+          <p style={{ margin: 0 }}>
+            这是<strong>主任务结果验收</strong>，不是计划审批，也不是改进验收。
+            可以只进入 <code style={{ fontSize: 12 }}>completed</code>，也可以完成后立即归档。
+          </p>
+          <div
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid rgba(34,197,94,0.45)",
+              background: "rgba(34,197,94,0.1)",
+              color: "#166534",
+              fontSize: 12,
+            }}
+          >
+            <div><strong>确认对象：</strong>主任务「{taskTitle}」</div>
+            <div style={{ marginTop: 4 }}><strong>普通确认：</strong>状态变为 completed；不自动归档。</div>
+            <div style={{ marginTop: 4 }}><strong>确认并归档：</strong>先 completed，再移动到已归档并生成知识条目。</div>
+          </div>
+        </div>
+      ) as ReactNode,
+      confirmLabel: "确认主任务已完成",
+      secondaryConfirmLabel: "确认并归档",
+      secondaryIntent: "success",
+      cancelLabel: "暂不验收",
+      intent: "default",
+    });
+    if (!choice) return;
+
+    const shouldArchive = choice === "secondary";
+    acceptingInFlightRef.current = true;
+    setAcceptingKey(`${taskKey}:${MAIN_ACCEPT_KEY}`);
+    try {
+      const completeRes = await fetch(`/api/studio/tasks/${encodeURIComponent(taskKey)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cwd,
+          to: "completed",
+          contextId,
+          reason: shouldArchive
+            ? "User accepted main task and requested archive from session widget"
+            : "User accepted main task from session widget",
+        }),
+      });
+      const completeData = await completeRes.json().catch(() => ({})) as { error?: string };
+      if (!completeRes.ok) {
+        throw new Error(completeData.error || `验收失败（HTTP ${completeRes.status}）`);
+      }
+
+      if (!shouldArchive) {
+        toast({ message: "已确认主任务验收完成（completed）", tone: "success" });
+        onTaskChanged?.(taskKey);
+        return;
+      }
+
+      const archiveRes = await fetch(`/api/studio/tasks/${encodeURIComponent(taskKey)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cwd,
+          action: "archive",
+          contextId,
+          reason: "Accepted and archived from session widget",
+          allowFallbackKnowledge: true,
+        }),
+      });
+      const archiveData = await archiveRes.json().catch(() => ({})) as { error?: string };
+      if (!archiveRes.ok) {
+        toast({
+          message: `主任务已完成，但归档失败：${archiveData.error || `HTTP ${archiveRes.status}`}。可从 Studio Panel 重试归档。`,
+          tone: "error",
+          durationMs: 8000,
+        });
+        onTaskChanged?.(taskKey);
+        return;
+      }
+
+      toast({ message: "已确认主任务验收完成并归档", tone: "success" });
+      onTaskChanged?.(taskKey);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ message: `主任务验收失败：${message}`, tone: "error" });
+      onTaskChanged?.(taskKey);
+    } finally {
+      acceptingInFlightRef.current = false;
+      setAcceptingKey(null);
+    }
+  }, [confirmChoice, contextId, cwd, onTaskChanged, toast]);
 
   const panelRef = useRef<HTMLElement | null>(null);
   const ballRef = useRef<HTMLDivElement | null>(null);
@@ -1300,16 +1508,6 @@ export function YpiStudioSessionWidget({
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobile]);
 
-  const planReviewModal = (
-    <YpiStudioPlanReviewModal
-      open={Boolean(planReviewTarget) && Boolean(cwd?.trim())}
-      cwd={cwd ?? ""}
-      target={planReviewTarget}
-      onClose={handleClosePlanReview}
-      onOpenFile={onOpenFile}
-    />
-  );
-
   // A bound task is the sole rendering prerequisite. Drawer focus must not hide
   // or rewrite the user-selected expanded/collapsed presentation.
   if (tasks.length === 0) return null;
@@ -1379,30 +1577,38 @@ export function YpiStudioSessionWidget({
                 </button>
               </div>
               <div style={{ paddingBottom: 12 }}>
-                {sortedCandidates.map((c) => (
-                  <TaskCard
-                    key={c.task.key}
-                    candidate={c}
-                    runs={candidateRuns.get(c.task.key) ?? []}
-                    isPrimary={c.task.key === primaryTaskKey}
-                    onOpen={() => { onOpenTask(c.task.key); setMobileOpen(false); }}
-                    onPreviewPlan={handlePreviewPlan}
-                    onOpenPrototype={handleOpenPrototype}
-                    onAcceptImprovement={(improvement) => {
-                      void handleAcceptImprovement(c.task.key, improvement);
-                    }}
-                    acceptingImprovementId={
-                      acceptingKey?.startsWith(`${c.task.key}:`)
-                        ? acceptingKey.slice(c.task.key.length + 1)
-                        : null
-                    }
-                  />
-                ))}
+                {sortedCandidates.map((c) => {
+                  const taskAcceptSuffix = acceptingKey?.startsWith(`${c.task.key}:`)
+                    ? acceptingKey.slice(c.task.key.length + 1)
+                    : null;
+                  const acceptingMainTask = taskAcceptSuffix === MAIN_ACCEPT_KEY;
+                  return (
+                    <TaskCard
+                      key={c.task.key}
+                      candidate={c}
+                      runs={candidateRuns.get(c.task.key) ?? []}
+                      isPrimary={c.task.key === primaryTaskKey}
+                      onOpen={() => { onOpenTask(c.task.key); setMobileOpen(false); }}
+                      onPreviewPlan={handlePreviewPlan}
+                      onOpenPrototype={handleOpenPrototype}
+                      onAcceptImprovement={(improvement) => {
+                        void handleAcceptImprovement(c.task.key, improvement);
+                      }}
+                      acceptingImprovementId={
+                        taskAcceptSuffix && !acceptingMainTask ? taskAcceptSuffix : null
+                      }
+                      onAcceptMainTask={() => {
+                        void handleAcceptMainTask(c.task.key, c.task.title);
+                      }}
+                      acceptingMainTask={acceptingMainTask}
+                      acceptWriteBusy={Boolean(acceptingKey)}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
         )}
-        {planReviewModal}
       </>
     );
   }
@@ -1446,7 +1652,6 @@ export function YpiStudioSessionWidget({
             attentionSequence={attentionSequence}
           />
         </div>
-        {planReviewModal}
       </>
     );
   }
@@ -1522,25 +1727,34 @@ export function YpiStudioSessionWidget({
           minHeight: 0,
         }}
       >
-        {sortedCandidates.map((c) => (
-          <TaskCard
-            key={c.task.key}
-            candidate={c}
-            runs={candidateRuns.get(c.task.key) ?? []}
-            isPrimary={c.task.key === primaryTaskKey}
-            onOpen={() => onOpenTask(c.task.key)}
-            onPreviewPlan={handlePreviewPlan}
-            onOpenPrototype={handleOpenPrototype}
-            onAcceptImprovement={(improvement) => {
-              void handleAcceptImprovement(c.task.key, improvement);
-            }}
-            acceptingImprovementId={
-              acceptingKey?.startsWith(`${c.task.key}:`)
-                ? acceptingKey.slice(c.task.key.length + 1)
-                : null
-            }
-          />
-        ))}
+        {sortedCandidates.map((c) => {
+          const taskAcceptSuffix = acceptingKey?.startsWith(`${c.task.key}:`)
+            ? acceptingKey.slice(c.task.key.length + 1)
+            : null;
+          const acceptingMainTask = taskAcceptSuffix === MAIN_ACCEPT_KEY;
+          return (
+            <TaskCard
+              key={c.task.key}
+              candidate={c}
+              runs={candidateRuns.get(c.task.key) ?? []}
+              isPrimary={c.task.key === primaryTaskKey}
+              onOpen={() => onOpenTask(c.task.key)}
+              onPreviewPlan={handlePreviewPlan}
+              onOpenPrototype={handleOpenPrototype}
+              onAcceptImprovement={(improvement) => {
+                void handleAcceptImprovement(c.task.key, improvement);
+              }}
+              acceptingImprovementId={
+                taskAcceptSuffix && !acceptingMainTask ? taskAcceptSuffix : null
+              }
+              onAcceptMainTask={() => {
+                void handleAcceptMainTask(c.task.key, c.task.title);
+              }}
+              acceptingMainTask={acceptingMainTask}
+              acceptWriteBusy={Boolean(acceptingKey)}
+            />
+          );
+        })}
       </div>
 
       {/* Footer */}
@@ -1556,7 +1770,6 @@ export function YpiStudioSessionWidget({
         共绑定 {tasks.length} 个任务 · 仅展示绑定当前会话的 Task
       </div>
       </div>
-      {planReviewModal}
     </aside>
   );
 }

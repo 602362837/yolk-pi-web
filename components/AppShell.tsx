@@ -1528,7 +1528,16 @@ function AppShellContent() {
               onStudioToolProgressChange={handleStudioToolProgressChange}
               onSessionListRefreshNeeded={handleStudioSessionListRefreshNeeded}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
-              defaultThinkingLevel={webConfig?.yolk.defaultThinkingLevel}
+              defaultThinkingLevel={
+                webConfig?.yolk.defaultModel.mode === "specific"
+                  ? (webConfig.yolk.defaultModel.thinking ?? webConfig.yolk.defaultThinkingLevel)
+                  : webConfig?.yolk.defaultThinkingLevel
+              }
+              defaultModel={
+                webConfig?.yolk.defaultModel.mode === "specific"
+                  ? { provider: webConfig.yolk.defaultModel.provider, modelId: webConfig.yolk.defaultModel.modelId }
+                  : null
+              }
             />
           ) : showPlaceholder ? (
             activeCwd ? (

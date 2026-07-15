@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-15T02:51:35.130Z",
+  "updatedAt": "2026-07-15T06:58:02.519Z",
   "entries": [
+    {
+      "id": "20260715-145802-任务浮窗资料链接新标签打开并改进任务详情自包含查看",
+      "title": "任务浮窗资料链接新标签打开并改进任务详情自包含查看",
+      "taskId": "20260715-113533-任务浮窗资料链接新标签打开并改进任务详情自包含查看",
+      "taskKey": "archived:2026-07:20260715-113533-任务浮窗资料链接新标签打开并改进任务详情自包含查看",
+      "workflowId": "feature-dev",
+      "summary": "规划完成，待用户审批 `plan-review.md` 与 HTML 原型后进入实现。未改生产代码。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260715-113533-任务浮窗资料链接新标签打开并改进任务详情自包含查看",
+      "knowledgePath": ".ypi/knowledge/20260715-145802-任务浮窗资料链接新标签打开并改进任务详情自包含查看.md",
+      "createdAt": "2026-07-15T06:58:02.519Z",
+      "archivedAt": "2026-07-15T06:58:02.519Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260715-105135-操作按钮科技感-流动-tag-化与全局圆角",
       "title": "操作按钮科技感/流动/tag 化与全局圆角",
