@@ -69,9 +69,9 @@
     "release": "npm run release:patch"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "^0.80.6",
-    "@earendil-works/pi-ai": "^0.80.6",
-    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@earendil-works/pi-agent-core": "^0.80.7",
+    "@earendil-works/pi-ai": "^0.80.7",
+    "@earendil-works/pi-coding-agent": "^0.80.7",
     "@lobehub/icons": "^5.6.0",
     "@lydell/node-pty": "^1.2.0-beta.12",
     "@monaco-editor/react": "^4.7.0",
@@ -85,7 +85,7 @@
     "mermaid": "^11.14.0",
     "monaco-editor": "^0.55.1",
     "next": "16.2.9",
-    "pi-grok-cli": "^0.4.1",
+    "pi-grok-cli": "^0.5.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
