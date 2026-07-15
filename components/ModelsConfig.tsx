@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { DeepSeekBalanceResult } from "@/lib/deepseek-balance";
 import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, convertOAuthAccountCredentialWithWarnings, validateRawOAuthCredentialImport, type OAuthAccountImportMode, type OAuthAccountImportWarning } from "@/lib/oauth-account-converters";
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay } from "@/lib/quota-display";
+import { ActionFlowIcon } from "./ActionFlowIcon";
 import { ChatGptWarmupDialog } from "./ChatGptWarmupDialog";
+import { iconFlowAttrs } from "./iconFlow";
 import { SelectDropdown } from "./SelectDropdown";
 import { usePrompt } from "./AppPromptProvider";
 // Color icons (have their own fill colors — no background needed)
@@ -830,16 +832,17 @@ function OAuthQuotaView({
         <button
           onClick={() => onRefresh()}
           disabled={loading || resetting}
+          {...iconFlowAttrs(loading || resetting ? "off" : "interactive")}
           title="Refresh usage"
           aria-label="Refresh usage"
           style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading || resetting ? "var(--text-dim)" : "var(--text-muted)", cursor: loading || resetting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <ActionFlowIcon width={14} height={14} strokeWidth={2}>
             <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
             <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
             <path d="M3 4v8h8" />
             <path d="M21 20v-8h-8" />
-          </svg>
+          </ActionFlowIcon>
         </button>
       </div>
 
@@ -1009,16 +1012,17 @@ function GrokQuotaView({
         <button
           onClick={onRefresh}
           disabled={loading}
+          {...iconFlowAttrs(loading ? "off" : "interactive")}
           title="Refresh usage"
           aria-label="Refresh usage"
           style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <ActionFlowIcon width={14} height={14} strokeWidth={2}>
             <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
             <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
             <path d="M3 4v8h8" />
             <path d="M21 20v-8h-8" />
-          </svg>
+          </ActionFlowIcon>
         </button>
       </div>
 
@@ -1161,16 +1165,17 @@ function OAuthAccountsView({
           <button
             onClick={onRefresh}
             disabled={loading}
+            {...iconFlowAttrs(loading ? "off" : "interactive")}
             title="Refresh accounts"
             aria-label="Refresh accounts"
             style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <ActionFlowIcon width={14} height={14} strokeWidth={2}>
               <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
               <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
               <path d="M3 4v8h8" />
               <path d="M21 20v-8h-8" />
-            </svg>
+            </ActionFlowIcon>
           </button>
         </div>
       </div>
@@ -3093,6 +3098,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   <button
                     onClick={() => handleReveal(account.accountId)}
                     disabled={isRevealing}
+                    {...iconFlowAttrs(isRevealing ? "off" : "interactive")}
                     style={{
                       ...actionBtnBase,
                       color: isRevealing ? "var(--text-dim)" : (isRevealed ? "#f59e0b" : "var(--text-muted)"),
@@ -3105,20 +3111,20 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                       "Loading…"
                     ) : isRevealed ? (
                       <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <ActionFlowIcon width={12} height={12} strokeWidth={2}>
                           <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12a18.45 18.45 0 0 1 5.06-6.94" />
                           <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.11 11 8a18.5 18.5 0 0 1-2.16 3.19" />
                           <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
                           <path d="M1 1l22 22" />
-                        </svg>
+                        </ActionFlowIcon>
                         Hide
                       </>
                     ) : (
                       <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <ActionFlowIcon width={12} height={12} strokeWidth={2}>
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
                           <circle cx="12" cy="12" r="3" />
-                        </svg>
+                        </ActionFlowIcon>
                         Show
                       </>
                     )}
@@ -3127,6 +3133,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   <button
                     onClick={() => handleCopy(account.accountId)}
                     disabled={isRevealing || isBusy}
+                    {...iconFlowAttrs(isRevealing || isBusy || isCopied ? "off" : "interactive")}
                     style={{
                       ...actionBtnBase,
                       color: isCopied ? "#4ade80" : "var(--text-muted)",
@@ -3145,10 +3152,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                       </>
                     ) : (
                       <>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <ActionFlowIcon width={11} height={11} strokeWidth={2}>
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
+                        </ActionFlowIcon>
                         Copy
                       </>
                     )}
@@ -3540,16 +3547,17 @@ function DeepSeekBalanceView({
         <button
           onClick={onRefresh}
           disabled={loading}
+          {...iconFlowAttrs(loading ? "off" : "interactive")}
           title="Refresh balance"
           aria-label="Refresh balance"
           style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <ActionFlowIcon width={14} height={14} strokeWidth={2}>
             <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
             <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
             <path d="M3 4v8h8" />
             <path d="M21 20v-8h-8" />
-          </svg>
+          </ActionFlowIcon>
         </button>
       </div>
 

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay, type QuotaDisplayTier } from "@/lib/quota-display";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 import { usePrompt } from "./AppPromptProvider";
 
 type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
@@ -390,8 +392,13 @@ export function ChatGptUsagePanel() {
                   {resetting ? "Resetting…" : "Reset limit"}
                 </button>
               )}
-              <button type="button" onClick={refreshQuota} disabled={refreshing || resetting} title="Refresh active account usage" aria-label="Refresh active account usage" style={{ width: 30, height: 30, border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", color: refreshing || resetting ? "var(--text-dim)" : "var(--accent)", cursor: refreshing || resetting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" /><path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" /><path d="M3 4v8h8" /><path d="M21 20v-8h-8" /></svg>
+              <button type="button" onClick={refreshQuota} disabled={refreshing || resetting} {...iconFlowAttrs(refreshing || resetting ? "off" : "interactive")} title="Refresh active account usage" aria-label="Refresh active account usage" style={{ width: 30, height: 30, border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", color: refreshing || resetting ? "var(--text-dim)" : "var(--accent)", cursor: refreshing || resetting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>
+                <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+                  <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+                  <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+                  <path d="M3 4v8h8" />
+                  <path d="M21 20v-8h-8" />
+                </ActionFlowIcon>
               </button>
             </div>
           </div>

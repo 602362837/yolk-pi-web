@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UsageStatsResult, UsageTotals } from "@/lib/usage-stats";
 import type { PiWebConfig } from "@/lib/pi-web-config";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 import { UsageProviderModelTable } from "./UsageProviderModelTable";
 
 interface UsageStatsModalProps {
@@ -276,11 +278,11 @@ export function UsageStatsModal({ cwd, onClose }: UsageStatsModalProps) {
                 );
               })}
             </div>
-            <button type="button" onClick={() => void loadStats()} disabled={loading} style={iconButtonStyle} title="Refresh">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button type="button" onClick={() => void loadStats()} disabled={loading} {...iconFlowAttrs(loading ? "off" : "interactive")} style={iconButtonStyle} title="Refresh">
+              <ActionFlowIcon width={13} height={13} strokeWidth={2}>
                 <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                 <polyline points="21 3 21 9 15 9" />
-              </svg>
+              </ActionFlowIcon>
             </button>
             <button type="button" onClick={onClose} style={iconButtonStyle} title="Close">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

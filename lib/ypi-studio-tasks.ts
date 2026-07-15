@@ -3481,7 +3481,15 @@ export function isYpiStudioTaskCreateBody(value: unknown): value is YpiStudioTas
 }
 
 export function isYpiStudioTaskTransitionBody(value: unknown): value is YpiStudioTaskTransitionBody {
-  return isRecord(value) && typeof value.cwd === "string" && typeof value.to === "string" && value.to.trim().length > 0;
+  // Must not swallow improvement transitions: bodies with action=transition_improvement also carry cwd+to
+  // and previously matched this loose guard, causing "waiting_for_improvements -> accepted" on the parent task.
+  if (!isRecord(value) || typeof value.cwd !== "string" || typeof value.to !== "string" || value.to.trim().length === 0) {
+    return false;
+  }
+  if (value.action === undefined || value.action === null || value.action === "") {
+    return true;
+  }
+  return value.action === "transition";
 }
 
 export function isYpiStudioTaskArtifactUpdateBody(value: unknown): value is YpiStudioTaskArtifactUpdateBody {

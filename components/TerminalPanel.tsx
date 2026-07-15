@@ -5,6 +5,8 @@ import { Terminal, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { TerminalSshProfilePicker } from "./TerminalSshProfilePicker";
 import { usePrompt } from "./AppPromptProvider";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 import type { TerminalSshProfile } from "@/lib/terminal-ssh-types";
 
 interface Props {
@@ -954,28 +956,88 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
             onToggleCollapsed();
             window.setTimeout(requestLayoutFit, 0);
           }}
-          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, padding: "4px 6px" }}
+          {...iconFlowAttrs("interactive")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "none",
+            border: "none",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            padding: "4px 6px",
+          }}
           title={collapsed ? "展开终端" : "折叠终端"}
+          aria-label={collapsed ? "展开终端" : "折叠终端"}
         >
-          {collapsed ? "▴" : "▾"}
+          <ActionFlowIcon width={12} height={12} viewBox="0 0 12 12" strokeWidth={1.8}>
+            {collapsed ? (
+              <polyline points="2 8 6 4 10 8" />
+            ) : (
+              <polyline points="2 4 6 8 10 4" />
+            )}
+          </ActionFlowIcon>
         </button>
         <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 700 }}>Terminal</span>
         <span title={activeContextLabel} style={{ minWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>{activeContextLabel}</span>
         <button
           type="button"
           onClick={addLocalTab}
-          style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", borderRadius: 6, fontSize: 12, lineHeight: 1, padding: "5px 8px" }}
+          {...iconFlowAttrs("interactive")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: "var(--bg)",
+            border: "1px solid var(--border)",
+            color: "var(--text)",
+            cursor: "pointer",
+            borderRadius: 6,
+            fontSize: 12,
+            lineHeight: 1,
+            padding: "5px 8px",
+          }}
           title="New local terminal tab"
+          aria-label="New local terminal tab"
         >
-          + Local
+          <ActionFlowIcon width={11} height={11} viewBox="0 0 12 12" strokeWidth={2}>
+            <line x1="6" y1="1" x2="6" y2="11" />
+            <line x1="1" y1="6" x2="11" y2="6" />
+          </ActionFlowIcon>
+          Local
         </button>
         <button
           type="button"
           onClick={() => setSshPickerOpen((value) => !value)}
-          style={{ background: sshPickerOpen ? "var(--bg-selected)" : "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", borderRadius: 6, fontSize: 12, lineHeight: 1, padding: "5px 8px" }}
+          {...iconFlowAttrs("interactive")}
+          className={sshPickerOpen ? "is-active" : undefined}
+          aria-expanded={sshPickerOpen}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: sshPickerOpen ? "var(--bg-selected)" : "var(--bg)",
+            border: "1px solid var(--border)",
+            color: "var(--text)",
+            cursor: "pointer",
+            borderRadius: 6,
+            fontSize: 12,
+            lineHeight: 1,
+            padding: "5px 8px",
+          }}
           title="Open SSH profile"
+          aria-label="Open SSH profile"
         >
-          SSH ▾
+          <ActionFlowIcon width={12} height={12} strokeWidth={1.8}>
+            <rect x="2" y="4" width="20" height="14" rx="2" />
+            <path d="M6 10h4" />
+            <path d="M8 8v4" />
+            <path d="M13 14h5" />
+          </ActionFlowIcon>
+          SSH
+          <ActionFlowIcon width={9} height={9} viewBox="0 0 12 12" strokeWidth={1.8}>
+            <polyline points="2 4 6 8 10 4" />
+          </ActionFlowIcon>
         </button>
         {shellLabel && <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{shellLabel}</span>}
         <span style={{ fontSize: 11, color: activeTab?.status === "error" ? "#f87171" : activeTab?.status === "connected" ? "#22c55e" : "var(--text-dim)", marginLeft: shellLabel ? 0 : "auto" }}>{activeTab?.status ?? "starting"}</span>
@@ -986,11 +1048,37 @@ export function TerminalPanel({ cwd, collapsed, onToggleCollapsed, onClose, init
             setFullscreen((value) => !value);
             window.setTimeout(requestLayoutFit, 0);
           }}
-          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "2px 6px" }}
+          {...iconFlowAttrs("interactive")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "none",
+            border: "none",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            padding: "2px 6px",
+          }}
           title={fullscreen ? "Exit terminal fullscreen" : "Maximize terminal in app"}
+          aria-label={fullscreen ? "Exit terminal fullscreen" : "Maximize terminal in app"}
         >
-          {fullscreen ? "🗗" : "🗖"}
+          {fullscreen ? (
+            <ActionFlowIcon width={13} height={13} strokeWidth={1.8}>
+              <polyline points="4 14 4 20 10 20" />
+              <polyline points="20 10 20 4 14 4" />
+              <line x1="14" y1="10" x2="21" y2="3" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </ActionFlowIcon>
+          ) : (
+            <ActionFlowIcon width={13} height={13} strokeWidth={1.8}>
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </ActionFlowIcon>
+          )}
         </button>
+        {/* Close dock: blacklist — destructive terminate-all; keep static × */}
         <button
           type="button"
           onClick={handleCloseDock}

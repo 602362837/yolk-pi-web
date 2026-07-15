@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { SkillSearchResult } from "@/app/api/skills/search/route";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 
 interface Skill {
   name: string;
@@ -809,7 +811,16 @@ export function SkillsConfig({
               }}
             >
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setAddMode(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setAddMode(true);
+                  }
+                }}
+                {...iconFlowAttrs("interactive")}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -829,19 +840,10 @@ export function SkillsConfig({
                   if (!addMode) e.currentTarget.style.background = "none";
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <ActionFlowIcon width={13} height={13} strokeWidth={2}>
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+                </ActionFlowIcon>
                 Add skill
               </div>
             </div>

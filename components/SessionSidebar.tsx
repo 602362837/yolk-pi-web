@@ -7,7 +7,9 @@ import type { PiWebProjectRecord, PiWebProjectSpaceRecord } from "@/lib/project-
 import { displayProjectName, displaySpaceName, activeProjectSpaces, sortProjectsForSidebar, worktreeInfoFromSpace, shortenCwd } from "@/lib/project-display";
 import { formatWorkspaceHeaderTitle, formatWorkspaceSubtitle, formatWorkspaceTitle } from "@/lib/workspace-title";
 import { displayTitleForSession } from "@/lib/session-title";
+import { ActionFlowIcon } from "./ActionFlowIcon";
 import { Checkbox } from "./Checkbox";
+import { iconFlowAttrs } from "./iconFlow";
 
 import { ProjectSpaceSwitchDialog } from "./ProjectSpaceSwitchDialog";
 import { usePrompt } from "./AppPromptProvider";
@@ -1301,6 +1303,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             <button
               onClick={handleNewSession}
               disabled={!selectedCwd || !!selectedSpace?.missing}
+              {...iconFlowAttrs(!selectedCwd || !!selectedSpace?.missing ? "off" : "interactive")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 background: "var(--bg-hover)",
@@ -1330,15 +1333,16 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 e.currentTarget.style.borderColor = "var(--border)";
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <ActionFlowIcon width={12} height={12} viewBox="0 0 12 12" strokeWidth={2.2}>
                 <line x1="6" y1="1" x2="6" y2="11" />
                 <line x1="1" y1="6" x2="11" y2="6" />
-              </svg>
+              </ActionFlowIcon>
               New
             </button>
             <button
               onClick={() => void handleNewWorktree()}
               disabled={!selectedCwd || creatingWorktree}
+              {...iconFlowAttrs(!selectedCwd || creatingWorktree ? "off" : "interactive")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 background: "var(--bg-hover)",
@@ -1368,16 +1372,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 e.currentTarget.style.borderColor = "var(--border)";
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionFlowIcon width={12} height={12} strokeWidth={2.2}>
                 <circle cx="6" cy="18" r="3" />
                 <circle cx="18" cy="6" r="3" />
                 <path d="M6 15V9a3 3 0 0 1 3-3h6" />
                 <path d="M9 18h6a3 3 0 0 0 3-3V9" />
-              </svg>
+              </ActionFlowIcon>
               {creatingWorktree ? "创建中…" : "WorkTree"}
             </button>
             <button
               onClick={() => { void loadProjects(false); void loadSessions(false); }}
+              {...iconFlowAttrs((sessionRefreshDone || projectsRefreshDone) ? "off" : "interactive")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: (sessionRefreshDone || projectsRefreshDone) ? "rgba(74,222,128,0.18)" : "var(--bg-hover)",
@@ -1409,10 +1414,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <ActionFlowIcon width={15} height={15} strokeWidth={2}>
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                   <path d="M3 3v5h5" />
-                </svg>
+                </ActionFlowIcon>
               )}
             </button>
             {/* Workspace actions menu */}
@@ -1420,6 +1425,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               <div ref={workspaceMenuRef} style={{ position: "relative" }}>
                 <button
                   onClick={() => setWorkspaceMenuOpen((v) => !v)}
+                  {...iconFlowAttrs("interactive")}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "var(--bg-hover)",
@@ -1432,12 +1438,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     flexShrink: 0,
                   }}
                   title="Workspace actions"
+                  aria-expanded={workspaceMenuOpen}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <ActionFlowIcon width={14} height={14} strokeWidth={2}>
                     <circle cx="12" cy="5" r="1" />
                     <circle cx="12" cy="12" r="1" />
                     <circle cx="12" cy="19" r="1" />
-                  </svg>
+                  </ActionFlowIcon>
                 </button>
                 {workspaceMenuOpen && (
                   <>

@@ -34,6 +34,20 @@
   --assistant-bg: #ffffff;
   --tool-bg: #f9fafb;
   --bg-subtle: rgba(0,0,0,0.03);
+
+  /* Shared control radius / action-tag / icon-flow tokens (static borders; motion only on SVG strokes). */
+  --control-radius: 8px;
+  --control-radius-sm: 6px;
+  --control-radius-pill: 999px;
+  --control-motion-fast: 140ms;
+  --icon-flow-ambient: 4.8s;
+  --icon-flow-interactive: 1.55s;
+  --icon-flow-active: 1.25s;
+  --icon-flow-dash: 9 34;
+  --icon-flow-travel: -43;
+  --icon-flow-a: #38bdf8;
+  --icon-flow-b: #2563eb;
+  --icon-flow-c: #a78bfa;
 }
 
 html.dark {
@@ -51,6 +65,9 @@ html.dark {
   --assistant-bg: #1a1a1a;
   --tool-bg: #1f2937;
   --bg-subtle: rgba(255,255,255,0.04);
+  --icon-flow-a: #67e8f9;
+  --icon-flow-b: #60a5fa;
+  --icon-flow-c: #c4b5fd;
 }
 
 /* Theme toggle: circular wipe via View Transitions API.
@@ -1021,8 +1038,9 @@ html.dark .usage-chart-tooltip {
   .git-branch-switch-row > select {
     width: 100%;
   }
-  .branch-navigator-inline span,
-  .branch-navigator-inline svg + span {
+  /* Only hide the inline trigger label; never hide dropdown tree text. */
+  .branch-navigator-inline > .tech-action-tag .app-top-label,
+  .branch-navigator-inline > button > span {
     display: none !important;
   }
   .subagent-run-row {
@@ -2655,4 +2673,289 @@ button.session-stats-chip:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .app-toast { animation: none; }
+}
+
+/* ==========================================================================
+   Action tags + SVG icon-flow (static button chrome; motion only on strokes)
+   ========================================================================== */
+
+/* Low-specificity ordinary-button baseline. Explicit border-radius on circular,
+   pill, segmented, and special controls continues to win without !important. */
+:where(button) {
+  border-radius: var(--control-radius);
+}
+
+.tech-action-tag {
+  --tag-bg: color-mix(in srgb, var(--bg-panel) 78%, var(--bg));
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius-pill);
+  background: var(--tag-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  transition:
+    color var(--control-motion-fast) ease,
+    background var(--control-motion-fast) ease,
+    border-color var(--control-motion-fast) ease,
+    box-shadow var(--control-motion-fast) ease;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.tech-action-tag--icon {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+}
+
+.tech-action-tag:hover:not(:disabled) {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  --tag-bg: color-mix(in srgb, var(--accent) 6%, var(--bg-panel));
+  box-shadow: inset 0 1px color-mix(in srgb, white 20%, transparent);
+}
+
+.tech-action-tag:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  color: var(--text);
+}
+
+.tech-action-tag.is-active,
+.tech-action-tag[aria-pressed="true"],
+.tech-action-tag[aria-expanded="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+  --tag-bg: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.tech-action-tag:disabled,
+.tech-action-tag.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  color: var(--text-dim);
+  --tag-bg: var(--bg-panel);
+  box-shadow: none;
+}
+
+/* Sidebar utility strip: 30px tags; 260px 4-col, 220px 2×2. */
+.sidebar-utility-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  flex-shrink: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.sidebar-utility-tag {
+  width: 100%;
+  height: 30px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  gap: 4px;
+}
+
+/* 220px 2×2: IMP-02 wires narrow state via class or data attribute on the host. */
+.sidebar-utility-actions.is-narrow,
+.sidebar-container[data-sidebar-width="220"] .sidebar-utility-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+/* Top bar action tags sit in the 36px bar; labels hide on mobile via .app-top-label. */
+.app-top-action-tag {
+  height: 28px;
+  align-self: center;
+}
+
+.app-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Branches inline: outer host keeps top-bar alignment; button is the pill tag.
+   Dropdown still positions via containerRef/topBarRef (top/left/width). */
+.branch-navigator-inline {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex-shrink: 0;
+  height: auto;
+  overflow: visible;
+}
+
+.branch-navigator-inline .app-top-action-tag {
+  overflow: visible;
+}
+
+.branch-navigator-dropdown {
+  overflow: visible;
+}
+
+/* Shared badge layer above SVG overlay; keep inside tag for mobile. */
+.tech-action-tag__badge {
+  z-index: 2;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .app-top-action-tag:not(.sidebar-utility-tag) {
+    width: 28px;
+    min-width: 28px;
+    padding: 0;
+  }
+
+  .tech-action-tag__badge {
+    top: 1px;
+    right: 1px;
+  }
+}
+
+/* ---- ActionFlowIcon stroke layers ---- */
+.action-flow-icon {
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.action-flow-icon__base {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.82;
+}
+
+.action-flow-icon__overlay {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  stroke-dasharray: var(--icon-flow-dash);
+  stroke-dashoffset: 0;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--icon-flow-a) 72%, transparent));
+  pointer-events: none;
+}
+
+@keyframes action-icon-flow {
+  to {
+    stroke-dashoffset: var(--icon-flow-travel);
+  }
+}
+
+/* Host-agnostic icon-flow opt-in.
+   Motion only when host sets data-icon-flow AND has a descendant .action-flow-icon__overlay.
+   No global button animation; hosts without data-icon-flow stay static. */
+
+/* Interactive: default static; flow on hover / focus-visible / active-open. */
+[data-icon-flow="interactive"]:is(:hover, :focus-visible):not(:disabled):not(.is-disabled)
+  .action-flow-icon__overlay {
+  opacity: 0.95;
+  animation: action-icon-flow var(--icon-flow-interactive) linear infinite;
+}
+
+/* Active-open (panel expanded / .is-active): keep flow while open.
+   aria-pressed alone does NOT flow — toggles like theme stay static at rest
+   and only animate on hover/focus-visible (IMP-E optional polish). */
+[data-icon-flow="interactive"]:is(.is-active, [aria-expanded="true"]):not(:disabled):not(.is-disabled)
+  .action-flow-icon__overlay {
+  opacity: 1;
+  animation: action-icon-flow var(--icon-flow-active) linear infinite;
+}
+
+/* Ambient: low-frequency continuous flow (sidebar utility whitelist only by host usage). */
+[data-icon-flow="ambient"]:not(:disabled):not(.is-disabled) .action-flow-icon__overlay {
+  opacity: 0.7;
+  animation: action-icon-flow var(--icon-flow-ambient) linear infinite;
+}
+
+/* Ambient stagger remains scoped to the sidebar utility strip container. */
+.sidebar-utility-actions > [data-icon-flow="ambient"]:nth-child(2) .action-flow-icon__overlay {
+  animation-delay: -1.2s;
+}
+.sidebar-utility-actions > [data-icon-flow="ambient"]:nth-child(3) .action-flow-icon__overlay {
+  animation-delay: -2.4s;
+}
+.sidebar-utility-actions > [data-icon-flow="ambient"]:nth-child(4) .action-flow-icon__overlay {
+  animation-delay: -3.6s;
+}
+
+/* Explicit off + disabled: hide decorative overlay; keep base stroke readable. */
+[data-icon-flow="off"] .action-flow-icon__overlay,
+[data-icon-flow]:disabled .action-flow-icon__overlay,
+:disabled[data-icon-flow] .action-flow-icon__overlay,
+[data-icon-flow].is-disabled .action-flow-icon__overlay {
+  opacity: 0 !important;
+  animation: none !important;
+  filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-action-tag {
+    transition: none;
+  }
+
+  .action-flow-icon__overlay {
+    opacity: 0 !important;
+    animation: none !important;
+    filter: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Chat primary actions (Send / Steer / Follow-up): keep icon+label contrast on
+   hover/focus/active. Focus uses outline/ring only — never bleach the whole
+   button to white with light icons (user hard gate for IMP-001). */
+.chat-input-primary-action:focus {
+  outline: none;
+}
+
+.chat-input-primary-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chat-input-primary-action--send:not(:disabled):is(:hover, :focus-visible, :active) {
+  background: var(--accent) !important;
+  color: #fff !important;
+  filter: brightness(1.05);
+}
+
+.chat-input-primary-action--send:not(:disabled):focus-visible {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bg) 88%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 1px 3px rgba(37, 99, 235, 0.25);
+  outline: none;
+}
+
+/* On accent (white label/icon), keep flow overlay readable — prefer pale stops. */
+.chat-input-primary-action--send:not(:disabled) {
+  --icon-flow-a: #a5f3fc;
+  --icon-flow-b: #e0e7ff;
+  --icon-flow-c: #ddd6fe;
+}
+
+.chat-input-primary-action--steer:not(:disabled):focus-visible,
+.chat-input-primary-action--followup:not(:disabled):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }

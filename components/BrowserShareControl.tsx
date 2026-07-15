@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BrowserShareCommand, BrowserShareCommandType, BrowserShareDebuggerSummary, BrowserShareLifecycleStatus, BrowserShareOperatorInfo, BrowserShareSessionState } from "@/lib/browser-share-types";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 
 interface Props {
   cwd?: string | null;
@@ -246,6 +248,7 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
         disabled={!canUse}
         onClick={() => setOpen((value) => !value)}
         title={sessionId ? "将 Chrome 插件分享码绑定到当前 chat/session" : "绑定会先创建 chat/session，使首条消息也能使用共享页面"}
+        {...iconFlowAttrs(!canUse || loading ? "off" : "interactive")}
         style={{
           display: "flex", alignItems: "center", gap: 5,
           maxWidth: 190,
@@ -263,11 +266,11 @@ export function BrowserShareControl({ cwd, sessionId, ensureSession, disabled }:
           textOverflow: "ellipsis",
         }}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <ActionFlowIcon width={12} height={12} strokeWidth={2}>
           <rect x="3" y="4" width="18" height="14" rx="2" />
           <path d="M8 20h8" />
           <path d="M12 18v2" />
-        </svg>
+        </ActionFlowIcon>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
       </button>
 

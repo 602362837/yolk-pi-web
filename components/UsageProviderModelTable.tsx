@@ -9,6 +9,8 @@ import type {
   LlmUsageProviderSummary,
 } from "@/lib/llm-usage-types";
 import { LLM_USAGE_SOURCE_KINDS } from "@/lib/llm-usage-types";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -339,11 +341,11 @@ export function UsageProviderModelTable({ cwd, onClose, onSwitchToLegacy }: Usag
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button type="button" onClick={() => void loadData()} disabled={loading} style={iconButtonStyle} title="刷新">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button type="button" onClick={() => void loadData()} disabled={loading} {...iconFlowAttrs(loading ? "off" : "interactive")} style={iconButtonStyle} title="刷新">
+              <ActionFlowIcon width={13} height={13} strokeWidth={2}>
                 <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                 <polyline points="21 3 21 9 15 9" />
-              </svg>
+              </ActionFlowIcon>
             </button>
             <button type="button" onClick={onClose} style={iconButtonStyle} title="关闭">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
