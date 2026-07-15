@@ -1,12 +1,12 @@
-// Lightweight regression check for the Usage aggregation chain.
+// Lightweight regression check for the Usage session_rollup chain.
 //
-// Validates that lib/usage-stats.ts getUsageStats / getUsageStatsForSessionRollup
-// truly roll up Studio child session usage under both active and archive scopes:
-//   - global totals include child usage
-//   - bySession keeps child rows with kind=studio_child + parentSessionId
-//   - byParentSession.totals === ownTotals + studioChildTotals
+// Validates that lib/usage-stats.ts getUsageStatsForSessionRollup rolls up Studio
+// child session usage under both active and archive scopes:
+//   - session_rollup(parent/child/standalone/orphan/archived) display 口径
+//   - parent totals === ownTotals + studioChildTotals
 //   - orphan child (parent missing) keeps parentFound=false
-//   - session_rollup(parent/child/standalone) matches the confirmed display 口径
+//   - includeArchived=false drops archived children from parent rollup
+//   - additive child contextUsage (unavailable / live / lastKnown / null occupancy)
 //
 // Builds real JSONL fixtures under a temp PI_CODING_AGENT_DIR so the actual
 // SessionManager + session-reader scan path is exercised. No heavy test framework.
@@ -23,7 +23,7 @@ import process from "node:process";
 const agentDir = mkdtempSync(join(tmpdir(), "pi-usage-rollup-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 
-const { getUsageStats, getUsageStatsForSessionRollup } = await import("../lib/usage-stats.ts");
+const { getUsageStatsForSessionRollup } = await import("../lib/usage-stats.ts");
 const {
   registerYpiStudioChildRun,
   unregisterYpiStudioChildRun,
@@ -164,73 +164,8 @@ writeSession(archiveDir, {
   ],
 });
 
-const from = new Date(Date.now() - 60 * 60 * 1000);
-const to = new Date(Date.now() + 60 * 60 * 1000);
-
 // ---------------------------------------------------------------------------
-// 1. Global stats with archived included.
-// ---------------------------------------------------------------------------
-const stats = await getUsageStats({ from, to, includeArchived: true });
-
-// global totals = parent(30) + child(10) + standalone(3) + orphan(4) + archived child(14) = 61
-assert.equal(stats.scope.includeStudioChildren, true, "scope.includeStudioChildren must be true");
-assert.equal(stats.totals.cost, 61, `global totals.cost expected 61, got ${stats.totals.cost}`);
-assert.equal(stats.totals.calls, 5, `global totals.calls expected 5, got ${stats.totals.calls}`);
-
-// bySession keeps child row with kind + parentSessionId.
-const childRow = stats.bySession.find((row) => row.sessionId === childId);
-assert.ok(childRow, "bySession must include the studio child row");
-assert.equal(childRow.kind, "studio_child", "child row kind must be studio_child");
-assert.equal(childRow.parentSessionId, parentId, "child row parentSessionId must point at parent");
-assert.equal(childRow.totals.cost, 10, "child row totals.cost must equal its own usage");
-
-// No-usage child appears in bySession only if it has no usage records -> it should NOT appear
-// (bySession is built from usage records only).
-const noUsageRow = stats.bySession.find((row) => row.sessionId === childNoUsageId);
-assert.equal(noUsageRow, undefined, "child with no usage must not appear in bySession");
-
-// ---------------------------------------------------------------------------
-// 2. byParentSession rollups.
-// ---------------------------------------------------------------------------
-const parentRollup = stats.byParentSession.find((row) => row.parentSessionId === parentId);
-assert.ok(parentRollup, "byParentSession must include parent rollup");
-assert.equal(parentRollup.parentFound, true, "parent must be found");
-// parent own(30) + child(10) + archived child(14) = 54; no-usage child contributes 0.
-assert.equal(parentRollup.ownTotals.cost, 30, "parent ownTotals.cost must be 30");
-assert.equal(parentRollup.studioChildTotals.cost, 24, `parent studioChildTotals.cost must be 24, got ${parentRollup.studioChildTotals.cost}`);
-assert.equal(
-  parentRollup.totals.cost,
-  parentRollup.ownTotals.cost + parentRollup.studioChildTotals.cost,
-  "byParentSession.totals must equal ownTotals + studioChildTotals",
-);
-assert.equal(parentRollup.studioChildSessionCount, 3, "parent must count 3 studio children (incl. no-usage + archived)");
-assert.ok(parentRollup.studioChildSessionIds.includes(childId), "parent rollup must list child with usage");
-assert.ok(parentRollup.studioChildSessionIds.includes(childNoUsageId), "parent rollup must list no-usage child");
-assert.ok(parentRollup.studioChildSessionIds.includes(archivedChildId), "parent rollup must list archived child");
-
-const orphanRollup = stats.byParentSession.find((row) => row.parentSessionId === missingParentId);
-assert.ok(orphanRollup, "orphan child must still produce a rollup row");
-assert.equal(orphanRollup.parentFound, false, "orphan child rollup must have parentFound=false");
-assert.equal(orphanRollup.totals.cost, 4, "orphan rollup totals must equal the orphan child usage");
-assert.equal(orphanRollup.ownTotals.cost, 0, "orphan rollup ownTotals must be 0 (parent missing)");
-
-const standaloneRollup = stats.byParentSession.find((row) => row.parentSessionId === standaloneId);
-assert.ok(standaloneRollup, "standalone must appear as its own parent rollup");
-assert.equal(standaloneRollup.studioChildSessionCount, 0, "standalone must have zero studio children");
-assert.equal(standaloneRollup.totals.cost, 3, "standalone rollup totals must equal its own usage");
-
-// ---------------------------------------------------------------------------
-// 3. includeArchived=false drops archived child from global totals and parent rollup.
-// ---------------------------------------------------------------------------
-const statsNoArchive = await getUsageStats({ from, to, includeArchived: false });
-assert.equal(statsNoArchive.totals.cost, 47, `no-archive totals.cost expected 47 (61-14), got ${statsNoArchive.totals.cost}`);
-const parentRollupNoArchive = statsNoArchive.byParentSession.find((row) => row.parentSessionId === parentId);
-assert.ok(parentRollupNoArchive, "parent rollup must exist without archive");
-assert.equal(parentRollupNoArchive.studioChildTotals.cost, 10, "no-archive parent studioChildTotals must be 10 (only active child)");
-assert.equal(parentRollupNoArchive.studioChildSessionCount, 2, "no-archive parent must count 2 studio children");
-
-// ---------------------------------------------------------------------------
-// 4. session_rollup(parent).
+// 1. session_rollup(parent) with archived included.
 // ---------------------------------------------------------------------------
 const parentSessionRollup = await getUsageStatsForSessionRollup({ sessionId: parentId, includeArchived: true });
 assert.ok(parentSessionRollup, "parent rollup must resolve");
@@ -257,6 +192,20 @@ for (const child of parentSessionRollup.childSessions) {
   assert.equal(child.contextUsage.percent, null, "unavailable percent must be null, never 0");
   assert.equal(child.contextUsage.tokens, null, "unavailable tokens must be null");
 }
+
+// ---------------------------------------------------------------------------
+// 1b. includeArchived=false drops archived child from parent session_rollup.
+// ---------------------------------------------------------------------------
+const parentNoArchive = await getUsageStatsForSessionRollup({ sessionId: parentId, includeArchived: false });
+assert.ok(parentNoArchive, "parent rollup must resolve without archive");
+assert.equal(parentNoArchive.studioChildTotals.cost, 10, "no-archive parent studioChildTotals must be 10 (only active child)");
+assert.equal(parentNoArchive.totals.cost, 40, "no-archive parent totals must be own(30)+active child(10)");
+assert.equal(parentNoArchive.studioChildSessionCount, 2, "no-archive parent must count 2 studio children");
+assert.equal(
+  parentNoArchive.childSessions.some((child) => child.sessionId === archivedChildId),
+  false,
+  "no-archive parent childSessions must not include archived child",
+);
 
 // Live runtime snapshot merge: register a process-local handle for childId.
 const liveRunId = "test-live-context-run";
@@ -327,7 +276,7 @@ assert.equal(nullOccChild.contextUsage.contextWindow, 200000, "window remains wh
 unregisterYpiStudioChildRun(liveRunId);
 
 // ---------------------------------------------------------------------------
-// 5. session_rollup(child) — child audit session shows its own usage, tooltip carries parent rollup.
+// 3. session_rollup(child) — child audit session shows its own usage, tooltip carries parent rollup.
 // ---------------------------------------------------------------------------
 const childSessionRollup = await getUsageStatsForSessionRollup({ sessionId: childId, includeArchived: true });
 assert.ok(childSessionRollup, "child rollup must resolve");
@@ -342,7 +291,7 @@ assert.equal(childSessionRollup.totals.cost, 54, "child rollup totals (legacy) m
 assert.equal(childSessionRollup.studioChildSessionCount, 3, "child rollup must still enumerate siblings");
 
 // ---------------------------------------------------------------------------
-// 6. session_rollup(standalone).
+// 4. session_rollup(standalone).
 // ---------------------------------------------------------------------------
 const standaloneSessionRollup = await getUsageStatsForSessionRollup({ sessionId: standaloneId, includeArchived: true });
 assert.ok(standaloneSessionRollup, "standalone rollup must resolve");
@@ -356,7 +305,7 @@ assert.equal(standaloneSessionRollup.studioChildSessionCount, 0, "standalone mus
 assert.equal(standaloneSessionRollup.childSessions.length, 0, "standalone childSessions must be empty");
 
 // ---------------------------------------------------------------------------
-// 7. session_rollup(orphan child) — parent missing, still resolves own usage.
+// 5. session_rollup(orphan child) — parent missing, still resolves own usage.
 // ---------------------------------------------------------------------------
 const orphanSessionRollup = await getUsageStatsForSessionRollup({ sessionId: orphanChildId, includeArchived: true });
 assert.ok(orphanSessionRollup, "orphan child rollup must resolve");
@@ -365,7 +314,7 @@ assert.equal(orphanSessionRollup.parentFound, false, "orphan child rollup parent
 assert.equal(orphanSessionRollup.selectedSessionTotals.cost, 4, "orphan child selectedSessionTotals must be its own usage (4)");
 
 // ---------------------------------------------------------------------------
-// 8. session_rollup for archived child works via metadata scan path.
+// 6. session_rollup for archived child works via metadata scan path.
 // ---------------------------------------------------------------------------
 const archivedSessionRollup = await getUsageStatsForSessionRollup({ sessionId: archivedChildId, includeArchived: true });
 assert.ok(archivedSessionRollup, "archived child rollup must resolve via metadata scan");
@@ -379,6 +328,5 @@ rmSync(agentDir, { recursive: true, force: true });
 
 console.log("usage stats rollup regression tests passed");
 console.log("  fixtures: 1 parent + 1 child(usage) + 1 child(no-usage) + 1 standalone + 1 orphan child + 1 archived child");
-console.log("  verified: global totals, bySession, byParentSession (parent/orphan/standalone),");
-console.log("            session_rollup(parent/child/standalone/orphan/archived), includeArchived toggle,");
+console.log("  verified: session_rollup(parent/child/standalone/orphan/archived), includeArchived toggle,");
 console.log("            additive child contextUsage (unavailable / live / lastKnown / null-occupancy)");

@@ -130,6 +130,42 @@ If `GROK_CLI_OAUTH_TOKEN` (or related fixed env tokens) override managed OAuth f
 - Use `npm run test:studio-dag` for DAG scheduling regressions and `npm run test:studio-policy` for approval/policy regressions.
 - UI truncation flags on subagent transcripts are display limits, not failure signals; use run status, `result.isError`, and termination reason for severity.
 
+## Usage ledger and session rollup
+
+Two retained paths — do not confuse them:
+
+| Surface | API | Data | Config |
+| --- | --- | --- | --- |
+| Sidebar **Usage** modal | `GET /api/usage/calls` | Immutable `usage-events/v1/` | Independent of `includeArchived` |
+| Chat top-bar chips | `GET /api/usage?sessionId=` | Selected session (+ Studio children) JSONL | `usage.includeArchived` |
+
+### Date range looks wrong in Usage
+
+Ledger dates are **server-local** day bounds, not browser-local and not UTC day labels:
+
+1. `from`/`to` → local `00:00:00.000` … `23:59:59.999` (`lib/local-date-range.ts`)
+2. Store scans intersecting **UTC** partitions only as a candidate index
+3. Query keeps events only when `occurredAt` is inside the inclusive instants
+4. `byDay` and `range.timezone` use the same local calendar semantics
+
+If a single local day still shows neighbor-day traffic after upgrade, confirm the server process timezone and that `/api/usage/calls` response `range.timezone` matches expectations. Focused regression: `npm run test:llm-usage-query` (also with `TZ=Asia/Shanghai`).
+
+### `/api/usage` returns 400
+
+Missing `sessionId` is intentional: global Session-scan aggregation is retired. Use `/api/usage/calls` for global stats, or pass `sessionId` for top-bar rollup. External clients that called the old no-session route must migrate.
+
+### Old `usage.statsSource` / missing ledger writes
+
+Retired field is ignored on read and stripped on the next Settings usage save. Ledger recording is always on; old `"legacy"` values must not disable the recorder. There is no UI switch back to Session 统计.
+
+### Top bar vs Usage modal numbers differ
+
+Expected: top bar is session_rollup (one chat + Studio children from JSONL); Usage modal is the call ledger (workspace/date/source filtered events). Different stores and scopes by design.
+
+### Coverage / corrupt counts not shown in UI
+
+Wire `coverage` remains on `/api/usage/calls` for ops; the Usage UI no longer renders coverage banners, known gaps, or corrupt-file footers. Inspect the JSON response or server logs when diagnosing capture gaps.
+
 ## Model Price Configuration
 
 ### Pricing data flow

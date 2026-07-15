@@ -153,16 +153,16 @@ Archive/unarchive is a pure file move (`renameSync`) between `sessions/` and `se
 Active sessions live under `sessions/`; archived sessions live under `sessions-archive/`. Both directories are enumerated by the same lightweight metadata scanner with different roots (`scanSessionInventory()` vs `scanSessionInventory({ rootDir: getSessionsArchiveDir() })`), but **call sites are separated**:
 
 - **Active Sidebar / list hot path:** `GET /api/projects/:projectId/spaces/:spaceId/sessions` and `GET /api/sessions` only read active inventory. They do **not** call `scanArchivedCwds()`, do **not** walk `sessions-archive/`, and do **not** return `archivedCounts` / `archivedCwds`. SessionSidebar only displays active history and archive **write** actions (single/batch/archive-all); it has no archived list, count, or unarchive UI.
-- **Explicit archive capability (kept):** `POST /api/sessions/archive`, `archive-all`, `unarchive`, `GET /api/sessions/archived`, session-by-id detail with `archived: true` (read-only chat), and Usage when `usage.includeArchived` is enabled. `scanArchivedCwds()` remains available in `lib/session-reader.ts` for explicit helpers but is not wired into active list routes.
+- **Explicit archive capability (kept):** `POST /api/sessions/archive`, `archive-all`, `unarchive`, `GET /api/sessions/archived`, session-by-id detail with `archived: true` (read-only chat), and Chat top-bar session rollup when `usage.includeArchived` is enabled. `scanArchivedCwds()` remains available in `lib/session-reader.ts` for explicit helpers but is not wired into active list routes. The global Usage ledger never scans session inventory or archive storage.
 - **Project list source:** Project Registry (`pi-web-projects.json`), not archive cwd counts or a CWD picker synthesized from sessions.
 
 Archive-all matches target sessions by canonical cwd against the lightweight **active** inventory and must not call SDK `SessionManager.listAll()`. Removing archive I/O from the Sidebar path does **not** by itself rewrite active `listAllSessions()` into a directed per-space scan; that remains a separate performance concern.
 
 ### Session inventory memory contract
 
-- **In scope (lightweight only):** global/project **active** session lists, allowed-roots session cwd discovery, delete sessions for WorkTree cwd, archive-all (active inventory), and **explicit** archived session lists / Usage archive helpers that need name/count/firstMessage/modified.
-- **Out of scope (may open full files):** session detail, context/branch tree, export, and Usage precise assistant-`usage` scans for selected sessions. Usage still builds its session set from the lightweight inventory (`listAllSessions` / archived helpers with `includeStudioChildren: true`) and must not depend on `allMessagesText`.
-- **Studio child defaults unchanged:** list roots hide Studio children unless `includeStudioChildren` is set; UI may opt into `includeStudioChildDisplay` for task-title projection; Usage opt-in child rollup is unchanged.
+- **In scope (lightweight only):** global/project **active** session lists, allowed-roots session cwd discovery, delete sessions for WorkTree cwd, archive-all (active inventory), **explicit** archived session lists, and Chat top-bar session_rollup inventory helpers that need name/count/firstMessage/modified.
+- **Out of scope (may open full files):** session detail, context/branch tree, export, and session_rollup precise assistant-`usage` scans for the selected parent/child JSONL files. Session rollup builds its session set from the lightweight inventory (`listAllSessions` / archived helpers with `includeStudioChildren: true`) and must not depend on `allMessagesText`. The global Usage ledger does not use session inventory at all.
+- **Studio child defaults unchanged:** list roots hide Studio children unless `includeStudioChildren` is set; UI may opt into `includeStudioChildDisplay` for task-title projection; session_rollup Studio-child inclusion is unchanged.
 - **Rollback:** code-level only — restore previous inventory call sites to SDK `SessionManager.listAll()` if needed. No JSONL migration or data rollback. Do not long-term default back to the full-text inventory path.
 
 ### Tool calls and events
@@ -181,14 +181,31 @@ Archive-all matches target sessions by canonical cwd against the lightweight **a
 
 ### Usage accounting
 
-- `GET /api/usage` is a read-only reporting path. It scans active sessions and, when `pi-web.json` `usage.includeArchived` is enabled, archived sessions; usage scans explicitly opt in to YPI Studio child audit sessions so Studio SDK child JSONL costs are visible in totals.
-- All token aggregation (legacy and ledger) excludes `cacheWrite` per the cache-write removal decision; deprecated fields stay at 0 for wire compatibility. See "Usage accounting — cache-write removal" above.
-- Global usage responses keep the legacy `bySession` dimension as individual JSONL files and add `byParentSession` for parent-chat rollups. Ordinary sessions roll up to themselves; Studio child sessions roll up by `studioChild.parentSessionId`; unresolved/deleted parents still produce `parentFound=false` rows so child usage is not dropped.
-- `GET /api/usage?sessionId=<id>` returns a lightweight lifetime `session_rollup` for the selected session: parent own totals, Studio child totals, combined totals, child count, and child session summaries. If the selected session is itself a Studio child, the rollup resolves back to its parent id when possible. The result also exposes additive `selectedSessionTotals` (the selected session's own usage), `parentRollupTotals` (parent own + Studio children, equal to `totals`), and `childSessions[].contextUsage` so the top bar can render confirmed values without guessing from generic totals. Old fields keep their semantics; callers that ignore additive fields continue to work.
-- Child `contextUsage` is a bounded numeric-only projection (`percent`, `contextWindow`, `tokens`, availability/source, optional capture time). The SDK child runner samples authoritative `AgentSession.getContextUsage()` at low frequency and once before teardown; the runtime can retain that sample process-locally after unregister. CLI, historical/restarted, and never-sampled children return explicit null-valued `unavailable`. It never derives occupancy from lifetime usage or progress tokens/tps, never changes JSONL headers, and never returns child transcript, prompt, output, tool result, artifact, or path data.
-- Chat top-bar usage display口径 (confirmed): a `parent` session compact shows the parent rollup total and appends `incl. Studio` only when Studio children have real usage (child token total or child cost > 0, not merely child count > 0); a `standalone` session compact shows its own usage with no child marker; a `studio_child` audit session compact shows only that child's own usage (`selectedSessionTotals`) and must not show a bare `+child` or a parent-rollup placeholder, while its tooltip may include the parent rollup total and parent id. The top bar must not mutate the parent session file or append child content to the React message list.
-- Usage totals come only from standard assistant message `usage` fields persisted in session JSONL. The reporting path does not parse `.ypi/.runtime/studio-subagents/*.jsonl` sidecars, does not estimate CLI `--no-session` runner cost, and does not return transcript, prompt/output, or artifact bodies.
-- Chat top-bar usage prefers the `session_rollup` API result and falls back to local parent-session `messages` usage while loading or after API failure. This is a display-only enhancement and must not mutate the parent session file or append child content to the React message list.
+Global Usage and Chat top-bar rollup are **two retained boundaries**. Do not merge them or resurrect a dual-view UI.
+
+#### Global ledger (only global Usage UI)
+
+- Sidebar Usage opens the independent call ledger only (`components/UsageProviderModelTable.tsx` → `GET /api/usage/calls`). There is no `Session 统计` tab and no global Session-scan page.
+- Ledger data lives under `usage-events/v1/` (one immutable event file per call). Session archive/delete never mutates or deletes ledger events. Historical event files and Session JSONL are never rewritten for this feature.
+- `lib/llm-usage-recorder.ts` always records by default. Retired `usage.statsSource` is ignored on read, not projected by the config API, and stripped on the next `pi-web.json` usage save; old `"legacy"` values must not stop ledger writes. `setRecorderEnabled(false)` remains diagnostics/tests only.
+- Date semantics for `/api/usage/calls` (server-local, not browser-local):
+  1. Browser `from`/`to` (`YYYY-MM-DD`) parse to inclusive local-day instants (`00:00:00.000` … `23:59:59.999`) via `lib/local-date-range.ts`.
+  2. `lib/llm-usage-store.ts` scans every **UTC** `YYYY-MM-DD` partition that intersects those instants (candidate index only; max 366 days).
+  3. `lib/llm-usage-query.ts` keeps only events with `occurredAt` inside the inclusive instant range, then applies optional cwd/provider/model/source/status filters.
+  4. `byDay` groups by the same server-local calendar day; response `range.from/to` echo the request labels; `range.timezone` is the process-local zone.
+- Query cache keys hash full ISO boundary instants plus every filter (not UTC day labels alone).
+- Wire `coverage` diagnostics remain on the ledger API for ops/compat; the Usage UI does **not** render coverage banners, known gaps, corrupt counts, or legacy-compat footers.
+- Ledger UI: workspace filter defaults to and resets to **全部** (request omits `cwd` unless the user chooses 当前); source/status use shared `SelectDropdown` (`size="toolbar"`); token volumes use `lib/token-format.ts` with **M primary + exact secondary** (compact axes keep exact in tooltip). Daily charts use `byDay` + `byDayModel`: line trend (single-day pie fallback) and stacked bars side by side; shared **使用量/费用** metric toggle; Token 拆分 on the next row; tooltips follow the active metric (`M · exact` or `$x.xx`) and may show the other metric as secondary. Sidebar and modal header share `UsageLedgerIcon` geometry.
+
+#### Session rollup (Chat top bar only)
+
+- `GET /api/usage` is **session_rollup only**. `sessionId` is required; missing it returns `400 { error: "sessionId is required" }` and must not scan sessions. There is no global date-range aggregate on this route.
+- `GET /api/usage?sessionId=<id>` returns a lightweight lifetime (optional `from`/`to`) rollup via `getUsageStatsForSessionRollup()`: parent own totals, Studio child totals, combined totals, child count, and child summaries. If the selected session is a Studio child, the rollup resolves back to its parent id when possible. Additive fields: `selectedSessionTotals`, `parentRollupTotals` (equals `totals`), `selectedSessionKind`, `childSessions[].contextUsage`. Callers that ignore additive fields continue to work.
+- `usage.includeArchived` controls whether session_rollup may read `sessions-archive/`; it does **not** control the global ledger. Settings copy must say Session rollup scope only.
+- Session rollup totals come only from standard assistant message `usage` fields in selected parent/child JSONL. It does not parse `.ypi/.runtime/studio-subagents/*.jsonl` sidecars, does not estimate CLI `--no-session` runner cost, and does not return transcript/prompt/output/artifact bodies.
+- Child `contextUsage` is a bounded numeric-only projection (`percent`, `contextWindow`, `tokens`, availability/source, optional capture time). The SDK child runner samples authoritative `AgentSession.getContextUsage()` at low frequency and once before teardown; CLI/historical/never-sampled children return explicit null-valued `unavailable`. Never derive occupancy from lifetime usage or progress tokens/tps.
+- Chat top-bar display口径 (confirmed, `SessionStatsChips` / `useAgentSession`): `parent` compact shows parent rollup total and appends `incl. Studio` only when Studio children have real usage (child tokens or cost > 0, not mere child count); `standalone` shows own usage with no child marker; `studio_child` shows only that child's `selectedSessionTotals` (no bare `+child` / parent-rollup placeholder) while tooltip may include parent rollup + parent id. Prefer `session_rollup` API; fall back to local `messages` usage while loading/on failure. Display-only: never mutate parent JSONL or append child content to the React message list.
+- All token aggregation (ledger and session rollup) excludes `cacheWrite` per the cache-write removal decision; deprecated fields stay at 0 for wire compatibility.
 
 ### Model price configuration
 
@@ -215,21 +232,21 @@ Suggestions always carry per-field evidence URLs, confidence scores, match metho
 
 ### Usage accounting — cache-write removal
 
-Per the cache-write removal decision, new usage events no longer collect `cacheWrite` or `cacheWrite1h` from the SDK. The v1 ledger types (`LlmUsageTokens`, `LlmUsageTotals`) retain `cacheWrite` as a deprecated numeric field fixed at 0 for backward compatibility; aggregators (`addLlmUsageToTotals`, legacy `addTotals`/`addUsage`) no longer accumulate it.
+Per the cache-write removal decision, new usage events no longer collect `cacheWrite` or `cacheWrite1h` from the SDK. The v1 ledger types (`LlmUsageTokens`, `LlmUsageTotals`) and session-rollup `UsageTotals` retain `cacheWrite` as a deprecated numeric field fixed at 0 for backward compatibility; aggregators (`addLlmUsageToTotals`, rollup `addTotals`/`addUsage`) no longer accumulate it.
 
 Key invariants:
-- Historical usage event files under `usage-events/v1/` are never rewritten or migrated.
+- Historical usage event files under `usage-events/v1/` and historical Session JSONL are never rewritten or migrated.
 - `cost.total` remains the SDK authoritative total and is not recalculated.
 - SDK `totalTokens` may still include cache-write tokens internally; the project uses the provider's authoritative total without attempting to decompose it.
-- Legacy `/api/usage` aggregation also excludes cache-write; `UsageTotals.cacheWrite` stays at 0.
-- All UI surfaces (Usage modal, ledger table, session stats chips, message footer, chat top bar) have removed cache-write rows, columns, tooltips, and local fallback accumulations.
+- Session rollup (`/api/usage?sessionId=`) and ledger (`/api/usage/calls`) both exclude cache-write; wire `cacheWrite` stays at 0.
+- All UI surfaces (global ledger modal, session stats chips, message footer, chat top bar) have removed cache-write rows, columns, tooltips, and local fallback accumulations.
 - Cache Read remains displayed independently; the cache-hit ratio formula is `cacheRead / (input + cacheRead)`.
 
 ### Exact token + M display
 
 All token values in Usage, ledger, topbar, and message footers follow these conventions (implemented by `lib/token-format.ts`):
-- **Exact**: full locale-grouped integer (e.g., `1,234,567 tokens`). This is the primary display value.
-- **M**: derived `tokens / 1_000_000`, at most 6 decimal places with trailing zeros stripped (e.g., `1.234567 M`). Displayed as secondary visual text, not a replacement for the exact value. Never used as storage or aggregation input.
+- **M**: derived `tokens / 1_000_000`, at most 2 decimal places with trailing zeros stripped (e.g., `1.23 M`). Primary visual unit for Usage ledger token volumes. Never used as storage or aggregation input.
+- **Exact**: full locale-grouped integer (e.g., `1,234,567 tokens`). Secondary/detail unit next to M in Usage ledger UI; still used for non-volume counts (calls) and full-precision tooltips.
 - **Compact**: for tight spaces like chips and chart axes (≥1M → `1.2M`, ≥1k → `1k`, otherwise exact). Callers must include the exact value in a tooltip or secondary text.
 
 ### Models and tools

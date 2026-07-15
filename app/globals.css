@@ -855,6 +855,18 @@ html.dark .usage-chart-tooltip {
   color: var(--text-dim);
 }
 
+.usage-line-chart .usage-line-point:hover,
+.usage-line-chart .usage-line-point:focus {
+  fill: var(--accent);
+  outline: none;
+}
+
+.usage-bar-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @media (max-width: 640px) {
   .usage-chart-tooltip {
     max-width: 200px !important;
@@ -873,6 +885,23 @@ html.dark .usage-chart-tooltip {
 
   .usage-chart-tooltip-calls {
     font-size: 9px;
+  }
+
+  .usage-chart-title-range {
+    display: none;
+  }
+
+  .usage-chart-controls {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  .usage-bar-row {
+    grid-template-columns: 42px minmax(0, 1fr) minmax(72px, auto) !important;
+  }
+
+  .usage-line-chart {
+    height: 170px !important;
   }
 
   .pi-modal-overlay {

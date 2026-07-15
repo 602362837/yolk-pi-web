@@ -133,14 +133,17 @@ export interface ReadEventsResult {
 }
 
 /**
- * Read all usage events for a date range.
+ * Read all usage events whose UTC partition intersects `[from, to]`.
  *
- * Scans date directories between `from` and `to` (both inclusive UTC dates).
+ * UTC `YYYY-MM-DD` directories are only a candidate scan index derived from the
+ * instants' UTC calendar days. Callers that need local-day product semantics
+ * must still filter by full `occurredAt` after reading.
+ *
  * Each file is read and parsed independently; corrupt or oversized files are
  * isolated (logged via diagnostics counter) and do not fail the entire read.
  *
- * @param from Start date (inclusive).
- * @param to End date (inclusive).
+ * @param from Start instant (inclusive); UTC day of this instant is the first partition.
+ * @param to End instant (inclusive); UTC day of this instant is the last partition.
  * @param onCorrupt Optional callback invoked for each corrupt/skipped file.
  */
 export function readLlmUsageEvents(

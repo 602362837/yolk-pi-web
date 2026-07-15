@@ -11,7 +11,7 @@ import { FileExplorer } from "./FileExplorer";
 import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
-import { UsageStatsModal } from "./UsageStatsModal";
+import { UsageProviderModelTable } from "./UsageProviderModelTable";
 import { ChatGptUsagePanel } from "./ChatGptUsagePanel";
 import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
@@ -24,6 +24,7 @@ import { GitPanel } from "./GitPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import { ActionFlowIcon } from "./ActionFlowIcon";
 import { iconFlowAttrs } from "./iconFlow";
+import { UsageLedgerFlowIcon } from "./UsageLedgerIcon";
 import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
@@ -1104,12 +1105,7 @@ function AppShellContent() {
             label: "Usage",
             onClick: () => setUsageStatsOpen(true),
             disabled: false,
-            icon: (
-              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
-                <line x1="12" y1="1" x2="12" y2="23" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6" />
-              </ActionFlowIcon>
-            ),
+            icon: <UsageLedgerFlowIcon width={14} height={14} strokeWidth={2} />,
           },
           {
             label: "Skills",
@@ -1859,7 +1855,7 @@ function AppShellContent() {
       <SkillsConfig cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!} onClose={() => setSkillsConfigOpen(false)} />
     )}
     {usageStatsOpen && (
-      <UsageStatsModal cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} onClose={() => setUsageStatsOpen(false)} />
+      <UsageProviderModelTable cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} onClose={() => setUsageStatsOpen(false)} />
     )}
     {settingsConfigOpen && (
       <SettingsConfig

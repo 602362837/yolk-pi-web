@@ -124,9 +124,8 @@ export interface PiWebStudioConfig {
 }
 
 export interface PiWebUsageConfig {
+  /** Whether Chat top-bar session_rollup may include archived sessions. Does not control the global ledger. */
   includeArchived: boolean;
-  /** Which data source the Usage modal uses: "legacy" (session scan) or "ledger" (independent event store). Default "ledger". */
-  statsSource: "legacy" | "ledger";
   /** Models explicitly marked as free by the user. Stored as provider:model pairs. */
   explicitFreeModels: Array<{ provider: string; model: string }>;
   /** AI assistant policy for model price suggestion (structured extraction from bounded evidence). */
@@ -279,7 +278,6 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   },
   usage: {
     includeArchived: true,
-    statsSource: "ledger" as const,
     explicitFreeModels: [],
     pricingAssistant: {
       model: { mode: "followMain" },
@@ -492,10 +490,6 @@ function readYolkConfig(value: unknown, fallback: PiWebYolkConfig): PiWebYolkCon
 
 function readSessionDisplay(value: unknown, fallback: "separate" | "tag"): "separate" | "tag" {
   return value === "separate" || value === "tag" ? value : fallback;
-}
-
-function readStatsSource(value: unknown, fallback: "legacy" | "ledger"): "legacy" | "ledger" {
-  return value === "legacy" || value === "ledger" ? value : fallback;
 }
 
 function normalizeDailyTime(value: unknown): string | null {
@@ -848,8 +842,8 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       sessionDisplay: readSessionDisplay(worktree.sessionDisplay, defaults.worktree.sessionDisplay),
     },
     usage: {
+      // Retired usage.statsSource is ignored on read; ledger is always the global Usage source.
       includeArchived: readBoolean(usage.includeArchived, defaults.usage.includeArchived),
-      statsSource: readStatsSource(usage.statsSource, defaults.usage.statsSource),
       explicitFreeModels: readExplicitFreeModels(usage.explicitFreeModels),
       pricingAssistant: readSubagentPolicy(usage.pricingAssistant, defaults.usage.pricingAssistant),
       pricingAssistantFallback: readSubagentPolicy(usage.pricingAssistantFallback, defaults.usage.pricingAssistantFallback),
@@ -1219,8 +1213,8 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
     throw new PiWebConfigValidationError("usage config must be an object");
   }
   return {
+    // Retired usage.statsSource is not projected; next save strips it from disk.
     includeArchived: requireBoolean(value.includeArchived, "usage.includeArchived"),
-    statsSource: readStatsSource(value.statsSource, "ledger"),
     explicitFreeModels: readExplicitFreeModels(value.explicitFreeModels),
     pricingAssistant: value.pricingAssistant === undefined
       ? DEFAULT_PI_WEB_CONFIG.usage.pricingAssistant
@@ -1630,10 +1624,13 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
 
   if (normalizedUsage) {
     const previousUsage = isRecord(raw.usage) ? raw.usage : {};
-    nextRaw.usage = {
+    const nextUsage: Record<string, unknown> = {
       ...previousUsage,
       ...normalizedUsage,
     };
+    // Drop retired selector so a config save no longer writes usage.statsSource.
+    delete nextUsage.statsSource;
+    nextRaw.usage = nextUsage;
   }
 
   if (normalizedTerminal) {
