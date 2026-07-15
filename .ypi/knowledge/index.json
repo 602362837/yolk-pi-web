@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-14T09:50:52.946Z",
+  "updatedAt": "2026-07-15T02:51:35.130Z",
   "entries": [
+    {
+      "id": "20260715-105135-操作按钮科技感-流动-tag-化与全局圆角",
+      "title": "操作按钮科技感/流动/tag 化与全局圆角",
+      "taskId": "20260715-085126-操作按钮科技感-流动-tag-化与全局圆角",
+      "taskKey": "archived:2026-07:20260715-085126-操作按钮科技感-流动-tag-化与全局圆角",
+      "workflowId": "feature-dev",
+      "summary": "操作按钮科技感/tag/图标线条流动与全局圆角；IMP-001 最大合理 opt-in 替换；修复浮窗改进验收误匹配主任务 transition。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260715-085126-操作按钮科技感-流动-tag-化与全局圆角",
+      "knowledgePath": ".ypi/knowledge/20260715-105135-操作按钮科技感-流动-tag-化与全局圆角.md",
+      "createdAt": "2026-07-15T02:51:35.130Z",
+      "archivedAt": "2026-07-15T02:51:35.130Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260714-175052-优化-ypi-studio-浮窗计划-原型入口-状态站点图与改进验收",
       "title": "优化 YPI Studio 浮窗计划/原型入口、状态站点图与改进验收",

@@ -8,6 +8,8 @@ import { encodeFilePathForApi, getFileName, getRelativeFilePath } from "@/lib/fi
 import { markdownPreviewRehypePlugins, markdownPreviewRemarkPlugins } from "@/lib/markdown";
 import type { PiWebEditorConfig } from "@/lib/pi-web-config";
 import type { MonacoFileEditorProps } from "./MonacoFileEditor";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 import { usePrompt } from "./AppPromptProvider";
 
 const MonacoFileEditor = dynamic<MonacoFileEditorProps>(
@@ -428,6 +430,7 @@ function ImageViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: str
           <button
             onClick={() => onAddChat(filePath)}
             title="Add to chat (⌘1)"
+            {...iconFlowAttrs("interactive")}
             style={{
               padding: "2px 8px", fontSize: 11, cursor: "pointer",
               background: "var(--bg-hover)",
@@ -440,7 +443,10 @@ function ImageViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: str
             onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            <ActionFlowIcon width={10} height={10} strokeWidth={2.5}>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </ActionFlowIcon>
             Chat
           </button>
         )}
@@ -582,6 +588,7 @@ function AudioViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: str
           <button
             onClick={() => onAddChat(filePath)}
             title="Add to chat (⌘1)"
+            {...iconFlowAttrs("interactive")}
             style={{
               padding: "2px 8px", fontSize: 11, cursor: "pointer",
               background: "var(--bg-hover)",
@@ -594,7 +601,10 @@ function AudioViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: str
             onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            <ActionFlowIcon width={10} height={10} strokeWidth={2.5}>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </ActionFlowIcon>
             Chat
           </button>
         )}
@@ -735,6 +745,7 @@ function DocumentViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: 
           <button
             onClick={() => onAddChat(filePath)}
             title="Add to chat (⌘1)"
+            {...iconFlowAttrs("interactive")}
             style={{
               padding: "2px 8px", fontSize: 11, cursor: "pointer",
               background: "var(--bg-hover)",
@@ -747,7 +758,10 @@ function DocumentViewer({ filePath, cwd, onAddChat }: { filePath: string; cwd?: 
             onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            <ActionFlowIcon width={10} height={10} strokeWidth={2.5}>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </ActionFlowIcon>
             Chat
           </button>
         )}
@@ -1209,6 +1223,7 @@ function TextFileViewer({ filePath, cwd, initialLine, editorConfig, onAddChat, o
               window.getSelection()?.removeAllRanges();
             }}
             title="Add to chat (⌘1)"
+            {...iconFlowAttrs("interactive")}
             style={{
               padding: "2px 8px", fontSize: 11, cursor: "pointer",
               background: selectedLines ? "rgba(37,99,235,0.10)" : "var(--bg-hover)",
@@ -1222,7 +1237,10 @@ function TextFileViewer({ filePath, cwd, initialLine, editorConfig, onAddChat, o
             onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; e.currentTarget.style.color = "var(--text)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = selectedLines ? "rgba(37,99,235,0.10)" : "var(--bg-hover)"; e.currentTarget.style.color = selectedLines ? "var(--accent)" : "var(--text-muted)"; }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            <ActionFlowIcon width={10} height={10} strokeWidth={2.5}>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </ActionFlowIcon>
             <span>{selectedLines ? `lines ${selectedLines.startLine}-${selectedLines.endLine}` : "Chat"}</span>
           </button>
         )}

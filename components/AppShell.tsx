@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useSyncExternalStore, type CSSProperties } from "react";
+import { useState, useCallback, useRef, useEffect, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -22,6 +22,8 @@ import { YpiStudioPanel } from "./YpiStudioPanel";
 import { BranchNavigator } from "./BranchNavigator";
 import { GitPanel } from "./GitPanel";
 import { TerminalPanel } from "./TerminalPanel";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import { iconFlowAttrs } from "./iconFlow";
 import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
@@ -1075,20 +1077,27 @@ function AppShellContent() {
         terminalEnabled={terminalEnabled}
         onOpenTerminalCommand={handleOpenTerminalCommand}
       />
-      <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
+      <div
+        className={`sidebar-utility-actions${sidebarWidth <= 220 ? " is-narrow" : ""}`}
+      >
         {([
           {
             label: "Models",
             onClick: () => setModelsConfigOpen(true),
             disabled: false,
             icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" />
-                <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-                <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-                <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
-                <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
-              </svg>
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="9" y="9" width="6" height="6" />
+                <line x1="9" y1="1" x2="9" y2="4" />
+                <line x1="15" y1="1" x2="15" y2="4" />
+                <line x1="9" y1="20" x2="9" y2="23" />
+                <line x1="15" y1="20" x2="15" y2="23" />
+                <line x1="20" y1="9" x2="23" y2="9" />
+                <line x1="20" y1="14" x2="23" y2="14" />
+                <line x1="1" y1="9" x2="4" y2="9" />
+                <line x1="1" y1="14" x2="4" y2="14" />
+              </ActionFlowIcon>
             ),
           },
           {
@@ -1096,10 +1105,10 @@ function AppShellContent() {
             onClick: () => setUsageStatsOpen(true),
             disabled: false,
             icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
                 <line x1="12" y1="1" x2="12" y2="23" />
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
+              </ActionFlowIcon>
             ),
           },
           {
@@ -1107,11 +1116,11 @@ function AppShellContent() {
             onClick: () => setSkillsConfigOpen(true),
             disabled: !activeCwd && !selectedSession?.cwd && !newSessionCwd,
             icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
-              </svg>
+              </ActionFlowIcon>
             ),
           },
           {
@@ -1119,30 +1128,25 @@ function AppShellContent() {
             onClick: () => { setSettingsStudioFocusMember(null); setSettingsConfigOpen(true); },
             disabled: false,
             icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.06V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.06-.33H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1.06V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.4.14.74.38 1 .6.31.23.68.35 1.06.33H21a2 2 0 1 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z" />
-              </svg>
+              </ActionFlowIcon>
             ),
           },
-        ] as { label: string; onClick: () => void; disabled: boolean; icon: React.ReactNode }[]).map(({ label, onClick, disabled, icon }) => (
+        ] as { label: string; onClick: () => void; disabled: boolean; icon: ReactNode }[]).map(({ label, onClick, disabled, icon }) => (
           <button
             key={label}
+            type="button"
+            className="tech-action-tag sidebar-utility-tag"
+            {...iconFlowAttrs(disabled ? "off" : "ambient")}
             onClick={onClick}
             disabled={disabled}
             title={label}
-            style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              height: 32, padding: 0, background: "none", border: "none",
-              borderRadius: 9, color: "var(--text-muted)", cursor: disabled ? "default" : "pointer",
-              fontSize: 12, opacity: disabled ? 0.35 : 1,
-              transition: "background 0.12s, color 0.12s",
-            }}
-            onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-muted)"; }}
+            aria-label={label}
           >
             {icon}
-            {label}
+            <span>{label}</span>
           </button>
         ))}
       </div>
@@ -1170,6 +1174,7 @@ function AppShellContent() {
       {/* Left sidebar */}
       <div
         className={`sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${sidebarResizing ? " sidebar-resizing" : ""}`}
+        data-sidebar-width={sidebarWidth <= 220 ? "220" : undefined}
         style={sidebarContainerStyle}
       >
         {sidebarContent}
@@ -1199,30 +1204,33 @@ function AppShellContent() {
       {/* Center: chat */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} className="app-top-bar" style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
+        <div ref={topBarRef} className="app-top-bar" style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 36, background: "var(--bg-panel)" }}>
           <button
+            type="button"
+            className={`tech-action-tag tech-action-tag--icon app-top-action-tag${sidebarOpen ? " is-active" : ""}`}
+            {...iconFlowAttrs("interactive")}
             onClick={() => setSidebarOpen((v) => !v)}
             title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 36, height: 36, padding: 0,
-              background: "none", border: "none", borderRight: "1px solid var(--border)",
-              color: "var(--text-muted)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
+            aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            aria-pressed={sidebarOpen}
           >
             {sidebarOpen ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
-              </svg>
+              <ActionFlowIcon width={16} height={16} strokeWidth={2}>
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+              </ActionFlowIcon>
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
+              <ActionFlowIcon width={16} height={16} strokeWidth={2}>
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </ActionFlowIcon>
             )}
           </button>
           <button
+            type="button"
+            className="tech-action-tag tech-action-tag--icon app-top-action-tag"
+            {...iconFlowAttrs("interactive")}
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
@@ -1230,81 +1238,41 @@ function AppShellContent() {
             title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             aria-pressed={isDark}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 36, height: 36, padding: 0,
-              background: "none", border: "none", borderRight: "1px solid var(--border)",
-              color: "var(--text-muted)", cursor: "pointer", flexShrink: 0, transition: "color 0.12s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             {isDark ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionFlowIcon width={16} height={16} strokeWidth={2}>
                 <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </ActionFlowIcon>
             ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionFlowIcon width={16} height={16} strokeWidth={2}>
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
+              </ActionFlowIcon>
             )}
           </button>
           {showChat && (
-            <div className="app-top-actions" style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
+            <div className="app-top-actions">
               <button
+                type="button"
+                className="tech-action-tag app-top-action-tag"
+                {...iconFlowAttrs(selectedSession ? "interactive" : "off")}
                 onClick={handleExportSession}
                 disabled={!selectedSession}
                 title={selectedSession ? "Export HTML" : "Export is available after the session is saved"}
                 aria-label="Export HTML"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  height: "100%",
-                  padding: "0 12px",
-                  background: "none",
-                  border: "none",
-                  borderTop: "2px solid transparent",
-                  borderRight: "1px solid var(--border)",
-                  color: selectedSession ? "var(--text-muted)" : "var(--text-dim)",
-                  cursor: selectedSession ? "pointer" : "not-allowed",
-                  opacity: selectedSession ? 1 : 0.45,
-                  flexShrink: 0,
-                  fontSize: 11,
-                  whiteSpace: "nowrap",
-                  transition: "color 0.1s, background 0.1s, opacity 0.1s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!selectedSession) return;
-                  e.currentTarget.style.color = "var(--text)";
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = selectedSession ? "var(--text-muted)" : "var(--text-dim)";
-                  e.currentTarget.style.background = "none";
-                }}
               >
-                <span style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 18,
-                  height: 18,
-                  borderRadius: 5,
-                  background: "transparent",
-                  color: selectedSession ? "var(--text-muted)" : "var(--text-dim)",
-                  flexShrink: 0,
-                }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                </span>
+                <ActionFlowIcon width={12} height={12} strokeWidth={2.2}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </ActionFlowIcon>
                 <span className="app-top-label">Export</span>
               </button>
               <BranchNavigator
@@ -1319,110 +1287,118 @@ function AppShellContent() {
               />
               <button
                 ref={systemBtnRef}
+                type="button"
+                className={`tech-action-tag app-top-action-tag${activeTopPanel === "system" ? " is-active" : ""}`}
+                {...iconFlowAttrs("interactive")}
+                aria-expanded={activeTopPanel === "system"}
+                aria-label="System"
+                title="System"
                 onClick={() => toggleTopPanel("system")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: "100%", padding: "0 12px",
-                  background: activeTopPanel === "system" ? "var(--bg-selected)" : "none",
-                  border: "none",
-                  borderTop: activeTopPanel === "system" ? "2px solid var(--accent)" : "2px solid transparent",
-                  borderRight: "1px solid var(--border)",
-                  cursor: "pointer",
-                  color: activeTopPanel === "system" ? "var(--text)" : "var(--text-muted)",
-                  fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "system" ? "var(--text)" : "var(--text-muted)"; }}
+                style={systemPrompt ? { color: "var(--accent)" } : undefined}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: systemPrompt ? "var(--accent)" : "var(--text-dim)", flexShrink: 0 }}>
+                <ActionFlowIcon width={12} height={12} strokeWidth={2}>
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                   <line x1="8" y1="13" x2="16" y2="13" />
                   <line x1="8" y1="17" x2="13" y2="17" />
-                </svg>
+                </ActionFlowIcon>
                 <span className="app-top-label">System</span>
               </button>
               <button
+                type="button"
+                className={`tech-action-tag app-top-action-tag${activeTopPanel === "subagents" ? " is-active" : ""}`}
+                {...iconFlowAttrs("interactive")}
+                aria-expanded={activeTopPanel === "subagents"}
+                aria-label="Subagents"
+                title="Subagents"
                 onClick={() => toggleTopPanel("subagents")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: "100%", padding: "0 12px",
-                  background: activeTopPanel === "subagents" ? "var(--bg-selected)" : "none",
-                  border: "none",
-                  borderTop: activeTopPanel === "subagents" ? "2px solid var(--accent)" : "2px solid transparent",
-                  borderRight: "1px solid var(--border)",
-                  cursor: "pointer",
-                  color: activeTopPanel === "subagents" ? "var(--text)" : "var(--text-muted)",
-                  fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
-                  position: "relative",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "subagents" ? "var(--text)" : "var(--text-muted)"; }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <ActionFlowIcon width={12} height={12} strokeWidth={2}>
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
+                </ActionFlowIcon>
                 <span className="app-top-label">Subagents</span>
                 {(() => {
                   const running = subagentRuns.filter((r) => r.status === "running").length;
                   const completed = subagentRuns.filter((r) => r.status === "completed" || r.status === "failed").length;
                   if (running > 0) {
                     return (
-                      <span style={{
-                        position: "absolute", top: 4, right: 4,
-                        width: 7, height: 7, borderRadius: "50%",
-                        background: "#f59e0b",
-                      }} />
+                      <span
+                        className="tech-action-tag__badge"
+                        style={{
+                          position: "absolute",
+                          top: 2,
+                          right: 2,
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: "#f59e0b",
+                          zIndex: 2,
+                          pointerEvents: "none",
+                        }}
+                      />
                     );
                   }
                   if (completed > 0) {
                     return (
-                      <span style={{
-                        fontSize: 10, color: "#22c55e",
-                        marginLeft: 2,
-                      }}>✓</span>
+                      <span
+                        className="tech-action-tag__badge"
+                        style={{
+                          fontSize: 10,
+                          color: "#22c55e",
+                          marginLeft: 2,
+                          zIndex: 2,
+                        }}
+                      >
+                        ✓
+                      </span>
                     );
                   }
                   return null;
                 })()}
               </button>
               <button
+                type="button"
+                className={`tech-action-tag app-top-action-tag${activeTopPanel === "git" ? " is-active" : ""}`}
+                {...iconFlowAttrs("interactive")}
+                aria-expanded={activeTopPanel === "git"}
+                aria-label="Git"
+                title="Git"
                 onClick={() => toggleTopPanel("git")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: "100%", padding: "0 12px",
-                  background: activeTopPanel === "git" ? "var(--bg-selected)" : "none",
-                  border: "none",
-                  borderTop: activeTopPanel === "git" ? "2px solid var(--accent)" : "2px solid transparent",
-                  borderRight: "1px solid var(--border)",
-                  cursor: "pointer",
-                  color: activeTopPanel === "git" ? "var(--text)" : "var(--text-muted)",
-                  fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
-                  position: "relative",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = activeTopPanel === "git" ? "var(--text)" : "var(--text-muted)"; }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <ActionFlowIcon width={12} height={12} strokeWidth={2}>
                   <line x1="6" y1="3" x2="6" y2="15" />
                   <circle cx="18" cy="6" r="3" />
                   <circle cx="6" cy="18" r="3" />
                   <path d="M18 9a9 9 0 0 1-9 9" />
-                </svg>
+                </ActionFlowIcon>
                 <span className="app-top-label">Git</span>
                 {gitDirty && (
-                  <span style={{
-                    position: "absolute", top: 4, right: 4,
-                    width: 7, height: 7, borderRadius: "50%",
-                    background: "#f59e0b",
-                  }} />
+                  <span
+                    className="tech-action-tag__badge"
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "#f59e0b",
+                      zIndex: 2,
+                      pointerEvents: "none",
+                    }}
+                  />
                 )}
               </button>
             </div>
           )}
           {terminalEnabled && terminalCwd && (
             <button
+              type="button"
+              className={`tech-action-tag app-top-action-tag${terminalOpen ? " is-active" : ""}`}
+              {...iconFlowAttrs("interactive")}
+              aria-pressed={terminalOpen}
+              aria-label="Terminal"
               onClick={async () => {
                 if (!terminalOpen) {
                   setTerminalDockCwd(terminalCwd);
@@ -1449,24 +1425,11 @@ function AppShellContent() {
                 setTerminalCollapsed((collapsed) => !collapsed);
               }}
               title={terminalOpen && terminalDockCwd && terminalDockCwd !== terminalCwd ? "Open terminal for selected workspace" : "Open web terminal"}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                height: "100%", padding: "0 12px",
-                background: terminalOpen ? "var(--bg-selected)" : "none",
-                border: "none",
-                borderTop: terminalOpen ? "2px solid var(--accent)" : "2px solid transparent",
-                borderRight: "1px solid var(--border)",
-                cursor: "pointer",
-                color: terminalOpen ? "var(--text)" : "var(--text-muted)",
-                fontSize: 11, whiteSpace: "nowrap", transition: "color 0.1s, background 0.1s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = terminalOpen ? "var(--text)" : "var(--text-muted)"; }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <ActionFlowIcon width={12} height={12} strokeWidth={2}>
                 <polyline points="4 17 10 11 4 5" />
                 <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
+              </ActionFlowIcon>
               <span className="app-top-label">Terminal</span>
             </button>
           )}
@@ -1699,6 +1662,7 @@ function AppShellContent() {
                         explorerRefreshTimerRef.current = setTimeout(() => setExplorerRefreshDone(false), 2000);
                       }}
                       title="刷新项目空间信息"
+                      {...iconFlowAttrs(explorerRefreshDone ? "off" : "interactive")}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "center",
                         width: 26, height: 26, padding: 0, marginRight: 6,
@@ -1718,10 +1682,10 @@ function AppShellContent() {
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       ) : (
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <ActionFlowIcon width={13} height={13} strokeWidth={2}>
                           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                           <path d="M3 3v5h5" />
-                        </svg>
+                        </ActionFlowIcon>
                       )}
                     </button>
                   </div>

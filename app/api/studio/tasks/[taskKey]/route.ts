@@ -104,6 +104,17 @@ export async function PATCH(
       const task = updateYpiStudioTaskArtifact(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
     }
+    // Improvement-scoped patches must be matched before the loose parent task transition body
+    // (cwd + to), otherwise widget accept would hit transitionYpiStudioTask and fail with
+    // "Invalid Studio transition: waiting_for_improvements -> accepted".
+    if (isYpiStudioImprovementTransitionBody(body)) {
+      const task = transitionYpiStudioImprovement(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementDispositionBody(body)) {
+      const task = resolveYpiStudioImprovementDisposition(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
     if (isYpiStudioTaskTransitionBody(body)) {
       const task = transitionYpiStudioTask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
@@ -130,14 +141,6 @@ export async function PATCH(
     }
     if (isYpiStudioImprovementCreateBody(body)) {
       const task = createYpiStudioImprovement(taskKey, { ...body, cwd: authorizedCwd });
-      return NextResponse.json({ task });
-    }
-    if (isYpiStudioImprovementTransitionBody(body)) {
-      const task = transitionYpiStudioImprovement(taskKey, { ...body, cwd: authorizedCwd });
-      return NextResponse.json({ task });
-    }
-    if (isYpiStudioImprovementDispositionBody(body)) {
-      const task = resolveYpiStudioImprovementDisposition(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
     }
     if (isYpiStudioImprovementArtifactUpdateBody(body)) {

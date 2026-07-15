@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-001 · 最大合理替换 · 多区域黑白名单</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --bg-panel: #ffffff;
+      --bg-hover: #eef2f6;
+      --border: #d5dbe3;
+      --text: #1f2937;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --accent: #2563eb;
+      --danger: #ef4444;
+      --icon-flow-a: #22d3ee;
+      --icon-flow-b: #3b82f6;
+      --icon-flow-c: #8b5cf6;
+      --icon-flow-dash: 6 42;
+      --icon-flow-travel: -48;
+      --icon-flow-interactive: 1.55s;
+      --icon-flow-ambient: 4.8s;
+      --control-radius-pill: 999px;
+    }
+    html.dark {
+      --bg: #0f1419;
+      --bg-panel: #171c23;
+      --bg-hover: #1f2630;
+      --border: #2a3340;
+      --text: #e5eef7;
+      --text-muted: #9aa8b8;
+      --text-dim: #6b7a8c;
+      --accent: #60a5fa;
+      --icon-flow-a: #67e8f9;
+      --icon-flow-b: #60a5fa;
+      --icon-flow-c: #c4b5fd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 13px/1.45 system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 18px 20px 40px;
+    }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    h2 { font-size: 14px; margin: 0 0 8px; }
+    .sub { color: var(--text-muted); margin: 0 0 14px; max-width: 820px; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center;
+    }
+    .toolbar > button {
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .toolbar > button.is-on { border-color: var(--accent); color: var(--accent); }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .badge.ok { color: #16a34a; border-color: rgba(34,197,94,.35); }
+    .badge.no { color: var(--danger); border-color: rgba(239,68,68,.35); }
+    .badge.warn { color: #ca8a04; border-color: rgba(234,179,8,.35); }
+    .badge.info { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .region {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .region p { margin: 0 0 10px; color: var(--text-muted); font-size: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .mock-bar {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      padding: 8px;
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--bg) 70%, var(--bg-panel));
+      border: 1px dashed var(--border);
+      min-height: 44px;
+    }
+    .mock-label {
+      font-size: 10px; font-weight: 700; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: .06em; margin-right: 4px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 30px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--bg-panel) 80%, var(--bg));
+      color: var(--text-muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+    }
+    .btn:hover:not(:disabled) {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+      background: var(--bg-hover);
+    }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.pill { border-radius: var(--control-radius-pill); }
+    .btn.icon {
+      width: 30px; padding: 0;
+    }
+    .btn.danger {
+      color: var(--danger);
+      border-color: rgba(239,68,68,.35);
+      background: rgba(239,68,68,.06);
+    }
+    .btn.ghost {
+      border-color: transparent;
+      background: transparent;
+    }
+    .btn.share {
+      color: #16a34a;
+      border-color: rgba(34,197,94,.35);
+      background: rgba(34,197,94,.08);
+    }
+    .btn.send {
+      background: var(--accent);
+      border-color: transparent;
+      color: #fff;
+    }
+    .btn.send:hover:not(:disabled) { filter: brightness(1.05); color: #fff; }
+
+    .list {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      min-width: 220px;
+      flex: 1;
+    }
+    .list-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .list-row:last-child { border-bottom: 0; }
+    .list-row .grow { flex: 1; min-width: 0; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .list-row button {
+      width: 26px; height: 26px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; background: transparent; color: var(--text-dim); border-radius: 6px; cursor: default;
+    }
+
+    .action-flow-icon { display: block; flex: 0 0 auto; overflow: visible; pointer-events: none; }
+    .action-flow-icon__base {
+      fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; opacity: .88;
+    }
+    .action-flow-icon__overlay {
+      fill: none; stroke-linecap: round; stroke-linejoin: round;
+      opacity: 0;
+      stroke-dasharray: var(--icon-flow-dash);
+      stroke-dashoffset: 0;
+      filter: drop-shadow(0 0 2px color-mix(in srgb, var(--icon-flow-a) 72%, transparent));
+      pointer-events: none;
+    }
+    @keyframes action-icon-flow {
+      to { stroke-dashoffset: var(--icon-flow-travel); }
+    }
+
+    /* Proposed production contract: host-agnostic opt-in */
+    [data-icon-flow="interactive"]:is(:hover, :focus-visible, .is-active, [aria-pressed="true"], [aria-expanded="true"]):not(:disabled)
+      .action-flow-icon__overlay {
+      opacity: .95;
+      animation: action-icon-flow var(--icon-flow-interactive) linear infinite;
+    }
+    [data-icon-flow="ambient"]:not(:disabled) .action-flow-icon__overlay {
+      opacity: .7;
+      animation: action-icon-flow var(--icon-flow-ambient) linear infinite;
+    }
+    .ambient-row [data-icon-flow="ambient"]:nth-child(2) .action-flow-icon__overlay { animation-delay: -1.2s; }
+    .ambient-row [data-icon-flow="ambient"]:nth-child(3) .action-flow-icon__overlay { animation-delay: -2.4s; }
+    .ambient-row [data-icon-flow="ambient"]:nth-child(4) .action-flow-icon__overlay { animation-delay: -3.6s; }
+
+    [data-icon-flow="off"] .action-flow-icon__overlay,
+    [data-icon-flow]:disabled .action-flow-icon__overlay,
+    :disabled[data-icon-flow] .action-flow-icon__overlay {
+      opacity: 0 !important;
+      animation: none !important;
+      filter: none;
+    }
+    html.reduce-motion .action-flow-icon__overlay,
+    @media (prefers-reduced-motion: reduce) {
+      .action-flow-icon__overlay {
+        opacity: 0 !important;
+        animation: none !important;
+        filter: none;
+      }
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    footer {
+      margin-top: 18px; color: var(--text-dim); font-size: 11px; max-width: 860px;
+    }
+    code { font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>IMP-001 · 最大合理替换 · 多区域示范</h1>
+  <p class="sub">
+    修订目标：范围尽量大，<strong>能安全替换的都替换</strong>。仍是
+    <code>ActionFlowIcon</code> + 宿主 <code>data-icon-flow</code> opt-in，
+    <strong>禁止</strong>全局 <code>button</code> 扫射。亮色段只沿 SVG 线条行进；边框静态。
+    下方绿色区域 = 应替换（hover/focus 流动）；红色区域 = 黑名单保持静止。
+  </p>
+
+  <div class="toolbar">
+    <button type="button" id="themeBtn" class="is-on">浅色 / 深色</button>
+    <button type="button" id="motionBtn">模拟 reduced-motion</button>
+    <span style="color:var(--text-muted);font-size:12px">Tab 到白名单按钮可看 focus 流动</span>
+  </div>
+
+  <div class="legend">
+    <span class="badge ok">REPLACE · interactive</span>
+    <span class="badge warn">REPLACE · ambient（仅侧栏 utility）</span>
+    <span class="badge info">DEFAULT · 无 attr = 静</span>
+    <span class="badge no">BLACKLIST · 不换</span>
+  </div>
+
+  <div class="stack">
+    <!-- Contract -->
+    <section class="region">
+      <h2>契约对照</h2>
+      <p>同一套图标几何：无 attr 静止；interactive 仅交互时流动；禁止用全局 CSS 让所有 button 动。</p>
+      <div class="row">
+        <button type="button" class="btn" aria-label="未 opt-in">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="g0" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#g0)" stroke-width="2.5"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></g>
+          </svg>
+          无 attr · 必须静
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="interactive" aria-label="interactive 示范">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="0.5" stop-color="var(--icon-flow-b)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#g1)" stroke-width="2.5"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></g>
+          </svg>
+          interactive · hover 流动
+        </button>
+        <button type="button" class="btn" data-icon-flow="interactive" disabled aria-label="disabled">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="g1d" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#g1d)" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></g>
+          </svg>
+          disabled · 静
+        </button>
+      </div>
+    </section>
+
+    <!-- B0 top / sidebar -->
+    <section class="region">
+      <div class="row" style="margin-bottom:8px;gap:8px">
+        <h2 style="margin:0">B0 · 顶栏 / 侧栏 utility（已有 · 契约迁移）</h2>
+        <span class="badge ok">interactive</span>
+        <span class="badge warn">ambient</span>
+      </div>
+      <p>顶栏默认静、hover 流动；侧栏低频错峰 ambient；Skills disabled 静。</p>
+      <div class="mock-bar ambient-row" style="margin-bottom:8px">
+        <span class="mock-label">Sidebar</span>
+        <button type="button" class="btn pill" data-icon-flow="ambient" aria-label="Models">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="ga1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#ga1)" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></g>
+          </svg>
+          Models
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="ambient" aria-label="Usage">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="ga2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#ga2)" stroke-width="2.5"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"/></g>
+          </svg>
+          Usage
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="off" disabled aria-label="Skills">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M12 3l2 4 4 .5-3 3 .8 4.5L12 13l-3.8 2 .8-4.5-3-3 4-.5z"/></g>
+            <g class="action-flow-icon__overlay" stroke="currentColor" stroke-width="2.5" style="opacity:0"><path d="M12 3l2 4 4 .5-3 3 .8 4.5L12 13l-3.8 2 .8-4.5-3-3 4-.5z"/></g>
+          </svg>
+          Skills
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="ambient" aria-label="Settings">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="ga4" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#ga4)" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></g>
+          </svg>
+          Settings
+        </button>
+      </div>
+      <div class="mock-bar">
+        <span class="mock-label">Top bar</span>
+        <button type="button" class="btn icon pill" data-icon-flow="interactive" aria-label="Sidebar" title="Sidebar">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gt1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gt1)" stroke-width="2.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></g>
+          </svg>
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="interactive" aria-label="Export">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gt2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gt2)" stroke-width="2.4"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></g>
+          </svg>
+          Export
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="interactive" aria-label="Git">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gt3" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="6" cy="18" r="2"/><path d="M8 6h5a3 3 0 0 1 3 3v7"/><path d="M6 8v8"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gt3)" stroke-width="2.4"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="6" cy="18" r="2"/><path d="M8 6h5a3 3 0 0 1 3 3v7"/><path d="M6 8v8"/></g>
+          </svg>
+          Git
+        </button>
+        <button type="button" class="btn pill" data-icon-flow="interactive" aria-label="Terminal">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gt4" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15h5M8 9l3 3-3 3"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gt4)" stroke-width="2.4"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15h5M8 9l3 3-3 3"/></g>
+          </svg>
+          Terminal
+        </button>
+      </div>
+    </section>
+
+    <!-- B1 Chat -->
+    <section class="region">
+      <div class="row" style="margin-bottom:8px;gap:8px">
+        <h2 style="margin:0">B1 · Chat 底栏 / Browser Share / 消息 action（必做）</h2>
+        <span class="badge ok">REPLACE</span>
+      </div>
+      <p>Attach、Browser Share、Send/Steer、Compact、吸底/提示音、消息 Copy/Edit → interactive。Stop 实心与附件 remove X 黑名单。</p>
+      <div class="mock-bar" style="margin-bottom:8px">
+        <span class="mock-label">Chat tools</span>
+        <button type="button" class="btn icon ghost" data-icon-flow="interactive" title="Attach image" aria-label="Attach image">
+          <svg class="action-flow-icon" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gc1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc1)" stroke-width="2.3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></g>
+          </svg>
+        </button>
+        <button type="button" class="btn icon ghost" data-icon-flow="interactive" title="Attach file" aria-label="Attach file">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gc2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="1.8"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc2)" stroke-width="2.3"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></g>
+          </svg>
+        </button>
+        <button type="button" class="btn pill share" data-icon-flow="interactive" aria-label="Browser Share">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gc3" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8M12 18v2"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc3)" stroke-width="2.4"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8M12 18v2"/></g>
+          </svg>
+          Browser Share
+        </button>
+        <button type="button" class="btn ghost" data-icon-flow="interactive" title="压缩上下文" aria-label="Compact">
+          <svg class="action-flow-icon" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gc4" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc4)" stroke-width="2.4"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></g>
+          </svg>
+          Compact
+        </button>
+        <button type="button" class="btn icon ghost" data-icon-flow="interactive" title="自动吸底" aria-label="自动吸底">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gc5" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc5)" stroke-width="2.4"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></g>
+          </svg>
+        </button>
+        <button type="button" class="btn icon ghost" data-icon-flow="interactive" title="提示音" aria-label="提示音">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gc6" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc6)" stroke-width="2.4"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></g>
+          </svg>
+        </button>
+        <button type="button" class="btn send" data-icon-flow="interactive" aria-label="Send">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <defs><linearGradient id="gc7" x1="0" y1="0" x2="14" y2="14" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#a5f3fc"/><stop offset="1" stop-color="#ddd6fe"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><line x1="2" y1="7" x2="11" y2="7"/><polyline points="7.5 3 12 7 7.5 11"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gc7)" stroke-width="2.4"><line x1="2" y1="7" x2="11" y2="7"/><polyline points="7.5 3 12 7 7.5 11"/></g>
+          </svg>
+          Send
+        </button>
+        <button type="button" class="btn danger" aria-label="Stop Agent" title="黑名单：实心 Stop">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor"/></svg>
+          Stop
+        </button>
+      </div>
+      <div class="row">
+        <button type="button" class="btn ghost" data-icon-flow="interactive" title="Copy message" aria-label="Copy message">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gm1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gm1)" stroke-width="2.4"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g>
+          </svg>
+          Copy
+        </button>
+        <button type="button" class="btn ghost" data-icon-flow="interactive" title="Edit from here" aria-label="Edit from here">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gm2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gm2)" stroke-width="2.4"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></g>
+          </svg>
+          Edit
+        </button>
+      </div>
+    </section>
+
+    <!-- B2 / B3 -->
+    <section class="region">
+      <div class="row" style="margin-bottom:8px;gap:8px">
+        <h2 style="margin:0">B2 / B3 · 侧栏工作区工具条 + 面板工具条（必做）</h2>
+        <span class="badge ok">REPLACE</span>
+      </div>
+      <p>新建会话 / 工作树 / 刷新 / Workspace；Usage·Models·Skills·FileViewer 的 Refresh / Add / Add to chat。不改会话行与 Close。</p>
+      <div class="mock-bar" style="margin-bottom:8px">
+        <span class="mock-label">Sidebar tools</span>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="新建会话">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <defs><linearGradient id="gs1" x1="0" y1="0" x2="12" y2="12" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2.2"><path d="M6 2v8M2 6h8"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gs1)" stroke-width="2.6"><path d="M6 2v8M2 6h8"/></g>
+          </svg>
+          新建
+        </button>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="创建工作树">
+          <svg class="action-flow-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gs2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2.2"><path d="M6 3v12"/><circle cx="6" cy="18" r="3"/><path d="M6 9h8a3 3 0 0 1 3 3v3"/><circle cx="17" cy="18" r="3"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gs2)" stroke-width="2.6"><path d="M6 3v12"/><circle cx="6" cy="18" r="3"/><path d="M6 9h8a3 3 0 0 1 3 3v3"/><circle cx="17" cy="18" r="3"/></g>
+          </svg>
+          工作树
+        </button>
+        <button type="button" class="btn icon" data-icon-flow="interactive" title="刷新" aria-label="刷新">
+          <svg class="action-flow-icon" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gs3" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gs3)" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></g>
+          </svg>
+        </button>
+        <button type="button" class="btn icon" data-icon-flow="interactive" title="Workspace actions" aria-label="Workspace actions">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gs4" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gs4)" stroke-width="2.5"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></g>
+          </svg>
+        </button>
+      </div>
+      <div class="mock-bar">
+        <span class="mock-label">Panel tools</span>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="Refresh usage">
+          <svg class="action-flow-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gp1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gp1)" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></g>
+          </svg>
+          Refresh
+        </button>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="Add skill">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gp2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gp2)" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></g>
+          </svg>
+          Add skill
+        </button>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="Add to chat">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gp3" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gp3)" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g>
+          </svg>
+          Add to chat
+        </button>
+        <button type="button" class="btn" aria-label="Close" title="黑名单 Close">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          Close
+        </button>
+      </div>
+    </section>
+
+    <!-- Blacklist -->
+    <section class="region">
+      <div class="row" style="margin-bottom:8px;gap:8px">
+        <h2 style="margin:0">黑名单示范 · 必须静止</h2>
+        <span class="badge no">DO NOT REPLACE</span>
+      </div>
+      <p>危险、关闭、会话/列表行内、spin 刷新、实心 Stop。即使技术上可包 ActionFlowIcon，产品策略禁止。</p>
+      <div class="two-col">
+        <div class="list" role="list">
+          <div class="list-row" role="listitem">
+            <span class="grow">session-alpha.jsonl</span>
+            <button type="button" title="Rename（行内 · 禁止）" aria-label="Rename">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button type="button" title="Delete（危险 · 禁止）" aria-label="Delete" style="color:var(--danger)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 14h8l1-14"/></svg>
+            </button>
+          </div>
+          <div class="list-row" role="listitem">
+            <span class="grow">session-beta.jsonl</span>
+            <button type="button" title="Archive（行内 · 禁止）" aria-label="Archive">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </button>
+            <button type="button" title="Close tab（禁止）" aria-label="Close">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="row" style="align-content:flex-start">
+          <button type="button" class="btn danger" aria-label="解绑">解绑 Browser Share</button>
+          <button type="button" class="btn danger" aria-label="拒绝">拒绝命令</button>
+          <button type="button" class="btn" aria-label="Git refresh spin" title="已有 spin · 禁止叠加">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+            </svg>
+            Git Refresh
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- B4 note -->
+    <section class="region">
+      <div class="row" style="margin-bottom:8px;gap:8px">
+        <h2 style="margin:0">B4 · Terminal 等（尽量）</h2>
+        <span class="badge warn">BEST EFFORT</span>
+      </div>
+      <p>New terminal / Open SSH / Maximize 等非关闭工具条尽量 interactive；Close tab / 结束进程保持黑名单。实现受阻可 handoff 记录，不回退 B1–B3。</p>
+      <div class="mock-bar">
+        <span class="mock-label">Terminal</span>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="New local terminal">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gterm1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gterm1)" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></g>
+          </svg>
+          New
+        </button>
+        <button type="button" class="btn" data-icon-flow="interactive" aria-label="Open SSH">
+          <svg class="action-flow-icon" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <defs><linearGradient id="gterm2" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--icon-flow-a)"/><stop offset="1" stop-color="var(--icon-flow-c)"/></linearGradient></defs>
+            <g class="action-flow-icon__base" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V8a5 5 0 0 1 10 0v3"/></g>
+            <g class="action-flow-icon__overlay" stroke="url(#gterm2)" stroke-width="2.5"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V8a5 5 0 0 1 10 0v3"/></g>
+          </svg>
+          SSH
+        </button>
+        <button type="button" class="btn danger" aria-label="关闭终端">关闭终端</button>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    审批入口：同目录 <code>plan-review.md</code>。本页仅规划示范，不代表已改生产代码。
+    建议批准语见 plan-review「最大合理全站替换」。API：
+    <code>ActionFlowIcon</code> + <code>data-icon-flow</code> + 可选 <code>iconFlowAttrs()</code>。
+  </footer>
+
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <script>
+    const root = document.documentElement;
+    document.getElementById("themeBtn").addEventListener("click", (e) => {
+      root.classList.toggle("dark");
+      e.currentTarget.classList.toggle("is-on", !root.classList.contains("dark"));
+    });
+    document.getElementById("motionBtn").addEventListener("click", (e) => {
+      root.classList.toggle("reduce-motion");
+      e.currentTarget.classList.toggle("is-on", root.classList.contains("reduce-motion"));
+    });
+  </script>
+</body>
+</html>
