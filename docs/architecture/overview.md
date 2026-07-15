@@ -200,7 +200,8 @@ Model pricing is configured by writing directly to Pi's single source of truth: 
 - **Explicit free models**: user marks a model as free. `cost` is written as 0 in `models.json` and the model is recorded in `pi-web.json` `usage.explicitFreeModels[]` so the UI can distinguish "missing price" from "intentionally free" without relying on zero-matches.
 
 **Safety invariants:**
-- The config service (`lib/model-price-config.ts`) never touches `apiKey`, `baseUrl`, `headers`, `compat`, `tiers`, or `cost.cacheWrite` fields. It does a minimal deep-merge of only the `cost.input/output/cacheRead` fields.
+- The config service (`lib/model-price-config.ts`) never touches `apiKey`, `baseUrl`, `headers`, `compat`, or `tiers` fields. It does a minimal deep-merge of only the `cost.input/output/cacheRead` fields.
+- For custom `models[]` entries, if a `cost` object is written, the service fills missing schema-required rates (`input`/`output`/`cacheRead`/`cacheWrite`) with `0` so Pi ModelRegistry does not reject the entire `models.json`. Existing `cacheWrite` values are preserved; billing UI still does not manage cache-write pricing.
 - Writes use atomic `tmp + rename`, best-effort `0600` permissions, and an opaque revision hash for concurrency control (409 on stale revision).
 - Before and after each write, the service verifies the file can be read back and loads a fresh `ModelRegistry` to confirm resolved prices match expectations. Partial failures roll back to the pre-write backup.
 - JSONC comments are stripped with `stripJsonComments()` on read and lost on write (clean JSON output). A backup file (`models.json.backup`) is saved before every write.
