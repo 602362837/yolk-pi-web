@@ -617,8 +617,13 @@ span.linenumber {
   .app-top-label {
     display: none !important;
   }
+  /* Single usage host carries mobile right-drawer clearance once for GPT and/or Grok pills. */
   .app-top-usage-panel {
     padding-right: 84px !important;
+    gap: 8px;
+  }
+  .app-top-usage-panel > * {
+    flex-shrink: 0;
   }
   .right-panel-toggle-strip {
     z-index: 700 !important;
@@ -3334,4 +3339,57 @@ button.session-stats-chip:focus-visible {
 .chat-input-primary-action--followup:not(:disabled):focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
+}
+
+/* ChatGPT top usage panel (GPT-USAGE-02): spinner / focus / reduced-motion only.
+ * Keep selectors scoped under .chatgpt-usage-panel so Grok and global topbar styles stay untouched.
+ * Host layout (single .app-top-usage-panel, GPT→Grok order, one right padding) lives in AppShell. */
+.chatgpt-usage-panel {
+  flex-shrink: 0;
+}
+
+.chatgpt-usage-panel__trigger:focus-visible,
+.chatgpt-usage-panel__action:focus-visible,
+.chatgpt-usage-panel button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chatgpt-usage-panel__spinner {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1.5px solid rgba(148, 163, 184, 0.35);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+  box-sizing: border-box;
+}
+
+.chatgpt-usage-panel__skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.12) 0%,
+    rgba(148, 163, 184, 0.28) 50%,
+    rgba(148, 163, 184, 0.12) 100%
+  );
+  background-size: 200% 100%;
+  animation: chatgpt-usage-panel-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes chatgpt-usage-panel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatgpt-usage-panel__spinner,
+  .chatgpt-usage-panel__skeleton-shimmer {
+    animation: none !important;
+  }
+
+  .chatgpt-usage-panel,
+  .chatgpt-usage-panel * {
+    transition: none !important;
+  }
 }

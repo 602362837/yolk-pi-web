@@ -16,6 +16,18 @@ export const QUOTA_TIER_LABELS: Record<string, string> = {
   seven_day: "7d",
 };
 
+/** Chinese compact labels for the GPT top-bar usage pill (5h / week). */
+export const GPT_QUOTA_TIER_COMPACT_LABELS: Record<string, string> = {
+  five_hour: "5 小时",
+  seven_day: "周",
+};
+
+/** Chinese expanded labels for GPT quota window cards. */
+export const GPT_QUOTA_TIER_PANEL_LABELS: Record<string, string> = {
+  five_hour: "5 小时额度",
+  seven_day: "7 天额度",
+};
+
 export function isKnownQuotaTier(tier: QuotaDisplayTier): boolean {
   return tier.name in QUOTA_TIER_LABELS;
 }
@@ -68,6 +80,34 @@ export function formatQuotaQueriedAt(timestamp: number | null): string {
   if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
   if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
   return `${Math.floor(diffSeconds / 86400)}d ago`;
+}
+
+/**
+ * Chinese relative age for GPT usage panel cache timestamps.
+ * Keeps Models' English formatQuotaQueriedAt unchanged.
+ */
+export function formatGptQuotaRelativeAge(timestamp: number | null | undefined): string | null {
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp) || timestamp <= 0) return null;
+  const ageMs = Math.max(0, Date.now() - timestamp);
+  if (ageMs < 5_000) return "刚刚";
+  if (ageMs < 60_000) return `${Math.max(1, Math.round(ageMs / 1000))} 秒`;
+  if (ageMs < 3_600_000) return `${Math.max(1, Math.round(ageMs / 60_000))} 分钟`;
+  if (ageMs < 86_400_000) return `${Math.max(1, Math.round(ageMs / 3_600_000))} 小时`;
+  return `${Math.max(1, Math.round(ageMs / 86_400_000))} 天`;
+}
+
+/** Chinese countdown for GPT reset windows / credits (e.g. "2 小时 15 分"). */
+export function formatGptResetCountdown(resetsAt: string | null | undefined): string | null {
+  if (!resetsAt) return null;
+  const diffMs = new Date(resetsAt).getTime() - Date.now();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return null;
+
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours >= 24) return `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`;
+  if (hours > 0) return `${hours} 小时 ${minutes} 分`;
+  return `${minutes} 分`;
 }
 
 export function earliestResetCreditExpiration(credits: CodexResetCreditDisplay[]): string | null {
