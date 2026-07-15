@@ -172,6 +172,8 @@ export interface PiWebGrokAutoFailoverConfig {
 }
 
 export interface PiWebGrokConfig {
+  /** Top-right Grok usage pill; default off so upgrades do not mount or poll. */
+  usagePanelEnabled: boolean;
   autoFailover: PiWebGrokAutoFailoverConfig;
 }
 
@@ -344,6 +346,7 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     },
   },
   grok: {
+    usagePanelEnabled: false,
     autoFailover: {
       enabled: false,
       maxAttemptsPerTurn: 1,
@@ -879,6 +882,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       autoFailover: readOpencodeGoAutoFailoverConfig(opencodeGo.autoFailover, defaults.opencodeGo.autoFailover),
     },
     grok: {
+      usagePanelEnabled: readBoolean(grok.usagePanelEnabled, defaults.grok.usagePanelEnabled),
       autoFailover: readGrokAutoFailoverConfig(grok.autoFailover, defaults.grok.autoFailover),
     },
     editor: {
@@ -1486,6 +1490,7 @@ export function validatePiWebGrokConfig(value: unknown): PiWebGrokConfig {
     throw new PiWebConfigValidationError("grok config must be an object");
   }
   return {
+    usagePanelEnabled: requireBoolean(value.usagePanelEnabled, "grok.usagePanelEnabled"),
     autoFailover: validateGrokAutoFailoverConfig(value.autoFailover),
   };
 }

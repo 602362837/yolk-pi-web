@@ -1978,11 +1978,17 @@ export function SettingsConfig({
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Grok</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-                        控制 Grok CLI 全局 Active 账号的自动轮换。Models 的 Activate 只设置当前全局 Active，不是锁定；账号管理仍在 Models 中完成。
+                        控制 Grok CLI 全局 Active 账号的自动轮换与顶部用量入口。Models 的 Activate 只设置当前全局 Active，不是锁定；账号管理仍在 Models 中完成。
                         保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
                         {exists ? "" : "（保存时会自动创建）"}
                       </p>
                     </div>
+                    <ToggleField
+                      label="Grok 用量悬浮面板"
+                      description="默认关闭。开启后顶部右侧会显示当前全局 Active Grok 账号的半透明用量入口；展开后可查看月度/可选周额度、缓存状态、手动刷新并切换账号。"
+                      checked={grok.usagePanelEnabled}
+                      onChange={(usagePanelEnabled) => updateGrok({ usagePanelEnabled })}
+                    />
                     <ToggleField
                       label="明确限额或限流时自动切换可用账号"
                       description="默认关闭。开启后仅对 grok-cli 生效：当 provider code/type 或已确认错误文案明确识别为 quota、usage、credits、monthly、weekly exhaustion，或 rate-limit / too-many-requests 时，后端会在进程锁内切换全局 Active 并安全重试同一 turn 一次。手动 Activate 的账号同样参与自动轮换。裸/模糊状态、网络错误、timeout、5xx、auth/reauth、context、content 或 model 错误不会触发。切换影响所有普通 live/new Session 的后续请求；已发出的 in-flight 请求不换 token。每 turn 默认最多 1 次切号 / 1 次重试；并发时后进入者复用新 Active，不级联切第三账号。"

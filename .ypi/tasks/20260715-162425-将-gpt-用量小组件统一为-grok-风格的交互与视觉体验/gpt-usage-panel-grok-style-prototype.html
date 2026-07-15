@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yolk Pi Web · GPT Grok 风格用量面板原型</title>
+  <style>
+    :root {
+      --bg: #191919;
+      --bg-panel: #242424;
+      --bg-hover: #303030;
+      --bg-selected: #373737;
+      --surface: rgba(148,163,184,.065);
+      --border: #3b3b3b;
+      --text: #e8e8e8;
+      --text-muted: #a3a8b2;
+      --text-dim: #737985;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --shadow: 0 20px 58px rgba(0,0,0,.46), 0 0 0 1px rgba(255,255,255,.025);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 76% 0, rgba(96,165,250,.10), transparent 33rem),
+        radial-gradient(circle at 8% 92%, rgba(251,191,36,.055), transparent 28rem),
+        #121212;
+      font: 13px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button { font: inherit; }
+    button:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed !important; }
+    .hidden { display: none !important; }
+
+    .prototype-head {
+      position: sticky;
+      inset: 0 0 auto;
+      z-index: 1200;
+      min-height: 72px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(17,17,17,.86);
+      backdrop-filter: blur(18px);
+    }
+    .prototype-title { min-width: 220px; }
+    .prototype-title strong { display: block; font-size: 14px; }
+    .prototype-title span { color: var(--text-muted); font-size: 11px; }
+    .control-area { display: flex; flex-direction: column; gap: 7px; align-items: flex-end; }
+    .control-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+    .control-label { align-self: center; margin-right: 3px; color: var(--text-dim); font-size: 10px; font-weight: 800; }
+    .demo-btn, .secondary-btn, .danger-btn, .primary-btn, .icon-btn, .small-btn, .link-btn {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: rgba(36,36,36,.92);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .demo-btn { min-height: 28px; padding: 4px 8px; font-size: 10px; }
+    .demo-btn:hover, .secondary-btn:hover, .icon-btn:hover, .small-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .demo-btn.active { color: var(--accent); border-color: rgba(96,165,250,.52); background: rgba(96,165,250,.11); }
+    .primary-btn { min-height: 34px; padding: 6px 11px; color: #0b1220; border-color: var(--accent); background: var(--accent); font-weight: 850; }
+    .primary-btn:hover { background: var(--accent-hover); }
+    .secondary-btn { min-height: 32px; padding: 5px 10px; }
+    .danger-btn { min-height: 30px; padding: 5px 9px; color: var(--danger); border-color: rgba(251,113,133,.34); background: transparent; font-size: 10px; font-weight: 800; }
+    .danger-btn:hover { background: rgba(251,113,133,.08); }
+    .icon-btn { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; font-size: 16px; }
+    .small-btn { min-height: 29px; padding: 4px 8px; color: var(--accent); font-size: 10px; font-weight: 800; }
+    .link-btn { padding: 3px 0; border: 0; background: transparent; color: var(--accent); font-size: 10px; font-weight: 800; text-align: left; }
+
+    main { padding: 24px 14px 76px; }
+    .stage-wrap { max-width: 1230px; margin: 0 auto; }
+    .stage-meta {
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .viewport-badge { color: var(--accent); font-family: var(--font-mono); font-weight: 800; white-space: nowrap; }
+    .app-frame {
+      position: relative;
+      width: 100%;
+      height: min(700px, calc(100vh - 190px));
+      min-height: 600px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 13px;
+      background: var(--bg);
+      box-shadow: 0 28px 90px rgba(0,0,0,.42);
+      transition: width .18s ease;
+    }
+    .app-frame.viewport-375 { width: 375px; max-width: 100%; height: 720px; }
+    .app-frame.viewport-320 { width: 320px; max-width: 100%; height: 720px; }
+    .app-layout { height: 100%; display: grid; grid-template-columns: 216px minmax(0,1fr); }
+    .app-frame.is-narrow .app-layout { grid-template-columns: 1fr; }
+    .sidebar { min-width: 0; border-right: 1px solid var(--border); background: #202020; }
+    .app-frame.is-narrow .sidebar { display: none; }
+    .brand { height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); font-weight: 850; }
+    .brand-mark { width: 19px; height: 19px; display: grid; place-items: center; border-radius: 6px; color: #261700; background: linear-gradient(145deg,#facc15,#fb923c); font-size: 10px; }
+    .side-body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .side-row { padding: 8px; border-radius: 7px; color: var(--text-muted); background: rgba(255,255,255,.025); }
+    .side-row.active { color: var(--text); border: 1px solid var(--border); background: var(--bg-selected); }
+    .workspace { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .topbar {
+      height: 42px;
+      flex: 0 0 42px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      border-bottom: 1px solid var(--border);
+      background: rgba(36,36,36,.84);
+      backdrop-filter: blur(16px);
+    }
+    .topbar::-webkit-scrollbar { display: none; }
+    .top-action {
+      height: 28px;
+      flex: 0 0 auto;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid rgba(148,163,184,.20);
+      border-radius: 8px;
+      background: rgba(15,23,42,.08);
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-size: 10px;
+    }
+    .top-spacer { flex: 1 1 auto; min-width: 12px; }
+    .stats-chip {
+      height: 23px;
+      flex: 0 0 auto;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(148,163,184,.20);
+      border-radius: 999px;
+      color: var(--text-muted);
+      background: rgba(15,23,42,.10);
+      white-space: nowrap;
+      font-size: 10px;
+    }
+    .stats-chip b { color: var(--text); }
+    .usage-host { flex: 0 0 auto; padding-right: 44px; display: flex; align-items: center; gap: 8px; }
+    .app-frame.is-narrow .usage-host { padding-right: 84px; }
+    .usage-trigger {
+      height: 26px;
+      flex: 0 0 auto;
+      padding: 0 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid rgba(148,163,184,.28);
+      border-radius: 999px;
+      color: var(--text-muted);
+      background: rgba(15,23,42,.10);
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+    .usage-trigger:hover, .usage-trigger[aria-expanded="true"] { border-color: rgba(96,165,250,.58); background: rgba(96,165,250,.08); }
+    .usage-brand { color: var(--text); font-weight: 850; }
+    .status-inline, .mini-quota { display: inline-flex; align-items: center; gap: 4px; }
+    .status-dot { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: var(--text-dim); }
+    .status-dot.success { background: var(--success); box-shadow: 0 0 8px rgba(74,222,128,.48); }
+    .status-dot.warning { background: var(--warning); }
+    .status-dot.danger { background: var(--danger); }
+    .spinner { width: 10px; height: 10px; flex: 0 0 auto; border: 1.5px solid rgba(148,163,184,.32); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ring {
+      --p: 0;
+      --ring: var(--text-dim);
+      width: 17px;
+      height: 17px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid rgba(148,163,184,.30);
+      border-radius: 50%;
+      background: conic-gradient(var(--ring) calc(var(--p) * 1%), rgba(148,163,184,.18) 0);
+    }
+    .ring::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #252525; }
+    .mini-quota small { color: var(--text-dim); font-size: 9px; font-weight: 800; }
+
+    .chat-canvas {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.016) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px;
+    }
+    .chat-copy { width: min(700px, calc(100% - 34px)); margin: 44px auto; }
+    .chat-copy h1 { margin: 0 0 8px; font-size: 20px; }
+    .chat-copy p { max-width: 610px; margin: 0; color: var(--text-muted); line-height: 1.65; }
+    .path-card { margin-top: 24px; padding: 13px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); background: rgba(36,36,36,.66); }
+    .path-card strong { color: var(--text); }
+    .input-mock { position: absolute; right: 18px; bottom: 20px; left: 18px; height: 72px; padding: 12px; border: 1px solid var(--border); border-radius: 13px; color: var(--text-dim); background: rgba(36,36,36,.9); }
+
+    .usage-panel {
+      position: absolute;
+      z-index: 700;
+      width: min(392px, calc(100% - 16px));
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid rgba(148,163,184,.31);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(17px);
+    }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .panel-title { font-size: 13px; font-weight: 850; }
+    .panel-meta { margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--text-dim); font-size: 10px; }
+    .source-badge { padding: 2px 6px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 999px; font-weight: 800; }
+    .source-badge.success { color: var(--success); border-color: rgba(74,222,128,.28); }
+    .source-badge.warning { color: var(--warning); border-color: rgba(251,191,36,.30); }
+    .source-badge.danger { color: var(--danger); border-color: rgba(251,113,133,.30); }
+    .panel-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .surface { padding: 9px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+    .account-summary { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; }
+    .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-name { font-size: 12px; font-weight: 800; }
+    .account-id { margin-top: 3px; color: var(--text-dim); font: 10px var(--font-mono); }
+    .active-badge { color: var(--success); font-size: 10px; font-weight: 900; }
+    .notice { padding: 9px 10px; display: flex; align-items: flex-start; gap: 8px; border-radius: 9px; font-size: 11px; line-height: 1.5; }
+    .notice.warning { color: #fde68a; border: 1px solid rgba(251,191,36,.27); background: rgba(251,191,36,.085); }
+    .notice.danger { color: #fecdd3; border: 1px solid rgba(251,113,133,.25); background: rgba(251,113,133,.085); }
+    .notice.neutral { color: var(--text-muted); border: 1px solid var(--border); background: rgba(148,163,184,.055); }
+    .section-kicker { color: var(--text-dim); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 850; }
+    .section-hint { color: var(--text-dim); font-size: 9px; font-weight: 600; }
+    .quota-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .app-frame.is-narrow .quota-grid { grid-template-columns: 1fr; }
+    .quota-card { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: rgba(148,163,184,.055); }
+    .quota-label { color: var(--text-muted); font-size: 10px; font-weight: 800; }
+    .quota-value { margin-top: 5px; font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .quota-value small { color: var(--text-dim); font-size: 10px; font-weight: 600; }
+    .progress { height: 6px; margin: 8px 0 6px; overflow: hidden; border-radius: 999px; background: rgba(148,163,184,.16); }
+    .progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+    .progress span.warning { background: var(--warning); }
+    .progress span.danger { background: var(--danger); }
+    .quota-detail { color: var(--text-dim); font-size: 10px; }
+    .account-list { display: flex; flex-direction: column; gap: 7px; }
+    .account-row { padding: 8px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(148,163,184,.045); }
+    .account-row.active { border-color: rgba(74,222,128,.38); background: rgba(74,222,128,.055); }
+    .account-row strong, .account-row code, .account-row span.summary { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-row strong { font-size: 11px; }
+    .account-row code { margin-top: 2px; color: var(--text-dim); font: 9px var(--font-mono); }
+    .account-row span.summary { margin-top: 2px; color: var(--text-dim); font-size: 9px; }
+    .active-explain { padding: 8px; color: var(--text-dim); border: 1px solid rgba(96,165,250,.23); border-radius: 8px; background: rgba(96,165,250,.055); font-size: 10px; }
+    .provider-divider { height: 1px; margin: 2px 0; background: linear-gradient(90deg,rgba(96,165,250,.5),var(--border),transparent); }
+    .gpt-tools { padding: 10px; display: flex; flex-direction: column; gap: 9px; border: 1px solid rgba(96,165,250,.22); border-radius: 10px; background: rgba(96,165,250,.035); }
+    .tool-card { padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: rgba(15,15,15,.18); }
+    .tool-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tool-title { font-size: 11px; font-weight: 850; }
+    .tool-copy { margin-top: 3px; color: var(--text-dim); font-size: 9px; line-height: 1.5; }
+    .scheduler-grid { margin-top: 7px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; color: var(--text-muted); font-size: 9px; }
+    .scheduler-cell { padding: 6px; border-radius: 6px; background: rgba(148,163,184,.055); }
+    .scheduler-cell b { display: block; color: var(--text); font-size: 10px; }
+    .scheduler-cell.warning b { color: var(--warning); }
+    .panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-dim); font-size: 9px; }
+    .skeleton { position: relative; height: 11px; overflow: hidden; border-radius: 4px; background: rgba(148,163,184,.13); }
+    .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent); animation: shimmer 1.3s infinite; }
+    @keyframes shimmer { to { transform: translateX(100%); } }
+
+    .confirm-layer { position: fixed; inset: 0; z-index: 1800; padding: 16px; display: grid; place-items: center; background: rgba(0,0,0,.65); backdrop-filter: blur(5px); }
+    .confirm-dialog { width: min(430px,100%); padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel); box-shadow: var(--shadow); }
+    .confirm-dialog h2 { margin: 0; font-size: 15px; }
+    .confirm-dialog p { margin: 8px 0 16px; color: var(--text-muted); font-size: 12px; line-height: 1.65; }
+    .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .toast { position: fixed; right: 16px; bottom: 16px; z-index: 2000; max-width: min(390px,calc(100vw - 32px)); padding: 10px 12px; color: var(--text); border: 1px solid rgba(96,165,250,.35); border-radius: 9px; background: rgba(36,36,36,.95); box-shadow: var(--shadow); font-size: 11px; }
+
+    @media (max-width: 820px) {
+      .prototype-head { align-items: flex-start; flex-direction: column; }
+      .control-area { align-items: flex-start; }
+      .control-row { justify-content: flex-start; }
+      main { padding-top: 16px; }
+      .app-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .stage-meta { flex-direction: column; }
+      .top-action .label, .stats-chip .detail { display: none; }
+      .quota-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .prototype-title span { display: none; }
+      .app-frame { min-height: 620px; height: 720px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="prototype-head">
+    <div class="prototype-title">
+      <strong>GPT 顶部用量面板 · Grok 风格统一原型</strong>
+      <span>同一交互语言 · 保留 5 小时 / 7 天、Reset credits、scheduler 与 lock 语义</span>
+    </div>
+    <div class="control-area" aria-label="原型状态控制">
+      <div class="control-row">
+        <span class="control-label">数据状态</span>
+        <button type="button" class="demo-btn active" data-state="live">实时</button>
+        <button type="button" class="demo-btn" data-state="cached">已缓存</button>
+        <button type="button" class="demo-btn" data-state="fallback">刷新失败回退</button>
+        <button type="button" class="demo-btn" data-state="nocache">无缓存</button>
+        <button type="button" class="demo-btn" data-state="noaccount">无账号</button>
+        <button type="button" class="demo-btn" data-state="reauth">重新登录</button>
+        <button type="button" class="demo-btn" data-state="loading">加载</button>
+      </div>
+      <div class="control-row">
+        <span class="control-label">视口与运维</span>
+        <button type="button" class="demo-btn active" data-width="desktop">桌面</button>
+        <button type="button" class="demo-btn" data-width="375">375px</button>
+        <button type="button" class="demo-btn" data-width="320">320px</button>
+        <button type="button" class="demo-btn" id="lockStateBtn" aria-pressed="false">lock 正常</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage-wrap">
+      <div class="stage-meta">
+        <span>点击顶部 GPT 展开。面板外点击、Escape、关闭按钮均可关闭；关闭后还焦 GPT 触发按钮。</span>
+        <span class="viewport-badge" id="viewportBadge">桌面视口 · 生产采用 fixed + 8px 夹紧</span>
+      </div>
+      <section class="app-frame viewport-desktop" id="appFrame" aria-label="Yolk Pi Web 顶部布局交互演示">
+        <div class="app-layout">
+          <aside class="sidebar" aria-hidden="true">
+            <div class="brand"><span class="brand-mark">Y</span> yolk pi web</div>
+            <div class="side-body">
+              <div class="side-row active">GPT 用量体验统一</div>
+              <div class="side-row">会话历史</div>
+              <div class="side-row">YPI Studio</div>
+            </div>
+          </aside>
+          <div class="workspace">
+            <div class="topbar" id="topbar">
+              <button type="button" class="top-action"><span>⑂</span><span class="label">分支</span></button>
+              <button type="button" class="top-action"><span>⌁</span><span class="label">Git</span></button>
+              <button type="button" class="top-action"><span>›_</span><span class="label">终端</span></button>
+              <span class="top-spacer"></span>
+              <span class="stats-chip" title="当前会话统计"><b>¥0.42</b><span class="detail">输入 1.2M · 输出 48K</span></span>
+              <div class="usage-host" aria-label="提供商用量入口">
+                <span id="gptTriggerMount"></span>
+                <button type="button" class="usage-trigger" id="grokStatic" title="Grok 用量（仅用于演示并排顺序）" aria-label="Grok 用量（仅用于演示并排顺序）">
+                  <span class="usage-brand">Grok</span><span class="status-inline"><span class="status-dot success"></span>已缓存</span>
+                  <span class="mini-quota"><span class="ring" style="--p:34;--ring:var(--accent)"></span><small>月 34%</small></span>
+                  <span class="mini-quota"><span class="ring" style="--p:12;--ring:var(--accent)"></span><small>周 12%</small></span>
+                </button>
+              </div>
+              <button type="button" class="top-action" title="打开右侧文件抽屉" aria-label="打开右侧文件抽屉"><span>▥</span><span class="label">文件</span></button>
+            </div>
+            <div class="chat-canvas">
+              <div class="chat-copy">
+                <h1>同一顶部体验，不同提供商语义</h1>
+                <p>GPT 沿用 Grok 的胶囊入口、fixed 视口夹紧、状态反馈与键盘关闭方式；额度仍来自真实的 5 小时与 7 天窗口。</p>
+                <div class="path-card"><strong>主路径：</strong>状态 → Active 账号 → 5 小时 / 7 天额度 → 刷新 → 账号切换。<br><strong>GPT 专属次级区：</strong>Reset credits → scheduler → lock repair。</div>
+              </div>
+              <div class="input-mock">输入消息…</div>
+            </div>
+          </div>
+        </div>
+        <div id="panelMount"></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="confirm-layer hidden" id="confirmLayer" role="presentation">
+    <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+      <h2 id="confirmTitle">确认操作</h2>
+      <p id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button type="button" class="secondary-btn" id="confirmCancel">取消</button>
+        <button type="button" class="danger-btn" id="confirmAccept">确认继续</button>
+      </div>
+    </section>
+  </div>
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const models = {
+        live: { status: "实时", tone: "success", source: "实时", age: "刚刚", quota: true, five: 43, week: 72, fiveReset: "2 小时 18 分", weekReset: "4 天 7 小时" },
+        cached: { status: "已缓存 · 8 分钟", tone: "success", source: "已缓存", age: "8 分钟前", quota: true, five: 43, week: 72, fiveReset: "2 小时 10 分", weekReset: "4 天 7 小时" },
+        fallback: { status: "刷新失败", tone: "warning", source: "本页成功数据", age: "2 分钟前", quota: true, five: 47, week: 72, fiveReset: "2 小时 4 分", weekReset: "4 天 7 小时", fallback: true },
+        nocache: { status: "无缓存", tone: "muted", source: "无缓存", age: "从未更新", quota: false },
+        noaccount: { status: "登录", tone: "muted", source: "无缓存", age: "从未更新", account: false, quota: false },
+        reauth: { status: "重新登录", tone: "danger", source: "已缓存 · 需重新登录", age: "1 小时前", quota: true, five: 61, week: 78, fiveReset: "1 小时 26 分", weekReset: "4 天 7 小时", reauth: true },
+        loading: { status: "加载中", tone: "muted", source: "正在读取", age: "正在读取…", loading: true, quota: false }
+      };
+      const accounts = [
+        { id: "primary", name: "个人 ChatGPT Plus", masked: "per•••@example.com", note: "主力账号" },
+        { id: "team", name: "团队 Codex", masked: "tea•••@example.com", note: "项目备用" },
+        { id: "long", name: "用于验证窄屏省略显示的超长 ChatGPT 账号名称", masked: "ver••••••••@long-domain.example", note: "长内容测试" }
+      ];
+
+      let currentState = "live";
+      let panelOpen = true;
+      let viewport = "desktop";
+      let activeIndex = 0;
+      let refreshing = false;
+      let switchingIndex = null;
+      let resetting = false;
+      let repairing = false;
+      let schedulerReloading = false;
+      let staleLock = false;
+      let resetCredits = 3;
+      let toastTimer = null;
+      let confirmAction = null;
+      let confirmReturn = null;
+
+      const frame = document.getElementById("appFrame");
+      const topbar = document.getElementById("topbar");
+      const triggerMount = document.getElementById("gptTriggerMount");
+      const panelMount = document.getElementById("panelMount");
+      const toast = document.getElementById("toast");
+      const confirmLayer = document.getElementById("confirmLayer");
+      const confirmTitle = document.getElementById("confirmTitle");
+      const confirmMessage = document.getElementById("confirmMessage");
+      const confirmAccept = document.getElementById("confirmAccept");
+
+      function esc(value) {
+        return String(value).replace(/[&<>\"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[char]));
+      }
+      function ringColor(value) { return value >= 95 ? "var(--danger)" : value >= 80 ? "var(--warning)" : "var(--accent)"; }
+      function barClass(value) { return value >= 95 ? "danger" : value >= 80 ? "warning" : ""; }
+      function model() { return models[currentState]; }
+      function hasAccount() { return model().account !== false && !model().loading; }
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.remove("hidden");
+        toastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2900);
+      }
+
+      function renderTrigger() {
+        const data = model();
+        const status = refreshing ? "正在刷新…" : resetting ? "正在重置…" : data.status;
+        const busy = refreshing || resetting || data.loading;
+        const five = data.quota ? data.five : null;
+        const week = data.quota ? data.week : null;
+        triggerMount.innerHTML = `<button class="usage-trigger" id="gptTrigger" type="button" title="ChatGPT/Codex 用量" aria-label="ChatGPT/Codex 用量，当前状态：${esc(status)}" aria-expanded="${panelOpen}" aria-controls="gptUsagePanel">
+          <span class="usage-brand">GPT</span>
+          <span class="status-inline">${busy ? '<span class="spinner" aria-hidden="true"></span>' : `<span class="status-dot ${data.tone === "muted" ? "" : data.tone}" aria-hidden="true"></span>`}<span>${esc(status)}</span></span>
+          <span class="mini-quota" title="${five === null ? "5 小时额度未知" : `5 小时已使用 ${five}%`}"><span class="ring" style="--p:${five ?? 0};--ring:${five === null ? "var(--text-dim)" : ringColor(five)}"></span><small>${five === null ? "5 小时 —" : `5 小时 ${five}%`}</small></span>
+          <span class="mini-quota" title="${week === null ? "7 天额度未知" : `7 天已使用 ${week}%`}"><span class="ring" style="--p:${week ?? 0};--ring:${week === null ? "var(--text-dim)" : ringColor(week)}"></span><small>${week === null ? "周 —" : `周 ${week}%`}</small></span>
+        </button>`;
+        document.getElementById("gptTrigger").addEventListener("click", event => {
+          event.stopPropagation();
+          panelOpen ? closePanel(true) : openPanel();
+        });
+      }
+
+      function quotaCard(label, percent, resetText) {
+        return `<div class="quota-card">
+          <div class="quota-label">${label}</div>
+          <div class="quota-value" style="color:${ringColor(percent)}">${percent}<small>% 已使用</small></div>
+          <div class="progress" role="progressbar" aria-label="${label}已使用比例" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span class="${barClass(percent)}" style="width:${percent}%"></span></div>
+          <div class="quota-detail">重置倒计时 ${resetText}</div>
+        </div>`;
+      }
+
+      function accountRows() {
+        return accounts.map((account, index) => {
+          const active = index === activeIndex;
+          const busy = switchingIndex !== null || refreshing || resetting;
+          return `<div class="account-row ${active ? "active" : ""}">
+            <div style="min-width:0"><strong title="${esc(account.name)}">${esc(account.name)}</strong><code title="${esc(account.masked)}">${esc(account.masked)} · ${esc(account.note)}</code><span class="summary">${active ? "当前 Active · 已缓存 8 分钟前" : "已保存账号 · 独立额度缓存"}</span></div>
+            ${active ? '<span class="active-badge">Active</span>' : `<button type="button" class="small-btn switch-account" data-index="${index}" ${busy ? "disabled" : ""} aria-label="将 ${esc(account.name)} 设为 Active">${switchingIndex === index ? "正在切换…" : "设为 Active"}</button>`}
+          </div>`;
+        }).join("");
+      }
+
+      function specialTools() {
+        const resetDisabled = refreshing || resetting || switchingIndex !== null || resetCredits < 1;
+        const lockText = staleLock ? "stale · 需要检查" : "当前进程持有";
+        return `<div class="provider-divider"></div>
+          <section class="gpt-tools" aria-labelledby="gptToolsTitle">
+            <div><div class="section-kicker">GPT 专属次级区</div><div class="section-head" id="gptToolsTitle"><span>GPT 专属工具</span><span class="section-hint">不与 Grok 共享</span></div></div>
+            <div class="tool-card">
+              <div class="tool-row"><div><div class="tool-title">Reset credits：${resetCredits}</div><div class="tool-copy">最早一笔将在 3 天 12 小时后过期；每次重置消耗一次 Codex Reset credit。</div></div><button type="button" class="small-btn" id="resetBtn" ${resetDisabled ? "disabled" : ""} title="消耗一次 Reset credit 重置额度">${resetting ? "正在重置…" : "使用一次"}</button></div>
+            </div>
+            <div class="tool-card">
+              <div class="tool-row"><div><div class="tool-title">后台自动刷新 scheduler</div><div class="tool-copy">展示既有 scheduler 与 lock 状态；此处不会修改刷新算法。</div></div><button type="button" class="small-btn" id="schedulerReload" ${schedulerReloading ? "disabled" : ""}>${schedulerReloading ? "正在重载…" : "重载状态"}</button></div>
+              <div class="scheduler-grid">
+                <div class="scheduler-cell"><b>scheduler 已启用</b>运行中：否 · 下次 18:30</div>
+                <div class="scheduler-cell ${staleLock ? "warning" : ""}"><b>lock ${lockText}</b>上次完成：18:00</div>
+              </div>
+              <div class="tool-row" style="margin-top:8px"><span class="tool-copy" style="margin:0">仅在刷新器卡住或 lock stale 时修复。</span><button type="button" class="danger-btn" id="repairBtn" ${repairing || !staleLock ? "disabled" : ""}>${repairing ? "正在修复…" : "修复刷新 lock"}</button></div>
+            </div>
+          </section>`;
+      }
+
+      function renderPanel() {
+        if (!panelOpen) { panelMount.innerHTML = ""; return; }
+        const data = model();
+        const active = accounts[activeIndex];
+        const sourceTone = data.tone === "muted" ? "" : data.tone;
+        const busy = refreshing || resetting || switchingIndex !== null;
+        let body = "";
+
+        if (data.loading) {
+          body = `<div class="surface" aria-busy="true" style="display:flex;flex-direction:column;gap:9px"><div class="skeleton" style="width:52%"></div><div class="skeleton" style="width:78%"></div><div class="skeleton" style="height:82px"></div><span style="color:var(--text-muted);font-size:11px">正在加载已保存账号与额度缓存…</span></div>`;
+        } else if (!hasAccount()) {
+          body = `<div class="notice neutral"><span aria-hidden="true">◇</span><div><strong style="display:block;color:var(--text);margin-bottom:3px">无 Active ChatGPT/Codex 账号</strong>请先在 Models → ChatGPT 登录或激活账号。未知额度不会显示为 0%。</div></div><button type="button" class="primary-btn" id="modelsSignin">打开 Models → ChatGPT</button>`;
+        } else {
+          body += `<div class="section-kicker">通用主路径 · 额度与账号</div>
+            <div class="surface account-summary"><div style="min-width:0"><div class="account-name ellipsis" title="${esc(active.name)}">${esc(active.name)}</div><div class="account-id ellipsis" title="${esc(active.masked)}">${esc(active.masked)} · ${esc(active.note)}</div></div><span class="active-badge">Active</span></div>`;
+
+          if (data.fallback) body += `<div class="notice warning"><span aria-hidden="true">△</span><div><strong>刷新失败。</strong>正在展示本页上次成功数据；该回退仅属于当前账号，不代表服务端缓存已过期。</div></div>`;
+          if (data.reauth) body += `<div class="notice danger"><span aria-hidden="true">!</span><div><strong>登录已失效，需要重新登录。</strong>请前往 Models → ChatGPT 更新 OAuth 凭据。</div></div>`;
+
+          if (data.quota) {
+            body += `<div class="quota-grid">${quotaCard("5 小时额度", data.five, data.fiveReset)}${quotaCard("7 天额度", data.week, data.weekReset)}</div>`;
+          } else {
+            body += `<div class="notice neutral"><span aria-hidden="true">○</span><div><strong style="color:var(--text)">额度未知。</strong>当前账号没有成功缓存；请手动刷新查询当前 Active 账号。</div></div>`;
+          }
+
+          if (data.reauth) body += `<button type="button" class="primary-btn" id="modelsRelogin">在 Models → ChatGPT 重新登录</button>`;
+
+          body += `<div class="section-head"><span>账号</span><span class="section-hint">全局 Active</span></div><div class="active-explain">“设为 Active”会切换全局 Active ChatGPT/Codex 账号。切换成功后刷新新账号额度；旧账号响应不得覆盖。</div><div class="account-list">${accountRows()}</div><div class="panel-footer"><button type="button" class="link-btn" id="modelsManage">在 Models → ChatGPT 管理</button><span>页面可见时每 30 秒只重读账号缓存</span></div>${specialTools()}`;
+        }
+
+        panelMount.innerHTML = `<section class="usage-panel" id="gptUsagePanel" role="dialog" aria-label="ChatGPT/Codex 用量" aria-live="polite">
+          <div class="panel-head"><div style="min-width:0"><div class="panel-title">ChatGPT/Codex 用量</div><div class="panel-meta"><span class="source-badge ${sourceTone}"><span class="status-dot ${sourceTone}" aria-hidden="true"></span>${esc(data.source)}</span><span>更新时间：${esc(data.age)}</span></div></div>
+          <div class="panel-actions"><button type="button" class="icon-btn" id="refreshBtn" title="刷新当前 Active 账号额度" aria-label="刷新当前 Active ChatGPT/Codex 账号额度" ${busy || !hasAccount() || data.loading ? "disabled" : ""}>${refreshing ? '<span class="spinner" aria-hidden="true"></span>' : "↻"}</button><button type="button" class="icon-btn" id="panelClose" title="关闭用量面板" aria-label="关闭 ChatGPT/Codex 用量面板">×</button></div></div>
+          ${refreshing ? '<div style="color:var(--text-muted);font-size:11px">正在刷新当前 Active 账号额度…</div>' : ""}${body}
+        </section>`;
+
+        document.getElementById("panelClose").addEventListener("click", () => closePanel(true));
+        document.getElementById("refreshBtn")?.addEventListener("click", manualRefresh);
+        document.querySelectorAll(".switch-account").forEach(button => button.addEventListener("click", () => switchAccount(Number(button.dataset.index))));
+        document.getElementById("resetBtn")?.addEventListener("click", openResetConfirm);
+        document.getElementById("schedulerReload")?.addEventListener("click", reloadScheduler);
+        document.getElementById("repairBtn")?.addEventListener("click", openRepairConfirm);
+        ["modelsSignin", "modelsRelogin", "modelsManage"].forEach(id => document.getElementById(id)?.addEventListener("click", openModels));
+        updatePanelPosition();
+      }
+
+      function render() { renderTrigger(); renderPanel(); }
+      function openPanel() { panelOpen = true; render(); window.setTimeout(() => document.getElementById("panelClose")?.focus(), 0); }
+      function closePanel(restoreFocus) { panelOpen = false; render(); if (restoreFocus) window.setTimeout(() => document.getElementById("gptTrigger")?.focus(), 0); }
+      function updatePanelPosition() {
+        const panel = document.getElementById("gptUsagePanel");
+        const trigger = document.getElementById("gptTrigger");
+        if (!panel || !trigger) return;
+        const frameRect = frame.getBoundingClientRect();
+        const triggerRect = trigger.getBoundingClientRect();
+        const width = Math.min(392, Math.max(0, frame.clientWidth - 16));
+        const preferredRight = Math.max(8, frameRect.right - triggerRect.right);
+        const leftAtPreferred = frame.clientWidth - preferredRight - width;
+        const right = leftAtPreferred < 8 ? 8 : preferredRight;
+        const top = Math.max(8, Math.round(triggerRect.bottom - frameRect.top + 5));
+        panel.style.right = `${Math.round(right)}px`;
+        panel.style.top = `${top}px`;
+        panel.style.maxHeight = `${Math.max(220, frame.clientHeight - top - 8)}px`;
+      }
+
+      function manualRefresh() {
+        if (refreshing || !hasAccount()) return;
+        refreshing = true;
+        render();
+        window.setTimeout(() => {
+          refreshing = false;
+          currentState = "live";
+          models.live.five = activeIndex === 1 ? 68 : activeIndex === 2 ? 29 : 43;
+          models.live.week = activeIndex === 1 ? 54 : activeIndex === 2 ? 88 : 72;
+          syncStateControls();
+          render();
+          showToast("额度已实时刷新；数据仅属于当前 Active 账号。");
+        }, 950);
+      }
+      function switchAccount(index) {
+        if (switchingIndex !== null || refreshing || resetting) return;
+        switchingIndex = index;
+        render();
+        window.setTimeout(() => {
+          activeIndex = index;
+          switchingIndex = null;
+          currentState = "live";
+          models.live.five = index === 1 ? 68 : index === 2 ? 29 : 43;
+          models.live.week = index === 1 ? 54 : index === 2 ? 88 : 72;
+          syncStateControls();
+          render();
+          showToast(`全局 Active 已切换为 ${accounts[index].name}；新账号额度已刷新。`);
+        }, 900);
+      }
+      function reloadScheduler() {
+        if (schedulerReloading) return;
+        schedulerReloading = true;
+        render();
+        window.setTimeout(() => { schedulerReloading = false; render(); showToast("scheduler 与 lock 状态已重载。"); }, 700);
+      }
+      function openModels() { closePanel(false); showToast("实现时打开现有 Models → ChatGPT 账号管理，不新增配置。"); }
+
+      function openConfirm({ title, message, acceptLabel, action, returnElement }) {
+        confirmTitle.textContent = title;
+        confirmMessage.textContent = message;
+        confirmAccept.textContent = acceptLabel;
+        confirmAction = action;
+        confirmReturn = returnElement;
+        confirmLayer.classList.remove("hidden");
+        window.setTimeout(() => document.getElementById("confirmCancel").focus(), 0);
+      }
+      function closeConfirm(restore = true) {
+        confirmLayer.classList.add("hidden");
+        const target = confirmReturn;
+        confirmAction = null;
+        confirmReturn = null;
+        if (restore) window.setTimeout(() => target?.focus(), 0);
+      }
+      function openResetConfirm(event) {
+        openConfirm({
+          title: "确认使用 Reset credit？",
+          message: "此操作将消耗一次 Codex Reset credit 并调用现有额度重置接口。取消不会产生任何写入。",
+          acceptLabel: "确认使用一次",
+          returnElement: event.currentTarget,
+          action: () => {
+            closeConfirm(false);
+            resetting = true;
+            render();
+            window.setTimeout(() => { resetting = false; resetCredits = Math.max(0, resetCredits - 1); models.live.five = 0; currentState = "live"; syncStateControls(); render(); showToast("额度已重置，已消耗一次 Reset credit。"); }, 900);
+          }
+        });
+      }
+      function openRepairConfirm(event) {
+        openConfirm({
+          title: "确认修复刷新 lock？",
+          message: "修复会删除当前 ChatGPT 自动刷新 lock。如果另一个健康的 Yolk Pi Web 进程仍在运行，可能短时间产生重复刷新。仅在刷新器明显卡住或 lock stale 时继续。",
+          acceptLabel: "继续修复",
+          returnElement: event.currentTarget,
+          action: () => {
+            closeConfirm(false);
+            repairing = true;
+            render();
+            window.setTimeout(() => { repairing = false; staleLock = false; syncLockControl(); render(); showToast("刷新 lock 已修复；scheduler 状态已重新读取。"); }, 900);
+          }
+        });
+      }
+
+      function syncStateControls() { document.querySelectorAll("[data-state]").forEach(button => button.classList.toggle("active", button.dataset.state === currentState)); }
+      function syncWidthControls() { document.querySelectorAll("[data-width]").forEach(button => button.classList.toggle("active", button.dataset.width === viewport)); }
+      function syncLockControl() {
+        const button = document.getElementById("lockStateBtn");
+        button.textContent = staleLock ? "lock stale" : "lock 正常";
+        button.classList.toggle("active", staleLock);
+        button.setAttribute("aria-pressed", String(staleLock));
+      }
+      function setViewport(value) {
+        viewport = value;
+        frame.className = `app-frame viewport-${value}${value === "desktop" ? "" : " is-narrow"}`;
+        document.getElementById("viewportBadge").textContent = value === "desktop" ? "桌面视口 · 生产采用 fixed + 8px 夹紧" : `${value}px 视口 · 面板宽 ${Number(value) - 16}px · 左右各 8px`;
+        syncWidthControls();
+        panelOpen = true;
+        render();
+        window.setTimeout(() => { document.getElementById("gptTrigger")?.scrollIntoView({ inline: "center", block: "nearest" }); updatePanelPosition(); }, 30);
+      }
+
+      document.querySelectorAll("[data-state]").forEach(button => button.addEventListener("click", () => {
+        currentState = button.dataset.state;
+        refreshing = false;
+        switchingIndex = null;
+        resetting = false;
+        panelOpen = true;
+        syncStateControls();
+        render();
+      }));
+      document.querySelectorAll("[data-width]").forEach(button => button.addEventListener("click", () => setViewport(button.dataset.width)));
+      document.getElementById("lockStateBtn").addEventListener("click", () => { staleLock = !staleLock; syncLockControl(); panelOpen = true; render(); });
+      document.getElementById("grokStatic").addEventListener("click", () => showToast("Grok 保持独立 schema；本原型仅演示 GPT → Grok 的既有顺序。"));
+      document.getElementById("confirmCancel").addEventListener("click", () => closeConfirm(true));
+      confirmAccept.addEventListener("click", () => confirmAction?.());
+      confirmLayer.addEventListener("mousedown", event => { if (event.target === confirmLayer) closeConfirm(true); });
+
+      document.addEventListener("mousedown", event => {
+        if (!panelOpen || !confirmLayer.classList.contains("hidden")) return;
+        if (event.target.closest?.("#gptUsagePanel") || event.target.closest?.("#gptTrigger") || event.target.closest?.(".prototype-head")) return;
+        closePanel(false);
+      });
+      document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        if (!confirmLayer.classList.contains("hidden")) { closeConfirm(true); return; }
+        if (panelOpen) closePanel(true);
+      });
+      window.addEventListener("resize", updatePanelPosition);
+      topbar.addEventListener("scroll", updatePanelPosition);
+
+      render();
+      syncLockControl();
+    })();
+  </script>
+</body>
+</html>

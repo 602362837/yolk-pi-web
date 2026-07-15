@@ -1,0 +1,897 @@
+"use client";
+
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { GrokQuotaResultV1 } from "@/lib/grok-subscription-quota";
+import { ActionFlowIcon } from "./ActionFlowIcon";
+import {
+  formatGrokQuotaTime,
+  grokCacheStateDot,
+  grokCacheStateLabel,
+  grokQuotaErrorMessage,
+  grokUtilizationColor,
+  type GrokQuotaErrorCode,
+} from "./GrokQuotaView";
+import { iconFlowAttrs } from "./iconFlow";
+
+const ACCOUNT_CACHE_POLL_INTERVAL_MS = 30_000;
+const GROK_PROVIDER_ID = "grok-cli";
+
+interface GrokOAuthAccountSummary {
+  accountId: string;
+  label?: string;
+  extraInfo?: string;
+  displayName: string;
+  maskedAccountId: string;
+  active: boolean;
+}
+
+interface GrokOAuthAccountsResponse {
+  provider?: string;
+  activeAccountId?: string | null;
+  accounts?: GrokOAuthAccountSummary[];
+  error?: string;
+}
+
+function isGrokQuotaResult(value: unknown): value is GrokQuotaResultV1 {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return record.kind === "grok_subscription_quota" && record.schemaVersion === 1 && typeof record.success === "boolean";
+}
+
+function selectActiveAccount(data: GrokOAuthAccountsResponse): GrokOAuthAccountSummary | null {
+  const accounts = data.accounts ?? [];
+  return accounts.find((account) => account.active)
+    ?? accounts.find((account) => account.accountId === data.activeAccountId)
+    ?? null;
+}
+
+function formatRelativeAge(ageMs: number | null | undefined, queriedAt: string | null | undefined): string | null {
+  if (typeof ageMs === "number" && Number.isFinite(ageMs) && ageMs >= 0) {
+    if (ageMs < 5_000) return "刚刚";
+    if (ageMs < 60_000) return `${Math.max(1, Math.round(ageMs / 1000))} 秒`;
+    if (ageMs < 3_600_000) return `${Math.max(1, Math.round(ageMs / 60_000))} 分钟`;
+    if (ageMs < 86_400_000) return `${Math.max(1, Math.round(ageMs / 3_600_000))} 小时`;
+    return `${Math.max(1, Math.round(ageMs / 86_400_000))} 天`;
+  }
+  if (!queriedAt) return null;
+  const timestamp = Date.parse(queriedAt);
+  if (!Number.isFinite(timestamp)) return null;
+  return formatRelativeAge(Date.now() - timestamp, null);
+}
+
+function UsageRing({
+  percent,
+  label,
+  title,
+  size = 17,
+}: {
+  percent: number | null;
+  label: string;
+  title: string;
+  size?: number;
+}) {
+  const utilization = percent === null ? 0 : Math.min(Math.max(percent, 0), 100);
+  const color = percent === null ? "var(--text-dim)" : grokUtilizationColor(utilization);
+  const background = percent === null
+    ? "conic-gradient(rgba(148,163,184,0.25) 0deg, rgba(148,163,184,0.25) 360deg)"
+    : `conic-gradient(${color} ${utilization * 3.6}deg, rgba(148,163,184,0.18) 0deg)`;
+
+  return (
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background,
+          border: "1px solid rgba(148,163,184,0.35)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxSizing: "border-box",
+        }}
+      >
+        <span
+          style={{
+            width: Math.max(6, Math.floor(size * 0.48)),
+            height: Math.max(6, Math.floor(size * 0.48)),
+            borderRadius: "50%",
+            background: "var(--bg-panel)",
+            opacity: 0.92,
+          }}
+        />
+      </span>
+      <span style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 700 }}>
+        {percent === null ? `${label} —` : `${label} ${Math.round(utilization)}%`}
+      </span>
+    </span>
+  );
+}
+
+function StatusDot({ tone }: { tone: "success" | "warning" | "danger" | "muted" }) {
+  const color = tone === "success"
+    ? "#4ade80"
+    : tone === "warning"
+      ? "#fbbf24"
+      : tone === "danger"
+        ? "#fb7185"
+        : "var(--text-dim)";
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: color,
+        boxShadow: tone === "success" ? "0 0 8px rgba(74,222,128,0.48)" : undefined,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function buildLocalNetworkError(accountId: string): GrokQuotaResultV1 {
+  return {
+    kind: "grok_subscription_quota",
+    schemaVersion: 1,
+    success: false,
+    provider: "grok-cli",
+    accountId,
+    cache: { state: "none", queriedAt: null, ageMs: null },
+    reauthRequired: false,
+    error: {
+      code: "network",
+      message: "network_failure",
+      retryable: true,
+    },
+  };
+}
+
+export function GrokUsagePanel({
+  onOpenModels,
+}: {
+  /** Optional hook so AppShell can open Models → Grok without hard coupling. */
+  onOpenModels?: () => void;
+} = {}) {
+  const panelDomId = useId();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const accountsRequestGen = useRef(0);
+  const quotaRequestGen = useRef(0);
+  const accountsAbortRef = useRef<AbortController | null>(null);
+  const quotaAbortRef = useRef<AbortController | null>(null);
+
+  const [open, setOpen] = useState(false);
+  const [accounts, setAccounts] = useState<GrokOAuthAccountSummary[]>([]);
+  const [account, setAccount] = useState<GrokOAuthAccountSummary | null>(null);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<GrokQuotaResultV1 | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
+  const [activateError, setActivateError] = useState<string | null>(null);
+  // Viewport-clamped fixed coordinates so the expanded panel never overflows narrow screens.
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number }>({ top: 35, right: 8 });
+
+  const loadQuota = useCallback(async (options?: {
+    accountId?: string | null;
+    force?: boolean;
+    silent?: boolean;
+    signal?: AbortSignal;
+  }) => {
+    const force = options?.force === true;
+    const silent = options?.silent === true;
+    const accountId = options?.accountId ?? null;
+    const generation = ++quotaRequestGen.current;
+
+    if (!silent) setQuotaLoading(true);
+
+    const params = new URLSearchParams();
+    if (accountId) params.set("accountId", accountId);
+    if (force) params.set("refresh", "1");
+    const query = params.toString();
+    const url = `/api/auth/quota/${encodeURIComponent(GROK_PROVIDER_ID)}${query ? `?${query}` : ""}`;
+
+    try {
+      const res = await fetch(url, { signal: options?.signal, cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (generation !== quotaRequestGen.current) return null;
+      if (isGrokQuotaResult(data)) {
+        // Ignore responses that no longer match the requested account when one was specified.
+        if (accountId && data.accountId && data.accountId !== accountId) return null;
+        setQuota(data);
+        return data;
+      }
+      const fallback = buildLocalNetworkError(accountId ?? "");
+      setQuota(fallback);
+      return fallback;
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return null;
+      if (generation !== quotaRequestGen.current) return null;
+      const fallback = buildLocalNetworkError(accountId ?? "");
+      setQuota(fallback);
+      return fallback;
+    } finally {
+      if (generation === quotaRequestGen.current && !silent) {
+        setQuotaLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  const loadAccounts = useCallback(async (options?: {
+    silent?: boolean;
+    signal?: AbortSignal;
+    refreshQuota?: boolean;
+    forceQuota?: boolean;
+  }) => {
+    const silent = options?.silent === true;
+    const generation = ++accountsRequestGen.current;
+    if (!silent) {
+      setAccountsLoading(true);
+      setAccountsError(null);
+    }
+
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(GROK_PROVIDER_ID)}`, {
+        signal: options?.signal,
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({})) as GrokOAuthAccountsResponse;
+      if (generation !== accountsRequestGen.current) return null;
+      if (!res.ok || data.error) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+
+      const nextAccounts = data.accounts ?? [];
+      const nextActive = selectActiveAccount(data);
+      setAccounts(nextAccounts);
+      setAccount(nextActive);
+      setAccountsError(null);
+
+      if (options?.refreshQuota !== false) {
+        if (nextActive) {
+          await loadQuota({
+            accountId: nextActive.accountId,
+            force: options?.forceQuota === true,
+            // Force refresh always shows loading; otherwise inherit accounts silent mode
+            // so mount/initial loads keep the loading skeleton while poll/expand stay quiet.
+            silent: options?.forceQuota === true ? false : silent,
+            signal: options?.signal,
+          });
+        } else {
+          setQuota(null);
+        }
+      }
+      return { accounts: nextAccounts, active: nextActive };
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return null;
+      if (generation !== accountsRequestGen.current) return null;
+      if (!silent) {
+        setAccountsError("无法加载 Grok 账号列表。请稍后重试。");
+        setAccounts([]);
+        setAccount(null);
+        setQuota(null);
+      }
+      return null;
+    } finally {
+      if (generation === accountsRequestGen.current && !silent) {
+        setAccountsLoading(false);
+      }
+    }
+  }, [loadQuota]);
+
+  // Initial mount load.
+  useEffect(() => {
+    const controller = new AbortController();
+    accountsAbortRef.current = controller;
+    void loadAccounts({ signal: controller.signal, refreshQuota: true });
+    return () => {
+      controller.abort();
+      accountsAbortRef.current?.abort();
+      quotaAbortRef.current?.abort();
+      accountsRequestGen.current += 1;
+      quotaRequestGen.current += 1;
+    };
+  }, [loadAccounts]);
+
+  // Foreground 30s light revalidation (no refresh=1).
+  useEffect(() => {
+    let controller: AbortController | null = null;
+    const refreshSilently = () => {
+      if (document.hidden) return;
+      controller?.abort();
+      controller = new AbortController();
+      void loadAccounts({
+        silent: true,
+        signal: controller.signal,
+        refreshQuota: true,
+        forceQuota: false,
+      });
+    };
+
+    const interval = window.setInterval(refreshSilently, ACCOUNT_CACHE_POLL_INTERVAL_MS);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) refreshSilently();
+    };
+    window.addEventListener("focus", refreshSilently);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshSilently);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      controller?.abort();
+    };
+  }, [loadAccounts]);
+
+  // Revalidate on expand (light; keep existing content).
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    void loadAccounts({
+      silent: true,
+      signal: controller.signal,
+      refreshQuota: true,
+      forceQuota: false,
+    });
+    return () => controller.abort();
+  }, [open, loadAccounts]);
+
+  // Keep the expanded panel inside the viewport (8px side gutters, width <= 100vw-16).
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = Math.min(392, Math.max(0, window.innerWidth - 16));
+      // Prefer aligning the panel's right edge with the trigger, then clamp to [8, vw-8].
+      const preferredRight = Math.max(8, window.innerWidth - rect.right);
+      const leftIfPreferred = window.innerWidth - preferredRight - width;
+      const right = leftIfPreferred < 8 ? 8 : preferredRight;
+      setPanelPos({
+        top: Math.max(8, Math.round(rect.bottom + 5)),
+        right: Math.round(right),
+      });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    // Topbar may scroll horizontally on narrow screens; reclamp while open.
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  // Outside click + Escape close.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (refreshing || activatingAccountId || !account) return;
+    setRefreshing(true);
+    setActivateError(null);
+    const controller = new AbortController();
+    quotaAbortRef.current?.abort();
+    quotaAbortRef.current = controller;
+    await loadQuota({
+      accountId: account.accountId,
+      force: true,
+      silent: false,
+      signal: controller.signal,
+    });
+    await loadAccounts({
+      silent: true,
+      refreshQuota: false,
+    });
+  }, [account, activatingAccountId, loadAccounts, loadQuota, refreshing]);
+
+  const handleActivate = useCallback(async (accountId: string) => {
+    if (activatingAccountId || refreshing) return;
+    setActivatingAccountId(accountId);
+    setActivateError(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(GROK_PROVIDER_ID)}/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json().catch(() => ({})) as GrokOAuthAccountsResponse;
+      if (!res.ok || data.error) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+
+      // Abort any in-flight quota for the previous Active before applying new state.
+      quotaAbortRef.current?.abort();
+      const controller = new AbortController();
+      quotaAbortRef.current = controller;
+
+      const nextAccounts = data.accounts ?? [];
+      const nextActive = selectActiveAccount(data);
+      setAccounts(nextAccounts);
+      setAccount(nextActive);
+      setAccountsError(null);
+
+      if (nextActive) {
+        setRefreshing(true);
+        await loadQuota({
+          accountId: nextActive.accountId,
+          force: true,
+          silent: false,
+          signal: controller.signal,
+        });
+      } else {
+        setQuota(null);
+      }
+    } catch {
+      // Fail closed: keep existing Active and already-shown quota.
+      setActivateError("切换全局 Active 失败，已保留当前账号。请稍后重试。");
+    } finally {
+      setActivatingAccountId(null);
+    }
+  }, [activatingAccountId, loadQuota, refreshing]);
+
+  const openModels = useCallback(() => {
+    setOpen(false);
+    onOpenModels?.();
+  }, [onOpenModels]);
+
+  const compact = useMemo(() => {
+    if (refreshing) {
+      return { status: "正在刷新…", tone: "muted" as const, showSpinner: true };
+    }
+    if (accountsLoading && !account && !quota) {
+      return { status: "加载中", tone: "muted" as const, showSpinner: true };
+    }
+    if (accountsError && !account) {
+      return { status: "错误", tone: "danger" as const, showSpinner: false };
+    }
+    if (!account) {
+      return { status: "登录", tone: "muted" as const, showSpinner: false };
+    }
+    if (quota?.reauthRequired) {
+      return { status: "重新登录", tone: "danger" as const, showSpinner: false };
+    }
+    if (quota?.cache.state === "stale" && quota.monthly) {
+      return { status: "缓存过期", tone: "warning" as const, showSpinner: false };
+    }
+    if (quota && !quota.success && !quota.monthly) {
+      return { status: "错误", tone: "danger" as const, showSpinner: false };
+    }
+    if (quota?.cache.state === "live") {
+      const age = formatRelativeAge(quota.cache.ageMs, quota.cache.queriedAt);
+      return {
+        status: age && age !== "刚刚" ? `实时 · ${age}` : "实时",
+        tone: "success" as const,
+        showSpinner: false,
+      };
+    }
+    if (quota?.cache.state === "fresh") {
+      const age = formatRelativeAge(quota.cache.ageMs, quota.cache.queriedAt);
+      return {
+        status: age ? `缓存新鲜 · ${age}` : "缓存新鲜",
+        tone: "success" as const,
+        showSpinner: false,
+      };
+    }
+    if (quotaLoading) {
+      return { status: "加载中", tone: "muted" as const, showSpinner: true };
+    }
+    return { status: "无缓存", tone: "muted" as const, showSpinner: false };
+  }, [account, accountsError, accountsLoading, quota, quotaLoading, refreshing]);
+
+  const monthlyPercent = quota?.monthly ? quota.monthly.utilization : null;
+  const weeklyPercent = quota?.weekly ? quota.weekly.usedPercent : null;
+  const cacheLabel = quota ? grokCacheStateLabel(quota.cache.state) : accountsLoading ? "加载中" : "无缓存";
+  const queriedLabel = (() => {
+    if (accountsLoading && !quota) return "正在读取…";
+    if (!quota?.cache.queriedAt) return "从未更新";
+    const age = formatRelativeAge(quota.cache.ageMs, quota.cache.queriedAt);
+    if (age === "刚刚") return "刚刚";
+    if (age) return `${age}前`;
+    return formatGrokQuotaTime(quota.cache.queriedAt);
+  })();
+
+  const hasMonthly = Boolean(quota?.monthly);
+  const errorCode = (quota?.error?.code ?? null) as GrokQuotaErrorCode | null;
+  const safeErrorText = errorCode
+    ? grokQuotaErrorMessage(errorCode, { hasMonthly })
+    : accountsError;
+
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        title="Grok 用量"
+        aria-label="Grok 用量"
+        aria-expanded={open}
+        aria-controls={panelDomId}
+        style={{
+          height: 26,
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          padding: "0 9px",
+          borderRadius: 999,
+          border: open ? "1px solid rgba(96,165,250,0.58)" : "1px solid rgba(148,163,184,0.28)",
+          background: open ? "rgba(96,165,250,0.08)" : "rgba(15,23,42,0.10)",
+          backdropFilter: "blur(10px)",
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          fontSize: 11,
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontWeight: 800, color: "var(--text)" }}>Grok</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {compact.showSpinner ? (
+            <span
+              aria-hidden="true"
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                border: "1.5px solid rgba(148,163,184,0.35)",
+                borderTopColor: "var(--accent)",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+          ) : (
+            <StatusDot tone={compact.tone} />
+          )}
+          <span>{compact.status}</span>
+        </span>
+        <UsageRing
+          percent={account ? monthlyPercent : null}
+          label="月"
+          title={monthlyPercent === null ? "月度用量未知" : `月度已使用 ${Math.round(monthlyPercent)}%`}
+        />
+        {weeklyPercent !== null && (
+          <UsageRing
+            percent={weeklyPercent}
+            label="周"
+            title={`周度已使用 ${Math.round(weeklyPercent)}%`}
+          />
+        )}
+      </button>
+
+      {open && (
+        <section
+          ref={panelRef}
+          id={panelDomId}
+          role="dialog"
+          aria-label="Grok 用量"
+          aria-live="polite"
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: panelPos.top,
+            right: panelPos.right,
+            zIndex: 550,
+            width: "min(392px, calc(100vw - 16px))",
+            maxHeight: "min(680px, calc(100vh - 80px))",
+            overflow: "auto",
+            border: "1px solid rgba(148,163,184,0.30)",
+            borderRadius: 12,
+            background: "color-mix(in srgb, var(--bg-panel) 86%, transparent)",
+            boxShadow: "0 18px 45px rgba(0,0,0,0.28)",
+            backdropFilter: "blur(14px)",
+            padding: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>Grok 用量</div>
+              <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: quota ? grokCacheStateDot(quota.cache.state) : "var(--text-dim)",
+                    }}
+                  />
+                  <span>{quota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}</span>
+                </span>
+                <span>更新时间：{queriedLabel}</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => void handleManualRefresh()}
+                disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
+                {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
+                title="强制刷新当前 Active 账号 quota"
+                aria-label="刷新当前 Active Grok 账号 quota"
+                style={{
+                  width: 30,
+                  height: 30,
+                  border: "1px solid var(--border)",
+                  borderRadius: 7,
+                  background: "var(--bg)",
+                  color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
+                  cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                }}
+              >
+                <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+                  <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+                  <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+                  <path d="M3 4v8h8" />
+                  <path d="M21 20v-8h-8" />
+                </ActionFlowIcon>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+                aria-label="关闭 Grok 用量面板"
+                style={{
+                  width: 30,
+                  height: 30,
+                  border: "1px solid var(--border)",
+                  borderRadius: 7,
+                  background: "var(--bg)",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: 16,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          {refreshing && (
+            <div style={{ color: "var(--text-muted)", fontSize: 11 }}>正在刷新…</div>
+          )}
+
+          {accountsLoading && !account && !quota ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)" }} aria-busy="true">
+              <div style={{ height: 10, width: "54%", borderRadius: 4, background: "rgba(148,163,184,0.18)" }} />
+              <div style={{ height: 10, width: "78%", borderRadius: 4, background: "rgba(148,163,184,0.14)" }} />
+              <div style={{ height: 72, borderRadius: 8, background: "rgba(148,163,184,0.10)" }} />
+              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>正在加载已保存账号与缓存 quota…</span>
+            </div>
+          ) : !account ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
+                <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active Grok 账号</strong>
+                请先在 Models → Grok 登录或激活一个账号。面板不会为未登录状态伪造额度。
+                {accountsError && <div style={{ marginTop: 6, color: "#f87171" }}>{accountsError}</div>}
+              </div>
+              <button
+                type="button"
+                onClick={openModels}
+                style={{
+                  minHeight: 34,
+                  borderRadius: 8,
+                  border: "1px solid var(--accent)",
+                  background: "var(--accent)",
+                  color: "#0b1220",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: 12,
+                }}
+              >
+                打开 Models → Grok
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {account.displayName}
+                  </span>
+                  <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {account.maskedAccountId}{account.label ? ` · ${account.label}` : ""}
+                  </code>
+                </div>
+                <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>Active</span>
+              </div>
+
+              {quota?.reauthRequired && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                  <strong>需要重新登录。</strong> {grokQuotaErrorMessage("unauthorized")}
+                </div>
+              )}
+
+              {!quota?.reauthRequired && quota?.cache.state === "stale" && hasMonthly && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 12, lineHeight: 1.5 }}>
+                  <strong>缓存已过期。</strong> {safeErrorText ?? "正在展示上次成功数据。"}
+                </div>
+              )}
+
+              {!quota?.reauthRequired && quota && !quota.success && !hasMonthly && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                  <strong>额度暂不可用。</strong> {safeErrorText ?? "请稍后重试。"}
+                </div>
+              )}
+
+              {activateError && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                  {activateError}
+                </div>
+              )}
+
+              {quota?.monthly ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+                    <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>月度额度</div>
+                    <div style={{ color: grokUtilizationColor(quota.monthly.utilization), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                      {quota.monthly.used.toLocaleString()} <small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>/ {quota.monthly.limit.toLocaleString()}</small>
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-label="月度额度"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(Math.min(Math.max(quota.monthly.utilization, 0), 100))}
+                      style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
+                    >
+                      <div style={{ height: "100%", width: `${Math.min(quota.monthly.utilization, 100)}%`, background: grokUtilizationColor(quota.monthly.utilization), borderRadius: 99 }} />
+                    </div>
+                    <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                      剩余 {quota.monthly.remaining.toLocaleString()} · 重置时间 {formatGrokQuotaTime(quota.monthly.resetsAt)}
+                    </div>
+                  </div>
+
+                  {quota.weekly ? (
+                    <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+                      <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>周额度</div>
+                      <div style={{ color: grokUtilizationColor(quota.weekly.usedPercent), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                        {Math.round(quota.weekly.usedPercent)}<small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>% 已使用</small>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label="周额度"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(Math.min(Math.max(quota.weekly.usedPercent, 0), 100))}
+                        style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
+                      >
+                        <div style={{ height: "100%", width: `${Math.min(quota.weekly.usedPercent, 100)}%`, background: grokUtilizationColor(quota.weekly.usedPercent), borderRadius: 99 }} />
+                      </div>
+                      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                        重置时间 {formatGrokQuotaTime(quota.weekly.resetsAt)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                      <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>周额度</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5 }}>当前 API 未提供周额度。</div>
+                      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>不推断为 0%、不限额或订阅权益缺失。</div>
+                    </div>
+                  )}
+                </div>
+              ) : !quota?.error && !quotaLoading ? (
+                <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
+                  用量未知。请刷新以查询当前 Active 账号。
+                </div>
+              ) : null}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>账号</span>
+                  <span style={{ color: "var(--text-dim)", fontSize: 9, fontWeight: 600 }}>全局 Active</span>
+                </div>
+                <div style={{ padding: 8, borderRadius: 8, border: "1px solid rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
+                  “设为 Active”会切换全局 Active Grok 账号，影响当前与新建会话的后续请求。
+                </div>
+                {accounts.length === 0 ? (
+                  <div style={{ color: "var(--text-dim)", fontSize: 12 }}>没有已保存账号。</div>
+                ) : accounts.map((item) => (
+                  <div
+                    key={item.accountId}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 8,
+                      alignItems: "center",
+                      padding: 8,
+                      borderRadius: 8,
+                      border: item.active ? "1px solid rgba(34,197,94,0.45)" : "1px solid var(--border)",
+                      background: item.active ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.06)",
+                    }}
+                  >
+                    <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span title={item.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.displayName}
+                      </span>
+                      <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.maskedAccountId}{item.label ? ` · ${item.label}` : ""}
+                      </code>
+                    </div>
+                    {item.active ? (
+                      <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 800 }}>Active</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleActivate(item.accountId)}
+                        disabled={Boolean(activatingAccountId) || refreshing}
+                        style={{
+                          minHeight: 30,
+                          padding: "5px 9px",
+                          borderRadius: 6,
+                          border: "1px solid var(--border)",
+                          background: "var(--bg)",
+                          color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)",
+                          cursor: activatingAccountId || refreshing ? "default" : "pointer",
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {activatingAccountId === item.accountId ? "正在切换…" : "设为 Active"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
+                <button
+                  type="button"
+                  onClick={openModels}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: 0,
+                    textAlign: "left",
+                  }}
+                >
+                  {quota?.reauthRequired ? "在 Models → Grok 重新登录" : "在 Models → Grok 管理"}
+                </button>
+                <span style={{ color: "var(--text-dim)", fontSize: 10 }}>页面可见时每 30 秒刷新</span>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}

@@ -1,12 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay, type QuotaDisplayTier } from "@/lib/quota-display";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  earliestResetCreditExpiration,
+  formatGptQuotaRelativeAge,
+  formatGptResetCountdown,
+  GPT_QUOTA_TIER_COMPACT_LABELS,
+  GPT_QUOTA_TIER_PANEL_LABELS,
+  knownQuotaTiers,
+  quotaColor,
+  type CodexResetCreditDisplay,
+  type QuotaDisplayTier,
+} from "@/lib/quota-display";
 import { ActionFlowIcon } from "./ActionFlowIcon";
 import { iconFlowAttrs } from "./iconFlow";
 import { usePrompt } from "./AppPromptProvider";
 
 type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
+type ChatGptQuotaSource = "live" | "cached" | "page_fallback" | "none";
 
 interface OAuthAccountQuotaCache {
   success: boolean;
@@ -46,6 +57,16 @@ interface SubscriptionQuota {
   resetCreditsAvailableCount: number | null;
   resetCredits: CodexResetCreditDisplay[];
   resetCreditsError: string | null;
+  accountId?: string | null;
+}
+
+interface SuccessfulQuotaSnapshot {
+  accountId: string;
+  tiers: QuotaDisplayTier[];
+  queriedAt: number | null;
+  resetCreditsAvailableCount: number | null;
+  resetCredits: CodexResetCreditDisplay[];
+  credentialStatus: CredentialStatus;
 }
 
 interface SchedulerStatus {
@@ -71,111 +92,416 @@ interface SchedulerStatus {
 }
 
 const ACCOUNT_CACHE_POLL_INTERVAL_MS = 30_000;
+const GPT_PROVIDER_ID = "openai-codex";
 
-function UsagePie({ tier, label, size = 18 }: { tier: QuotaDisplayTier | null; label?: string; size?: number }) {
-  const utilization = tier ? Math.min(Math.max(tier.utilization, 0), 100) : 0;
-  const color = tier ? quotaColor(utilization) : "var(--text-dim)";
-  const background = tier
-    ? `conic-gradient(${color} ${utilization * 3.6}deg, rgba(148,163,184,0.18) 0deg)`
-    : "conic-gradient(rgba(148,163,184,0.25) 0deg, rgba(148,163,184,0.25) 360deg)";
+const SAFE_MESSAGES = {
+  accountsLoadFailed: "无法加载 ChatGPT 账号列表，请稍后重试。",
+  quotaFetchFailed: "无法获取额度，请检查网络后重试。",
+  quotaPageFallback: "刷新失败，正在展示本页上次成功数据。",
+  activateFailed: "切换 Active 账号失败，已保留当前账号。",
+  activateQuotaFailed: "账号已切换，额度刷新失败。",
+  resetFailed: "Reset credits 消耗失败，未更新当前额度。",
+  schedulerLoadFailed: "无法读取后台自动刷新状态。",
+  schedulerLastError: "最近一次后台刷新失败。",
+  schedulerAccountError: "最近一次账号刷新失败。",
+  repairFailed: "修复刷新锁失败，请确认没有健康进程占用后重试。",
+  credentialExpired: "登录已失效，需要重新登录。",
+  credentialNotFound: "未找到 OAuth 凭据，请在 Models → ChatGPT 重新登录。",
+  credentialParseError: "无法读取 OAuth 凭据，请在 Models → ChatGPT 重新登录。",
+} as const;
+
+function selectActiveAccount(data: OAuthAccountsResponse): OAuthAccountSummary | null {
+  return data.accounts.find((account) => account.active)
+    ?? data.accounts.find((account) => account.accountId === data.activeAccountId)
+    ?? null;
+}
+
+function credentialStatusMessage(status: CredentialStatus | null | undefined): string | null {
+  if (status === "expired") return SAFE_MESSAGES.credentialExpired;
+  if (status === "not_found") return SAFE_MESSAGES.credentialNotFound;
+  if (status === "parse_error") return SAFE_MESSAGES.credentialParseError;
+  return null;
+}
+
+function snapshotFromQuota(accountId: string, quota: SubscriptionQuota): SuccessfulQuotaSnapshot | null {
+  if (!quota.success) return null;
+  return {
+    accountId,
+    tiers: quota.tiers ?? [],
+    queriedAt: quota.queriedAt,
+    resetCreditsAvailableCount: quota.resetCreditsAvailableCount,
+    resetCredits: quota.resetCredits ?? [],
+    credentialStatus: quota.credentialStatus,
+  };
+}
+
+function snapshotFromCache(accountId: string, cache: OAuthAccountQuotaCache | undefined): SuccessfulQuotaSnapshot | null {
+  if (!cache || cache.success !== true) return null;
+  return {
+    accountId,
+    tiers: cache.tiers ?? [],
+    queriedAt: cache.queriedAt,
+    resetCreditsAvailableCount: cache.resetCreditsAvailableCount,
+    resetCredits: cache.resetCredits ?? [],
+    credentialStatus: "valid",
+  };
+}
+
+function formatSchedulerTime(value: number | null): string {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return "—";
+  }
+}
+
+function lockStateLabel(status: SchedulerStatus): string {
+  if (status.lockOwned) return "本进程持有";
+  if (status.lock.stale) return "陈旧";
+  if (status.lock.exists) return "被占用";
+  return "无";
+}
+
+function UsageRing({
+  percent,
+  label,
+  title,
+  size = 17,
+}: {
+  percent: number | null;
+  label: string;
+  title: string;
+  size?: number;
+}) {
+  const utilization = percent === null ? 0 : Math.min(Math.max(percent, 0), 100);
+  const color = percent === null ? "var(--text-dim)" : quotaColor(utilization);
+  const background = percent === null
+    ? "conic-gradient(rgba(148,163,184,0.25) 0deg, rgba(148,163,184,0.25) 360deg)"
+    : `conic-gradient(${color} ${utilization * 3.6}deg, rgba(148,163,184,0.18) 0deg)`;
 
   return (
-    <span title={tier ? `${label ?? tier.name} ${Math.round(utilization)}% used` : "Unknown usage"} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-      <span style={{ width: size, height: size, borderRadius: "50%", background, border: "1px solid rgba(148,163,184,0.35)", display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
-        <span style={{ width: Math.max(6, Math.floor(size * 0.48)), height: Math.max(6, Math.floor(size * 0.48)), borderRadius: "50%", background: "var(--bg-panel)", opacity: 0.92 }} />
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background,
+          border: "1px solid rgba(148,163,184,0.35)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxSizing: "border-box",
+        }}
+      >
+        <span
+          style={{
+            width: Math.max(6, Math.floor(size * 0.48)),
+            height: Math.max(6, Math.floor(size * 0.48)),
+            borderRadius: "50%",
+            background: "var(--bg-panel)",
+            opacity: 0.92,
+          }}
+        />
       </span>
-      {label && <span style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 700 }}>{label}</span>}
+      <span style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 700 }}>
+        {percent === null ? `${label} —` : `${label} ${Math.round(utilization)}%`}
+      </span>
     </span>
   );
 }
 
-function selectActiveAccount(data: OAuthAccountsResponse): OAuthAccountSummary | null {
-  return data.accounts.find((account) => account.active) ?? data.accounts.find((account) => account.accountId === data.activeAccountId) ?? null;
+function StatusDot({ tone }: { tone: "success" | "warning" | "danger" | "muted" }) {
+  const color = tone === "success"
+    ? "#4ade80"
+    : tone === "warning"
+      ? "#fbbf24"
+      : tone === "danger"
+        ? "#fb7185"
+        : "var(--text-dim)";
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: color,
+        boxShadow: tone === "success" ? "0 0 8px rgba(74,222,128,0.48)" : undefined,
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 
-function accountQuotaSummary(account: OAuthAccountSummary): string {
-  const cache = account.quotaCache;
-  if (!cache?.queriedAt) return "No quota cache";
-  if (cache.error) return cache.error;
-  const resetCreditsText = typeof cache.resetCreditsAvailableCount === "number" ? `Credits ${cache.resetCreditsAvailableCount}` : null;
-  const tiers = knownQuotaTiers(cache.tiers ?? []);
-  if (tiers.length === 0) return resetCreditsText ? `${formatQuotaQueriedAt(cache.queriedAt)} · ${resetCreditsText}` : formatQuotaQueriedAt(cache.queriedAt);
-  const tiersText = tiers.map((tier) => `${QUOTA_TIER_LABELS[tier.name]} ${Math.round(tier.utilization)}%`).join(" · ");
-  return resetCreditsText ? `${tiersText} · ${resetCreditsText}` : tiersText;
+function QuotaWindowCard({ tier }: { tier: QuotaDisplayTier }) {
+  const utilization = Math.min(Math.max(tier.utilization, 0), 100);
+  const color = quotaColor(utilization);
+  const countdown = formatGptResetCountdown(tier.resetsAt);
+  const label = GPT_QUOTA_TIER_PANEL_LABELS[tier.name] ?? tier.name;
+
+  return (
+    <div
+      style={{
+        padding: 10,
+        borderRadius: 9,
+        border: "1px solid var(--border)",
+        background: "rgba(148,163,184,0.06)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>{label}</div>
+      <div style={{ color, fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+        {Math.round(utilization)}
+        <small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>% 已使用</small>
+      </div>
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(utilization)}
+        style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
+      >
+        <div style={{ height: "100%", width: `${utilization}%`, background: color, borderRadius: 99 }} />
+      </div>
+      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+        {countdown ? `重置倒计时 ${countdown}` : "重置时间未知"}
+      </div>
+    </div>
+  );
 }
 
-function formatTime(value: number | null): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleString();
-}
-
-export function ChatGptUsagePanel() {
+export function ChatGptUsagePanel({
+  onOpenModels,
+}: {
+  /** Optional hook so AppShell can open Models → ChatGPT without hard coupling. */
+  onOpenModels?: () => void;
+} = {}) {
   const { confirm } = usePrompt();
+  const panelDomId = useId();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const accountsRequestGen = useRef(0);
+  const quotaRequestGen = useRef(0);
+  const accountsAbortRef = useRef<AbortController | null>(null);
+  const quotaAbortRef = useRef<AbortController | null>(null);
+  const pageSnapshotsRef = useRef<Map<string, SuccessfulQuotaSnapshot>>(new Map());
+  const liveQuotaAccountIdRef = useRef<string | null>(null);
+
   const [open, setOpen] = useState(false);
-  const [account, setAccount] = useState<OAuthAccountSummary | null>(null);
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
+  const [account, setAccount] = useState<OAuthAccountSummary | null>(null);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [activatingAccountId, setActivatingAccountId] = useState<string | null>(null);
-  const [quotaResult, setQuotaResult] = useState<SubscriptionQuota | null>(null);
+  const [liveQuota, setLiveQuota] = useState<SubscriptionQuota | null>(null);
+  const [liveQuotaAccountId, setLiveQuotaAccountId] = useState<string | null>(null);
+  const [pageFallbackActive, setPageFallbackActive] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionWarning, setActionWarning] = useState<string | null>(null);
   const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
   const [repairingLock, setRepairingLock] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number }>({ top: 35, right: 8 });
 
-  const loadAccounts = useCallback(async (signal?: AbortSignal, options?: { silent?: boolean }) => {
+  const rememberSnapshot = useCallback((snapshot: SuccessfulQuotaSnapshot | null) => {
+    if (!snapshot) return;
+    const existing = pageSnapshotsRef.current.get(snapshot.accountId);
+    // Metadata may lag a just-completed manual GET; do not let it replace the newer page success.
+    if (
+      existing
+      && typeof existing.queriedAt === "number"
+      && (!snapshot.queriedAt || snapshot.queriedAt < existing.queriedAt)
+    ) {
+      return;
+    }
+    pageSnapshotsRef.current.set(snapshot.accountId, snapshot);
+  }, []);
+
+  const setLiveQuotaForAccount = useCallback((accountId: string | null, quota: SubscriptionQuota | null) => {
+    liveQuotaAccountIdRef.current = accountId;
+    setLiveQuotaAccountId(accountId);
+    setLiveQuota(quota);
+  }, []);
+
+  const loadAccounts = useCallback(async (options?: {
+    silent?: boolean;
+    signal?: AbortSignal;
+  }) => {
     const silent = options?.silent === true;
+    const generation = ++accountsRequestGen.current;
     if (!silent) {
       setAccountsLoading(true);
       setAccountsError(null);
     }
+
     try {
-      const res = await fetch("/api/auth/accounts/openai-codex", { signal });
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(GPT_PROVIDER_ID)}`, {
+        signal: options?.signal,
+        cache: "no-store",
+      });
       const data = await res.json().catch(() => ({})) as OAuthAccountsResponse;
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      if (generation !== accountsRequestGen.current) return null;
+      if (!res.ok || data.error) {
+        throw new Error("accounts_failed");
+      }
+
+      const nextAccounts = data.accounts ?? [];
+      const nextActive = selectActiveAccount(data);
+      setAccounts(nextAccounts);
+      setAccount(nextActive);
       setAccountsError(null);
-      setAccounts(data.accounts ?? []);
-      setAccount(selectActiveAccount(data));
+
+      // Successful metadata cache can seed the per-account page snapshot.
+      for (const item of nextAccounts) {
+        rememberSnapshot(snapshotFromCache(item.accountId, item.quotaCache));
+      }
+
+      // Drop live quota if Active changed out from under us.
+      const currentLiveAccountId = liveQuotaAccountIdRef.current;
+      if (currentLiveAccountId && nextActive?.accountId !== currentLiveAccountId) {
+        setLiveQuotaForAccount(null, null);
+        setPageFallbackActive(false);
+        // Abort any in-flight quota that belonged to the previous Active.
+        quotaAbortRef.current?.abort();
+        quotaRequestGen.current += 1;
+      }
+
+      return { accounts: nextAccounts, active: nextActive };
     } catch (error) {
-      if ((error as { name?: string }).name === "AbortError") return;
+      if ((error as { name?: string }).name === "AbortError") return null;
+      if (generation !== accountsRequestGen.current) return null;
       if (!silent) {
-        setAccountsError(error instanceof Error ? error.message : String(error));
+        setAccountsError(SAFE_MESSAGES.accountsLoadFailed);
         setAccounts([]);
         setAccount(null);
       }
+      return null;
     } finally {
-      if (!silent) setAccountsLoading(false);
+      if (generation === accountsRequestGen.current && !silent) {
+        setAccountsLoading(false);
+      }
     }
-  }, []);
+  }, [rememberSnapshot, setLiveQuotaForAccount]);
 
   const loadSchedulerStatus = useCallback(async (signal?: AbortSignal) => {
     setSchedulerError(null);
     try {
-      const res = await fetch("/api/chatgpt/usage-refresh/status", { signal });
+      const res = await fetch("/api/chatgpt/usage-refresh/status", { signal, cache: "no-store" });
       const data = await res.json().catch(() => ({})) as SchedulerStatus;
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      if (!res.ok || data.error) throw new Error("scheduler_failed");
       setSchedulerStatus(data);
     } catch (error) {
       if ((error as { name?: string }).name === "AbortError") return;
-      setSchedulerError(error instanceof Error ? error.message : String(error));
+      setSchedulerError(SAFE_MESSAGES.schedulerLoadFailed);
       setSchedulerStatus(null);
     }
   }, []);
 
+  const loadQuota = useCallback(async (options: {
+    accountId: string;
+    signal?: AbortSignal;
+    silent?: boolean;
+  }) => {
+    const { accountId, signal, silent = false } = options;
+    const generation = ++quotaRequestGen.current;
+    if (!silent) setRefreshing(true);
+
+    try {
+      const params = new URLSearchParams({ accountId });
+      const res = await fetch(
+        `/api/auth/quota/${encodeURIComponent(GPT_PROVIDER_ID)}?${params.toString()}`,
+        { signal, cache: "no-store" },
+      );
+      const data = await res.json().catch(() => null) as SubscriptionQuota | null;
+      if (generation !== quotaRequestGen.current) return null;
+
+      if (!data || typeof data !== "object") {
+        throw new Error("quota_failed");
+      }
+
+      // Ignore responses that no longer match the requested account when present.
+      if (data.accountId && data.accountId !== accountId) return null;
+
+      if (data.success) {
+        const snapshot = snapshotFromQuota(accountId, data);
+        rememberSnapshot(snapshot);
+        setLiveQuotaForAccount(accountId, data);
+        setPageFallbackActive(false);
+        setActionError(null);
+        setActionWarning(null);
+        return data;
+      }
+
+      // Failed payload must not wipe a same-account success snapshot.
+      const pageSnapshot = pageSnapshotsRef.current.get(accountId) ?? null;
+      if (pageSnapshot) {
+        // Preserve the failed credential state for recovery guidance while
+        // rendering this account's successful page snapshot as the fallback.
+        setLiveQuotaForAccount(accountId, data);
+        setPageFallbackActive(true);
+        setActionWarning(SAFE_MESSAGES.quotaPageFallback);
+        setActionError(null);
+      } else {
+        setLiveQuotaForAccount(accountId, data);
+        setPageFallbackActive(false);
+        setActionError(credentialStatusMessage(data.credentialStatus) ?? SAFE_MESSAGES.quotaFetchFailed);
+        setActionWarning(null);
+      }
+      return data;
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return null;
+      if (generation !== quotaRequestGen.current) return null;
+
+      const pageSnapshot = pageSnapshotsRef.current.get(accountId) ?? null;
+      if (pageSnapshot) {
+        setLiveQuotaForAccount(null, null);
+        setPageFallbackActive(true);
+        setActionWarning(SAFE_MESSAGES.quotaPageFallback);
+        setActionError(null);
+      } else {
+        setLiveQuotaForAccount(null, null);
+        setPageFallbackActive(false);
+        setActionError(SAFE_MESSAGES.quotaFetchFailed);
+        setActionWarning(null);
+      }
+      return null;
+    } finally {
+      if (generation === quotaRequestGen.current && !silent) {
+        setRefreshing(false);
+      }
+    }
+  }, [rememberSnapshot, setLiveQuotaForAccount]);
+
+  // Initial mount: accounts metadata only (no quota upstream).
   useEffect(() => {
     const controller = new AbortController();
-    void loadAccounts(controller.signal);
-    return () => controller.abort();
+    accountsAbortRef.current = controller;
+    void loadAccounts({ signal: controller.signal });
+    return () => {
+      controller.abort();
+      accountsAbortRef.current?.abort();
+      quotaAbortRef.current?.abort();
+      accountsRequestGen.current += 1;
+      quotaRequestGen.current += 1;
+    };
   }, [loadAccounts]);
 
+  // Foreground 30s light revalidation of accounts metadata only.
   useEffect(() => {
     let controller: AbortController | null = null;
     const refreshSilently = () => {
       if (document.hidden) return;
       controller?.abort();
       controller = new AbortController();
-      void loadAccounts(controller.signal, { silent: true });
+      void loadAccounts({ silent: true, signal: controller.signal });
     };
 
     const interval = window.setInterval(refreshSilently, ACCOUNT_CACHE_POLL_INTERVAL_MS);
@@ -193,103 +519,165 @@ export function ChatGptUsagePanel() {
     };
   }, [loadAccounts]);
 
+  // Expand: keep existing content, re-read accounts + scheduler.
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    void loadAccounts(controller.signal);
+    void loadAccounts({ silent: true, signal: controller.signal });
     void loadSchedulerStatus(controller.signal);
     return () => controller.abort();
   }, [open, loadAccounts, loadSchedulerStatus]);
 
-  const refreshQuota = useCallback(async () => {
-    if (resetting) return;
-    setRefreshing(true);
-    setQuotaResult(null);
-    try {
-      const res = await fetch("/api/auth/quota/openai-codex");
-      const data = await res.json() as SubscriptionQuota;
-      setQuotaResult(data);
-      await loadAccounts();
-    } catch (error) {
-      setQuotaResult({
-        tool: "openai-codex",
-        credentialStatus: "valid",
-        credentialMessage: error instanceof Error ? error.message : String(error),
-        success: false,
-        tiers: [],
-        error: error instanceof Error ? error.message : "Usage query failed",
-        queriedAt: Date.now(),
-        resetCreditsAvailableCount: null,
-        resetCredits: [],
-        resetCreditsError: null,
+  // Viewport-clamped fixed coordinates so the expanded panel never overflows narrow screens.
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = Math.min(392, Math.max(0, window.innerWidth - 16));
+      const preferredRight = Math.max(8, window.innerWidth - rect.right);
+      const leftIfPreferred = window.innerWidth - preferredRight - width;
+      const right = leftIfPreferred < 8 ? 8 : preferredRight;
+      setPanelPos({
+        top: Math.max(8, Math.round(rect.bottom + 5)),
+        right: Math.round(right),
       });
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadAccounts, resetting]);
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
 
-  const resetQuota = useCallback(async () => {
-    if (!account || resetting) return;
+  // Outside click + Escape close with focus restore.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const operationBusy = refreshing || resetting || activatingAccountId !== null || repairingLock;
+
+  const handleManualRefresh = useCallback(async () => {
+    if (operationBusy || !account) return;
+    setActionError(null);
+    setActionWarning(null);
+    const controller = new AbortController();
+    quotaAbortRef.current?.abort();
+    quotaAbortRef.current = controller;
+    await loadQuota({ accountId: account.accountId, signal: controller.signal });
+    await loadAccounts({ silent: true });
+  }, [account, loadAccounts, loadQuota, operationBusy]);
+
+  const handleActivate = useCallback(async (accountId: string) => {
+    if (operationBusy) return;
+    setActivatingAccountId(accountId);
+    setActionError(null);
+    setActionWarning(null);
+    try {
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(GPT_PROVIDER_ID)}/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse;
+      if (!res.ok || data.error) {
+        throw new Error("activate_failed");
+      }
+
+      // Abort any in-flight quota for the previous Active before applying new state.
+      quotaAbortRef.current?.abort();
+      const controller = new AbortController();
+      quotaAbortRef.current = controller;
+
+      const nextAccounts = data.accounts ?? [];
+      const nextActive = selectActiveAccount(data);
+      setAccounts(nextAccounts);
+      setAccount(nextActive);
+      setAccountsError(null);
+      setLiveQuotaForAccount(null, null);
+      setPageFallbackActive(false);
+
+      for (const item of nextAccounts) {
+        rememberSnapshot(snapshotFromCache(item.accountId, item.quotaCache));
+      }
+
+      if (nextActive) {
+        const quota = await loadQuota({
+          accountId: nextActive.accountId,
+          signal: controller.signal,
+        });
+        if (!quota || !quota.success) {
+          // Activate already succeeded; do not claim rollback.
+          setActionError(null);
+          setActionWarning(SAFE_MESSAGES.activateQuotaFailed);
+        }
+      }
+    } catch {
+      setActionError(SAFE_MESSAGES.activateFailed);
+    } finally {
+      setActivatingAccountId(null);
+    }
+  }, [loadQuota, operationBusy, rememberSnapshot, setLiveQuotaForAccount]);
+
+  const handleReset = useCallback(async () => {
+    if (!account || operationBusy) return;
     const ok = await confirm({
-      title: "确认重置额度",
-      message: "将消耗一次 Codex 重置机会，确认继续？",
+      title: "确认消耗 Reset credit",
+      message: "将消耗一次 Codex Reset credit 以重置额度，确认继续？",
       confirmLabel: "确认继续",
       intent: "danger",
     });
     if (!ok) return;
 
     setResetting(true);
-    setQuotaResult(null);
+    setActionError(null);
+    setActionWarning(null);
     try {
-      const res = await fetch("/api/auth/quota/openai-codex", {
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(GPT_PROVIDER_ID)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId: account.accountId }),
       });
       const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
-      if (!res.ok || !data.success) throw new Error(data.error ?? data.credentialMessage ?? `HTTP ${res.status}`);
-      setQuotaResult(data);
-      await loadAccounts();
-    } catch (error) {
-      setQuotaResult({
-        tool: "openai-codex",
-        credentialStatus: "valid",
-        credentialMessage: error instanceof Error ? error.message : String(error),
-        success: false,
-        tiers: [],
-        error: error instanceof Error ? error.message : "Reset failed",
-        queriedAt: Date.now(),
-        resetCreditsAvailableCount: null,
-        resetCredits: [],
-        resetCreditsError: null,
-      });
+      if (!res.ok || !data.success) {
+        throw new Error("reset_failed");
+      }
+      rememberSnapshot(snapshotFromQuota(account.accountId, data));
+      setLiveQuotaForAccount(account.accountId, data);
+      setPageFallbackActive(false);
+      await loadAccounts({ silent: true });
+    } catch {
+      // Keep previous success data; only surface a fixed Chinese error.
+      setActionError(SAFE_MESSAGES.resetFailed);
     } finally {
       setResetting(false);
     }
-  }, [account, confirm, loadAccounts, resetting]);
+  }, [account, confirm, loadAccounts, operationBusy, rememberSnapshot, setLiveQuotaForAccount]);
 
-  const activateAccount = useCallback(async (accountId: string) => {
-    setActivatingAccountId(accountId);
-    setAccountsError(null);
-    try {
-      const res = await fetch("/api/auth/accounts/openai-codex/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId }),
-      });
-      const data = await res.json().catch(() => ({})) as OAuthAccountsResponse;
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setAccounts(data.accounts ?? []);
-      setAccount(selectActiveAccount(data));
-      setQuotaResult(null);
-    } catch (error) {
-      setAccountsError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setActivatingAccountId(null);
-    }
-  }, []);
-
-  const repairLock = useCallback(async () => {
+  const handleRepairLock = useCallback(async () => {
+    if (operationBusy) return;
     const ok = await confirm({
       title: "确认修复刷新锁",
       message: "风险提示：修复会删除当前 ChatGPT 自动刷新锁。如果另一个健康的 yolk pi web 进程仍在运行，可能短时间产生重复刷新。确认只在刷新器明显卡住或锁文件 stale 时继续？",
@@ -306,34 +694,193 @@ export function ChatGptUsagePanel() {
         body: JSON.stringify({ confirm: true }),
       });
       const data = await res.json().catch(() => ({})) as SchedulerStatus;
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+      if (!res.ok || data.error) throw new Error("repair_failed");
       setSchedulerStatus(data);
-    } catch (error) {
-      setSchedulerError(error instanceof Error ? error.message : String(error));
+    } catch {
+      setSchedulerError(SAFE_MESSAGES.repairFailed);
     } finally {
       setRepairingLock(false);
     }
-  }, [confirm]);
+  }, [confirm, operationBusy]);
 
-  const quotaCache = account?.quotaCache ?? null;
-  const displayedQuota = quotaResult?.success ? quotaResult : quotaCache;
-  const knownTiers = useMemo(() => knownQuotaTiers(displayedQuota?.tiers ?? []), [displayedQuota?.tiers]);
-  const refreshText = displayedQuota?.queriedAt ? formatQuotaQueriedAt(displayedQuota.queriedAt) : "Unknown";
-  const compactStatus = accountsLoading ? "Loading" : accountsError ? "Error" : !account ? "No account" : displayedQuota?.error ? "Error" : refreshText;
-  const resetCreditsAvailableCount = displayedQuota?.resetCreditsAvailableCount ?? null;
-  const resetCredits = displayedQuota?.resetCredits ?? [];
-  const resetCreditsError = displayedQuota?.resetCreditsError ?? null;
-  const resetExpiresAt = earliestResetCreditExpiration(resetCredits);
-  const resetExpiresCountdown = formatResetCountdown(resetExpiresAt);
+  const openModels = useCallback(() => {
+    setOpen(false);
+    onOpenModels?.();
+  }, [onOpenModels]);
+
+  const displayModel = useMemo(() => {
+    const accountId = account?.accountId ?? null;
+    const liveMatches = Boolean(liveQuota && liveQuotaAccountId && accountId && liveQuotaAccountId === accountId && liveQuota.success);
+    const cache = account?.quotaCache;
+    const cacheOk = Boolean(cache && cache.success === true);
+    const pageSnapshot = accountId ? pageSnapshotsRef.current.get(accountId) ?? null : null;
+    const failedCredentialStatus = liveQuota
+      && liveQuotaAccountId === accountId
+      && !liveQuota.success
+      ? liveQuota.credentialStatus
+      : null;
+
+    let source: ChatGptQuotaSource = "none";
+    let tiers: QuotaDisplayTier[] = [];
+    let queriedAt: number | null = null;
+    let resetCreditsAvailableCount: number | null = null;
+    let resetCredits: CodexResetCreditDisplay[] = [];
+    let credentialStatus: CredentialStatus | null = null;
+
+    if (liveMatches && liveQuota) {
+      source = "live";
+      tiers = liveQuota.tiers ?? [];
+      queriedAt = liveQuota.queriedAt;
+      resetCreditsAvailableCount = liveQuota.resetCreditsAvailableCount;
+      resetCredits = liveQuota.resetCredits ?? [];
+      credentialStatus = liveQuota.credentialStatus;
+    } else if (pageFallbackActive && pageSnapshot && accountId && pageSnapshot.accountId === accountId) {
+      // A failed manual GET must keep this account's last successful page data visible,
+      // even when accounts metadata still contains an older successful cache.
+      source = "page_fallback";
+      tiers = pageSnapshot.tiers;
+      queriedAt = pageSnapshot.queriedAt;
+      resetCreditsAvailableCount = pageSnapshot.resetCreditsAvailableCount;
+      resetCredits = pageSnapshot.resetCredits;
+      credentialStatus = pageSnapshot.credentialStatus;
+    } else if (cacheOk && cache) {
+      source = "cached";
+      tiers = cache.tiers ?? [];
+      queriedAt = cache.queriedAt;
+      resetCreditsAvailableCount = cache.resetCreditsAvailableCount;
+      resetCredits = cache.resetCredits ?? [];
+      credentialStatus = "valid";
+    } else if (pageSnapshot && accountId && pageSnapshot.accountId === accountId) {
+      source = "page_fallback";
+      tiers = pageSnapshot.tiers;
+      queriedAt = pageSnapshot.queriedAt;
+      resetCreditsAvailableCount = pageSnapshot.resetCreditsAvailableCount;
+      resetCredits = pageSnapshot.resetCredits;
+      credentialStatus = pageSnapshot.credentialStatus;
+    } else if (liveQuota && liveQuotaAccountId === accountId && !liveQuota.success) {
+      source = "none";
+      credentialStatus = liveQuota.credentialStatus;
+    }
+
+
+    return {
+      source,
+      tiers: knownQuotaTiers(tiers),
+      queriedAt,
+      resetCreditsAvailableCount,
+      resetCredits,
+      // Keep the fallback cards, but do not hide an expired/missing/invalid
+      // credential behind an earlier successful snapshot.
+      credentialStatus: failedCredentialStatus ?? credentialStatus,
+    };
+  }, [account, liveQuota, liveQuotaAccountId, pageFallbackActive]);
+
+  const fiveHourTier = displayModel.tiers.find((tier) => tier.name === "five_hour") ?? null;
+  const sevenDayTier = displayModel.tiers.find((tier) => tier.name === "seven_day") ?? null;
+  const fiveHourPercent = fiveHourTier ? Math.min(Math.max(fiveHourTier.utilization, 0), 100) : null;
+  const sevenDayPercent = sevenDayTier ? Math.min(Math.max(sevenDayTier.utilization, 0), 100) : null;
+
+  const compact = useMemo(() => {
+    if (refreshing) {
+      return { status: "正在刷新…", tone: "muted" as const, showSpinner: true };
+    }
+    if (resetting) {
+      return { status: "正在重置…", tone: "muted" as const, showSpinner: true };
+    }
+    if (activatingAccountId) {
+      return { status: "正在切换…", tone: "muted" as const, showSpinner: true };
+    }
+    if (accountsLoading && !account) {
+      return { status: "加载中", tone: "muted" as const, showSpinner: true };
+    }
+    if (accountsError && !account) {
+      return { status: "错误", tone: "danger" as const, showSpinner: false };
+    }
+    if (!account) {
+      return { status: "登录", tone: "muted" as const, showSpinner: false };
+    }
+    if (displayModel.credentialStatus && displayModel.credentialStatus !== "valid" && displayModel.source === "none") {
+      return { status: "重新登录", tone: "danger" as const, showSpinner: false };
+    }
+    if (displayModel.source === "live") {
+      return { status: "实时", tone: "success" as const, showSpinner: false };
+    }
+    if (displayModel.source === "cached") {
+      const age = formatGptQuotaRelativeAge(displayModel.queriedAt);
+      return {
+        status: age ? `已缓存 · ${age}` : "已缓存",
+        tone: "success" as const,
+        showSpinner: false,
+      };
+    }
+    if (displayModel.source === "page_fallback") {
+      return { status: "已缓存", tone: "warning" as const, showSpinner: false };
+    }
+    if (actionError) {
+      return { status: "错误", tone: "danger" as const, showSpinner: false };
+    }
+    return { status: "无缓存", tone: "muted" as const, showSpinner: false };
+  }, [
+    account,
+    accountsError,
+    accountsLoading,
+    actionError,
+    activatingAccountId,
+    displayModel.credentialStatus,
+    displayModel.queriedAt,
+    displayModel.source,
+    refreshing,
+    resetting,
+  ]);
+
+  const sourceLabel = (() => {
+    if (refreshing) return "正在刷新…";
+    if (displayModel.source === "live") return "实时";
+    if (displayModel.source === "cached") {
+      const age = formatGptQuotaRelativeAge(displayModel.queriedAt);
+      return age ? `已缓存 · ${age}` : "已缓存";
+    }
+    if (displayModel.source === "page_fallback") return "本页上次成功数据";
+    if (accountsLoading) return "加载中";
+    return "无缓存";
+  })();
+
+  const queriedLabel = (() => {
+    if (accountsLoading && displayModel.source === "none") return "正在读取…";
+    if (!displayModel.queriedAt) return "从未更新";
+    const age = formatGptQuotaRelativeAge(displayModel.queriedAt);
+    if (age === "刚刚") return "刚刚";
+    if (age) return `${age}前`;
+    return "已更新";
+  })();
+
+  const credentialBanner = credentialStatusMessage(displayModel.credentialStatus);
+  const needsReauth = Boolean(credentialBanner);
+  const resetCreditsAvailableCount = displayModel.resetCreditsAvailableCount;
+  const resetExpiresAt = earliestResetCreditExpiration(displayModel.resetCredits);
+  const resetExpiresCountdown = formatGptResetCountdown(resetExpiresAt);
+  const hasQuotaWindows = displayModel.tiers.length > 0;
 
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center", height: "100%" }}>
+    <div className="chatgpt-usage-panel" style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
+      {/* Local layout helpers; GPT-USAGE-02 may promote reduced-motion/spinner rules to globals. */}
+      <style>{`
+        @media (max-width: 420px) {
+          .chatgpt-usage-quota-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .chatgpt-usage-spinner { animation: none !important; border-top-color: var(--text-dim) !important; }
+        }
+      `}</style>
       <button
+        ref={triggerRef}
+        className="chatgpt-usage-panel__trigger"
         type="button"
         onClick={() => setOpen((value) => !value)}
-        title="ChatGPT usage"
-        aria-label="ChatGPT usage"
+        title="ChatGPT 用量"
+        aria-label="ChatGPT 用量"
         aria-expanded={open}
+        aria-controls={panelDomId}
         style={{
           height: 26,
           display: "flex",
@@ -341,33 +888,63 @@ export function ChatGptUsagePanel() {
           gap: 7,
           padding: "0 9px",
           borderRadius: 999,
-          border: "1px solid rgba(148,163,184,0.28)",
-          background: "rgba(15,23,42,0.10)",
+          border: open ? "1px solid rgba(96,165,250,0.58)" : "1px solid rgba(148,163,184,0.28)",
+          background: open ? "rgba(96,165,250,0.08)" : "rgba(15,23,42,0.10)",
           backdropFilter: "blur(10px)",
           color: "var(--text-muted)",
           cursor: "pointer",
           fontSize: 11,
           fontVariantNumeric: "tabular-nums",
           whiteSpace: "nowrap",
+          flexShrink: 0,
         }}
       >
-        <span style={{ fontWeight: 700, color: "var(--text)" }}>GPT</span>
-        <span>{compactStatus}</span>
+        <span style={{ fontWeight: 800, color: "var(--text)" }}>GPT</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          {knownTiers.length > 0 ? knownTiers.map((tier) => (
-            <UsagePie key={tier.name} tier={tier} label={QUOTA_TIER_LABELS[tier.name]} />
-          )) : <UsagePie tier={null} />}
+          {compact.showSpinner ? (
+            <span
+              className="chatgpt-usage-panel__spinner"
+              aria-hidden="true"
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                border: "1.5px solid rgba(148,163,184,0.35)",
+                borderTopColor: "var(--accent)",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+          ) : (
+            <StatusDot tone={compact.tone} />
+          )}
+          <span>{compact.status}</span>
         </span>
+        <UsageRing
+          percent={account ? fiveHourPercent : null}
+          label={GPT_QUOTA_TIER_COMPACT_LABELS.five_hour}
+          title={fiveHourPercent === null ? "5 小时额度未知" : `5 小时已使用 ${Math.round(fiveHourPercent)}%`}
+        />
+        <UsageRing
+          percent={account ? sevenDayPercent : null}
+          label={GPT_QUOTA_TIER_COMPACT_LABELS.seven_day}
+          title={sevenDayPercent === null ? "7 天额度未知" : `周额度已使用 ${Math.round(sevenDayPercent)}%`}
+        />
       </button>
 
       {open && (
-        <div
+        <section
+          ref={panelRef}
+          id={panelDomId}
+          role="dialog"
+          aria-label="ChatGPT 用量"
+          aria-live="polite"
+          onClick={(event) => event.stopPropagation()}
           style={{
-            position: "absolute",
-            top: 31,
-            right: 0,
+            position: "fixed",
+            top: panelPos.top,
+            right: panelPos.right,
             zIndex: 550,
-            width: 380,
+            width: "min(392px, calc(100vw - 16px))",
             maxHeight: "min(680px, calc(100vh - 80px))",
             overflow: "auto",
             border: "1px solid rgba(148,163,184,0.30)",
@@ -383,16 +960,47 @@ export function ChatGptUsagePanel() {
         >
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>ChatGPT usage</div>
-              <div style={{ marginTop: 3, color: "var(--text-dim)", fontSize: 11 }}>Updated: {refreshText}</div>
+              <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>ChatGPT 用量</div>
+              <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <StatusDot
+                    tone={
+                      displayModel.source === "live" || displayModel.source === "cached"
+                        ? "success"
+                        : displayModel.source === "page_fallback"
+                          ? "warning"
+                          : needsReauth || actionError
+                            ? "danger"
+                            : "muted"
+                    }
+                  />
+                  <span>{sourceLabel}</span>
+                </span>
+                <span>更新时间：{queriedLabel}</span>
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {account && (resetCreditsAvailableCount ?? 0) > 0 && (
-                <button type="button" onClick={resetQuota} disabled={refreshing || resetting} title={resetExpiresCountdown ? `Consumes one reset credit. Earliest expires in ${resetExpiresCountdown}` : "Consumes one Codex reset credit"} style={{ height: 30, padding: "0 9px", border: "1px solid rgba(34,197,94,0.45)", borderRadius: 7, background: "var(--bg)", color: refreshing || resetting ? "var(--text-dim)" : "#22c55e", cursor: refreshing || resetting ? "default" : "pointer", fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
-                  {resetting ? "Resetting…" : "Reset limit"}
-                </button>
-              )}
-              <button type="button" onClick={refreshQuota} disabled={refreshing || resetting} {...iconFlowAttrs(refreshing || resetting ? "off" : "interactive")} title="Refresh active account usage" aria-label="Refresh active account usage" style={{ width: 30, height: 30, border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", color: refreshing || resetting ? "var(--text-dim)" : "var(--accent)", cursor: refreshing || resetting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => void handleManualRefresh()}
+                disabled={operationBusy || !account || accountsLoading}
+                {...iconFlowAttrs(operationBusy ? "off" : "interactive")}
+                title="刷新当前 Active 账号额度"
+                aria-label="刷新当前 Active ChatGPT 账号额度"
+                style={{
+                  width: 30,
+                  height: 30,
+                  border: "1px solid var(--border)",
+                  borderRadius: 7,
+                  background: "var(--bg)",
+                  color: operationBusy || !account ? "var(--text-dim)" : "var(--accent)",
+                  cursor: operationBusy || !account ? "default" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                }}
+              >
                 <ActionFlowIcon width={14} height={14} strokeWidth={2}>
                   <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
                   <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
@@ -400,96 +1008,355 @@ export function ChatGptUsagePanel() {
                   <path d="M21 20v-8h-8" />
                 </ActionFlowIcon>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+                aria-label="关闭 ChatGPT 用量面板"
+                style={{
+                  width: 30,
+                  height: 30,
+                  border: "1px solid var(--border)",
+                  borderRadius: 7,
+                  background: "var(--bg)",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: 16,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
             </div>
           </div>
 
-          {accountsLoading ? <div style={{ color: "var(--text-muted)", fontSize: 12 }}>Loading cached accounts…</div> : accountsError ? <div style={{ color: "#f87171", fontSize: 12, lineHeight: 1.45 }}>{accountsError}</div> : !account ? <div style={{ color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>No active ChatGPT/Codex saved account. Add or activate one in Models.</div> : (
-            <>
-              <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "flex", flexDirection: "column", gap: 5 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
-                  <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>Active</span>
-                </div>
-                <code style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{account.maskedAccountId}</code>
-                {account.label && <div style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.4 }}>备注：{account.label}</div>}
-                {account.extraInfo && <div style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{account.extraInfo}</div>}
-              </div>
-
-              {quotaResult && !quotaResult.success && <div style={{ color: quotaResult.credentialStatus === "expired" ? "#fb923c" : "#f87171", fontSize: 12, lineHeight: 1.45 }}>{quotaResult.error ?? quotaResult.credentialMessage ?? "Usage query failed."}</div>}
-              {quotaCache?.error && <div style={{ color: "#fb923c", fontSize: 12, lineHeight: 1.45 }}>{quotaCache.error}</div>}
-              {resetCreditsAvailableCount !== null && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>Reset credits: {resetCreditsAvailableCount}</span>
-                  <span style={{ color: resetCreditsError ? "#fb923c" : "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
-                    {resetCreditsError ? resetCreditsError : resetExpiresCountdown ? `Earliest expires in ${resetExpiresCountdown}` : resetExpiresAt ? `Earliest expires ${new Date(resetExpiresAt).toLocaleDateString()}` : "No credit expiration details"}
-                  </span>
-                </div>
-              )}
-
-              {knownTiers.length === 0 ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 9, background: "rgba(148,163,184,0.08)", border: "1px solid var(--border)" }}>
-                  <UsagePie tier={null} size={34} />
-                  <div style={{ color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>Usage unknown. Click refresh to query the active account.</div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {knownTiers.map((tier) => {
-                    const utilization = Math.min(Math.max(tier.utilization, 0), 100);
-                    const color = quotaColor(utilization);
-                    const countdown = formatResetCountdown(tier.resetsAt);
-                    return (
-                      <div key={tier.name} style={{ display: "grid", gridTemplateColumns: "42px 1fr auto", alignItems: "center", gap: 10, padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)" }}>
-                        <UsagePie tier={tier} label={QUOTA_TIER_LABELS[tier.name]} size={30} />
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                          <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 700 }}>{QUOTA_TIER_LABELS[tier.name]} window</span>
-                          <span style={{ color: "var(--text-dim)", fontSize: 10 }}>{countdown ? `Resets in ${countdown}` : "Reset time unknown"}</span>
-                        </div>
-                        <span style={{ color, fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{Math.round(utilization)}%</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
+          {(refreshing || resetting || activatingAccountId) && (
+            <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
+              {refreshing ? "正在刷新…" : resetting ? "正在重置…" : "正在切换…"}
+            </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
-            <div style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>Accounts</div>
-            {accounts.length === 0 && !accountsLoading ? <div style={{ color: "var(--text-dim)", fontSize: 12 }}>No saved accounts.</div> : accounts.map((item) => (
-              <div key={item.accountId} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: 8, borderRadius: 8, border: item.active ? "1px solid rgba(34,197,94,0.45)" : "1px solid var(--border)", background: item.active ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.06)" }}>
-                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.displayName}</span>
-                  <code style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.maskedAccountId}</code>
-                  <span style={{ color: item.quotaCache?.error ? "#fb923c" : "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{accountQuotaSummary(item)}</span>
-                </div>
-                {item.active ? <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 800 }}>active</span> : (
-                  <button type="button" onClick={() => void activateAccount(item.accountId)} disabled={Boolean(activatingAccountId)} style={{ padding: "5px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)", color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 700 }}>
-                    {activatingAccountId === item.accountId ? "Switching…" : "Activate"}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-              <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>Auto refresh</span>
-              <button type="button" onClick={() => void loadSchedulerStatus()} style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, padding: "4px 7px" }}>Reload</button>
+          {accountsLoading && !account ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: 10,
+                borderRadius: 9,
+                border: "1px solid var(--border)",
+                background: "rgba(148,163,184,0.06)",
+              }}
+              aria-busy="true"
+            >
+              <div className="chatgpt-usage-panel__skeleton-shimmer" style={{ height: 10, width: "54%", borderRadius: 4 }} />
+              <div className="chatgpt-usage-panel__skeleton-shimmer" style={{ height: 10, width: "78%", borderRadius: 4 }} />
+              <div className="chatgpt-usage-panel__skeleton-shimmer" style={{ height: 72, borderRadius: 8 }} />
+              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>正在加载已保存账号与缓存额度…</span>
             </div>
-            {schedulerError && <div style={{ color: "#f87171", fontSize: 11, lineHeight: 1.45 }}>{schedulerError}</div>}
-            {schedulerStatus ? (
-              <div style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.55 }}>
-                <div>Enabled: {schedulerStatus.enabled ? "yes" : "no"} · Running: {schedulerStatus.running ? "yes" : "no"} · Lock: {schedulerStatus.lockOwned ? "owned" : schedulerStatus.lock.stale ? "stale" : schedulerStatus.lock.exists ? "held" : "none"}</div>
-                <div>Next: {formatTime(schedulerStatus.nextRunAt)} · Last: {formatTime(schedulerStatus.lastRunFinishedAt)}</div>
-                {schedulerStatus.lastError && <div style={{ color: "#f87171" }}>Last error: {schedulerStatus.lastError}</div>}
-                {schedulerStatus.lastAccountError && <div style={{ color: "#fb923c" }}>Account error: {schedulerStatus.lastAccountError}</div>}
+          ) : !account ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
+                <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active ChatGPT 账号</strong>
+                请先在 Models → ChatGPT 登录或激活一个账号。面板不会为未登录状态伪造额度。
+                {accountsError && <div style={{ marginTop: 6, color: "#f87171" }}>{accountsError}</div>}
               </div>
-            ) : <div style={{ color: "var(--text-dim)", fontSize: 11 }}>Scheduler status unavailable.</div>}
-            <button type="button" onClick={() => void repairLock()} disabled={repairingLock} style={{ alignSelf: "flex-start", padding: "5px 9px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.35)", background: "transparent", color: repairingLock ? "var(--text-dim)" : "#f87171", cursor: repairingLock ? "default" : "pointer", fontSize: 11, fontWeight: 700 }}>
-              {repairingLock ? "Repairing…" : "故障处理：修复刷新锁"}
-            </button>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={openModels}
+                style={{
+                  minHeight: 34,
+                  borderRadius: 8,
+                  border: "1px solid var(--accent)",
+                  background: "var(--accent)",
+                  color: "#0b1220",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: 12,
+                }}
+              >
+                打开 Models → ChatGPT
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                  <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {account.displayName}
+                  </span>
+                  <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {account.maskedAccountId}{account.label ? ` · ${account.label}` : ""}
+                  </code>
+                  {account.extraInfo && (
+                    <div title={account.extraInfo} style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {account.extraInfo}
+                    </div>
+                  )}
+                </div>
+                <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>Active</span>
+              </div>
+
+              {needsReauth && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                  <strong>需要重新登录。</strong> {credentialBanner}
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={openModels}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--accent)",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: 0,
+                      }}
+                    >
+                      打开 Models → ChatGPT
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {actionWarning && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 12, lineHeight: 1.5 }}>
+                  {actionWarning}
+                </div>
+              )}
+
+              {actionError && (
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                  {actionError}
+                </div>
+              )}
+
+              {hasQuotaWindows ? (
+                <div
+                  className="chatgpt-usage-quota-grid"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {displayModel.tiers.map((tier) => (
+                    <QuotaWindowCard key={tier.name} tier={tier} />
+                  ))}
+                </div>
+              ) : !needsReauth ? (
+                <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
+                  用量未知。请刷新以查询当前 Active 账号。不会以 0% 表示未知额度。
+                </div>
+              ) : null}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>账号</span>
+                  <span style={{ color: "var(--text-dim)", fontSize: 9, fontWeight: 600 }}>全局 Active</span>
+                </div>
+                <div style={{ padding: 8, borderRadius: 8, border: "1px solid rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
+                  “设为 Active”会切换全局 Active ChatGPT/Codex 账号，影响当前与新建会话的后续请求。
+                </div>
+                {accounts.length === 0 ? (
+                  <div style={{ color: "var(--text-dim)", fontSize: 12 }}>没有已保存账号。</div>
+                ) : accounts.map((item) => (
+                  <div
+                    key={item.accountId}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 8,
+                      alignItems: "center",
+                      padding: 8,
+                      borderRadius: 8,
+                      border: item.active ? "1px solid rgba(34,197,94,0.45)" : "1px solid var(--border)",
+                      background: item.active ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.06)",
+                    }}
+                  >
+                    <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span title={item.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.displayName}
+                      </span>
+                      <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.maskedAccountId}{item.label ? ` · ${item.label}` : ""}
+                      </code>
+                    </div>
+                    {item.active ? (
+                      <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 800 }}>Active</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleActivate(item.accountId)}
+                        disabled={operationBusy}
+                        style={{
+                          minHeight: 30,
+                          padding: "5px 9px",
+                          borderRadius: 6,
+                          border: "1px solid var(--border)",
+                          background: "var(--bg)",
+                          color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)",
+                          cursor: operationBusy ? "default" : "pointer",
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {activatingAccountId === item.accountId ? "正在切换…" : "设为 Active"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
+                <button
+                  type="button"
+                  onClick={openModels}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: 0,
+                    textAlign: "left",
+                  }}
+                >
+                  {needsReauth ? "在 Models → ChatGPT 重新登录" : "在 Models → ChatGPT 管理"}
+                </button>
+                <span style={{ color: "var(--text-dim)", fontSize: 10 }}>页面可见时每 30 秒重读缓存</span>
+              </div>
+
+              {/* GPT-only secondary tools: Reset credits + backend auto-refresh. */}
+              <div
+                style={{
+                  marginTop: 2,
+                  paddingTop: 10,
+                  borderTop: "1px dashed rgba(148,163,184,0.28)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 800, letterSpacing: 0.3 }}>
+                  GPT 专属工具
+                </div>
+
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.05)", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>
+                      Reset credits{typeof resetCreditsAvailableCount === "number" ? `：${resetCreditsAvailableCount}` : ""}
+                    </span>
+                    {(resetCreditsAvailableCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void handleReset()}
+                        disabled={operationBusy}
+                        title={resetExpiresCountdown ? `消耗一次 Reset credit。最早过期：${resetExpiresCountdown}` : "消耗一次 Codex Reset credit"}
+                        style={{
+                          minHeight: 28,
+                          padding: "4px 9px",
+                          border: "1px solid rgba(34,197,94,0.45)",
+                          borderRadius: 7,
+                          background: "var(--bg)",
+                          color: operationBusy ? "var(--text-dim)" : "#22c55e",
+                          cursor: operationBusy ? "default" : "pointer",
+                          fontSize: 11,
+                          fontWeight: 800,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {resetting ? "正在重置…" : "使用一次"}
+                      </button>
+                    )}
+                  </div>
+                  <span style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                    {typeof resetCreditsAvailableCount !== "number"
+                      ? "暂无 Reset credits 信息。"
+                      : resetCreditsAvailableCount <= 0
+                        ? "当前没有可用的 Reset credit。"
+                        : resetExpiresCountdown
+                          ? `最早过期倒计时 ${resetExpiresCountdown}`
+                          : resetExpiresAt
+                            ? `最早过期 ${new Date(resetExpiresAt).toLocaleDateString()}`
+                            : "有可用 Reset credit。"}
+                  </span>
+                </div>
+
+                <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.05)", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>后台自动刷新</span>
+                    <button
+                      type="button"
+                      onClick={() => void loadSchedulerStatus()}
+                      disabled={repairingLock}
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: 6,
+                        background: "var(--bg)",
+                        color: "var(--text-muted)",
+                        cursor: repairingLock ? "default" : "pointer",
+                        fontSize: 11,
+                        padding: "4px 7px",
+                      }}
+                    >
+                      重载
+                    </button>
+                  </div>
+                  {schedulerError && (
+                    <div style={{ color: "#f87171", fontSize: 11, lineHeight: 1.45 }}>{schedulerError}</div>
+                  )}
+                  {schedulerStatus ? (
+                    <div style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.55 }}>
+                      <div>
+                        启用：{schedulerStatus.enabled ? "是" : "否"}
+                        {" · "}
+                        运行中：{schedulerStatus.running ? "是" : "否"}
+                        {" · "}
+                        锁：{lockStateLabel(schedulerStatus)}
+                      </div>
+                      <div>
+                        下次：{formatSchedulerTime(schedulerStatus.nextRunAt)}
+                        {" · "}
+                        上次：{formatSchedulerTime(schedulerStatus.lastRunFinishedAt)}
+                      </div>
+                      {schedulerStatus.lastError && (
+                        <div style={{ color: "#f87171" }}>{SAFE_MESSAGES.schedulerLastError}</div>
+                      )}
+                      {schedulerStatus.lastAccountError && (
+                        <div style={{ color: "#fb923c" }}>{SAFE_MESSAGES.schedulerAccountError}</div>
+                      )}
+                    </div>
+                  ) : (
+                    !schedulerError && <div style={{ color: "var(--text-dim)", fontSize: 11 }}>后台刷新状态不可用。</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleRepairLock()}
+                    disabled={operationBusy}
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "5px 9px",
+                      borderRadius: 6,
+                      border: "1px solid rgba(239,68,68,0.35)",
+                      background: "transparent",
+                      color: repairingLock ? "var(--text-dim)" : "#f87171",
+                      cursor: operationBusy ? "default" : "pointer",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {repairingLock ? "正在修复…" : "故障处理：修复刷新锁"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
       )}
     </div>
   );

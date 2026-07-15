@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yolk Pi Web · Grok 用量悬浮面板原型</title>
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --bg-subtle: rgba(255,255,255,.045);
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --shadow: 0 22px 70px rgba(0,0,0,.48), 0 0 0 1px rgba(255,255,255,.035);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 70% 2%, rgba(96,165,250,.10), transparent 32rem),
+        radial-gradient(circle at 15% 90%, rgba(167,139,250,.07), transparent 28rem),
+        #131313;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+    }
+    button { font: inherit; }
+    button:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .prototype-header {
+      min-height: 66px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(18,18,18,.78);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .prototype-title { min-width: 0; }
+    .prototype-title strong { display: block; font-size: 14px; letter-spacing: .01em; }
+    .prototype-title span { color: var(--text-muted); font-size: 11px; }
+    .demo-controls { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .demo-btn, .icon-btn, .secondary-btn, .primary-btn {
+      min-height: 30px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(36,36,36,.88);
+      color: var(--text-muted);
+      padding: 5px 9px;
+      cursor: pointer;
+    }
+    .demo-btn:hover, .icon-btn:hover, .secondary-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .demo-btn.active { color: var(--accent); border-color: rgba(96,165,250,.52); background: rgba(96,165,250,.11); }
+    .primary-btn { color: #0b1220; background: var(--accent); border-color: var(--accent); font-weight: 800; }
+    .primary-btn:hover { background: var(--accent-hover); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    .prototype-main { padding: 28px 20px 90px; }
+    .stage-wrap { max-width: 1220px; margin: 0 auto; }
+    .stage-note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 10px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .stage-note code { color: var(--accent); font-family: var(--font-mono); }
+    .app-frame {
+      width: 100%;
+      height: min(700px, calc(100vh - 155px));
+      min-height: 540px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 13px;
+      background: var(--bg);
+      box-shadow: 0 28px 90px rgba(0,0,0,.38);
+      transition: width .2s ease;
+    }
+    .app-frame.narrow { width: 390px; max-width: 100%; }
+    .app-layout { display: grid; grid-template-columns: 216px minmax(0,1fr); height: 100%; }
+    .app-frame.narrow .app-layout { grid-template-columns: 1fr; }
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: #202020;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .app-frame.narrow .sidebar { display: none; }
+    .brand { height: 42px; padding: 0 13px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); font-weight: 800; }
+    .brand-mark { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 6px; background: linear-gradient(145deg,#facc15,#fb923c); color: #251600; font-size: 10px; }
+    .side-body { padding: 10px; display: flex; flex-direction: column; gap: 7px; }
+    .side-line { height: 32px; border-radius: 7px; background: rgba(255,255,255,.035); border: 1px solid transparent; color: var(--text-muted); padding: 8px; }
+    .side-line.selected { background: var(--bg-selected); border-color: var(--border); color: var(--text); }
+    .workspace { min-width: 0; position: relative; display: flex; flex-direction: column; }
+    .topbar {
+      height: 42px;
+      flex: 0 0 42px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(36,36,36,.82);
+      backdrop-filter: blur(16px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .topbar::-webkit-scrollbar { display: none; }
+    .top-action {
+      height: 28px;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 8px;
+      border: 1px solid rgba(148,163,184,.20);
+      border-radius: 8px;
+      background: rgba(15,23,42,.08);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 11px;
+    }
+    .top-action:hover { background: var(--bg-hover); color: var(--text); }
+    .top-spacer { flex: 1 1 auto; min-width: 12px; }
+    .usage-cluster { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+    .stats-chip {
+      height: 23px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(15,23,42,.10);
+      border: 1px solid rgba(148,163,184,.20);
+      color: var(--text-muted);
+      font-size: 10px;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .stats-chip b { color: var(--text); }
+    .usage-trigger {
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 9px;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,.28);
+      background: rgba(15,23,42,.10);
+      backdrop-filter: blur(10px);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .usage-trigger:hover, .usage-trigger[aria-expanded="true"] { border-color: rgba(96,165,250,.58); background: rgba(96,165,250,.08); }
+    .usage-brand { color: var(--text); font-weight: 800; }
+    .status-inline { display: inline-flex; align-items: center; gap: 4px; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex: 0 0 auto; }
+    .status-dot.success { background: var(--success); box-shadow: 0 0 8px rgba(74,222,128,.48); }
+    .status-dot.warning { background: var(--warning); }
+    .status-dot.danger { background: var(--danger); }
+    .mini-quota { display: inline-flex; align-items: center; gap: 3px; }
+    .mini-ring {
+      --p: 0;
+      --ring: var(--accent);
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      background: conic-gradient(var(--ring) calc(var(--p) * 1%), rgba(148,163,184,.18) 0);
+      border: 1px solid rgba(148,163,184,.28);
+    }
+    .mini-ring::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #252525; }
+    .mini-quota small { color: var(--text-dim); font-size: 9px; font-weight: 800; }
+    .spinner { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid rgba(148,163,184,.25); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .chat-canvas {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.016) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px;
+    }
+    .chat-content { width: min(720px, calc(100% - 36px)); margin: 42px auto 0; }
+    .chat-heading { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+    .chat-sub { color: var(--text-muted); line-height: 1.6; max-width: 620px; }
+    .message-card { margin-top: 28px; padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(36,36,36,.64); color: var(--text-muted); }
+    .input-mock { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: min(720px, calc(100% - 30px)); height: 76px; border-radius: 13px; border: 1px solid var(--border); background: rgba(36,36,36,.88); box-shadow: 0 12px 35px rgba(0,0,0,.28); padding: 12px; color: var(--text-dim); }
+
+    .grok-popover {
+      position: absolute;
+      top: 47px;
+      right: 44px;
+      z-index: 700;
+      width: 392px;
+      max-height: min(650px, calc(100% - 60px));
+      overflow: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid rgba(148,163,184,.32);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--bg-panel) 87%, transparent);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .app-frame.narrow .grok-popover { right: 8px; width: calc(100% - 16px); max-height: calc(100% - 62px); }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .panel-title { font-size: 13px; font-weight: 850; }
+    .panel-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; color: var(--text-dim); font-size: 10px; }
+    .panel-actions { display: flex; gap: 6px; }
+    .icon-btn { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; }
+    .cache-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); background: var(--bg-subtle); font-weight: 800; }
+    .cache-badge.success { color: var(--success); border-color: rgba(74,222,128,.28); }
+    .cache-badge.warning { color: var(--warning); border-color: rgba(251,191,36,.3); }
+    .cache-badge.danger { color: var(--danger); border-color: rgba(251,113,133,.3); }
+    .surface { border: 1px solid var(--border); border-radius: 9px; background: rgba(148,163,184,.065); padding: 10px; }
+    .account-summary { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: start; }
+    .account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; font-size: 12px; }
+    .account-id { margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font: 10px var(--font-mono); }
+    .active-badge { color: var(--success); font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .notice { display: flex; gap: 8px; align-items: flex-start; padding: 9px 10px; border-radius: 9px; font-size: 11px; line-height: 1.48; }
+    .notice.warning { color: #fde68a; background: rgba(251,191,36,.09); border: 1px solid rgba(251,191,36,.26); }
+    .notice.danger { color: #fecdd3; background: rgba(251,113,133,.09); border: 1px solid rgba(251,113,133,.26); }
+    .notice.neutral { color: var(--text-muted); background: rgba(148,163,184,.07); border: 1px solid var(--border); }
+    .quota-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .quota-card { min-width: 0; border: 1px solid var(--border); border-radius: 9px; background: rgba(148,163,184,.055); padding: 10px; }
+    .quota-card .label { color: var(--text-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+    .quota-big { margin-top: 5px; display: flex; align-items: baseline; gap: 4px; font-size: 19px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .quota-big small { color: var(--text-dim); font-size: 10px; font-weight: 600; }
+    .progress { height: 6px; overflow: hidden; margin: 8px 0 6px; border-radius: 999px; background: rgba(148,163,184,.16); }
+    .progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+    .progress > span.warning { background: var(--warning); }
+    .progress > span.danger { background: var(--danger); }
+    .quota-detail { color: var(--text-dim); font-size: 10px; line-height: 1.45; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text); font-size: 12px; font-weight: 850; }
+    .account-list { display: flex; flex-direction: column; gap: 7px; }
+    .account-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: rgba(148,163,184,.045); }
+    .account-row.active { border-color: rgba(74,222,128,.36); background: rgba(74,222,128,.055); }
+    .account-row .meta { min-width: 0; }
+    .account-row .meta strong, .account-row .meta code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .account-row .meta strong { font-size: 11px; }
+    .account-row .meta code { margin-top: 2px; color: var(--text-dim); font: 9px var(--font-mono); }
+    .small-btn { min-height: 28px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--accent); cursor: pointer; font-size: 10px; font-weight: 800; }
+    .small-btn:hover { background: var(--bg-hover); }
+    .panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 2px; }
+    .link-btn { border: 0; padding: 4px 0; background: transparent; color: var(--accent); cursor: pointer; font-weight: 800; font-size: 11px; }
+    .fineprint { color: var(--text-dim); font-size: 9px; line-height: 1.4; }
+    .skeleton { overflow: hidden; position: relative; height: 12px; border-radius: 4px; background: rgba(148,163,184,.12); }
+    .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent); animation: shimmer 1.3s infinite; }
+    @keyframes shimmer { to { transform: translateX(100%); } }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1500;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(0,0,0,.62);
+      backdrop-filter: blur(6px);
+    }
+    .settings-modal {
+      width: min(820px, 100%);
+      height: min(620px, calc(100vh - 32px));
+      display: grid;
+      grid-template-columns: 190px minmax(0,1fr);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: var(--shadow);
+    }
+    .settings-nav { padding: 14px 10px; border-right: 1px solid var(--border); background: var(--bg-panel); }
+    .settings-nav h2 { margin: 0 8px 12px; font-size: 14px; }
+    .nav-item { width: 100%; min-height: 34px; display: flex; align-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); padding: 0 9px; cursor: default; }
+    .nav-item.active { color: var(--text); background: var(--bg-selected); font-weight: 800; }
+    .settings-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .settings-head { height: 48px; flex: 0 0 48px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .settings-content { flex: 1; overflow: auto; padding: 20px; }
+    .settings-content h3 { margin: 0; font-size: 15px; }
+    .settings-content > p { margin: 6px 0 18px; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .toggle-field {
+      width: 100%; min-height: 76px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      border: 1px solid var(--border); border-radius: 10px; background: var(--bg-subtle); color: var(--text); text-align: left; cursor: pointer;
+    }
+    .toggle-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .toggle-copy strong { font-size: 13px; }
+    .toggle-copy span { color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+    .switch-visual { width: 40px; height: 22px; flex: 0 0 40px; border-radius: 999px; position: relative; background: var(--border); transition: background .12s; }
+    .switch-visual::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .12s; }
+    .toggle-field[aria-checked="true"] .switch-visual { background: var(--accent); }
+    .toggle-field[aria-checked="true"] .switch-visual::after { left: 21px; }
+    .settings-help { margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); color: var(--text-dim); font-size: 11px; line-height: 1.55; }
+    .settings-footer { min-height: 54px; padding: 10px 14px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; border-top: 1px solid var(--border); }
+    .close-x { border: 0; background: transparent; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2000;
+      max-width: min(360px, calc(100vw - 36px));
+      padding: 10px 12px;
+      border: 1px solid rgba(96,165,250,.35);
+      border-radius: 9px;
+      background: rgba(36,36,36,.92);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      font-size: 11px;
+      backdrop-filter: blur(14px);
+    }
+    .hidden { display: none !important; }
+
+    @media (max-width: 780px) {
+      .prototype-header { align-items: flex-start; flex-direction: column; }
+      .demo-controls { justify-content: flex-start; }
+      .prototype-main { padding: 16px 8px 70px; }
+      .app-layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .top-action .action-label { display: none; }
+      .stats-chip .token-detail { display: none; }
+      .settings-modal { grid-template-columns: 1fr; }
+      .settings-nav { display: none; }
+      .quota-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .prototype-title span { display: none; }
+      .stage-note { align-items: flex-start; flex-direction: column; }
+      .app-frame { min-height: 560px; height: calc(100vh - 220px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="prototype-header">
+    <div class="prototype-title">
+      <strong>Grok 顶部用量悬浮面板 · UI 原型</strong>
+      <span>深色玻璃化 · 独立 GPT/Grok 开关 · 安全 quota 投影 · 用户可见文案中文化</span>
+    </div>
+    <div class="demo-controls" aria-label="原型状态控制">
+      <button class="demo-btn active" data-state="success">成功</button>
+      <button class="demo-btn" data-state="stale">缓存过期</button>
+      <button class="demo-btn" data-state="signedout">未登录</button>
+      <button class="demo-btn" data-state="reauth">需要重新登录</button>
+      <button class="demo-btn" data-state="error">错误</button>
+      <button class="demo-btn" data-state="loading">加载中</button>
+      <button class="demo-btn" id="narrowBtn" aria-pressed="false">窄屏 390px</button>
+      <button class="demo-btn" id="settingsBtn">Settings → Grok</button>
+    </div>
+  </header>
+
+  <main class="prototype-main">
+    <div class="stage-wrap">
+      <div class="stage-note">
+        <span>点击顶部 <code>Grok</code> 展开；手动刷新和账号切换可演示忙碌状态。</span>
+        <span>原型为便于审阅默认“已开启”；生产配置默认关闭。</span>
+      </div>
+      <section class="app-frame" id="appFrame" aria-label="Yolk Pi Web 顶部布局演示">
+        <div class="app-layout">
+          <aside class="sidebar" aria-hidden="true">
+            <div class="brand"><span class="brand-mark">Y</span> yolk pi web</div>
+            <div class="side-body">
+              <div class="side-line selected">Grok 用量面板任务</div>
+              <div class="side-line">会话历史</div>
+              <div class="side-line">Studio 子任务审计</div>
+            </div>
+          </aside>
+          <div class="workspace">
+            <div class="topbar" id="topbar">
+              <button class="top-action"><span>⑂</span><span class="action-label">分支</span></button>
+              <button class="top-action"><span>⌁</span><span class="action-label">Git</span></button>
+              <button class="top-action"><span>›_</span><span class="action-label">终端</span></button>
+              <span class="top-spacer"></span>
+              <div class="usage-cluster">
+                <span class="stats-chip" title="会话统计"><b>$0.42</b><span class="token-detail">输入 1.2M · 输出 48K</span></span>
+                <button class="usage-trigger" id="gptTrigger" title="ChatGPT 用量（原型仅展示双组件布局）">
+                  <span class="usage-brand">GPT</span>
+                  <span class="status-inline"><span class="status-dot success"></span>缓存新鲜</span>
+                  <span class="mini-quota"><span class="mini-ring" style="--p:46"></span><small>5 小时</small></span>
+                  <span class="mini-quota"><span class="mini-ring" style="--p:18"></span><small>周</small></span>
+                </button>
+                <span id="grokTriggerMount"></span>
+              </div>
+              <button class="top-action" id="drawerBtn" title="右侧抽屉"><span>▥</span><span class="action-label">文件</span></button>
+            </div>
+            <div class="chat-canvas">
+              <div class="chat-content">
+                <div class="chat-heading">快速查看 Grok quota</div>
+                <div class="chat-sub">顶部只展示安全、可快速扫读的 quota 投影。展开后查看 Active 账号、月度/可选周额度、缓存新鲜度，并可刷新或切换账号。</div>
+                <div class="message-card">顺序：会话统计 → GPT（若开）→ Grok（若开）→ 右侧抽屉。两个提供商的设置与状态完全独立。</div>
+              </div>
+              <div class="input-mock">输入消息…</div>
+            </div>
+          </div>
+        </div>
+        <div id="grokPanelMount"></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="modal-backdrop hidden" id="settingsBackdrop">
+    <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <nav class="settings-nav" aria-label="Settings 分区">
+        <h2 id="settingsTitle">Settings</h2>
+        <button class="nav-item">Yolk Pi</button>
+        <button class="nav-item">用量</button>
+        <button class="nav-item">ChatGPT</button>
+        <button class="nav-item">OpenCode Go</button>
+        <button class="nav-item active" aria-current="page">Grok</button>
+        <button class="nav-item">编辑器</button>
+      </nav>
+      <div class="settings-main">
+        <div class="settings-head">
+          <strong>Settings → Grok</strong>
+          <button class="close-x" id="settingsClose" aria-label="关闭设置">×</button>
+        </div>
+        <div class="settings-content">
+          <h3>Grok</h3>
+          <p>控制 Grok CLI 账号相关显示与全局 Active 账号自动轮换。Models 中的“设为 Active”用于设置当前全局 Active；账号登录和管理仍在 Models 中完成。保存到 <code style="font-family:var(--font-mono);color:var(--text)">pi-web.json</code>。</p>
+          <button class="toggle-field" id="usageToggle" type="button" role="switch" aria-checked="true">
+            <span class="toggle-copy">
+              <strong>Grok 用量悬浮面板</strong>
+              <span>默认关闭。开启后顶部右侧会显示当前全局 Active Grok 账号的半透明用量入口；展开后可查看月度/可选周额度、缓存状态、手动刷新并切换账号。</span>
+            </span>
+            <span class="switch-visual" aria-hidden="true"></span>
+          </button>
+          <div style="height:12px"></div>
+          <button class="toggle-field" type="button" role="switch" aria-checked="false">
+            <span class="toggle-copy">
+              <strong>明确限额或限流时自动切换可用账号</strong>
+              <span>默认关闭。仅在明确 quota、月度或周度额度耗尽、限流时切换全局 Active 并安全重试一次。</span>
+            </span>
+            <span class="switch-visual" aria-hidden="true"></span>
+          </button>
+          <div class="settings-help">用量面板与自动切换是两个独立设置。关闭用量面板不会关闭自动故障切换；开启用量面板也不会自动开启自动故障切换。Grok 不支持 ChatGPT 重置额度或后台定时任务。</div>
+        </div>
+        <footer class="settings-footer">
+          <button class="secondary-btn" id="settingsCancel">取消</button>
+          <button class="primary-btn" id="settingsSave">保存设置</button>
+        </footer>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const stateModels = {
+        success: {
+          status: "缓存新鲜 · 18 秒", tone: "success", cache: "fresh", cacheLabel: "缓存新鲜", queried: "18 秒前",
+          monthly: { limit: 1000, used: 342, remaining: 658, utilization: 34.2, resetsAt: "2026-08-01 08:00" },
+          weekly: { usedPercent: 12, resetsAt: "2026-07-20 00:00" }, active: true
+        },
+        stale: {
+          status: "缓存过期", tone: "warning", cache: "stale", cacheLabel: "缓存已过期", queried: "2 小时前",
+          monthly: { limit: 1000, used: 781, remaining: 219, utilization: 78.1, resetsAt: "2026-08-01 08:00" },
+          weekly: { usedPercent: 86, resetsAt: "2026-07-20 00:00" }, active: true, errorCode: "upstream"
+        },
+        signedout: { status: "登录", tone: "muted", cache: "none", cacheLabel: "无缓存", queried: "从未更新", active: false },
+        reauth: {
+          status: "重新登录", tone: "danger", cache: "stale", cacheLabel: "缓存过期 · 需重新登录", queried: "5 小时前",
+          monthly: { limit: 1000, used: 604, remaining: 396, utilization: 60.4, resetsAt: "2026-08-01 08:00" },
+          weekly: null, active: true, reauthRequired: true, errorCode: "unauthorized"
+        },
+        error: { status: "错误", tone: "danger", cache: "none", cacheLabel: "无缓存", queried: "无可用缓存", active: true, errorCode: "network" },
+        loading: { status: "加载中", tone: "muted", cache: "none", cacheLabel: "加载中", queried: "正在读取…", active: true, loading: true }
+      };
+
+      const safeErrors = {
+        network: "无法连接额度服务，且没有可用缓存。请检查网络后重试。",
+        rate_limited: "额度服务暂时限流。请稍后重试。",
+        unauthorized: "Grok 登录已失效，需要重新登录。",
+        upstream: "额度服务暂时不可用，正在展示上次成功数据。",
+        invalid_payload: "额度服务返回了无法识别的数据。请稍后重试。"
+      };
+
+      let currentState = "success";
+      let panelOpen = false;
+      let appliedEnabled = true; // 为审阅直接展示；产品默认值在文案中明确为 false。
+      let draftEnabled = true;
+      let refreshing = false;
+      let switchingId = null;
+      let activeIndex = 0;
+      let narrow = false;
+      let toastTimer = null;
+      const accounts = [
+        { id: "acc_primary", name: "个人 SuperGrok", masked: "per•••@example.com", label: "主力账号" },
+        { id: "acc_backup", name: "工作区 Grok", masked: "wor•••@example.com", label: "备用账号" },
+        { id: "acc_long", name: "用于验证省略显示的超长账号名称", masked: "ver••••••••@long-domain.example", label: "长内容测试" }
+      ];
+
+      const appFrame = document.getElementById("appFrame");
+      const triggerMount = document.getElementById("grokTriggerMount");
+      const panelMount = document.getElementById("grokPanelMount");
+      const settingsBackdrop = document.getElementById("settingsBackdrop");
+      const usageToggle = document.getElementById("usageToggle");
+      const toast = document.getElementById("toast");
+
+      function esc(value) {
+        return String(value).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      }
+      function toneClass(tone) { return tone === "muted" ? "" : tone; }
+      function ringTone(value) { return value >= 95 ? "var(--danger)" : value >= 80 ? "var(--warning)" : "var(--accent)"; }
+      function barTone(value) { return value >= 95 ? "danger" : value >= 80 ? "warning" : ""; }
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.remove("hidden");
+        toastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2600);
+      }
+
+      function renderTrigger() {
+        if (!appliedEnabled) {
+          triggerMount.innerHTML = "";
+          return;
+        }
+        const model = stateModels[currentState];
+        const month = model.monthly;
+        const week = model.weekly;
+        triggerMount.innerHTML = `
+          <button class="usage-trigger" id="grokTrigger" type="button" aria-expanded="${panelOpen}" aria-controls="grokUsagePanel" title="Grok 用量">
+            <span class="usage-brand">Grok</span>
+            <span class="status-inline">${model.loading ? '<span class="spinner" aria-hidden="true"></span>' : `<span class="status-dot ${toneClass(model.tone)}" aria-hidden="true"></span>`}<span>${esc(refreshing ? "正在刷新…" : model.status)}</span></span>
+            <span class="mini-quota" title="${month ? `月度已使用 ${Math.round(month.utilization)}%` : "月度用量未知"}">
+              <span class="mini-ring" style="--p:${month ? month.utilization : 0};--ring:${month ? ringTone(month.utilization) : "var(--text-dim)"}"></span><small>${month ? `月 ${Math.round(month.utilization)}%` : "月 —"}</small>
+            </span>
+            ${week ? `<span class="mini-quota" title="周度已使用 ${Math.round(week.usedPercent)}%"><span class="mini-ring" style="--p:${week.usedPercent};--ring:${ringTone(week.usedPercent)}"></span><small>周 ${Math.round(week.usedPercent)}%</small></span>` : ""}
+          </button>`;
+        document.getElementById("grokTrigger").addEventListener("click", event => {
+          event.stopPropagation();
+          panelOpen ? closePanel() : openPanel();
+        });
+      }
+
+      function quotaCard(label, percent, bigHtml, detailHtml) {
+        return `<div class="quota-card">
+          <div class="label">${label}</div>
+          <div class="quota-big">${bigHtml}</div>
+          <div class="progress" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(percent)}"><span class="${barTone(percent)}" style="width:${Math.min(100, Math.max(0, percent))}%"></span></div>
+          <div class="quota-detail">${detailHtml}</div>
+        </div>`;
+      }
+
+      function renderPanel() {
+        if (!panelOpen || !appliedEnabled) { panelMount.innerHTML = ""; return; }
+        const model = stateModels[currentState];
+        const active = accounts[activeIndex];
+        let body = "";
+        if (model.loading) {
+          body = `<div class="surface" aria-busy="true" style="display:flex;flex-direction:column;gap:9px">
+            <div class="skeleton" style="width:54%"></div><div class="skeleton" style="width:78%"></div><div class="skeleton" style="height:72px"></div>
+            <span style="color:var(--text-muted);font-size:11px">正在加载已保存账号与缓存 quota…</span>
+          </div>`;
+        } else if (!model.active) {
+          body = `<div class="notice neutral"><span aria-hidden="true">◇</span><div><strong style="display:block;color:var(--text);margin-bottom:3px">无 Active Grok 账号</strong>请先在 Models → Grok 登录或激活一个账号。面板不会为未登录状态伪造额度。</div></div>
+            <button class="primary-btn" id="signinBtn" style="justify-content:center">打开 Models → Grok</button>`;
+        } else {
+          body += `<div class="surface account-summary">
+            <div style="min-width:0"><div class="account-name" title="${esc(active.name)}">${esc(active.name)}</div><div class="account-id" title="${esc(active.masked)}">${esc(active.masked)} · ${esc(active.label)}</div></div>
+            <span class="active-badge">Active</span>
+          </div>`;
+          if (model.reauthRequired) body += `<div class="notice danger"><span aria-hidden="true">!</span><div><strong>需要重新登录。</strong> ${safeErrors.unauthorized}</div></div>`;
+          else if (model.cache === "stale") body += `<div class="notice warning"><span aria-hidden="true">△</span><div><strong>cache 已过期。</strong> ${safeErrors[model.errorCode]}</div></div>`;
+          else if (model.errorCode && !model.monthly) body += `<div class="notice danger"><span aria-hidden="true">!</span><div><strong>quota 暂不可用。</strong> ${safeErrors[model.errorCode]}</div></div>`;
+
+          if (model.monthly) {
+            const m = model.monthly;
+            const monthCard = quotaCard("月度额度", m.utilization, `${m.used.toLocaleString()} <small>/ ${m.limit.toLocaleString()}</small>`, `剩余 ${m.remaining.toLocaleString()} · 重置时间 ${m.resetsAt}`);
+            const weekCard = model.weekly
+              ? quotaCard("周额度", model.weekly.usedPercent, `${Math.round(model.weekly.usedPercent)}<small>% 已使用</small>`, `重置时间 ${model.weekly.resetsAt}`)
+              : `<div class="quota-card"><div class="label">周额度</div><div style="margin-top:11px;color:var(--text-muted);font-size:11px;line-height:1.5">当前 API 未提供周额度。</div><div class="quota-detail" style="margin-top:9px">不推断为 0%、不限额或订阅权益缺失。</div></div>`;
+            body += `<div class="quota-grid">${monthCard}${weekCard}</div>`;
+          } else if (!model.errorCode) {
+            body += `<div class="notice neutral">用量未知。请刷新以查询当前 Active 账号。</div>`;
+          }
+
+          body += `<div class="section-title"><span>账号</span><span style="color:var(--text-dim);font-size:9px;font-weight:600">全局 Active</span></div><div class="account-list">`;
+          accounts.forEach((account, index) => {
+            const isActive = index === activeIndex;
+            body += `<div class="account-row ${isActive ? "active" : ""}">
+              <div class="meta"><strong title="${esc(account.name)}">${esc(account.name)}</strong><code title="${esc(account.masked)}">${esc(account.masked)} · ${esc(account.label)}</code></div>
+              ${isActive ? '<span class="active-badge">Active</span>' : `<button class="small-btn switch-account" data-index="${index}" ${switchingId ? "disabled" : ""}>${switchingId === account.id ? "正在切换…" : "设为 Active"}</button>`}
+            </div>`;
+          });
+          body += `</div><div class="panel-footer"><button class="link-btn" id="modelsBtn">${model.reauthRequired ? "在 Models → Grok 重新登录" : "在 Models → Grok 管理"}</button><span class="fineprint">页面可见时每 30 秒刷新</span></div>`;
+        }
+
+        panelMount.innerHTML = `<section class="grok-popover" id="grokUsagePanel" role="dialog" aria-label="Grok 用量" aria-live="polite" onclick="event.stopPropagation()">
+          <div class="panel-head">
+            <div><div class="panel-title">Grok 用量</div><div class="panel-meta"><span class="cache-badge ${toneClass(model.tone)}"><span class="status-dot ${toneClass(model.tone)}"></span>${esc(model.cacheLabel)}</span><span>更新时间：${esc(model.queried)}</span></div></div>
+            <div class="panel-actions">
+              <button class="icon-btn" id="refreshBtn" type="button" aria-label="刷新当前 Active Grok 账号 quota" title="强制刷新当前 Active 账号 quota" ${refreshing || model.loading || !model.active ? "disabled" : ""}>${refreshing ? '<span class="spinner"></span>' : "↻"}</button>
+              <button class="icon-btn" id="panelClose" type="button" aria-label="关闭 Grok 用量面板">×</button>
+            </div>
+          </div>${body}
+        </section>`;
+
+        document.getElementById("panelClose").addEventListener("click", closePanel);
+        const refreshBtn = document.getElementById("refreshBtn");
+        if (refreshBtn) refreshBtn.addEventListener("click", manualRefresh);
+        document.querySelectorAll(".switch-account").forEach(btn => btn.addEventListener("click", () => switchAccount(Number(btn.dataset.index))));
+        const modelsBtn = document.getElementById("modelsBtn");
+        if (modelsBtn) modelsBtn.addEventListener("click", () => showToast("实现时打开 Models → Grok 账号管理。"));
+        const signinBtn = document.getElementById("signinBtn");
+        if (signinBtn) signinBtn.addEventListener("click", () => showToast("实现时打开 Models → Grok 登录入口。"));
+      }
+
+      function render() { renderTrigger(); renderPanel(); }
+      function openPanel() {
+        panelOpen = true;
+        render();
+        window.setTimeout(() => document.getElementById("panelClose")?.focus(), 0);
+      }
+      function closePanel() {
+        panelOpen = false;
+        render();
+        window.setTimeout(() => document.getElementById("grokTrigger")?.focus(), 0);
+      }
+      function manualRefresh() {
+        if (refreshing) return;
+        refreshing = true;
+        render();
+        window.setTimeout(() => {
+          refreshing = false;
+          currentState = "success";
+          stateModels.success.status = "实时 · 刚刚";
+          stateModels.success.cache = "live";
+          stateModels.success.cacheLabel = "实时";
+          stateModels.success.queried = "刚刚";
+          syncStateButtons();
+          render();
+          showToast("Grok quota 已通过 refresh=1 强制刷新。");
+        }, 950);
+      }
+      function switchAccount(index) {
+        if (switchingId) return;
+        switchingId = accounts[index].id;
+        render();
+        window.setTimeout(() => {
+          activeIndex = index;
+          switchingId = null;
+          currentState = "success";
+          stateModels.success.status = "实时 · 刚刚";
+          stateModels.success.cache = "live";
+          stateModels.success.cacheLabel = "实时";
+          stateModels.success.queried = "刚刚";
+          stateModels.success.monthly = index === 1
+            ? { limit: 1000, used: 718, remaining: 282, utilization: 71.8, resetsAt: "2026-08-01 08:00" }
+            : { limit: 1000, used: 342, remaining: 658, utilization: 34.2, resetsAt: "2026-08-01 08:00" };
+          syncStateButtons();
+          render();
+          showToast(`全局 Active 账号已切换为 ${accounts[index].name}；quota 已重新加载。`);
+        }, 900);
+      }
+      function syncStateButtons() {
+        document.querySelectorAll("[data-state]").forEach(btn => btn.classList.toggle("active", btn.dataset.state === currentState));
+      }
+
+      document.querySelectorAll("[data-state]").forEach(btn => btn.addEventListener("click", () => {
+        currentState = btn.dataset.state;
+        refreshing = false;
+        switchingId = null;
+        if (!appliedEnabled) {
+          showToast("Grok 面板当前已关闭；请在 Settings → Grok 开启并保存。" );
+        } else {
+          panelOpen = true;
+        }
+        syncStateButtons();
+        render();
+      }));
+
+      document.getElementById("narrowBtn").addEventListener("click", event => {
+        narrow = !narrow;
+        appFrame.classList.toggle("narrow", narrow);
+        event.currentTarget.classList.toggle("active", narrow);
+        event.currentTarget.setAttribute("aria-pressed", String(narrow));
+        if (narrow) {
+          currentState = "success";
+          panelOpen = true;
+          syncStateButtons();
+          render();
+        }
+      });
+      document.getElementById("gptTrigger").addEventListener("click", () => showToast("GPT 组件保持独立；本原型聚焦 Grok。"));
+      document.getElementById("drawerBtn").addEventListener("click", () => showToast("右侧抽屉入口位于 GPT / Grok 之后。"));
+
+      function openSettings() {
+        draftEnabled = appliedEnabled;
+        usageToggle.setAttribute("aria-checked", String(draftEnabled));
+        settingsBackdrop.classList.remove("hidden");
+        window.setTimeout(() => usageToggle.focus(), 0);
+      }
+      function closeSettings(restore = true) {
+        settingsBackdrop.classList.add("hidden");
+        if (restore) document.getElementById("settingsBtn").focus();
+      }
+      document.getElementById("settingsBtn").addEventListener("click", openSettings);
+      document.getElementById("settingsClose").addEventListener("click", () => closeSettings());
+      document.getElementById("settingsCancel").addEventListener("click", () => { closeSettings(); showToast("已取消，顶部设置未变更。" ); });
+      usageToggle.addEventListener("click", () => {
+        draftEnabled = !draftEnabled;
+        usageToggle.setAttribute("aria-checked", String(draftEnabled));
+      });
+      document.querySelectorAll(".settings-content .toggle-field")[1].addEventListener("click", event => {
+        const next = event.currentTarget.getAttribute("aria-checked") !== "true";
+        event.currentTarget.setAttribute("aria-checked", String(next));
+      });
+      document.getElementById("settingsSave").addEventListener("click", () => {
+        appliedEnabled = draftEnabled;
+        if (!appliedEnabled) panelOpen = false;
+        closeSettings();
+        render();
+        showToast(appliedEnabled ? "设置已保存：Grok 用量面板已开启。" : "设置已保存：Grok 用量面板已关闭；GPT 保持显示。" );
+      });
+      settingsBackdrop.addEventListener("click", event => { if (event.target === settingsBackdrop) closeSettings(); });
+
+      document.addEventListener("click", event => {
+        if (!panelOpen) return;
+        if (event.target.closest?.("#grokUsagePanel") || event.target.closest?.("#grokTrigger")) return;
+        closePanel();
+      });
+      document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        if (!settingsBackdrop.classList.contains("hidden")) { closeSettings(); return; }
+        if (panelOpen) closePanel();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

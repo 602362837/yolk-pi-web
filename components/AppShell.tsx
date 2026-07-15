@@ -13,6 +13,10 @@ import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { UsageStatsModal } from "./UsageStatsModal";
 import { ChatGptUsagePanel } from "./ChatGptUsagePanel";
+import { GrokUsagePanel } from "./GrokUsagePanel";
+// GPT-USAGE-02 wires Models recovery now; GPT-USAGE-01 owns accepting/using onOpenModels inside the panel.
+type ProviderUsagePanelProps = { onOpenModels?: () => void };
+const ChatGptUsagePanelHost = ChatGptUsagePanel as unknown as (props?: ProviderUsagePanelProps) => ReactNode;
 import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
 import { TrellisPanel } from "./TrellisPanel";
@@ -784,6 +788,9 @@ function AppShellContent() {
   const studioCwd = trellisCwd;
   const terminalCwd = activeCwd ?? selectedSession?.cwd ?? newSessionCwd;
   const rightPanelTogglePadding = rightPanelOpen ? 12 : 48 + 36 + (trellisEnabled ? 36 : 0);
+  const showChatGptUsage = webConfig?.chatgpt.usagePanelEnabled === true;
+  const showGrokUsage = webConfig?.grok.usagePanelEnabled === true;
+  const showAnyProviderUsage = showChatGptUsage || showGrokUsage;
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
   const browserTitleProjectContext = projectContextMatchesBrowserTitle(activeProjectContext, selectedSession, newSessionProjectContext, browserTitleCwd)
@@ -1439,12 +1446,28 @@ function AppShellContent() {
             <SessionStatsChips
               sessionStats={sessionStats}
               contextUsage={contextUsage}
-              paddingRight={webConfig?.chatgpt.usagePanelEnabled ? 12 : rightPanelTogglePadding}
+              paddingRight={showAnyProviderUsage ? 12 : rightPanelTogglePadding}
             />
           )}
-          {webConfig?.chatgpt.usagePanelEnabled && (
-            <div className="app-top-usage-panel" style={{ marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto", paddingRight: rightPanelTogglePadding, height: "100%", display: "flex", alignItems: "center", flexShrink: 0 }}>
-              <ChatGptUsagePanel />
+          {showAnyProviderUsage && (
+            <div
+              className="app-top-usage-panel"
+              style={{
+                marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto",
+                paddingRight: rightPanelTogglePadding,
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0,
+              }}
+            >
+              {showChatGptUsage && (
+                <ChatGptUsagePanelHost onOpenModels={() => setModelsConfigOpen(true)} />
+              )}
+              {showGrokUsage && (
+                <GrokUsagePanel onOpenModels={() => setModelsConfigOpen(true)} />
+              )}
             </div>
           )}
           {/* Top panel dropdown — shared, only one active at a time */}
