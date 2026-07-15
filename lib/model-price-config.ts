@@ -491,8 +491,22 @@ function isRecord(value: unknown): value is DeepRecord {
 }
 
 /**
- * Deep-clone a value using JSON round-trip (safe for models.json content).
+ * Pi models.json requires full cost rates for custom model definitions.
+ * modelOverrides may be partial, but custom `models[]` entries must include
+ * input/output/cacheRead/cacheWrite whenever cost is present.
  */
+function ensureCustomModelCostRates(cost: DeepRecord): DeepRecord {
+  return {
+    ...cost,
+    input: typeof cost.input === "number" ? cost.input : 0,
+    output: typeof cost.output === "number" ? cost.output : 0,
+    cacheRead: typeof cost.cacheRead === "number" ? cost.cacheRead : 0,
+    // Billing UI no longer manages cacheWrite, but schema still requires it.
+    cacheWrite: typeof cost.cacheWrite === "number" ? cost.cacheWrite : 0,
+  };
+}
+
+/** Deep-clone a value using JSON round-trip (safe for models.json content). */
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -642,7 +656,8 @@ export function mergePriceChanges(
                 }
               }
 
-              (cm as DeepRecord).cost = newCost;
+              // Custom models[] cost must satisfy models.json schema (cacheWrite required).
+              (cm as DeepRecord).cost = ensureCustomModelCostRates(newCost);
               entry.success = true;
               applied = true;
               break;

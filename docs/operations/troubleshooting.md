@@ -163,6 +163,18 @@ Then reload Settings to pick up the restored prices.
 
 If `~/.pi/agent/models.json` contains JSONC comments (`// ...`), they will be **lost on the first write** because the service writes clean JSON. A backup is always saved beforehand. If preserving comments is critical, avoid using the model price settings page on a commented file until the JSONC round-trip issue is resolved.
 
+### Custom providers missing from model selector
+
+If the shared model selector only shows managed/built-in providers and every Custom provider from Settings → Models disappears:
+
+1. Check whether Pi rejected the whole `models.json`. From a Node process that can import `@earendil-works/pi-coding-agent`, inspect `modelRegistry.getError()` after `createAgentSessionServices(...)`.
+2. A common failure is incomplete custom `cost` objects, for example only `input`/`output`/`cacheRead` without required `cacheWrite`. Pi schema validation then drops **all** custom providers/models, not just the invalid entry.
+3. Repair by adding the missing rate(s) on each custom model cost, typically `"cacheWrite": 0` when cache-write pricing is unused, then reload `/api/models`.
+4. Write paths now normalize this for custom models:
+   - Settings → Models save via `PUT /api/models-config`
+   - Model price patch via `lib/model-price-config.ts` `mergePriceChanges`
+5. After a bad write, restore from the latest backup under `~/.pi/agent/` (`models.json.pi-price-backup` or a dated `models.json.bak-*`) if needed.
+
 ### Suggest API failure modes
 
 - OpenRouter catalog fetch fails → only AI-assisted matching attempted (if evidence exists from other sources)
