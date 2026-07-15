@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { queryLlmUsage, QueryValidationError } from "@/lib/llm-usage-query";
-import { parseLocalDateParam } from "@/lib/usage-stats";
+import { parseLocalDateParam } from "@/lib/local-date-range";
 import type { LlmUsageSourceKind, LlmUsageStatus } from "@/lib/llm-usage-types";
 import { LLM_USAGE_SOURCE_KINDS } from "@/lib/llm-usage-types";
 
@@ -92,6 +92,10 @@ export async function GET(request: NextRequest) {
     const result = await queryLlmUsage({
       from,
       to,
+      // Echo the original local calendar labels so clients see the same day
+      // strings they sent, not a UTC re-format of the boundary instants.
+      fromLabel: fromParam,
+      toLabel: toParam,
       cwd,
       provider,
       model,

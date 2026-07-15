@@ -22,7 +22,8 @@ interface Props {
   ariaLabel?: string;
   title?: string;
   icon?: ReactNode;
-  size?: "compact" | "field";
+  /** compact = chat toolbar pill; field = settings form; toolbar = dense bordered control (e.g. Usage filters). */
+  size?: "compact" | "field" | "toolbar";
   placement?: "above" | "below" | "auto";
   minWidth?: number;
 }
@@ -93,7 +94,10 @@ export function SelectDropdown({
     const availableBelow = Math.max(0, viewportHeight - rect.bottom - PANEL_MARGIN - PANEL_GAP);
     const shouldOpenAbove = placement === "above" || (placement === "auto" && availableAbove > availableBelow && availableBelow < MIN_PANEL_HEIGHT);
     const available = shouldOpenAbove ? availableAbove : availableBelow;
-    const width = Math.max(rect.width, minWidth ?? (size === "compact" ? 180 : 220));
+    const width = Math.max(
+      rect.width,
+      minWidth ?? (size === "compact" ? 180 : size === "toolbar" ? 160 : 220),
+    );
     const left = Math.min(Math.max(PANEL_MARGIN, rect.right - width), Math.max(PANEL_MARGIN, viewportWidth - width - PANEL_MARGIN));
     const maxHeight = Math.max(100, Math.min(MAX_PANEL_HEIGHT, Math.max(MIN_PANEL_HEIGHT, available)));
 
@@ -151,40 +155,60 @@ export function SelectDropdown({
     : enabledOptions[0];
 
   const triggerIsActive = open || hovered;
-  const triggerStyle: React.CSSProperties = size === "compact"
-    ? {
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "8px 12px",
-        height: 32,
-        background: triggerIsActive ? "var(--bg-hover)" : "none",
-        border: "none",
-        borderRadius: 9,
-        color: triggerIsActive ? "var(--text)" : "var(--text-muted)",
-        cursor: disabled ? "not-allowed" : "pointer",
-        fontSize: 12,
-        opacity: disabled ? 0.5 : 1,
-        transition: "background 0.12s, color 0.12s",
-      }
-    : {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        width: "100%",
-        minHeight: 34,
-        padding: "7px 9px",
-        background: triggerIsActive ? "var(--bg-hover)" : "var(--bg)",
-        border: "1px solid var(--border)",
-        borderRadius: 7,
-        color: "var(--text)",
-        cursor: disabled ? "not-allowed" : "pointer",
-        fontSize: 12,
-        opacity: disabled ? 0.6 : 1,
-        boxSizing: "border-box",
-        textAlign: "left",
-        transition: "background 0.12s, border-color 0.12s",
-      };
+  const triggerStyle: React.CSSProperties =
+    size === "compact"
+      ? {
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "8px 12px",
+          height: 32,
+          background: triggerIsActive ? "var(--bg-hover)" : "none",
+          border: "none",
+          borderRadius: 9,
+          color: triggerIsActive ? "var(--text)" : "var(--text-muted)",
+          cursor: disabled ? "not-allowed" : "pointer",
+          fontSize: 12,
+          opacity: disabled ? 0.5 : 1,
+          transition: "background 0.12s, color 0.12s",
+        }
+      : size === "toolbar"
+        ? {
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            height: 26,
+            minWidth: minWidth ?? 128,
+            padding: "0 9px",
+            background: triggerIsActive ? "var(--bg-hover)" : "var(--bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 7,
+            color: "var(--text)",
+            cursor: disabled ? "not-allowed" : "pointer",
+            fontSize: 11,
+            opacity: disabled ? 0.6 : 1,
+            boxSizing: "border-box",
+            textAlign: "left",
+            transition: "background 0.12s, border-color 0.12s",
+          }
+        : {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            minHeight: 34,
+            padding: "7px 9px",
+            background: triggerIsActive ? "var(--bg-hover)" : "var(--bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 7,
+            color: "var(--text)",
+            cursor: disabled ? "not-allowed" : "pointer",
+            fontSize: 12,
+            opacity: disabled ? 0.6 : 1,
+            boxSizing: "border-box",
+            textAlign: "left",
+            transition: "background 0.12s, border-color 0.12s",
+          };
 
   const panel = open && panelPosition ? (
     <div

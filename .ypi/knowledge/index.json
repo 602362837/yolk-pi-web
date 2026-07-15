@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-15T06:58:02.519Z",
+  "updatedAt": "2026-07-15T09:00:47.373Z",
   "entries": [
+    {
+      "id": "20260715-170047-完善计费模块并下线旧-session-统计计费",
+      "title": "完善计费模块并下线旧 session 统计计费",
+      "taskId": "20260715-151357-完善计费模块并下线旧-session-统计计费",
+      "taskKey": "archived:2026-07:20260715-151357-完善计费模块并下线旧-session-统计计费",
+      "workflowId": "feature-dev",
+      "summary": "完善计费模块并下线旧全局 Session 统计：ledger 日期按本地日精确过滤，Usage UI 默认全部/统一下拉/M 主 exact 辅，折线+叠柱并排（单日饼图），保留 session_rollup 顶栏计费。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260715-151357-完善计费模块并下线旧-session-统计计费",
+      "knowledgePath": ".ypi/knowledge/20260715-170047-完善计费模块并下线旧-session-统计计费.md",
+      "createdAt": "2026-07-15T09:00:47.373Z",
+      "archivedAt": "2026-07-15T09:00:47.373Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260715-145802-任务浮窗资料链接新标签打开并改进任务详情自包含查看",
       "title": "任务浮窗资料链接新标签打开并改进任务详情自包含查看",

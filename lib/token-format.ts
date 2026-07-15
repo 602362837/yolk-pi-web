@@ -5,10 +5,13 @@
  * helpers so that exact-integer, M-derived, and compact representations are
  * always consistent across the codebase.
  *
- * Rules (per PRD FR-2 / USG-02):
+ * Rules:
  * - Exact: full integer with locale grouping, e.g. "1,234,567 tokens".
- * - M:    tokens / 1_000_000, at most 6 decimal places, trailing zeros stripped.
- *         0 → "0 M". Never used as storage or aggregation input.
+ *         Secondary/detail unit for Usage ledger token volumes; still used for
+ *         non-volume counts and full-precision tooltips.
+ * - M:    tokens / 1_000_000, at most 2 decimal places, trailing zeros stripped.
+ *         0 → "0 M". Primary visual unit for Usage ledger token volumes.
+ *         Never used as storage or aggregation input.
  * - Compact: for tight spaces (chart axis, chip). Uses M with 1 decimal when
  *   ≥1M, k when ≥1k, falls back to exact integer.
  *   Tooltip MUST show exact value when compact is used.
@@ -36,18 +39,18 @@ export function formatTokensLabel(value: number): string {
 }
 
 /**
- * Format token count as millions (M) with up to 6 decimal places and
+ * Format token count as millions (M) with up to 2 decimal places and
  * trailing zeros stripped. Returns "0 M" for zero.
  *
  * @param value Non-negative token count.
- * @returns e.g. "1.234567 M", "0 M", "1 M".
+ * @returns e.g. "1.23 M", "0 M", "1 M".
  */
 export function formatTokensM(value: number): string {
   if (!Number.isFinite(value) || value < 0) return "0 M";
   if (value === 0) return "0 M";
   const m = value / 1_000_000;
-  // Round to 6 decimal places max, strip trailing zeros
-  const fixed = m.toFixed(6);
+  // Round to 2 decimal places max, strip trailing zeros
+  const fixed = m.toFixed(2);
   const trimmed = fixed.replace(/\.?0+$/, "");
   return `${trimmed} M`;
 }

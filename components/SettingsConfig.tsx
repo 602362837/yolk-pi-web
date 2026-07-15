@@ -1702,15 +1702,15 @@ export function SettingsConfig({
                 ) : section === "usage" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Usage 统计</h3>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Session rollup</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-                        控制左下角 Usage 弹窗扫描哪些 session 文件。保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        控制聊天顶栏 Session rollup 是否读取已归档 session。不影响独立调用账本。保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
                         {exists ? "" : "（保存时会自动创建）"}
                       </p>
                     </div>
                     <ToggleField
-                      label="统计时包含已归档 Session"
-                      description="开启后 Usage 会同时扫描 sessions 和 sessions-archive；关闭后只统计当前存活的 sessions。已删除的 session 文件不会参与统计。"
+                      label="Session rollup 包含已归档 Session"
+                      description="开启后聊天顶栏 Session rollup 会同时读取 sessions 与 sessions-archive；关闭后只统计当前存活的 sessions。已删除的 session 文件不会参与统计。不影响独立调用账本。"
                       checked={usage.includeArchived}
                       onChange={(includeArchived) => updateUsage({ includeArchived })}
                     />

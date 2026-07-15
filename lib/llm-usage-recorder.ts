@@ -20,7 +20,6 @@
 
 import { createHash } from "node:crypto";
 import type { Usage } from "@earendil-works/pi-ai/compat";
-import { readPiWebConfig } from "./pi-web-config";
 import { normalizeProvider, normalizeModel, normalizeSdkUsage } from "./llm-usage-normalize";
 import { writeLlmUsageEvent, generateCallId, generateEventId, backfillEventId } from "./llm-usage-store";
 import type {
@@ -32,18 +31,17 @@ import type {
 } from "./llm-usage-types";
 
 // ---------------------------------------------------------------------------
-// Module-level enable/disable gate (config-driven)
+// Module-level enable/disable gate
 // ---------------------------------------------------------------------------
 
 /**
  * Whether the recorder is currently enabled.
  *
- * Set to `false` to stop all ledger writes without a code deploy.
- * Controlled externally via `setRecorderEnabled()` when reading config.
- * The default is enabled through `usage.statsSource: "ledger"`; an explicit
- * `"legacy"` setting disables recording for the current server process.
+ * Ledger recording is always on by default. `setRecorderEnabled(false)` remains
+ * available for diagnostics/tests only; retired `usage.statsSource` no longer
+ * gates writes (including old `"legacy"` values on disk).
  */
-let recorderEnabled = readPiWebConfig().usage.statsSource === "ledger";
+let recorderEnabled = true;
 
 /** Enable or disable the entire usage recorder at runtime. */
 export function setRecorderEnabled(enabled: boolean): void {
