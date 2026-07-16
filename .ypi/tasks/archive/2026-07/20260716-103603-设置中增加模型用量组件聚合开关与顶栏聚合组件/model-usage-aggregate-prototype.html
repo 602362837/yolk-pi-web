@@ -1,0 +1,2216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yolk Pi - 模型用量组件聚合 & Ring-First v6 交互原型</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --bg-panel: rgba(15, 23, 42, 0.9);
+      --border: rgba(148, 163, 184, 0.15);
+      --border-focus: rgba(96, 165, 250, 0.6);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --warning: #fbbf24;
+      --danger: #ef4444;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #030712;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Controller Panel Styles */
+    .controls-panel {
+      background: #0f172a;
+      border-bottom: 2px solid var(--accent);
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .controls-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .controls-group label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .controls-group select,
+    .controls-group button {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+      min-width: 140px;
+    }
+
+    .controls-group select:focus {
+      border-color: var(--accent);
+    }
+
+    /* Sandbox Container */
+    .sandbox-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: var(--bg);
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 20px;
+      transition: width 0.3s ease;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Width limits simulated by wrapper */
+    .sandbox-width-wrapper {
+      width: 100%;
+      max-width: 1280px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      transition: max-width 0.3s ease;
+    }
+
+    /* Mock Next.js TopBar */
+    .mock-topbar {
+      height: 48px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: relative;
+    }
+
+    .mock-topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-badge {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--accent);
+      background: rgba(59, 130, 246, 0.15);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .session-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .mock-topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    /* Top Bar Panel Host */
+    .app-top-usage-panel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Common Trigger Styles */
+    .usage-trigger-btn {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(10px);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 0 10px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .usage-trigger-btn:hover {
+      background: rgba(15, 23, 42, 0.6);
+      border-color: rgba(148, 163, 184, 0.45);
+    }
+
+    .usage-trigger-btn:focus-visible {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .usage-trigger-btn[data-open="true"] {
+      border-color: var(--border-focus);
+      background: rgba(96, 165, 250, 0.1);
+      color: var(--text);
+    }
+
+    .trigger-provider-label {
+      font-weight: 800;
+      color: var(--text);
+      margin-right: 4px;
+    }
+
+    /* Status indicator components */
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .status-dot[data-tone="success"] { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.48); }
+    .status-dot[data-tone="warning"] { background: #fbbf24; }
+    .status-dot[data-tone="danger"] { background: #ef4444; }
+    .status-dot[data-tone="muted"] { background: var(--text-dim); }
+
+    /* SVG Nested Rings styles */
+    .usage-ring-unit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      flex-shrink: 0;
+      margin: 0 4px;
+      vertical-align: middle;
+    }
+
+    .usage-ring-inner-mask {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: #0b0f19; /* matches default theme bg */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+      pointer-events: none;
+    }
+
+    .ring-center-label {
+      font-weight: 800;
+      color: var(--text);
+      text-transform: uppercase;
+    }
+    .ring-center-val {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Sheen flow animation CSS */
+    .sheen-flow {
+      animation: sheen-move 2.5s linear infinite;
+    }
+
+    @keyframes sheen-move {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: -45;
+      }
+    }
+
+    /* Reduced Motion static override */
+    .reduced-motion .sheen-flow {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sheen-flow {
+        animation: none !important;
+        opacity: 0 !important;
+      }
+    }
+
+    /* Trigger Segments for v6 Ring-First */
+    .v3-trigger-segments {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .v3-segment {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(148, 163, 184, 0.08);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 10px;
+      height: 32px;
+      border: 1px solid transparent;
+    }
+    
+    .v3-segment-label {
+      font-weight: 800;
+      color: var(--text-muted);
+      margin-right: 3px;
+    }
+
+    .v3-segment-value {
+      color: var(--text-dim);
+      font-weight: 700;
+      font-size: 9px;
+      margin-left: 2px;
+    }
+    .v3-segment[data-risk="danger"] { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.15); }
+    .v3-segment[data-risk="warning"] { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.15); }
+
+    /* Aggregate Panel Dialog */
+    .aggregate-panel-dialog {
+      position: absolute;
+      max-height: calc(100vh - 120px);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 12px;
+      background: rgba(11, 15, 25, 0.98);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      padding: 16px;
+      z-index: 900;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeIn 0.12s ease-out;
+      outline: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .panel-header-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-header-badge {
+      font-size: 10px;
+      background: rgba(148, 163, 184, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+
+    .btn-close-panel {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #1e293b;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-close-panel:hover {
+      color: var(--text);
+      background: #334155;
+    }
+
+    /* Columns / Grid layout (v6 replacements for accordion) */
+    .aggregate-panel-columns {
+      display: grid;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .provider-column {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(148, 163, 184, 0.02);
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.2s;
+    }
+
+    .provider-column[data-risk="danger"] {
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+    .provider-column[data-risk="warning"] {
+      border-color: rgba(251, 191, 36, 0.25);
+    }
+
+    .column-header {
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: rgba(148, 163, 184, 0.04);
+    }
+
+    .column-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .column-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .provider-title {
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .provider-summary-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .column-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+
+    /* Quota Cards inside Column */
+    .usage-quota-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .quota-card {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .quota-card-label {
+      color: var(--text-dim);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .quota-card-value {
+      font-size: 14px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-bar-container {
+      height: 5px;
+      border-radius: 99px;
+      background: #1e293b;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.3s;
+    }
+
+    .quota-card-meta {
+      color: var(--text-dim);
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    /* Active Account Section */
+    .active-account-strip {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: rgba(148, 163, 184, 0.03);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .active-account-strip[data-active="true"] {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.04);
+    }
+
+    .account-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+    }
+
+    .account-displayname {
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-id-masked {
+      color: var(--text-dim);
+      font-size: 9px;
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .active-badge {
+      color: var(--success);
+      font-size: 9px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    /* Global Active Alert Banner */
+    .global-active-alert {
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      background: rgba(59, 130, 246, 0.03);
+      color: var(--text-muted);
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    /* Account Selection Rows */
+    .account-selector-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .account-selector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.3);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .account-selector-row:hover {
+      border-color: rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .account-selector-row[data-active="true"] {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.04);
+      cursor: default;
+    }
+
+    .btn-set-active {
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--accent);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+    .btn-set-active:hover {
+      text-decoration: underline;
+    }
+
+    /* Quick Action Buttons inside Panel */
+    .panel-action-buttons-group {
+      display: flex;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .btn-panel-action {
+      flex: 1;
+      min-height: 26px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #1e293b;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-panel-action:hover:not(:disabled) {
+      color: var(--text);
+      background: #334155;
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .btn-panel-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-panel-action-primary {
+      background: var(--accent);
+      color: #0c111d;
+      border: none;
+    }
+
+    .btn-panel-action-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      color: #ffffff;
+    }
+
+    /* Alert Banner (Error, Warning, Info) */
+    .status-alert-banner {
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .status-alert-banner[data-type="danger"] {
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      background: rgba(239, 68, 68, 0.08);
+      color: #f87171;
+    }
+
+    .status-alert-banner[data-type="warning"] {
+      border: 1px solid rgba(251, 191, 36, 0.28);
+      background: rgba(251, 191, 36, 0.08);
+      color: #fbbf24;
+    }
+
+    /* Spinner Animation */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner-icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(148, 163, 184, 0.35);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+      box-sizing: border-box;
+      display: inline-block;
+    }
+
+    /* Mock Settings Page */
+    .mock-settings-container {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.06);
+    }
+
+    .settings-row-label-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 70%;
+    }
+
+    .settings-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .settings-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    /* Custom Switch/Toggle Styles */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #334155;
+      transition: .2s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+
+    input:disabled + .slider {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .settings-hint {
+      font-size: 10px;
+      color: var(--warning);
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* Viewport Simulator classes on body */
+    body.v-desktop .sandbox-width-wrapper { max-width: 1280px; }
+    body.v-640 .sandbox-width-wrapper { max-width: 640px; }
+    body.v-375 .sandbox-width-wrapper { max-width: 375px; }
+    body.v-320 .sandbox-width-wrapper { max-width: 320px; }
+
+    body.v-desktop .aggregate-panel-columns { grid-template-columns: repeat(var(--columns, 3), 1fr); }
+    body.v-640 .aggregate-panel-columns { grid-template-columns: repeat(min(var(--columns, 3), 2), 1fr); }
+    body.v-375 .aggregate-panel-columns { grid-template-columns: 1fr; }
+    body.v-320 .aggregate-panel-columns { grid-template-columns: 1fr; }
+
+    .viewport-indicator {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body class="v-desktop">
+
+  <!-- Controls Panel at Top (for tester usage) -->
+  <div class="controls-panel">
+    <div class="controls-group">
+      <label>预设场景 (Scenarios - v6 Specifications)</label>
+      <select id="presetScenario" onchange="applyPresetScenario(this.value)">
+        <option value="all-normal">1. 三家均正常 (GPT center=5h, Grok center=周, Kiro center=Daily)</option>
+        <option value="grok-stale">2. Grok 缓存过期 (Grok Stale with warnings)</option>
+        <option value="kiro-reauth">3. Kiro 需登录 (Kiro Reauth Fallback)</option>
+        <option value="gpt-refreshing">4. GPT 刷新中 (GPT Busy Spinner)</option>
+        <option value="some-unknown">5. Grok/Kiro 额度未知 (Unknown Muted Arcs)</option>
+        <option value="kiro-only-remaining">6. Kiro 仅有 remaining (No percent fallback)</option>
+        <option value="kiro-only">7. 仅 Kiro 启用 (Single Provider aggregate wrapper)</option>
+        <option value="gpt-5h-unknown">8. GPT 5h 未知, 周正常 (Inner gray, Outer colored, center=5h/—)</option>
+        <option value="grok-month-unknown">9. Grok 月未知, 周正常 (Outer gray, Inner colored, center=周/51%)</option>
+        <option value="gpt-only-week">10. GPT 仅有周额度 (Single Ring Week 37%)</option>
+        <option value="grok-only-week">11. Grok 仅有周额度 (Single Ring Week 51%)</option>
+        <option value="kiro-sortable-nested">12. Kiro 双环嵌套 (Limits solid / Daily dashed)</option>
+        <option value="kiro-triple-nested">13. Kiro 三环嵌套 (Limits solid / Daily long-dash / Hourly short-dash)</option>
+      </select>
+    </div>
+
+    <div class="controls-group">
+      <label>模拟视口宽度 (Viewport Simulator)</label>
+      <select id="viewportWidth" onchange="adjustViewportWidth(this.value)">
+        <option value="desktop">桌面 (100% - max 1280px)</option>
+        <option value="640">中窄屏 (640px)</option>
+        <option value="375">小窄屏 (375px)</option>
+        <option value="320">极窄屏 (320px)</option>
+      </select>
+    </div>
+
+    <div class="controls-group">
+      <label>已启用提供商 (Enabled Providers)</label>
+      <div style="display: flex; gap: 10px; align-items: center; height: 30px;">
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="enableGpt" checked onchange="toggleProviderEnabled('gpt', this.checked)"> GPT
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="enableGrok" checked onchange="toggleProviderEnabled('grok', this.checked)"> Grok
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="enableKiro" checked onchange="toggleProviderEnabled('kiro', this.checked)"> Kiro
+        </label>
+      </div>
+    </div>
+
+    <div class="controls-group">
+      <label>视觉/可访问性模拟 (A11y Sim)</label>
+      <div style="display: flex; gap: 10px; align-items: center; height: 30px;">
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;" title="模拟 prefers-reduced-motion: reduce 静态效果">
+          <input type="checkbox" id="reducedMotionToggle" onchange="toggleReducedMotion(this.checked)"> prefers-reduced-motion
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-left: auto;" class="viewport-indicator" id="viewportIndicator">
+      当前视口: 桌面模式 (最大 1280px)
+    </div>
+  </div>
+
+  <!-- Sandbox Container -->
+  <div class="sandbox-container" id="sandboxContainer">
+    <div class="sandbox-width-wrapper" id="sandboxWidthWrapper">
+      
+      <!-- Part 1: Top Bar with Usage Triggers -->
+      <div>
+        <h3 style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 800;">
+          CHAT 顶栏预览 (Chat Topbar Preview - Hover / Tab focus to trigger)
+        </h3>
+        
+        <header class="mock-topbar" id="mockTopbar">
+          <div class="mock-topbar-left">
+            <span class="logo-badge">YPI</span>
+            <span class="session-title">feature/model-usage-aggregate</span>
+          </div>
+          
+          <div class="mock-topbar-right">
+            <!-- App top usage panel target -->
+            <div class="app-top-usage-panel" id="appTopUsagePanel">
+              <!-- Rendered dynamically by script -->
+            </div>
+            
+            <div style="font-size: 11px; color: var(--text-dim); padding-left: 8px; border-left: 1px solid var(--border)">
+              会话统计 | ⚙️ 设置
+            </div>
+          </div>
+        </header>
+      </div>
+
+      <!-- Part 2: Interactive Settings Page -->
+      <div class="mock-settings-container">
+        <div class="settings-title">
+          <span>⚙️</span> Web UI 设置 &rsaquo; 额度用量组件 (Usage Panel Settings)
+        </div>
+        
+        <!-- Toggle: Aggregate switch -->
+        <div class="settings-row">
+          <div class="settings-row-label-group">
+            <span class="settings-label">模型用量组件聚合 (usage.providerPanelsAggregated)</span>
+            <span class="settings-desc flex-col">
+              <span>开启后，顶栏中所有的模型用量组件将被合并为一个聚合入口；可以在面板内查看各提供商明细并进行刷新、切换账号等操作。建议在启用较多提供商时开启以节省顶栏空间。</span>
+              <span style="color:var(--accent); font-weight:bold; margin-top:2px;">(聚合 Trigger 采用 N-ring 架构：包含每家服务商一个主用量环)</span>
+            </span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="aggregatedToggle" onchange="toggleAggregatedMode(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Toggle: Compact Mode switch -->
+        <div class="settings-row">
+          <div class="settings-row-label-group">
+            <span class="settings-label">紧凑单组件模式 (usage.providerPanelsCompact)</span>
+            <span class="settings-desc">
+              开启时，缩短各独立组件的顶栏 Trigger 呈现，仅保留主要数据。此设置仅在“独立组件模式”下生效。
+              <span style="color:var(--accent); font-weight:bold; display:block; margin-top:2px;">(新用量环模式下：紧凑模式不再是文字 summaries，而是以最多 2 个/3个紧凑用量环展示)</span>
+            </span>
+            <span class="settings-hint" id="compactModeHint" style="display: none;">
+              ⚠️ 仅在独立组件模式生效；关闭聚合后恢复此设置。
+            </span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="compactToggle" checked onchange="toggleCompactMode(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Part 3: Design details annotation -->
+      <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: rgba(15, 23, 42, 0.4);">
+        <h4 style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 800; text-transform: uppercase;">
+          UI v6 规范设计说明 (v6 UI Design Specs)
+        </h4>
+        <ul style="font-size: 11px; color: var(--text-muted); line-height: 1.6; padding-left: 16px;">
+          <li><strong>统一多环与层身份 (Multi-ring & Layer Identity)：</strong>
+            <ul style="padding-left: 14px; margin-top: 4px; list-style-type: circle;">
+              <li>1 个安全窗口 = 1 圈环；N 个安全且可靠排序的窗口 = N 个同心环（外长内短）。</li>
+              <li>每层具有稳定且明显可区分的 **层身份/笔触风格** (不再仅靠透明度) ——
+                <strong>最外层：</strong>Solid 实线；
+                <strong>第二层/中层：</strong>Dashed 长虚线；
+                <strong>第三层/内层：</strong>Dotted 短虚线。
+              </li>
+              <li>即使多层同时进入 warning (黄) 或 danger (红) 警戒色，仍然可以借由清晰的笔触风格区分不同的周期窗口。</li>
+            </ul>
+          </li>
+          <li><strong>中心规则与 Unknown 降级 (Center Value & Unknown Fallback)：</strong>
+            <ul style="padding-left: 14px; margin-top: 4px; list-style-type: circle;">
+              <li>中心值一律锁定 **最内层可用层 (Innermost Layer)** 周期标签与百分比。</li>
+              <li>GPT 默认为 5h，Grok 默认为 **周 (Week)**，Kiro 根据多窗口排序。</li>
+              <li>如果最内层 percent 为 null (未知)，中心百分比显示 `—`，绝不借用外层的百分比数据误导用户。</li>
+            </ul>
+          </li>
+          <li><strong>CSS 流光动画 (Subtle CSS-only Used Arc Flow)：</strong>
+            <ul style="padding-left: 14px; margin-top: 4px; list-style-type: circle;">
+              <li>通过 SVG `clipPath` 将流光高光图层精确限制在 **已使用弧段 (Used arc)** 内部移动，完全不溢出至灰色的 empty track。</li>
+              <li>流光是 CSS 驱动的，无任何 JS Timer 或 React state 刷新。0% 或 null 状态无流光。</li>
+              <li>完美适配 `prefers-reduced-motion`，当开启减弱动画时，流光高光完全静止/隐藏。</li>
+            </ul>
+          </li>
+          <li><strong>聚合交互与生命周期 (Hover/Focus Life Cycle & Grace Timer)：</strong>
+            <ul style="padding-left: 14px; margin-top: 4px; list-style-type: circle;">
+              <li>聚合面板不再是 click-primary，而是通过 <strong>pointer hover</strong> 或 <strong>keyboard focus (Tab)</strong> 触发打开。</li>
+              <li><strong>220ms 延时关闭 grace window：</strong>指针或焦点离开 Trigger 与 Panel 组成的整体交互区时，启动 220ms 延时，在间隙或快速扫过时防止面板闪退；重新进入两者任何区域会取消关闭。</li>
+              <li><strong>Escape 防重开抑制 (Suppression)：</strong>按 Escape 键关闭面板并还焦给 Trigger；同时设置临时 suppression，防止 focus 重置事件立即导致面板再次被唤起，直到 Trigger 失去焦点或指针重新移入。</li>
+            </ul>
+          </li>
+          <li><strong>非手风琴分栏面板 (Non-Accordion Columns Grid)：</strong>
+            <ul style="padding-left: 14px; margin-top: 4px; list-style-type: circle;">
+              <li>取消了旧版的 Accordion (折叠手风琴) 一次仅看一家的设定。所有的启用提供商 (GPT / Grok / Kiro) column 同时平铺于 DOM 中展示。</li>
+              <li>Desktop 自动根据启用数渲染为 1–3 列 Grid；在 640px/375px/320px 窄视口下智能响应为 2列/1列，以纵向卡片平铺，绝不隐藏任何服务商。</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Dialog / Panel Portal (Rendered here to simulate React fixed portal) -->
+  <div id="portalContainer">
+    <!-- Rendered dynamically by script -->
+  </div>
+
+  <!-- Script for Mock States and Interactive Events -->
+  <script>
+    // State Store
+    const state = {
+      aggregated: true,
+      compact: true,
+      open: false,
+      reducedMotion: false,
+      providers: {
+        gpt: {
+          enabled: true,
+          label: "GPT",
+          risk: "normal", // normal, danger, warning, muted
+          loading: false,
+          value: "5h 42%",
+          percent: 42,
+          percentWeekly: 37,
+          title: "GPT 5h: 42% 已使用 (剩余 58分钟/重置 2小时前) · 周额度: 37% 已使用",
+          activeAccount: {
+            displayName: "Personal Account",
+            maskedAccountId: "openai-codex:pers...x7a8"
+          },
+          accounts: [
+            { id: "personal", displayName: "Personal Account", maskedAccountId: "openai-codex:pers...x7a8", active: true },
+            { id: "team", displayName: "Earendil Works Org", maskedAccountId: "openai-codex:team...m2o9", active: false }
+          ],
+          quota: {
+            fiveHour: { usedPercent: 42, limit: "5h", reset: "2小时内" },
+            weekly: { usedPercent: 37, limit: "150次/周", reset: "3天后" }
+          },
+          alert: null
+        },
+        grok: {
+          enabled: true,
+          label: "Grok",
+          risk: "normal",
+          loading: false,
+          value: "周 51%",
+          percent: 73, // monthly
+          percentWeekly: 51, // weekly
+          title: "Grok 月度: 7,300/10,000 (73% 已使用) · 周额度: 51%",
+          activeAccount: {
+            displayName: "Developer CLI Account",
+            maskedAccountId: "grok-cli:dev-cl...c21x"
+          },
+          accounts: [
+            { id: "dev", displayName: "Developer CLI Account", maskedAccountId: "grok-cli:dev-cl...c21x", active: true },
+            { id: "corp", displayName: "Yolk Pi Corp Admin", maskedAccountId: "grok-cli:corp-...3a9a", active: false }
+          ],
+          quota: {
+            monthly: { used: 7300, limit: 10000, resetsAt: "12天后" },
+            weekly: { usedPercent: 51, resetsAt: "2天后" }
+          },
+          alert: null
+        },
+        kiro: {
+          enabled: true,
+          label: "Kiro",
+          risk: "normal",
+          loading: false,
+          value: "Limits 75%",
+          percent: 75, // primary (Limits)
+          percentWeekly: 20, // Daily
+          percentHourly: null, // Hourly (if triple nested)
+          hasTripleRings: false,
+          shortValue: "余 125",
+          title: "Kiro 额度: 剩余 125M (已用 375M) · Limits: 75% · Daily: 20%",
+          activeAccount: {
+            displayName: "Kiro Primary User",
+            maskedAccountId: "kiro:user-pri...77b2"
+          },
+          accounts: [
+            { id: "primary", displayName: "Kiro Primary User", maskedAccountId: "kiro:user-pri...77b2", active: true },
+            { id: "backup", displayName: "Kiro Backup Tier", maskedAccountId: "kiro:user-back...9a1a", active: false }
+          ],
+          quota: {
+            remaining: 125,
+            used: 375,
+            limit: 500,
+            utilization: 75,
+            resetsAt: "5天后"
+          },
+          alert: null
+        }
+      }
+    };
+
+    // Preset Scenarios Definition
+    const presets = {
+      'all-normal': () => {
+        // Reset everything to normal state
+        state.providers.gpt.risk = "normal";
+        state.providers.gpt.value = "5h 42%";
+        state.providers.gpt.percent = 42;
+        state.providers.gpt.percentWeekly = 37;
+        state.providers.gpt.alert = null;
+        state.providers.gpt.loading = false;
+        state.providers.gpt.hasOnlyWeekly = false;
+        
+        state.providers.grok.risk = "normal";
+        state.providers.grok.value = "周 51%";
+        state.providers.grok.percent = 73;
+        state.providers.grok.percentWeekly = 51;
+        state.providers.grok.alert = null;
+        state.providers.grok.loading = false;
+        state.providers.grok.hasOnlyWeekly = false;
+        
+        state.providers.kiro.enabled = true;
+        state.providers.kiro.risk = "normal";
+        state.providers.kiro.value = "Limits 75%";
+        state.providers.kiro.percent = 75;
+        state.providers.kiro.percentWeekly = 20;
+        state.providers.kiro.percentHourly = null;
+        state.providers.kiro.hasTripleRings = false;
+        state.providers.kiro.shortValue = "余 125";
+        state.providers.kiro.alert = null;
+        state.providers.kiro.loading = false;
+      },
+      'grok-stale': () => {
+        presets['all-normal']();
+        state.providers.grok.risk = "warning";
+        state.providers.grok.value = "Stale (周 51%)";
+        state.providers.grok.alert = {
+          type: "warning",
+          text: "<strong>⚠️ Grok 额度数据缓存已过期</strong><br>最后更新于 6小时前。这可能由于与 X.ai API 同步超时或速率限制导致。建议尝试点击下方刷新额度。"
+        };
+      },
+      'kiro-reauth': () => {
+        presets['all-normal']();
+        state.providers.kiro.risk = "danger";
+        state.providers.kiro.value = "需重新登录";
+        state.providers.kiro.percent = null;
+        state.providers.kiro.percentWeekly = null;
+        state.providers.kiro.shortValue = "AUTH";
+        state.providers.kiro.alert = {
+          type: "danger",
+          text: "<strong>❌ AWS CodeWhisperer 凭证失效</strong><br>AWS Quota 读写权限失效或 IAM Session 过期，无法读取用量利用率。请前往 [管理 Models] 重新授权。"
+        };
+      },
+      'gpt-refreshing': () => {
+        presets['all-normal']();
+        state.providers.gpt.loading = true;
+      },
+      'some-unknown': () => {
+        presets['all-normal']();
+        state.providers.grok.percent = null;
+        state.providers.grok.percentWeekly = null;
+        state.providers.grok.value = "未知";
+        
+        state.providers.kiro.percent = null;
+        state.providers.kiro.percentWeekly = null;
+        state.providers.kiro.value = "未知";
+        state.providers.kiro.shortValue = "—";
+      },
+      'kiro-only-remaining': () => {
+        presets['all-normal']();
+        // Kiro only remaining: no percent available. Outer is gray unknown, center is Limits + —.
+        state.providers.kiro.percent = null;
+        state.providers.kiro.percentWeekly = null;
+        state.providers.kiro.value = "余 125";
+        state.providers.kiro.shortValue = "余 125";
+      },
+      'kiro-only': () => {
+        presets['all-normal']();
+        state.providers.gpt.enabled = false;
+        state.providers.grok.enabled = false;
+        state.providers.kiro.enabled = true;
+      },
+      'gpt-5h-unknown': () => {
+        presets['all-normal']();
+        state.providers.gpt.percent = null; // 5h unknown
+        state.providers.gpt.percentWeekly = 37; // week is normal
+        state.providers.gpt.value = "5h —";
+      },
+      'grok-month-unknown': () => {
+        presets['all-normal']();
+        state.providers.grok.percent = null; // month unknown
+        state.providers.grok.percentWeekly = 51; // week is normal
+        state.providers.grok.value = "周 51%";
+      },
+      'gpt-only-week': () => {
+        presets['all-normal']();
+        state.providers.gpt.percentWeekly = 37;
+        state.providers.gpt.value = "周 37%";
+        state.providers.gpt.hasOnlyWeekly = true;
+      },
+      'grok-only-week': () => {
+        presets['all-normal']();
+        state.providers.grok.percent = null;
+        state.providers.grok.percentWeekly = 51;
+        state.providers.grok.value = "周 51%";
+        state.providers.grok.hasOnlyWeekly = true;
+      },
+      'kiro-sortable-nested': () => {
+        presets['all-normal']();
+        state.providers.kiro.percent = 75;
+        state.providers.kiro.percentWeekly = 20;
+        state.providers.kiro.value = "Limits 75% · Daily 20%";
+      },
+      'kiro-triple-nested': () => {
+        presets['all-normal']();
+        state.providers.kiro.percent = 75;
+        state.providers.kiro.percentWeekly = 40;
+        state.providers.kiro.percentHourly = 10;
+        state.providers.kiro.hasTripleRings = true;
+        state.providers.kiro.value = "Limits 75% · Daily 40% · Hourly 10%";
+      }
+    };
+
+    function getProviderRingUnit(key, provider) {
+      if (provider.loading) return null;
+      
+      const res = {
+        key: key,
+        ariaLabel: provider.title,
+        unknownCenterValue: provider.risk === 'danger' ? '?' : '—'
+      };
+
+      if (key === 'gpt') {
+        if (provider.hasOnlyWeekly) {
+          res.outer = { id: 'gpt-week', shortLabel: '周', percent: provider.percentWeekly };
+          res.centerLayerId = 'gpt-week';
+        } else {
+          // Dual ring: outer=week, inner=5h. Center = innermost = 5h
+          res.outer = { id: 'gpt-week', shortLabel: '周', percent: provider.percentWeekly };
+          res.inner = { id: 'gpt-5h', shortLabel: '5h', percent: provider.percent };
+          res.centerLayerId = 'gpt-5h';
+        }
+      } else if (key === 'grok') {
+        if (provider.hasOnlyWeekly) {
+          res.outer = { id: 'grok-week', shortLabel: '周', percent: provider.percentWeekly };
+          res.centerLayerId = 'grok-week';
+        } else {
+          // Dual ring: outer=month, inner=week. Center = innermost = week (周) [v6 rule]
+          res.outer = { id: 'grok-month', shortLabel: '月', percent: provider.percent };
+          res.inner = { id: 'grok-week', shortLabel: '周', percent: provider.percentWeekly };
+          res.centerLayerId = 'grok-week';
+        }
+      } else if (key === 'kiro') {
+        if (provider.hasTripleRings) {
+          // Triple ring: outer=Limits, middle=Daily, inner=Hourly
+          res.outer = { id: 'kiro-limits', shortLabel: 'Limits', percent: provider.percent };
+          res.middle = { id: 'kiro-daily', shortLabel: 'Daily', percent: provider.percentWeekly };
+          res.inner = { id: 'kiro-hourly', shortLabel: 'Hourly', percent: provider.percentHourly };
+          res.centerLayerId = 'kiro-hourly';
+        } else {
+          const hasWeekly = provider.percentWeekly !== undefined && provider.percentWeekly !== null;
+          if (hasWeekly) {
+            res.outer = { id: 'kiro-limits', shortLabel: 'Limits', percent: provider.percent };
+            res.inner = { id: 'kiro-daily', shortLabel: 'Daily', percent: provider.percentWeekly };
+            res.centerLayerId = 'kiro-daily';
+          } else {
+            // Default single ring
+            res.outer = { id: 'kiro-limits', shortLabel: 'Limits', percent: provider.percent };
+            res.centerLayerId = 'kiro-limits';
+          }
+        }
+      }
+      return res;
+    }
+
+    // Helper to generate dynamic SVG ring HTML
+    function createSvgRingHtml(unit, size = 'small') {
+      if (!unit) return '';
+      const d = size === 'small' ? 30 : 38;
+      const cx = d / 2;
+      const cy = d / 2;
+      
+      let layers = [];
+      if (unit.outer) layers.push({ ...unit.outer, index: 0 });
+      if (unit.middle) layers.push({ ...unit.middle, index: 1 });
+      if (unit.inner) layers.push({ ...unit.inner, index: unit.middle ? 2 : 1 });
+
+      const numLayers = layers.length;
+      let svgContent = '';
+      let clipDefs = '';
+
+      layers.forEach((layer) => {
+        let R, W, dashPattern;
+        if (size === 'small') {
+          if (numLayers === 1) {
+            R = 12.5; W = 3.6; dashPattern = 'none';
+          } else if (numLayers === 2) {
+            if (layer.index === 0) { R = 13.5; W = 2.4; dashPattern = 'none'; }
+            else { R = 10.7; W = 2.4; dashPattern = '3 1.5'; }
+          } else {
+            // 3 layers
+            if (layer.index === 0) { R = 13.8; W = 1.8; dashPattern = 'none'; }
+            else if (layer.index === 1) { R = 11.6; W = 1.8; dashPattern = '5 2'; }
+            else { R = 9.4; W = 1.8; dashPattern = '2 1.5'; }
+          }
+        } else {
+          // large
+          if (numLayers === 1) {
+            R = 16; W = 5; dashPattern = 'none';
+          } else if (numLayers === 2) {
+            if (layer.index === 0) { R = 17; W = 3; dashPattern = 'none'; }
+            else { R = 13.5; W = 3; dashPattern = '4 2'; }
+          } else {
+            // 3 layers
+            if (layer.index === 0) { R = 17.5; W = 2.2; dashPattern = 'none'; }
+            else if (layer.index === 1) { R = 14.8; W = 2.2; dashPattern = '6 2.5'; }
+            else { R = 12.1; W = 2.2; dashPattern = '3 2'; }
+          }
+        }
+
+        const circ = 2 * Math.PI * R;
+        const percent = layer.percent;
+        const isUnknown = percent === null || percent === undefined;
+        
+        // Track color (gray)
+        let trackStroke = 'rgba(148, 163, 184, 0.12)';
+        if (isUnknown) {
+          trackStroke = 'rgba(148, 163, 184, 0.25)';
+        }
+
+        // Used arc color
+        let usedStroke = 'var(--accent)';
+        if (!isUnknown) {
+          if (percent >= 95) usedStroke = 'var(--danger)';
+          else if (percent >= 80) usedStroke = 'var(--warning)';
+          else {
+            // Base layer identity colors:
+            if (layer.index === 0) usedStroke = '#06b6d4'; // Cyan
+            else if (layer.index === 1) usedStroke = '#8b5cf6'; // Violet
+            else usedStroke = '#ec4899'; // Pink
+          }
+        }
+
+        // Unique clip path ID
+        const clipId = `clip-${unit.key}-${size}-${layer.index}`;
+
+        // Draw track
+        svgContent += `
+          <circle cx="${cx}" cy="${cy}" r="${R}" 
+            fill="none" 
+            stroke="${trackStroke}" 
+            stroke-width="${W}" 
+            ${dashPattern !== 'none' ? `stroke-dasharray="${dashPattern}"` : ''}
+            transform="rotate(-90 ${cx} ${cy})"
+          />
+        `;
+
+        // Draw used arc if not unknown and percent > 0
+        if (!isUnknown && percent > 0) {
+          const usedLen = (percent / 100) * circ;
+          
+          // We define a clip path for the used portion: a solid arc
+          clipDefs += `
+            <clipPath id="${clipId}">
+              <circle cx="${cx}" cy="${cy}" r="${R}" 
+                fill="none" 
+                stroke="black" 
+                stroke-width="${W + 0.2}" 
+                stroke-dasharray="${usedLen} ${circ}"
+                transform="rotate(-90 ${cx} ${cy})"
+              />
+            </clipPath>
+          `;
+
+          // The colored used arc, with the layer's dash pattern, clipped to the used portion
+          svgContent += `
+            <g clip-path="url(#${clipId})">
+              <circle cx="${cx}" cy="${cy}" r="${R}" 
+                fill="none" 
+                stroke="${usedStroke}" 
+                stroke-width="${W}" 
+                ${dashPattern !== 'none' ? `stroke-dasharray="${dashPattern}"` : ''}
+                transform="rotate(-90 ${cx} ${cy})"
+              />
+              <!-- Sheen animation overlay -->
+              <circle cx="${cx}" cy="${cy}" r="${R}" 
+                class="sheen-flow"
+                fill="none" 
+                stroke="rgba(255, 255, 255, 0.45)" 
+                stroke-width="${W + 0.1}" 
+                stroke-dasharray="15 30"
+                transform="rotate(-90 ${cx} ${cy})"
+              />
+            </g>
+          `;
+        }
+      });
+
+      // Calculate center text
+      let centerLabel = '—';
+      let centerVal = '—';
+      
+      const innermostLayer = layers[layers.length - 1];
+      if (innermostLayer) {
+        centerLabel = innermostLayer.shortLabel;
+        if (innermostLayer.percent !== null && innermostLayer.percent !== undefined) {
+          centerVal = `${innermostLayer.percent}%`;
+        } else if (unit.unknownCenterValue) {
+          centerVal = unit.unknownCenterValue;
+        }
+      }
+
+      // Font sizing adjustments
+      let fontLabelSize, fontValSize, maskSize;
+      if (size === 'small') {
+        fontLabelSize = '8px';
+        fontValSize = '7px';
+        maskSize = numLayers === 1 ? 21 : numLayers === 2 ? 18.5 : 15.5;
+      } else {
+        fontLabelSize = '10px';
+        fontValSize = '9px';
+        maskSize = numLayers === 1 ? 27 : numLayers === 2 ? 23.5 : 21.5;
+      }
+
+      return `
+        <span class="usage-ring-unit" data-size="${size}" title="${unit.ariaLabel || ''}">
+          <svg width="${d}" height="${d}" style="display: block;">
+            <defs>${clipDefs}</defs>
+            ${svgContent}
+          </svg>
+          <span class="usage-ring-inner-mask" style="width: ${maskSize}px; height: ${maskSize}px;">
+            <span class="ring-center-label" style="font-size: ${fontLabelSize};">${centerLabel}</span>
+            <span class="ring-center-val" style="font-size: ${fontValSize};">${centerVal}</span>
+          </span>
+        </span>
+      `;
+    }
+
+    // Hover & Focus state machine variables
+    let hoverTimer = null;
+    let escapeSuppressed = false;
+    let isPointerInTrigger = false;
+    let isPointerInPanel = false;
+    let isFocusInTrigger = false;
+    let isFocusInPanel = false;
+
+    // Initialize UI elements state
+    function init() {
+      // Setup default configuration check toggles
+      document.getElementById('aggregatedToggle').checked = state.aggregated;
+      document.getElementById('compactToggle').checked = state.compact;
+      
+      // Setup global click listener to close if clicked outside
+      document.addEventListener('click', (e) => {
+        if (!state.open || !state.aggregated) return;
+        const dialog = document.getElementById('aggregatePanel');
+        const trigger = document.getElementById('aggregateTriggerBtn');
+        if (dialog && trigger && !dialog.contains(e.target) && !trigger.contains(e.target)) {
+          closePanel();
+        }
+      });
+
+      renderTopBar();
+      renderDialog();
+    }
+
+    // Unified Open Panel
+    function openPanel(reason) {
+      if (escapeSuppressed && reason === 'focus') {
+        return; // prevent auto-reopening on focus restore from Escape
+      }
+      if (state.open) return;
+      state.open = true;
+      renderTopBar();
+      renderDialog();
+      positionDialog();
+    }
+
+    // Unified Schedule Close
+    function scheduleClose() {
+      if (hoverTimer) clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => {
+        if (!isPointerInTrigger && !isPointerInPanel && !isFocusInTrigger && !isFocusInPanel) {
+          closePanel();
+        }
+      }, 220); // 220ms grace delay
+    }
+
+    // Unified Cancel Close
+    function cancelClose() {
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+      }
+    }
+
+    // Close Panel
+    function closePanel() {
+      if (!state.open) return;
+      state.open = false;
+      renderTopBar();
+      renderDialog();
+    }
+
+    // Keyboard Event Listener
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.open) {
+        escapeSuppressed = true;
+        closePanel();
+        const trigger = document.getElementById('aggregateTriggerBtn');
+        if (trigger && document.activeElement && document.getElementById('aggregatePanel')?.contains(document.activeElement)) {
+          trigger.focus();
+        }
+      }
+    });
+
+    // Render App Bar panel triggers
+    function renderTopBar() {
+      const host = document.getElementById('appTopUsagePanel');
+      host.innerHTML = '';
+      
+      const enabledKeys = Object.keys(state.providers).filter(k => state.providers[k].enabled);
+      if (enabledKeys.length === 0) {
+        host.style.display = 'none';
+        return;
+      }
+      host.style.display = 'flex';
+
+      if (state.aggregated) {
+        // Aggregate trigger mode
+        // 1. Calculate overall risk
+        let overallRisk = "normal";
+        const risks = enabledKeys.map(k => state.providers[k].risk);
+        if (risks.includes("danger")) overallRisk = "danger";
+        else if (risks.includes("warning")) overallRisk = "warning";
+        else if (risks.every(r => r === "muted")) overallRisk = "muted";
+
+        // 2. Generate button structure
+        const btn = document.createElement('button');
+        btn.id = "aggregateTriggerBtn";
+        btn.className = "usage-trigger-btn";
+        btn.setAttribute('data-open', state.open);
+        btn.setAttribute('aria-expanded', state.open);
+        btn.setAttribute('aria-haspopup', 'dialog');
+        btn.setAttribute('aria-controls', 'aggregatePanel');
+        btn.setAttribute('aria-label', '模型用量聚合入口');
+        
+        // Bind hover and focus events
+        btn.onmouseenter = () => { isPointerInTrigger = true; escapeSuppressed = false; cancelClose(); openPanel('hover'); };
+        btn.onmouseleave = () => { isPointerInTrigger = false; scheduleClose(); };
+        btn.onfocus = () => { isFocusInTrigger = true; cancelClose(); openPanel('focus'); };
+        btn.onblur = () => { isFocusInTrigger = false; escapeSuppressed = false; scheduleClose(); };
+        
+        // Clicking focuses the button, which opens it naturally. We also support toggling.
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          if (state.open) {
+            closePanel();
+          } else {
+            escapeSuppressed = false;
+            openPanel('click');
+          }
+        };
+
+        // Overall risk status dot indicator
+        const dot = document.createElement('span');
+        dot.className = "status-dot";
+        dot.setAttribute('data-tone', overallRisk === 'normal' ? 'success' : overallRisk);
+        btn.appendChild(dot);
+
+        // Core label
+        const label = document.createElement('span');
+        label.className = "trigger-provider-label";
+        label.style.marginLeft = "4px";
+        label.innerText = "用量";
+        btn.appendChild(label);
+
+        // Separator
+        const sep = document.createElement('span');
+        sep.innerText = "·";
+        sep.style.margin = "0 3px";
+        sep.style.color = "var(--text-dim)";
+        btn.appendChild(sep);
+
+        // Segments container
+        const segmentsContainer = document.createElement('span');
+        segmentsContainer.className = "v3-trigger-segments";
+        
+        enabledKeys.forEach(k => {
+          const provider = state.providers[k];
+          const segment = document.createElement('span');
+          segment.className = "v3-segment";
+          segment.setAttribute('data-risk', provider.risk);
+          segment.title = provider.title;
+
+          const pLabel = document.createElement('span');
+          pLabel.className = "v3-segment-label";
+          pLabel.innerText = provider.label;
+          segment.appendChild(pLabel);
+
+          if (provider.loading) {
+            const spinner = document.createElement('span');
+            spinner.className = "spinner-icon";
+            segment.appendChild(spinner);
+          } else {
+            const unit = getProviderRingUnit(k, provider);
+            segment.innerHTML += createSvgRingHtml(unit, 'small');
+            
+            // Kiro shortValue addition if available
+            if (k === 'kiro' && provider.shortValue) {
+              const val = document.createElement('span');
+              val.className = "v3-segment-value";
+              val.innerText = provider.shortValue;
+              segment.appendChild(val);
+            }
+          }
+
+          segmentsContainer.appendChild(segment);
+        });
+        btn.appendChild(segmentsContainer);
+        host.appendChild(btn);
+        
+      } else {
+        // Standalone triggers mode
+        enabledKeys.forEach(k => {
+          const provider = state.providers[k];
+          
+          const btn = document.createElement('button');
+          btn.className = "usage-trigger-btn standalone-trigger-btn";
+          btn.style.marginRight = "4px";
+          btn.title = provider.title;
+          
+          const label = document.createElement('span');
+          label.className = "trigger-provider-label";
+          label.innerText = provider.label;
+          btn.appendChild(label);
+
+          if (state.compact) {
+            // Compact Mode triggers: provider name + provider-owned nested rings
+            if (provider.loading) {
+              const spinner = document.createElement('span');
+              spinner.className = "spinner-icon";
+              btn.appendChild(spinner);
+            } else {
+              const unit = getProviderRingUnit(k, provider);
+              btn.innerHTML += createSvgRingHtml(unit, 'small');
+              if (k === 'kiro' && provider.shortValue) {
+                const val = document.createElement('span');
+                val.style.fontSize = "9px";
+                val.style.fontWeight = "700";
+                val.style.marginLeft = "3px";
+                val.style.color = "var(--text-dim)";
+                val.innerText = provider.shortValue;
+                btn.appendChild(val);
+              }
+            }
+          } else {
+            // Full Mode triggers (always preserves rings and status dot)
+            const dot = document.createElement('span');
+            dot.className = "status-dot";
+            dot.setAttribute('data-tone', provider.risk === 'normal' ? 'success' : provider.risk);
+            btn.appendChild(dot);
+
+            const status = document.createElement('span');
+            status.style.fontSize = "10px";
+            status.style.marginLeft = "4px";
+            status.innerText = provider.risk === 'normal' ? '实时' : provider.value;
+            btn.appendChild(status);
+
+            // Full rings
+            if (provider.loading) {
+              const spinner = document.createElement('span');
+              spinner.className = "spinner-icon";
+              btn.appendChild(spinner);
+            } else {
+              const unit = getProviderRingUnit(k, provider);
+              btn.innerHTML += createSvgRingHtml(unit, 'large');
+            }
+          }
+
+          btn.onclick = () => {
+            alert(`独立模式点击：已激活 ${provider.label}。此处仅作 Full/Compact 对照展示。`);
+          };
+
+          host.appendChild(btn);
+        });
+      }
+    }
+
+    // Render aggregate panel columns dialog contents (v6 grid replacing accordion)
+    function renderDialog() {
+      const portal = document.getElementById('portalContainer');
+      portal.innerHTML = '';
+
+      if (!state.open || !state.aggregated) return;
+
+      const enabledKeys = Object.keys(state.providers).filter(k => state.providers[k].enabled);
+      if (enabledKeys.length === 0) return;
+
+      const dialog = document.createElement('section');
+      dialog.id = "aggregatePanel";
+      dialog.className = "aggregate-panel-dialog";
+      dialog.tabIndex = -1;
+      dialog.setAttribute('role', 'dialog');
+      dialog.setAttribute('aria-label', '模型用量');
+      dialog.setAttribute('aria-live', 'polite');
+      
+      // Bind hover and focus events to dialog to maintain open status
+      dialog.onmouseenter = () => { isPointerInPanel = true; cancelClose(); };
+      dialog.onmouseleave = () => { isPointerInPanel = false; scheduleClose(); };
+      dialog.onfocusin = () => { isFocusInPanel = true; cancelClose(); };
+      dialog.onfocusout = () => { isFocusInPanel = false; scheduleClose(); };
+
+      // 1. Header
+      const header = document.createElement('div');
+      header.className = "panel-header";
+      
+      const titleGroup = document.createElement('div');
+      titleGroup.className = "panel-header-title";
+      titleGroup.innerHTML = `<span>📊</span> 模型用量 <span class="panel-header-badge">${enabledKeys.length} 个启用服务商</span>`;
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.className = "btn-close-panel";
+      closeBtn.innerHTML = "×";
+      closeBtn.setAttribute('aria-label', '关闭模型用量面板');
+      closeBtn.onclick = closePanel;
+
+      header.appendChild(titleGroup);
+      header.appendChild(closeBtn);
+      dialog.appendChild(header);
+
+      // 2. Columns Container (v6 Multi-column side-by-side layout)
+      const columnsContainer = document.createElement('div');
+      columnsContainer.className = "aggregate-panel-columns";
+      columnsContainer.style.setProperty('--columns', enabledKeys.length);
+
+      enabledKeys.forEach(k => {
+        const provider = state.providers[k];
+
+        const col = document.createElement('div');
+        col.className = "provider-column";
+        col.setAttribute('data-risk', provider.risk);
+
+        // Column Header
+        const colHeader = document.createElement('div');
+        colHeader.className = "column-header";
+
+        const leftGroup = document.createElement('div');
+        leftGroup.className = "column-header-left";
+        
+        const dot = document.createElement('span');
+        dot.className = "status-dot";
+        dot.setAttribute('data-tone', provider.risk === 'normal' ? 'success' : provider.risk);
+        leftGroup.appendChild(dot);
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = "provider-title";
+        labelSpan.innerText = provider.label;
+        leftGroup.appendChild(labelSpan);
+
+        const rightGroup = document.createElement('div');
+        rightGroup.className = "column-header-right";
+
+        const valSpan = document.createElement('span');
+        valSpan.className = "provider-summary-text";
+        valSpan.innerText = provider.loading ? "正在刷新..." : provider.value;
+        rightGroup.appendChild(valSpan);
+
+        // N-ring next to title
+        const unit = getProviderRingUnit(k, provider);
+        if (unit) {
+          rightGroup.innerHTML += createSvgRingHtml(unit, 'small');
+        }
+
+        colHeader.appendChild(leftGroup);
+        colHeader.appendChild(rightGroup);
+        col.appendChild(colHeader);
+
+        // Column Detail Body
+        const colBody = document.createElement('div');
+        colBody.className = "column-body";
+
+        // Inject provider specific detailed view
+        injectProviderDetails(colBody, k, provider);
+
+        col.appendChild(colBody);
+        columnsContainer.appendChild(col);
+      });
+
+      dialog.appendChild(columnsContainer);
+      portal.appendChild(dialog);
+    }
+
+    // Helper to render specific provider HTML structure in Column Detail
+    function injectProviderDetails(container, key, provider) {
+      if (provider.loading) {
+        container.innerHTML = `
+          <div style="display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--text-dim); font-size:11px; padding: 40px 0; text-align:center;">
+            <span class="spinner-icon" style="width:20px; height:20px; border-width:2.5px;"></span>
+            <span>正在从服务端刷新 ${provider.label} 额度数据...</span>
+          </div>
+        `;
+        return;
+      }
+
+      // 2. Alert Banner (e.g. Stale, Reauth, Error)
+      if (provider.alert) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = "status-alert-banner";
+        alertDiv.setAttribute('data-type', provider.alert.type);
+        alertDiv.innerHTML = provider.alert.text;
+        container.appendChild(alertDiv);
+      }
+
+      // 3. Active Account Stripe
+      const activeStrip = document.createElement('div');
+      activeStrip.className = "active-account-strip";
+      activeStrip.setAttribute('data-active', "true");
+
+      const activeInfo = document.createElement('div');
+      activeInfo.className = "account-info";
+      activeInfo.innerHTML = `
+        <span class="account-displayname" title="${provider.activeAccount.displayName}">${provider.activeAccount.displayName}</span>
+        <code class="account-id-masked" title="${provider.activeAccount.maskedAccountId}">${provider.activeAccount.maskedAccountId}</code>
+      `;
+      
+      const activeBadge = document.createElement('span');
+      activeBadge.className = "active-badge";
+      activeBadge.innerText = "Active";
+
+      activeStrip.appendChild(activeInfo);
+      activeStrip.appendChild(activeBadge);
+      container.appendChild(activeStrip);
+
+      // 4. Quota Info (Different layouts for GPT / Grok / Kiro)
+      if (key === 'gpt') {
+        const quotaDiv = document.createElement('div');
+        quotaDiv.className = "usage-quota-grid";
+        
+        // Card A: 5h
+        quotaDiv.innerHTML += `
+          <div class="quota-card">
+            <span class="quota-card-label">5小时额度 (Innermost Layer)</span>
+            <span class="quota-card-value" style="color: #8b5cf6;">${provider.percent !== null ? provider.percent + '%' : '—'} <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" style="width: ${provider.percent || 0}%; background: #8b5cf6;"></div>
+            </div>
+            <span class="quota-card-meta">刷新自 Cache (5小时重置窗口)</span>
+          </div>
+        `;
+        // Card B: Weekly
+        if (!provider.hasOnlyWeekly) {
+          quotaDiv.innerHTML += `
+            <div class="quota-card">
+              <span class="quota-card-label">周分配额度 (Outer Layer)</span>
+              <span class="quota-card-value" style="color: #06b6d4;">${provider.percentWeekly}% <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: ${provider.percentWeekly}%; background: #06b6d4;"></div>
+              </div>
+              <span class="quota-card-meta">分配上限: ${provider.quota.weekly.limit} (${provider.quota.weekly.reset})</span>
+            </div>
+          `;
+        }
+        container.appendChild(quotaDiv);
+
+      } else if (key === 'grok') {
+        if (provider.risk !== 'danger') {
+          const quotaDiv = document.createElement('div');
+          quotaDiv.className = "usage-quota-grid";
+          
+          if (!provider.hasOnlyWeekly) {
+            quotaDiv.innerHTML += `
+              <div class="quota-card">
+                <span class="quota-card-label">月度使用额度 (Outer Layer)</span>
+                <span class="quota-card-value" style="color: #06b6d4;">${provider.percent !== null ? provider.percent + '%' : '—'} <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill" style="width: ${provider.percent || 0}%; background: #06b6d4;"></div>
+                </div>
+                <span class="quota-card-meta">重置时间: ${provider.quota.monthly.resetsAt}</span>
+              </div>
+            `;
+          }
+          
+          quotaDiv.innerHTML += `
+            <div class="quota-card">
+              <span class="quota-card-label">周使用额度 (Innermost Layer)</span>
+              <span class="quota-card-value" style="color: #8b5cf6;">${provider.percentWeekly !== null ? provider.percentWeekly + '%' : '—'} <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: ${provider.percentWeekly || 0}%; background: #8b5cf6;"></div>
+              </div>
+              <span class="quota-card-meta">重置时间: ${provider.quota.weekly.resetsAt}</span>
+            </div>
+          `;
+          container.appendChild(quotaDiv);
+        } else {
+          // Danger / Reauth status card fallback
+          const errorCard = document.createElement('div');
+          errorCard.className = "quota-card";
+          errorCard.innerHTML = `
+            <span class="quota-card-label">订阅限额 (Subscription Limit)</span>
+            <span style="font-size:11px; color:var(--text-dim); padding:6px 0;">鉴权失效，无法读取当前账户配额明细。</span>
+            <span class="quota-card-meta">状态: REAUTH_REQUIRED</span>
+          `;
+          container.appendChild(errorCard);
+        }
+
+      } else if (key === 'kiro') {
+        if (provider.risk !== 'danger') {
+          const quotaDiv = document.createElement('div');
+          quotaDiv.className = "usage-quota-grid";
+          
+          quotaDiv.innerHTML += `
+            <div class="quota-card">
+              <span class="quota-card-label">Limits 配额 (Outer Layer)</span>
+              <span class="quota-card-value" style="color: #06b6d4;">${provider.percent !== null ? provider.percent + '%' : '—'} <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: ${provider.percent || 0}%; background: #06b6d4;"></div>
+              </div>
+              <span class="quota-card-meta">已用量/总量：${provider.quota.used}M / ${provider.quota.limit}M</span>
+            </div>
+          `;
+          
+          if (provider.percentWeekly !== null && provider.percentWeekly !== undefined) {
+            quotaDiv.innerHTML += `
+              <div class="quota-card">
+                <span class="quota-card-label">Daily 限制 (Inner Layer)</span>
+                <span class="quota-card-value" style="color: #8b5cf6;">${provider.percentWeekly}% <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill" style="width: ${provider.percentWeekly}%; background: #8b5cf6;"></div>
+                </div>
+                <span class="quota-card-meta">重置时间：${provider.quota.resetsAt}</span>
+              </div>
+            `;
+          }
+
+          if (provider.hasTripleRings && provider.percentHourly !== null) {
+            quotaDiv.innerHTML += `
+              <div class="quota-card">
+                <span class="quota-card-label">Hourly 限制 (Innermost Layer)</span>
+                <span class="quota-card-value" style="color: #ec4899;">${provider.percentHourly}% <small style="color:var(--text-dim); font-size:10px; font-weight:500;">已使用</small></span>
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill" style="width: ${provider.percentHourly}%; background: #ec4899;"></div>
+                </div>
+                <span class="quota-card-meta">每小时滚动重置</span>
+              </div>
+            `;
+          }
+
+          container.appendChild(quotaDiv);
+        } else {
+          // Reauth / Login card for Kiro
+          const errorCard = document.createElement('div');
+          errorCard.className = "quota-card";
+          errorCard.innerHTML = `
+            <span class="quota-card-label">AWS Limits Quotas</span>
+            <span style="font-size:11px; color:var(--text-dim); padding:6px 0;">AWS Service Quota API requires active credential profile authentication.</span>
+            <span class="quota-card-meta">状态: UNAUTHORIZED</span>
+          `;
+          container.appendChild(errorCard);
+        }
+      }
+
+      // 5. Account Switcher list
+      const listDiv = document.createElement('div');
+      listDiv.className = "account-selector-list";
+      
+      const labelRow = document.createElement('div');
+      labelRow.style.display = "flex";
+      labelRow.style.justifyContent = "space-between";
+      labelRow.style.alignItems = "center";
+      labelRow.style.fontSize = "10px";
+      labelRow.style.fontWeight = "bold";
+      labelRow.style.color = "var(--text-muted)";
+      labelRow.innerHTML = `<span>切换账号 (Switch Credentials)</span>`;
+      listDiv.appendChild(labelRow);
+
+      // Accounts selector rows
+      provider.accounts.forEach(acc => {
+        const row = document.createElement('div');
+        row.className = "account-selector-row";
+        row.setAttribute('data-active', acc.active);
+
+        const info = document.createElement('div');
+        info.className = "account-info";
+        info.innerHTML = `
+          <span class="account-displayname" title="${acc.displayName}">${acc.displayName}</span>
+          <code class="account-id-masked" title="${acc.maskedAccountId}">${acc.maskedAccountId}</code>
+        `;
+        row.appendChild(info);
+
+        if (acc.active) {
+          const badge = document.createElement('span');
+          badge.className = "active-badge";
+          badge.innerText = "Active";
+          row.appendChild(badge);
+        } else {
+          const btn = document.createElement('button');
+          btn.type = "button";
+          btn.className = "btn-set-active";
+          btn.innerText = "切换";
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            changeActiveAccount(key, acc.id);
+          };
+          row.appendChild(btn);
+        }
+
+        listDiv.appendChild(row);
+      });
+      container.appendChild(listDiv);
+
+      // 6. Action Panel Footer
+      const footerActions = document.createElement('div');
+      footerActions.className = "panel-action-buttons-group";
+
+      // Refresh Button
+      const refreshBtn = document.createElement('button');
+      refreshBtn.type = "button";
+      refreshBtn.className = "btn-panel-action";
+      refreshBtn.innerHTML = `
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span>刷新额度</span>
+      `;
+      refreshBtn.onclick = () => simulateRefresh(key);
+      footerActions.appendChild(refreshBtn);
+
+      // Models Recovery / Manage Button
+      const manageBtn = document.createElement('button');
+      manageBtn.type = "button";
+      manageBtn.className = "btn-panel-action btn-panel-action-primary";
+      manageBtn.innerText = `管理 ${provider.label}`;
+      manageBtn.onclick = () => {
+        closePanel();
+        alert(`跳转到: Models → ${provider.label} 界面进行完整凭证管理与鉴权交互。`);
+      };
+      footerActions.appendChild(manageBtn);
+
+      container.appendChild(footerActions);
+    }
+
+    // Position popover dialog below trigger
+    function positionDialog() {
+      const dialog = document.getElementById('aggregatePanel');
+      const trigger = document.getElementById('aggregateTriggerBtn');
+      if (!dialog || !trigger) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const bodyRect = document.body.getBoundingClientRect();
+
+      dialog.style.position = 'absolute';
+      dialog.style.top = (triggerRect.bottom + window.scrollY) + 'px';
+      
+      const rightOffset = bodyRect.right - triggerRect.right;
+      dialog.style.right = rightOffset + 'px';
+      dialog.style.left = 'auto';
+
+      // Narrow Viewports overrides
+      const isNarrow = document.body.classList.contains('v-640') || 
+                       document.body.classList.contains('v-375') || 
+                       document.body.classList.contains('v-320');
+      
+      if (isNarrow) {
+        const topbar = document.getElementById('mockTopbar');
+        if (topbar) {
+          const topbarRect = topbar.getBoundingClientRect();
+          dialog.style.left = (topbarRect.left + window.scrollX) + 'px';
+          dialog.style.width = topbarRect.width + 'px';
+          dialog.style.right = 'auto';
+        }
+      } else {
+        const enabledKeys = Object.keys(state.providers).filter(k => state.providers[k].enabled);
+        if (enabledKeys.length === 1) {
+          dialog.style.width = '320px';
+        } else if (enabledKeys.length === 2) {
+          dialog.style.width = '600px';
+        } else {
+          dialog.style.width = '880px';
+        }
+      }
+    }
+
+    // Simulate switching active accounts inside the panel
+    function changeActiveAccount(providerKey, accountId) {
+      const provider = state.providers[providerKey];
+      provider.accounts.forEach(acc => {
+        acc.active = (acc.id === accountId);
+      });
+      const selected = provider.accounts.find(acc => acc.active);
+      provider.activeAccount = {
+        displayName: selected.displayName,
+        maskedAccountId: selected.maskedAccountId
+      };
+
+      // Clear error warning since new auth is active
+      if (provider.risk !== "normal") {
+        provider.risk = "normal";
+        provider.alert = null;
+        if (providerKey === 'gpt') {
+          provider.value = "5h 42%";
+          provider.percent = 42;
+        }
+        if (providerKey === 'grok') {
+          provider.value = "周 51%";
+          provider.percent = 73;
+          provider.percentWeekly = 51;
+        }
+        if (providerKey === 'kiro') {
+          provider.value = "Limits 75%";
+          provider.percent = 75;
+          provider.percentWeekly = 20;
+          provider.shortValue = "余 125";
+        }
+      }
+
+      renderDialog();
+      renderTopBar();
+      positionDialog();
+    }
+
+    // Simulate clicking refreshing button inside panel
+    function simulateRefresh(providerKey) {
+      const provider = state.providers[providerKey];
+      provider.loading = true;
+      renderDialog();
+      renderTopBar();
+      positionDialog();
+
+      setTimeout(() => {
+        provider.loading = false;
+        if (providerKey === 'gpt') {
+          provider.quota.fiveHour.usedPercent = Math.floor(Math.random() * 20) + 30;
+          provider.percent = provider.quota.fiveHour.usedPercent;
+          provider.value = `5h ${provider.quota.fiveHour.usedPercent}%`;
+          provider.title = `GPT 5h: ${provider.quota.fiveHour.usedPercent}% 已使用 (剩余 58分钟/重置 刚刚刷新) · 周额度: 37% 已使用`;
+        } else if (providerKey === 'grok') {
+          provider.quota.weekly.usedPercent = Math.floor(Math.random() * 20) + 40;
+          provider.percentWeekly = provider.quota.weekly.usedPercent;
+          provider.value = `周 ${provider.percentWeekly}%`;
+        } else if (providerKey === 'kiro') {
+          provider.quota.remaining = 125 - Math.floor(Math.random() * 5);
+          provider.value = `Limits 75%`;
+          provider.shortValue = `余 ${provider.quota.remaining}`;
+          provider.percent = Math.round((provider.quota.limit - provider.quota.remaining) / provider.quota.limit * 100);
+        }
+        
+        renderDialog();
+        renderTopBar();
+        positionDialog();
+      }, 1000);
+    }
+
+    // Toggle Aggregated Mode switch on settings
+    function toggleAggregatedMode(checked) {
+      state.aggregated = checked;
+      state.open = false;
+
+      const compactToggle = document.getElementById('compactToggle');
+      const compactHint = document.getElementById('compactModeHint');
+
+      if (checked) {
+        compactToggle.disabled = true;
+        compactHint.style.display = 'block';
+      } else {
+        compactToggle.disabled = false;
+        compactHint.style.display = 'none';
+      }
+
+      renderTopBar();
+      renderDialog();
+    }
+
+    // Toggle Compact Mode switch on settings
+    function toggleCompactMode(checked) {
+      state.compact = checked;
+      renderTopBar();
+    }
+
+    // Toggle single provider active checkboxes
+    function toggleProviderEnabled(key, checked) {
+      state.providers[key].enabled = checked;
+      renderTopBar();
+      renderDialog();
+      if (state.open) positionDialog();
+    }
+
+    // Change simulate viewport widths
+    function adjustViewportWidth(width) {
+      document.body.className = ''; // Reset
+      document.body.classList.add('v-' + width);
+      
+      const indicator = document.getElementById('viewportIndicator');
+      if (width === 'desktop') {
+        indicator.innerText = '当前视口: 桌面模式 (最大 1280px)';
+      } else {
+        indicator.innerText = `当前视口: 窄屏模式 (${width}px)`;
+      }
+
+      if (state.open) positionDialog();
+    }
+
+    // Toggle Reduced Motion Simulation
+    function toggleReducedMotion(checked) {
+      state.reducedMotion = checked;
+      if (checked) {
+        document.body.classList.add('reduced-motion');
+      } else {
+        document.body.classList.remove('reduced-motion');
+      }
+    }
+
+    // Apply preset scenarios
+    function applyPresetScenario(name) {
+      if (presets[name]) {
+        presets[name]();
+        
+        // Synchronize checkboxes
+        document.getElementById('enableGpt').checked = state.providers.gpt.enabled;
+        document.getElementById('enableGrok').checked = state.providers.grok.enabled;
+        document.getElementById('enableKiro').checked = state.providers.kiro.enabled;
+        
+        renderTopBar();
+        renderDialog();
+        if (state.open) positionDialog();
+      }
+    }
+
+    // Run Initialization
+    window.onload = init;
+  </script>
+</body>
+</html>

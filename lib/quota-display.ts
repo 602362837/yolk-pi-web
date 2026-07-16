@@ -43,9 +43,10 @@ export function knownQuotaTiers<T extends QuotaDisplayTier>(tiers: T[]): T[] {
  * @returns CSS 颜色值。
  */
 export function quotaColor(utilization: number): string {
-  if (utilization >= 90) return "#f87171";
-  if (utilization >= 70) return "#fb923c";
-  return "#4ade80";
+  // Theme-aware usage status colors (light/dark tokens with safe fallbacks).
+  if (utilization >= 90) return "var(--usage-status-danger-fg, #b91c1c)";
+  if (utilization >= 70) return "var(--usage-status-warning-fg, #b45309)";
+  return "var(--usage-status-success-fg, #15803d)";
 }
 
 /**

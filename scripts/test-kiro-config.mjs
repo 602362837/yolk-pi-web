@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * Kiro + global compact mode config checks (KIRO-03).
+ * Kiro + global compact/aggregate usage config checks (KIRO-03 / USAGE-AGG-01).
  *
  * Covers:
  * - usage.providerPanelsCompact default false
+ * - usage.providerPanelsAggregated default false
  * - kiro.usagePanelEnabled / kiro.autoFailover defaults
  * - missing-field normalize compatibility on old pi-web.json
  * - strict validate rejects non-boolean flags
  * - partial kiro/usage patches preserve unrelated fields
- * - Settings left-nav Kiro section + Usage compact placement
+ * - aggregate on keeps compact value; Settings disables Compact when aggregated
+ * - Settings left-nav Kiro section + Usage compact/aggregate placement
  *
  * Run:
  *   npm run test:kiro-config
@@ -62,6 +64,10 @@ try {
     assert.equal(DEFAULT_PI_WEB_CONFIG.usage.providerPanelsCompact, false);
   });
 
+  await test("DEFAULT usage.providerPanelsAggregated is false", () => {
+    assert.equal(DEFAULT_PI_WEB_CONFIG.usage.providerPanelsAggregated, false);
+  });
+
   await test("DEFAULT kiro panel/failover are disabled with Grok-aligned budgets", () => {
     assert.equal(DEFAULT_PI_WEB_CONFIG.kiro.usagePanelEnabled, false);
     assert.equal(DEFAULT_PI_WEB_CONFIG.kiro.autoFailover.enabled, false);
@@ -94,6 +100,7 @@ try {
     const config = readPiWebConfig();
     assert.equal(config.usage.includeArchived, false);
     assert.equal(config.usage.providerPanelsCompact, false);
+    assert.equal(config.usage.providerPanelsAggregated, false);
     assert.equal(config.kiro.usagePanelEnabled, false);
     assert.equal(config.kiro.autoFailover.enabled, false);
     assert.equal(config.grok.usagePanelEnabled, true);
@@ -107,6 +114,17 @@ try {
       }),
       (error) => error instanceof PiWebConfigValidationError
         && String(error.message).includes("usage.providerPanelsCompact"),
+    );
+  });
+
+  await test("validate rejects non-boolean providerPanelsAggregated", () => {
+    assert.throws(
+      () => validatePiWebUsageConfig({
+        ...DEFAULT_PI_WEB_CONFIG.usage,
+        providerPanelsAggregated: "yes",
+      }),
+      (error) => error instanceof PiWebConfigValidationError
+        && String(error.message).includes("usage.providerPanelsAggregated"),
     );
   });
 
@@ -155,6 +173,7 @@ try {
         usage: {
           includeArchived: false,
           providerPanelsCompact: false,
+          providerPanelsAggregated: false,
           explicitFreeModels: [{ provider: "openai", model: "gpt-test" }],
         },
       }),
@@ -166,6 +185,30 @@ try {
     });
     assert.equal(result.config.usage.providerPanelsCompact, true);
     assert.equal(result.config.usage.includeArchived, false);
+    assert.equal(result.config.usage.providerPanelsAggregated, false);
+    assert.deepEqual(result.config.usage.explicitFreeModels, [{ provider: "openai", model: "gpt-test" }]);
+  });
+
+  await test("partial usage aggregate patch preserves compact and free models", async () => {
+    await writeFile(
+      join(agentDir, "pi-web.json"),
+      JSON.stringify({
+        usage: {
+          includeArchived: false,
+          providerPanelsCompact: true,
+          providerPanelsAggregated: false,
+          explicitFreeModels: [{ provider: "openai", model: "gpt-test" }],
+        },
+      }),
+      "utf8",
+    );
+
+    const result = writePiWebConfigPatch({
+      usage: { providerPanelsAggregated: true },
+    });
+    assert.equal(result.config.usage.providerPanelsAggregated, true);
+    assert.equal(result.config.usage.providerPanelsCompact, true);
+    assert.equal(result.config.usage.includeArchived, false);
     assert.deepEqual(result.config.usage.explicitFreeModels, [{ provider: "openai", model: "gpt-test" }]);
   });
 
@@ -173,7 +216,11 @@ try {
     await writeFile(
       join(agentDir, "pi-web.json"),
       JSON.stringify({
-        usage: { includeArchived: true, providerPanelsCompact: false },
+        usage: {
+          includeArchived: true,
+          providerPanelsCompact: false,
+          providerPanelsAggregated: false,
+        },
         chatgpt: { usagePanelEnabled: true },
         grok: { usagePanelEnabled: true },
         kiro: {
@@ -185,7 +232,10 @@ try {
     );
 
     writePiWebConfigPatch({
-      usage: { providerPanelsCompact: true },
+      usage: {
+        providerPanelsCompact: true,
+        providerPanelsAggregated: true,
+      },
       kiro: {
         usagePanelEnabled: true,
         autoFailover: {
@@ -197,6 +247,7 @@ try {
 
     const reloaded = readPiWebConfig();
     assert.equal(reloaded.usage.providerPanelsCompact, true);
+    assert.equal(reloaded.usage.providerPanelsAggregated, true);
     assert.equal(reloaded.usage.includeArchived, true);
     assert.equal(reloaded.kiro.usagePanelEnabled, true);
     assert.equal(reloaded.kiro.autoFailover.enabled, true);
@@ -204,27 +255,59 @@ try {
     assert.equal(reloaded.grok.usagePanelEnabled, true);
   });
 
-  await test("Settings places compact only under Usage and Kiro as a left-nav peer", () => {
+  await test("aggregate enable keeps compact value without rewriting it false", async () => {
+    await writeFile(
+      join(agentDir, "pi-web.json"),
+      JSON.stringify({
+        usage: {
+          includeArchived: true,
+          providerPanelsCompact: true,
+          providerPanelsAggregated: false,
+        },
+      }),
+      "utf8",
+    );
+
+    const enabled = writePiWebConfigPatch({
+      usage: { providerPanelsAggregated: true },
+    });
+    assert.equal(enabled.config.usage.providerPanelsAggregated, true);
+    assert.equal(enabled.config.usage.providerPanelsCompact, true);
+
+    const disabled = writePiWebConfigPatch({
+      usage: { providerPanelsAggregated: false },
+    });
+    assert.equal(disabled.config.usage.providerPanelsAggregated, false);
+    assert.equal(disabled.config.usage.providerPanelsCompact, true);
+  });
+
+  await test("Settings places compact/aggregate only under Usage and Kiro as a left-nav peer", () => {
     const settings = read("components/SettingsConfig.tsx");
     const config = read("lib/pi-web-config.ts");
     const route = read("app/api/web-config/route.ts");
 
     assert.match(config, /providerPanelsCompact:\s*false/);
+    assert.match(config, /providerPanelsAggregated:\s*false/);
     assert.match(config, /"usage\.providerPanelsCompact"/);
+    assert.match(config, /"usage\.providerPanelsAggregated"/);
     assert.match(config, /kiro:\s*\{[\s\S]*usagePanelEnabled:\s*false/);
     assert.match(config, /"kiro\.usagePanelEnabled"/);
     assert.match(route, /kiro\?: unknown/);
 
     assert.match(settings, /renderSectionButton\("kiro", "Kiro"/);
+    assert.match(settings, /模型用量组件聚合/);
     assert.match(settings, /顶部额度组件简要显示 \(Compact Mode\)/);
+    assert.match(settings, /disabled=\{usage\.providerPanelsAggregated\}/);
+    assert.match(settings, /providerPanelsAggregated === b\.providerPanelsAggregated/);
     assert.match(settings, /Kiro 用量悬浮面板/);
     assert.match(settings, /明确限额或限流时自动切换可用账号/);
     assert.match(settings, /section === "kiro"/);
     assert.match(settings, /providerPanelsCompact/);
+    assert.match(settings, /providerPanelsAggregated/);
     assert.match(settings, /updateKiro/);
     assert.match(settings, /kiro,\s*editor/);
 
-    // Compact must live in the Usage section, not be duplicated under Kiro.
+    // Compact/aggregate must live in the Usage section, not be duplicated under Kiro.
     const usageSectionStart = settings.indexOf('section === "usage"');
     const kiroSectionStart = settings.indexOf('section === "kiro"');
     assert.ok(usageSectionStart > 0, "usage section missing");
@@ -232,7 +315,10 @@ try {
     const usageSection = settings.slice(usageSectionStart, kiroSectionStart);
     const kiroSection = settings.slice(kiroSectionStart, settings.indexOf('section === "editor"', kiroSectionStart));
     assert.match(usageSection, /providerPanelsCompact/);
+    assert.match(usageSection, /providerPanelsAggregated/);
+    assert.match(usageSection, /模型用量组件聚合/);
     assert.doesNotMatch(kiroSection, /providerPanelsCompact/);
+    assert.doesNotMatch(kiroSection, /providerPanelsAggregated/);
     assert.match(kiroSection, /Kiro 用量悬浮面板/);
     assert.match(kiroSection, /autoFailover/);
   });

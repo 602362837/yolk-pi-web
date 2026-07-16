@@ -130,8 +130,14 @@ export interface PiWebUsageConfig {
    * Global compact mode for GPT/Grok/Kiro top-bar usage triggers.
    * Only compresses the trigger summary; detailed popovers stay available.
    * Default false preserves the existing full trigger layout.
+   * When providerPanelsAggregated is true this value is retained but not applied.
    */
   providerPanelsCompact: boolean;
+  /**
+   * When true, Chat top-bar mounts one aggregate provider-usage entry instead of
+   * standalone GPT/Grok/Kiro triggers. Default false preserves the existing layout.
+   */
+  providerPanelsAggregated: boolean;
   /** Models explicitly marked as free by the user. Stored as provider:model pairs. */
   explicitFreeModels: Array<{ provider: string; model: string }>;
   /** AI assistant policy for model price suggestion (structured extraction from bounded evidence). */
@@ -304,6 +310,7 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   usage: {
     includeArchived: true,
     providerPanelsCompact: false,
+    providerPanelsAggregated: false,
     explicitFreeModels: [],
     pricingAssistant: {
       model: { mode: "followMain" },
@@ -896,6 +903,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
       // Retired usage.statsSource is ignored on read; ledger is always the global Usage source.
       includeArchived: readBoolean(usage.includeArchived, defaults.usage.includeArchived),
       providerPanelsCompact: readBoolean(usage.providerPanelsCompact, defaults.usage.providerPanelsCompact),
+      providerPanelsAggregated: readBoolean(usage.providerPanelsAggregated, defaults.usage.providerPanelsAggregated),
       explicitFreeModels: readExplicitFreeModels(usage.explicitFreeModels),
       pricingAssistant: readSubagentPolicy(usage.pricingAssistant, defaults.usage.pricingAssistant),
       pricingAssistantFallback: readSubagentPolicy(usage.pricingAssistantFallback, defaults.usage.pricingAssistantFallback),
@@ -1275,6 +1283,9 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
     providerPanelsCompact: value.providerPanelsCompact === undefined
       ? DEFAULT_PI_WEB_CONFIG.usage.providerPanelsCompact
       : requireBoolean(value.providerPanelsCompact, "usage.providerPanelsCompact"),
+    providerPanelsAggregated: value.providerPanelsAggregated === undefined
+      ? DEFAULT_PI_WEB_CONFIG.usage.providerPanelsAggregated
+      : requireBoolean(value.providerPanelsAggregated, "usage.providerPanelsAggregated"),
     explicitFreeModels: readExplicitFreeModels(value.explicitFreeModels),
     pricingAssistant: value.pricingAssistant === undefined
       ? DEFAULT_PI_WEB_CONFIG.usage.pricingAssistant

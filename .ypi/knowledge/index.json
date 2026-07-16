@@ -1,7 +1,61 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-16T02:17:49.909Z",
+  "updatedAt": "2026-07-16T08:38:53.865Z",
   "entries": [
+    {
+      "id": "20260716-163853-设置中增加模型用量组件聚合开关与顶栏聚合组件",
+      "title": "设置中增加模型用量组件聚合开关与顶栏聚合组件",
+      "taskId": "20260716-103603-设置中增加模型用量组件聚合开关与顶栏聚合组件",
+      "taskKey": "archived:2026-07:20260716-103603-设置中增加模型用量组件聚合开关与顶栏聚合组件",
+      "workflowId": "feature-dev",
+      "summary": "## Subtask - **ID**: `USAGE-AGG-07` - **Title**: 完成文档、全量验证与 UI v6 验收 - **Status**: **done**（文档 + 自动验证收口完成；浏览器人工矩阵因环境限制部分未手测，见下） ## 已完成 ### 文档（v6 口径，无 accordion / Grok 中心月 / Kiro 默认 single / 总环 / 新 quota API） | File | 变更摘要 | | --- | --- | | `docs/architecture/overview.md` | 顶栏用量改为 N-ring + optional aggregate：外长内短、中心最内层、层 identity/tone、used-arc flow/reduced-motion、`providerPanelsAggregated` 默认 false、互斥挂载、Kiro 统一 1/N | | `docs/modules/frontend.md` | AppShell 互斥；新增 `ProviderUsagePanelContract` / `ProviderUsageAggregatePanel`；Trigger/GPT/Grok/Kiro/Settings 描述对齐 v6 | | `docs/modules/api.md` | `web-config` 增加 `usage.providerPanelsAggregated`；明确无新 provider quota routes | | `docs/modules/library.md` | `pi-web-config` Usage 布尔字段与 partial merge 语义 | | `docs/integrations/README.md` | Grok/Kiro 顶栏 N-ring、aggregate、中心周、止血 `providerPanelsAggregated=false` | | `docs/operations/troubleshooting.md` | Agg…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260716-103603-设置中增加模型用量组件聚合开关与顶栏聚合组件",
+      "knowledgePath": ".ypi/knowledge/20260716-163853-设置中增加模型用量组件聚合开关与顶栏聚合组件.md",
+      "createdAt": "2026-07-16T08:38:53.865Z",
+      "archivedAt": "2026-07-16T08:38:53.865Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
+    {
+      "id": "20260716-163809-修复聚合用量浮窗主题-环尺寸与窗口优先级",
+      "title": "修复聚合用量浮窗主题、环尺寸与窗口优先级",
+      "taskId": "20260716-144724-修复聚合用量浮窗主题-环尺寸与窗口优先级",
+      "taskKey": "archived:2026-07:20260716-144724-修复聚合用量浮窗主题-环尺寸与窗口优先级",
+      "workflowId": "feature-dev",
+      "summary": "## Subtask - id: `USAGE-FIX-05` - title: 同步文档并完成自动与浏览器验收 - status: done（代码/文档/自动验证完成；浏览器矩阵已记录，含 1 项响应式观察） ## Files Changed - `docs/architecture/overview.md` — 同步 actual candidates → shared projector、outer=shortest / center=outer、unknown/tie 降级、theme tokens、panel ring 尺寸与 rollback。 - `docs/modules/frontend.md` — ProviderUsage contract/trigger/aggregate/GPT/Grok/Kiro 口径改为无序候选 + 公共 projector；删除固定 `[week,5h]` / `[month,week]` / center-innermost 布局。 - `docs/modules/library.md` — 补充 `lib/kiro-usage-ring.ts`；`quota-display` 标明不合成固定 5h/7d。 - `docs/integrations/README.md` — Grok/Kiro 顶栏 N-ring 改为共享 projector 短→长；rollback 说明。 - `docs/operations/troubleshooting.md` — 聚合主题/环尺寸/动态窗口错误布局排查；删除固定 GPT/Grok layer 预期。 未改生产 TS/CSS（本子任务边界仅 docs + validation）。 ## Validation | Command | Result | | --- | --- | | `npm run lint` | 0 errors；既有 warnings（含 `ChatGptUsagePanel` unused vars / projector local var，非本子任务…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260716-144724-修复聚合用量浮窗主题-环尺寸与窗口优先级",
+      "knowledgePath": ".ypi/knowledge/20260716-163809-修复聚合用量浮窗主题-环尺寸与窗口优先级.md",
+      "createdAt": "2026-07-16T08:38:09.415Z",
+      "archivedAt": "2026-07-16T08:38:09.415Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260716-101749-项目选择右键菜单与-chat-顶部-subagents-子-session-嗅探及-ui-改造",
       "title": "项目选择右键菜单与 Chat 顶部 Subagents 子 session 嗅探及 UI 改造",

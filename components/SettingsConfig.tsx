@@ -735,7 +735,8 @@ function studioConfigsEqual(a: PiWebStudioConfig | null, b: PiWebStudioConfig | 
 function usageConfigsEqual(a: PiWebUsageConfig | null, b: PiWebUsageConfig | null): boolean {
   if (!a || !b) return a === b;
   return a.includeArchived === b.includeArchived
-    && a.providerPanelsCompact === b.providerPanelsCompact;
+    && a.providerPanelsCompact === b.providerPanelsCompact
+    && a.providerPanelsAggregated === b.providerPanelsAggregated;
 }
 
 function terminalConfigsEqual(a: PiWebTerminalConfig | null, b: PiWebTerminalConfig | null): boolean {
@@ -1741,11 +1742,33 @@ export function SettingsConfig({
                       </p>
                     </div>
                     <ToggleField
+                      label="模型用量组件聚合"
+                      description="开启后，Chat 顶栏用一个聚合入口承载所有已启用的 GPT / Grok / Kiro 用量组件；关闭后恢复各提供商独立挂载。默认关闭。"
+                      checked={usage.providerPanelsAggregated}
+                      onChange={(providerPanelsAggregated) => updateUsage({ providerPanelsAggregated })}
+                    />
+                    <ToggleField
                       label="顶部额度组件简要显示 (Compact Mode)"
-                      description="开启后，GPT、Grok、Kiro 顶栏的 Trigger 将被折叠为更紧凑的标识以及摘要，从而给顶栏留出更多空间。点击简要 Pill 仍能展开完整的详细用量面板。"
+                      description={usage.providerPanelsAggregated
+                        ? "聚合开启时 Compact 不参与呈现；当前勾选值会保留，关闭聚合后恢复生效。"
+                        : "开启后，GPT、Grok、Kiro 顶栏的 Trigger 使用更紧凑的 N-ring 用量单元，从而给顶栏留出更多空间。点击简要 Pill 仍能展开完整的详细用量面板。"}
                       checked={usage.providerPanelsCompact}
                       onChange={(providerPanelsCompact) => updateUsage({ providerPanelsCompact })}
+                      disabled={usage.providerPanelsAggregated}
                     />
+                    {usage.providerPanelsAggregated ? (
+                      <div style={{
+                        padding: 10,
+                        borderRadius: 8,
+                        border: "1px solid color-mix(in srgb, var(--warning, #d97706) 35%, var(--border))",
+                        background: "color-mix(in srgb, var(--warning, #d97706) 12%, var(--bg-subtle))",
+                        color: "var(--text-muted)",
+                        fontSize: 11,
+                        lineHeight: 1.5,
+                      }}>
+                        聚合模式优先于 Compact：当前 Compact 勾选值已保留，关闭「模型用量组件聚合」后会恢复生效，不会被自动改写。
+                      </div>
+                    ) : null}
                   </div>
                 ) : section === "modelPrices" ? (
                   <ModelPricesConfig cwd={cwd} />

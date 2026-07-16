@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yolk Pi - 聚合用量动态窗口、主题与环尺寸原型 (v7)</title>
+  <style>
+    /* 昼夜主题 CSS 变量定义 - 深度对齐 app/globals.css 及其派生语义 */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg-subtle: rgba(0, 0, 0, 0.03);
+
+      /* 浮窗特定面板色（浅色） */
+      --panel-bg-overlay: rgba(250, 250, 250, 0.98);
+      --panel-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --close-btn-bg: #e2e8f0;
+      --close-btn-hover: #cbd5e1;
+
+      /* 用量环状态色（浅色） */
+      --ring-danger: #ef4444;
+      --ring-warning: #f59e0b;
+      --ring-muted: rgba(107, 114, 128, 0.2);
+      
+      /* 层身份基本色 */
+      --ring-layer-0: #06b6d4; /* 外圈优先：青色 */
+      --ring-layer-1: #8b5cf6; /* 中圈过渡：紫色 */
+      --ring-layer-2: #db2777; /* 内圈长期：粉色 */
+
+      /* 状态条背景（浅色） */
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --column-bg: rgba(0, 0, 0, 0.01);
+      
+      --control-radius: 8px;
+    }
+
+    .dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+
+      /* 浮窗特定面板色（深色） */
+      --panel-bg-overlay: rgba(20, 24, 33, 0.98);
+      --panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      --close-btn-bg: #1e293b;
+      --close-btn-hover: #334155;
+
+      /* 用量环状态色（深色） */
+      --ring-danger: #fb7185;
+      --ring-warning: #fbbf24;
+      --ring-muted: rgba(148, 163, 184, 0.25);
+      
+      /* 层身份基本色 */
+      --ring-layer-0: #22d3ee;
+      --ring-layer-1: #a78bfa;
+      --ring-layer-2: #f472b6;
+
+      /* 状态条背景（深色） */
+      --card-bg: rgba(15, 23, 42, 0.4);
+      --column-bg: rgba(148, 163, 184, 0.02);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      transition: background-color 0.25s, color 0.25s;
+    }
+
+    /* Controller Panel Styles */
+    .controls-panel {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .controls-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .controls-group label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .controls-group select,
+    .controls-group button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: var(--control-radius);
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+      min-width: 140px;
+    }
+
+    .controls-group select:focus {
+      border-color: var(--accent);
+    }
+
+    /* Sandbox Container */
+    .sandbox-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 32px 16px;
+      margin: 0 auto;
+      width: 100%;
+      max-width: 1280px;
+      gap: 24px;
+      transition: max-width 0.3s ease;
+    }
+
+    /* Simulating layout modes */
+    body.v-desktop .sandbox-container { max-width: 1280px; }
+    body.v-640 .sandbox-container { max-width: 640px; }
+    body.v-375 .sandbox-container { max-width: 375px; }
+    body.v-320 .sandbox-container { max-width: 320px; }
+
+    /* Mock Next.js TopBar */
+    .mock-topbar {
+      height: 48px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: relative;
+    }
+
+    .mock-topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-badge {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--accent);
+      background: var(--bg-subtle);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .session-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .mock-topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    /* Aggregate Trigger (Top Bar) */
+    .usage-trigger-btn {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.2s, background-color 0.2s;
+      outline: none;
+    }
+
+    .usage-trigger-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .usage-trigger-btn:focus-visible {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+    }
+
+    .usage-trigger-btn[data-open="true"] {
+      border-color: rgba(96, 165, 250, 0.58);
+      background: rgba(96, 165, 250, 0.08);
+      color: var(--text);
+    }
+
+    .trigger-provider-label {
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+      transition: background-color 0.2s, box-shadow 0.2s;
+    }
+    .status-dot[data-tone="success"] { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.48); }
+    .status-dot[data-tone="warning"] { background: var(--ring-warning); }
+    .status-dot[data-tone="danger"] { background: var(--ring-danger); }
+    .status-dot[data-tone="muted"] { background: var(--text-dim); }
+
+    /* SVG Nested Rings styles */
+    .usage-ring-unit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+
+    .usage-ring-inner-mask {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--bg-panel); /* matches default theme bg-panel */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+      pointer-events: none;
+    }
+
+    .ring-center-label {
+      font-weight: 800;
+      color: var(--text);
+      text-transform: uppercase;
+    }
+    .ring-center-val {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Sheen flow animation CSS */
+    .sheen-flow {
+      animation: sheen-move 2.5s linear infinite;
+    }
+
+    @keyframes sheen-move {
+      from {
+        stroke-dashoffset: 0;
+      }
+      to {
+        stroke-dashoffset: -45;
+      }
+    }
+
+    /* Reduced Motion static override */
+    .reduced-motion .sheen-flow {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sheen-flow {
+        animation: none !important;
+        opacity: 0 !important;
+      }
+    }
+
+    /* Trigger Segments */
+    .v6-trigger-segments {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .v6-segment {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(148, 163, 184, 0.08);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 10px;
+      height: 24px;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .v6-segment[data-risk="danger"] {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+    .v6-segment[data-risk="warning"] {
+      background: rgba(251, 191, 36, 0.1);
+      border-color: rgba(251, 191, 36, 0.25);
+    }
+
+    .v6-segment-label {
+      font-weight: 800;
+      color: var(--text-muted);
+    }
+
+    /* Aggregate Panel Dialog */
+    .aggregate-panel-dialog {
+      position: absolute;
+      z-index: 900;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-bg-overlay);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--panel-shadow);
+      outline: none;
+      transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out, background-color 0.25s;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .panel-header-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-header-badge {
+      font-size: 10px;
+      background: var(--bg-subtle);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+
+    .btn-close-panel {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--close-btn-bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-close-panel:hover {
+      color: var(--text);
+      background: var(--close-btn-hover);
+    }
+
+    /* Columns / Grid layout - Non-accordion */
+    .aggregate-panel-columns {
+      display: grid;
+      gap: 16px;
+      width: 100%;
+    }
+
+    body.v-desktop .aggregate-panel-columns { grid-template-columns: repeat(var(--columns, 3), 1fr); }
+    body.v-640 .aggregate-panel-columns { grid-template-columns: repeat(min(var(--columns, 3), 2), 1fr); }
+    body.v-375 .aggregate-panel-columns { grid-template-columns: 1fr; }
+    body.v-320 .aggregate-panel-columns { grid-template-columns: 1fr; }
+
+    .provider-column {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--column-bg);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      transition: border-color 0.2s;
+    }
+
+    .provider-column[data-risk="danger"] { border-color: rgba(239, 68, 68, 0.25); }
+    .provider-column[data-risk="warning"] { border-color: rgba(251, 191, 36, 0.25); }
+
+    .column-header {
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-subtle);
+    }
+
+    .column-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .column-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .provider-title {
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .column-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* Quota Cards inside Column */
+    .usage-quota-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .quota-card {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .quota-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .quota-card-label {
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .quota-card-value {
+      font-size: 13px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+
+    .progress-bar-container {
+      height: 5px;
+      border-radius: 99px;
+      background: var(--bg-selected);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.3s;
+    }
+
+    .quota-card-meta {
+      color: var(--text-dim);
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    /* Active Account Section */
+    .active-account-strip {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .account-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+    }
+
+    .account-displayname {
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-id-masked {
+      color: var(--text-muted);
+      font-size: 9px;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .active-badge {
+      color: #10b981;
+      font-size: 9px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    /* Action Buttons in Panel Column */
+    .panel-action-buttons-group {
+      display: flex;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .btn-panel-action {
+      flex: 1;
+      min-height: 26px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-panel-action:hover:not(:disabled) {
+      color: var(--text);
+      background: var(--bg-hover);
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .btn-panel-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-panel-action-primary {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+    }
+
+    .btn-panel-action-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      color: #ffffff;
+    }
+
+    /* Banner style alerts */
+    .status-alert-banner {
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .status-alert-banner[data-type="danger"] {
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      background: rgba(239, 68, 68, 0.05);
+      color: var(--ring-danger);
+    }
+
+    .status-alert-banner[data-type="warning"] {
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      background: rgba(251, 191, 36, 0.05);
+      color: var(--ring-warning);
+    }
+
+    /* Account Selection Rows */
+    .account-selector-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .account-selector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .account-selector-row:hover {
+      border-color: rgba(148, 163, 184, 0.3);
+      background: var(--bg-hover);
+    }
+
+    .account-selector-row[data-active="true"] {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.04);
+      cursor: default;
+    }
+
+    /* Comparison Area */
+    .comparison-section {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: var(--bg-panel);
+    }
+
+    .comparison-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ring-size-box {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .ring-size-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .viewport-indicator {
+      text-align: right;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: bold;
+    }
+
+    .spinner-icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(148, 163, 184, 0.35);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+      box-sizing: border-box;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="v-desktop">
+
+  <!-- Controls Panel at Top -->
+  <div class="controls-panel">
+    <div class="controls-group">
+      <label>预设场景 (Dynamic Window Scenarios - v7)</label>
+      <select id="presetScenario" onchange="applyPresetScenario(this.value)">
+        <option value="all-normal">1. 动态正常（实际窗口经公共排序）</option>
+        <option value="only-7d">2. GPT only-7d（仅一个 7d 圈）</option>
+        <option value="only-week">3. Grok only-week（仅一个周圈）</option>
+        <option value="mixed-window">4. Mixed windows（乱序输入，外短内长）</option>
+        <option value="unknown-duration">5. Unknown duration（单圈 / 详情降级）</option>
+        <option value="outer-unknown">6. 外圈 percent 未知（中心 —，不借值）</option>
+        <option value="warning-trigger">7. 警告状态（任意窗口 >=80%）</option>
+        <option value="danger-trigger">8. 危险状态（任意窗口 >=95%）</option>
+      </select>
+    </div>
+
+    <div class="controls-group">
+      <label>当前主题 (Theme Toggle)</label>
+      <select id="themeSelect" onchange="toggleTheme(this.value)">
+        <option value="light">浅色模式 (Light Theme)</option>
+        <option value="dark">深色模式 (Dark Theme)</option>
+      </select>
+    </div>
+
+    <div class="controls-group">
+      <label>视口模拟 (Viewport Width)</label>
+      <select id="viewportWidth" onchange="adjustViewportWidth(this.value)">
+        <option value="desktop">桌面版 (Desktop / max 1280px)</option>
+        <option value="640">中窄屏 (640px)</option>
+        <option value="375">小窄屏 (375px)</option>
+        <option value="320">极窄屏 (320px)</option>
+      </select>
+    </div>
+
+    <div class="controls-group">
+      <label>服务商启用 (Enabled Providers)</label>
+      <div style="display: flex; gap: 10px; align-items: center; height: 30px;">
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="enableGpt" checked onchange="toggleProviderEnabled('gpt', this.checked)"> GPT
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="enableGrok" checked onchange="toggleProviderEnabled('grok', this.checked)"> Grok
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="enableKiro" checked onchange="toggleProviderEnabled('kiro', this.checked)"> Kiro
+        </label>
+      </div>
+    </div>
+
+    <div class="controls-group">
+      <label>流光减弱 (Reduced Motion)</label>
+      <div style="display: flex; gap: 10px; align-items: center; height: 30px;">
+        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="reducedMotionToggle" onchange="toggleReducedMotion(this.checked)"> reduced-motion
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-left: auto;" class="viewport-indicator" id="viewportIndicator">
+      当前视口: 桌面模式
+    </div>
+  </div>
+
+  <!-- Sandbox Container -->
+  <div class="sandbox-container" id="sandboxContainer">
+    
+    <!-- Part 1: Top Bar with Usage Trigger -->
+    <div>
+      <h3 style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">
+        CHAT 顶栏预览 (Hover 激活聚合浮窗)
+      </h3>
+      
+      <header class="mock-topbar" id="mockTopbar">
+        <div class="mock-topbar-left">
+          <span class="logo-badge">YPI</span>
+          <span class="session-title">feature/usage-aggregate-fixed</span>
+        </div>
+        
+        <div class="mock-topbar-right">
+          <!-- App Top Usage Panel Host -->
+          <div class="app-top-usage-panel" id="appTopUsagePanel">
+            <!-- Dynamic Rendered -->
+          </div>
+          
+          <div style="font-size: 11px; color: var(--text-dim); padding-left: 8px; border-left: 1px solid var(--border)">
+            会话统计 | ⚙️ 设置
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <!-- Aggregate Panel Dialog (Positioned relatively in the sandbox for visualization, but simulates fixed viewport clamp) -->
+    <div id="aggregatePanelWrapper" style="position: relative; height: auto; min-height: 480px; display: none;">
+      <!-- Styled dialog block -->
+    </div>
+
+    <!-- Part 2: Ring Comparison Section -->
+    <div class="comparison-section">
+      <div class="comparison-title">
+        <span>📏 用量环尺寸对比与笔触演示</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="ring-size-box">
+          <div id="compRingSmall"></div>
+          <div class="ring-size-desc">
+            <strong>顶栏 Trigger 紧凑环 (30px)</strong> — 用于顶部常驻状态显示。外层 Solid，中层 Dashed，内层 Dotted。中心展示外圈优先窗口值。
+          </div>
+        </div>
+        <div class="ring-size-box">
+          <div id="compRingLarge"></div>
+          <div class="ring-size-desc">
+            <strong>浮窗 Column Header 大环 (40px / 原型确认的 panel 尺寸)</strong> — 列头展示。在 Desktop 到 320px 下维持优秀的字号对比度与可读性。
+          </div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); border-top: 1px dashed var(--border); padding-top: 8px; line-height: 1.5;">
+          <strong>动态窗口语义规则 (v7)</strong>：provider 只给当前账号实际存在的无序候选，公共 projector 按可信 duration 排序。最外圈为最短周期并使用 <strong>Solid</strong>；中层使用 <strong>Dashed</strong>；更内层使用 <strong>Dotted</strong>。<br>
+          单个窗口（包括 only-7d / only-week / 单个 unknown-duration）只显示一个圈。多窗口中的 unknown duration 或相同 duration 冲突不参与径向排序，并标记“仅在详情展示”；全部不可比较时不伪造 ring。<br>
+          中心锁定最终 layers[0]。若外圈 percent 为 null，中心显示 <code>—</code>，绝不借用内圈值。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // System State
+    const state = {
+      theme: "light",
+      viewport: "desktop",
+      scenario: "all-normal",
+      open: false,
+      reducedMotion: false,
+      providers: {
+        gpt: { enabled: true, loading: false, risk: "normal" },
+        grok: { enabled: true, loading: false, risk: "normal" },
+        kiro: { enabled: true, loading: false, risk: "normal" }
+      }
+    };
+
+    // Scenarios Mapping
+    const scenarios = {
+      "all-normal": {
+        gpt: {
+          layers: [
+            { id: "gpt-5h", shortLabel: "5h", fullLabel: "5小时用量", percent: 42 },
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 30 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "OpenCode-Primary", mask: "sk-proj...X81a", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: 55 },
+            { id: "grok-month", shortLabel: "月", fullLabel: "月用量", percent: 40 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "SuperGrok-OAuth-1", mask: "oauth-user...99ac", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1h", shortLabel: "1h", fullLabel: "1小时用量", percent: 20 },
+            { id: "kiro-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 15 },
+            { id: "kiro-1w", shortLabel: "1w", fullLabel: "1周用量", percent: 10 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Kiro-Enterprise-Key", mask: "kiro-key...ffd2", active: true }]
+        }
+      },
+      "only-7d": {
+        gpt: {
+          layers: [
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 37 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Only-Weekly-Account", mask: "sk-proj...7d01", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-month", shortLabel: "月", fullLabel: "月用量", percent: 40 },
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: 55 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "SuperGrok-OAuth-1", mask: "oauth-user...99ac", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1w", shortLabel: "1w", fullLabel: "1周用量", percent: 10 },
+            { id: "kiro-1h", shortLabel: "1h", fullLabel: "1小时用量", percent: 20 },
+            { id: "kiro-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 15 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Kiro-Enterprise-Key", mask: "kiro-key...ffd2", active: true }]
+        }
+      },
+      "only-week": {
+        gpt: {
+          layers: [
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 30 },
+            { id: "gpt-5h", shortLabel: "5h", fullLabel: "5小时用量", percent: 42 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "OpenCode-Primary", mask: "sk-proj...X81a", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: 55 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Weekly-Only-OAuth", mask: "oauth-user...w001", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 15 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Kiro-Daily", mask: "kiro-key...d001", active: true }]
+        }
+      },
+      "mixed-window": {
+        gpt: {
+          layers: [
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 31 },
+            { id: "gpt-2h", shortLabel: "2h", fullLabel: "2小时用量", percent: 61 },
+            { id: "gpt-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 46 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Future-Mixed-Windows", mask: "sk-proj...mix1", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-30d", shortLabel: "30d", fullLabel: "30天用量", percent: 40 },
+            { id: "grok-12h", shortLabel: "12h", fullLabel: "12小时用量", percent: 58 },
+            { id: "grok-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 52 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Mixed-Grok-Account", mask: "oauth-user...mix2", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1mo", shortLabel: "1mo", fullLabel: "1月用量", percent: 18 },
+            { id: "kiro-90m", shortLabel: "90m", fullLabel: "90分钟用量", percent: 63 },
+            { id: "kiro-2d", shortLabel: "2d", fullLabel: "2天用量", percent: 34 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Kiro-Mixed-Periods", mask: "kiro-key...mix3", active: true }]
+        }
+      },
+      "unknown-duration": {
+        gpt: {
+          layers: [
+            { id: "gpt-team", shortLabel: "Team", fullLabel: "团队窗口（周期未知）", percent: 44 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Single-Unknown-Window", mask: "sk-proj...unk1", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-burst", shortLabel: "Burst", fullLabel: "Burst窗口（周期未知）", percent: 22 },
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: 57 }
+          ],
+          risk: "normal",
+          accounts: [{ name: "Known-Plus-Unknown", mask: "oauth-user...unk2", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-limits", shortLabel: "Limits", fullLabel: "Limits（周期未知）", percent: 28 },
+            { id: "kiro-bonus", shortLabel: "Bonus", fullLabel: "Bonus（周期未知）", percent: 19 }
+          ],
+          risk: "muted",
+          accounts: [{ name: "All-Unknown-Windows", mask: "kiro-key...unk3", active: true }]
+        }
+      },
+      "outer-unknown": {
+        gpt: {
+          layers: [
+            { id: "gpt-5h", shortLabel: "5h", fullLabel: "5小时用量", percent: null },
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 30 }
+          ],
+          risk: "muted",
+          accounts: [{ name: "OpenCode-Primary", mask: "sk-proj...X81a", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: null },
+            { id: "grok-month", shortLabel: "月", fullLabel: "月用量", percent: 40 }
+          ],
+          risk: "muted",
+          accounts: [{ name: "SuperGrok-OAuth-1", mask: "oauth-user...99ac", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1h", shortLabel: "1h", fullLabel: "1小时用量", percent: null },
+            { id: "kiro-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 15 },
+            { id: "kiro-1w", shortLabel: "1w", fullLabel: "1周用量", percent: 10 }
+          ],
+          risk: "muted",
+          accounts: [{ name: "Kiro-Enterprise-Key", mask: "kiro-key...ffd2", active: true }]
+        }
+      },
+      "warning-trigger": {
+        gpt: {
+          layers: [
+            { id: "gpt-5h", shortLabel: "5h", fullLabel: "5小时用量", percent: 85 },
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 30 }
+          ],
+          risk: "warning",
+          accounts: [{ name: "OpenCode-Primary", mask: "sk-proj...X81a", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: 55 },
+            { id: "grok-month", shortLabel: "月", fullLabel: "月用量", percent: 82 }
+          ],
+          risk: "warning",
+          accounts: [{ name: "SuperGrok-OAuth-1", mask: "oauth-user...99ac", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1h", shortLabel: "1h", fullLabel: "1小时用量", percent: 20 },
+            { id: "kiro-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 85 },
+            { id: "kiro-1w", shortLabel: "1w", fullLabel: "1周用量", percent: 10 }
+          ],
+          risk: "warning",
+          accounts: [{ name: "Kiro-Enterprise-Key", mask: "kiro-key...ffd2", active: true }]
+        }
+      },
+      "danger-trigger": {
+        gpt: {
+          layers: [
+            { id: "gpt-5h", shortLabel: "5h", fullLabel: "5小时用量", percent: 96 },
+            { id: "gpt-7d", shortLabel: "7d", fullLabel: "7天用量", percent: 30 }
+          ],
+          risk: "danger",
+          accounts: [{ name: "OpenCode-Primary", mask: "sk-proj...X81a", active: true }]
+        },
+        grok: {
+          layers: [
+            { id: "grok-week", shortLabel: "周", fullLabel: "周用量", percent: 55 },
+            { id: "grok-month", shortLabel: "月", fullLabel: "月用量", percent: 98 }
+          ],
+          risk: "danger",
+          accounts: [{ name: "SuperGrok-OAuth-1", mask: "oauth-user...99ac", active: true }]
+        },
+        kiro: {
+          layers: [
+            { id: "kiro-1h", shortLabel: "1h", fullLabel: "1小时用量", percent: 20 },
+            { id: "kiro-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 15 },
+            { id: "kiro-1w", shortLabel: "1w", fullLabel: "1周用量", percent: 97 }
+          ],
+          risk: "danger",
+          accounts: [{ name: "Kiro-Enterprise-Key", mask: "kiro-key...ffd2", active: true }]
+        }
+      }
+    };
+
+    // Shared duration resolver used by every provider in this prototype.
+    // It deliberately ignores provider identity, input order, percent, remaining,
+    // reset timestamps, resourceType, and generic words such as Limits/quota.
+    function resolveDurationMs(windowCandidate) {
+      if (Number.isFinite(windowCandidate.durationMs) && windowCandidate.durationMs > 0) {
+        return windowCandidate.durationMs;
+      }
+      const text = `${windowCandidate.id || ""} ${windowCandidate.shortLabel || ""} ${windowCandidate.fullLabel || ""}`.toLowerCase();
+      const numeric = text.match(/(?:^|[^a-z0-9])(\d+(?:\.\d+)?)\s*(m|min|minute|minutes|h|hr|hour|hours|d|day|days|w|week|weeks|mo|month|months|y|year|years)(?:[^a-z]|$)/);
+      if (numeric) {
+        const value = Number(numeric[1]);
+        const unit = numeric[2];
+        const unitMs = unit.startsWith("m") && unit !== "mo" && !unit.startsWith("month") ? 60_000
+          : unit === "h" || unit === "hr" || unit.startsWith("hour") ? 3_600_000
+          : unit === "d" || unit.startsWith("day") ? 86_400_000
+          : unit === "w" || unit.startsWith("week") ? 7 * 86_400_000
+          : unit === "mo" || unit.startsWith("month") ? 30 * 86_400_000
+          : 365 * 86_400_000;
+        return value * unitMs;
+      }
+      if (/小时/.test(text)) return 3_600_000;
+      if (/分钟/.test(text)) return 60_000;
+      if (/\bweekly\b|周用量|周额度/.test(text)) return 7 * 86_400_000;
+      if (/\bmonthly\b|月用量|月额度/.test(text)) return 30 * 86_400_000;
+      if (/\bdaily\b|天用量|日额度/.test(text)) return 86_400_000;
+      return null;
+    }
+
+    // Generic safe candidate projector. Providers do not choose layer order/center.
+    function projectScenarioProvider(providerData) {
+      const actual = providerData.layers.filter(layer => layer && layer.id && layer.shortLabel && layer.fullLabel);
+      let projected = [];
+      let detailWindows = [];
+
+      if (actual.length === 1) {
+        projected = [...actual]; // One candidate has no ordering ambiguity, even with unknown duration.
+      } else if (actual.length > 1) {
+        const ranked = actual.map(layer => ({ layer, durationMs: resolveDurationMs(layer) }));
+        const rankCounts = new Map();
+        ranked.forEach(entry => {
+          if (entry.durationMs !== null) rankCounts.set(entry.durationMs, (rankCounts.get(entry.durationMs) || 0) + 1);
+        });
+        projected = ranked
+          .filter(entry => entry.durationMs !== null && rankCounts.get(entry.durationMs) === 1)
+          .sort((a, b) => a.durationMs - b.durationMs)
+          .map(entry => entry.layer);
+        const projectedIds = new Set(projected.map(layer => layer.id));
+        detailWindows = actual.filter(layer => !projectedIds.has(layer.id));
+      }
+
+      return {
+        ...providerData,
+        allWindows: actual,
+        layers: projected,
+        detailWindows,
+        centerLayerId: projected[0]?.id || null,
+        fallback: projected.length === 0 && actual.length > 0 ? "详情" : null
+      };
+    }
+
+    // Calculate overall risk
+    function resolveOverallRisk() {
+      let highest = "muted";
+      const keys = ["gpt", "grok", "kiro"];
+      const mapping = { danger: 3, warning: 2, normal: 1, muted: 0 };
+      const reverse = ["muted", "normal", "warning", "danger"];
+
+      keys.forEach(k => {
+        if (!state.providers[k].enabled) return;
+        const currentRisk = scenarios[state.scenario][k].risk;
+        if (mapping[currentRisk] > mapping[highest]) {
+          highest = currentRisk;
+        }
+      });
+      return highest;
+    }
+
+    // Toggle Theme
+    function toggleTheme(theme) {
+      state.theme = theme;
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+      renderAll();
+    }
+
+    // Toggle Reduced Motion
+    function toggleReducedMotion(val) {
+      state.reducedMotion = val;
+      if (val) {
+        document.body.classList.add("reduced-motion");
+      } else {
+        document.body.classList.remove("reduced-motion");
+      }
+    }
+
+    // Adjust simulated width
+    function adjustViewportWidth(w) {
+      state.viewport = w;
+      document.body.className = `v-${w}`;
+      if (state.theme === "dark") document.documentElement.classList.add("dark");
+      
+      const indicator = document.getElementById("viewportIndicator");
+      const nameMap = { desktop: "桌面版 (1280px)", 640: "中窄屏 (640px)", 375: "小窄屏 (375px)", 320: "极窄屏 (320px)" };
+      indicator.textContent = `当前视口: ${nameMap[w]}`;
+
+      // Recalculate column display variables
+      let enabledCount = 0;
+      if (state.providers.gpt.enabled) enabledCount++;
+      if (state.providers.grok.enabled) enabledCount++;
+      if (state.providers.kiro.enabled) enabledCount++;
+      document.documentElement.style.setProperty('--columns', enabledCount);
+
+      renderAll();
+    }
+
+    // Toggle provider status
+    function toggleProviderEnabled(key, val) {
+      state.providers[key].enabled = val;
+      adjustViewportWidth(state.viewport);
+    }
+
+    // Apply Scenario Preset
+    function applyPresetScenario(val) {
+      state.scenario = val;
+      renderAll();
+    }
+
+    // Render SVG concentric rings
+    function makeConcentricRingSvg(layers, centerLayerId, size = "small") {
+      const d = size === "small" ? 30 : 40;
+      const cx = d / 2;
+      const cy = d / 2;
+      const layerCount = layers.length;
+
+      let svgContent = '';
+      let clipDefs = '';
+
+      layers.forEach((layer, index) => {
+        let R, W, dashPattern;
+        
+        // v7 shared-projector stroke identity mapping
+        if (size === "small") {
+          if (layerCount === 1) {
+            R = 12.5; W = 4; dashPattern = "none";
+          } else if (layerCount === 2) {
+            // layers[0]=outer (Solid), layers[1]=inner (Dashed)
+            if (index === 0) { R = 13.5; W = 2.4; dashPattern = "none"; }
+            else { R = 10.7; W = 2.4; dashPattern = "3 1.5"; }
+          } else {
+            // layers[0]=outer (Solid), layers[1]=middle (Dashed), layers[2]=inner (Dotted)
+            if (index === 0) { R = 13.8; W = 1.8; dashPattern = "none"; }
+            else if (index === 1) { R = 11.6; W = 1.8; dashPattern = "5 2"; }
+            else { R = 9.4; W = 1.8; dashPattern = "2 1.5"; }
+          }
+        } else {
+          // large >= 38px (using 40px)
+          if (layerCount === 1) {
+            R = 16.5; W = 5; dashPattern = "none";
+          } else if (layerCount === 2) {
+            if (index === 0) { R = 17.5; W = 3; dashPattern = "none"; }
+            else { R = 14.0; W = 3; dashPattern = "4 2"; }
+          } else {
+            if (index === 0) { R = 18.0; W = 2.4; dashPattern = "none"; }
+            else if (index === 1) { R = 15.2; W = 2.4; dashPattern = "6 2.5"; }
+            else { R = 12.4; W = 2.4; dashPattern = "3 2"; }
+          }
+        }
+
+        const circ = 2 * Math.PI * R;
+        const percent = layer.percent;
+        const isUnknown = percent === null || percent === undefined;
+
+        // Base Track (Muted)
+        const trackStroke = isUnknown ? "rgba(148,163,184,0.25)" : "var(--ring-muted)";
+        svgContent += `
+          <circle cx="${cx}" cy="${cy}" r="${R}" 
+            fill="none" 
+            stroke="${trackStroke}" 
+            stroke-width="${W}" 
+            ${dashPattern !== "none" ? `stroke-dasharray="${dashPattern}"` : ""}
+            transform="rotate(-90 ${cx} ${cy})"
+          />
+        `;
+
+        // Used Arc
+        if (!isUnknown && percent > 0) {
+          const usedLen = (percent / 100) * circ;
+          const maskId = `used-mask-${layer.id}-${size}`;
+
+          let strokeColor = `var(--ring-layer-${index})`;
+          if (percent >= 95) strokeColor = "var(--ring-danger)";
+          else if (percent >= 80) strokeColor = "var(--ring-warning)";
+
+          clipDefs += `
+            <mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${d}" height="${d}">
+              <rect x="0" y="0" width="${d}" height="${d}" fill="black" />
+              <circle cx="${cx}" cy="${cy}" r="${R}"
+                fill="none"
+                stroke="white"
+                stroke-width="${W + 0.2}"
+                stroke-dasharray="${usedLen} ${circ}"
+                transform="rotate(-90 ${cx} ${cy})"
+              />
+            </mask>
+          `;
+
+          svgContent += `
+            <g mask="url(#${maskId})">
+              <circle cx="${cx}" cy="${cy}" r="${R}" 
+                fill="none" 
+                stroke="${strokeColor}" 
+                stroke-width="${W}" 
+                ${dashPattern !== "none" ? `stroke-dasharray="${dashPattern}"` : ""}
+                transform="rotate(-90 ${cx} ${cy})"
+              />
+              <circle cx="${cx}" cy="${cy}" r="${R}" 
+                class="sheen-flow"
+                fill="none" 
+                stroke="rgba(255, 255, 255, 0.45)" 
+                stroke-width="${W + 0.1}" 
+                stroke-dasharray="15 30"
+                transform="rotate(-90 ${cx} ${cy})"
+              />
+            </g>
+          `;
+        }
+      });
+
+      // Center must be the projector-selected outer layer; invalid ids fail loudly.
+      const centerLayer = layers.find(l => l.id === centerLayerId);
+      if (!centerLayer || centerLayer.id !== layers[0]?.id) {
+        throw new Error("centerLayerId must identify the projected outermost layer");
+      }
+      const centerLabel = centerLayer.shortLabel;
+      const centerValue = centerLayer.percent !== null ? `${Math.round(centerLayer.percent)}%` : "—";
+
+      let fontLabelSize = size === "small" ? "8px" : "10px";
+      let fontValSize = size === "small" ? "7px" : "9px";
+      let maskSize;
+      
+      if (size === "small") {
+        maskSize = layerCount === 1 ? 21 : layerCount === 2 ? 18.5 : 15.5;
+      } else {
+        maskSize = layerCount === 1 ? 27 : layerCount === 2 ? 23.5 : 21.5;
+      }
+
+      return `
+        <span class="usage-ring-unit">
+          <svg width="${d}" height="${d}">
+            <defs>${clipDefs}</defs>
+            ${svgContent}
+          </svg>
+          <span class="usage-ring-inner-mask" style="width: ${maskSize}px; height: ${maskSize}px; background: var(--bg-panel)">
+            <span class="ring-center-label" style="font-size: ${fontLabelSize}; color: var(--text); font-weight: 800;">${centerLabel}</span>
+            <span class="ring-center-val" style="font-size: ${fontValSize}; color: var(--text-muted);">${centerValue}</span>
+          </span>
+        </span>
+      `;
+    }
+
+    // Toggle dialog visibility
+    let hoverTimer = null;
+    let escapeSuppressed = false;
+
+    function openDialog() {
+      if (escapeSuppressed) return;
+      state.open = true;
+      renderAll();
+    }
+
+    function closeDialog() {
+      state.open = false;
+      renderAll();
+    }
+
+    function scheduleClose() {
+      if (hoverTimer) clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => {
+        closeDialog();
+      }, 220); // 220ms grace delay
+    }
+
+    function cancelClose() {
+      if (hoverTimer) clearTimeout(hoverTimer);
+    }
+
+    // Render the App Bar Triggers & Dialog
+    function renderAll() {
+      const topbarHost = document.getElementById("appTopUsagePanel");
+      const wrapper = document.getElementById("aggregatePanelWrapper");
+      const currentScen = scenarios[state.scenario];
+      const overallRisk = resolveOverallRisk();
+
+      // 1. Render trigger segments
+      let segmentsHtml = '';
+      const enabledKeys = ["gpt", "grok", "kiro"].filter(k => state.providers[k].enabled);
+      
+      enabledKeys.forEach(k => {
+        const provData = projectScenarioProvider(currentScen[k]);
+        const ringSvg = provData.layers.length > 0
+          ? makeConcentricRingSvg(provData.layers, provData.centerLayerId, "small")
+          : `<span style="font-size:9px;color:var(--text-muted);font-weight:800;">${provData.fallback || "—"}</span>`;
+        segmentsHtml += `
+          <span class="v6-segment" data-provider="${k}" data-risk="${provData.risk}">
+            <span class="v6-segment-label">${k === 'gpt' ? 'GPT' : k === 'grok' ? 'Grok' : 'Kiro'}</span>
+            ${ringSvg}
+          </span>
+        `;
+      });
+
+      topbarHost.innerHTML = `
+        <button class="usage-trigger-btn" id="aggregateTriggerBtn" data-open="${state.open}"
+          onmouseenter="cancelClose(); openDialog();"
+          onmouseleave="scheduleClose();"
+          onfocus="openDialog();"
+          onblur="scheduleClose();"
+        >
+          <span class="status-dot" data-tone="${overallRisk === 'normal' ? 'success' : overallRisk}"></span>
+          <span class="trigger-provider-label">用量</span>
+          <span style="opacity: 0.55;">·</span>
+          <span class="v6-trigger-segments">
+            ${segmentsHtml}
+          </span>
+        </button>
+      `;
+
+      // 2. Render Dialog Panel
+      if (state.open && enabledKeys.length > 0) {
+        wrapper.style.display = "block";
+        
+        let colsHtml = '';
+        enabledKeys.forEach(k => {
+          const provData = projectScenarioProvider(currentScen[k]);
+          const providerLabel = k === 'gpt' ? 'GPT' : k === 'grok' ? 'Grok' : 'Kiro';
+          const headerRing = provData.layers.length > 0
+            ? makeConcentricRingSvg(provData.layers, provData.centerLayerId, "large")
+            : `<span style="font-size:10px;color:var(--text);font-weight:800;">额度详情</span>`;
+
+          let cardsHtml = '';
+          provData.allWindows.forEach(layer => {
+            const isNull = layer.percent === null;
+            const isDetailOnly = provData.detailWindows.some(item => item.id === layer.id);
+            const valText = isNull ? "未知" : `${layer.percent}%`;
+            let barColor = `var(--ring-layer-0)`;
+            if (layer.percent >= 95) barColor = "var(--ring-danger)";
+            else if (layer.percent >= 80) barColor = "var(--ring-warning)";
+
+            cardsHtml += `
+              <div class="quota-card">
+                <div class="quota-card-header">
+                  <span class="quota-card-label">${layer.fullLabel}${isDetailOnly ? " · 仅详情" : ""}</span>
+                  <span class="quota-card-value">${valText}</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill" style="width: ${isNull ? 0 : layer.percent}%; background: ${barColor}"></div>
+                </div>
+              </div>
+            `;
+          });
+
+          // Warning / danger and safe detail-only text
+          let alertBanner = provData.detailWindows.length > 0
+            ? `<div class="status-alert-banner" data-type="warning"><strong>ℹ️ 另有窗口仅在详情展示</strong>周期未知或并列，未猜测径向顺序。</div>`
+            : '';
+          if (provData.risk === 'danger') {
+            alertBanner = `<div class="status-alert-banner" data-type="danger"><strong>🚨 极高用量警告</strong>有额度即将耗尽，请及时切换或补充额度。</div>`;
+          } else if (provData.risk === 'warning' && provData.detailWindows.length === 0) {
+            alertBanner = `<div class="status-alert-banner" data-type="warning"><strong>⚠️ 警告</strong>当前用量较高，请合理分配调用频率。</div>`;
+          } else if (provData.risk === 'muted' && provData.detailWindows.length === 0) {
+            alertBanner = `<div class="status-alert-banner" data-type="warning"><strong>❓ 未知状态</strong>无法安全比较当前窗口周期，已降级到详情。</div>`;
+          }
+
+          colsHtml += `
+            <div class="provider-column" data-provider="${k}" data-risk="${provData.risk}">
+              <div class="column-header">
+                <div class="column-header-left">
+                  <span class="status-dot" data-tone="${provData.risk === 'normal' ? 'success' : provData.risk}"></span>
+                  <span class="provider-title">${providerLabel}</span>
+                </div>
+                <div class="column-header-right">
+                  ${headerRing}
+                </div>
+              </div>
+              <div class="column-body">
+                ${alertBanner}
+                <div class="active-account-strip">
+                  <div class="account-info">
+                    <span class="account-displayname">${provData.accounts[0].name}</span>
+                    <span class="account-id-masked">${provData.accounts[0].mask}</span>
+                  </div>
+                  <span class="active-badge">Active</span>
+                </div>
+                <div class="usage-quota-grid">
+                  ${cardsHtml}
+                </div>
+                <div class="panel-action-buttons-group">
+                  <button class="btn-panel-action" onclick="alert('刷新额度成功！')">刷新额度</button>
+                  <button class="btn-panel-action btn-panel-action-primary" onclick="alert('管理 ${providerLabel} 账号')">管理</button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        // Simulating viewport size bounds inside the sandbox wrapper
+        const dialogWidth = state.viewport === 'desktop' ? '720px' : state.viewport === '640' ? '600px' : '100%';
+
+        wrapper.innerHTML = `
+          <section class="aggregate-panel-dialog" id="aggregatePanel"
+            onmouseenter="cancelClose();"
+            onmouseleave="scheduleClose();"
+            style="width: ${dialogWidth}; left: 0; top: 12px; position: relative;"
+          >
+            <header class="panel-header">
+              <div class="panel-header-title">
+                <span>📊 模型用量</span>
+                <span class="panel-header-badge">${enabledKeys.length} 个启用服务商</span>
+              </div>
+              <button class="btn-close-panel" aria-label="关闭" onclick="closeDialog();">×</button>
+            </header>
+            <div class="aggregate-panel-columns">
+              ${colsHtml}
+            </div>
+          </section>
+        `;
+      } else {
+        wrapper.style.display = "none";
+      }
+
+      // 3. Render Compare Section Rings
+      const compSmall = document.getElementById("compRingSmall");
+      const compLarge = document.getElementById("compRingLarge");
+
+      // We render a standard 3-layer ring for demonstration of the strokes and prioritizations
+      const demoLayers = [
+        { id: "demo-1h", shortLabel: "1h", fullLabel: "1小时用量", percent: 45 },
+        { id: "demo-1d", shortLabel: "1d", fullLabel: "1天用量", percent: 60 },
+        { id: "demo-1w", shortLabel: "1w", fullLabel: "1周用量", percent: 30 }
+      ];
+
+      compSmall.innerHTML = makeConcentricRingSvg(demoLayers, "demo-1h", "small");
+      compLarge.innerHTML = makeConcentricRingSvg(demoLayers, "demo-1h", "large");
+    }
+
+    // Keyboard Escape listener
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && state.open) {
+        escapeSuppressed = true;
+        closeDialog();
+        // Restore focus to trigger
+        const trigger = document.getElementById("aggregateTriggerBtn");
+        if (trigger) trigger.focus();
+        setTimeout(() => {
+          escapeSuppressed = false;
+        }, 300);
+      }
+    });
+
+    // Initialize layout
+    toggleTheme("light");
+    adjustViewportWidth("desktop");
+  </script>
+</body>
+</html>

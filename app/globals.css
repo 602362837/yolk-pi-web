@@ -48,6 +48,47 @@
   --icon-flow-a: #38bdf8;
   --icon-flow-b: #2563eb;
   --icon-flow-c: #a78bfa;
+
+  /*
+   * Provider usage aggregate / compact semantic tokens (light).
+   * Panel surface, center text, and status copy must follow theme — never fixed night colors.
+   */
+  --usage-panel-surface: color-mix(in srgb, var(--bg-panel) 92%, #ffffff 8%);
+  --usage-panel-surface-elevated: color-mix(in srgb, var(--bg) 88%, #ffffff 12%);
+  --usage-panel-surface-subtle: color-mix(in srgb, var(--bg-subtle) 70%, transparent);
+  --usage-panel-border: color-mix(in srgb, var(--border) 88%, var(--text-muted) 12%);
+  --usage-panel-shadow: 0 12px 36px rgba(15, 23, 42, 0.12);
+  --usage-panel-close-bg: var(--bg-hover);
+  --usage-panel-close-hover: var(--bg-selected);
+  --usage-segment-bg: color-mix(in srgb, var(--bg-subtle) 80%, transparent);
+  --usage-column-bg: color-mix(in srgb, var(--bg) 96%, var(--bg-panel) 4%);
+  --usage-column-header-bg: color-mix(in srgb, var(--bg-subtle) 90%, transparent);
+  --usage-card-bg: color-mix(in srgb, var(--bg) 94%, var(--bg-panel) 6%);
+  --usage-center-bg: var(--bg-panel);
+  --usage-center-label: var(--text);
+  --usage-center-value: color-mix(in srgb, var(--text) 78%, var(--text-muted) 22%);
+  --usage-status-success-fg: #15803d;
+  --usage-status-success-bg: rgba(34, 197, 94, 0.10);
+  --usage-status-success-border: rgba(34, 197, 94, 0.32);
+  --usage-status-warning-fg: #b45309;
+  --usage-status-warning-bg: rgba(245, 158, 11, 0.10);
+  --usage-status-warning-border: rgba(245, 158, 11, 0.34);
+  --usage-status-danger-fg: #b91c1c;
+  --usage-status-danger-bg: rgba(239, 68, 68, 0.08);
+  --usage-status-danger-border: rgba(239, 68, 68, 0.28);
+  --usage-status-info-fg: color-mix(in srgb, var(--text) 72%, var(--accent) 28%);
+  --usage-status-info-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+  --usage-status-info-border: color-mix(in srgb, var(--accent) 28%, var(--border) 72%);
+  --usage-active-fg: #15803d;
+  --usage-dot-success: #16a34a;
+  --usage-dot-warning: #d97706;
+  --usage-dot-danger: #dc2626;
+  --usage-dot-muted: var(--text-dim);
+  --provider-usage-ring-layer-0: #06b6d4;
+  --provider-usage-ring-layer-1: #8b5cf6;
+  --provider-usage-ring-layer-2: #db2777;
+  --provider-usage-ring-warning: #d97706;
+  --provider-usage-ring-danger: #dc2626;
 }
 
 html.dark {
@@ -68,6 +109,44 @@ html.dark {
   --icon-flow-a: #67e8f9;
   --icon-flow-b: #60a5fa;
   --icon-flow-c: #c4b5fd;
+
+  /* Provider usage aggregate / compact semantic tokens (dark). */
+  --usage-panel-surface: color-mix(in srgb, var(--bg-panel) 86%, #0b0f19 14%);
+  --usage-panel-surface-elevated: color-mix(in srgb, var(--bg-panel) 72%, #111827 28%);
+  --usage-panel-surface-subtle: rgba(148, 163, 184, 0.06);
+  --usage-panel-border: color-mix(in srgb, var(--border) 80%, rgba(148, 163, 184, 0.35) 20%);
+  --usage-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  --usage-panel-close-bg: var(--bg-hover);
+  --usage-panel-close-hover: var(--bg-selected);
+  --usage-segment-bg: rgba(148, 163, 184, 0.08);
+  --usage-column-bg: rgba(148, 163, 184, 0.02);
+  --usage-column-header-bg: rgba(148, 163, 184, 0.04);
+  --usage-card-bg: rgba(148, 163, 184, 0.06);
+  --usage-center-bg: var(--bg-panel);
+  --usage-center-label: var(--text);
+  --usage-center-value: color-mix(in srgb, var(--text) 82%, var(--text-muted) 18%);
+  --usage-status-success-fg: #4ade80;
+  --usage-status-success-bg: rgba(34, 197, 94, 0.10);
+  --usage-status-success-border: rgba(34, 197, 94, 0.36);
+  --usage-status-warning-fg: #fbbf24;
+  --usage-status-warning-bg: rgba(251, 191, 36, 0.10);
+  --usage-status-warning-border: rgba(251, 191, 36, 0.32);
+  --usage-status-danger-fg: #fb7185;
+  --usage-status-danger-bg: rgba(239, 68, 68, 0.10);
+  --usage-status-danger-border: rgba(239, 68, 68, 0.30);
+  --usage-status-info-fg: color-mix(in srgb, var(--text) 70%, var(--accent) 30%);
+  --usage-status-info-bg: rgba(96, 165, 250, 0.08);
+  --usage-status-info-border: rgba(96, 165, 250, 0.28);
+  --usage-active-fg: #4ade80;
+  --usage-dot-success: #4ade80;
+  --usage-dot-warning: #fbbf24;
+  --usage-dot-danger: #fb7185;
+  --usage-dot-muted: var(--text-dim);
+  --provider-usage-ring-layer-0: #22d3ee;
+  --provider-usage-ring-layer-1: #a78bfa;
+  --provider-usage-ring-layer-2: #f472b6;
+  --provider-usage-ring-warning: #fbbf24;
+  --provider-usage-ring-danger: #fb7185;
 }
 
 /* Theme toggle: circular wipe via View Transitions API.
@@ -3414,6 +3493,263 @@ button.session-stats-chip:focus-visible {
   box-sizing: border-box;
 }
 
+/*
+ * Shared N-ring primitive (Full / Compact / aggregate).
+ * Layer identity hues + stroke dash patterns; warning/danger is a second channel.
+ * Used-arc sheen is CSS-only and clipped to the used arc in SVG.
+ * Ring layer/status tokens live on :root / html.dark above.
+ */
+.provider-usage-ring-unit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.provider-usage-ring-unit__canvas {
+  flex-shrink: 0;
+}
+
+.provider-usage-ring-unit__svg {
+  display: block;
+  overflow: visible;
+}
+
+.provider-usage-ring-unit__center {
+  background: var(--usage-center-bg, var(--bg-panel));
+}
+
+.provider-usage-ring-unit__center-label {
+  color: var(--usage-center-label, var(--text));
+  font-weight: 800;
+}
+
+.provider-usage-ring-unit__center-value {
+  color: var(--usage-center-value, var(--text-muted));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-usage-ring-unit__layer[data-tone="warning"] .provider-usage-ring-unit__used {
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--provider-usage-ring-warning) 55%, transparent));
+}
+
+.provider-usage-ring-unit__layer[data-tone="danger"] .provider-usage-ring-unit__used {
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--provider-usage-ring-danger) 55%, transparent));
+}
+
+.provider-usage-ring-unit__sheen,
+.sheen-flow {
+  animation: provider-usage-sheen-move 2.5s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes provider-usage-sheen-move {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -45;
+  }
+}
+
+/* Aggregate hover/focus shell — non-accordion provider columns. */
+.provider-usage-aggregate {
+  flex-shrink: 0;
+}
+
+.provider-usage-aggregate__trigger {
+  border: 1px solid var(--usage-panel-border, var(--border));
+  background: var(--usage-segment-bg, var(--bg-subtle));
+  color: var(--text-muted);
+}
+
+.provider-usage-aggregate__trigger[data-open="true"] {
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.provider-usage-aggregate__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.provider-usage-aggregate__segment {
+  background: var(--usage-segment-bg, rgba(148, 163, 184, 0.08));
+  border: 1px solid transparent;
+}
+
+.provider-usage-aggregate__segment[data-risk="danger"] {
+  border-color: var(--usage-status-danger-border);
+  background: var(--usage-status-danger-bg);
+}
+
+.provider-usage-aggregate__segment[data-risk="warning"] {
+  border-color: var(--usage-status-warning-border);
+  background: var(--usage-status-warning-bg);
+}
+
+.provider-usage-aggregate__panel {
+  box-sizing: border-box;
+  border: 1px solid var(--usage-panel-border, var(--border));
+  background: var(--usage-panel-surface, var(--bg-panel));
+  box-shadow: var(--usage-panel-shadow, 0 16px 40px rgba(0, 0, 0, 0.18));
+  color: var(--text);
+  max-width: calc(100vw - 16px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.provider-usage-aggregate__header {
+  border-bottom: 1px solid var(--usage-panel-border, var(--border));
+}
+
+.provider-usage-aggregate__badge {
+  background: var(--usage-panel-surface-subtle, var(--bg-subtle));
+  color: var(--text-muted);
+}
+
+.provider-usage-aggregate__close {
+  background: var(--usage-panel-close-bg, var(--bg-hover));
+  border: 1px solid var(--usage-panel-border, var(--border));
+  color: var(--text-muted);
+}
+
+.provider-usage-aggregate__close:hover {
+  background: var(--usage-panel-close-hover, var(--bg-selected));
+  color: var(--text);
+}
+
+.provider-usage-aggregate__columns {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  overflow: auto;
+}
+
+.provider-usage-aggregate__column {
+  min-width: 0;
+  border: 1px solid var(--usage-panel-border, var(--border));
+  background: var(--usage-column-bg, transparent);
+  border-radius: 8px;
+}
+
+.provider-usage-aggregate__column[data-risk="danger"] {
+  border-color: var(--usage-status-danger-border);
+}
+
+.provider-usage-aggregate__column[data-risk="warning"] {
+  border-color: var(--usage-status-warning-border);
+}
+
+.provider-usage-aggregate__column-header {
+  background: var(--usage-column-header-bg, var(--bg-subtle));
+  border-bottom: 1px solid var(--usage-panel-border, var(--border));
+  min-width: 0;
+}
+
+.provider-usage-aggregate__column-header .provider-usage-ring-unit,
+.provider-usage-aggregate__column-header .provider-usage-ring-unit__canvas {
+  flex-shrink: 0;
+}
+
+.provider-usage-aggregate__column-fallback {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.provider-usage-aggregate__close:focus-visible,
+.provider-usage-aggregate__column button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Shared provider detail status banners / Active badge (light+dark tokens). */
+.provider-usage-status-banner {
+  padding: 9px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.provider-usage-status-banner[data-tone="danger"] {
+  border: 1px solid var(--usage-status-danger-border);
+  background: var(--usage-status-danger-bg);
+  color: var(--usage-status-danger-fg);
+}
+
+.provider-usage-status-banner[data-tone="warning"] {
+  border: 1px solid var(--usage-status-warning-border);
+  background: var(--usage-status-warning-bg);
+  color: var(--usage-status-warning-fg);
+}
+
+.provider-usage-status-banner[data-tone="info"],
+.provider-usage-status-banner[data-tone="detail-only"] {
+  border: 1px solid var(--usage-status-info-border);
+  background: var(--usage-status-info-bg);
+  color: var(--usage-status-info-fg);
+}
+
+.provider-usage-status-banner[data-tone="muted"] {
+  border: 1px solid var(--usage-panel-border, var(--border));
+  background: var(--usage-card-bg, var(--bg-subtle));
+  color: var(--text-dim);
+}
+
+.provider-usage-active-badge {
+  color: var(--usage-active-fg);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.provider-usage-detail-card {
+  border: 1px solid var(--usage-panel-border, var(--border));
+  background: var(--usage-card-bg, rgba(148, 163, 184, 0.06));
+  border-radius: 9px;
+}
+
+.provider-usage-account-row[data-active="true"] {
+  border: 1px solid var(--usage-status-success-border);
+  background: var(--usage-status-success-bg);
+}
+
+.provider-usage-account-row[data-active="false"] {
+  border: 1px solid var(--usage-panel-border, var(--border));
+  background: var(--usage-card-bg, rgba(148, 163, 184, 0.06));
+}
+
+/* Desktop keeps 1–3 columns from inline style; narrow viewports stack. */
+@media (max-width: 640px) {
+  .provider-usage-aggregate__columns[data-columns="3"],
+  .provider-usage-aggregate__columns[data-columns="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .provider-usage-aggregate__columns {
+    grid-template-columns: 1fr !important;
+  }
+
+  .provider-usage-aggregate__segments {
+    max-width: min(70vw, 280px);
+    overflow: hidden;
+  }
+
+  .provider-usage-aggregate__panel {
+    width: calc(100vw - 16px) !important;
+    right: 8px !important;
+    left: 8px;
+  }
+}
+
 .grok-usage-panel,
 .kiro-usage-panel {
   flex-shrink: 0;
@@ -3454,14 +3790,26 @@ button.session-stats-chip:focus-visible {
   .chatgpt-usage-panel__spinner,
   .chatgpt-usage-panel__skeleton-shimmer,
   .provider-usage-trigger__spinner,
-  .kiro-usage-panel__skeleton-shimmer {
+  .provider-usage-aggregate__spinner,
+  .kiro-usage-panel__skeleton-shimmer,
+  .provider-usage-ring-unit__sheen,
+  .sheen-flow {
     animation: none !important;
+  }
+
+  .provider-usage-ring-unit__sheen,
+  .sheen-flow {
+    opacity: 0 !important;
   }
 
   .chatgpt-usage-panel,
   .chatgpt-usage-panel *,
   .provider-usage-trigger,
   .provider-usage-trigger *,
+  .provider-usage-aggregate,
+  .provider-usage-aggregate *,
+  .provider-usage-ring-unit,
+  .provider-usage-ring-unit *,
   .grok-usage-panel,
   .grok-usage-panel *,
   .kiro-usage-panel,

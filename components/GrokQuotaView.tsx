@@ -16,10 +16,10 @@ export type GrokQuotaCacheState = GrokQuotaResultV1["cache"]["state"];
 export type GrokQuotaErrorCode = NonNullable<GrokQuotaResultV1["error"]>["code"];
 
 const CACHE_DOT: Record<GrokQuotaCacheState, string> = {
-  live: "#4ade80",
-  fresh: "#4ade80",
-  stale: "#eab308",
-  none: "var(--text-dim)",
+  live: "var(--usage-dot-success, #4ade80)",
+  fresh: "var(--usage-dot-success, #4ade80)",
+  stale: "var(--usage-dot-warning, #eab308)",
+  none: "var(--usage-dot-muted, var(--text-dim))",
 };
 
 const CACHE_LABEL: Record<GrokQuotaCacheState, string> = {
@@ -76,8 +76,8 @@ export function formatGrokQuotaTime(iso: string | null | undefined): string {
 }
 
 export function grokUtilizationColor(pct: number): string {
-  if (pct >= 95) return "#ef4444";
-  if (pct >= 80) return "#eab308";
+  if (pct >= 95) return "var(--usage-status-danger-fg, #b91c1c)";
+  if (pct >= 80) return "var(--usage-status-warning-fg, #b45309)";
   return "var(--accent)";
 }
 

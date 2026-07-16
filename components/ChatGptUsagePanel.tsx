@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   earliestResetCreditExpiration,
   formatGptQuotaRelativeAge,
   formatGptResetCountdown,
   GPT_QUOTA_TIER_COMPACT_LABELS,
   GPT_QUOTA_TIER_PANEL_LABELS,
+  isKnownQuotaTier,
   knownQuotaTiers,
   quotaColor,
+  QUOTA_TIER_LABELS,
   type CodexResetCreditDisplay,
   type QuotaDisplayTier,
 } from "@/lib/quota-display";
@@ -16,11 +18,22 @@ import { ActionFlowIcon } from "./ActionFlowIcon";
 import { iconFlowAttrs } from "./iconFlow";
 import { usePrompt } from "./AppPromptProvider";
 import {
+  clampUsagePercent,
+  projectProviderUsageWindows,
+  resolveOverallProviderUsageRisk,
+  resolveUsageWindowDuration,
+  type ProviderUsageAggregateProjection,
+  type ProviderUsageRingUnit,
+  type ProviderUsageRisk,
+  type ProviderUsageWindowCandidate,
+} from "./ProviderUsagePanelContract";
+import {
   ProviderUsageTrigger,
-  type ProviderUsageCompactSummary,
   type ProviderUsageDisplayMode,
-  type ProviderUsageRingItem,
 } from "./ProviderUsageTrigger";
+
+/** Standalone owns trigger+dialog; aggregate reuses detail only for the shell column. */
+export type ChatGptUsagePresentation = "standalone" | "aggregate";
 
 type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
 type ChatGptQuotaSource = "live" | "cached" | "page_fallback" | "none";
@@ -171,12 +184,12 @@ function lockStateLabel(status: SchedulerStatus): string {
 
 function StatusDot({ tone }: { tone: "success" | "warning" | "danger" | "muted" }) {
   const color = tone === "success"
-    ? "#4ade80"
+    ? "var(--usage-dot-success, #4ade80)"
     : tone === "warning"
-      ? "#fbbf24"
+      ? "var(--usage-dot-warning, #fbbf24)"
       : tone === "danger"
-        ? "#fb7185"
-        : "var(--text-dim)";
+        ? "var(--usage-dot-danger, #fb7185)"
+        : "var(--usage-dot-muted, var(--text-dim))";
   return (
     <span
       aria-hidden="true"
@@ -185,7 +198,10 @@ function StatusDot({ tone }: { tone: "success" | "warning" | "danger" | "muted" 
         height: 6,
         borderRadius: "50%",
         background: color,
-        boxShadow: tone === "success" ? "0 0 8px rgba(74,222,128,0.48)" : undefined,
+        boxShadow:
+          tone === "success"
+            ? "0 0 8px color-mix(in srgb, var(--usage-dot-success, #4ade80) 48%, transparent)"
+            : undefined,
         flexShrink: 0,
       }}
     />
@@ -204,7 +220,7 @@ function QuotaWindowCard({ tier }: { tier: QuotaDisplayTier }) {
         padding: 10,
         borderRadius: 9,
         border: "1px solid var(--border)",
-        background: "rgba(148,163,184,0.06)",
+        background: "var(--usage-card-bg, rgba(148,163,184,0.06))",
         display: "flex",
         flexDirection: "column",
         gap: 6,
@@ -233,14 +249,130 @@ function QuotaWindowCard({ tier }: { tier: QuotaDisplayTier }) {
   );
 }
 
+/** Canonical tier name → stable ring id (display only; not sort order). */
+const GPT_TIER_RING_IDS: Record<string, string> = {
+  five_hour: "gpt-5h",
+  seven_day: "gpt-week",
+};
+
+/**
+ * Emit unordered safe GPT window candidates from actual allowlisted tiers.
+ * Missing tiers are never synthesized; adapter does not assign layer index/center.
+ * Accepts known five_hour/seven_day rows and any future tier whose name resolves
+ * as a trusted period token via the shared duration resolver.
+ */
+export function buildChatGptUsageWindowCandidates(
+  tiers: readonly QuotaDisplayTier[],
+): ProviderUsageWindowCandidate[] {
+  const candidates: ProviderUsageWindowCandidate[] = [];
+  for (const tier of tiers) {
+    if (!tier?.name?.trim()) continue;
+    const known = isKnownQuotaTier(tier);
+    const resolved = resolveUsageWindowDuration({
+      durationEvidence: tier.name,
+      token: tier.name,
+      label: tier.name,
+    });
+    // Reject unknown/untrusted names — never invent windows from raw payload noise.
+    if (!known && !resolved) continue;
+
+    const percent = clampUsagePercent(
+      typeof tier.utilization === "number" && Number.isFinite(tier.utilization)
+        ? tier.utilization
+        : null,
+    );
+    const panelLabel =
+      GPT_QUOTA_TIER_PANEL_LABELS[tier.name]
+      ?? QUOTA_TIER_LABELS[tier.name]
+      ?? tier.name;
+    const compactLabel =
+      GPT_QUOTA_TIER_COMPACT_LABELS[tier.name]
+      ?? QUOTA_TIER_LABELS[tier.name]
+      ?? tier.name;
+    // Prefer short ring labels for known periods (5h / 周).
+    const shortLabel =
+      tier.name === "five_hour"
+        ? "5h"
+        : tier.name === "seven_day"
+          ? "周"
+          : compactLabel;
+    const fullLabel = panelLabel;
+    let title: string;
+    if (tier.name === "five_hour") {
+      title = percent === null ? "5 小时额度未知" : `5 小时已使用 ${Math.round(percent)}%`;
+    } else if (tier.name === "seven_day") {
+      title = percent === null ? "7 天额度未知" : `周额度已使用 ${Math.round(percent)}%`;
+    } else {
+      title = percent === null
+        ? `${fullLabel}未知`
+        : `${fullLabel}已使用 ${Math.round(percent)}%`.replace("额度已使用", "已使用");
+    }
+    candidates.push({
+      id: GPT_TIER_RING_IDS[tier.name] ?? `gpt-${tier.name}`,
+      shortLabel,
+      fullLabel,
+      percent,
+      title,
+      present: true,
+      trusted: true,
+      durationMs: null,
+      // Canonical tier token is duration evidence for the shared resolver only.
+      durationEvidence: tier.name,
+    });
+  }
+  return candidates;
+}
+
+/**
+ * Project actual GPT tiers through the shared window projector.
+ * only-7d / only-5h → single ring; dual → outer shortest (5h) → inner longer (7d).
+ * Adapter never pushes fixed [5h,7d] order or fabricates missing windows.
+ */
+export function buildChatGptUsageRingUnit(
+  tiers: readonly QuotaDisplayTier[],
+): ProviderUsageRingUnit | null {
+  const candidates = buildChatGptUsageWindowCandidates(tiers);
+  if (candidates.length === 0) return null;
+  const projected = projectProviderUsageWindows(candidates, { providerLabel: "GPT" });
+  return projected.ringUnit;
+}
+
+function riskFromRingUnit(unit: ProviderUsageRingUnit | null, fallbackRisk: ProviderUsageRisk): ProviderUsageRisk {
+  if (!unit) return fallbackRisk;
+  const tones = unit.layers.map((layer) => {
+    const percent = clampUsagePercent(layer.percent);
+    if (percent === null) return "muted" as const;
+    if (percent >= 95) return "danger" as const;
+    if (percent >= 80) return "warning" as const;
+    return "normal" as const;
+  });
+  // Map layer tones onto aggregate risk channel (danger > warning > normal > muted).
+  const risks: ProviderUsageRisk[] = tones.map((tone) => {
+    if (tone === "danger") return "danger";
+    if (tone === "warning") return "warning";
+    if (tone === "muted") return "muted";
+    return "normal";
+  });
+  return resolveOverallProviderUsageRisk(risks);
+}
+
 export function ChatGptUsagePanel({
   onOpenModels,
   displayMode = "full",
+  presentation = "standalone",
+  onAggregateProjectionChange,
 }: {
   /** Optional hook so AppShell can open Models → ChatGPT without hard coupling. */
   onOpenModels?: () => void;
-  /** Global top-bar density from usage.providerPanelsCompact. */
+  /** Global top-bar density from usage.providerPanelsCompact (standalone only). */
   displayMode?: ProviderUsageDisplayMode;
+  /**
+   * standalone (default): own click trigger + dialog.
+   * aggregate: no trigger/dialog/outside handler; detail body only for shell column.
+   */
+  presentation?: ChatGptUsagePresentation;
+  /** Allowlisted projection for the aggregate shell; never includes secrets. */
+  onAggregateProjectionChange?: (projection: ProviderUsageAggregateProjection) => void;
 } = {}) {
   const { confirm } = usePrompt();
   const panelDomId = useId();
@@ -254,6 +386,7 @@ export function ChatGptUsagePanel({
   const liveQuotaAccountIdRef = useRef<string | null>(null);
 
   const [open, setOpen] = useState(false);
+  const escapeSuppressedRef = useRef(false);
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
   const [account, setAccount] = useState<OAuthAccountSummary | null>(null);
   const [accountsLoading, setAccountsLoading] = useState(true);
@@ -270,6 +403,7 @@ export function ChatGptUsagePanel({
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
   const [repairingLock, setRepairingLock] = useState(false);
   const [panelPos, setPanelPos] = useState<{ top: number; right: number }>({ top: 35, right: 8 });
+  const isAggregate = presentation === "aggregate";
 
   const rememberSnapshot = useCallback((snapshot: SuccessfulQuotaSnapshot | null) => {
     if (!snapshot) return;
@@ -479,18 +613,20 @@ export function ChatGptUsagePanel({
     };
   }, [loadAccounts]);
 
-  // Expand: keep existing content, re-read accounts + scheduler.
+  // Expand (standalone only): keep existing content, re-read accounts + scheduler.
+  // Aggregate detail is always mounted in the shell column; load scheduler lazily
+  // only when presentation is standalone and the dialog opens (no extra secondary fetch in aggregate).
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const controller = new AbortController();
     void loadAccounts({ silent: true, signal: controller.signal });
     void loadSchedulerStatus(controller.signal);
     return () => controller.abort();
-  }, [open, loadAccounts, loadSchedulerStatus]);
+  }, [isAggregate, open, loadAccounts, loadSchedulerStatus]);
 
   // Viewport-clamped fixed coordinates so the expanded panel never overflows narrow screens.
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const updatePosition = () => {
       const trigger = triggerRef.current;
       if (!trigger) return;
@@ -511,11 +647,11 @@ export function ChatGptUsagePanel({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open]);
+  }, [isAggregate, open]);
 
-  // Outside click + Escape close with focus restore.
+  // Outside click + Escape close with focus restore (standalone dialog only).
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
@@ -526,6 +662,7 @@ export function ChatGptUsagePanel({
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
+        escapeSuppressedRef.current = true;
         triggerRef.current?.focus();
       }
     };
@@ -535,7 +672,7 @@ export function ChatGptUsagePanel({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [isAggregate, open]);
 
   const operationBusy = refreshing || resetting || activatingAccountId !== null || repairingLock;
 
@@ -664,9 +801,10 @@ export function ChatGptUsagePanel({
   }, [confirm, operationBusy]);
 
   const openModels = useCallback(() => {
-    setOpen(false);
+    // Aggregate shell closes itself before Models; standalone closes own dialog.
+    if (!isAggregate) setOpen(false);
     onOpenModels?.();
-  }, [onOpenModels]);
+  }, [isAggregate, onOpenModels]);
 
   const displayModel = useMemo(() => {
     const accountId = account?.accountId ?? null;
@@ -735,10 +873,8 @@ export function ChatGptUsagePanel({
     };
   }, [account, liveQuota, liveQuotaAccountId, pageFallbackActive]);
 
-  const fiveHourTier = displayModel.tiers.find((tier) => tier.name === "five_hour") ?? null;
-  const sevenDayTier = displayModel.tiers.find((tier) => tier.name === "seven_day") ?? null;
-  const fiveHourPercent = fiveHourTier ? Math.min(Math.max(fiveHourTier.utilization, 0), 100) : null;
-  const sevenDayPercent = sevenDayTier ? Math.min(Math.max(sevenDayTier.utilization, 0), 100) : null;
+  // Detail cards list actual displayModel.tiers; ring projection uses the same
+  // tiers array via the shared candidate/projector (no fixed 5h/7d push).
 
   const fullStatus = useMemo(() => {
     if (refreshing) {
@@ -793,23 +929,15 @@ export function ChatGptUsagePanel({
     resetting,
   ]);
 
-  const rings = useMemo((): ProviderUsageRingItem[] => ([
-    {
-      percent: account ? fiveHourPercent : null,
-      label: GPT_QUOTA_TIER_COMPACT_LABELS.five_hour,
-      title: fiveHourPercent === null ? "5 小时额度未知" : `5 小时已使用 ${Math.round(fiveHourPercent)}%`,
-      color: fiveHourPercent === null ? undefined : quotaColor(fiveHourPercent),
-    },
-    {
-      percent: account ? sevenDayPercent : null,
-      label: GPT_QUOTA_TIER_COMPACT_LABELS.seven_day,
-      title: sevenDayPercent === null ? "7 天额度未知" : `周额度已使用 ${Math.round(sevenDayPercent)}%`,
-      color: sevenDayPercent === null ? undefined : quotaColor(sevenDayPercent),
-    },
-  ]), [account, fiveHourPercent, sevenDayPercent]);
+  // Shared N-ring unit for Full / Compact / Aggregate via actual tiers → projector.
+  const ringUnit = useMemo((): ProviderUsageRingUnit | null => {
+    if (!account) return null;
+    // Only project when at least one safe known window exists in the actual tiers.
+    if (displayModel.tiers.length === 0) return null;
+    return buildChatGptUsageRingUnit(displayModel.tiers);
+  }, [account, displayModel.tiers]);
 
-  const compactProjection = useMemo(() => {
-    const summaries: ProviderUsageCompactSummary[] = [];
+  const compactFallback = useMemo(() => {
     let fallback: string | null = null;
     let loading = false;
 
@@ -822,28 +950,16 @@ export function ChatGptUsagePanel({
       fallback = "登录";
     } else if (displayModel.credentialStatus && displayModel.credentialStatus !== "valid" && displayModel.source === "none") {
       fallback = "需登录";
-    } else if (fiveHourPercent !== null || sevenDayPercent !== null) {
-      if (fiveHourPercent !== null) {
-        summaries.push({
-          label: "5h",
-          value: `${Math.round(fiveHourPercent)}%`,
-          title: `5 小时已使用 ${Math.round(fiveHourPercent)}%`,
-        });
-      }
-      if (sevenDayPercent !== null) {
-        summaries.push({
-          label: "周",
-          value: `${Math.round(sevenDayPercent)}%`,
-          title: `周额度已使用 ${Math.round(sevenDayPercent)}%`,
-        });
-      }
+    } else if (ringUnit) {
+      // Normal quota: Compact uses ringUnit only — no text summary chips.
+      fallback = null;
     } else if (actionError) {
       fallback = "错误";
     } else if (account) {
       fallback = "额度未知";
     }
 
-    return { summaries, fallback, loading };
+    return { fallback, loading };
   }, [
     account,
     accountsError,
@@ -852,11 +968,74 @@ export function ChatGptUsagePanel({
     activatingAccountId,
     displayModel.credentialStatus,
     displayModel.source,
-    fiveHourPercent,
     refreshing,
     resetting,
-    sevenDayPercent,
+    ringUnit,
   ]);
+
+  const aggregateProjection = useMemo((): ProviderUsageAggregateProjection => {
+    const loading =
+      refreshing
+      || resetting
+      || Boolean(activatingAccountId)
+      || (accountsLoading && !account)
+      || compactFallback.loading;
+
+    let fallback: string | null = null;
+    let risk: ProviderUsageRisk = "muted";
+
+    if (loading) {
+      fallback = ringUnit ? null : "加载中";
+      risk = ringUnit ? riskFromRingUnit(ringUnit, "normal") : "muted";
+    } else if (accountsError && !account) {
+      fallback = "错误";
+      risk = "danger";
+    } else if (!account) {
+      fallback = "登录";
+      risk = "muted";
+    } else if (displayModel.credentialStatus && displayModel.credentialStatus !== "valid" && displayModel.source === "none") {
+      fallback = "需登录";
+      risk = "danger";
+    } else if (ringUnit) {
+      fallback = null;
+      risk = riskFromRingUnit(ringUnit, displayModel.source === "page_fallback" ? "warning" : "normal");
+      if (displayModel.source === "page_fallback" && risk === "normal") risk = "warning";
+    } else if (actionError) {
+      fallback = "错误";
+      risk = "danger";
+    } else {
+      fallback = "额度未知";
+      risk = "muted";
+    }
+
+    // Allowlisted projection only — never accountId / credentials / raw errors.
+    return {
+      key: "gpt",
+      label: "GPT",
+      order: 0,
+      risk,
+      loading,
+      ringUnit,
+      fallback,
+      title: ringUnit?.ariaLabel ?? (fallback ? `GPT ${fallback}` : "GPT 用量"),
+    };
+  }, [
+    account,
+    accountsError,
+    accountsLoading,
+    actionError,
+    activatingAccountId,
+    compactFallback.loading,
+    displayModel.credentialStatus,
+    displayModel.source,
+    refreshing,
+    resetting,
+    ringUnit,
+  ]);
+
+  useEffect(() => {
+    onAggregateProjectionChange?.(aggregateProjection);
+  }, [aggregateProjection, onAggregateProjectionChange]);
 
   const sourceLabel = (() => {
     if (refreshing) return "正在刷新…";
@@ -886,143 +1065,143 @@ export function ChatGptUsagePanel({
   const resetExpiresCountdown = formatGptResetCountdown(resetExpiresAt);
   const hasQuotaWindows = displayModel.tiers.length > 0;
 
-  return (
-    <div className="chatgpt-usage-panel" style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
-      {/* Local layout helpers; GPT-USAGE-02 may promote reduced-motion/spinner rules to globals. */}
-      <style>{`
-        @media (max-width: 420px) {
-          .chatgpt-usage-quota-grid { grid-template-columns: 1fr !important; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .chatgpt-usage-spinner { animation: none !important; border-top-color: var(--text-dim) !important; }
-        }
-      `}</style>
-      <ProviderUsageTrigger
-        buttonRef={triggerRef}
-        className="chatgpt-usage-panel__trigger"
-        providerLabel="GPT"
-        open={open}
-        displayMode={displayMode}
-        tone={fullStatus.tone}
-        statusText={fullStatus.status}
-        loading={fullStatus.showSpinner || compactProjection.loading}
-        rings={rings}
-        compactSummaries={compactProjection.summaries}
-        compactFallback={compactProjection.fallback}
-        onClick={() => setOpen((value) => !value)}
-        title="ChatGPT 用量"
-        aria-label="ChatGPT 用量"
-        aria-controls={panelDomId}
-      />
-
-      {open && (
-        <section
-          ref={panelRef}
-          id={panelDomId}
-          role="dialog"
-          aria-label="ChatGPT 用量"
-          aria-live="polite"
-          onClick={(event) => event.stopPropagation()}
-          style={{
-            position: "fixed",
-            top: panelPos.top,
-            right: panelPos.right,
-            zIndex: 550,
-            width: "min(392px, calc(100vw - 16px))",
-            maxHeight: "min(680px, calc(100vh - 80px))",
-            overflow: "auto",
-            border: "1px solid rgba(148,163,184,0.30)",
-            borderRadius: 12,
-            background: "color-mix(in srgb, var(--bg-panel) 86%, transparent)",
-            boxShadow: "0 18px 45px rgba(0,0,0,0.28)",
-            backdropFilter: "blur(14px)",
-            padding: 12,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>ChatGPT 用量</div>
-              <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <StatusDot
-                    tone={
-                      displayModel.source === "live" || displayModel.source === "cached"
-                        ? "success"
-                        : displayModel.source === "page_fallback"
-                          ? "warning"
-                          : needsReauth || actionError
-                            ? "danger"
-                            : "muted"
-                    }
-                  />
-                  <span>{sourceLabel}</span>
-                </span>
-                <span>更新时间：{queriedLabel}</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => void handleManualRefresh()}
-                disabled={operationBusy || !account || accountsLoading}
-                {...iconFlowAttrs(operationBusy ? "off" : "interactive")}
-                title="刷新当前 Active 账号额度"
-                aria-label="刷新当前 Active ChatGPT 账号额度"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: "1px solid var(--border)",
-                  borderRadius: 7,
-                  background: "var(--bg)",
-                  color: operationBusy || !account ? "var(--text-dim)" : "var(--accent)",
-                  cursor: operationBusy || !account ? "default" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                }}
-              >
-                <ActionFlowIcon width={14} height={14} strokeWidth={2}>
-                  <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
-                  <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
-                  <path d="M3 4v8h8" />
-                  <path d="M21 20v-8h-8" />
-                </ActionFlowIcon>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  triggerRef.current?.focus();
-                }}
-                aria-label="关闭 ChatGPT 用量面板"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: "1px solid var(--border)",
-                  borderRadius: 7,
-                  background: "var(--bg)",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
+  // Shared detail body for standalone dialog and aggregate column.
+  // Aggregate does not render its own trigger/dialog/outside handler.
+  const detailBody: ReactNode = (
+    <>
+      {!isAggregate && (
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>ChatGPT 用量</div>
+            <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <StatusDot
+                  tone={
+                    displayModel.source === "live" || displayModel.source === "cached"
+                      ? "success"
+                      : displayModel.source === "page_fallback"
+                        ? "warning"
+                        : needsReauth || actionError
+                          ? "danger"
+                          : "muted"
+                  }
+                />
+                <span>{sourceLabel}</span>
+              </span>
+              <span>更新时间：{queriedLabel}</span>
             </div>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => void handleManualRefresh()}
+              disabled={operationBusy || !account || accountsLoading}
+              {...iconFlowAttrs(operationBusy ? "off" : "interactive")}
+              title="刷新当前 Active 账号额度"
+              aria-label="刷新当前 Active ChatGPT 账号额度"
+              style={{
+                width: 30,
+                height: 30,
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                background: "var(--bg)",
+                color: operationBusy || !account ? "var(--text-dim)" : "var(--accent)",
+                cursor: operationBusy || !account ? "default" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+                <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+                <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+                <path d="M3 4v8h8" />
+                <path d="M21 20v-8h-8" />
+              </ActionFlowIcon>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
+              aria-label="关闭 ChatGPT 用量面板"
+              style={{
+                width: 30,
+                height: 30,
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                background: "var(--bg)",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                fontSize: 16,
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
-          {(refreshing || resetting || activatingAccountId) && (
-            <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
-              {refreshing ? "正在刷新…" : resetting ? "正在重置…" : "正在切换…"}
-            </div>
-          )}
+      {isAggregate && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-dim)", fontSize: 11, minWidth: 0 }}>
+            <StatusDot
+              tone={
+                displayModel.source === "live" || displayModel.source === "cached"
+                  ? "success"
+                  : displayModel.source === "page_fallback"
+                    ? "warning"
+                    : needsReauth || actionError
+                      ? "danger"
+                      : "muted"
+              }
+            />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {sourceLabel} · {queriedLabel}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleManualRefresh()}
+            disabled={operationBusy || !account || accountsLoading}
+            {...iconFlowAttrs(operationBusy ? "off" : "interactive")}
+            title="刷新当前 Active 账号额度"
+            aria-label="刷新当前 Active ChatGPT 账号额度"
+            style={{
+              width: 30,
+              height: 30,
+              border: "1px solid var(--border)",
+              borderRadius: 7,
+              background: "var(--bg)",
+              color: operationBusy || !account ? "var(--text-dim)" : "var(--accent)",
+              cursor: operationBusy || !account ? "default" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+              <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+              <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+              <path d="M3 4v8h8" />
+              <path d="M21 20v-8h-8" />
+            </ActionFlowIcon>
+          </button>
+        </div>
+      )}
 
-          {accountsLoading && !account ? (
+      {(refreshing || resetting || activatingAccountId) && (
+        <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
+          {refreshing ? "正在刷新…" : resetting ? "正在重置…" : "正在切换…"}
+        </div>
+      )}
+
+      {accountsLoading && !account ? (
             <div
               style={{
                 display: "flex",
@@ -1031,7 +1210,7 @@ export function ChatGptUsagePanel({
                 padding: 10,
                 borderRadius: 9,
                 border: "1px solid var(--border)",
-                background: "rgba(148,163,184,0.06)",
+                background: "var(--usage-card-bg, rgba(148,163,184,0.06))",
               }}
               aria-busy="true"
             >
@@ -1042,10 +1221,10 @@ export function ChatGptUsagePanel({
             </div>
           ) : !account ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
+              <div className="provider-usage-detail-card" style={{ padding: 10, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
                 <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active ChatGPT 账号</strong>
                 请先在 Models → ChatGPT 登录或激活一个账号。面板不会为未登录状态伪造额度。
-                {accountsError && <div style={{ marginTop: 6, color: "#f87171" }}>{accountsError}</div>}
+                {accountsError && <div style={{ marginTop: 6, color: "var(--usage-status-danger-fg, #b91c1c)" }}>{accountsError}</div>}
               </div>
               <button
                 type="button"
@@ -1055,7 +1234,7 @@ export function ChatGptUsagePanel({
                   borderRadius: 8,
                   border: "1px solid var(--accent)",
                   background: "var(--accent)",
-                  color: "#0b1220",
+                  color: "var(--bg)",
                   cursor: "pointer",
                   fontWeight: 800,
                   fontSize: 12,
@@ -1066,25 +1245,21 @@ export function ChatGptUsagePanel({
             </div>
           ) : (
             <>
-              <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+              <div className="provider-usage-detail-card" style={{ padding: 9, display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
                 <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
                   <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {account.displayName}
                   </span>
+                  {/* Account labels and extra metadata can be user-supplied; keep usage popovers to safe display fields. */}
                   <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {account.maskedAccountId}{account.label ? ` · ${account.label}` : ""}
+                    {account.maskedAccountId}
                   </code>
-                  {account.extraInfo && (
-                    <div title={account.extraInfo} style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {account.extraInfo}
-                    </div>
-                  )}
                 </div>
-                <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>Active</span>
+                <span className="provider-usage-active-badge" style={{ fontSize: 10 }}>Active</span>
               </div>
 
               {needsReauth && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
                   <strong>需要重新登录。</strong> {credentialBanner}
                   <div style={{ marginTop: 8 }}>
                     <button
@@ -1107,13 +1282,13 @@ export function ChatGptUsagePanel({
               )}
 
               {actionWarning && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 12, lineHeight: 1.5 }}>
+                <div className="provider-usage-status-banner" data-tone="warning" style={{ fontSize: 12, lineHeight: 1.5 }}>
                   {actionWarning}
                 </div>
               )}
 
               {actionError && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
+                <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
                   {actionError}
                 </div>
               )}
@@ -1132,7 +1307,7 @@ export function ChatGptUsagePanel({
                   ))}
                 </div>
               ) : !needsReauth ? (
-                <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
+                <div className="provider-usage-detail-card" style={{ padding: 10, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
                   用量未知。请刷新以查询当前 Active 账号。不会以 0% 表示未知额度。
                 </div>
               ) : null}
@@ -1157,8 +1332,8 @@ export function ChatGptUsagePanel({
                       alignItems: "center",
                       padding: 8,
                       borderRadius: 8,
-                      border: item.active ? "1px solid rgba(34,197,94,0.45)" : "1px solid var(--border)",
-                      background: item.active ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.06)",
+                      border: item.active ? "1px solid var(--usage-status-success-border)" : "1px solid var(--usage-panel-border, var(--border))",
+                      background: item.active ? "var(--usage-status-success-bg)" : "var(--usage-card-bg, rgba(148,163,184,0.06))",
                     }}
                   >
                     <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1166,11 +1341,11 @@ export function ChatGptUsagePanel({
                         {item.displayName}
                       </span>
                       <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.maskedAccountId}{item.label ? ` · ${item.label}` : ""}
+                        {item.maskedAccountId}
                       </code>
                     </div>
                     {item.active ? (
-                      <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 800 }}>Active</span>
+                      <span className="provider-usage-active-badge" style={{ fontSize: 11 }}>Active</span>
                     ) : (
                       <button
                         type="button"
@@ -1244,10 +1419,10 @@ export function ChatGptUsagePanel({
                         style={{
                           minHeight: 28,
                           padding: "4px 9px",
-                          border: "1px solid rgba(34,197,94,0.45)",
+                          border: "1px solid var(--usage-status-success-border)",
                           borderRadius: 7,
                           background: "var(--bg)",
-                          color: operationBusy ? "var(--text-dim)" : "#22c55e",
+                          color: operationBusy ? "var(--text-dim)" : "var(--usage-active-fg, #15803d)",
                           cursor: operationBusy ? "default" : "pointer",
                           fontSize: 11,
                           fontWeight: 800,
@@ -1292,7 +1467,7 @@ export function ChatGptUsagePanel({
                     </button>
                   </div>
                   {schedulerError && (
-                    <div style={{ color: "#f87171", fontSize: 11, lineHeight: 1.45 }}>{schedulerError}</div>
+                    <div style={{ color: "var(--usage-status-danger-fg, #b91c1c)", fontSize: 11, lineHeight: 1.45 }}>{schedulerError}</div>
                   )}
                   {schedulerStatus ? (
                     <div style={{ color: "var(--text-dim)", fontSize: 11, lineHeight: 1.55 }}>
@@ -1309,7 +1484,7 @@ export function ChatGptUsagePanel({
                         上次：{formatSchedulerTime(schedulerStatus.lastRunFinishedAt)}
                       </div>
                       {schedulerStatus.lastError && (
-                        <div style={{ color: "#f87171" }}>{SAFE_MESSAGES.schedulerLastError}</div>
+                        <div style={{ color: "var(--usage-status-danger-fg, #b91c1c)" }}>{SAFE_MESSAGES.schedulerLastError}</div>
                       )}
                       {schedulerStatus.lastAccountError && (
                         <div style={{ color: "#fb923c" }}>{SAFE_MESSAGES.schedulerAccountError}</div>
@@ -1326,9 +1501,9 @@ export function ChatGptUsagePanel({
                       alignSelf: "flex-start",
                       padding: "5px 9px",
                       borderRadius: 6,
-                      border: "1px solid rgba(239,68,68,0.35)",
+                      border: "1px solid var(--usage-status-danger-border)",
                       background: "transparent",
-                      color: repairingLock ? "var(--text-dim)" : "#f87171",
+                      color: repairingLock ? "var(--text-dim)" : "var(--usage-status-danger-fg, #b91c1c)",
                       cursor: operationBusy ? "default" : "pointer",
                       fontSize: 11,
                       fontWeight: 700,
@@ -1340,6 +1515,86 @@ export function ChatGptUsagePanel({
               </div>
             </>
           )}
+    </>
+  );
+
+  if (isAggregate) {
+    return (
+      <div
+        className="chatgpt-usage-panel chatgpt-usage-panel--aggregate"
+        data-presentation="aggregate"
+        style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}
+      >
+        <style>{`
+          @media (max-width: 420px) {
+            .chatgpt-usage-quota-grid { grid-template-columns: 1fr !important; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .chatgpt-usage-spinner { animation: none !important; border-top-color: var(--text-dim) !important; }
+          }
+        `}</style>
+        {detailBody}
+      </div>
+    );
+  }
+
+  return (
+    <div className="chatgpt-usage-panel" data-presentation="standalone" onMouseLeave={() => setOpen(false)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }} style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
+      {/* Local layout helpers; GPT-USAGE-02 may promote reduced-motion/spinner rules to globals. */}
+      <style>{`
+        @media (max-width: 420px) {
+          .chatgpt-usage-quota-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .chatgpt-usage-spinner { animation: none !important; border-top-color: var(--text-dim) !important; }
+        }
+      `}</style>
+      <ProviderUsageTrigger
+        buttonRef={triggerRef}
+        className="chatgpt-usage-panel__trigger"
+        providerLabel="GPT"
+        open={open}
+        displayMode={displayMode}
+        tone={fullStatus.tone}
+        statusText={fullStatus.status}
+        loading={fullStatus.showSpinner || compactFallback.loading}
+        ringUnit={ringUnit}
+        compactFallback={compactFallback.fallback}
+        onFocus={() => { if (escapeSuppressedRef.current) { escapeSuppressedRef.current = false; return; } setOpen(true); }}
+        onMouseEnter={() => { escapeSuppressedRef.current = false; setOpen(true); }}
+        title={ringUnit?.ariaLabel ?? "ChatGPT 用量"}
+        aria-label={ringUnit?.ariaLabel ?? "ChatGPT 用量"}
+        aria-controls={panelDomId}
+      />
+
+      {open && (
+        <section
+          ref={panelRef}
+          id={panelDomId}
+          role="dialog"
+          aria-label="ChatGPT 用量"
+          aria-live="polite"
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: panelPos.top,
+            right: panelPos.right,
+            zIndex: 550,
+            width: "min(392px, calc(100vw - 16px))",
+            maxHeight: "min(680px, calc(100vh - 80px))",
+            overflow: "auto",
+            border: "1px solid rgba(148,163,184,0.30)",
+            borderRadius: 12,
+            background: "color-mix(in srgb, var(--bg-panel) 86%, transparent)",
+            boxShadow: "0 18px 45px rgba(0,0,0,0.28)",
+            backdropFilter: "blur(14px)",
+            padding: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          {detailBody}
         </section>
       )}
     </div>

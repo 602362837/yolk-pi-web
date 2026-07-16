@@ -147,17 +147,38 @@ Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independen
 
 ### Rollback / stop-bleed
 
-1. Settings → Kiro: turn off usage panel and auto-failover; Settings → Usage: turn off **顶部额度组件简要显示** if needed (`usage.providerPanelsCompact=false`).
+1. Settings → Usage: turn off **模型用量组件聚合** (`usage.providerPanelsAggregated=false`) to leave the aggregate path and restore standalone Full/Compact immediately; Compact preference is retained and re-applies. Optionally turn off **顶部额度组件简要显示** (`usage.providerPanelsCompact=false`). Settings → Kiro: turn off usage panel and auto-failover if needed.
 2. Provider-layer: remove Kiro from `webProviderExtensions()` and hide Kiro UI/API branches; Grok continues.
-3. Keep `~/.pi/agent/auth-accounts/kiro/` credentials and `.quota-cache.json`; do not bulk-delete.
+3. Keep `~/.pi/agent/auth-accounts/kiro/` credentials and `.quota-cache.json`; do not bulk-delete. Aggregate/compact flags never delete credentials or quota cache.
 4. Failover state is independent of GPT/Grok/OpenCode (`__piKiroFailover` vs `__piGrokFailover` / `__piChatGptFailover` / `__piOpencodeGoFailover`).
 
 ### Compact top-bar looks wrong
 
-- Compact is **global**: one `usage.providerPanelsCompact` switch affects all enabled provider triggers together.
+- Compact is **global** and **standalone-only**: one `usage.providerPanelsCompact` switch affects all enabled provider triggers together when aggregate is off.
+- When aggregate is on, Compact is disabled in Settings but its boolean is not rewritten; turn aggregate off to re-apply Compact.
 - Provider visibility remains independent (`chatgpt|grok|kiro.usagePanelEnabled`).
 - Host order is always GPT → Grok → Kiro inside a single `.app-top-usage-panel` with one right-padding reserve.
-- Compact trigger click still opens the same detailed popover (refresh / Activate / Models recovery preserved).
+- Standalone Full/Compact use shared N-ring (not text summary chips); click still opens the same detailed popover (refresh / Activate / Models recovery preserved).
+- Ring layout comes from actual account windows + shared projector (short→long outer→inner, center = outermost). Missing windows are not filled with empty 5h/7d/week/month tracks.
+
+### Aggregate top-bar looks wrong / double polling
+
+- Aggregate is **global**: `usage.providerPanelsAggregated` (default false). When true, AppShell mounts only `ProviderUsageAggregatePanel` — never CSS-hide standalone panels.
+- Open is hover/focus (not click-primary accordion). Leaving both trigger and panel schedules a fixed **220ms** close; Escape uses focus-suppression so restore focus does not instantly reopen.
+- Panel is non-accordion provider columns (1–3 desktop, ≤640px max 2, ≤420px single); there is no total ring/percent and no “refresh all”.
+- Theme: panel/close/column/status colors must follow light/dark usage tokens (`--usage-panel-*` / status tokens in `app/globals.css`). Fixed night surfaces like `rgba(11,15,25,.98)` or `#1e293b` close buttons are regressions.
+- Ring sizes: aggregate trigger 30px; column-header rings target 40px (minimum 38px, not flex-shrunk below). Center text uses high-contrast tokens; outer unknown percent stays label + `—` (or same-bucket remaining) and never borrows an inner layer.
+- Network: each enabled provider should still own one accounts/quota client instance. If requests double, confirm aggregate/standalone JSX mutual exclusion and that disabled providers are not mounted.
+- Safe stop-bleed: `usage.providerPanelsAggregated=false` (credentials/cache/Compact preference untouched).
+
+### Aggregate / N-ring shows wrong windows or center
+
+- Providers only emit **actual present** safe candidates; the shared projector decides single/multi rings. Do not expect fixed GPT `[5h,7d]` or Grok `[week,month]` layouts.
+- Outer = shortest **trusted** duration; center always follows final outer (`layers[0]` / `centerLayerId`).
+- Single window (e.g. GPT only-7d, Grok only-week, single unknown-duration) is a single ring with that window as center.
+- Multi-window unknown duration or same-duration ties stay in detail with “另有窗口仅在详情展示”; all-unknown multi shows no ring + safe “详情” fallback (not array-order center).
+- Duration evidence is only explicit positive duration or strict period tokens/labels (`5h`, `7d`, `weekly`, `90m`, …). `Limits`, `quota`, remaining, resetAt, resourceType, percent, provider name, and array/field/id order are **not** duration — Kiro must not treat `Limits` as 90d.
+- When live provider data cannot prove duration for multi-window accounts, detail-only degradation is correct; do not loosen evidence just to force multi-rings.
 
 
 ## YPI Studio DAG and Async Runs

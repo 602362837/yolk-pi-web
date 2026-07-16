@@ -2,19 +2,36 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KiroQuotaBucket, KiroQuotaErrorCode, KiroQuotaResultV1 } from "@/lib/kiro-subscription-quota";
-import { formatTokensCompact } from "@/lib/token-format";
+import {
+  formatKiroRemaining,
+  projectKiroRingUnit,
+} from "@/lib/kiro-usage-ring";
 import { ActionFlowIcon } from "./ActionFlowIcon";
 import { iconFlowAttrs } from "./iconFlow";
 import {
+  toneForUsagePercent,
+  type ProviderUsageAggregateProjection,
+  type ProviderUsageRisk,
+  type ProviderUsageRingUnit,
+} from "./ProviderUsagePanelContract";
+import {
   ProviderUsageTrigger,
-  type ProviderUsageCompactSummary,
   type ProviderUsageDisplayMode,
-  type ProviderUsageRingItem,
   type ProviderUsageTriggerTone,
 } from "./ProviderUsageTrigger";
 
 const ACCOUNT_CACHE_POLL_INTERVAL_MS = 30_000;
 const KIRO_PROVIDER_ID = "kiro";
+/** Aggregate presentation mode for AppShell mutual exclusion (USAGE-AGG-05/06). */
+export type KiroUsagePresentation = "standalone" | "aggregate";
+
+// Re-export pure projection helpers for tests / adapters that import from the panel.
+export {
+  extractKiroBucketOrderEvidence,
+  formatKiroRemaining,
+  projectKiroRingUnit,
+  KIRO_EXTRA_WINDOWS_DETAIL_NOTE,
+} from "@/lib/kiro-usage-ring";
 
 interface KiroOAuthAccountSummary {
   accountId: string;
@@ -33,10 +50,10 @@ interface KiroOAuthAccountsResponse {
 }
 
 const CACHE_DOT: Record<KiroQuotaResultV1["cache"]["state"], string> = {
-  live: "#4ade80",
-  fresh: "#4ade80",
-  stale: "#eab308",
-  none: "var(--text-dim)",
+  live: "var(--usage-dot-success, #4ade80)",
+  fresh: "var(--usage-dot-success, #4ade80)",
+  stale: "var(--usage-dot-warning, #eab308)",
+  none: "var(--usage-dot-muted, var(--text-dim))",
 };
 
 const CACHE_LABEL: Record<KiroQuotaResultV1["cache"]["state"], string> = {
@@ -86,8 +103,8 @@ function formatKiroQuotaTime(iso: string | null | undefined): string {
 }
 
 function kiroUtilizationColor(pct: number): string {
-  if (pct >= 95) return "#ef4444";
-  if (pct >= 80) return "#eab308";
+  if (pct >= 95) return "var(--usage-status-danger-fg, #b91c1c)";
+  if (pct >= 80) return "var(--usage-status-warning-fg, #b45309)";
   return "var(--accent)";
 }
 
@@ -132,23 +149,30 @@ function kiroQuotaErrorMessage(
   }
 }
 
-function formatKiroRemaining(value: number, unit?: string): string {
-  if (!Number.isFinite(value) || value < 0) return "未知";
-  // Credits/usage volumes can be large; reuse compact token-style formatting for M/k.
-  const compact = value >= 1_000 ? formatTokensCompact(value) : Math.round(value).toLocaleString();
-  if (unit && unit.trim() && unit.trim().toLowerCase() !== "credit" && unit.trim().toLowerCase() !== "credits") {
-    return `${compact} ${unit.trim()}`;
-  }
-  return compact;
-}
-
+/** Detail highlight only — never decides multi-ring product shape. */
 function selectPrimaryBucket(quota: KiroQuotaResultV1 | null): KiroQuotaBucket | null {
   if (!quota || quota.buckets.length === 0) return null;
   if (quota.primaryBucketId) {
     const primary = quota.buckets.find((bucket) => bucket.id === quota.primaryBucketId);
     if (primary) return primary;
   }
-  return quota.buckets.find((bucket) => bucket.resourceType === "CREDIT") ?? quota.buckets[0] ?? null;
+  return null;
+}
+
+function riskFromRingUnit(unit: ProviderUsageRingUnit | null, context: {
+  reauth?: boolean;
+  stale?: boolean;
+  muted?: boolean;
+}): ProviderUsageRisk {
+  if (context.reauth) return "danger";
+  if (context.muted || !unit) return "muted";
+  let best: ProviderUsageRisk = context.stale ? "warning" : "normal";
+  for (const layer of unit.layers) {
+    const tone = toneForUsagePercent(layer.percent);
+    if (tone === "danger") return "danger";
+    if (tone === "warning") best = "warning";
+  }
+  return best;
 }
 
 function buildLocalNetworkError(accountId: string): KiroQuotaResultV1 {
@@ -172,12 +196,22 @@ function buildLocalNetworkError(accountId: string): KiroQuotaResultV1 {
 export function KiroUsagePanel({
   onOpenModels,
   displayMode = "full",
+  presentation = "standalone",
+  onAggregateProjectionChange,
 }: {
   /** Optional hook so AppShell can open Models → Kiro without hard coupling. */
   onOpenModels?: () => void;
   /** Global top-bar density from usage.providerPanelsCompact. */
   displayMode?: ProviderUsageDisplayMode;
+  /**
+   * standalone (default): owns click trigger + dialog + outside handlers.
+   * aggregate: no self trigger/dialog/outside handler; reuses the same detail body.
+   */
+  presentation?: KiroUsagePresentation;
+  /** Aggregate shell consumes allowlisted projection only (no secrets). */
+  onAggregateProjectionChange?: (projection: ProviderUsageAggregateProjection) => void;
 } = {}) {
+  const isAggregate = presentation === "aggregate";
   const panelDomId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -187,6 +221,7 @@ export function KiroUsagePanel({
   const quotaAbortRef = useRef<AbortController | null>(null);
 
   const [open, setOpen] = useState(false);
+  const escapeSuppressedRef = useRef(false);
   const [accounts, setAccounts] = useState<KiroOAuthAccountSummary[]>([]);
   const [account, setAccount] = useState<KiroOAuthAccountSummary | null>(null);
   const [accountsLoading, setAccountsLoading] = useState(true);
@@ -346,8 +381,9 @@ export function KiroUsagePanel({
     };
   }, [loadAccounts]);
 
+  // Aggregate never owns a self dialog; still refresh silently when mounted.
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const controller = new AbortController();
     void loadAccounts({
       silent: true,
@@ -356,10 +392,10 @@ export function KiroUsagePanel({
       forceQuota: false,
     });
     return () => controller.abort();
-  }, [open, loadAccounts]);
+  }, [isAggregate, open, loadAccounts]);
 
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const updatePosition = () => {
       const trigger = triggerRef.current;
       if (!trigger) return;
@@ -380,10 +416,10 @@ export function KiroUsagePanel({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open]);
+  }, [isAggregate, open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
@@ -394,6 +430,7 @@ export function KiroUsagePanel({
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
+        escapeSuppressedRef.current = true;
         triggerRef.current?.focus();
       }
     };
@@ -403,7 +440,7 @@ export function KiroUsagePanel({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [isAggregate, open]);
 
   const handleManualRefresh = useCallback(async () => {
     if (refreshing || activatingAccountId || !account) return;
@@ -472,6 +509,7 @@ export function KiroUsagePanel({
   }, [activatingAccountId, loadQuota, refreshing]);
 
   const openModels = useCallback(() => {
+    // Always close standalone dialog before Models; aggregate shell closes via parent.
     setOpen(false);
     onOpenModels?.();
   }, [onOpenModels]);
@@ -485,6 +523,20 @@ export function KiroUsagePanel({
   const safeQuota = quotaMatchesAccount ? quota : null;
   const safePrimary = useMemo(() => selectPrimaryBucket(safeQuota), [safeQuota]);
   const hasBuckets = Boolean(safeQuota && safeQuota.buckets.length > 0);
+
+  const ringProjection = useMemo(() => {
+    if (!account || !safeQuota || !hasBuckets) {
+      return {
+        ringUnit: null as ProviderUsageRingUnit | null,
+        detailOnlyBucketIds: [] as string[],
+        detailNote: null as string | null,
+        mode: "empty" as const,
+      };
+    }
+    // reauth without trusted buckets must not invent rings; hasBuckets already guards.
+    // primaryBucketId is detail highlight only — never radial order/center.
+    return projectKiroRingUnit(safeQuota.buckets);
+  }, [account, hasBuckets, safeQuota]);
 
   const fullStatus = useMemo(() => {
     if (refreshing) {
@@ -530,53 +582,76 @@ export function KiroUsagePanel({
     return { status: "无缓存", tone: "muted" as const, showSpinner: false };
   }, [account, accountsError, accountsLoading, hasBuckets, quotaLoading, refreshing, safeQuota]);
 
-  const compactProjection = useMemo(() => {
-    const summaries: ProviderUsageCompactSummary[] = [];
+  const triggerFallback = useMemo(() => {
     let fallback: string | null = null;
     let loading = false;
 
-    if (refreshing || (accountsLoading && !account && !safeQuota) || (quotaLoading && !safePrimary)) {
+    if (refreshing || (accountsLoading && !account && !safeQuota) || (quotaLoading && !ringProjection.ringUnit && !hasBuckets)) {
       loading = true;
       fallback = "加载中";
     } else if (accountsError && !account) {
       fallback = "错误";
     } else if (!account) {
       fallback = "登录";
-    } else if (safeQuota?.reauthRequired) {
+    } else if (safeQuota?.reauthRequired && !hasBuckets) {
       fallback = "需登录";
     } else if (safeQuota && !safeQuota.success && !hasBuckets) {
       fallback = "不可用";
-    } else if (safeQuota?.cache.state === "stale" && hasBuckets) {
-      // Prototype compact stale: short status only (fail-closed for auto switch elsewhere).
-      fallback = "已缓存";
-    } else if (safePrimary) {
-      summaries.push({
-        label: "剩余",
-        value: formatKiroRemaining(safePrimary.remaining, safePrimary.unit),
-        title: `${safePrimary.label} 剩余 ${formatKiroRemaining(safePrimary.remaining, safePrimary.unit)}`,
-      });
-    } else if (account) {
+    } else if (!ringProjection.ringUnit && account) {
       fallback = "额度未知";
     }
 
-    return { summaries, fallback, loading };
-  }, [account, accountsError, accountsLoading, hasBuckets, quotaLoading, refreshing, safePrimary, safeQuota]);
+    return { fallback, loading };
+  }, [
+    account,
+    accountsError,
+    accountsLoading,
+    hasBuckets,
+    quotaLoading,
+    refreshing,
+    ringProjection.ringUnit,
+    safeQuota,
+  ]);
 
-  const rings = useMemo((): ProviderUsageRingItem[] => {
-    if (!account || !safePrimary) {
-      return [{
-        percent: null,
-        label: "额度",
-        title: account ? "Kiro 额度未知" : "未登录",
-      }];
-    }
-    return [{
-      percent: safePrimary.utilization,
-      label: safePrimary.resourceType === "CREDIT" ? "Credit" : (safePrimary.label || "额度"),
-      title: `${safePrimary.label} 已使用 ${Math.round(safePrimary.utilization)}% · 剩余 ${formatKiroRemaining(safePrimary.remaining, safePrimary.unit)}`,
-      color: kiroUtilizationColor(safePrimary.utilization),
-    }];
-  }, [account, safePrimary]);
+  const aggregateProjection = useMemo((): ProviderUsageAggregateProjection => {
+    const loading = fullStatus.showSpinner || triggerFallback.loading;
+    const reauth = Boolean(safeQuota?.reauthRequired);
+    const stale = Boolean(safeQuota?.cache.state === "stale" && hasBuckets);
+    const ringUnit = reauth && !hasBuckets ? null : ringProjection.ringUnit;
+    const risk = riskFromRingUnit(ringUnit, {
+      reauth,
+      stale,
+      muted: Boolean(triggerFallback.fallback) && !ringUnit,
+    });
+    const titleParts = ["Kiro 用量"];
+    if (fullStatus.status) titleParts.push(fullStatus.status);
+    if (ringProjection.detailNote) titleParts.push(ringProjection.detailNote);
+    return {
+      key: "kiro",
+      label: "Kiro",
+      order: 3,
+      risk,
+      loading,
+      ringUnit,
+      fallback: ringUnit ? null : (triggerFallback.fallback ?? fullStatus.status),
+      title: titleParts.join(" · "),
+    };
+  }, [
+    fullStatus.showSpinner,
+    fullStatus.status,
+    hasBuckets,
+    ringProjection.detailNote,
+    ringProjection.ringUnit,
+    safeQuota?.cache.state,
+    safeQuota?.reauthRequired,
+    triggerFallback.fallback,
+    triggerFallback.loading,
+  ]);
+
+  useEffect(() => {
+    if (!isAggregate) return;
+    onAggregateProjectionChange?.(aggregateProjection);
+  }, [aggregateProjection, isAggregate, onAggregateProjectionChange]);
 
   const cacheLabel = safeQuota
     ? kiroCacheStateLabel(safeQuota.cache.state)
@@ -598,10 +673,389 @@ export function KiroUsagePanel({
     : accountsError;
 
   const subscriptionTitle = safeQuota?.subscription?.title?.trim() || null;
+  const projectedLayerIds = useMemo(
+    () => new Set(ringProjection.ringUnit?.layers.map((layer) => layer.id) ?? []),
+    [ringProjection.ringUnit],
+  );
+
+  const detailBody = (
+    <>
+      {!isAggregate && (
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
+              {subscriptionTitle ? `Kiro · ${subscriptionTitle}` : "Kiro 用量"}
+            </div>
+            <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: safeQuota ? kiroCacheStateDot(safeQuota.cache.state) : "var(--text-dim)",
+                  }}
+                />
+                <span>{safeQuota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}</span>
+              </span>
+              <span>更新时间：{queriedLabel}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button
+              type="button"
+              className="kiro-usage-panel__action"
+              onClick={() => void handleManualRefresh()}
+              disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
+              {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
+              title="强制刷新当前 Active 账号 quota"
+              aria-label="刷新当前 Active Kiro 账号 quota"
+              style={{
+                width: 30,
+                height: 30,
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                background: "var(--bg)",
+                color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
+                cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+                <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+                <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+                <path d="M3 4v8h8" />
+                <path d="M21 20v-8h-8" />
+              </ActionFlowIcon>
+            </button>
+            <button
+              type="button"
+              className="kiro-usage-panel__action"
+              onClick={() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
+              aria-label="关闭 Kiro 用量面板"
+              style={{
+                width: 30,
+                height: 30,
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                background: "var(--bg)",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                fontSize: 16,
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isAggregate && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ minWidth: 0, color: "var(--text-dim)", fontSize: 11 }}>
+            {subscriptionTitle ? `Kiro · ${subscriptionTitle}` : "Kiro"}
+            {" · "}
+            {safeQuota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}
+            {" · "}
+            更新时间：{queriedLabel}
+          </div>
+          <button
+            type="button"
+            className="kiro-usage-panel__action"
+            onClick={() => void handleManualRefresh()}
+            disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
+            {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
+            title="强制刷新当前 Active 账号 quota"
+            aria-label="刷新当前 Active Kiro 账号 quota"
+            style={{
+              width: 30,
+              height: 30,
+              border: "1px solid var(--border)",
+              borderRadius: 7,
+              background: "var(--bg)",
+              color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
+              cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+              <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+              <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+              <path d="M3 4v8h8" />
+              <path d="M21 20v-8h-8" />
+            </ActionFlowIcon>
+          </button>
+        </div>
+      )}
+
+      {refreshing && (
+        <div style={{ color: "var(--text-muted)", fontSize: 11 }}>正在刷新…</div>
+      )}
+
+      {accountsLoading && !account && !safeQuota ? (
+        <div
+          className="kiro-usage-panel__skeleton provider-usage-detail-card"
+          style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10 }}
+          aria-busy="true"
+        >
+          <div className="kiro-usage-panel__skeleton-shimmer" style={{ height: 10, width: "54%", borderRadius: 4 }} />
+          <div className="kiro-usage-panel__skeleton-shimmer" style={{ height: 10, width: "78%", borderRadius: 4 }} />
+          <div className="kiro-usage-panel__skeleton-shimmer" style={{ height: 72, borderRadius: 8 }} />
+          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>正在加载已保存账号与缓存 quota…</span>
+        </div>
+      ) : !account ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="provider-usage-detail-card" style={{ padding: 10, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
+            <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active Kiro 账号</strong>
+            请先在 Models → Kiro 登录或激活一个账号。面板不会为未登录状态伪造额度。
+            {accountsError && <div style={{ marginTop: 6, color: "var(--usage-status-danger-fg, #b91c1c)" }}>{accountsError}</div>}
+          </div>
+          <button
+            type="button"
+            onClick={openModels}
+            style={{
+              minHeight: 34,
+              borderRadius: 8,
+              border: "1px solid var(--accent)",
+              background: "var(--accent)",
+              color: "var(--bg)",
+              cursor: "pointer",
+              fontWeight: 800,
+              fontSize: 12,
+            }}
+          >
+            打开 Models → Kiro
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="provider-usage-detail-card" style={{ padding: 9, display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+            <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+              <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {account.displayName}
+              </span>
+              <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {account.maskedAccountId}
+              </code>
+            </div>
+            <span className="provider-usage-active-badge" style={{ fontSize: 10 }}>Active</span>
+          </div>
+
+          {safeQuota?.reauthRequired && (
+            <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <strong>需要重新登录。</strong> {kiroQuotaErrorMessage("unauthorized")}
+            </div>
+          )}
+
+          {!safeQuota?.reauthRequired && safeQuota?.cache.state === "stale" && hasBuckets && (
+            <div className="provider-usage-status-banner" data-tone="warning" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <strong>缓存已过期。</strong> {safeErrorText ?? "正在展示上次成功数据。"}
+            </div>
+          )}
+
+          {!safeQuota?.reauthRequired && safeQuota && !safeQuota.success && !hasBuckets && (
+            <div className="provider-usage-status-banner" data-tone="warning" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <strong>额度暂不可用。</strong> {safeErrorText ?? "请稍后重试。不会从本地 turn 用量臆造剩余额度。"}
+            </div>
+          )}
+
+          {activateError && (
+            <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              {activateError}
+            </div>
+          )}
+
+          {ringProjection.detailNote && hasBuckets && (
+            <div
+              data-kiro-detail-note="extra-windows"
+              className="provider-usage-status-banner" data-tone="detail-only" style={{ fontSize: 11, lineHeight: 1.45 }}
+            >
+              {ringProjection.detailNote}
+            </div>
+          )}
+
+          {hasBuckets && safeQuota ? (
+            <div className="kiro-usage-quota-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {safeQuota.buckets.map((bucket) => {
+                const inRing = projectedLayerIds.has(bucket.id);
+                const isPrimary = bucket.id === safePrimary?.id;
+                const percentKnown = Number.isFinite(bucket.utilization);
+                return (
+                  <div
+                    key={bucket.id}
+                    data-in-ring={inRing ? "true" : "false"}
+                    style={{
+                      padding: 10,
+                      borderRadius: 9,
+                      border: inRing
+                        ? "1px solid rgba(96,165,250,0.40)"
+                        : isPrimary
+                          ? "1px solid rgba(96,165,250,0.28)"
+                          : "1px solid var(--border)",
+                      background: "var(--usage-card-bg, rgba(148,163,184,0.06))",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>
+                      {bucket.label}
+                      {isPrimary ? " · 主额度" : ""}
+                      {!inRing && ringProjection.ringUnit ? " · 仅详情" : ""}
+                    </div>
+                    <div style={{ color: percentKnown ? kiroUtilizationColor(bucket.utilization) : "var(--text-dim)", fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                      {Number.isFinite(bucket.used) ? bucket.used.toLocaleString() : "—"}{" "}
+                      <small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>
+                        / {Number.isFinite(bucket.limit) && bucket.limit > 0 ? bucket.limit.toLocaleString() : "—"}
+                      </small>
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-label={bucket.label}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      {...(percentKnown
+                        ? { "aria-valuenow": Math.round(Math.min(Math.max(bucket.utilization, 0), 100)) }
+                        : {})}
+                      style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: percentKnown ? `${Math.min(Math.max(bucket.utilization, 0), 100)}%` : "0%",
+                          background: percentKnown ? kiroUtilizationColor(bucket.utilization) : "rgba(148,163,184,0.35)",
+                          borderRadius: 99,
+                        }}
+                      />
+                    </div>
+                    <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                      剩余 {formatKiroRemaining(bucket.remaining, bucket.unit)}
+                      {bucket.resetsAt ? ` · 重置 ${formatKiroQuotaTime(bucket.resetsAt)}` : ""}
+                      {percentKnown ? ` · 已用 ${Math.round(bucket.utilization)}%` : " · 比例未知"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : !safeQuota?.error && !quotaLoading ? (
+            <div className="provider-usage-detail-card" style={{ padding: 10, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
+              用量未知。请刷新以查询当前 Active 账号。
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>账号</span>
+              <span style={{ color: "var(--text-dim)", fontSize: 9, fontWeight: 600 }}>全局 Active</span>
+            </div>
+            <div style={{ padding: 8, borderRadius: 8, border: "1px solid rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
+              “设为 Active”会切换全局 Active Kiro 账号，影响当前与新建会话的后续请求。in-flight 请求不换 Token。
+            </div>
+            {accounts.length === 0 ? (
+              <div style={{ color: "var(--text-dim)", fontSize: 12 }}>没有已保存账号。</div>
+            ) : accounts.map((item) => (
+              <div
+                key={item.accountId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: 8,
+                  alignItems: "center",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: item.active ? "1px solid var(--usage-status-success-border)" : "1px solid var(--usage-panel-border, var(--border))",
+                  background: item.active ? "var(--usage-status-success-bg)" : "var(--usage-card-bg, rgba(148,163,184,0.06))",
+                }}
+              >
+                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span title={item.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.displayName}
+                  </span>
+                  <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.maskedAccountId}
+                  </code>
+                </div>
+                {item.active ? (
+                  <span className="provider-usage-active-badge" style={{ fontSize: 11 }}>Active</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleActivate(item.accountId)}
+                    disabled={Boolean(activatingAccountId) || refreshing}
+                    style={{
+                      minHeight: 30,
+                      padding: "5px 9px",
+                      borderRadius: 6,
+                      border: "1px solid var(--border)",
+                      background: "var(--bg)",
+                      color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)",
+                      cursor: activatingAccountId || refreshing ? "default" : "pointer",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {activatingAccountId === item.accountId ? "正在切换…" : "设为 Active"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
+            <button
+              type="button"
+              onClick={openModels}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--accent)",
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: 0,
+                textAlign: "left",
+              }}
+            >
+              {safeQuota?.reauthRequired ? "在 Models → Kiro 重新登录" : "在 Models → Kiro 管理"}
+            </button>
+            <span style={{ color: "var(--text-dim)", fontSize: 10 }}>页面可见时每 30 秒刷新</span>
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  if (isAggregate) {
+    return (
+      <div
+        className="kiro-usage-panel kiro-usage-panel--aggregate"
+        data-presentation="aggregate"
+        style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}
+      >
+        {detailBody}
+      </div>
+    );
+  }
 
   return (
     <div
       className="kiro-usage-panel"
+      data-presentation="standalone"
+      onMouseLeave={() => setOpen(false)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}
       style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}
     >
       <ProviderUsageTrigger
@@ -612,13 +1066,13 @@ export function KiroUsagePanel({
         displayMode={displayMode}
         tone={fullStatus.tone}
         statusText={fullStatus.status}
-        loading={fullStatus.showSpinner || compactProjection.loading}
-        rings={rings}
-        compactSummaries={compactProjection.summaries}
-        compactFallback={compactProjection.fallback}
-        onClick={() => setOpen((value) => !value)}
-        title="Kiro 用量"
-        aria-label="Kiro 用量"
+        loading={fullStatus.showSpinner || triggerFallback.loading}
+        ringUnit={ringProjection.ringUnit}
+        compactFallback={triggerFallback.fallback}
+        onFocus={() => { if (escapeSuppressedRef.current) { escapeSuppressedRef.current = false; return; } setOpen(true); }}
+        onMouseEnter={() => { escapeSuppressedRef.current = false; setOpen(true); }}
+        title={aggregateProjection.title}
+        aria-label={ringProjection.ringUnit?.ariaLabel ?? "Kiro 用量"}
         aria-controls={panelDomId}
       />
 
@@ -650,286 +1104,7 @@ export function KiroUsagePanel({
             gap: 10,
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
-                {subscriptionTitle ? `Kiro · ${subscriptionTitle}` : "Kiro 用量"}
-              </div>
-              <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: safeQuota ? kiroCacheStateDot(safeQuota.cache.state) : "var(--text-dim)",
-                    }}
-                  />
-                  <span>{safeQuota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}</span>
-                </span>
-                <span>更新时间：{queriedLabel}</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <button
-                type="button"
-                className="kiro-usage-panel__action"
-                onClick={() => void handleManualRefresh()}
-                disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
-                {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
-                title="强制刷新当前 Active 账号 quota"
-                aria-label="刷新当前 Active Kiro 账号 quota"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: "1px solid var(--border)",
-                  borderRadius: 7,
-                  background: "var(--bg)",
-                  color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
-                  cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                }}
-              >
-                <ActionFlowIcon width={14} height={14} strokeWidth={2}>
-                  <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
-                  <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
-                  <path d="M3 4v8h8" />
-                  <path d="M21 20v-8h-8" />
-                </ActionFlowIcon>
-              </button>
-              <button
-                type="button"
-                className="kiro-usage-panel__action"
-                onClick={() => {
-                  setOpen(false);
-                  triggerRef.current?.focus();
-                }}
-                aria-label="关闭 Kiro 用量面板"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: "1px solid var(--border)",
-                  borderRadius: 7,
-                  background: "var(--bg)",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          {refreshing && (
-            <div style={{ color: "var(--text-muted)", fontSize: 11 }}>正在刷新…</div>
-          )}
-
-          {accountsLoading && !account && !safeQuota ? (
-            <div
-              className="kiro-usage-panel__skeleton"
-              style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)" }}
-              aria-busy="true"
-            >
-              <div className="kiro-usage-panel__skeleton-shimmer" style={{ height: 10, width: "54%", borderRadius: 4 }} />
-              <div className="kiro-usage-panel__skeleton-shimmer" style={{ height: 10, width: "78%", borderRadius: 4 }} />
-              <div className="kiro-usage-panel__skeleton-shimmer" style={{ height: 72, borderRadius: 8 }} />
-              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>正在加载已保存账号与缓存 quota…</span>
-            </div>
-          ) : !account ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
-                <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active Kiro 账号</strong>
-                请先在 Models → Kiro 登录或激活一个账号。面板不会为未登录状态伪造额度。
-                {accountsError && <div style={{ marginTop: 6, color: "#f87171" }}>{accountsError}</div>}
-              </div>
-              <button
-                type="button"
-                onClick={openModels}
-                style={{
-                  minHeight: 34,
-                  borderRadius: 8,
-                  border: "1px solid var(--accent)",
-                  background: "var(--accent)",
-                  color: "#0b1220",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 12,
-                }}
-              >
-                打开 Models → Kiro
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
-                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-                  <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {account.displayName}
-                  </span>
-                  <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {account.maskedAccountId}{account.label ? ` · ${account.label}` : ""}
-                  </code>
-                </div>
-                <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>Active</span>
-              </div>
-
-              {safeQuota?.reauthRequired && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>需要重新登录。</strong> {kiroQuotaErrorMessage("unauthorized")}
-                </div>
-              )}
-
-              {!safeQuota?.reauthRequired && safeQuota?.cache.state === "stale" && hasBuckets && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>缓存已过期。</strong> {safeErrorText ?? "正在展示上次成功数据。"}
-                </div>
-              )}
-
-              {!safeQuota?.reauthRequired && safeQuota && !safeQuota.success && !hasBuckets && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>额度暂不可用。</strong> {safeErrorText ?? "请稍后重试。不会从本地 turn 用量臆造剩余额度。"}
-                </div>
-              )}
-
-              {activateError && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
-                  {activateError}
-                </div>
-              )}
-
-              {hasBuckets && safeQuota ? (
-                <div className="kiro-usage-quota-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {safeQuota.buckets.map((bucket) => (
-                    <div
-                      key={bucket.id}
-                      style={{
-                        padding: 10,
-                        borderRadius: 9,
-                        border: bucket.id === safePrimary?.id ? "1px solid rgba(96,165,250,0.40)" : "1px solid var(--border)",
-                        background: "rgba(148,163,184,0.06)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                        minWidth: 0,
-                      }}
-                    >
-                      <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>
-                        {bucket.label}{bucket.id === safePrimary?.id ? " · 主额度" : ""}
-                      </div>
-                      <div style={{ color: kiroUtilizationColor(bucket.utilization), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                        {Number.isFinite(bucket.used) ? bucket.used.toLocaleString() : "—"}{" "}
-                        <small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>
-                          / {Number.isFinite(bucket.limit) && bucket.limit > 0 ? bucket.limit.toLocaleString() : "—"}
-                        </small>
-                      </div>
-                      <div
-                        role="progressbar"
-                        aria-label={bucket.label}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(Math.min(Math.max(bucket.utilization, 0), 100))}
-                        style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
-                      >
-                        <div style={{ height: "100%", width: `${Math.min(Math.max(bucket.utilization, 0), 100)}%`, background: kiroUtilizationColor(bucket.utilization), borderRadius: 99 }} />
-                      </div>
-                      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
-                        剩余 {formatKiroRemaining(bucket.remaining, bucket.unit)}
-                        {bucket.resetsAt ? ` · 重置 ${formatKiroQuotaTime(bucket.resetsAt)}` : ""}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : !safeQuota?.error && !quotaLoading ? (
-                <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
-                  用量未知。请刷新以查询当前 Active 账号。
-                </div>
-              ) : null}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>账号</span>
-                  <span style={{ color: "var(--text-dim)", fontSize: 9, fontWeight: 600 }}>全局 Active</span>
-                </div>
-                <div style={{ padding: 8, borderRadius: 8, border: "1px solid rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
-                  “设为 Active”会切换全局 Active Kiro 账号，影响当前与新建会话的后续请求。in-flight 请求不换 Token。
-                </div>
-                {accounts.length === 0 ? (
-                  <div style={{ color: "var(--text-dim)", fontSize: 12 }}>没有已保存账号。</div>
-                ) : accounts.map((item) => (
-                  <div
-                    key={item.accountId}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr auto",
-                      gap: 8,
-                      alignItems: "center",
-                      padding: 8,
-                      borderRadius: 8,
-                      border: item.active ? "1px solid rgba(34,197,94,0.45)" : "1px solid var(--border)",
-                      background: item.active ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.06)",
-                    }}
-                  >
-                    <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span title={item.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.displayName}
-                      </span>
-                      <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.maskedAccountId}{item.label ? ` · ${item.label}` : ""}
-                      </code>
-                    </div>
-                    {item.active ? (
-                      <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 800 }}>Active</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void handleActivate(item.accountId)}
-                        disabled={Boolean(activatingAccountId) || refreshing}
-                        style={{
-                          minHeight: 30,
-                          padding: "5px 9px",
-                          borderRadius: 6,
-                          border: "1px solid var(--border)",
-                          background: "var(--bg)",
-                          color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)",
-                          cursor: activatingAccountId || refreshing ? "default" : "pointer",
-                          fontSize: 11,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {activatingAccountId === item.accountId ? "正在切换…" : "设为 Active"}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
-                <button
-                  type="button"
-                  onClick={openModels}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: 0,
-                    textAlign: "left",
-                  }}
-                >
-                  {safeQuota?.reauthRequired ? "在 Models → Kiro 重新登录" : "在 Models → Kiro 管理"}
-                </button>
-                <span style={{ color: "var(--text-dim)", fontSize: 10 }}>页面可见时每 30 秒刷新</span>
-              </div>
-            </>
-          )}
+          {detailBody}
         </section>
       )}
     </div>
