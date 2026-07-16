@@ -1072,11 +1072,6 @@ html.dark .usage-chart-tooltip {
   .git-branch-switch-row > select {
     width: 100%;
   }
-  /* Only hide the inline trigger label; never hide dropdown tree text. */
-  .branch-navigator-inline > .tech-action-tag .app-top-label,
-  .branch-navigator-inline > button > span {
-    display: none !important;
-  }
   .subagent-run-row {
     align-items: flex-start !important;
     flex-wrap: wrap;
@@ -3169,25 +3164,6 @@ button.session-stats-chip:focus-visible {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-/* Branches inline: outer host keeps top-bar alignment; button is the pill tag.
-   Dropdown still positions via containerRef/topBarRef (top/left/width). */
-.branch-navigator-inline {
-  display: inline-flex;
-  align-items: center;
-  align-self: center;
-  flex-shrink: 0;
-  height: auto;
-  overflow: visible;
-}
-
-.branch-navigator-inline .app-top-action-tag {
-  overflow: visible;
-}
-
-.branch-navigator-dropdown {
-  overflow: visible;
 }
 
 /* Shared badge layer above SVG overlay; keep inside tag for mobile. */

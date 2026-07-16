@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PiWebThinkingLevel, PiWebToolPreset } from "@/lib/pi-web-config";
-import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { AgentMessage, SessionInfo } from "@/lib/types";
 import type { YpiStudioLiveRunOverlay } from "@/lib/ypi-studio-types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
@@ -12,7 +12,6 @@ import { useAgentSession, type AgentPhase, type SessionUsageTopbarStats } from "
 import { useAudio } from "@/hooks/useAudio";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useDragDrop } from "@/hooks/useDragDrop";
-import { SessionChangesFloatingPanel } from "./SessionChangesFloatingPanel";
 
 interface Props {
   session: SessionInfo | null;
@@ -23,7 +22,6 @@ interface Props {
   onSessionForked?: (newSessionId: string) => void;
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
-  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSubagentChange?: (runs: import("@/hooks/useAgentSession").SubagentRun[]) => void;
   onSessionStatsChange?: (stats: SessionUsageTopbarStats | null) => void;
@@ -167,7 +165,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {
+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -183,7 +181,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     handleToolPresetChange, handleThinkingLevelChange, handleAgentEventRef,
   } = useAgentSession({
     session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
+    modelsRefreshKey, onSystemPromptChange, onSubagentChange,
     autoScrollEnabled, defaultToolPreset, defaultThinkingLevel, defaultModel,
   });
 
@@ -490,9 +488,6 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     >
       {archivedBannerElement}
       {studioChildBannerElement}
-      {session?.id && (
-        <SessionChangesFloatingPanel sessionId={session.id} agentRunning={agentRunning} />
-      )}
       {isDragOver && (
         <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-[rgba(37,99,235,0.06)] backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
