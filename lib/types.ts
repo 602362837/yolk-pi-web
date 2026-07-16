@@ -340,6 +340,66 @@ export interface StudioChildSessionDisplay {
   runSummary?: string;
 }
 
+/** Normalized panel status for GET /api/sessions/:id/studio-children. */
+export type StudioChildPanelStatus =
+  | "queued"
+  | "running"
+  | "waiting_for_user"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "runtime_lost"
+  | "unknown";
+
+/**
+ * Browser-safe projection of one YPI Studio child audit session for the Chat top-bar panel.
+ * Wire allowlist: no path/cwd/sessionFile/contextId/prompt/output/summary/error/transcript/artifact.
+ */
+export interface StudioChildSessionListItem {
+  sessionId: string;
+  taskId: string;
+  runId: string;
+  member: string;
+  subtaskId?: string;
+  title: string;
+  taskTitle?: string;
+  subtaskTitle?: string;
+  status: StudioChildPanelStatus;
+  rawStatus?: string;
+  statusSource: "task" | "header";
+  statusMayBeStale: boolean;
+  createdAt: string;
+  modifiedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  messageCount: number;
+}
+
+export interface StudioChildSessionListCounts {
+  active: number;
+  waitingForUser: number;
+  terminalAvailable: number;
+  terminalReturned: number;
+}
+
+export interface StudioChildSessionListLimits {
+  terminal: 20;
+  terminalTruncated: boolean;
+  defensiveActiveCap: number;
+  activeTruncated: boolean;
+}
+
+export interface StudioChildSessionListResponse {
+  kind: "ypi_studio_child_sessions";
+  parentSessionId: string;
+  children: StudioChildSessionListItem[];
+  counts: StudioChildSessionListCounts;
+  limits: StudioChildSessionListLimits;
+  generatedAt: string;
+  /** Bounded non-sensitive notes when individual task projections degrade. */
+  warnings?: string[];
+}
+
 export interface SessionInfo {
   path: string;
   id: string;

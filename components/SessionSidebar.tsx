@@ -134,12 +134,11 @@ interface WorktreeActionResponse {
   };
 }
 
-interface WorktreeContextMenuState {
-  x: number;
-  y: number;
-  cwd: string;
-  worktree: WorktreeInfo;
-}
+/** Shared current-workspace menu: three-dots (anchored) and project-switch right-click (context). */
+type CurrentWorkspaceMenuState =
+  | { mode: "anchored" }
+  | { mode: "context"; x: number; y: number }
+  | null;
 
 interface SessionContextMenuState {
   x: number;
@@ -229,6 +228,7 @@ function findProjectSpace(projects: PiWebProjectRecord[], projectId: string | nu
 function WorkspaceMenuButton({ children, danger = false, onClick }: { children: React.ReactNode; danger?: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
         display: "flex",
@@ -249,6 +249,97 @@ function WorkspaceMenuButton({ children, danger = false, onClick }: { children: 
       {children}
     </button>
   );
+}
+
+function WorkspaceMenuSeparator() {
+  return <div className="session-sidebar-menu-separator" role="separator" />;
+}
+
+/** Single source of current-workspace menu items for both triggers. */
+function CurrentWorkspaceMenuContent({
+  selectedProjectSpace,
+  selectedCwd,
+  selectedWorktree,
+  onClose,
+  onEditProjectMetadata,
+  onEditSpaceMetadata,
+  onToggleProjectPinned,
+  onToggleSpacePinned,
+  onArchiveAllSessions,
+  onArchiveCurrentSpace,
+  onArchiveProject,
+  onArchiveWorktree,
+  onDeleteWorktree,
+}: {
+  selectedProjectSpace: { project: PiWebProjectRecord; space: PiWebProjectSpaceRecord } | null;
+  selectedCwd: string | null;
+  selectedWorktree?: WorktreeInfo;
+  onClose: () => void;
+  onEditProjectMetadata: () => void;
+  onEditSpaceMetadata: () => void;
+  onToggleProjectPinned: () => void;
+  onToggleSpacePinned: () => void;
+  onArchiveAllSessions: () => void;
+  onArchiveCurrentSpace: () => void;
+  onArchiveProject: () => void;
+  onArchiveWorktree: () => void;
+  onDeleteWorktree: () => void;
+}) {
+  const showWorktreeActions = Boolean(selectedCwd && selectedWorktree);
+
+  return (
+    <>
+      {selectedProjectSpace && (
+        <>
+          <WorkspaceMenuButton onClick={() => { onClose(); onEditProjectMetadata(); }}>
+            编辑项目元数据…
+          </WorkspaceMenuButton>
+          <WorkspaceMenuButton onClick={() => { onClose(); onEditSpaceMetadata(); }}>
+            编辑空间元数据…
+          </WorkspaceMenuButton>
+          <WorkspaceMenuButton onClick={() => { onClose(); onToggleProjectPinned(); }}>
+            {selectedProjectSpace.project.pinned ? "取消星标项目" : "星标项目"}
+          </WorkspaceMenuButton>
+          <WorkspaceMenuButton onClick={() => { onClose(); onToggleSpacePinned(); }}>
+            {selectedProjectSpace.space.pinned ? "取消星标空间" : "星标空间"}
+          </WorkspaceMenuButton>
+        </>
+      )}
+      <WorkspaceMenuButton onClick={() => { onClose(); onArchiveAllSessions(); }}>
+        归档所有会话
+      </WorkspaceMenuButton>
+      {selectedProjectSpace && (
+        <>
+          <WorkspaceMenuButton danger onClick={() => { onClose(); onArchiveCurrentSpace(); }}>
+            归档当前空间
+          </WorkspaceMenuButton>
+          <WorkspaceMenuButton danger onClick={() => { void onArchiveProject(); }}>
+            归档项目
+          </WorkspaceMenuButton>
+        </>
+      )}
+      {showWorktreeActions && (
+        <>
+          <WorkspaceMenuSeparator />
+          <WorkspaceMenuButton onClick={() => { onClose(); onArchiveWorktree(); }}>
+            归档 WorkTree…
+          </WorkspaceMenuButton>
+          <WorkspaceMenuButton danger onClick={() => { onClose(); onDeleteWorktree(); }}>
+            删除 WorkTree…
+          </WorkspaceMenuButton>
+        </>
+      )}
+    </>
+  );
+}
+
+function clampMenuPosition(x: number, y: number, width: number, height: number, pad = 8): { x: number; y: number } {
+  const maxX = Math.max(pad, window.innerWidth - width - pad);
+  const maxY = Math.max(pad, window.innerHeight - height - pad);
+  return {
+    x: Math.min(Math.max(pad, x), maxX),
+    y: Math.min(Math.max(pad, y), maxY),
+  };
 }
 
 function studioChildBadgeText(session: SessionInfo): string | null {
@@ -346,8 +437,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [gitAddError, setGitAddError] = useState<string | null>(null);
   const [gitParentPickerBusy, setGitParentPickerBusy] = useState(false);
   const [gitCloneBusy, setGitCloneBusy] = useState(false);
-  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [currentWorkspaceMenu, setCurrentWorkspaceMenu] = useState<CurrentWorkspaceMenuState>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuPanelRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedForArchive, setSelectedForArchive] = useState<Set<string>>(new Set());
   const [archiveAllConfirming, setArchiveAllConfirming] = useState(false);
   const [archiveAllBusy, setArchiveAllBusy] = useState(false);
@@ -356,7 +450,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [creatingWorktree, setCreatingWorktree] = useState(false);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
   const [, setEphemeralWorktrees] = useState<Record<string, WorktreeInfo>>({});
-  const [worktreeContextMenu, setWorktreeContextMenu] = useState<WorktreeContextMenuState | null>(null);
   const [sessionContextMenu, setSessionContextMenu] = useState<SessionContextMenuState | null>(null);
   const [metadataEditTarget, setMetadataEditTarget] = useState<MetadataEditTarget | null>(null);
   const [metadataBusy, setMetadataBusy] = useState(false);
@@ -865,16 +958,73 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     resetGitAddForm,
   ]);
 
-  // Close context menus on outside click
+  const closeCurrentWorkspaceMenu = useCallback(() => {
+    setCurrentWorkspaceMenu(null);
+    setContextMenuPosition(null);
+  }, []);
+
+  // Close context menus on outside click / Escape (dialog target menu + session menu).
   useEffect(() => {
     const handler = () => {
-      setWorktreeContextMenu(null);
       setSessionContextMenu(null);
       setProjectSpaceContextMenu(null);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Outside click + Escape for the shared current-workspace menu (both triggers).
+  useEffect(() => {
+    if (!currentWorkspaceMenu) return;
+
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (workspaceMenuPanelRef.current?.contains(target)) return;
+      if (workspaceMenuRef.current?.contains(target)) return;
+      closeCurrentWorkspaceMenu();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeCurrentWorkspaceMenu();
+        workspaceMenuTriggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [currentWorkspaceMenu, closeCurrentWorkspaceMenu]);
+
+  // Clamp fixed context-menu coordinates after layout so the panel stays in viewport.
+  useEffect(() => {
+    if (!currentWorkspaceMenu || currentWorkspaceMenu.mode !== "context") {
+      setContextMenuPosition(null);
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const panel = workspaceMenuPanelRef.current;
+      const width = panel?.offsetWidth ?? 220;
+      const height = panel?.offsetHeight ?? 280;
+      setContextMenuPosition(
+        clampMenuPosition(currentWorkspaceMenu.x, currentWorkspaceMenu.y, width, height),
+      );
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentWorkspaceMenu]);
+
+  // Drop the menu when the current workspace disappears or changes identity.
+  useEffect(() => {
+    if (!selectedCwd) {
+      closeCurrentWorkspaceMenu();
+    }
+  }, [selectedCwd, selectedProjectId, selectedSpaceId, closeCurrentWorkspaceMenu]);
 
   const handleNewSession = useCallback(() => {
     if (!selectedCwd) return;
@@ -927,21 +1077,39 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, [selectedCwd, creatingWorktree, onNewSession, selectedProjectId, loadProjects]);
 
   const openWorktreeAction = useCallback((kind: "delete" | "archive", cwd: string, worktree: WorktreeInfo) => {
-    setWorktreeContextMenu(null);
+    closeCurrentWorkspaceMenu();
     setWorktreeAction({ kind, cwd, worktree, force: false, busy: false, error: null });
-  }, []);
+  }, [closeCurrentWorkspaceMenu]);
 
   const handleDialogProjectContextMenu = useCallback((event: React.MouseEvent, project: PiWebProjectRecord) => {
     event.preventDefault();
     event.stopPropagation();
+    closeCurrentWorkspaceMenu();
     setProjectSpaceContextMenu({ x: event.clientX, y: event.clientY, project });
-  }, []);
+  }, [closeCurrentWorkspaceMenu]);
 
   const handleDialogSpaceContextMenu = useCallback((event: React.MouseEvent, project: PiWebProjectRecord, space: PiWebProjectSpaceRecord) => {
     event.preventDefault();
     event.stopPropagation();
+    closeCurrentWorkspaceMenu();
     setProjectSpaceContextMenu({ x: event.clientX, y: event.clientY, project, space });
-  }, []);
+  }, [closeCurrentWorkspaceMenu]);
+
+  const openCurrentWorkspaceMenuAnchored = useCallback(() => {
+    if (!selectedCwd) return;
+    setSessionContextMenu(null);
+    setProjectSpaceContextMenu(null);
+    setCurrentWorkspaceMenu((prev) => (prev?.mode === "anchored" ? null : { mode: "anchored" }));
+  }, [selectedCwd]);
+
+  const openCurrentWorkspaceMenuContext = useCallback((event: React.MouseEvent) => {
+    if (!selectedCwd) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSessionContextMenu(null);
+    setProjectSpaceContextMenu(null);
+    setCurrentWorkspaceMenu({ mode: "context", x: event.clientX, y: event.clientY });
+  }, [selectedCwd]);
 
   // Rollback snapshot for drag-reorder optimistic updates
   const projectsBeforeReorder = useRef<PiWebProjectRecord[] | null>(null);
@@ -1200,6 +1368,80 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     return () => window.clearInterval(interval);
   }, [showTrellisInitializePrompt]);
 
+  // Shared action callbacks for both menu triggers (anchored + context).
+  const currentWorkspaceMenuContent = selectedCwd ? (
+    <CurrentWorkspaceMenuContent
+      selectedProjectSpace={selectedProjectSpace}
+      selectedCwd={selectedCwd}
+      selectedWorktree={selectedWorktree}
+      onClose={closeCurrentWorkspaceMenu}
+      onEditProjectMetadata={() => {
+        setMetadataError(null);
+        if (selectedProjectSpace) {
+          setMetadataEditTarget({ kind: "project", project: selectedProjectSpace.project });
+        }
+      }}
+      onEditSpaceMetadata={() => {
+        setMetadataError(null);
+        if (selectedProjectSpace) {
+          setMetadataEditTarget({
+            kind: "space",
+            project: selectedProjectSpace.project,
+            space: selectedProjectSpace.space,
+          });
+        }
+      }}
+      onToggleProjectPinned={() => {
+        if (selectedProjectSpace) {
+          void patchProjectMetadata(selectedProjectSpace.project.id, {
+            pinned: !selectedProjectSpace.project.pinned,
+          });
+        }
+      }}
+      onToggleSpacePinned={() => {
+        if (selectedProjectSpace) {
+          void patchSpaceMetadata(
+            selectedProjectSpace.project.id,
+            selectedProjectSpace.space.id,
+            { pinned: !selectedProjectSpace.space.pinned },
+          );
+        }
+      }}
+      onArchiveAllSessions={() => setArchiveAllConfirming(true)}
+      onArchiveCurrentSpace={() => {
+        if (selectedProjectSpace) {
+          void patchSpaceMetadata(
+            selectedProjectSpace.project.id,
+            selectedProjectSpace.space.id,
+            { archived: true },
+          );
+        }
+      }}
+      onArchiveProject={async () => {
+        if (!selectedProjectSpace) return;
+        const confirmed = await confirm({
+          title: "确认归档项目",
+          message: `归档项目 “${displayProjectName(selectedProjectSpace.project)}”？项目会从侧边栏隐藏，sessions 不会被删除。`,
+          confirmLabel: "归档项目",
+          intent: "danger",
+        });
+        if (!confirmed) return;
+        closeCurrentWorkspaceMenu();
+        void patchProjectMetadata(selectedProjectSpace.project.id, { archived: true });
+      }}
+      onArchiveWorktree={() => {
+        if (selectedCwd && selectedWorktree) {
+          openWorktreeAction("archive", selectedCwd, selectedWorktree);
+        }
+      }}
+      onDeleteWorktree={() => {
+        if (selectedCwd && selectedWorktree) {
+          openWorktreeAction("delete", selectedCwd, selectedWorktree);
+        }
+      }}
+    />
+  ) : null;
+
   return (
     <div className="session-sidebar-root" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Header */}
@@ -1213,14 +1455,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         {/* Project-space switch button */}
         <div style={{ position: "relative", marginBottom: 10 }}>
           <button
-            onClick={() => setProjectSwitchOpen(true)}
-            onContextMenu={(e) => {
-              const worktree = selectedWorktree;
-              if (!selectedCwd || !worktree) return;
-              e.preventDefault();
-              e.stopPropagation();
-              setWorktreeContextMenu({ x: e.clientX, y: e.clientY, cwd: selectedCwd, worktree });
+            type="button"
+            onClick={() => {
+              closeCurrentWorkspaceMenu();
+              setProjectSwitchOpen(true);
             }}
+            onContextMenu={openCurrentWorkspaceMenuContext}
             style={{
               width: "100%",
               border: "1px solid var(--border)",
@@ -1420,15 +1660,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 </ActionFlowIcon>
               )}
             </button>
-            {/* Workspace actions menu */}
+            {/* Workspace actions menu trigger (shared content rendered below) */}
             {selectedCwd && (
               <div ref={workspaceMenuRef} style={{ position: "relative" }}>
                 <button
-                  onClick={() => setWorkspaceMenuOpen((v) => !v)}
+                  ref={workspaceMenuTriggerRef}
+                  type="button"
+                  onClick={openCurrentWorkspaceMenuAnchored}
                   {...iconFlowAttrs("interactive")}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "var(--bg-hover)",
+                    background: currentWorkspaceMenu?.mode === "anchored" ? "var(--bg-selected)" : "var(--bg-hover)",
                     border: "1px solid var(--border)",
                     color: "var(--text-muted)",
                     cursor: "pointer",
@@ -1437,8 +1679,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     padding: 0,
                     flexShrink: 0,
                   }}
-                  title="Workspace actions"
-                  aria-expanded={workspaceMenuOpen}
+                  title="当前工作区操作"
+                  aria-label="当前工作区操作"
+                  aria-haspopup="menu"
+                  aria-expanded={currentWorkspaceMenu !== null}
                 >
                   <ActionFlowIcon width={14} height={14} strokeWidth={2}>
                     <circle cx="12" cy="5" r="1" />
@@ -1446,13 +1690,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     <circle cx="12" cy="19" r="1" />
                   </ActionFlowIcon>
                 </button>
-                {workspaceMenuOpen && (
-                  <>
-                    <div
-                      onClick={() => setWorkspaceMenuOpen(false)}
-                      style={{ position: "fixed", inset: 0, zIndex: 999 }}
-                    />
-                    <div className="session-sidebar-floating-menu" style={{
+                {currentWorkspaceMenu?.mode === "anchored" && (
+                  <div
+                    ref={workspaceMenuPanelRef}
+                    className="session-sidebar-floating-menu session-sidebar-current-workspace-menu"
+                    role="menu"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
                       position: "absolute",
                       right: 0,
                       top: "100%",
@@ -1465,50 +1709,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                       minWidth: 190,
                       padding: "4px 0",
                       overflow: "hidden",
-                    }}>
-                      {selectedProjectSpace && (
-                        <>
-                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setMetadataError(null); setMetadataEditTarget({ kind: "project", project: selectedProjectSpace.project }); }}>
-                            编辑项目元数据…
-                          </WorkspaceMenuButton>
-                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setMetadataError(null); setMetadataEditTarget({ kind: "space", project: selectedProjectSpace.project, space: selectedProjectSpace.space }); }}>
-                            编辑空间元数据…
-                          </WorkspaceMenuButton>
-                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchProjectMetadata(selectedProjectSpace.project.id, { pinned: !selectedProjectSpace.project.pinned }); }}>
-                            {selectedProjectSpace.project.pinned ? "取消星标项目" : "星标项目"}
-                          </WorkspaceMenuButton>
-                          <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { pinned: !selectedProjectSpace.space.pinned }); }}>
-                            {selectedProjectSpace.space.pinned ? "取消星标空间" : "星标空间"}
-                          </WorkspaceMenuButton>
-                        </>
-                      )}
-                      <WorkspaceMenuButton onClick={() => { setWorkspaceMenuOpen(false); setArchiveAllConfirming(true); }}>
-                        归档所有会话
-                      </WorkspaceMenuButton>
-                      {selectedProjectSpace && (
-                        <>
-                          <WorkspaceMenuButton danger onClick={() => { setWorkspaceMenuOpen(false); void patchSpaceMetadata(selectedProjectSpace.project.id, selectedProjectSpace.space.id, { archived: true }); }}>
-                            归档当前空间
-                          </WorkspaceMenuButton>
-                          <WorkspaceMenuButton danger onClick={() => {
-                            void (async () => {
-                              const confirmed = await confirm({
-                                title: "确认归档项目",
-                                message: `归档项目 “${displayProjectName(selectedProjectSpace.project)}”？项目会从侧边栏隐藏，sessions 不会被删除。`,
-                                confirmLabel: "归档项目",
-                                intent: "danger",
-                              });
-                              if (!confirmed) return;
-                              setWorkspaceMenuOpen(false);
-                              void patchProjectMetadata(selectedProjectSpace.project.id, { archived: true });
-                            })();
-                          }}>
-                            归档项目
-                          </WorkspaceMenuButton>
-                        </>
-                      )}
-                    </div>
-                  </>
+                    }}
+                  >
+                    {currentWorkspaceMenuContent}
+                  </div>
                 )}
               </div>
             )}
@@ -1590,34 +1794,27 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         />
       )}
 
-      {worktreeContextMenu && (
+      {currentWorkspaceMenu?.mode === "context" && selectedCwd && (
         <div
+          ref={workspaceMenuPanelRef}
+          className="session-sidebar-floating-menu session-sidebar-current-workspace-menu session-sidebar-current-workspace-menu--context"
+          role="menu"
           onMouseDown={(e) => e.stopPropagation()}
           style={{
             position: "fixed",
-            left: worktreeContextMenu.x,
-            top: worktreeContextMenu.y,
+            left: contextMenuPosition?.x ?? currentWorkspaceMenu.x,
+            top: contextMenuPosition?.y ?? currentWorkspaceMenu.y,
             zIndex: 1000,
             minWidth: 190,
-            padding: 4,
+            padding: "4px 0",
             borderRadius: 8,
             background: "var(--bg)",
             border: "1px solid var(--border)",
             boxShadow: "0 10px 28px rgba(0,0,0,0.18)",
+            visibility: contextMenuPosition ? "visible" : "hidden",
           }}
         >
-          <button
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); openWorktreeAction("archive", worktreeContextMenu.cwd, worktreeContextMenu.worktree); }}
-            style={{ width: "100%", padding: "8px 10px", background: "none", border: "none", color: "var(--text)", textAlign: "left", cursor: "pointer", fontSize: 12, borderRadius: 6 }}
-          >
-            归档 WorkTree…
-          </button>
-          <button
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); openWorktreeAction("delete", worktreeContextMenu.cwd, worktreeContextMenu.worktree); }}
-            style={{ width: "100%", padding: "8px 10px", background: "none", border: "none", color: "#dc2626", textAlign: "left", cursor: "pointer", fontSize: 12, borderRadius: 6 }}
-          >
-            删除 WorkTree…
-          </button>
+          {currentWorkspaceMenuContent}
         </div>
       )}
 
