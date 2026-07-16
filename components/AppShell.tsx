@@ -23,6 +23,7 @@ type ProviderUsagePanelProps = {
 };
 const ChatGptUsagePanelHost = ChatGptUsagePanel as unknown as (props?: ProviderUsagePanelProps) => ReactNode;
 import { SubagentPanel } from "./SubagentPanel";
+import { useStudioChildSessions } from "@/hooks/useStudioChildSessions";
 import { SettingsConfig } from "./SettingsConfig";
 import { TrellisPanel } from "./TrellisPanel";
 import { TrellisSessionWidget } from "./TrellisSessionWidget";
@@ -36,7 +37,7 @@ import { UsageLedgerFlowIcon } from "./UsageLedgerIcon";
 import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
-import type { GitInfo, SessionInfo } from "@/lib/types";
+import type { GitInfo, SessionInfo, StudioChildSessionListItem } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
 import type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTasksLinkResult } from "@/lib/ypi-studio-types";
@@ -454,7 +455,6 @@ function AppShellContent() {
   }, [explorerOpen]);
 
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
-  const systemBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleSystemPromptChange = useCallback((prompt: string | null) => {
     setSystemPrompt(prompt);
@@ -472,12 +472,6 @@ function AppShellContent() {
     setContextUsage(usage);
   }, []);
 
-  // Subagent runs — populated by ChatWindow, displayed in top bar panel
-  const [subagentRuns, setSubagentRuns] = useState<import("@/hooks/useAgentSession").SubagentRun[]>([]);
-  const handleSubagentChange = useCallback((runs: import("@/hooks/useAgentSession").SubagentRun[]) => {
-    setSubagentRuns(runs);
-  }, []);
-
   // Git panel state
   const [gitDirty, setGitDirty] = useState(false);
   const [gitRefreshKey, setGitRefreshKey] = useState(0);
@@ -485,6 +479,10 @@ function AppShellContent() {
   // Single active panel — only one dropdown open at a time
   const [activeTopPanel, setActiveTopPanel] = useState<"system" | "subagents" | "git" | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const systemBtnRef = useRef<HTMLButtonElement>(null);
+  const gitBtnRef = useRef<HTMLButtonElement>(null);
+  const subagentsTriggerRef = useRef<HTMLButtonElement>(null);
+  const topPanelHostRef = useRef<HTMLDivElement>(null);
 
   const toggleTopPanel = useCallback((panel: "system" | "subagents" | "git") => {
     setActiveTopPanel((cur) => cur === panel ? null : panel);
@@ -501,6 +499,62 @@ function AppShellContent() {
     ro.observe(topBarRef.current);
     return () => ro.disconnect();
   }, [activeTopPanel]);
+
+  // Shared top-bar popovers (System/Subagents/Git): click blank area or Escape to dismiss.
+  // Exclude the active trigger so the same button can still toggle closed via its own click handler.
+  useEffect(() => {
+    if (!activeTopPanel) return;
+
+    const focusTrigger = () => {
+      if (activeTopPanel === "system") systemBtnRef.current?.focus();
+      else if (activeTopPanel === "subagents") subagentsTriggerRef.current?.focus();
+      else if (activeTopPanel === "git") gitBtnRef.current?.focus();
+    };
+
+    const close = () => {
+      setActiveTopPanel(null);
+      // Restore focus after React applies the closed state.
+      window.requestAnimationFrame(focusTrigger);
+    };
+
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (activeTopPanel === "system" && systemBtnRef.current?.contains(target)) return;
+      if (activeTopPanel === "subagents" && subagentsTriggerRef.current?.contains(target)) return;
+      if (activeTopPanel === "git" && gitBtnRef.current?.contains(target)) return;
+
+      // system / subagents / git share the fixed host under the top bar
+      if (topPanelHostRef.current?.contains(target)) return;
+
+      close();
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      close();
+    };
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeTopPanel]);
+
+  // Parent id for Studio child inventory: when already inside a child audit session,
+  // keep listing siblings under the original parent (endpoint rejects child ids).
+  const studioChildListParentId = selectedSession?.studioChild?.kind === "ypi-studio-child-session"
+    ? (selectedSession.studioChild.parentSessionId ?? null)
+    : (selectedSession?.id ?? null);
+
+  const studioChildSessions = useStudioChildSessions(studioChildListParentId, {
+    refreshKey,
+    panelOpen: activeTopPanel === "subagents",
+  });
 
   // Right panel — file tabs, Studio members, and optional Trellis task drawer
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
@@ -661,6 +715,70 @@ function AppShellContent() {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
   }, [router]);
+
+  const handleOpenStudioChildSession = useCallback((child: StudioChildSessionListItem) => {
+    // Close panel first, then navigate with a minimal SessionInfo built from
+    // parent workspace context + child projection. Server detail resolves real path by id.
+    setActiveTopPanel(null);
+    const parent = selectedSession;
+    const parentCwd = parent?.cwd ?? activeProjectContext?.cwd ?? "";
+    const parentSessionId = studioChildListParentId ?? parent?.id;
+    const nextSession: SessionInfo = {
+      path: "",
+      id: child.sessionId,
+      cwd: parentCwd,
+      name: child.title,
+      created: child.createdAt,
+      modified: child.modifiedAt,
+      messageCount: child.messageCount,
+      firstMessage: child.title,
+      parentSessionId,
+      projectId: parent?.projectId ?? activeProjectContext?.projectId,
+      spaceId: parent?.spaceId ?? activeProjectContext?.spaceId,
+      studioChild: {
+        schemaVersion: 1,
+        kind: "ypi-studio-child-session",
+        runner: "sdk",
+        visibility: "child",
+        status: child.status,
+        parentSessionId,
+        taskId: child.taskId,
+        runId: child.runId,
+        member: child.member,
+        subtaskId: child.subtaskId,
+        createdAt: child.createdAt,
+        finishedAt: child.finishedAt,
+      },
+      studioChildDisplay: {
+        taskTitle: child.taskTitle,
+        subtaskId: child.subtaskId,
+        subtaskTitle: child.subtaskTitle,
+      },
+    };
+    handleSelectSession(nextSession);
+  }, [activeProjectContext, handleSelectSession, selectedSession, studioChildListParentId]);
+
+  const handleReturnToParentSession = useCallback((parentSessionId: string) => {
+    const id = parentSessionId.trim();
+    if (!id) return;
+    setActiveTopPanel(null);
+    // Prefer current child metadata so parent navigation stays in the same workspace
+    // even when the parent SessionInfo has not been reloaded from the sidebar list yet.
+    const child = selectedSession;
+    const parentSession: SessionInfo = {
+      path: "",
+      id,
+      cwd: child?.cwd ?? activeProjectContext?.cwd ?? "",
+      name: undefined,
+      created: child?.created ?? new Date().toISOString(),
+      modified: new Date().toISOString(),
+      messageCount: 0,
+      firstMessage: "",
+      projectId: child?.projectId ?? activeProjectContext?.projectId,
+      spaceId: child?.spaceId ?? activeProjectContext?.spaceId,
+    };
+    handleSelectSession(parentSession);
+  }, [activeProjectContext, handleSelectSession, selectedSession]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string, projectId?: string, spaceId?: string) => {
     setSelectedSession(null);
@@ -1148,7 +1266,11 @@ function AppShellContent() {
         onClick={() => setSidebarOpen(false)}
         style={{
           position: "fixed",
-          inset: 0,
+          // Leave the 36px app top bar free on mobile (CSS also forces top: 36px ≤640px).
+          top: 36,
+          right: 0,
+          bottom: 0,
+          left: 0,
           zIndex: 199,
           background: "rgba(0,0,0,0.4)",
           opacity: sidebarOpen ? 1 : 0,
@@ -1281,12 +1403,17 @@ function AppShellContent() {
                 <span className="app-top-label">System</span>
               </button>
               <button
+                ref={subagentsTriggerRef}
                 type="button"
-                className={`tech-action-tag app-top-action-tag${activeTopPanel === "subagents" ? " is-active" : ""}`}
+                className={`tech-action-tag app-top-action-tag${activeTopPanel === "subagents" ? " is-active" : ""}${studioChildSessions.hasActive ? " has-studio-children-active" : ""}`}
                 {...iconFlowAttrs("interactive")}
                 aria-expanded={activeTopPanel === "subagents"}
-                aria-label="Subagents"
-                title="Subagents"
+                aria-label={
+                  studioChildSessions.counts
+                    ? `Studio child sessions, ${studioChildSessions.counts.active} active, ${studioChildSessions.counts.waitingForUser} waiting`
+                    : "Studio child sessions"
+                }
+                title="Studio child sessions"
                 onClick={() => toggleTopPanel("subagents")}
               >
                 <ActionFlowIcon width={12} height={12} strokeWidth={2}>
@@ -1295,36 +1422,24 @@ function AppShellContent() {
                 </ActionFlowIcon>
                 <span className="app-top-label">Subagents</span>
                 {(() => {
-                  const running = subagentRuns.filter((r) => r.status === "running").length;
-                  const completed = subagentRuns.filter((r) => r.status === "completed" || r.status === "failed").length;
-                  if (running > 0) {
+                  const waiting = studioChildSessions.counts?.waitingForUser ?? 0;
+                  const active = studioChildSessions.counts?.active ?? 0;
+                  const terminalReturned = studioChildSessions.counts?.terminalReturned ?? 0;
+                  if (waiting > 0 || active > 0) {
                     return (
                       <span
-                        className="tech-action-tag__badge"
-                        style={{
-                          position: "absolute",
-                          top: 2,
-                          right: 2,
-                          width: 7,
-                          height: 7,
-                          borderRadius: "50%",
-                          background: "#f59e0b",
-                          zIndex: 2,
-                          pointerEvents: "none",
-                        }}
-                      />
+                        className={`tech-action-tag__badge studio-child-topbar-badge${waiting > 0 ? " is-waiting" : " is-active"}`}
+                        aria-hidden="true"
+                      >
+                        {waiting > 0 ? waiting : active}
+                      </span>
                     );
                   }
-                  if (completed > 0) {
+                  if (terminalReturned > 0) {
                     return (
                       <span
-                        className="tech-action-tag__badge"
-                        style={{
-                          fontSize: 10,
-                          color: "#22c55e",
-                          marginLeft: 2,
-                          zIndex: 2,
-                        }}
+                        className="tech-action-tag__badge studio-child-topbar-badge is-terminal"
+                        aria-hidden="true"
                       >
                         ✓
                       </span>
@@ -1334,6 +1449,7 @@ function AppShellContent() {
                 })()}
               </button>
               <button
+                ref={gitBtnRef}
                 type="button"
                 className={`tech-action-tag app-top-action-tag${activeTopPanel === "git" ? " is-active" : ""}`}
                 {...iconFlowAttrs("interactive")}
@@ -1453,13 +1569,16 @@ function AppShellContent() {
           )}
           {/* Top panel dropdown — shared, only one active at a time */}
           {activeTopPanel && topPanelPos && (
-            <div style={{
-              position: "fixed",
-              top: topPanelPos.top,
-              left: topPanelPos.left,
-              width: topPanelPos.width,
-              zIndex: 500,
-            }}>
+            <div
+              ref={topPanelHostRef}
+              style={{
+                position: "fixed",
+                top: topPanelPos.top,
+                left: topPanelPos.left,
+                width: topPanelPos.width,
+                zIndex: 500,
+              }}
+            >
               {activeTopPanel === "system" && (
                 <div style={{
                   background: "var(--bg-panel)",
@@ -1490,11 +1609,22 @@ function AppShellContent() {
                 </div>
               )}
               {activeTopPanel === "subagents" && (
-                <div style={{
+                <div className="studio-child-panel-host" style={{
                   background: "var(--bg-panel)",
                   borderBottom: "1px solid var(--border)",
                 }}>
-                  <SubagentPanel runs={subagentRuns} />
+                  <SubagentPanel
+                    parentSessionId={studioChildListParentId}
+                    items={studioChildSessions.children}
+                    counts={studioChildSessions.counts}
+                    limits={studioChildSessions.limits}
+                    loadState={studioChildSessions.loadState}
+                    stale={studioChildSessions.stale}
+                    errorMessage={studioChildSessions.errorMessage}
+                    hasParentSession={Boolean(studioChildListParentId)}
+                    onRefresh={studioChildSessions.refresh}
+                    onOpenChild={handleOpenStudioChildSession}
+                  />
                 </div>
               )}
               {activeTopPanel === "git" && (
@@ -1522,12 +1652,12 @@ function AppShellContent() {
               onAgentEnd={handleAgentEnd}
               onSessionCreated={handleSessionCreated}
               onSessionForked={handleSessionForked}
+              onReturnToParentSession={handleReturnToParentSession}
               modelsRefreshKey={modelsRefreshKey}
               chatInputRef={chatInputRef}
               onSystemPromptChange={handleSystemPromptChange}
               onSessionStatsChange={handleSessionStatsChange}
               onContextUsageChange={handleContextUsageChange}
-              onSubagentChange={handleSubagentChange}
               onStudioToolProgressChange={handleStudioToolProgressChange}
               onSessionListRefreshNeeded={handleStudioSessionListRefreshNeeded}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}

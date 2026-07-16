@@ -20,10 +20,11 @@ interface Props {
   onAgentEnd?: () => void;
   onSessionCreated?: (session: SessionInfo) => void;
   onSessionForked?: (newSessionId: string) => void;
+  /** Navigate from a Studio child audit view back to its parent Chat. */
+  onReturnToParentSession?: (parentSessionId: string) => void;
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
   onSystemPromptChange?: (prompt: string | null) => void;
-  onSubagentChange?: (runs: import("@/hooks/useAgentSession").SubagentRun[]) => void;
   onSessionStatsChange?: (stats: SessionUsageTopbarStats | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onStudioToolProgressChange?: (snapshot: { agentRunning: boolean; overlays: YpiStudioLiveRunOverlay[] }) => void;
@@ -165,7 +166,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSubagentChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {
+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -181,7 +182,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     handleToolPresetChange, handleThinkingLevelChange, handleAgentEventRef,
   } = useAgentSession({
     session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onSystemPromptChange, onSubagentChange,
+    modelsRefreshKey, onSystemPromptChange,
     autoScrollEnabled, defaultToolPreset, defaultThinkingLevel, defaultModel,
   });
 
@@ -382,22 +383,72 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
 
   const isArchived = !!session?.archived;
   const isStudioChildAudit = !!session?.studioChild;
+  const parentSessionId =
+    session?.studioChild?.parentSessionId?.trim()
+    || session?.parentSessionId?.trim()
+    || null;
+  const canReturnToParent = Boolean(parentSessionId && onReturnToParentSession);
+
+  const handleReturnToParent = useCallback(() => {
+    if (!parentSessionId || !onReturnToParentSession) return;
+    onReturnToParentSession(parentSessionId);
+  }, [onReturnToParentSession, parentSessionId]);
 
   const studioChildBannerElement = isStudioChildAudit ? (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      padding: "8px 14px",
-      background: "rgba(37,99,235,0.08)",
-      borderBottom: "1px solid rgba(37,99,235,0.2)",
-      color: "var(--text-muted)",
-      fontSize: 12,
-      flexShrink: 0,
-    }}>
-      <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent)" }} />
-      <span>这是 YPI Studio child session 审计视图（{session?.studioChild?.member} · {session?.studioChild?.status ?? "audit"}）。请回到父 Chat 继续编排。</span>
+    <div
+      className="studio-child-audit-banner"
+      role="status"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "8px 14px",
+        background: "rgba(37,99,235,0.08)",
+        borderBottom: "1px solid rgba(37,99,235,0.2)",
+        color: "var(--text-muted)",
+        fontSize: 12,
+        flexShrink: 0,
+        position: "relative",
+        zIndex: 140,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent)", flexShrink: 0 }} />
+        <span style={{ minWidth: 0 }}>
+          这是 YPI Studio child session 审计视图（{session?.studioChild?.member} · {session?.studioChild?.status ?? "audit"}）。
+          {canReturnToParent ? "可返回父 Chat 继续编排。" : "请从侧边栏选择父 Chat 继续编排。"}
+        </span>
+      </div>
+      {canReturnToParent ? (
+        <button
+          type="button"
+          className="tech-action-tag studio-child-return-parent-btn"
+          onClick={handleReturnToParent}
+          title="返回父 Chat"
+          aria-label="返回父 Chat"
+          style={{
+            flexShrink: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            height: 28,
+            padding: "0 10px",
+            borderRadius: 999,
+            border: "1px solid rgba(37,99,235,0.35)",
+            background: "var(--bg-panel)",
+            color: "var(--accent)",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          返回父 Chat
+        </button>
+      ) : null}
     </div>
   ) : null;
 
@@ -424,8 +475,42 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
   ) : null;
 
   const chatInputElement = isArchived || isStudioChildAudit ? (
-    <div style={{ padding: "12px 14px", textAlign: "center", color: "var(--text-dim)", fontSize: 12, flexShrink: 0 }}>
-      {isArchived ? "已归档的会话不可发送新消息。" : "Studio child session 为只读审计视图；请回到父 Chat 继续编排。"}
+    <div style={{ padding: "12px 14px", textAlign: "center", color: "var(--text-dim)", fontSize: 12, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div>
+        {isArchived
+          ? "已归档的会话不可发送新消息。"
+          : canReturnToParent
+            ? "Studio child session 为只读审计视图；点击返回父 Chat 继续编排。"
+            : "Studio child session 为只读审计视图；请从侧边栏选择父 Chat 继续编排。"}
+      </div>
+      {!isArchived && canReturnToParent ? (
+        <button
+          type="button"
+          className="tech-action-tag studio-child-return-parent-btn"
+          onClick={handleReturnToParent}
+          title="返回父 Chat"
+          aria-label="返回父 Chat"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            height: 30,
+            padding: "0 12px",
+            borderRadius: 999,
+            border: "1px solid rgba(37,99,235,0.35)",
+            background: "var(--bg-panel)",
+            color: "var(--accent)",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          返回父 Chat
+        </button>
+      ) : null}
     </div>
   ) : (
     <ChatInput

@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-16T02:03:02.627Z",
+  "updatedAt": "2026-07-16T02:17:49.909Z",
   "entries": [
+    {
+      "id": "20260716-101749-项目选择右键菜单与-chat-顶部-subagents-子-session-嗅探及-ui-改造",
+      "title": "项目选择右键菜单与 Chat 顶部 Subagents 子 session 嗅探及 UI 改造",
+      "taskId": "20260716-084658-项目选择右键菜单与-chat-顶部-subagents-子-session-嗅探及-ui-改造",
+      "taskKey": "archived:2026-07:20260716-084658-项目选择右键菜单与-chat-顶部-subagents-子-session-嗅探及-ui-改造",
+      "workflowId": "feature-dev",
+      "summary": "## 完成内容 1. **项目选择右键菜单**：左侧顶部项目空间选择按钮右键与三点按钮使用同一份当前工作区菜单；WorkTree 时两入口追加归档/删除。 2. **Chat 顶部 Subagents**：改为直接嗅探当前父 Chat 的 YPI Studio 持久 child session（`GET /api/sessions/:id/studio-children`），不再走旧 tool-call / sessionFile 递归探测。 3. **UI**：active + 最近 20 条终态分组展示；整行进入只读 audit session；动画与 reduced-motion；窄屏顶栏可达性修复。 4. **验收后补丁**： - child 审计视图增加明确「返回父 Chat」按钮 - Branches/System/Subagents/Git 顶栏面板统一支持点击空白 / Escape 关闭 ## 验证 - lint / tsc / `test:studio-child-sessions` 通过 - 真实浏览器验收（含 375/640 窄屏与用户验收）通过 ## 状态 用户验收通过。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260716-084658-项目选择右键菜单与-chat-顶部-subagents-子-session-嗅探及-ui-改造",
+      "knowledgePath": ".ypi/knowledge/20260716-101749-项目选择右键菜单与-chat-顶部-subagents-子-session-嗅探及-ui-改造.md",
+      "createdAt": "2026-07-16T02:17:49.909Z",
+      "archivedAt": "2026-07-16T02:17:49.909Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260716-100302-仿-grok-接入-kiro-提供商并支持顶栏额度简要显示",
       "title": "仿 Grok 接入 Kiro 提供商并支持顶栏额度简要显示",

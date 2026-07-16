@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yolk Pi Web UI Prototype - Current Workspace Menu & Studio Child Sessions Panel</title>
+  <style>
+    :root {
+      /* Theme styles (Dark mode by default, matching yolk pi web color palette) */
+      --bg: #0d0e12;
+      --panel: #16171f;
+      --panel-hover: #1f212e;
+      --border: #282a36;
+      --border-focus: #3b3f54;
+      --text: #e2e4ec;
+      --text-muted: #8a8f9f;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-muted: #1e293b;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --danger-muted: #450a0a;
+      --warning: #f59e0b;
+      --warning-muted: #78350f;
+      --success: #10b981;
+      --success-muted: #064e3b;
+      --scrollbar: #20222f;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --panel-hover: #f1f5f9;
+      --border: #e2e8f0;
+      --border-focus: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-muted: #eff6ff;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --danger-muted: #fef2f2;
+      --warning: #d97706;
+      --warning-muted: #fef3c7;
+      --success: #059669;
+      --success-muted: #ecfdf5;
+      --scrollbar: #cbd5e1;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    button, select {
+      font-family: inherit;
+      color: inherit;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Base Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar Styling */
+    .sidebar {
+      width: 260px;
+      background-color: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    /* Workspace trigger button styled as in layout */
+    .workspace-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background-color: var(--panel-hover);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 100%;
+      text-align: left;
+      font-weight: 500;
+      justify-content: space-between;
+    }
+    
+    .workspace-trigger:hover {
+      border-color: var(--border-focus);
+    }
+
+    .workspace-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .workspace-title {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .workspace-badge {
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background-color: var(--accent-muted);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    
+    .workspace-badge.worktree {
+      background-color: var(--warning-muted);
+      color: var(--warning);
+    }
+
+    .more-actions-btn {
+      padding: 6px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .more-actions-btn:hover {
+      background-color: var(--border);
+      color: var(--text);
+    }
+
+    .sidebar-content {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+    }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .session-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      text-decoration: none;
+      gap: 8px;
+    }
+
+    .session-item:hover {
+      background-color: var(--panel-hover);
+      color: var(--text);
+    }
+
+    .session-item.active {
+      background-color: var(--accent-muted);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* Main Area Styling */
+    .main-workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg);
+      position: relative;
+    }
+
+    /* Topbar Styling */
+    .topbar {
+      height: 48px;
+      background-color: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: relative;
+      z-index: 50;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .topbar-title {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Subagents action badge styling */
+    .subagents-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 16px;
+      background-color: var(--panel-hover);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      transition: background-color 150ms;
+    }
+
+    .subagents-btn:hover {
+      background-color: var(--border);
+    }
+
+    .subagents-btn.has-active {
+      border-color: var(--accent);
+    }
+
+    .subagents-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      font-size: 10px;
+      font-weight: bold;
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .subagents-badge.waiting {
+      background-color: var(--warning);
+      color: black;
+      animation: pulse-alert 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-alert {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Main Chat Area Container */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Audit Only Mode Banner */
+    .audit-banner {
+      background-color: var(--accent-muted);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    .audit-banner-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .back-to-parent-btn {
+      background-color: var(--accent);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .back-to-parent-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* Messages List */
+    .messages-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .message.user {
+      align-self: flex-end;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+    }
+
+    .message-bubble {
+      padding: 12px 16px;
+      border-radius: 12px;
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .message.user .message-bubble {
+      background-color: var(--accent-muted);
+      border-color: var(--accent);
+    }
+
+    .message-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .message.user .message-meta {
+      align-self: flex-end;
+    }
+
+    /* Chat Input Bar */
+    .chat-input-bar {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background-color: var(--panel);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-textarea {
+      flex: 1;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      resize: none;
+      height: 40px;
+      font-family: inherit;
+    }
+
+    .chat-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .chat-textarea:disabled {
+      background-color: var(--border);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .send-btn {
+      background-color: var(--accent);
+      color: white;
+      padding: 0 16px;
+      border-radius: 8px;
+      font-weight: 500;
+    }
+
+    .send-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .send-btn:disabled {
+      background-color: var(--border);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    /* Common Workspace Dropdown Menu */
+    .workspace-menu {
+      position: fixed;
+      width: 220px;
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      padding: 4px 0;
+      display: none;
+    }
+
+    .workspace-menu-header {
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .workspace-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      width: 100%;
+      text-align: left;
+      font-size: 13px;
+      color: var(--text);
+      transition: background-color 100ms;
+    }
+
+    .workspace-menu-item:hover {
+      background-color: var(--panel-hover);
+    }
+
+    .workspace-menu-item.danger {
+      color: var(--danger);
+    }
+
+    .workspace-menu-item.danger:hover {
+      background-color: var(--danger-muted);
+    }
+
+    .menu-separator {
+      height: 1px;
+      background-color: var(--border);
+      margin: 4px 0;
+    }
+
+    /* Subagents Panel Popover Styling */
+    .subagents-panel {
+      position: absolute;
+      top: 52px;
+      right: 16px;
+      width: 420px;
+      max-height: 520px;
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.4);
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .subagents-panel {
+        transition: none !important;
+      }
+      .loading-spinner {
+        animation: none !important;
+      }
+      .pulse-dot {
+        animation: none !important;
+      }
+      .workspace-menu {
+        transition: none !important;
+      }
+    }
+
+    .subagents-panel.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .refresh-btn {
+      color: var(--text-muted);
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .refresh-btn:hover {
+      color: var(--text);
+      background-color: var(--panel-hover);
+    }
+
+    /* State Content Panels */
+    .panel-state-container {
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .stale-banner {
+      background-color: var(--warning-muted);
+      color: var(--warning);
+      padding: 6px 12px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .loading-state {
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-muted);
+    }
+
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .error-state {
+      padding: 30px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .retry-btn {
+      background-color: var(--border);
+      border: 1px solid var(--border-focus);
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .retry-btn:hover {
+      background-color: var(--panel-hover);
+    }
+
+    /* List Groups and Items */
+    .child-group-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      background-color: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .child-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .child-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      width: 100%;
+      text-align: left;
+      transition: background-color 150ms;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .child-row:hover {
+      background-color: var(--panel-hover);
+    }
+
+    .child-main-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .child-title-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .child-title {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .child-meta-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .child-member {
+      background-color: var(--border);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 10px;
+      color: var(--text);
+    }
+
+    .child-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .pulse-dot.running {
+      background-color: var(--accent);
+      animation: pulse-scale 2.8s infinite ease-in-out;
+    }
+
+    .pulse-dot.waiting {
+      background-color: var(--warning);
+      animation: pulse-scale 2.8s infinite ease-in-out;
+    }
+
+    @keyframes pulse-scale {
+      0%, 100% { transform: scale(0.85); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+
+    .status-icon {
+      font-size: 12px;
+    }
+
+    .status-text {
+      text-transform: capitalize;
+    }
+
+    .status-stale-tag {
+      font-size: 9px;
+      background-color: var(--warning-muted);
+      color: var(--warning);
+      padding: 0 4px;
+      border-radius: 3px;
+      margin-left: 4px;
+    }
+
+    .child-enter-affordance {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding-left: 12px;
+      flex-shrink: 0;
+    }
+
+    .child-row:hover .child-enter-affordance {
+      color: var(--accent);
+    }
+
+    .limit-truncated-info {
+      padding: 10px 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      background-color: var(--panel-hover);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Settings Box for state toggling in prototype */
+    .prototype-bar {
+      background-color: var(--panel-hover);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      z-index: 1000;
+    }
+
+    .prototype-select {
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .status-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Screen sizing rules */
+    @media (max-width: 640px) {
+      .sidebar {
+        display: none; /* Mobile view simulation */
+      }
+      .subagents-panel {
+        width: calc(100vw - 32px);
+        right: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Prototype State and Helper Panel at top -->
+  <div class="prototype-bar">
+    <strong>🎨 原型演示控制器:</strong>
+    <label class="status-checkbox-label">
+      <input type="checkbox" id="worktree-toggle" onchange="toggleWorkTreeMode()">
+      模拟当前工作区为 WorkTree 模式
+    </label>
+    <span>|</span>
+    <label for="panel-state-select">面板状态演示: </label>
+    <select id="panel-state-select" class="prototype-select" onchange="changePanelState(this.value)">
+      <option value="active-mixed">运行中与混合状态 (默认)</option>
+      <option value="loading">加载中 Skeleton</option>
+      <option value="empty">空状态 (无 Child)</option>
+      <option value="stale-cache">网络刷新失败 (保留 Stale 缓存)</option>
+      <option value="error">首次加载错误</option>
+      <option value="truncated">终端超过 20 条 (触发截断提示)</option>
+    </select>
+    <span>|</span>
+    <button onclick="toggleTheme()" class="retry-btn" style="padding: 2px 10px;">切换深浅色主题</button>
+  </div>
+
+  <div class="app-container">
+    <!-- Session Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <button id="ws-trigger-btn" class="workspace-trigger" onclick="onWorkspaceLeftClick(event)" oncontextmenu="onWorkspaceRightClick(event)">
+          <div class="workspace-info">
+            <span id="ws-badge" class="workspace-badge">Project</span>
+            <span id="ws-title" class="workspace-title">pi-agent-web</span>
+          </div>
+          <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+        </button>
+        <button id="ws-more-btn" class="more-actions-btn" title="当前工作区菜单" onclick="onWorkspaceThreeDotsClick(event)">
+          ⋮
+        </button>
+      </div>
+
+      <div class="sidebar-content">
+        <div class="sidebar-section-title">我的会话</div>
+        <a href="#" class="session-item active" id="sidebar-parent-session" onclick="enterParentSession(event)">
+          💬 统一菜单与 Studio Child 改造
+        </a>
+        <a href="#" class="session-item" id="sidebar-child-audit-link" onclick="enterChildSession('child-1', 'task-102 · UI 设计与交互重构', 'ui-designer', event)">
+          🕵️ [只读] child: ui-designer
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main class="main-workspace">
+      <!-- Top Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div id="topbar-title-text" class="topbar-title">统一菜单与 Studio Child 改造</div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Subagents Trigger button -->
+          <button id="subagents-trigger" class="subagents-btn has-active" onclick="toggleSubagentsPanel()" aria-expanded="false" aria-label="查看子 Session 任务">
+            <span>Subagents</span>
+            <span id="trigger-badge" class="subagents-badge waiting">1</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat View Workspace -->
+      <div class="chat-container">
+        <!-- Audit Only Mode Banner (Initially hidden for parent session) -->
+        <div id="audit-mode-banner" class="audit-banner" style="display: none;">
+          <div class="audit-banner-content">
+            <span style="font-weight: 600;">🕵️ 只读审计模式</span>
+            <span style="font-size: 12px; opacity: 0.8;">| 你正在浏览 YPI Studio 子会话 (成员: <span id="audit-member-name">ui-designer</span>)。不允许在此发送消息。</span>
+          </div>
+          <button class="back-to-parent-btn" onclick="enterParentSession(event)">返回父会话</button>
+        </div>
+
+        <!-- Chat Transcript -->
+        <div class="messages-list" id="chat-messages">
+          <div class="message assistant">
+            <div class="message-bubble">
+              你好！我是架构师。我们今天需要讨论统一左侧当前工作区右键菜单，以及将顶栏 Subagents 改造为读取持久 child sessions 并支持一键进入审计的方案。
+            </div>
+            <div class="message-meta">架构师 · 10:15</div>
+          </div>
+          <div class="message user">
+            <div class="message-bubble">
+              没问题。原有的 subagent-children 扫描 JSONL 的逻辑比较繁琐，改用只读的 GET /api/sessions/:id/studio-children 接口更可靠。
+            </div>
+            <div class="message-meta">用户 · 10:17</div>
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <footer class="chat-input-bar">
+          <div class="input-wrapper">
+            <textarea id="chat-input-area" class="chat-textarea" placeholder="输入消息以回复..."></textarea>
+            <button id="chat-send-btn" class="send-btn">发送</button>
+          </div>
+          <div class="message-meta" style="align-self: flex-start;">
+            按 Enter 发送，Shift+Enter 换行。
+          </div>
+        </footer>
+      </div>
+
+      <!-- Subagents Popover Panel -->
+      <div id="subagents-panel-popover" class="subagents-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>Studio 子会话列表</span>
+            <span id="panel-header-counts" style="font-size: 11px; font-weight: normal; color: var(--text-muted);">(1 活动 / 2 总计)</span>
+          </div>
+          <div class="panel-actions">
+            <button class="refresh-btn" onclick="triggerManualRefresh()" title="手动刷新">
+              🔄
+            </button>
+          </div>
+        </div>
+
+        <div id="panel-state-container" class="panel-state-container">
+          <!-- The contents here are rendered dynamically based on chosen state -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Shared Context Menu for Workspace (Left click trigger & Right click trigger) -->
+  <div id="shared-workspace-menu" class="workspace-menu">
+    <div class="workspace-menu-header">
+      <strong id="menu-workspace-type">普通项目工作区</strong>
+      <span id="menu-workspace-path" style="opacity: 0.7; font-size: 10px;">/workspace/pi-agent-web</span>
+    </div>
+    
+    <button class="workspace-menu-item" onclick="handleMenuAction('编辑项目元数据')">
+      ✏️ 编辑项目元数据
+    </button>
+    <button class="workspace-menu-item" onclick="handleMenuAction('编辑空间元数据')">
+      ⚙️ 编辑空间元数据
+    </button>
+    <button class="workspace-menu-item" onclick="handleMenuAction('星标当前工作区')">
+      ⭐ 星标当前工作区
+    </button>
+    
+    <div class="menu-separator"></div>
+    
+    <button class="workspace-menu-item" onclick="handleMenuAction('归档所有会话')">
+      📦 归档所有会话
+    </button>
+    <button class="workspace-menu-item" onclick="handleMenuAction('归档当前空间')">
+      🗄️ 归档当前空间
+    </button>
+    <button class="workspace-menu-item" onclick="handleMenuAction('归档当前项目')">
+      🗃️ 归档项目
+    </button>
+
+    <!-- WorkTree Exclusive Section -->
+    <div id="worktree-exclusive-menu" style="display: none;">
+      <div class="menu-separator"></div>
+      <button class="workspace-menu-item" onclick="handleMenuAction('归档 WorkTree')">
+        📇 归档 WorkTree...
+      </button>
+      <button class="workspace-menu-item danger" onclick="handleMenuAction('删除 WorkTree')">
+        🗑️ 删除 WorkTree...
+      </button>
+    </div>
+  </div>
+
+  <!-- JavaScript Behavior Code -->
+  <script>
+    let isWorkTree = false;
+    let currentTheme = 'dark';
+    
+    // Initial mock data of children sessions under current parent
+    const mockChildren = [
+      {
+        id: "child-1",
+        taskId: "task-102",
+        title: "task-102 · UI 设计与交互重构",
+        member: "ui-designer",
+        status: "waiting_for_user",
+        statusMayBeStale: false,
+        time: "3 分钟前",
+        messageCount: 14
+      },
+      {
+        id: "child-2",
+        taskId: "task-101",
+        title: "task-101 · 实现只读数据接口契约",
+        member: "implementer",
+        status: "running",
+        statusMayBeStale: false,
+        time: "刚刚",
+        messageCount: 5
+      },
+      {
+        id: "child-3",
+        taskId: "task-99",
+        title: "task-99 · 覆盖测试与边界确认",
+        member: "checker",
+        status: "succeeded",
+        statusMayBeStale: false,
+        time: "10 分钟前",
+        messageCount: 22
+      },
+      {
+        id: "child-4",
+        taskId: "task-98",
+        title: "task-98 · 项目选择按钮测试",
+        member: "implementer",
+        status: "failed",
+        statusMayBeStale: true, // Marked as stale to show header fallback demo
+        time: "1 小时前",
+        messageCount: 8
+      }
+    ];
+
+    // Page Load Setup
+    window.addEventListener('DOMContentLoaded', () => {
+      // Default to rendering mixed active state
+      changePanelState('active-mixed');
+
+      // Close popups on outer click
+      document.addEventListener('click', (e) => {
+        const menu = document.getElementById('shared-workspace-menu');
+        const wsTrigger = document.getElementById('ws-trigger-btn');
+        const wsMore = document.getElementById('ws-more-btn');
+        
+        if (menu.style.display === 'block' && 
+            !menu.contains(e.target) && 
+            !wsTrigger.contains(e.target) && 
+            !wsMore.contains(e.target)) {
+          closeWorkspaceMenu();
+        }
+
+        const panel = document.getElementById('subagents-panel-popover');
+        const panelTrigger = document.getElementById('subagents-trigger');
+        if (panel.classList.contains('open') && 
+            !panel.contains(e.target) && 
+            !panelTrigger.contains(e.target)) {
+          toggleSubagentsPanel(false);
+        }
+      });
+
+      // Escape key to close
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeWorkspaceMenu();
+          toggleSubagentsPanel(false);
+        }
+      });
+    });
+
+    // Theme Toggle
+    function toggleTheme() {
+      const htmlEl = document.documentElement;
+      if (currentTheme === 'dark') {
+        htmlEl.setAttribute('data-theme', 'light');
+        currentTheme = 'light';
+      } else {
+        htmlEl.removeAttribute('data-theme');
+        currentTheme = 'dark';
+      }
+    }
+
+    // Toggle WorkTree mode simulator
+    function toggleWorkTreeMode() {
+      isWorkTree = document.getElementById('worktree-toggle').checked;
+      
+      const badge = document.getElementById('ws-badge');
+      const title = document.getElementById('ws-title');
+      const menuTypeText = document.getElementById('menu-workspace-type');
+      const menuPathText = document.getElementById('menu-workspace-path');
+      const worktreeSec = document.getElementById('worktree-exclusive-menu');
+
+      if (isWorkTree) {
+        badge.textContent = "WorkTree";
+        badge.className = "workspace-badge worktree";
+        title.textContent = "pi-agent-web (WT)";
+        menuTypeText.textContent = "WorkTree 工作区";
+        menuPathText.textContent = "/worktrees/pi-agent-web-wt-1";
+        worktreeSec.style.display = "block";
+      } else {
+        badge.textContent = "Project";
+        badge.className = "workspace-badge";
+        title.textContent = "pi-agent-web";
+        menuTypeText.textContent = "普通项目工作区";
+        menuPathText.textContent = "/workspace/pi-agent-web";
+        worktreeSec.style.display = "none";
+      }
+    }
+
+    // Workspace Left Click Behavior (Simulate original layout dialog toggle)
+    function onWorkspaceLeftClick(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      alert("👉 [左键点击]：已触发打开原有「项目空间切换弹窗 (ProjectSpaceSwitchDialog)」！");
+    }
+
+    // Workspace Right Click Behavior (New Unified Context Menu)
+    function onWorkspaceRightClick(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      // Open the workspace menu at the cursor position
+      openWorkspaceMenu(event.clientX, event.clientY);
+    }
+
+    // Workspace Three Dots click (Opens exact same workspace menu anchored to the dots)
+    function onWorkspaceThreeDotsClick(event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const btnRect = event.currentTarget.getBoundingClientRect();
+      // Anchor position below the three dots button
+      openWorkspaceMenu(btnRect.left - 180, btnRect.bottom + 4);
+    }
+
+    // Opens Menu at given coordinates with viewport boundary collision checks
+    function openWorkspaceMenu(x, y) {
+      const menu = document.getElementById('shared-workspace-menu');
+      menu.style.display = 'block';
+
+      // Clamp dimensions of the viewport
+      const menuWidth = menu.offsetWidth || 220;
+      const menuHeight = menu.offsetHeight || 280;
+      
+      let finalX = x;
+      let finalY = y;
+
+      if (finalX + menuWidth > window.innerWidth) {
+        finalX = window.innerWidth - menuWidth - 8;
+      }
+      if (finalY + menuHeight > window.innerHeight) {
+        finalY = window.innerHeight - menuHeight - 8;
+      }
+
+      menu.style.left = `${finalX}px`;
+      menu.style.top = `${finalY}px`;
+    }
+
+    function closeWorkspaceMenu() {
+      const menu = document.getElementById('shared-workspace-menu');
+      menu.style.display = 'none';
+    }
+
+    // Handle Click on Workspace items
+    function handleMenuAction(actionName) {
+      closeWorkspaceMenu();
+      alert(`✅ 触发动作: "${actionName}" \n(此为原型演示，实际将调用主应用中的共享 action 回调并保持一致)`);
+    }
+
+    // Subagents Popover Toggle
+    function toggleSubagentsPanel(forceState) {
+      const panel = document.getElementById('subagents-panel-popover');
+      const trigger = document.getElementById('subagents-trigger');
+      
+      const shouldOpen = (forceState !== undefined) ? forceState : !panel.classList.contains('open');
+      
+      if (shouldOpen) {
+        panel.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+      } else {
+        panel.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function triggerManualRefresh() {
+      // Simulate manual refresh: show loading momentarily, then restore current chosen demo state
+      const container = document.getElementById('panel-state-container');
+      const currentState = document.getElementById('panel-state-select').value;
+      
+      container.innerHTML = `
+        <div class="loading-state">
+          <div class="loading-spinner"></div>
+          <div>正在请求最新的持久化子会话...</div>
+        </div>
+      `;
+      
+      setTimeout(() => {
+        renderPanelState(currentState);
+      }, 500);
+    }
+
+    // Controller for Prototype select dropdown
+    function changePanelState(state) {
+      renderPanelState(state);
+      
+      // Update badge display based on fake states
+      const badge = document.getElementById('trigger-badge');
+      const trigger = document.getElementById('subagents-trigger');
+      
+      if (state === 'empty' || state === 'error') {
+        badge.style.display = 'none';
+        trigger.classList.remove('has-active');
+      } else {
+        badge.style.display = 'inline-flex';
+        trigger.classList.add('has-active');
+        
+        if (state === 'stale-cache') {
+          badge.textContent = '1';
+          badge.className = 'subagents-badge waiting';
+        } else if (state === 'loading') {
+          badge.textContent = '...';
+          badge.className = 'subagents-badge';
+        } else {
+          badge.textContent = '2';
+          badge.className = 'subagents-badge waiting';
+        }
+      }
+    }
+
+    // Render internal list state HTML markup dynamically
+    function renderPanelState(state) {
+      const container = document.getElementById('panel-state-container');
+      const countsSpan = document.getElementById('panel-header-counts');
+      
+      if (state === 'loading') {
+        countsSpan.textContent = "(正在同步...)";
+        container.innerHTML = `
+          <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <div style="font-size: 12px;">同步 Studio Task 运行状态中...</div>
+          </div>
+        `;
+        return;
+      }
+
+      if (state === 'empty') {
+        countsSpan.textContent = "(0 活动 / 0 总计)";
+        container.innerHTML = `
+          <div class="empty-state">
+            <div style="font-size: 24px;">💬</div>
+            <strong>当前会话下无 Studio 子会话</strong>
+            <p style="font-size: 12px;">当 YPI Studio 派出成员执行子任务时，会在此列出持久化的子 session 审计记录。</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (state === 'error') {
+        countsSpan.textContent = "(连接失败)";
+        container.innerHTML = `
+          <div class="error-state">
+            <div style="color: var(--danger); font-size: 24px;">⚠️</div>
+            <strong>同步子会话列表失败</strong>
+            <p style="font-size: 12px; color: var(--text-muted);">网络超时或后端服务不可达，无法加载 inventory。</p>
+            <button class="retry-btn" onclick="triggerManualRefresh()">🔄 重试连接</button>
+          </div>
+        `;
+        return;
+      }
+
+      if (state === 'stale-cache') {
+        countsSpan.textContent = "(1 活动 / 3 总计)";
+        container.innerHTML = `
+          <div class="stale-banner">
+            <span>⚠️ 网络错误，显示上次缓存数据 (可能会话状态已过期)</span>
+            <button onclick="triggerManualRefresh()" style="color: var(--warning); text-decoration: underline; font-size: 10px; font-weight:bold;">重试</button>
+          </div>
+          
+          <div class="child-group-title">需要关注 / 运行中</div>
+          <div class="child-list">
+            ${renderRowHTML(mockChildren[0])}
+          </div>
+          
+          <div class="child-group-title">最近完成 (已结束)</div>
+          <div class="child-list">
+            ${renderRowHTML(mockChildren[2])}
+            ${renderRowHTML(mockChildren[3])}
+          </div>
+        `;
+        return;
+      }
+
+      if (state === 'truncated') {
+        countsSpan.textContent = "(1 活动 / 24 总计)";
+        
+        let terminalRowsHtml = '';
+        // Create 20 mock terminated children to show truncation limit
+        for (let i = 1; i <= 20; i++) {
+          terminalRowsHtml += renderRowHTML({
+            id: `child-trunc-${i}`,
+            taskId: `task-${100-i}`,
+            title: `task-${100-i} · 自动化测试执行与日志检查 #${i}`,
+            member: i % 2 === 0 ? "checker" : "implementer",
+            status: "succeeded",
+            statusMayBeStale: false,
+            time: `${i} 小时前`,
+            messageCount: 5
+          });
+        }
+
+        container.innerHTML = `
+          <div class="child-group-title">需要关注 / 运行中</div>
+          <div class="child-list">
+            ${renderRowHTML(mockChildren[0])}
+          </div>
+          
+          <div class="child-group-title">最近完成 (已结束)</div>
+          <div class="child-list" style="max-height: 320px; overflow-y: auto;">
+            ${terminalRowsHtml}
+          </div>
+          <div class="limit-truncated-info">
+            💡 仅显示最近 20 条终态子会话 (共 24 条记录已限制传输)
+          </div>
+        `;
+        return;
+      }
+
+      // Default state: active-mixed
+      countsSpan.textContent = "(2 活动 / 4 总计)";
+      container.innerHTML = `
+        <div class="child-group-title">需要关注 / 运行中</div>
+        <div class="child-list">
+          ${renderRowHTML(mockChildren[0])}
+          ${renderRowHTML(mockChildren[1])}
+        </div>
+        
+        <div class="child-group-title">最近完成 (已结束)</div>
+        <div class="child-list">
+          ${renderRowHTML(mockChildren[2])}
+          ${renderRowHTML(mockChildren[3])}
+        </div>
+      `;
+    }
+
+    // Helper to render child row template
+    function renderRowHTML(child) {
+      let statusHtml = '';
+      
+      if (child.status === 'running') {
+        statusHtml = `
+          <span class="child-status-badge" style="color: var(--accent);">
+            <span class="pulse-dot running"></span>
+            <span class="status-text">运行中</span>
+          </span>
+        `;
+      } else if (child.status === 'waiting_for_user') {
+        statusHtml = `
+          <span class="child-status-badge" style="color: var(--warning);">
+            <span class="pulse-dot waiting"></span>
+            <span class="status-text">等待反馈</span>
+          </span>
+        `;
+      } else if (child.status === 'succeeded') {
+        statusHtml = `
+          <span class="child-status-badge" style="color: var(--success);">
+            <span class="status-icon">✓</span>
+            <span class="status-text">已完成</span>
+          </span>
+        `;
+      } else { // failed
+        statusHtml = `
+          <span class="child-status-badge" style="color: var(--danger);">
+            <span class="status-icon">✗</span>
+            <span class="status-text">失败</span>
+          </span>
+        `;
+      }
+
+      const staleTag = child.statusMayBeStale ? '<span class="status-stale-tag">未同步</span>' : '';
+
+      return `
+        <a href="#" class="child-row" onclick="enterChildSession('${child.id}', '${child.title}', '${child.member}', event)">
+          <div class="child-main-info">
+            <div class="child-title-bar">
+              <span class="child-title" title="${child.title}">${child.title}</span>
+            </div>
+            <div class="child-meta-bar">
+              <span class="child-member">${child.member}</span>
+              <span>${child.messageCount} 轮对话</span>
+              <span>·</span>
+              <span>${child.time}</span>
+              ${staleTag}
+              <span>·</span>
+              ${statusHtml}
+            </div>
+          </div>
+          <div class="child-enter-affordance">
+            <span>进入只读审计</span>
+            <span style="font-size: 12px;">→</span>
+          </div>
+        </a>
+      `;
+    }
+
+    // Select Parent Main Session
+    function enterParentSession(event) {
+      if (event) {
+        event.preventDefault();
+      }
+      
+      toggleSubagentsPanel(false);
+      
+      // Update UI state to represent original Chat Session
+      document.getElementById('sidebar-parent-session').classList.add('active');
+      document.getElementById('sidebar-child-audit-link').classList.remove('active');
+      
+      // Hide read-only header
+      document.getElementById('audit-mode-banner').style.display = 'none';
+      
+      // Update titles
+      document.getElementById('topbar-title-text').textContent = '统一菜单与 Studio Child 改造';
+      
+      // Enable textareas and inputs
+      const textarea = document.getElementById('chat-input-area');
+      textarea.disabled = false;
+      textarea.placeholder = "输入消息以回复...";
+      
+      const sendBtn = document.getElementById('chat-send-btn');
+      sendBtn.disabled = false;
+      
+      // Fill parent message list
+      document.getElementById('chat-messages').innerHTML = `
+        <div class="message assistant">
+          <div class="message-bubble">
+            你好！我是架构师。我们今天需要讨论统一左侧当前工作区右键菜单，以及将顶栏 Subagents 改造为读取持久 child sessions 并支持一键进入审计的方案。
+          </div>
+          <div class="message-meta">架构师 · 10:15</div>
+        </div>
+        <div class="message user">
+          <div class="message-bubble">
+            没问题。原有的 subagent-children 扫描 JSONL 的逻辑比较繁琐，改用只读的 GET /api/sessions/:id/studio-children 接口更可靠。
+          </div>
+          <div class="message-meta">用户 · 10:17</div>
+        </div>
+      `;
+    }
+
+    // Select Child Session (Simulate direct navigation on workspace audit)
+    function enterChildSession(childId, title, member, event) {
+      if (event) {
+        event.preventDefault();
+      }
+      
+      toggleSubagentsPanel(false);
+      
+      // Update active links
+      document.getElementById('sidebar-parent-session').classList.remove('active');
+      document.getElementById('sidebar-child-audit-link').classList.add('active');
+      
+      // Display audit header banner
+      document.getElementById('audit-mode-banner').style.display = 'flex';
+      document.getElementById('audit-member-name').textContent = member;
+      
+      // Update Topbar
+      document.getElementById('topbar-title-text').textContent = `🕵️ [只读审计] ${title}`;
+      
+      // Disable Chat input area completely to enforce read-only
+      const textarea = document.getElementById('chat-input-area');
+      textarea.disabled = true;
+      textarea.placeholder = "🔒 子审计会话只读，在此无法发送消息";
+      
+      const sendBtn = document.getElementById('chat-send-btn');
+      sendBtn.disabled = true;
+
+      // Populate audit messages list
+      document.getElementById('chat-messages').innerHTML = `
+        <div class="message assistant">
+          <div class="message-bubble">
+            [系统初始化完毕] 成员: ${member} 已载入子会话。已取得 workspace 工作目录。
+          </div>
+          <div class="message-meta">系统 · 10:20</div>
+        </div>
+        <div class="message assistant">
+          <div class="message-bubble">
+            我正在读取当前的 PRD 要求与 UI 原型门禁约束。根据 studio 规则，我不能在完成原型产出前直接修改任何应用代码。
+          </div>
+          <div class="message-meta">${member} · 10:22</div>
+        </div>
+        <div class="message user">
+          <div class="message-bubble">
+            收到，请确保你的 html 原型支持响应式布局，并且支持 prefers-reduced-motion 以便在低动画模式下静态渲染。
+          </div>
+          <div class="message-meta">Parent User · 10:24</div>
+        </div>
+        <div class="message assistant">
+          <div class="message-bubble">
+            明白，CSS 过渡时间已经设定为 180ms 弹性过渡，当 prefers-reduced-motion 为 reduce 时，所有的 animation 与 transition 都将切换为 none，保持 100% 静态可读。
+          </div>
+          <div class="message-meta">${member} · 10:25</div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
