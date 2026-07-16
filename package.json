@@ -56,6 +56,7 @@
     "test:chatgpt-failover-contract": "node scripts/test-chatgpt-failover-contract.mjs",
     "test:chatgpt-usage-panel": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-chatgpt-usage-panel.mjs",
     "test:provider-usage-compact": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-provider-usage-compact.mjs",
+    "test:provider-usage-aggregate": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-provider-usage-aggregate.mjs",
     "test:grok-global-auth": "node scripts/test-grok-global-auth.mjs",
     "test:grok-failover-adapter": "node scripts/test-grok-failover-adapter.mjs",
     "test:grok-failover-runtime": "node scripts/test-grok-failover-runtime.mjs",

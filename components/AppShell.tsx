@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar, type ProjectSpaceSelectionContext } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -15,13 +15,12 @@ import { UsageProviderModelTable } from "./UsageProviderModelTable";
 import { ChatGptUsagePanel } from "./ChatGptUsagePanel";
 import { GrokUsagePanel } from "./GrokUsagePanel";
 import { KiroUsagePanel } from "./KiroUsagePanel";
+import {
+  ProviderUsageAggregatePanel,
+  type ProviderUsageAggregateColumn,
+} from "./ProviderUsageAggregatePanel";
+import type { ProviderUsageAggregateProjection } from "./ProviderUsagePanelContract";
 import type { ProviderUsageDisplayMode } from "./ProviderUsageTrigger";
-// GPT-USAGE-02 wires Models recovery now; GPT-USAGE-01 owns accepting/using onOpenModels inside the panel.
-type ProviderUsagePanelProps = {
-  onOpenModels?: () => void;
-  displayMode?: ProviderUsageDisplayMode;
-};
-const ChatGptUsagePanelHost = ChatGptUsagePanel as unknown as (props?: ProviderUsagePanelProps) => ReactNode;
 import { SubagentPanel } from "./SubagentPanel";
 import { useStudioChildSessions } from "@/hooks/useStudioChildSessions";
 import { SettingsConfig } from "./SettingsConfig";
@@ -341,6 +340,11 @@ function AppShellContent() {
 
   const [modelsConfigOpen, setModelsConfigOpen] = useState(false);
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
+  // Aggregate shell close token (Models open / hot-switch) without remounting owners.
+  const [providerUsageAggregateCloseGeneration, setProviderUsageAggregateCloseGeneration] = useState(0);
+  const [gptAggregateProjection, setGptAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
+  const [grokAggregateProjection, setGrokAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
+  const [kiroAggregateProjection, setKiroAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [usageStatsOpen, setUsageStatsOpen] = useState(false);
   const [settingsConfigOpen, setSettingsConfigOpen] = useState(false);
@@ -894,9 +898,132 @@ function AppShellContent() {
   const showGrokUsage = webConfig?.grok.usagePanelEnabled === true;
   const showKiroUsage = webConfig?.kiro.usagePanelEnabled === true;
   const showAnyProviderUsage = showChatGptUsage || showGrokUsage || showKiroUsage;
-  // Global compact mode from Settings → Usage; detail popovers stay full.
+  // Aggregate takes presentation priority; Compact is retained in config but unused while aggregated.
+  const providerUsageAggregated = webConfig?.usage.providerPanelsAggregated === true;
+  // Global compact mode from Settings → Usage; detail popovers stay full. Only applies standalone.
   const providerUsageDisplayMode: ProviderUsageDisplayMode =
-    webConfig?.usage.providerPanelsCompact === true ? "compact" : "full";
+    !providerUsageAggregated && webConfig?.usage.providerPanelsCompact === true ? "compact" : "full";
+
+  // Clear stale projections when a provider is disabled so aggregate columns stay in sync.
+  useEffect(() => {
+    if (!showChatGptUsage) setGptAggregateProjection(null);
+  }, [showChatGptUsage]);
+  useEffect(() => {
+    if (!showGrokUsage) setGrokAggregateProjection(null);
+  }, [showGrokUsage]);
+  useEffect(() => {
+    if (!showKiroUsage) setKiroAggregateProjection(null);
+  }, [showKiroUsage]);
+  useEffect(() => {
+    if (!providerUsageAggregated) {
+      setGptAggregateProjection(null);
+      setGrokAggregateProjection(null);
+      setKiroAggregateProjection(null);
+      setProviderUsageAggregateCloseGeneration(0);
+    }
+  }, [providerUsageAggregated]);
+
+  const openModelsFromProviderUsage = useCallback(() => {
+    if (providerUsageAggregated) {
+      setProviderUsageAggregateCloseGeneration((value) => value + 1);
+    }
+    setModelsConfigOpen(true);
+  }, [providerUsageAggregated]);
+
+  // Stable detail owners for aggregate columns — mounted once per enabled provider so
+  // projection updates do not remount accounts/quota state machines.
+  const gptAggregateDetail = useMemo(
+    () => (
+      <ChatGptUsagePanel
+        presentation="aggregate"
+        onOpenModels={openModelsFromProviderUsage}
+        onAggregateProjectionChange={setGptAggregateProjection}
+      />
+    ),
+    [openModelsFromProviderUsage],
+  );
+  const grokAggregateDetail = useMemo(
+    () => (
+      <GrokUsagePanel
+        presentationMode="aggregate"
+        onOpenModels={openModelsFromProviderUsage}
+        onProjectionChange={setGrokAggregateProjection}
+      />
+    ),
+    [openModelsFromProviderUsage],
+  );
+  const kiroAggregateDetail = useMemo(
+    () => (
+      <KiroUsagePanel
+        presentation="aggregate"
+        onOpenModels={openModelsFromProviderUsage}
+        onAggregateProjectionChange={setKiroAggregateProjection}
+      />
+    ),
+    [openModelsFromProviderUsage],
+  );
+
+  const providerUsageAggregateColumns = useMemo((): ProviderUsageAggregateColumn[] => {
+    if (!providerUsageAggregated) return [];
+    const columns: ProviderUsageAggregateColumn[] = [];
+    if (showChatGptUsage) {
+      columns.push({
+        projection: gptAggregateProjection ?? {
+          key: "gpt",
+          label: "GPT",
+          order: 0,
+          risk: "muted",
+          loading: true,
+          ringUnit: null,
+          fallback: "加载中",
+          title: "GPT 用量",
+        },
+        detail: gptAggregateDetail,
+      });
+    }
+    if (showGrokUsage) {
+      columns.push({
+        projection: grokAggregateProjection ?? {
+          key: "grok",
+          label: "Grok",
+          order: 1,
+          risk: "muted",
+          loading: true,
+          ringUnit: null,
+          fallback: "加载中",
+          title: "Grok 用量",
+        },
+        detail: grokAggregateDetail,
+      });
+    }
+    if (showKiroUsage) {
+      columns.push({
+        projection: kiroAggregateProjection ?? {
+          key: "kiro",
+          label: "Kiro",
+          order: 2,
+          risk: "muted",
+          loading: true,
+          ringUnit: null,
+          fallback: "加载中",
+          title: "Kiro 用量",
+        },
+        detail: kiroAggregateDetail,
+      });
+    }
+    return columns;
+  }, [
+    gptAggregateDetail,
+    gptAggregateProjection,
+    grokAggregateDetail,
+    grokAggregateProjection,
+    kiroAggregateDetail,
+    kiroAggregateProjection,
+    providerUsageAggregated,
+    showChatGptUsage,
+    showGrokUsage,
+    showKiroUsage,
+  ]);
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
   const browserTitleProjectContext = projectContextMatchesBrowserTitle(activeProjectContext, selectedSession, newSessionProjectContext, browserTitleCwd)
@@ -1537,6 +1664,7 @@ function AppShellContent() {
           {showAnyProviderUsage && (
             <div
               className="app-top-usage-panel"
+              data-usage-mode={providerUsageAggregated ? "aggregate" : "standalone"}
               style={{
                 marginLeft: showChat && (sessionStats || contextUsage) ? 0 : "auto",
                 paddingRight: rightPanelTogglePadding,
@@ -1547,23 +1675,33 @@ function AppShellContent() {
                 flexShrink: 0,
               }}
             >
-              {showChatGptUsage && (
-                <ChatGptUsagePanelHost
-                  onOpenModels={() => setModelsConfigOpen(true)}
-                  displayMode={providerUsageDisplayMode}
+              {providerUsageAggregated ? (
+                <ProviderUsageAggregatePanel
+                  columns={providerUsageAggregateColumns}
+                  closeGeneration={providerUsageAggregateCloseGeneration}
+                  onOpenModels={() => openModelsFromProviderUsage()}
                 />
-              )}
-              {showGrokUsage && (
-                <GrokUsagePanel
-                  onOpenModels={() => setModelsConfigOpen(true)}
-                  displayMode={providerUsageDisplayMode}
-                />
-              )}
-              {showKiroUsage && (
-                <KiroUsagePanel
-                  onOpenModels={() => setModelsConfigOpen(true)}
-                  displayMode={providerUsageDisplayMode}
-                />
+              ) : (
+                <>
+                  {showChatGptUsage && (
+                    <ChatGptUsagePanel
+                      onOpenModels={openModelsFromProviderUsage}
+                      displayMode={providerUsageDisplayMode}
+                    />
+                  )}
+                  {showGrokUsage && (
+                    <GrokUsagePanel
+                      onOpenModels={openModelsFromProviderUsage}
+                      displayMode={providerUsageDisplayMode}
+                    />
+                  )}
+                  {showKiroUsage && (
+                    <KiroUsagePanel
+                      onOpenModels={openModelsFromProviderUsage}
+                      displayMode={providerUsageDisplayMode}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

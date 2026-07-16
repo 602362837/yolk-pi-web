@@ -13,11 +13,24 @@ import {
 } from "./GrokQuotaView";
 import { iconFlowAttrs } from "./iconFlow";
 import {
+  buildGrokUsageAggregateProjection,
+  type GrokUsagePresentationMode,
+} from "./GrokUsageProjection";
+import type { ProviderUsageAggregateProjection } from "./ProviderUsagePanelContract";
+import {
   ProviderUsageTrigger,
-  type ProviderUsageCompactSummary,
   type ProviderUsageDisplayMode,
-  type ProviderUsageRingItem,
 } from "./ProviderUsageTrigger";
+
+export {
+  buildGrokUsageAggregateProjection,
+  buildGrokUsageRingLayers,
+  buildGrokUsageRingUnit,
+  buildGrokUsageWindowCandidates,
+  type GrokUsagePresentationMode,
+  type GrokUsageProjectionState,
+  type GrokUsageRingProjectionInput,
+} from "./GrokUsageProjection";
 
 const ACCOUNT_CACHE_POLL_INTERVAL_MS = 30_000;
 const GROK_PROVIDER_ID = "grok-cli";
@@ -85,12 +98,22 @@ function buildLocalNetworkError(accountId: string): GrokQuotaResultV1 {
 export function GrokUsagePanel({
   onOpenModels,
   displayMode = "full",
+  presentationMode = "standalone",
+  onProjectionChange,
 }: {
   /** Optional hook so AppShell can open Models → Grok without hard coupling. */
   onOpenModels?: () => void;
   /** Global top-bar density from usage.providerPanelsCompact. */
   displayMode?: ProviderUsageDisplayMode;
+  /**
+   * standalone (default): own click trigger + dialog + outside/Escape handlers.
+   * aggregate: detail body only; no self trigger/dialog/outside handler.
+   */
+  presentationMode?: GrokUsagePresentationMode;
+  /** Emits allowlisted projection for the aggregate shell (USAGE-AGG-06). */
+  onProjectionChange?: (projection: ProviderUsageAggregateProjection) => void;
 } = {}) {
+  const isAggregate = presentationMode === "aggregate";
   const panelDomId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -100,6 +123,7 @@ export function GrokUsagePanel({
   const quotaAbortRef = useRef<AbortController | null>(null);
 
   const [open, setOpen] = useState(false);
+  const escapeSuppressedRef = useRef(false);
   const [accounts, setAccounts] = useState<GrokOAuthAccountSummary[]>([]);
   const [account, setAccount] = useState<GrokOAuthAccountSummary | null>(null);
   const [accountsLoading, setAccountsLoading] = useState(true);
@@ -264,9 +288,9 @@ export function GrokUsagePanel({
     };
   }, [loadAccounts]);
 
-  // Revalidate on expand (light; keep existing content).
+  // Revalidate on expand (standalone only; aggregate shell owns open lifecycle).
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const controller = new AbortController();
     void loadAccounts({
       silent: true,
@@ -275,11 +299,11 @@ export function GrokUsagePanel({
       forceQuota: false,
     });
     return () => controller.abort();
-  }, [open, loadAccounts]);
+  }, [isAggregate, open, loadAccounts]);
 
   // Keep the expanded panel inside the viewport (8px side gutters, width <= 100vw-16).
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const updatePosition = () => {
       const trigger = triggerRef.current;
       if (!trigger) return;
@@ -302,11 +326,11 @@ export function GrokUsagePanel({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open]);
+  }, [isAggregate, open]);
 
-  // Outside click + Escape close.
+  // Outside click + Escape close (standalone only; aggregate shell owns hover/focus/Escape).
   useEffect(() => {
-    if (!open) return;
+    if (isAggregate || !open) return;
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
@@ -317,6 +341,7 @@ export function GrokUsagePanel({
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
+        escapeSuppressedRef.current = true;
         triggerRef.current?.focus();
       }
     };
@@ -326,7 +351,7 @@ export function GrokUsagePanel({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [isAggregate, open]);
 
   const handleManualRefresh = useCallback(async () => {
     if (refreshing || activatingAccountId || !account) return;
@@ -393,9 +418,10 @@ export function GrokUsagePanel({
   }, [activatingAccountId, loadQuota, refreshing]);
 
   const openModels = useCallback(() => {
-    setOpen(false);
+    // Close standalone dialog before Models; aggregate parent also closes via onOpenModels.
+    if (!isAggregate) setOpen(false);
     onOpenModels?.();
-  }, [onOpenModels]);
+  }, [isAggregate, onOpenModels]);
 
   const fullStatus = useMemo(() => {
     if (refreshing) {
@@ -441,64 +467,23 @@ export function GrokUsagePanel({
     return { status: "无缓存", tone: "muted" as const, showSpinner: false };
   }, [account, accountsError, accountsLoading, quota, quotaLoading, refreshing]);
 
-  const monthlyPercent = quota?.monthly ? quota.monthly.utilization : null;
-  const weeklyPercent = quota?.weekly ? quota.weekly.usedPercent : null;
+  const aggregateProjection = useMemo(
+    () => buildGrokUsageAggregateProjection({
+      hasAccount: Boolean(account),
+      accountsLoading,
+      accountsError,
+      refreshing,
+      quotaLoading,
+      quota,
+    }),
+    [account, accountsError, accountsLoading, quota, quotaLoading, refreshing],
+  );
 
-  const rings = useMemo((): ProviderUsageRingItem[] => {
-    const items: ProviderUsageRingItem[] = [{
-      percent: account ? monthlyPercent : null,
-      label: "月",
-      title: monthlyPercent === null ? "月度用量未知" : `月度已使用 ${Math.round(monthlyPercent)}%`,
-      color: monthlyPercent === null ? undefined : grokUtilizationColor(monthlyPercent),
-    }];
-    if (weeklyPercent !== null) {
-      items.push({
-        percent: weeklyPercent,
-        label: "周",
-        title: `周度已使用 ${Math.round(weeklyPercent)}%`,
-        color: grokUtilizationColor(weeklyPercent),
-      });
-    }
-    return items;
-  }, [account, monthlyPercent, weeklyPercent]);
+  // Publish allowlisted projection for aggregate shell consumers.
+  useEffect(() => {
+    onProjectionChange?.(aggregateProjection);
+  }, [aggregateProjection, onProjectionChange]);
 
-  const compactProjection = useMemo(() => {
-    const summaries: ProviderUsageCompactSummary[] = [];
-    let fallback: string | null = null;
-    let loading = false;
-
-    if (refreshing || (accountsLoading && !account && !quota) || (quotaLoading && !quota?.monthly)) {
-      loading = true;
-      fallback = "加载中";
-    } else if (accountsError && !account) {
-      fallback = "错误";
-    } else if (!account) {
-      fallback = "登录";
-    } else if (quota?.reauthRequired) {
-      fallback = "需登录";
-    } else if (quota && !quota.success && !quota.monthly) {
-      fallback = "错误";
-    } else if (monthlyPercent !== null || weeklyPercent !== null) {
-      if (monthlyPercent !== null) {
-        summaries.push({
-          label: "月",
-          value: `${Math.round(monthlyPercent)}%`,
-          title: `月度已使用 ${Math.round(monthlyPercent)}%`,
-        });
-      }
-      if (weeklyPercent !== null) {
-        summaries.push({
-          label: "周",
-          value: `${Math.round(weeklyPercent)}%`,
-          title: `周度已使用 ${Math.round(weeklyPercent)}%`,
-        });
-      }
-    } else if (account) {
-      fallback = "额度未知";
-    }
-
-    return { summaries, fallback, loading };
-  }, [account, accountsError, accountsLoading, monthlyPercent, quota, quotaLoading, refreshing, weeklyPercent]);
   const cacheLabel = quota ? grokCacheStateLabel(quota.cache.state) : accountsLoading ? "加载中" : "无缓存";
   const queriedLabel = (() => {
     if (accountsLoading && !quota) return "正在读取…";
@@ -515,8 +500,355 @@ export function GrokUsagePanel({
     ? grokQuotaErrorMessage(errorCode, { hasMonthly })
     : accountsError;
 
+  const detailBody = (
+    <div
+      className={isAggregate ? "grok-usage-panel__detail grok-usage-panel__detail--aggregate" : "grok-usage-panel__detail"}
+      style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}
+    >
+      {!isAggregate && (
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>Grok 用量</div>
+            <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: quota ? grokCacheStateDot(quota.cache.state) : "var(--text-dim)",
+                  }}
+                />
+                <span>{quota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}</span>
+              </span>
+              <span>更新时间：{queriedLabel}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => void handleManualRefresh()}
+              disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
+              {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
+              title="强制刷新当前 Active 账号 quota"
+              aria-label="刷新当前 Active Grok 账号 quota"
+              style={{
+                width: 30,
+                height: 30,
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                background: "var(--bg)",
+                color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
+                cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >
+              <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+                <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+                <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+                <path d="M3 4v8h8" />
+                <path d="M21 20v-8h-8" />
+              </ActionFlowIcon>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
+              aria-label="关闭 Grok 用量面板"
+              style={{
+                width: 30,
+                height: 30,
+                border: "1px solid var(--border)",
+                borderRadius: 7,
+                background: "var(--bg)",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                fontSize: 16,
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isAggregate && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11, minWidth: 0 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: quota ? grokCacheStateDot(quota.cache.state) : "var(--text-dim)",
+                }}
+              />
+              <span>{quota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}</span>
+            </span>
+            <span>更新时间：{queriedLabel}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleManualRefresh()}
+            disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
+            {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
+            title="强制刷新当前 Active 账号 quota"
+            aria-label="刷新当前 Active Grok 账号 quota"
+            style={{
+              width: 30,
+              height: 30,
+              border: "1px solid var(--border)",
+              borderRadius: 7,
+              background: "var(--bg)",
+              color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
+              cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <ActionFlowIcon width={14} height={14} strokeWidth={2}>
+              <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
+              <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
+              <path d="M3 4v8h8" />
+              <path d="M21 20v-8h-8" />
+            </ActionFlowIcon>
+          </button>
+        </div>
+      )}
+
+      {refreshing && (
+        <div style={{ color: "var(--text-muted)", fontSize: 11 }}>正在刷新…</div>
+      )}
+
+      {accountsLoading && !account && !quota ? (
+        <div className="provider-usage-detail-card" style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10 }} aria-busy="true">
+          <div style={{ height: 10, width: "54%", borderRadius: 4, background: "rgba(148,163,184,0.18)" }} />
+          <div style={{ height: 10, width: "78%", borderRadius: 4, background: "rgba(148,163,184,0.14)" }} />
+          <div style={{ height: 72, borderRadius: 8, background: "rgba(148,163,184,0.10)" }} />
+          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>正在加载已保存账号与缓存 quota…</span>
+        </div>
+      ) : !account ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="provider-usage-detail-card" style={{ padding: 10, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
+            <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active Grok 账号</strong>
+            请先在 Models → Grok 登录或激活一个账号。面板不会为未登录状态伪造额度。
+            {accountsError && <div style={{ marginTop: 6, color: "var(--usage-status-danger-fg, #b91c1c)" }}>{accountsError}</div>}
+          </div>
+          <button
+            type="button"
+            onClick={openModels}
+            style={{
+              minHeight: 34,
+              borderRadius: 8,
+              border: "1px solid var(--accent)",
+              background: "var(--accent)",
+              color: "var(--bg)",
+              cursor: "pointer",
+              fontWeight: 800,
+              fontSize: 12,
+            }}
+          >
+            打开 Models → Grok
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="provider-usage-detail-card" style={{ padding: 9, display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+            <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+              <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {account.displayName}
+              </span>
+              <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {account.maskedAccountId}
+              </code>
+            </div>
+            <span className="provider-usage-active-badge" style={{ fontSize: 10 }}>Active</span>
+          </div>
+
+          {quota?.reauthRequired && (
+            <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <strong>需要重新登录。</strong> {grokQuotaErrorMessage("unauthorized")}
+            </div>
+          )}
+
+          {!quota?.reauthRequired && quota?.cache.state === "stale" && hasMonthly && (
+            <div className="provider-usage-status-banner" data-tone="warning" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <strong>缓存已过期。</strong> {safeErrorText ?? "正在展示上次成功数据。"}
+            </div>
+          )}
+
+          {!quota?.reauthRequired && quota && !quota.success && !hasMonthly && (
+            <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <strong>额度暂不可用。</strong> {safeErrorText ?? "请稍后重试。"}
+            </div>
+          )}
+
+          {activateError && (
+            <div className="provider-usage-status-banner" data-tone="danger" style={{ fontSize: 12, lineHeight: 1.5 }}>
+              {activateError}
+            </div>
+          )}
+
+          {quota?.monthly ? (
+            <div className="grok-usage-quota-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div className="provider-usage-detail-card" style={{ padding: 10, display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+                <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>月度额度</div>
+                <div style={{ color: grokUtilizationColor(quota.monthly.utilization), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                  {quota.monthly.used.toLocaleString()} <small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>/ {quota.monthly.limit.toLocaleString()}</small>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label="月度额度"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(Math.min(Math.max(quota.monthly.utilization, 0), 100))}
+                  style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
+                >
+                  <div style={{ height: "100%", width: `${Math.min(quota.monthly.utilization, 100)}%`, background: grokUtilizationColor(quota.monthly.utilization), borderRadius: 99 }} />
+                </div>
+                <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                  剩余 {quota.monthly.remaining.toLocaleString()} · 重置时间 {formatGrokQuotaTime(quota.monthly.resetsAt)}
+                </div>
+              </div>
+
+              {quota.weekly ? (
+                <div className="provider-usage-detail-card" style={{ padding: 10, display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+                  <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>周额度</div>
+                  <div style={{ color: grokUtilizationColor(quota.weekly.usedPercent), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
+                    {Math.round(quota.weekly.usedPercent)}<small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>% 已使用</small>
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-label="周额度"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(Math.min(Math.max(quota.weekly.usedPercent, 0), 100))}
+                    style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
+                  >
+                    <div style={{ height: "100%", width: `${Math.min(quota.weekly.usedPercent, 100)}%`, background: grokUtilizationColor(quota.weekly.usedPercent), borderRadius: 99 }} />
+                  </div>
+                  <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
+                    重置时间 {formatGrokQuotaTime(quota.weekly.resetsAt)}
+                  </div>
+                </div>
+              ) : (
+                <div className="provider-usage-detail-card" style={{ padding: 10, display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                  <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>周额度</div>
+                  <div style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5 }}>当前 API 未提供周额度。</div>
+                  <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>不推断为 0%、不限额或订阅权益缺失。</div>
+                </div>
+              )}
+            </div>
+          ) : !quota?.error && !quotaLoading ? (
+            <div className="provider-usage-detail-card" style={{ padding: 10, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
+              用量未知。请刷新以查询当前 Active 账号。
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>账号</span>
+              <span style={{ color: "var(--text-dim)", fontSize: 9, fontWeight: 600 }}>全局 Active</span>
+            </div>
+            <div style={{ padding: 8, borderRadius: 8, border: "1px solid rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
+              “设为 Active”会切换全局 Active Grok 账号，影响当前与新建会话的后续请求。
+            </div>
+            {accounts.length === 0 ? (
+              <div style={{ color: "var(--text-dim)", fontSize: 12 }}>没有已保存账号。</div>
+            ) : accounts.map((item) => (
+              <div
+                key={item.accountId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: 8,
+                  alignItems: "center",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: item.active ? "1px solid var(--usage-status-success-border)" : "1px solid var(--usage-panel-border, var(--border))",
+                  background: item.active ? "var(--usage-status-success-bg)" : "var(--usage-card-bg, rgba(148,163,184,0.06))",
+                }}
+              >
+                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span title={item.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.displayName}
+                  </span>
+                  <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.maskedAccountId}
+                  </code>
+                </div>
+                {item.active ? (
+                  <span className="provider-usage-active-badge" style={{ fontSize: 11 }}>Active</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleActivate(item.accountId)}
+                    disabled={Boolean(activatingAccountId) || refreshing}
+                    style={{
+                      minHeight: 30,
+                      padding: "5px 9px",
+                      borderRadius: 6,
+                      border: "1px solid var(--border)",
+                      background: "var(--bg)",
+                      color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)",
+                      cursor: activatingAccountId || refreshing ? "default" : "pointer",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {activatingAccountId === item.accountId ? "正在切换…" : "设为 Active"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
+            <button
+              type="button"
+              onClick={openModels}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--accent)",
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: 0,
+                textAlign: "left",
+              }}
+            >
+              {quota?.reauthRequired ? "在 Models → Grok 重新登录" : "在 Models → Grok 管理"}
+            </button>
+            <span style={{ color: "var(--text-dim)", fontSize: 10 }}>页面可见时每 30 秒刷新</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  if (isAggregate) {
+    return (
+      <div className="grok-usage-panel grok-usage-panel--aggregate" style={{ display: "flex", flexDirection: "column", minWidth: 0, height: "100%" }}>
+        {detailBody}
+      </div>
+    );
+  }
+
   return (
-    <div className="grok-usage-panel" style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
+    <div className="grok-usage-panel" onMouseLeave={() => setOpen(false)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }} style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
       <ProviderUsageTrigger
         buttonRef={triggerRef}
         className="grok-usage-panel__trigger"
@@ -525,13 +857,13 @@ export function GrokUsagePanel({
         displayMode={displayMode}
         tone={fullStatus.tone}
         statusText={fullStatus.status}
-        loading={fullStatus.showSpinner || compactProjection.loading}
-        rings={rings}
-        compactSummaries={compactProjection.summaries}
-        compactFallback={compactProjection.fallback}
-        onClick={() => setOpen((value) => !value)}
-        title="Grok 用量"
-        aria-label="Grok 用量"
+        loading={fullStatus.showSpinner || aggregateProjection.loading}
+        ringUnit={aggregateProjection.ringUnit}
+        compactFallback={aggregateProjection.fallback}
+        onFocus={() => { if (escapeSuppressedRef.current) { escapeSuppressedRef.current = false; return; } setOpen(true); }}
+        onMouseEnter={() => { escapeSuppressedRef.current = false; setOpen(true); }}
+        title={aggregateProjection.title}
+        aria-label={aggregateProjection.ringUnit?.ariaLabel ?? "Grok 用量"}
         aria-controls={panelDomId}
       />
 
@@ -562,286 +894,7 @@ export function GrokUsagePanel({
             gap: 10,
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 800 }}>Grok 用量</div>
-              <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: "var(--text-dim)", fontSize: 11 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: quota ? grokCacheStateDot(quota.cache.state) : "var(--text-dim)",
-                    }}
-                  />
-                  <span>{quota?.reauthRequired ? "缓存过期 · 需重新登录" : cacheLabel}</span>
-                </span>
-                <span>更新时间：{queriedLabel}</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={() => void handleManualRefresh()}
-                disabled={refreshing || Boolean(activatingAccountId) || !account || accountsLoading}
-                {...iconFlowAttrs(refreshing || Boolean(activatingAccountId) ? "off" : "interactive")}
-                title="强制刷新当前 Active 账号 quota"
-                aria-label="刷新当前 Active Grok 账号 quota"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: "1px solid var(--border)",
-                  borderRadius: 7,
-                  background: "var(--bg)",
-                  color: refreshing || Boolean(activatingAccountId) || !account ? "var(--text-dim)" : "var(--accent)",
-                  cursor: refreshing || Boolean(activatingAccountId) || !account ? "default" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                }}
-              >
-                <ActionFlowIcon width={14} height={14} strokeWidth={2}>
-                  <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
-                  <path d="M3 12a9 9 0 0 1 9-9 8.8 8.8 0 0 1 6.36 2.64" />
-                  <path d="M3 4v8h8" />
-                  <path d="M21 20v-8h-8" />
-                </ActionFlowIcon>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  triggerRef.current?.focus();
-                }}
-                aria-label="关闭 Grok 用量面板"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: "1px solid var(--border)",
-                  borderRadius: 7,
-                  background: "var(--bg)",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          {refreshing && (
-            <div style={{ color: "var(--text-muted)", fontSize: 11 }}>正在刷新…</div>
-          )}
-
-          {accountsLoading && !account && !quota ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)" }} aria-busy="true">
-              <div style={{ height: 10, width: "54%", borderRadius: 4, background: "rgba(148,163,184,0.18)" }} />
-              <div style={{ height: 10, width: "78%", borderRadius: 4, background: "rgba(148,163,184,0.14)" }} />
-              <div style={{ height: 72, borderRadius: 8, background: "rgba(148,163,184,0.10)" }} />
-              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>正在加载已保存账号与缓存 quota…</span>
-            </div>
-          ) : !account ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>
-                <strong style={{ display: "block", color: "var(--text)", marginBottom: 3 }}>无 Active Grok 账号</strong>
-                请先在 Models → Grok 登录或激活一个账号。面板不会为未登录状态伪造额度。
-                {accountsError && <div style={{ marginTop: 6, color: "#f87171" }}>{accountsError}</div>}
-              </div>
-              <button
-                type="button"
-                onClick={openModels}
-                style={{
-                  minHeight: 34,
-                  borderRadius: 8,
-                  border: "1px solid var(--accent)",
-                  background: "var(--accent)",
-                  color: "#0b1220",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 12,
-                }}
-              >
-                打开 Models → Grok
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={{ padding: 9, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.08)", display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
-                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-                  <span title={account.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {account.displayName}
-                  </span>
-                  <code title={account.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {account.maskedAccountId}{account.label ? ` · ${account.label}` : ""}
-                  </code>
-                </div>
-                <span style={{ color: "#22c55e", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>Active</span>
-              </div>
-
-              {quota?.reauthRequired && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>需要重新登录。</strong> {grokQuotaErrorMessage("unauthorized")}
-                </div>
-              )}
-
-              {!quota?.reauthRequired && quota?.cache.state === "stale" && hasMonthly && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fbbf24", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>缓存已过期。</strong> {safeErrorText ?? "正在展示上次成功数据。"}
-                </div>
-              )}
-
-              {!quota?.reauthRequired && quota && !quota.success && !hasMonthly && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>额度暂不可用。</strong> {safeErrorText ?? "请稍后重试。"}
-                </div>
-              )}
-
-              {activateError && (
-                <div style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: 12, lineHeight: 1.5 }}>
-                  {activateError}
-                </div>
-              )}
-
-              {quota?.monthly ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
-                    <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>月度额度</div>
-                    <div style={{ color: grokUtilizationColor(quota.monthly.utilization), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                      {quota.monthly.used.toLocaleString()} <small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>/ {quota.monthly.limit.toLocaleString()}</small>
-                    </div>
-                    <div
-                      role="progressbar"
-                      aria-label="月度额度"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={Math.round(Math.min(Math.max(quota.monthly.utilization, 0), 100))}
-                      style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
-                    >
-                      <div style={{ height: "100%", width: `${Math.min(quota.monthly.utilization, 100)}%`, background: grokUtilizationColor(quota.monthly.utilization), borderRadius: 99 }} />
-                    </div>
-                    <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
-                      剩余 {quota.monthly.remaining.toLocaleString()} · 重置时间 {formatGrokQuotaTime(quota.monthly.resetsAt)}
-                    </div>
-                  </div>
-
-                  {quota.weekly ? (
-                    <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
-                      <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>周额度</div>
-                      <div style={{ color: grokUtilizationColor(quota.weekly.usedPercent), fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
-                        {Math.round(quota.weekly.usedPercent)}<small style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500 }}>% 已使用</small>
-                      </div>
-                      <div
-                        role="progressbar"
-                        aria-label="周额度"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(Math.min(Math.max(quota.weekly.usedPercent, 0), 100))}
-                        style={{ height: 6, borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", overflow: "hidden" }}
-                      >
-                        <div style={{ height: "100%", width: `${Math.min(quota.weekly.usedPercent, 100)}%`, background: grokUtilizationColor(quota.weekly.usedPercent), borderRadius: 99 }} />
-                      </div>
-                      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>
-                        重置时间 {formatGrokQuotaTime(quota.weekly.resetsAt)}
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-                      <div style={{ color: "var(--text-dim)", fontSize: 10, fontWeight: 700 }}>周额度</div>
-                      <div style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5 }}>当前 API 未提供周额度。</div>
-                      <div style={{ color: "var(--text-dim)", fontSize: 10, lineHeight: 1.4 }}>不推断为 0%、不限额或订阅权益缺失。</div>
-                    </div>
-                  )}
-                </div>
-              ) : !quota?.error && !quotaLoading ? (
-                <div style={{ padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "rgba(148,163,184,0.06)", color: "var(--text-dim)", fontSize: 12, lineHeight: 1.45 }}>
-                  用量未知。请刷新以查询当前 Active 账号。
-                </div>
-              ) : null}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 2 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 800 }}>账号</span>
-                  <span style={{ color: "var(--text-dim)", fontSize: 9, fontWeight: 600 }}>全局 Active</span>
-                </div>
-                <div style={{ padding: 8, borderRadius: 8, border: "1px solid rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.45 }}>
-                  “设为 Active”会切换全局 Active Grok 账号，影响当前与新建会话的后续请求。
-                </div>
-                {accounts.length === 0 ? (
-                  <div style={{ color: "var(--text-dim)", fontSize: 12 }}>没有已保存账号。</div>
-                ) : accounts.map((item) => (
-                  <div
-                    key={item.accountId}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr auto",
-                      gap: 8,
-                      alignItems: "center",
-                      padding: 8,
-                      borderRadius: 8,
-                      border: item.active ? "1px solid rgba(34,197,94,0.45)" : "1px solid var(--border)",
-                      background: item.active ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.06)",
-                    }}
-                  >
-                    <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span title={item.displayName} style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.displayName}
-                      </span>
-                      <code title={item.maskedAccountId} style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.maskedAccountId}{item.label ? ` · ${item.label}` : ""}
-                      </code>
-                    </div>
-                    {item.active ? (
-                      <span style={{ color: "#22c55e", fontSize: 11, fontWeight: 800 }}>Active</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void handleActivate(item.accountId)}
-                        disabled={Boolean(activatingAccountId) || refreshing}
-                        style={{
-                          minHeight: 30,
-                          padding: "5px 9px",
-                          borderRadius: 6,
-                          border: "1px solid var(--border)",
-                          background: "var(--bg)",
-                          color: activatingAccountId === item.accountId ? "var(--text-dim)" : "var(--accent)",
-                          cursor: activatingAccountId || refreshing ? "default" : "pointer",
-                          fontSize: 11,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {activatingAccountId === item.accountId ? "正在切换…" : "设为 Active"}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
-                <button
-                  type="button"
-                  onClick={openModels}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: 0,
-                    textAlign: "left",
-                  }}
-                >
-                  {quota?.reauthRequired ? "在 Models → Grok 重新登录" : "在 Models → Grok 管理"}
-                </button>
-                <span style={{ color: "var(--text-dim)", fontSize: 10 }}>页面可见时每 30 秒刷新</span>
-              </div>
-            </>
-          )}
+          {detailBody}
         </section>
       )}
     </div>

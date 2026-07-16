@@ -127,7 +127,9 @@ await test("ChatGptUsagePanel source contract: shell, cache sources, safety, API
   // Prop + AppShell wiring
   assert.match(panel, /onOpenModels\?: \(\) => void/);
   assert.match(panel, /onOpenModels\?\.\(\)/);
-  assert.match(appShell, /ChatGptUsagePanelHost[\s\S]*?onOpenModels=\{\(\) => setModelsConfigOpen\(true\)\}/);
+  // AppShell mutual-exclusion: standalone ChatGptUsagePanel + aggregate detail both open Models via openModelsFromProviderUsage (closes aggregate first when needed).
+  assert.match(appShell, /openModelsFromProviderUsage/);
+  assert.match(appShell, /<ChatGptUsagePanel[\s\S]*?onOpenModels=\{openModelsFromProviderUsage\}/);
   assert.match(appShell, /displayMode=\{providerUsageDisplayMode\}/);
   assert.match(appShell, /showKiroUsage &&/);
   assert.match(appShell, /showChatGptUsage &&/);
@@ -219,6 +221,199 @@ await test("Grok panel still owns fresh/stale and has no GPT Reset/scheduler", (
   assert.match(grokView, /stale:\s*"缓存已过期"/);
   assert.doesNotMatch(grokPanel, /reset credit|scheduler|warmup|repair-lock/i);
   assert.doesNotMatch(grokView, /reset credit|scheduler|warmup|repair-lock/i);
+});
+
+await test("GPT N-ring adapter: actual tiers → projector, outer shortest / center outer", async () => {
+  // ChatGptUsagePanel is a client component; import pure helpers via dynamic ESM.
+  // We load the builder by evaluating the pure projection path from source modules.
+  const {
+    isValidRingUnitCenter,
+    formatRingCenterValue,
+    projectProviderUsageWindows,
+  } = await import("../components/ProviderUsagePanelContract.ts");
+  const panel = read("components/ChatGptUsagePanel.tsx");
+
+  assert.match(panel, /export function buildChatGptUsageRingUnit/);
+  assert.match(panel, /export function buildChatGptUsageWindowCandidates/);
+  assert.match(panel, /projectProviderUsageWindows/);
+  // No fixed hasFiveHour/hasSevenDay push order.
+  assert.doesNotMatch(panel, /hasFiveHour[\s\S]{0,80}layers\.push/);
+  assert.doesNotMatch(panel, /hasSevenDay[\s\S]{0,80}layers\.push/);
+  assert.match(panel, /durationEvidence: tier\.name/);
+  assert.match(panel, /knownQuotaTiers/);
+  assert.match(panel, /clampUsagePercent/);
+
+  // Inline the same candidate mapping rules for dual/only/unknown cases.
+  function candidatesFromTiers(tiers) {
+    return tiers.map((tier) => {
+      const percent = typeof tier.utilization === "number" && Number.isFinite(tier.utilization)
+        ? tier.utilization
+        : null;
+      if (tier.name === "five_hour") {
+        return {
+          id: "gpt-5h",
+          shortLabel: "5h",
+          fullLabel: GPT_QUOTA_TIER_PANEL_LABELS.five_hour,
+          percent,
+          title: percent === null ? "5 小时额度未知" : `5 小时已使用 ${Math.round(percent)}%`,
+          present: true,
+          trusted: true,
+          durationMs: null,
+          durationEvidence: "five_hour",
+        };
+      }
+      return {
+        id: "gpt-week",
+        shortLabel: "周",
+        fullLabel: GPT_QUOTA_TIER_PANEL_LABELS.seven_day,
+        percent,
+        title: percent === null ? "7 天额度未知" : `周额度已使用 ${Math.round(percent)}%`,
+        present: true,
+        trusted: true,
+        durationMs: null,
+        durationEvidence: "seven_day",
+      };
+    });
+  }
+
+  // Dual: input order 7d then 5h still projects outer 5h (short) → inner 7d (long).
+  const dual = projectProviderUsageWindows(candidatesFromTiers([
+    { name: "seven_day", utilization: 37, resetsAt: null },
+    { name: "five_hour", utilization: 42, resetsAt: null },
+  ]), { providerLabel: "GPT" }).ringUnit;
+  assert.ok(dual);
+  assert.equal(dual.layers.length, 2);
+  assert.equal(dual.layers[0].id, "gpt-5h");
+  assert.equal(dual.layers[1].id, "gpt-week");
+  assert.equal(dual.centerLayerId, "gpt-5h");
+  assert.equal(isValidRingUnitCenter(dual), true);
+  assert.equal(formatRingCenterValue(dual.layers[0].percent), "42%");
+  assert.match(dual.ariaLabel, /7 天额度/);
+  assert.match(dual.ariaLabel, /5 小时额度/);
+  assert.match(dual.ariaLabel, /中心为外圈优先层 5h/);
+
+  // 5h unknown keeps outer layer and center 5h/—; week still fills independently.
+  const fiveHourUnknown = projectProviderUsageWindows(candidatesFromTiers([
+    { name: "seven_day", utilization: 37, resetsAt: null },
+    { name: "five_hour", utilization: Number.NaN, resetsAt: null },
+  ]), { providerLabel: "GPT" }).ringUnit;
+  assert.ok(fiveHourUnknown);
+  assert.equal(fiveHourUnknown.layers[0].id, "gpt-5h");
+  assert.equal(fiveHourUnknown.layers[0].percent, null);
+  assert.equal(fiveHourUnknown.layers[1].percent, 37);
+  assert.equal(fiveHourUnknown.centerLayerId, "gpt-5h");
+  assert.equal(formatRingCenterValue(fiveHourUnknown.layers[0].percent), "—");
+  // Must not borrow inner week percent for center.
+  assert.notEqual(formatRingCenterValue(fiveHourUnknown.layers[0].percent), "37%");
+
+  // Only-7d: single layer, center week; no empty 5h track.
+  const onlyWeek = projectProviderUsageWindows(candidatesFromTiers([
+    { name: "seven_day", utilization: 37, resetsAt: null },
+  ]), { providerLabel: "GPT" }).ringUnit;
+  assert.ok(onlyWeek);
+  assert.equal(onlyWeek.layers.length, 1);
+  assert.equal(onlyWeek.centerLayerId, "gpt-week");
+  assert.equal(formatRingCenterValue(onlyWeek.layers[0].percent), "37%");
+
+  // Only-5h: single layer, center 5h.
+  const onlyFiveHour = projectProviderUsageWindows(candidatesFromTiers([
+    { name: "five_hour", utilization: 12, resetsAt: null },
+  ]), { providerLabel: "GPT" }).ringUnit;
+  assert.ok(onlyFiveHour);
+  assert.equal(onlyFiveHour.layers.length, 1);
+  assert.equal(onlyFiveHour.centerLayerId, "gpt-5h");
+
+  // Future recognized period tokens (e.g. monthly) sort through the shared projector
+  // without a provider-specific layout branch. Untrusted names are rejected by the adapter.
+  const futureMixed = projectProviderUsageWindows([
+    {
+      id: "gpt-monthly",
+      shortLabel: "月",
+      fullLabel: "月度额度",
+      percent: 18,
+      title: "月度已使用 18%",
+      present: true,
+      trusted: true,
+      durationMs: null,
+      durationEvidence: "monthly",
+    },
+    {
+      id: "gpt-5h",
+      shortLabel: "5h",
+      fullLabel: GPT_QUOTA_TIER_PANEL_LABELS.five_hour,
+      percent: 40,
+      title: "5 小时已使用 40%",
+      present: true,
+      trusted: true,
+      durationMs: null,
+      durationEvidence: "five_hour",
+    },
+  ], { providerLabel: "GPT" });
+  assert.equal(futureMixed.mode, "ordered-multi");
+  assert.deepEqual(futureMixed.ringUnit.layers.map((layer) => layer.id), ["gpt-5h", "gpt-monthly"]);
+  assert.equal(futureMixed.ringUnit.centerLayerId, "gpt-5h");
+
+  // Adapter source accepts future resolvable tier names and rejects unknown noise.
+  assert.match(panel, /future tier whose name resolves/);
+  assert.match(panel, /if \(!known && !resolved\) continue/);
+  assert.match(panel, /gpt-\$\{tier\.name\}|GPT_TIER_RING_IDS/);
+
+  // Empty tiers → null ring.
+  assert.equal(
+    projectProviderUsageWindows(candidatesFromTiers([]), { providerLabel: "GPT" }).ringUnit,
+    null,
+  );
+});
+
+await test("ChatGptUsagePanel uses ringUnit, aggregate presentation, no compact text chips", () => {
+  const panel = read("components/ChatGptUsagePanel.tsx");
+
+  // Shared N-ring unit for Full/Compact/Aggregate via projector.
+  assert.match(panel, /buildChatGptUsageRingUnit/);
+  assert.match(panel, /buildChatGptUsageWindowCandidates/);
+  assert.match(panel, /projectProviderUsageWindows/);
+  assert.match(panel, /ringUnit=\{ringUnit\}/);
+  assert.match(panel, /gpt-week/);
+  assert.match(panel, /gpt-5h/);
+  assert.match(panel, /["']周["']/);
+  assert.match(panel, /["']5h["']/);
+  // No fixed [5h,7d] push order in adapter.
+  assert.doesNotMatch(panel, /hasFiveHour[\s\S]{0,120}layers\.push/);
+  assert.doesNotMatch(panel, /hasSevenDay[\s\S]{0,120}layers\.push/);
+
+  // Compact normal quota must not construct text summary chips.
+  assert.doesNotMatch(panel, /compactSummaries/);
+  assert.doesNotMatch(panel, /ProviderUsageCompactSummary/);
+  assert.doesNotMatch(panel, /summaries\.push/);
+  assert.match(panel, /Compact uses ringUnit only/);
+
+  // Aggregate presentation reuses detail; no own trigger/dialog in aggregate path.
+  assert.match(panel, /presentation = "standalone"/);
+  assert.match(panel, /ChatGptUsagePresentation/);
+  assert.match(panel, /presentation === "aggregate"/);
+  assert.match(panel, /data-presentation="aggregate"/);
+  assert.match(panel, /onAggregateProjectionChange/);
+  assert.match(panel, /key: "gpt"/);
+  assert.match(panel, /order: 0/);
+  // Aggregate early return before ProviderUsageTrigger dialog shell.
+  assert.match(panel, /if \(isAggregate\)/);
+  assert.match(panel, /detailBody/);
+  // Models open still works; aggregate does not self-close dialog state.
+  assert.match(panel, /if \(!isAggregate\) setOpen\(false\)/);
+  // Secondary scheduler load stays standalone-open only.
+  assert.match(panel, /isAggregate \|\| !open/);
+  // Standalone still click-toggles detail.
+  assert.match(panel, /onClick=\{\(\) => setOpen\(\(value\) => !value\)\}/);
+  assert.match(panel, /role="dialog"/);
+  assert.match(panel, /Escape/);
+
+  // Forbidden secret fields must not appear in aggregate projection construction.
+  assert.doesNotMatch(panel, /aggregateProjection[\s\S]{0,400}accountId\s*:/);
+  assert.doesNotMatch(panel, /profileArn|clientSecret|access_token|refresh_token/);
+  // GPT-only tools retained.
+  assert.match(panel, /Reset credits/);
+  assert.match(panel, /usage-refresh\/status/);
+  assert.match(panel, /usage-refresh\/repair-lock/);
 });
 
 if (failures > 0) {

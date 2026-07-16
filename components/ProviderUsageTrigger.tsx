@@ -1,6 +1,18 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
+import { useId, useMemo } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode, Ref } from "react";
+import {
+  assertRingUnitCenterInvariant,
+  clampUsagePercent,
+  formatRingCenterValue,
+  layerIdentityForIndex,
+  resolveRingUnitCenterLayer,
+  toneForUsagePercent,
+  type ProviderUsageRingLayer,
+  type ProviderUsageRingTone,
+  type ProviderUsageRingUnit,
+} from "./ProviderUsagePanelContract";
 
 /** Visual tone for the full-mode status dot. */
 export type ProviderUsageTriggerTone = "success" | "warning" | "danger" | "muted";
@@ -8,7 +20,10 @@ export type ProviderUsageTriggerTone = "success" | "warning" | "danger" | "muted
 /** Top-bar density mode shared by GPT / Grok / Kiro. */
 export type ProviderUsageDisplayMode = "full" | "compact";
 
-/** Compact quota summary chip (provider-neutral; at most two shown). */
+/**
+ * @deprecated Prefer ProviderUsageRingUnit.layers. Kept for transitional
+ * standalone panels until USAGE-AGG-03/04/05 migrate adapters.
+ */
 export interface ProviderUsageCompactSummary {
   /** Short label, e.g. "5h", "月", "剩余". */
   label: string;
@@ -18,7 +33,10 @@ export interface ProviderUsageCompactSummary {
   title?: string;
 }
 
-/** Ring item for full-mode trigger (provider-owned utilization). */
+/**
+ * @deprecated Prefer ProviderUsageRingUnit. Kept for transitional standalone
+ * panels that still project parallel single rings.
+ */
 export interface ProviderUsageRingItem {
   percent: number | null;
   label: string;
@@ -33,7 +51,7 @@ export interface ProviderUsageTriggerProps
   providerLabel: string;
   /** Whether the detailed popover is open. */
   open: boolean;
-  /** full = status + rings; compact = provider + ≤2 summaries / short fallback. */
+  /** full = status + N-ring; compact = provider + N-ring / short fallback. */
   displayMode: ProviderUsageDisplayMode;
   /** Full-mode status tone (dot color). */
   tone?: ProviderUsageTriggerTone;
@@ -41,11 +59,19 @@ export interface ProviderUsageTriggerProps
   statusText?: string;
   /** Show spinner instead of status dot (full) or beside fallback (compact). */
   loading?: boolean;
-  /** Full-mode ring items (provider-specific windows / buckets). */
+  /**
+   * Preferred shared N-ring unit (outer → inner). When present, Full and Compact
+   * both render this primitive instead of parallel rings or text chips.
+   */
+  ringUnit?: ProviderUsageRingUnit | null;
+  /**
+   * @deprecated Transitional parallel rings when ringUnit is absent.
+   * USAGE-AGG-03/04/05 should migrate to ringUnit.
+   */
   rings?: ProviderUsageRingItem[];
   /**
-   * Compact-mode key quota summaries. At most two are rendered.
-   * When empty and no compactFallback, only the provider label is shown.
+   * @deprecated Transitional compact text chips when ringUnit is absent.
+   * Normal quota compact must use ringUnit once adapters migrate.
    */
   compactSummaries?: ProviderUsageCompactSummary[];
   /**
@@ -61,14 +87,22 @@ export interface ProviderUsageTriggerProps
   children?: ReactNode;
 }
 
+type RingGeometrySize = "small" | "large";
+
+interface LayerGeometry {
+  radius: number;
+  strokeWidth: number;
+  dashArray: string | null;
+}
+
 function StatusDot({ tone }: { tone: ProviderUsageTriggerTone }) {
   const color = tone === "success"
-    ? "#4ade80"
+    ? "var(--usage-dot-success, #4ade80)"
     : tone === "warning"
-      ? "#fbbf24"
+      ? "var(--usage-dot-warning, #fbbf24)"
       : tone === "danger"
-        ? "#fb7185"
-        : "var(--text-dim)";
+        ? "var(--usage-dot-danger, #fb7185)"
+        : "var(--usage-dot-muted, var(--text-dim))";
   return (
     <span
       aria-hidden="true"
@@ -79,14 +113,102 @@ function StatusDot({ tone }: { tone: ProviderUsageTriggerTone }) {
         height: 6,
         borderRadius: "50%",
         background: color,
-        boxShadow: tone === "success" ? "0 0 8px rgba(74,222,128,0.48)" : undefined,
+        boxShadow: tone === "success" ? "0 0 8px color-mix(in srgb, var(--usage-dot-success, #4ade80) 48%, transparent)" : undefined,
         flexShrink: 0,
       }}
     />
   );
 }
 
-function UsageRing({
+function Spinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="provider-usage-trigger__spinner"
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        border: "1.5px solid rgba(148,163,184,0.35)",
+        borderTopColor: "var(--accent)",
+        animation: "spin 0.8s linear infinite",
+        boxSizing: "border-box",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function layerGeometry(layerCount: number, index: number, size: RingGeometrySize): LayerGeometry {
+  // Adaptive geometry for 1 / 2 / 3+ layers (UI v6). All safe layers still render.
+  if (size === "small") {
+    if (layerCount <= 1) {
+      return { radius: 12.5, strokeWidth: 4, dashArray: null };
+    }
+    if (layerCount === 2) {
+      // layers[0]=outer (Solid), layers[1]=inner (Dashed)
+      return index === 0
+        ? { radius: 13.5, strokeWidth: 2.4, dashArray: null }
+        : { radius: 10.7, strokeWidth: 2.4, dashArray: "3 1.5" };
+    }
+    // 3+ : outer solid, middle dashed, innermost+ dotted
+    if (index === 0) return { radius: 13.8, strokeWidth: 1.8, dashArray: null };
+    if (index === 1) return { radius: 11.6, strokeWidth: 1.8, dashArray: "5 2" };
+    const step = Math.max(0, index - 2);
+    return {
+      radius: Math.max(6.5, 9.4 - step * 1.8),
+      strokeWidth: 1.8,
+      dashArray: "2 1.5",
+    };
+  }
+
+  if (layerCount <= 1) {
+    return { radius: 16.5, strokeWidth: 5, dashArray: null };
+  }
+  if (layerCount === 2) {
+    // layers[0]=outer (Solid), layers[1]=inner (Dashed)
+    return index === 0
+      ? { radius: 17.5, strokeWidth: 3, dashArray: null }
+      : { radius: 14.0, strokeWidth: 3, dashArray: "4 2" };
+  }
+  // 3+ : outer solid, middle dashed, innermost+ dotted
+  if (index === 0) return { radius: 18.0, strokeWidth: 2.4, dashArray: null };
+  if (index === 1) return { radius: 15.2, strokeWidth: 2.4, dashArray: "6 2.5" };
+  const step = Math.max(0, index - 2);
+  return {
+    radius: Math.max(8, 12.4 - step * 2.1),
+    strokeWidth: 2.2,
+    dashArray: "3 2",
+  };
+}
+
+/** small = aggregate/compact trigger 30px; large = panel header / full mode target 40px (geometry ≥38). */
+function ringBoxSize(size: RingGeometrySize): number {
+  return size === "small" ? 30 : 40;
+}
+
+function centerMaskSize(layerCount: number, size: RingGeometrySize): number {
+  if (size === "small") {
+    if (layerCount <= 1) return 21;
+    if (layerCount === 2) return 18.5;
+    return 15.5;
+  }
+  if (layerCount <= 1) return 27;
+  if (layerCount === 2) return 23.5;
+  return 21.5;
+}
+
+function usedStrokeForLayer(tone: ProviderUsageRingTone, index: number): string {
+  if (tone === "danger") return "var(--provider-usage-ring-danger, #ef4444)";
+  if (tone === "warning") return "var(--provider-usage-ring-warning, #eab308)";
+  if (tone === "muted") return "rgba(148, 163, 184, 0.35)";
+  // Layer identity hues (second channel is warning/danger above).
+  if (index <= 0) return "var(--provider-usage-ring-layer-0, #06b6d4)";
+  if (index === 1) return "var(--provider-usage-ring-layer-1, #8b5cf6)";
+  return "var(--provider-usage-ring-layer-2, #ec4899)";
+}
+
+function LegacyUsageRing({
   percent,
   label,
   title,
@@ -104,7 +226,7 @@ function UsageRing({
   return (
     <span
       title={title}
-      className="provider-usage-trigger__ring"
+      className="provider-usage-trigger__ring provider-usage-trigger__ring--legacy"
       style={{ display: "inline-flex", alignItems: "center", gap: 3 }}
     >
       <span
@@ -138,22 +260,250 @@ function UsageRing({
   );
 }
 
-function Spinner() {
+export interface ProviderUsageRingUnitViewProps {
+  unit: ProviderUsageRingUnit;
+  /** small = compact / aggregate trigger; large = full standalone. */
+  size?: RingGeometrySize;
+  className?: string;
+  style?: CSSProperties;
+  /** Optional decorative short value rendered after the unit (e.g. remaining). */
+  showShortValue?: boolean;
+}
+
+/**
+ * Shared N-ring primitive used by Full, Compact, and aggregate trigger segments.
+ * Renders all safe layers (no +N truncation). Center is always the outermost
+ * priority-short layer (layers[0] / centerLayerId) — never silent-fallback.
+ */
+export function ProviderUsageRingUnitView({
+  unit,
+  size = "small",
+  className,
+  style,
+  showShortValue = true,
+}: ProviderUsageRingUnitViewProps) {
+  const reactId = useId().replace(/:/g, "");
+  const layers = unit.layers;
+  const layerCount = layers.length;
+
+  // Resolve by centerLayerId and fail loud on drift — never silent-fallback to last layer.
+  if (process.env.NODE_ENV !== "production") {
+    assertRingUnitCenterInvariant(unit);
+  }
+  const centerLayer = resolveRingUnitCenterLayer(unit);
+  const centerLabel = centerLayer.shortLabel;
+  const centerValue = formatRingCenterValue(centerLayer.percent, unit.unknownCenterValue);
+  const box = ringBoxSize(size);
+  const cx = box / 2;
+  const cy = box / 2;
+  const mask = centerMaskSize(layerCount, size);
+  const fontLabel = size === "small" ? 8 : 10;
+  const fontVal = size === "small" ? 7 : 9;
+
+  const layerMeta = useMemo(
+    () =>
+      layers.map((layer, index) => {
+        const percent = clampUsagePercent(layer.percent);
+        const tone = toneForUsagePercent(percent);
+        const geometry = layerGeometry(layerCount, index, size);
+        const identity = layerIdentityForIndex(index);
+        return { layer, index, percent, tone, geometry, identity };
+      }),
+    [layerCount, layers, size],
+  );
+
   return (
     <span
-      aria-hidden="true"
-      className="provider-usage-trigger__spinner"
+      className={["provider-usage-ring-unit", `provider-usage-ring-unit--${size}`, className]
+        .filter(Boolean)
+        .join(" ")}
+      data-layer-count={layerCount}
+      data-center-layer-id={unit.centerLayerId}
+      title={unit.ariaLabel}
+      role="img"
+      aria-label={unit.ariaLabel}
       style={{
-        width: 10,
-        height: 10,
-        borderRadius: "50%",
-        border: "1.5px solid rgba(148,163,184,0.35)",
-        borderTopColor: "var(--accent)",
-        animation: "spin 0.8s linear infinite",
-        boxSizing: "border-box",
-        flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        verticalAlign: "middle",
+        ...style,
       }}
-    />
+    >
+      <span
+        className="provider-usage-ring-unit__canvas"
+        style={{
+          position: "relative",
+          width: box,
+          height: box,
+          flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <svg
+          width={box}
+          height={box}
+          viewBox={`0 0 ${box} ${box}`}
+          className="provider-usage-ring-unit__svg"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            {layerMeta.map(({ layer, index, percent, geometry }) => {
+              if (percent === null || percent <= 0) return null;
+              const circ = 2 * Math.PI * geometry.radius;
+              const usedLen = (percent / 100) * circ;
+              const maskId = `pu-mask-${reactId}-${index}-${layer.id}`;
+              return (
+                <mask
+                  key={maskId}
+                  id={maskId}
+                  maskUnits="userSpaceOnUse"
+                  x={0}
+                  y={0}
+                  width={box}
+                  height={box}
+                >
+                  <rect x={0} y={0} width={box} height={box} fill="black" />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={geometry.radius}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={geometry.strokeWidth + 0.2}
+                    strokeDasharray={`${usedLen} ${circ}`}
+                    transform={`rotate(-90 ${cx} ${cy})`}
+                  />
+                </mask>
+              );
+            })}
+          </defs>
+
+          {layerMeta.map(({ layer, index, percent, tone, geometry, identity }) => {
+            const trackStroke =
+              percent === null
+                ? "rgba(148, 163, 184, 0.25)"
+                : "rgba(148, 163, 184, 0.12)";
+            const dashProps = geometry.dashArray
+              ? { strokeDasharray: geometry.dashArray }
+              : {};
+            const usedStroke = usedStrokeForLayer(tone, index);
+            const maskId = `pu-mask-${reactId}-${index}-${layer.id}`;
+            const showUsed = percent !== null && percent > 0;
+
+            return (
+              <g
+                key={`${layer.id}:${index}`}
+                className="provider-usage-ring-unit__layer"
+                data-layer-id={layer.id}
+                data-layer-index={index}
+                data-layer-identity={identity}
+                data-tone={tone}
+                data-percent={percent === null ? "unknown" : String(Math.round(percent))}
+              >
+                {/* Track — layer identity via stroke style, muted when unknown. */}
+                <circle
+                  className="provider-usage-ring-unit__track"
+                  cx={cx}
+                  cy={cy}
+                  r={geometry.radius}
+                  fill="none"
+                  stroke={trackStroke}
+                  strokeWidth={geometry.strokeWidth}
+                  {...dashProps}
+                  transform={`rotate(-90 ${cx} ${cy})`}
+                />
+                {showUsed ? (
+                  <g mask={`url(#${maskId})`}>
+                    <circle
+                      className="provider-usage-ring-unit__used"
+                      cx={cx}
+                      cy={cy}
+                      r={geometry.radius}
+                      fill="none"
+                      stroke={usedStroke}
+                      strokeWidth={geometry.strokeWidth}
+                      {...dashProps}
+                      transform={`rotate(-90 ${cx} ${cy})`}
+                    />
+                    {/* CSS-only sheen; mask limits flow to used arc. */}
+                    <circle
+                      className="provider-usage-ring-unit__sheen sheen-flow"
+                      cx={cx}
+                      cy={cy}
+                      r={geometry.radius}
+                      fill="none"
+                      stroke="rgba(255, 255, 255, 0.45)"
+                      strokeWidth={geometry.strokeWidth + 0.1}
+                      strokeDasharray="15 30"
+                      transform={`rotate(-90 ${cx} ${cy})`}
+                    />
+                  </g>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+
+        <span
+          className="provider-usage-ring-unit__center"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: mask,
+            height: mask,
+            borderRadius: "50%",
+            // Theme-aware center fill — never a fixed night surface.
+            background: "var(--usage-center-bg, var(--bg-panel))",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 1.1,
+            pointerEvents: "none",
+          }}
+        >
+          <span
+            className="provider-usage-ring-unit__center-label"
+            style={{
+              fontWeight: 800,
+              fontSize: fontLabel,
+              color: "var(--usage-center-label, var(--text))",
+              textTransform: "uppercase",
+            }}
+          >
+            {centerLabel}
+          </span>
+          <span
+            className="provider-usage-ring-unit__center-value"
+            data-unknown={centerLayer.percent === null ? "true" : "false"}
+            style={{
+              fontWeight: 700,
+              fontSize: fontVal,
+              color: "var(--usage-center-value, var(--text-muted))",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {centerValue}
+          </span>
+        </span>
+      </span>
+
+      {showShortValue && unit.shortValue ? (
+        <span
+          className="provider-usage-ring-unit__short-value"
+          style={{ fontSize: 9, fontWeight: 700, color: "var(--text-dim)" }}
+        >
+          {unit.shortValue}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -162,6 +512,8 @@ function Spinner() {
  *
  * Owns only presentation for full/compact density. Provider panels keep their
  * own accounts/quota/popover state machines and pass pre-projected props here.
+ * Prefer ringUnit for Full/Compact/aggregate; legacy rings/summaries remain for
+ * transitional adapters until USAGE-AGG-03/04/05 complete.
  */
 export function ProviderUsageTrigger({
   providerLabel,
@@ -170,6 +522,7 @@ export function ProviderUsageTrigger({
   tone = "muted",
   statusText,
   loading = false,
+  ringUnit = null,
   rings = [],
   compactSummaries = [],
   compactFallback = null,
@@ -181,8 +534,11 @@ export function ProviderUsageTrigger({
   ...buttonProps
 }: ProviderUsageTriggerProps) {
   const isCompact = displayMode === "compact";
+  const hasRingUnit = Boolean(ringUnit && ringUnit.layers.length > 0);
   const summaries = compactSummaries.slice(0, 2);
-  const showCompactFallback = isCompact && summaries.length === 0 && Boolean(compactFallback);
+  const showCompactFallback =
+    isCompact && !hasRingUnit && summaries.length === 0 && Boolean(compactFallback);
+  const ringSize: RingGeometrySize = isCompact ? "small" : "large";
 
   return (
     <button
@@ -194,16 +550,21 @@ export function ProviderUsageTrigger({
         .join(" ")}
       data-display-mode={displayMode}
       data-open={open ? "true" : "false"}
+      data-has-ring-unit={hasRingUnit ? "true" : "false"}
       aria-expanded={open}
       style={{
-        height: 26,
+        height: hasRingUnit ? 32 : 26,
         display: "flex",
         alignItems: "center",
         gap: isCompact ? 5 : 7,
         padding: isCompact ? "0 8px" : "0 9px",
         borderRadius: 999,
-        border: open ? "1px solid rgba(96,165,250,0.58)" : "1px solid rgba(148,163,184,0.28)",
-        background: open ? "rgba(96,165,250,0.08)" : "rgba(15,23,42,0.10)",
+        border: open
+          ? "1px solid color-mix(in srgb, var(--accent) 58%, transparent)"
+          : "1px solid var(--usage-panel-border, var(--border))",
+        background: open
+          ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+          : "var(--usage-segment-bg, var(--bg-subtle))",
         backdropFilter: "blur(10px)",
         color: "var(--text-muted)",
         cursor: "pointer",
@@ -226,16 +587,25 @@ export function ProviderUsageTrigger({
               {statusText ? <span>{statusText}</span> : null}
             </span>
           )}
-          {rings.map((ring) => (
-            <UsageRing key={`${ring.label}:${ring.title}`} {...ring} />
-          ))}
+          {hasRingUnit && ringUnit ? (
+            <ProviderUsageRingUnitView unit={ringUnit} size={ringSize} />
+          ) : (
+            rings.map((ring) => (
+              <LegacyUsageRing key={`${ring.label}:${ring.title}`} {...ring} />
+            ))
+          )}
         </>
       )}
 
       {isCompact && (
         <span className="provider-usage-trigger__compact" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          {loading && summaries.length === 0 ? <Spinner /> : null}
-          {summaries.length > 0 ? (
+          {loading && !hasRingUnit && summaries.length === 0 ? <Spinner /> : null}
+          {hasRingUnit && ringUnit ? (
+            <>
+              {loading ? <Spinner /> : null}
+              <ProviderUsageRingUnitView unit={ringUnit} size="small" />
+            </>
+          ) : summaries.length > 0 ? (
             <span className="provider-usage-trigger__summaries" style={{ display: "inline-flex", alignItems: "center", gap: 0, fontSize: 10, color: "var(--text-dim)", fontWeight: 700 }}>
               {summaries.map((item, index) => (
                 <span key={`${item.label}:${item.value}:${index}`} style={{ display: "inline-flex", alignItems: "center" }}>
@@ -260,3 +630,10 @@ export function ProviderUsageTrigger({
     </button>
   );
 }
+
+// Re-export contract helpers used by adapters and tests.
+export type {
+  ProviderUsageRingLayer,
+  ProviderUsageRingTone,
+  ProviderUsageRingUnit,
+};
