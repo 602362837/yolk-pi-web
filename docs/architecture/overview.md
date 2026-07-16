@@ -174,7 +174,7 @@ Archive-all matches target sessions by canonical cwd against the lightweight **a
 
 ### Session file-change projection
 
-- Session changed-file UI is sidecar-based and non-Git; do not derive it from `git status` or `git diff`.
+- Session changed-file sidecars remain non-Git (edit/write tool events only); Chat no longer mounts a floating changed-file panel. Do not derive session file changes from `git status` or `git diff`.
 - `lib/rpc-manager.ts` forwards live edit/write tool events to `lib/session-file-changes.ts`, which captures bounded before/after text snapshots and persists `~/.pi/agent/session-changes/<session-id>.json`.
 - Session JSONL files are not modified for this UI-only projection.
 - MVP tracks built-in `edit` and `write` tools only; arbitrary `bash` file mutations are not shown unless a future scanner/sandbox design adds explicit support.

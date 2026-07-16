@@ -236,7 +236,6 @@ export interface UseAgentSessionOptions {
   onSessionForked?: (newSessionId: string) => void;
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
-  onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSubagentChange?: OnSubagentChange;
   autoScrollEnabled?: boolean;
@@ -337,7 +336,7 @@ function extractSubagentRuns(
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSubagentChange,
+    modelsRefreshKey, onSystemPromptChange, onSubagentChange,
     autoScrollEnabled = true,
     defaultToolPreset = "default",
     defaultThinkingLevel = "auto",
@@ -1289,16 +1288,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     await loadContext(sid, entryId);
   }, [loadContext]);
 
-  const handleLeafChange = useCallback(async (leafId: string | null) => {
-    setActiveLeafId(leafId);
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    await loadContext(sid, leafId);
-    if (leafId) {
-      sendAgentCommand(sid, { type: "navigate_tree", targetId: leafId }).catch(() => {});
-    }
-  }, [loadContext]);
-
   const handleModelChange = useCallback(async (provider: string, modelId: string) => {
     const next: SessionModelRef = { provider, modelId };
     // Optimistic UI + sync snapshot so an immediate send awaits this chain link.
@@ -1511,11 +1500,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useEffect(() => {
     onSystemPromptChange?.(systemPrompt);
   }, [systemPrompt, onSystemPromptChange]);
-
-  useEffect(() => {
-    if (!onBranchDataChange) return;
-    onBranchDataChange(data?.tree ?? [], activeLeafId, handleLeafChange);
-  }, [data?.tree, activeLeafId, handleLeafChange, onBranchDataChange]);
 
   const hasMessages = messages.length > 0;
 

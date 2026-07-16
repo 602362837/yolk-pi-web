@@ -23,7 +23,6 @@ import { TrellisPanel } from "./TrellisPanel";
 import { TrellisSessionWidget } from "./TrellisSessionWidget";
 import { YpiStudioSessionWidget } from "./YpiStudioSessionWidget";
 import { YpiStudioPanel } from "./YpiStudioPanel";
-import { BranchNavigator } from "./BranchNavigator";
 import { GitPanel } from "./GitPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import { ActionFlowIcon } from "./ActionFlowIcon";
@@ -32,7 +31,7 @@ import { UsageLedgerFlowIcon } from "./UsageLedgerIcon";
 import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
-import type { GitInfo, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { GitInfo, SessionInfo } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
 import type { YpiStudioAgent, YpiStudioLiveRunOverlay, YpiStudioSessionTasksLinkResult } from "@/lib/ypi-studio-types";
@@ -449,21 +448,6 @@ function AppShellContent() {
     window.addEventListener("pointercancel", finishResize);
   }, [explorerOpen]);
 
-  // Branch navigator state — populated by ChatWindow via onBranchDataChange
-  const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
-  const [branchActiveLeafId, setBranchActiveLeafId] = useState<string | null>(null);
-  const branchLeafChangeFnRef = useRef<((leafId: string | null) => void) | null>(null);
-
-  const handleBranchDataChange = useCallback((tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => {
-    setBranchTree(tree);
-    setBranchActiveLeafId(activeLeafId);
-    branchLeafChangeFnRef.current = onLeafChange;
-  }, []);
-
-  const handleBranchLeafChange = useCallback((leafId: string | null) => {
-    branchLeafChangeFnRef.current?.(leafId);
-  }, []);
-
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const systemBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -494,10 +478,10 @@ function AppShellContent() {
   const [gitRefreshKey, setGitRefreshKey] = useState(0);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "subagents" | "git" | null>(null);
+  const [activeTopPanel, setActiveTopPanel] = useState<"system" | "subagents" | "git" | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  const toggleTopPanel = useCallback((panel: "branches" | "system" | "subagents" | "git") => {
+  const toggleTopPanel = useCallback((panel: "system" | "subagents" | "git") => {
     setActiveTopPanel((cur) => cur === panel ? null : panel);
   }, []);
 
@@ -609,8 +593,6 @@ function AppShellContent() {
     setNewSessionCwd(context.cwd);
     setNewSessionProjectContext({ projectId: context.projectId, spaceId: context.spaceId });
     setSessionKey((k) => k + 1);
-    setBranchTree([]);
-    setBranchActiveLeafId(null);
     setSystemPrompt(null);
     setActiveTopPanel(null);
     setGitRefreshKey((k) => k + 1);
@@ -680,8 +662,6 @@ function AppShellContent() {
     setNewSessionCwd(cwd);
     setNewSessionProjectContext(projectId && spaceId ? { projectId, spaceId } : activeProjectContext?.cwd === cwd ? { projectId: activeProjectContext.projectId, spaceId: activeProjectContext.spaceId } : null);
     setSessionKey((k) => k + 1);
-    setBranchTree([]);
-    setBranchActiveLeafId(null);
     setSystemPrompt(null);
     setActiveTopPanel(null);
     router.replace("/", { scroll: false });
@@ -737,8 +717,6 @@ function AppShellContent() {
       setSelectedSession(null);
       setNewSessionCwd(cwd ?? null);
       setSessionKey((k) => k + 1);
-      setBranchTree([]);
-      setBranchActiveLeafId(null);
       setSystemPrompt(null);
       setActiveTopPanel(null);
       router.replace("/", { scroll: false });
@@ -847,10 +825,8 @@ function AppShellContent() {
       return;
     }
     try {
-      const params = new URLSearchParams();
-      if (branchActiveLeafId) params.set("leafId", branchActiveLeafId);
-      const suffix = params.toString() ? `?${params.toString()}` : "";
-      const res = await fetch(`/api/sessions/${encodeURIComponent(selectedSession.id)}/studio-task${suffix}`, { signal });
+      // Use the session's current leaf from the server; top-bar Branches UI is removed.
+      const res = await fetch(`/api/sessions/${encodeURIComponent(selectedSession.id)}/studio-task`, { signal });
       const data = await res.json() as YpiStudioSessionTasksLinkResult & { error?: string };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
       // Accept response if it has at least the primary task or non-empty tasks array
@@ -858,7 +834,7 @@ function AppShellContent() {
     } catch (error) {
       if ((error as { name?: string }).name !== "AbortError") setStudioSessionTask(null);
     }
-  }, [branchActiveLeafId, selectedSession]);
+  }, [selectedSession]);
 
   useEffect(() => {
     setFocusedStudioTaskKey(null);
@@ -975,8 +951,6 @@ function AppShellContent() {
       setSelectedSession(null);
       setNewSessionCwd(trellisCwd);
       setSessionKey((key) => key + 1);
-      setBranchTree([]);
-      setBranchActiveLeafId(null);
       setSystemPrompt(null);
       setActiveTopPanel(null);
       router.replace("/", { scroll: false });
@@ -1278,16 +1252,6 @@ function AppShellContent() {
                 </ActionFlowIcon>
                 <span className="app-top-label">Export</span>
               </button>
-              <BranchNavigator
-                tree={branchTree}
-                activeLeafId={branchActiveLeafId}
-                onLeafChange={handleBranchLeafChange}
-                inline
-                containerRef={topBarRef}
-                open={activeTopPanel === "branches"}
-                onToggle={() => toggleTopPanel("branches")}
-                hasSession
-              />
               <button
                 ref={systemBtnRef}
                 type="button"
@@ -1539,7 +1503,6 @@ function AppShellContent() {
               onSessionForked={handleSessionForked}
               modelsRefreshKey={modelsRefreshKey}
               chatInputRef={chatInputRef}
-              onBranchDataChange={handleBranchDataChange}
               onSystemPromptChange={handleSystemPromptChange}
               onSessionStatsChange={handleSessionStatsChange}
               onContextUsageChange={handleContextUsageChange}

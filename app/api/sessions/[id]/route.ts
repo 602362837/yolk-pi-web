@@ -13,7 +13,7 @@ import { deleteSessionChangesSidecar } from "@/lib/session-file-changes";
 import { getSessionProjectLink } from "@/lib/session-project-link";
 import type { StudioChildSessionInfo } from "@/lib/types";
 
-// BranchNavigator still traverses recursively, so keep the response tree shallow.
+// Keep the response tree shallow; clients may still walk it for leaf/context projection.
 const MAX_PROJECTED_TREE_DEPTH = 200;
 
 /**
