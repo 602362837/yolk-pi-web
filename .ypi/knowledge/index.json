@@ -1,7 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-16T08:38:53.865Z",
+  "updatedAt": "2026-07-16T09:36:43.679Z",
   "entries": [
+    {
+      "id": "20260716-173643-设置项归拢为树形导航并提供商摘要卡-studio-一级",
+      "title": "设置项归拢为树形导航并提供商摘要卡（Studio 一级）",
+      "taskId": "20260716-165629-设置项归拢为树形导航并提供商摘要卡-studio-一级",
+      "taskKey": "archived:2026-07:20260716-165629-设置项归拢为树形导航并提供商摘要卡-studio-一级",
+      "workflowId": "feature-dev",
+      "summary": "设置弹窗从 13 个扁平一级项归拢为树形导航 + 提供商策略摘要卡（方案 B）。Studio 为一级直达；Trellis 在工具；providerHub 为前端虚拟 view，不扩宽 initialSection；提供商策略整行展开/折叠；桌面弹窗定高防切页闪烁；Hub 只读草稿布尔、不改 web-config schema；保留 13 个 SettingsSection id 与 Studio 深链。",
+      "tags": [
+        "settings",
+        "ia",
+        "ui",
+        "navigation",
+        "provider-hub",
+        "feature-dev",
+        "studio"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260716-165629-设置项归拢为树形导航并提供商摘要卡-studio-一级",
+      "knowledgePath": ".ypi/knowledge/20260716-173643-设置项归拢为树形导航并提供商摘要卡-studio-一级.md",
+      "createdAt": "2026-07-16T09:36:43.679Z",
+      "archivedAt": "2026-07-16T09:36:43.679Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260716-163853-设置中增加模型用量组件聚合开关与顶栏聚合组件",
       "title": "设置中增加模型用量组件聚合开关与顶栏聚合组件",

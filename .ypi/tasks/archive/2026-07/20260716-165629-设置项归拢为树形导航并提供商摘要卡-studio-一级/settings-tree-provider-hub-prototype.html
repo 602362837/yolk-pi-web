@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Settings 树导航与 Provider Hub 原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg-subtle: rgba(0, 0, 0, 0.03);
+      --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+      --ok: #15803d;
+      --warn: #b45309;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+    }
+    html.dark {
+      color-scheme: dark;
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+      --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #162033, #323d55);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    button { font: inherit; }
+    
+    .prototype-toolbar {
+      position: fixed;
+      z-index: 10;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      background: rgba(13, 20, 33, 0.85);
+      color: #fff;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+    }
+    .prototype-toolbar strong { padding: 0 8px; white-space: nowrap; }
+    .prototype-toolbar button {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .prototype-toolbar button:hover, .prototype-toolbar button:focus-visible {
+      background: rgba(255, 255, 255, 0.18);
+      outline: 2px solid #93c5fd;
+      outline-offset: 1px;
+    }
+    
+    .stage { min-height: 100vh; display: grid; place-items: center; padding: 72px 20px 20px; }
+    
+    .modal {
+      width: min(960px, calc(100vw - 40px));
+      height: min(760px, calc(100vh - 92px));
+      min-height: 540px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg-panel);
+      box-shadow: var(--shadow);
+    }
+    
+    .modal-header {
+      flex: none;
+      padding: 15px 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h1 { margin: 0; font-size: 18px; }
+    .modal-header p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+    
+    .close {
+      width: 32px;
+      height: 32px;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 8px;
+      font-size: 24px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .close:hover, .close:focus-visible {
+      background: var(--bg-subtle);
+      color: var(--text);
+      outline: 2px solid var(--accent);
+    }
+    
+    .modal-body { min-height: 0; flex: 1; display: flex; }
+    
+    .tree-panel {
+      width: 218px;
+      flex: none;
+      padding: 10px 9px;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--bg-subtle);
+    }
+    .tree-label {
+      padding: 4px 10px 8px;
+      color: var(--text-dim);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .tree { display: flex; flex-direction: column; gap: 3px; }
+    
+    .node-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      border-radius: 8px;
+    }
+    .node-row[data-level="1"] { padding-left: 14px; }
+    .node-row[data-level="2"] { padding-left: 28px; }
+    
+    .node-main, .node-toggle {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .node-main {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 9px;
+      border-radius: 8px;
+      text-align: left;
+      font-weight: 650;
+    }
+    .node-main .icon {
+      width: 16px;
+      text-align: center;
+      flex: none;
+      color: var(--text-dim);
+    }
+    .node-main .label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .node-toggle {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      flex: none;
+      margin-right: 2px;
+      border-radius: 7px;
+      font-size: 11px;
+      transition: transform .14s;
+    }
+    .node-row:hover { background: var(--bg-subtle); }
+    .node-main:focus-visible, .node-toggle:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+    
+    /* Accessibility & Visual selection pattern (Not relying only on color) */
+    .node-row.active {
+      background: var(--bg-selected);
+      box-shadow: inset 3px 0 var(--accent);
+    }
+    .node-row.active .node-main {
+      color: var(--accent);
+      font-weight: 800;
+    }
+    
+    .node-row.root-leaf {
+      margin: 5px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      padding: 4px 0;
+    }
+    .node-row.root-leaf.active {
+      border-radius: 8px;
+      border-color: transparent;
+    }
+    
+    .group-children[hidden] { display: none; }
+    .group-children { display: flex; flex-direction: column; gap: 3px; }
+    .provider-parent .node-main { padding-right: 4px; }
+    
+    .content { min-width: 0; flex: 1; overflow-y: auto; padding: 20px; background: var(--bg); }
+    .view { display: none; max-width: 720px; margin: 0 auto; }
+    .view.active { display: block; }
+    
+    .eyebrow { color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .view h2 { margin: 4px 0 0; font-size: 19px; }
+    .lead { margin: 6px 0 18px; color: var(--text-muted); font-size: 12px; }
+    
+    .info-card, .setting-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-panel);
+      padding: 13px;
+      margin-top: 12px;
+    }
+    .setting-card {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      background: var(--bg-subtle);
+    }
+    .setting-card strong { display: block; }
+    .setting-card small { display: block; margin-top: 3px; color: var(--text-muted); }
+    
+    .switch {
+      flex: none;
+      width: 40px;
+      height: 22px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: var(--border);
+      position: relative;
+      cursor: pointer;
+    }
+    .switch::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+      transition: left .12s;
+    }
+    .switch.on { background: var(--accent); }
+    .switch.on::after { left: 21px; }
+    .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    
+    .hub-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .draft-note {
+      flex: none;
+      max-width: 230px;
+      padding: 7px 9px;
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    
+    .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .provider-card {
+      min-width: 0;
+      min-height: 204px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 15px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+      box-shadow: 0 5px 16px rgba(0,0,0,.04);
+      transition: border-color .14s, transform .14s, background .14s;
+    }
+    .provider-card:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    }
+    .provider-card h3 { margin: 0; font-size: 15px; }
+    .provider-card p { margin: 3px 0 0; color: var(--text-muted); font-size: 11px; }
+    
+    .provider-logo {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 900;
+    }
+    .provider-head { display: flex; gap: 10px; align-items: center; }
+    .status-list { display: flex; flex-direction: column; gap: 7px; margin: 0; }
+    .status-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--text-muted); font-size: 11px; }
+    
+    .pill {
+      flex: none;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text-muted);
+      font-weight: 800;
+      font-size: 10px;
+    }
+    .pill.on {
+      color: var(--ok);
+      border-color: color-mix(in srgb, var(--ok) 38%, var(--border));
+      background: color-mix(in srgb, var(--ok) 9%, var(--bg));
+    }
+    .pill.na { color: var(--text-dim); border-style: dashed; }
+    
+    .provider-open, .back {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .provider-open { width: 100%; margin-top: auto; padding: 8px 10px; font-weight: 750; }
+    .provider-open:hover, .provider-open:focus-visible, .back:hover, .back:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+      outline: 2px solid var(--accent-soft);
+    }
+    .back { padding: 5px 8px; margin-bottom: 10px; color: var(--text-muted); font-size: 11px; }
+    
+    .member-row { display: grid; grid-template-columns: 120px 1fr 100px; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; }
+    .member-row.highlight {
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+    .fake-select {
+      min-width: 0;
+      padding: 7px 8px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bg);
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .modal-footer {
+      flex: none;
+      padding: 11px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--bg-panel);
+    }
+    .footer-group { display: flex; align-items: center; gap: 9px; }
+    .footer-button {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .footer-button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+    .footer-button.primary:disabled {
+      background: var(--border);
+      border-color: var(--border);
+      color: var(--text-dim);
+      cursor: not-allowed;
+    }
+    .dirty { color: var(--text-dim); font-size: 11px; display: none; }
+    
+    .prototype-caption { position: fixed; right: 14px; bottom: 10px; color: rgba(255,255,255,.72); font-size: 11px; }
+    
+    @media (max-width: 640px) {
+      .prototype-toolbar { top: 6px; max-width: calc(100vw - 12px); overflow-x: auto; justify-content: flex-start; }
+      .prototype-toolbar strong { display: none; }
+      .stage { padding: 54px 0 0; display: block; }
+      .modal { width: 100vw; height: calc(100dvh - 54px); min-height: 0; border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; }
+      .modal-header { padding: 12px 14px; }
+      .modal-header p { display: none; }
+      .modal-body { flex-direction: column; }
+      .tree-panel { width: 100%; max-height: min(36dvh, 270px); border-right: 0; border-bottom: 1px solid var(--border); padding: 8px 10px; }
+      .tree-label { display: none; }
+      .content { padding: 15px 13px; }
+      .provider-grid { grid-template-columns: 1fr; }
+      .provider-card { min-height: 188px; }
+      .hub-header { display: block; }
+      .draft-note { max-width: none; margin-top: 10px; }
+      .member-row { grid-template-columns: 1fr; border-bottom: 1px solid var(--border); }
+      .modal-footer { padding: 9px 10px; }
+      .dirty { display: none; }
+      .prototype-caption { display: none; }
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="prototype-toolbar" aria-label="原型控制">
+    <strong>设置导航与 Provider Hub 原型</strong>
+    <button id="themeButton" type="button">切换明暗</button>
+    <button id="hubButton" type="button">提供商策略 Hub</button>
+    <button id="studioButton" type="button">模拟 Studio 深链</button>
+  </div>
+  <main class="stage">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <header class="modal-header">
+        <div>
+          <h1 id="settingsTitle">设置</h1>
+          <p>配置 yolk pi web 行为。保存后动态生效，无需重启。</p>
+        </div>
+        <button class="close" type="button" aria-label="关闭设置">×</button>
+      </header>
+      
+      <div class="modal-body">
+        <!-- Roving Focus Tree Navigation -->
+        <nav class="tree-panel" aria-label="设置导航">
+          <div class="tree-label">Settings</div>
+          <div class="tree" role="tree" id="settingsTree">
+            
+            <div class="node-row" data-view="group-session" data-level="0">
+              <button class="node-main group-button" type="button" role="treeitem" aria-expanded="true" aria-controls="group-session">
+                <span class="icon">⌄</span><span class="label">会话与工作区</span>
+              </button>
+            </div>
+            <div class="group-children" id="group-session" role="group">
+              <div class="node-row active" data-view="yolk" data-level="1">
+                <button class="node-main view-button" role="treeitem" aria-current="page"><span class="icon">π</span><span class="label">蛋黄𝝅</span></button>
+              </div>
+              <div class="node-row" data-view="worktree" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">⑂</span><span class="label">WorkTree</span></button>
+              </div>
+            </div>
+
+            <!-- Studio Root-Level Leaf -->
+            <div class="node-row root-leaf" data-view="studio" data-level="0">
+              <button class="node-main view-button" role="treeitem"><span class="icon">✦</span><span class="label">Studio</span></button>
+            </div>
+
+            <div class="node-row" data-view="group-models" data-level="0">
+              <button class="node-main group-button" type="button" role="treeitem" aria-expanded="true" aria-controls="group-models">
+                <span class="icon">⌄</span><span class="label">模型与用量</span>
+              </button>
+            </div>
+            <div class="group-children" id="group-models" role="group">
+              <div class="node-row" data-view="usage" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">◫</span><span class="label">Usage</span></button>
+              </div>
+              <div class="node-row" data-view="modelPrices" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">$</span><span class="label">模型价格</span></button>
+              </div>
+              <div class="node-row provider-parent" data-view="providerHub" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">◇</span><span class="label">提供商策略</span></button>
+                <button class="node-toggle" type="button" aria-label="展开或折叠提供商" aria-expanded="true" aria-controls="group-providers">⌄</button>
+              </div>
+              <div class="group-children" id="group-providers" role="group">
+                <div class="node-row" data-view="chatgpt" data-level="2">
+                  <button class="node-main view-button" role="treeitem"><span class="icon">G</span><span class="label">ChatGPT</span></button>
+                </div>
+                <div class="node-row" data-view="opencodeGo" data-level="2">
+                  <button class="node-main view-button" role="treeitem"><span class="icon">O</span><span class="label">OpenCode Go</span></button>
+                </div>
+                <div class="node-row" data-view="grok" data-level="2">
+                  <button class="node-main view-button" role="treeitem"><span class="icon">X</span><span class="label">Grok</span></button>
+                </div>
+                <div class="node-row" data-view="kiro" data-level="2">
+                  <button class="node-main view-button" role="treeitem"><span class="icon">K</span><span class="label">Kiro</span></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="node-row" data-view="group-tools" data-level="0">
+              <button class="node-main group-button" type="button" role="treeitem" aria-expanded="false" aria-controls="group-tools">
+                <span class="icon">›</span><span class="label">工具</span>
+              </button>
+            </div>
+            <div class="group-children" id="group-tools" role="group" hidden>
+              <div class="node-row" data-view="terminal" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">›_</span><span class="label">Terminal</span></button>
+              </div>
+              <div class="node-row" data-view="editor" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">⌁</span><span class="label">Editor</span></button>
+              </div>
+              <div class="node-row" data-view="trellis" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">T</span><span class="label">Trellis</span></button>
+              </div>
+            </div>
+
+            <div class="node-row" data-view="group-system" data-level="0">
+              <button class="node-main group-button" type="button" role="treeitem" aria-expanded="false" aria-controls="group-system">
+                <span class="icon">›</span><span class="label">系统</span>
+              </button>
+            </div>
+            <div class="group-children" id="group-system" role="group" hidden>
+              <div class="node-row" data-view="diagnostics" data-level="1">
+                <button class="node-main view-button" role="treeitem"><span class="icon">⌁</span><span class="label">诊断</span></button>
+              </div>
+            </div>
+            
+          </div>
+        </nav>
+
+        <section class="content" aria-live="polite">
+          <!-- yolk -->
+          <div class="view active" data-content="yolk">
+            <div class="eyebrow">会话与工作区</div>
+            <h2>蛋黄𝝅 默认配置</h2>
+            <p class="lead">原有新会话默认工具、模型与思考等级表单保持不变。</p>
+            <div class="setting-card">
+              <div>
+                <strong>默认工具预设</strong>
+                <small>新建会话时默认选中的工具预设。</small>
+              </div>
+              <div class="fake-select">default ⌄</div>
+            </div>
+            <div class="setting-card">
+              <div>
+                <strong>新建会话默认模型与思考等级</strong>
+                <small>Chat 内切换不会写回这里。</small>
+              </div>
+              <div class="fake-select">跟随 Pi 默认 ⌄</div>
+            </div>
+          </div>
+          
+          <!-- worktree -->
+          <div class="view" data-content="worktree">
+            <div class="eyebrow">会话与工作区</div>
+            <h2>New WorkTree 默认配置</h2>
+            <p class="lead">原有基础引用、命名和路径模板字段保持不变。</p>
+            <div class="info-card">示意：WorkTree 详情页只移动入口，不改变字段与保存路径。</div>
+          </div>
+          
+          <!-- studio -->
+          <div class="view" data-content="studio">
+            <div class="eyebrow">一级直达</div>
+            <h2>YPI Studio 成员运行策略</h2>
+            <p class="lead">Studio 与各分组平级；Members 深链仍自动滚动并高亮目标行。</p>
+            <div class="info-card">
+              <strong>默认成员</strong>
+              <div class="member-row" data-member="architect">
+                <code>architect</code>
+                <div class="fake-select">openai-codex/gpt-5.6-sol</div>
+                <div class="fake-select">high</div>
+              </div>
+              <div class="member-row" data-member="ui-designer">
+                <code>ui-designer</code>
+                <div class="fake-select">跟随主会话模型</div>
+                <div class="fake-select">inherit</div>
+              </div>
+              <div class="member-row" data-member="implementer">
+                <code>implementer</code>
+                <div class="fake-select">跟随主会话模型</div>
+                <div class="fake-select">inherit</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- usage -->
+          <div class="view" data-content="usage">
+            <div class="eyebrow">模型与用量</div>
+            <h2>Usage</h2>
+            <p class="lead">Session rollup 和全局聚合/Compact 开关仍在 Usage 详情，不合并为方案 C。</p>
+            <div class="setting-card">
+              <div>
+                <strong>模型用量组件聚合</strong>
+                <small>当前配置草稿，保存语义不变。</small>
+              </div>
+              <button class="switch" id="usage-aggregate-switch" aria-label="模型用量组件聚合"></button>
+            </div>
+          </div>
+          
+          <!-- modelPrices -->
+          <div class="view" data-content="modelPrices">
+            <div class="eyebrow">模型与用量</div>
+            <h2>模型价格</h2>
+            <p class="lead">继续复用现有 ModelPricesConfig，并写入 models.json。</p>
+            <div class="info-card">模型价格列表与智能建议内容不在本次 IA 原型中重绘。</div>
+          </div>
+
+          <!-- Provider Strategy Hub -->
+          <div class="view" data-content="providerHub">
+            <div class="hub-header">
+              <div>
+                <div class="eyebrow">模型与用量</div>
+                <h2>提供商策略</h2>
+                <p class="lead">先查看当前 Settings 草稿中的关键策略，再进入详情调整。账号仍在 Models 管理。</p>
+              </div>
+              <div class="draft-note">摘要只读取当前表单草稿，不请求账号、额度或 secret 数据。</div>
+            </div>
+            
+            <div class="provider-grid">
+              <article class="provider-card">
+                <div class="provider-head">
+                  <div class="provider-logo">G</div>
+                  <div>
+                    <h3>ChatGPT</h3>
+                    <p>Codex 用量展示、刷新与额度切换</p>
+                  </div>
+                </div>
+                <div class="status-list">
+                  <div class="status-row"><span>顶部用量面板</span><span class="pill" id="hub-chatgpt-usage">关</span></div>
+                  <div class="status-row"><span>额度耗尽自动切换</span><span class="pill" id="hub-chatgpt-failover">关</span></div>
+                  <div class="status-row"><span>后台自动刷新</span><span class="pill on">开</span></div>
+                </div>
+                <button class="provider-open" data-open="chatgpt" type="button">查看 ChatGPT 详情 →</button>
+              </article>
+              
+              <article class="provider-card">
+                <div class="provider-head">
+                  <div class="provider-logo">O</div>
+                  <div>
+                    <h3>OpenCode Go</h3>
+                    <p>托管 API Key 的被动 failover 策略</p>
+                  </div>
+                </div>
+                <div class="status-list">
+                  <div class="status-row"><span>顶部用量面板</span><span class="pill na">未提供</span></div>
+                  <div class="status-row"><span>账号不可用自动切换</span><span class="pill" id="hub-opencode-failover">关</span></div>
+                  <div class="status-row"><span>账号管理</span><span class="pill">Models</span></div>
+                </div>
+                <button class="provider-open" data-open="opencodeGo" type="button">查看 OpenCode Go 详情 →</button>
+              </article>
+              
+              <article class="provider-card">
+                <div class="provider-head">
+                  <div class="provider-logo">X</div>
+                  <div>
+                    <h3>Grok</h3>
+                    <p>Global Active OAuth 账号策略</p>
+                  </div>
+                </div>
+                <div class="status-list">
+                  <div class="status-row"><span>顶部用量面板</span><span class="pill" id="hub-grok-usage">关</span></div>
+                  <div class="status-row"><span>限额/限流自动切换</span><span class="pill" id="hub-grok-failover">关</span></div>
+                  <div class="status-row"><span>Global Active</span><span class="pill">Models</span></div>
+                </div>
+                <button class="provider-open" data-open="grok" type="button">查看 Grok 详情 →</button>
+              </article>
+              
+              <article class="provider-card">
+                <div class="provider-head">
+                  <div class="provider-logo">K</div>
+                  <div>
+                    <h3>Kiro</h3>
+                    <p>AWS GetUsageLimits 与账号轮换策略</p>
+                  </div>
+                </div>
+                <div class="status-list">
+                  <div class="status-row"><span>顶部用量面板</span><span class="pill" id="hub-kiro-usage">关</span></div>
+                  <div class="status-row"><span>限额/限流自动切换</span><span class="pill" id="hub-kiro-failover">关</span></div>
+                  <div class="status-row"><span>Global Active</span><span class="pill">Models</span></div>
+                </div>
+                <button class="provider-open" data-open="kiro" type="button">查看 Kiro 详情 →</button>
+              </article>
+            </div>
+          </div>
+
+          <!-- Provider Details -->
+          <div class="view provider-detail" data-content="chatgpt">
+            <button class="back" data-open="providerHub" type="button">← 返回提供商策略</button>
+            <div class="eyebrow">提供商策略</div>
+            <h2>ChatGPT</h2>
+            <p class="lead">现有详情字段保持原位。</p>
+            <div class="setting-card">
+              <div>
+                <strong>ChatGPT 用量悬浮面板</strong>
+                <small>开启后在顶部显示当前激活账号用量。</small>
+              </div>
+              <button class="switch" id="detail-chatgpt-usage" aria-label="ChatGPT 用量悬浮面板" type="button"></button>
+            </div>
+            <div class="setting-card">
+              <div>
+                <strong>额度耗尽时自动切换可用账号</strong>
+                <small>仅明确额度耗尽时安全重试一次。</small>
+              </div>
+              <button class="switch" id="detail-chatgpt-failover" aria-label="ChatGPT 自动切换" type="button"></button>
+            </div>
+          </div>
+          
+          <div class="view provider-detail" data-content="opencodeGo">
+            <button class="back" data-open="providerHub" type="button">← 返回提供商策略</button>
+            <div class="eyebrow">提供商策略</div>
+            <h2>OpenCode Go</h2>
+            <p class="lead">账号 Enable/Disable 仍在 Models；本页没有虚构用量开关。</p>
+            <div class="setting-card">
+              <div>
+                <strong>额度不足/账号不可用时自动切换</strong>
+                <small>只对明确余额限制或永久不可用错误生效。</small>
+              </div>
+              <button class="switch" id="detail-opencode-failover" aria-label="OpenCode Go 自动切换" type="button"></button>
+            </div>
+          </div>
+          
+          <div class="view provider-detail" data-content="grok">
+            <button class="back" data-open="providerHub" type="button">← 返回提供商策略</button>
+            <div class="eyebrow">提供商策略</div>
+            <h2>Grok</h2>
+            <p class="lead">Global Active 与账号管理仍在 Models。</p>
+            <div class="setting-card">
+              <div>
+                <strong>Grok 用量悬浮面板</strong>
+                <small>展示月度和可选周额度。</small>
+              </div>
+              <button class="switch" id="detail-grok-usage" aria-label="Grok 用量面板" type="button"></button>
+            </div>
+            <div class="setting-card">
+              <div>
+                <strong>明确限额或限流时自动切换</strong>
+                <small>全局 Active 切换，单 turn 最多一次。</small>
+              </div>
+              <button class="switch" id="detail-grok-failover" aria-label="Grok 自动切换" type="button"></button>
+            </div>
+          </div>
+          
+          <div class="view provider-detail" data-content="kiro">
+            <button class="back" data-open="providerHub" type="button">← 返回提供商策略</button>
+            <div class="eyebrow">提供商策略</div>
+            <h2>Kiro</h2>
+            <p class="lead">Global Active 与账号管理仍在 Models。</p>
+            <div class="setting-card">
+              <div>
+                <strong>Kiro 用量悬浮面板</strong>
+                <small>展示 GetUsageLimits 的订阅 buckets。</small>
+              </div>
+              <button class="switch" id="detail-kiro-usage" aria-label="Kiro 用量面板" type="button"></button>
+            </div>
+            <div class="setting-card">
+              <div>
+                <strong>明确限额或限流时自动切换</strong>
+                <small>未知或 stale 额度 fail-closed。</small>
+              </div>
+              <button class="switch" id="detail-kiro-failover" aria-label="Kiro 自动切换" type="button"></button>
+            </div>
+          </div>
+          
+          <!-- tools -->
+          <div class="view" data-content="terminal">
+            <div class="eyebrow">工具</div>
+            <h2>Web Terminal</h2>
+            <p class="lead">Terminal 归入工具组，原有 shell/env/SSH 表单不变。</p>
+            <div class="info-card">Web Terminal / SSH Profiles / Known Hosts</div>
+          </div>
+          <div class="view" data-content="editor">
+            <div class="eyebrow">工具</div>
+            <h2>Editor</h2>
+            <p class="lead">编辑器实现与快捷键设置保持不变。</p>
+            <div class="info-card">Monaco Editor 与 yolk pi web 自定义快捷键</div>
+          </div>
+          <div class="view" data-content="trellis">
+            <div class="eyebrow">工具</div>
+            <h2>Trellis 面板</h2>
+            <p class="lead">Trellis 与 Terminal / Editor 同级，不是一级 Studio 或“工作流代理”分组。</p>
+            <div class="info-card">Trellis 面板、流程辅助模型与子代理模型设置</div>
+          </div>
+          
+          <!-- system -->
+          <div class="view" data-content="diagnostics">
+            <div class="eyebrow">系统</div>
+            <h2>内存诊断快照</h2>
+            <p class="lead">诊断归入系统组；本地状态仍不参与配置 dirty/save。</p>
+            <div class="info-card">
+              <strong>生成内存诊断快照</strong>
+              <p>采集只读运行时状态并写入本地 diagnostics 目录。</p>
+            </div>
+          </div>
+        </section>
+      </div>
+      
+      <footer class="modal-footer">
+        <button class="footer-button" id="resetButton" type="button">恢复默认值</button>
+        <div class="footer-group">
+          <span class="dirty">有未保存更改</span>
+          <button class="footer-button" id="cancelButton" type="button">取消</button>
+          <button class="footer-button primary" id="saveButton" type="button" disabled>保存</button>
+        </div>
+      </footer>
+    </section>
+  </main>
+  
+  <div class="prototype-caption">YPI Studio · UI 设计员正式原型交付 · 2026</div>
+  
+  <script>
+    // State Manager to simulate React draft/saved states
+    const defaultState = {
+      chatgpt: { usage: true, failover: false },
+      opencodeGo: { failover: false },
+      grok: { usage: true, failover: false },
+      kiro: { usage: false, failover: true }
+    };
+    let savedState = JSON.parse(JSON.stringify(defaultState));
+    let draftState = JSON.parse(JSON.stringify(defaultState));
+
+    function syncPillsAndSwitches() {
+      // ChatGPT
+      updateSwitch('detail-chatgpt-usage', draftState.chatgpt.usage);
+      updateSwitch('detail-chatgpt-failover', draftState.chatgpt.failover);
+      updatePill('hub-chatgpt-usage', draftState.chatgpt.usage);
+      updatePill('hub-chatgpt-failover', draftState.chatgpt.failover);
+
+      // OpenCode Go
+      updateSwitch('detail-opencode-failover', draftState.opencodeGo.failover);
+      updatePill('hub-opencode-failover', draftState.opencodeGo.failover);
+
+      // Grok
+      updateSwitch('detail-grok-usage', draftState.grok.usage);
+      updateSwitch('detail-grok-failover', draftState.grok.failover);
+      updatePill('hub-grok-usage', draftState.grok.usage);
+      updatePill('hub-grok-failover', draftState.grok.failover);
+
+      // Kiro
+      updateSwitch('detail-kiro-usage', draftState.kiro.usage);
+      updateSwitch('detail-kiro-failover', draftState.kiro.failover);
+      updatePill('hub-kiro-usage', draftState.kiro.usage);
+      updatePill('hub-kiro-failover', draftState.kiro.failover);
+
+      // Update dirty indicator and save button disabled state
+      const isDirty = JSON.stringify(savedState) !== JSON.stringify(draftState);
+      document.querySelector('.dirty').style.display = isDirty ? 'inline' : 'none';
+      document.getElementById('saveButton').disabled = !isDirty;
+    }
+
+    function updateSwitch(id, on) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-pressed', String(on));
+    }
+
+    function updatePill(id, on) {
+      const pill = document.getElementById(id);
+      if (!pill) return;
+      pill.classList.toggle('on', on);
+      pill.textContent = on ? '开' : '关';
+    }
+
+    // Attach switch click listeners
+    document.querySelectorAll('.switch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.id;
+        if (!id) return;
+        
+        if (id === 'detail-chatgpt-usage') draftState.chatgpt.usage = !draftState.chatgpt.usage;
+        else if (id === 'detail-chatgpt-failover') draftState.chatgpt.failover = !draftState.chatgpt.failover;
+        else if (id === 'detail-opencode-failover') draftState.opencodeGo.failover = !draftState.opencodeGo.failover;
+        else if (id === 'detail-grok-usage') draftState.grok.usage = !draftState.grok.usage;
+        else if (id === 'detail-grok-failover') draftState.grok.failover = !draftState.grok.failover;
+        else if (id === 'detail-kiro-usage') draftState.kiro.usage = !draftState.kiro.usage;
+        else if (id === 'detail-kiro-failover') draftState.kiro.failover = !draftState.kiro.failover;
+        else if (id === 'usage-aggregate-switch') {
+          btn.classList.toggle('on');
+          btn.setAttribute('aria-pressed', String(btn.classList.contains('on')));
+          return;
+        }
+        syncPillsAndSwitches();
+      });
+    });
+
+    // Save, Cancel, Reset click listeners
+    document.getElementById('saveButton').addEventListener('click', () => {
+      savedState = JSON.parse(JSON.stringify(draftState));
+      syncPillsAndSwitches();
+      alert('设置已保存！');
+    });
+
+    document.getElementById('cancelButton').addEventListener('click', () => {
+      draftState = JSON.parse(JSON.stringify(savedState));
+      syncPillsAndSwitches();
+    });
+
+    document.getElementById('resetButton').addEventListener('click', () => {
+      draftState = JSON.parse(JSON.stringify(defaultState));
+      syncPillsAndSwitches();
+    });
+
+    // Roving Focus & Navigation
+    const tree = document.getElementById('settingsTree');
+    const providerViews = new Set(['chatgpt','opencodeGo','grok','kiro','providerHub']);
+    const groupByView = {
+      yolk: 'group-session',
+      worktree: 'group-session',
+      usage: 'group-models',
+      modelPrices: 'group-models',
+      providerHub: 'group-models',
+      chatgpt: 'group-models',
+      opencodeGo: 'group-models',
+      grok: 'group-models',
+      kiro: 'group-models',
+      terminal: 'group-tools',
+      editor: 'group-tools',
+      trellis: 'group-tools',
+      diagnostics: 'group-system'
+    };
+    
+    function setGroup(id, open) {
+      const child = document.getElementById(id);
+      const control = document.querySelector('[aria-controls="'+id+'"]');
+      if (!child || !control) return;
+      child.hidden = !open;
+      control.setAttribute('aria-expanded', String(open));
+      const icon = control.querySelector('.icon');
+      if (icon) icon.textContent = open ? '⌄' : '›';
+      if (control.classList.contains('node-toggle')) {
+        control.textContent = open ? '⌄' : '›';
+        control.setAttribute('aria-label', open ? '折叠提供商' : '展开提供商');
+      }
+    }
+    
+    function openView(view, focusNav=false) {
+      const ancestor = groupByView[view];
+      if (ancestor) setGroup(ancestor, true);
+      if (providerViews.has(view)) setGroup('group-providers', true);
+      
+      document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.dataset.content === view));
+      document.querySelectorAll('.node-row').forEach(row => {
+        const active = row.dataset.view === view;
+        row.classList.toggle('active', active);
+        const button = row.querySelector('.view-button');
+        if (button) {
+          if (active) {
+            button.setAttribute('aria-current', 'page');
+          } else {
+            button.removeAttribute('aria-current');
+          }
+        }
+      });
+      
+      const target = document.querySelector('.node-row[data-view="'+view+'"] .view-button');
+      if (focusNav && target) {
+        // Reset roving tab index to targeted item
+        document.querySelectorAll('#settingsTree button').forEach(b => b.setAttribute('tabindex', '-1'));
+        target.setAttribute('tabindex', '0');
+        target.focus();
+      }
+      document.querySelector('.content').scrollTop = 0;
+    }
+    
+    // Group Buttons
+    document.querySelectorAll('.group-button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setGroup(btn.getAttribute('aria-controls'), btn.getAttribute('aria-expanded') !== 'true');
+      });
+    });
+    
+    // Provider Toggle Chevron
+    document.querySelector('.node-toggle').addEventListener('click', e => {
+      const btn = e.currentTarget;
+      setGroup(btn.getAttribute('aria-controls'), btn.getAttribute('aria-expanded') !== 'true');
+    });
+    
+    // Node leaf buttons click
+    document.querySelectorAll('.view-button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.closest('.node-row').dataset.view;
+        if (view) openView(view);
+      });
+    });
+    
+    // Detail links
+    document.querySelectorAll('[data-open]').forEach(btn => {
+      btn.addEventListener('click', () => openView(btn.dataset.open, true));
+    });
+    
+    // Toolbar controls
+    document.getElementById('themeButton').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+    document.getElementById('hubButton').addEventListener('click', () => openView('providerHub', true));
+    
+    document.getElementById('studioButton').addEventListener('click', () => {
+      openView('studio', true);
+      const row = document.querySelector('[data-member="architect"]');
+      row.classList.add('highlight');
+      row.scrollIntoView({ block: 'center' });
+      setTimeout(() => row.classList.remove('highlight'), 2200);
+    });
+
+    // Close Dialog confirmation if dirty
+    document.querySelectorAll('.close').forEach(btn => btn.addEventListener('click', () => {
+      const isDirty = JSON.stringify(savedState) !== JSON.stringify(draftState);
+      if (isDirty) {
+        if (confirm('有未保存的的更改，确定要关闭并丢弃吗？')) {
+          alert('设置关闭。');
+        }
+      } else {
+        alert('设置关闭。');
+      }
+    }));
+
+    // Keyboard roving focus implementation
+    function initRovingFocus() {
+      const buttons = [...tree.querySelectorAll('button')];
+      buttons.forEach(btn => {
+        const row = btn.closest('.node-row');
+        const isActive = row && row.classList.contains('active');
+        btn.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+    }
+
+    tree.addEventListener('keydown', e => {
+      const buttons = [...tree.querySelectorAll('button')].filter(b => b.offsetParent !== null);
+      const index = buttons.indexOf(document.activeElement);
+      if (index < 0) return;
+
+      let nextIndex = index;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        nextIndex = Math.min(buttons.length - 1, index + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        nextIndex = Math.max(0, index - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        nextIndex = buttons.length - 1;
+      } else if (e.key === 'ArrowRight') {
+        const controls = document.activeElement.getAttribute('aria-controls');
+        if (controls) {
+          e.preventDefault();
+          setGroup(controls, true);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        const controls = document.activeElement.getAttribute('aria-controls');
+        if (controls) {
+          e.preventDefault();
+          setGroup(controls, false);
+        } else {
+          // If in a sub-item, go up to group header
+          const row = document.activeElement.closest('.node-row');
+          if (row && row.dataset.level !== '0') {
+            const groupChildren = row.closest('.group-children');
+            if (groupChildren) {
+              const parentId = groupChildren.id;
+              const parentBtn = tree.querySelector(`[aria-controls="${parentId}"]`);
+              if (parentBtn) {
+                e.preventDefault();
+                parentBtn.focus();
+                // Update roving index
+                buttons.forEach(b => b.setAttribute('tabindex', '-1'));
+                parentBtn.setAttribute('tabindex', '0');
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      if (nextIndex !== index) {
+        buttons.forEach(b => b.setAttribute('tabindex', '-1'));
+        buttons[nextIndex].setAttribute('tabindex', '0');
+        buttons[nextIndex].focus();
+      }
+    });
+
+    // Run initialization
+    initRovingFocus();
+    syncPillsAndSwitches();
+  </script>
+</body>
+</html>

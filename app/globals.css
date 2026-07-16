@@ -1040,9 +1040,15 @@ html.dark .usage-chart-tooltip {
     flex-direction: column;
     overflow: hidden;
     flex: 1;
+    min-height: 0;
   }
 
-  .settings-modal-body > :first-child {
+  /*
+   * Legacy flat Settings nav (pre tree IA): keep horizontal scroll tabs.
+   * Tree IA wraps navigation in .settings-tree-nav-panel and must not
+   * inherit the single-row tab layout.
+   */
+  .settings-modal-body > :first-child:not(.settings-tree-nav-panel):not(.settings-tree-nav) {
     width: 100% !important;
     border-right: none !important;
     border-bottom: 1px solid var(--border);
@@ -1051,15 +1057,67 @@ html.dark .usage-chart-tooltip {
     overflow-y: hidden;
     scrollbar-width: none;
   }
-  .settings-modal-body > :first-child::-webkit-scrollbar {
+  .settings-modal-body > :first-child:not(.settings-tree-nav-panel):not(.settings-tree-nav)::-webkit-scrollbar {
     display: none;
   }
 
+  /* Tree IA: top vertical scroll region with bounded height (not horizontal tabs). */
+  .settings-modal-body > .settings-tree-nav-panel,
+  .settings-modal-body > .settings-tree-nav {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: min(36dvh, 280px);
+    flex: 0 0 auto !important;
+    flex-direction: column !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 8px 10px !important;
+    scrollbar-width: thin;
+  }
+
+  .settings-modal-body > .settings-tree-nav-panel .settings-tree-nav {
+    width: 100%;
+    max-width: none;
+    flex: none;
+    border-right: none;
+    background: transparent;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .settings-modal-body .settings-tree-nav__label {
+    display: none;
+  }
+
+  .settings-modal-body > .settings-modal-content,
   .settings-modal-body > :last-child {
+    min-width: 0;
     min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  .settings-provider-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .settings-provider-card {
+    min-height: 188px;
+  }
+
+  .settings-provider-hub-header {
+    display: block;
+  }
+
+  .settings-provider-hub-note {
+    max-width: none;
+    margin-top: 10px;
   }
 
   .settings-modal-body [style*="grid-template-columns"],
+  .settings-provider-grid,
   .mobile-stack-grid {
     grid-template-columns: 1fr !important;
   }
@@ -4266,5 +4324,504 @@ button.session-stats-chip:focus-visible {
     animation: none !important;
     transition: none !important;
     transform: none !important;
+  }
+}
+
+/* ── Settings tree IA + Provider Hub (SETTINGS-IA-04) ───────────────────── */
+
+/*
+ * Wider desktop modal for three-level tree indentation.
+ * Override the legacy inline 760px width on SettingsConfig until IA-03
+ * adopts the same min(960px, ...) contract in JSX.
+ */
+.pi-modal-panel.settings-modal-panel {
+  width: min(960px, calc(100vw - 40px)) !important;
+  max-width: min(960px, calc(100vw - 40px));
+  /* Fixed shell height avoids resize flicker when switching Settings leaves. */
+  height: min(720px, calc(100vh - 40px)) !important;
+  max-height: calc(100vh - 40px) !important;
+}
+
+.settings-modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.settings-modal-content {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+/*
+ * Desktop tree shell.
+ * IA-03 currently wraps SettingsTreeNavigation in .settings-tree-nav-panel
+ * with an inline width; styles cover both the wrapper and a bare .settings-tree-nav.
+ */
+.settings-tree-nav-panel {
+  width: 216px;
+  max-width: 216px;
+  flex: 0 0 216px;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.settings-tree-nav {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+/* When the nav is used without the IA-03 wrapper, keep a full side-panel chrome. */
+.settings-modal-body > .settings-tree-nav {
+  width: 216px;
+  max-width: 216px;
+  flex: 0 0 216px;
+  padding: 10px 9px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-subtle);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.settings-tree-nav__label {
+  padding: 4px 10px 8px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.settings-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-tree-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-tree-group__children {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-tree-group__children[hidden] {
+  display: none !important;
+}
+
+.settings-tree-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 8px;
+}
+
+.settings-tree-node[data-level="1"] {
+  padding-left: 14px;
+}
+
+.settings-tree-node[data-level="2"] {
+  padding-left: 28px;
+}
+
+.settings-tree-node__main,
+.settings-tree-node__toggle {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.settings-tree-node__main {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  text-align: left;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.settings-tree-node__main--group {
+  width: 100%;
+}
+
+.settings-tree-node__icon {
+  width: 16px;
+  flex: 0 0 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.settings-tree-node__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-tree-node__toggle {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  margin-right: 2px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.settings-tree-node:hover {
+  background: var(--bg-hover);
+}
+
+.settings-tree-node__main:hover,
+.settings-tree-node__toggle:hover {
+  color: var(--text);
+}
+
+.settings-tree-node__main:focus-visible,
+.settings-tree-node__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  color: var(--text);
+  z-index: 1;
+}
+
+/* Selected state: background + accent edge indicator + weight (not color-only). */
+.settings-tree-node--active {
+  background: var(--bg-selected);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.settings-tree-node--active .settings-tree-node__main {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.settings-tree-node--active .settings-tree-node__icon {
+  color: var(--accent);
+}
+
+.settings-tree-node--active:hover {
+  background: var(--bg-selected);
+}
+
+/* Studio root leaf: first-level visual weight between groups. */
+.settings-tree-node--root-leaf {
+  margin: 5px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.settings-tree-node--root-leaf.settings-tree-node--active {
+  border-radius: 8px;
+  border-color: transparent;
+}
+
+.settings-tree-node--provider-parent .settings-tree-node__main {
+  padding-right: 4px;
+}
+
+/*
+ * Provider detail back action (wired by SETTINGS-IA-03).
+ * !important beats residual inline link chrome still present on the button
+ * until IA-03 drops those style props; keeps focus/hover visible in both themes.
+ */
+button.settings-provider-back {
+  align-self: flex-start !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin: 0 0 10px !important;
+  padding: 5px 8px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  background: var(--bg) !important;
+  color: var(--text-muted) !important;
+  font: inherit;
+  font-size: 11px !important;
+  font-weight: 650 !important;
+  cursor: pointer !important;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+button.settings-provider-back:hover,
+button.settings-provider-back:focus-visible {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg)) !important;
+}
+
+button.settings-provider-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Provider Hub layout */
+.settings-provider-hub {
+  min-width: 0;
+}
+
+.settings-provider-hub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.settings-provider-hub-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.settings-provider-hub-title {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.settings-provider-hub-lead {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 520px;
+}
+
+.settings-provider-hub-note {
+  flex: none;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.settings-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  min-width: 0;
+}
+
+.settings-provider-card {
+  min-width: 0;
+  min-height: 204px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.04);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.settings-provider-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--bg-panel) 92%, var(--bg-selected) 8%);
+  transform: translateY(-1px);
+}
+
+.settings-provider-card-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.settings-provider-card-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-subtle));
+  color: var(--accent);
+  font-weight: 900;
+  flex: none;
+}
+
+.settings-provider-card-copy {
+  min-width: 0;
+}
+
+.settings-provider-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.settings-provider-card-desc {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settings-provider-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  min-width: 0;
+}
+
+.settings-provider-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  min-width: 0;
+}
+
+.settings-provider-status-label {
+  min-width: 0;
+}
+
+.settings-provider-pill {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-weight: 800;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* Text-first status tones; color is secondary. */
+.settings-provider-pill--on {
+  color: var(--usage-status-success-fg, var(--accent));
+  border-color: color-mix(
+    in srgb,
+    var(--usage-status-success-fg, var(--accent)) 38%,
+    var(--border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--usage-status-success-fg, var(--accent)) 9%,
+    var(--bg)
+  );
+}
+
+.settings-provider-pill--off,
+.settings-provider-pill--models {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.settings-provider-pill--na {
+  color: var(--text-dim);
+  border-style: dashed;
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.settings-provider-card-open {
+  width: 100%;
+  margin-top: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  font-size: 12px;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+.settings-provider-card-open:hover,
+.settings-provider-card-open:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+}
+
+.settings-provider-card-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (max-width: 768px) {
+  .pi-modal-panel.settings-modal-panel {
+    width: min(960px, calc(100vw - 24px)) !important;
+    max-width: min(960px, calc(100vw - 24px));
+  }
+
+  .settings-tree-nav-panel,
+  .settings-modal-body > .settings-tree-nav {
+    width: 200px;
+    max-width: 200px;
+    flex-basis: 200px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-tree-node__toggle,
+  .settings-provider-card,
+  .settings-provider-card-open,
+  button.settings-provider-back {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .settings-provider-card:hover {
+    transform: none;
   }
 }
