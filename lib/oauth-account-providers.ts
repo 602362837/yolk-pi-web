@@ -14,6 +14,7 @@ import { convertOAuthAccountCredentialWithWarnings, type OAuthAccountImportMode 
 
 export const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
 export const GROK_CLI_PROVIDER_ID = "grok-cli";
+export const KIRO_PROVIDER_ID = "kiro";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -277,11 +278,72 @@ export const grokCliAdapter: OAuthAccountProviderAdapter = {
   maskAccountId,
 };
 
+// ─── Kiro Adapter ────────────────────────────────────────────────────────────
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isKiroCredential(value: unknown): boolean {
+  // Kiro credentials from pi-kiro-provider login()/refresh() always include
+  // access / refresh / expires. Builder ID may also keep clientId/clientSecret/
+  // region; social logins may keep profileArn/authMethod/provider/request.
+  // There is no required "type":"oauth" sentinel.
+  return isRecord(value)
+    && isNonEmptyString(value.access)
+    && isNonEmptyString(value.refresh)
+    && typeof value.expires === "number"
+    && Number.isFinite(value.expires);
+}
+
+function deriveKiroRealAccountId(credential: Record<string, unknown>): string {
+  // Kiro does not expose a stable public account id. Hash the refresh token for
+  // diagnostics only; filesystem keys remain random opaque storage ids.
+  const refresh = typeof credential.refresh === "string" ? credential.refresh : "";
+  const hash = createHash("sha256").update(refresh).digest("hex").slice(0, 16);
+  return `kiro-${hash}`;
+}
+
+function deriveKiroDisplayHint(credential: Record<string, unknown>): string | null {
+  // Prefer safe JWT claims from the access token. Never return tokens,
+  // clientSecret, full profileArn, request headers, or file paths.
+  if (typeof credential.access === "string") {
+    const claims = decodeJwtPayload(credential.access);
+    if (claims) {
+      const email = typeof claims.email === "string" ? claims.email.trim() || null : null;
+      if (email) return email;
+      const name = typeof claims.name === "string" ? claims.name.trim() || null : null;
+      if (name) return name;
+    }
+  }
+
+  const authMethod = isNonEmptyString(credential.authMethod) ? credential.authMethod.trim() : null;
+  const providerHint = isNonEmptyString(credential.provider) ? credential.provider.trim() : null;
+  if (authMethod && providerHint) return `${providerHint}/${authMethod}`;
+  if (authMethod) return authMethod;
+  if (providerHint) return providerHint;
+  return null;
+}
+
+export const kiroAdapter: OAuthAccountProviderAdapter = {
+  id: KIRO_PROVIDER_ID,
+  displayName: "Kiro (Builder ID / Google / GitHub)",
+  isCredential: isKiroCredential,
+  deriveRealAccountId: deriveKiroRealAccountId,
+  deriveDisplayHint: deriveKiroDisplayHint,
+  supportsCredentialImport: false,
+  normalizeImportCredential() {
+    throw new Error("Credential import is not supported for kiro. Use OAuth login instead.");
+  },
+  maskAccountId,
+};
+
 // ─── Adapter Registry ────────────────────────────────────────────────────────
 
 const adapters = new Map<string, OAuthAccountProviderAdapter>([
   [OPENAI_CODEX_PROVIDER_ID, openAICodexAdapter],
   [GROK_CLI_PROVIDER_ID, grokCliAdapter],
+  [KIRO_PROVIDER_ID, kiroAdapter],
 ]);
 
 /**

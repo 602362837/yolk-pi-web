@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { completeSimple, type AssistantMessage } from "@earendil-works/pi-ai/compat";
 import { AuthStorage } from "@earendil-works/pi-coding-agent";
-import { createGrokAwareModelRegistry } from "@/lib/pi-provider-extensions";
+import { createWebProviderAwareModelRegistry } from "@/lib/pi-provider-extensions";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       },
     }, null, 2), "utf8");
 
-    const registry = await createGrokAwareModelRegistry(AuthStorage.create(), modelsPath);
+    const registry = await createWebProviderAwareModelRegistry(AuthStorage.create(), modelsPath);
     const loadError = registry.getError();
     if (loadError) return NextResponse.json({ ok: false, error: loadError });
 

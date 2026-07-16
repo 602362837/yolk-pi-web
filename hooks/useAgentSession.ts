@@ -160,6 +160,15 @@ export interface GrokFailoverNotice {
   retrying: boolean;
 }
 
+/** Display-safe Kiro global Active failover notice (no account ids / tokens). */
+export interface KiroFailoverNotice {
+  status: string;
+  reason?: "quota_exhausted" | "rate_limited";
+  message: string;
+  /** When true, the banner may say "Retrying"; terminal statuses must not. */
+  retrying: boolean;
+}
+
 export type AgentPhase =
   | { kind: "waiting_model" }
   | { kind: "running_tools"; tools: { id: string; name: string }[] }
@@ -379,6 +388,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const opencodeGoFailoverNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [grokFailoverNotice, setGrokFailoverNotice] = useState<GrokFailoverNotice | null>(null);
   const grokFailoverNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [kiroFailoverNotice, setKiroFailoverNotice] = useState<KiroFailoverNotice | null>(null);
+  const kiroFailoverNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(session?.id ?? null);
@@ -845,6 +856,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           clearTimeout(grokFailoverNoticeTimerRef.current);
           grokFailoverNoticeTimerRef.current = null;
         }
+        setKiroFailoverNotice(null);
+        if (kiroFailoverNoticeTimerRef.current) {
+          clearTimeout(kiroFailoverNoticeTimerRef.current);
+          kiroFailoverNoticeTimerRef.current = null;
+        }
         dispatch({ type: "start" });
         break;
       case "agent_end": {
@@ -1116,6 +1132,58 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }, 12_000);
         break;
       }
+      case "kiro_account_failover": {
+        const status = String(event.status ?? "");
+        const reason = event.reason === "quota_exhausted" || event.reason === "rate_limited"
+          ? event.reason as "quota_exhausted" | "rate_limited"
+          : undefined;
+        const serverMessage = typeof event.message === "string" && event.message.trim()
+          ? event.message.trim()
+          : undefined;
+        const isSwitched = status === "switched";
+        const isAlreadySwitched = status === "already_switched_by_other_session";
+        const isNoUsable = status === "no_usable_account";
+        const isBudget = status === "retry_budget_exhausted";
+        const isFailed = status === "failed" || status === "no_active_account";
+        const retrying = isSwitched || isAlreadySwitched;
+
+        let message = serverMessage ?? "Kiro 账号自动切换。";
+        if (isSwitched) {
+          message = serverMessage
+            ?? (reason === "rate_limited"
+              ? "[Kiro 账号切换通知] 检测到当前 Active 账号已达到限流上限。正在自动切换到备用账号…"
+              : "[Kiro 账号切换通知] 检测到当前 Active 账号已达到 AWS 额度上限。正在自动切换到备用账号…");
+        } else if (isAlreadySwitched) {
+          message = serverMessage ?? "其他会话已切换 Kiro 全局 Active，正在用新账号重试…";
+        } else if (isNoUsable) {
+          message = serverMessage ?? "Kiro 限额/限流已触发，但没有可用账号。";
+        } else if (isBudget) {
+          message = serverMessage ?? "Kiro 限额/限流已触发，本 turn 重试预算已用尽。";
+        } else if (isFailed) {
+          message = serverMessage ?? "Kiro 账号自动切换失败。";
+        }
+
+        setKiroFailoverNotice({
+          status,
+          reason,
+          message,
+          retrying,
+        });
+
+        if (retrying) {
+          setRetryInfo({
+            attempt: 1,
+            maxAttempts: 1,
+            errorMessage: message,
+          });
+        }
+
+        if (kiroFailoverNoticeTimerRef.current) clearTimeout(kiroFailoverNoticeTimerRef.current);
+        kiroFailoverNoticeTimerRef.current = setTimeout(() => {
+          setKiroFailoverNotice(null);
+        }, 12_000);
+        break;
+      }
       case "auto_retry_start":
         setRetryInfo({ attempt: event.attempt as number, maxAttempts: event.maxAttempts as number, errorMessage: event.errorMessage as string | undefined });
         break;
@@ -1147,6 +1215,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       if (grokFailoverNoticeTimerRef.current) {
         clearTimeout(grokFailoverNoticeTimerRef.current);
+      }
+      if (kiroFailoverNoticeTimerRef.current) {
+        clearTimeout(kiroFailoverNoticeTimerRef.current);
       }
     };
   }, []);
@@ -1599,7 +1670,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
-    agentPhase, subagentRuns, toolProgressById, opencodeGoFailoverNotice, grokFailoverNotice,
+    agentPhase, subagentRuns, toolProgressById, opencodeGoFailoverNotice, grokFailoverNotice, kiroFailoverNotice,
     isNew, precreatedSessionId, effectiveSessionId,
     // Refs
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,

@@ -1,0 +1,455 @@
+# Implement：Kiro provider、多账号额度、自动切号与顶部简要模式
+
+## 实现前提
+
+1. UI 设计员已交付 task-local HTML原型，`ui.md`已链接原型。
+2. 用户已明确批准 [plan-review.md](./plan-review.md) 和 HTML原型。
+3. 主会话已合法保存本计划到 task `implementationPlan` 并 transition到 `implementing`。
+4. 实现员每次只处理已 claim的一个 `subtaskId`；不得绕过 DAG或修改无关用户改动。
+
+## 优先阅读
+
+1. `AGENTS.md`、`docs/integrations/README.md`、`docs/architecture/overview.md`
+2. `docs/modules/api.md`、`docs/modules/frontend.md`、`docs/modules/library.md`、`docs/standards/code-style.md`
+3. 本任务 `brief.md`、`prd.md`、`ui.md`、HTML原型、`design.md`、`checks.md`
+4. `lib/pi-provider-extensions.ts`、`next.config.ts`、所有 bootstrap call site
+5. `lib/oauth-accounts.ts`、`lib/oauth-account-providers.ts`、Auth routes、`ModelsConfig.tsx`
+6. `lib/grok-account-token.ts`、`lib/grok-subscription-quota.ts`、`lib/grok-account-failover.ts`、`lib/rpc-manager.ts`
+7. `ChatGptUsagePanel.tsx`、`GrokUsagePanel.tsx`、`AppShell.tsx`、`SettingsConfig.tsx`、`pi-web-config.ts`
+8. `pi-kiro-provider@0.2.2`发布物的 `index.ts`、`src/index.ts`、`src/oauth.ts`、`src/kiro.ts`、`src/config.ts`
+
+## 人类可读子任务表
+
+| ID | 阶段 | 顺序 | 依赖 | 子任务 | 可并行 |
+| --- | --- | ---: | --- | --- | --- |
+| KIRO-01 | provider-bootstrap | 1 | — | 依赖、jiti/external、统一 provider bootstrap与 cold-start审计 | 是 |
+| KIRO-02 | oauth-accounts | 2 | KIRO-01 | Kiro adapter、opaque多账号、token refresh/CAS与 Auth API | 是 |
+| KIRO-03 | config-settings | 2 | KIRO-01 | Kiro开关与全局 compact配置/Settings | 是（与02） |
+| KIRO-04 | quota-service | 3 | KIRO-02 | GetUsageLimits client、parser/cache、安全 API | 是 |
+| KIRO-05 | failover-runtime | 4 | KIRO-03, KIRO-04 | Kiro Path B classifier/controller、RPC retry、SSE notice | 是 |
+| KIRO-06 | models-ui | 4 | KIRO-03, KIRO-04 | Models Kiro登录、多账号与额度 UI | 是（与05） |
+| KIRO-07 | topbar-compact | 4 | KIRO-03, KIRO-04 | 共享 trigger、Kiro panel、GPT/Grok/Kiro compact与 AppShell | 是（与05/06，注意文件隔离） |
+| KIRO-08 | integration-checks-docs | 5 | 01–07 | 集成测试、浏览器验收、文档与回归 | 否 |
+
+建议 `maxConcurrency=3`。第4阶段三个子任务必须保持文件所有权：05只写 runtime/hook/Chat notice；06只写 Models/KiroQuotaView；07只写 usage panels/AppShell/shared trigger/CSS。
+
+## Implementation Plan
+
+```json ypi-implementation-plan
+{
+  "schemaVersion": 2,
+  "sourceArtifact": "implement.md",
+  "summary": "固定接入 pi-kiro-provider，复用 OAuth saved-account store，实现 AWS GetUsageLimits 配额、独立 Path B 自动切号，并用全局设置统一 GPT/Grok/Kiro 顶栏简要模式。",
+  "strategy": "bootstrap first; parallel accounts and config; quota barrier; parallel failover, Models, and topbar UI; final integration/docs",
+  "maxConcurrency": 3,
+  "scheduler": {
+    "failFast": true,
+    "defaultFailurePolicy": "block_dependents"
+  },
+  "subtasks": [
+    {
+      "id": "KIRO-01",
+      "title": "接入 pi-kiro-provider 并泛化 Web provider bootstrap",
+      "phase": "provider-bootstrap",
+      "order": 1,
+      "dependsOn": [],
+      "files": [
+        "package.json",
+        "package-lock.json",
+        "next.config.ts",
+        "lib/pi-provider-extensions.ts",
+        "app/api/models/route.ts",
+        "app/api/auth/providers/route.ts",
+        "app/api/auth/login/[provider]/route.ts",
+        "app/api/auth/logout/[provider]/route.ts",
+        "app/api/auth/all-providers/route.ts",
+        "app/api/auth/api-key/[provider]/route.ts",
+        "app/api/models-config/test/route.ts",
+        "app/api/skills/route.ts",
+        "app/api/commands/route.ts",
+        "app/api/terminal/env/assist/route.ts",
+        "app/api/trellis/workflow/assist/route.ts",
+        "lib/deepseek-balance.ts",
+        "lib/ypi-studio-child-session-runner.ts",
+        "scripts/test-kiro-provider.mjs"
+      ],
+      "instructions": [
+        "Add pi-kiro-provider@0.2.2-compatible dependency and serverExternalPackages entry; never statically import its TS source.",
+        "Create a named inline Kiro extension that uses createJiti(...).import('pi-kiro-provider') and invokes only the public default factory.",
+        "Introduce provider-neutral extension/bootstrap/ModelRegistry helpers that always load Grok and Kiro before extra factories or refresh; retain deprecated Grok-named aliases only if needed for compatibility.",
+        "Audit every ResourceLoader/createAgentSessionServices/ModelRegistry call site. Replace direct [grokCliExtension] paths with the unified provider list, including Studio SDK children and assistant routes.",
+        "Keep load failure best-effort per provider so unrelated providers remain available; surface diagnostics through existing Models/Auth paths.",
+        "Add a cold-start/source contract test for jiti, externalization, model/auth discovery, call-site coverage, and Grok preservation."
+      ],
+      "acceptance": [
+        "Cold /api/models and /api/auth/providers can discover kiro without opening Chat first.",
+        "Main and Studio child service factories include both fixed providers.",
+        "No Next/Turbopack static import of pi-kiro-provider exists.",
+        "Existing Grok provider tests remain semantically unchanged."
+      ],
+      "validation": [
+        "npm install",
+        "npm run test:kiro-provider",
+        "npm run test:grok-provider",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "A missed registry call site drops Kiro after refresh",
+        "jiti interopDefault shape differs from Grok",
+        "renaming helpers causes broad unrelated churn"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-02",
+      "title": "实现 Kiro OAuth saved accounts 与安全 token refresh",
+      "phase": "oauth-accounts",
+      "order": 2,
+      "dependsOn": ["KIRO-01"],
+      "files": [
+        "lib/oauth-account-providers.ts",
+        "lib/oauth-accounts.ts",
+        "lib/kiro-account-token.ts",
+        "app/api/auth/accounts/[provider]/route.ts",
+        "app/api/auth/accounts/[provider]/activate/route.ts",
+        "app/api/auth/providers/route.ts",
+        "app/api/auth/login/[provider]/route.ts",
+        "scripts/test-kiro-accounts.mjs"
+      ],
+      "instructions": [
+        "Add KIRO_PROVIDER_ID and an adapter that validates access/refresh/expires while preserving Builder ID and social credential fields locally.",
+        "Derive provider-native diagnostic id from a refresh-token hash; allocate a fresh opaque storage id per login; do not support JSON import.",
+        "Derive only safe display hints; never project access, refresh, clientSecret, full profileArn, request headers, or paths.",
+        "Implement per-account single-flight token refresh with forceRefresh, atomic 0600 write, file lock, and active-mirror compare-and-set.",
+        "Ensure account add/login/activate/delete/label flows remain provider-scoped and reload live auth state after Activate.",
+        "Cover Builder ID, Google/GitHub-like credential fixtures, duplicate login non-overwrite, file modes, delete-active protection, refresh races, and CAS."
+      ],
+      "acceptance": [
+        "Two Kiro logins produce independent opaque secret files and metadata entries.",
+        "Non-active refresh cannot overwrite auth.json Active.",
+        "Activate changes subsequent live requests after reload without session pinning.",
+        "No Kiro secret appears in account/API projections."
+      ],
+      "validation": [
+        "npm run test:kiro-accounts",
+        "npm run test:oauth-accounts",
+        "npm run test:grok-accounts",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "Builder ID client metadata is dropped on refresh",
+        "Social profileArn leaks into display metadata",
+        "Generic OAuth store changes regress GPT/Grok"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-03",
+      "title": "增加 Kiro 与全局顶部简要模式配置",
+      "phase": "config-settings",
+      "order": 2,
+      "dependsOn": ["KIRO-01"],
+      "files": [
+        "lib/pi-web-config.ts",
+        "app/api/web-config/route.ts",
+        "components/SettingsConfig.tsx",
+        "scripts/test-kiro-config.mjs"
+      ],
+      "instructions": [
+        "Add usage.providerPanelsCompact default false and additive read/write validation.",
+        "Add kiro.usagePanelEnabled default false and Kiro autoFailover config aligned with Grok budget/cooldown defaults.",
+        "Place the single global compact toggle in Settings Usage and Kiro panel/failover toggles in a Kiro section; do not duplicate compact per provider.",
+        "Use approved HTML prototype copy and explain that compact keeps the detailed popover.",
+        "Keep unknown old config compatible and ensure web-config PUT accepts the new kiro patch."
+      ],
+      "acceptance": [
+        "Old pi-web.json reads as full trigger, hidden Kiro panel, disabled Kiro failover.",
+        "Save/reload preserves all three new settings without dropping unrelated sections.",
+        "Settings wording matches approved product decisions."
+      ],
+      "validation": [
+        "npm run test:kiro-config",
+        "npm run lint",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "Config normalizer strips unrelated fields",
+        "Global compact is accidentally persisted per provider",
+        "Settings dirty/save guards omit kiro"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-04",
+      "title": "实现 AWS GetUsageLimits Kiro quota 服务与安全 API",
+      "phase": "quota-service",
+      "order": 3,
+      "dependsOn": ["KIRO-02"],
+      "files": [
+        "lib/kiro-subscription-quota.ts",
+        "app/api/auth/quota/[provider]/route.ts",
+        "scripts/test-kiro-quota.mjs"
+      ],
+      "instructions": [
+        "Call only https://q.<validated-region>.amazonaws.com/ with AmazonCodeWhispererService.GetUsageLimits and official JSON fields; never accept an arbitrary endpoint from credentials.",
+        "Use AI_EDITOR/CREDIT primary body and at most one ValidationException fallback; include credential profileArn only server-side when present.",
+        "Implement strict bounded parser for usageBreakdownList/usageBreakdown with precision-first values, normalized primary bucket, subscription title, and reset dates.",
+        "Implement 60s fresh/24h stale normalized cache, per-account single-flight, 10s timeout, manual force refresh, and one 401 force-refresh retry.",
+        "Return KiroQuotaResultV1 only; omit userInfo, email, overage raw, profileArn, tokens, upstream bodies, URLs, and paths. Use fixed error codes/messages and no-store.",
+        "POST quota for Kiro returns 405; unknown/missing buckets remain unavailable, never 0%."
+      ],
+      "acceptance": [
+        "Official fixture variants normalize to correct used/limit/remaining/utilization/reset values.",
+        "401 retries once, stale fallback works, malformed payload cannot leak raw fields.",
+        "Quota query works for a selected opaque Kiro account and Active default.",
+        "Unavailable quota does not block provider chat/account management."
+      ],
+      "validation": [
+        "npm run test:kiro-quota",
+        "npm run test:grok-quota",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "Region/profile requirements differ by account type",
+        "Payload schema adds multiple resource buckets",
+        "403 is misreported as token expiry"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-05",
+      "title": "实现 Kiro 独立 Path B 自动切号与 turn 重试",
+      "phase": "failover-runtime",
+      "order": 4,
+      "dependsOn": ["KIRO-03", "KIRO-04"],
+      "files": [
+        "lib/kiro-account-failover.ts",
+        "lib/rpc-manager.ts",
+        "hooks/useAgentSession.ts",
+        "components/ChatWindow.tsx",
+        "components/ChatInput.tsx",
+        "scripts/test-kiro-failover-adapter.mjs",
+        "scripts/test-kiro-failover-runtime.mjs"
+      ],
+      "instructions": [
+        "Create a Kiro-only classifier/controller; never edit ChatGPT/Grok/OpenCode classifiers.",
+        "Hard-negative auth/network/timeout/5xx/context/content/model/capacity errors before positive matching. Reject INSUFFICIENT_MODEL_CAPACITY and bare status codes.",
+        "Allow only explicit AWS quota reason codes and explicit quota/rate-limit semantics.",
+        "Use process lock, trigger Active snapshot, Active double-check, pre-Activate TOCTOU check, cooldown, and per-turn max one switch/retry.",
+        "Candidates require a valid credential and fresh/live primary Kiro quota with remaining > 0; unknown/stale/reauth fail closed.",
+        "Patch Kiro outside Grok while preserving the existing chain. Remove the failed assistant message only when retry=true.",
+        "Emit a sanitized kiro_account_failover event/notice with no account ids, tokens, paths, raw error, or false Retrying text for terminal statuses."
+      ],
+      "acceptance": [
+        "Explicit quota/rate-limit switches and retries once; all required negative classes do not switch.",
+        "Concurrent sessions reuse a single Active change and do not cascade.",
+        "No usable candidate yields a terminal safe notice and no retry.",
+        "GPT/Grok/OpenCode failover suites remain green."
+      ],
+      "validation": [
+        "npm run test:kiro-failover-adapter",
+        "npm run test:kiro-failover-runtime",
+        "npm run test:chatgpt-failover-contract",
+        "npm run test:grok-failover-adapter",
+        "npm run test:grok-failover-runtime",
+        "npm run test:opencode-go-failover-behavior",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "Generic 429 is confused with monthly quota",
+        "Outer patch order changes existing retry semantics",
+        "Candidate quota probes delay post-run handling"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-06",
+      "title": "在 Models 实现 Kiro OAuth 多账号与额度体验",
+      "phase": "models-ui",
+      "order": 4,
+      "dependsOn": ["KIRO-03", "KIRO-04"],
+      "files": [
+        "components/ModelsConfig.tsx",
+        "components/KiroQuotaView.tsx",
+        "scripts/test-kiro-models-ui.mjs"
+      ],
+      "instructions": [
+        "Extend OAuth saved-account rendering by provider capabilities rather than cloning a second Grok-only tree.",
+        "Expose Builder ID, Google, and GitHub login selection through the existing SSE OAuth callbacks.",
+        "Render Active-first Kiro accounts with label/edit/relogin/activate/delete protection and global-Active semantics.",
+        "Render all normalized quota buckets, primary summary, subscription/reset, live/fresh/stale/none/reauth/error, and manual refresh using KiroQuotaView.",
+        "Do not show Reset credits, raw overage/user info, credential import, token/profile ARN, or upstream error body.",
+        "Match the approved HTML prototype including narrow widths, keyboard, loading, empty, and unavailable states."
+      ],
+      "acceptance": [
+        "A user can add two Kiro accounts via supported OAuth methods, Activate either, manage metadata, and inspect each quota.",
+        "Unknown quota remains a clear unavailable state while account actions continue working.",
+        "Delete Active requires replacement/disconnect and never silently removes auth.",
+        "No secret or raw backend payload reaches DOM."
+      ],
+      "validation": [
+        "npm run test:kiro-models-ui",
+        "npm run test:kiro-accounts",
+        "npm run test:kiro-quota",
+        "npm run lint",
+        "node_modules/.bin/tsc --noEmit",
+        "Manual browser Models Kiro OAuth/account/quota flow"
+      ],
+      "risks": [
+        "Grok-specific account UI assumptions leak into Kiro",
+        "Provider SSE select/prompt states are not rendered",
+        "Raw errors are reused from existing generic UI"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-07",
+      "title": "实现 Kiro 顶栏面板与 GPT/Grok/Kiro 全局简要模式",
+      "phase": "topbar-compact",
+      "order": 4,
+      "dependsOn": ["KIRO-03", "KIRO-04"],
+      "files": [
+        "components/ProviderUsageTrigger.tsx",
+        "components/ChatGptUsagePanel.tsx",
+        "components/GrokUsagePanel.tsx",
+        "components/KiroUsagePanel.tsx",
+        "components/AppShell.tsx",
+        "app/globals.css",
+        "scripts/test-provider-usage-compact.mjs"
+      ],
+      "instructions": [
+        "Extract only a pure provider-neutral topbar trigger/summary primitive; keep provider accounts/quota/popover state machines separate.",
+        "Implement full and compact trigger modes from the approved prototype. Compact shows provider plus at most two key quota summaries; no long status sentence or duplicate rings.",
+        "Compact loading/login/reauth/unknown states use short explicit text and never invent 0%. Clicking still opens the same detailed popover.",
+        "Add KiroUsagePanel for global Active accounts/quota/refresh/activate/Models recovery with request generation and accountId guards.",
+        "Mount enabled panels in GPT -> Grok -> Kiro order, preserve one usage host and one right padding calculation, and pass the global mode to all panels.",
+        "Implement viewport clamp, Escape/outside/close, focus restore, ARIA/progressbar, 320/375/640 responsive behavior, and reduced motion."
+      ],
+      "acceptance": [
+        "Global toggle changes all enabled provider triggers together without changing detail content.",
+        "GPT 5h/week, Grok month/week, and Kiro primary quota keep provider-correct labels.",
+        "Kiro Active change cannot show the previous account quota.",
+        "All provider visibility combinations preserve order, spacing, and a single right-side reserve."
+      ],
+      "validation": [
+        "npm run test:provider-usage-compact",
+        "npm run test:chatgpt-usage-panel",
+        "npm run test:grok-usage-panel",
+        "npm run lint",
+        "node_modules/.bin/tsc --noEmit",
+        "Manual browser desktop and 320/375/640px prototype comparison"
+      ],
+      "risks": [
+        "Shared trigger abstraction accidentally merges provider semantics",
+        "Compact copy is ambiguous without prototype approval",
+        "Adding third panel duplicates host padding or causes overflow"
+      ],
+      "parallelizable": true,
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "KIRO-08",
+      "title": "完成 Kiro 集成回归、文档与端到端验收",
+      "phase": "integration-checks-docs",
+      "order": 5,
+      "dependsOn": ["KIRO-01", "KIRO-02", "KIRO-03", "KIRO-04", "KIRO-05", "KIRO-06", "KIRO-07"],
+      "files": [
+        "package.json",
+        "docs/integrations/README.md",
+        "docs/architecture/overview.md",
+        "docs/modules/api.md",
+        "docs/modules/frontend.md",
+        "docs/modules/library.md",
+        "docs/operations/troubleshooting.md",
+        "scripts/test-kiro-integration.mjs"
+      ],
+      "instructions": [
+        "Run all Kiro tests plus GPT/Grok/OpenCode regression suites, lint, tsc, and git diff --check; do not run next build directly.",
+        "Exercise cold Models/Auth, real OAuth methods where credentials permit, Kiro model chat, quota, two-account Activate, explicit failover fixture/manual path, and compact UI.",
+        "Verify API/DOM/log/file privacy boundaries and 0600/0700 storage modes.",
+        "Update integrations, architecture, API, frontend, library, and troubleshooting docs with exact endpoint/cache/failover/compact semantics and rollback.",
+        "Record any real-provider flow that could not be executed; do not claim it passed based only on mocks."
+      ],
+      "acceptance": [
+        "Automated baseline passes with no GPT/Grok/OpenCode regressions.",
+        "At least one real Kiro login/model/quota flow is evidenced, or the missing credential blocker is explicitly recorded.",
+        "Desktop and narrow browser flows match the approved HTML prototype.",
+        "Docs accurately describe safe endpoint, data layout, defaults, failure downgrade, and rollback."
+      ],
+      "validation": [
+        "npm run lint",
+        "node_modules/.bin/tsc --noEmit",
+        "npm run test:kiro-integration",
+        "npm run test:kiro-provider",
+        "npm run test:kiro-accounts",
+        "npm run test:kiro-quota",
+        "npm run test:kiro-failover-adapter",
+        "npm run test:kiro-failover-runtime",
+        "npm run test:provider-usage-compact",
+        "npm run test:chatgpt-failover-contract",
+        "npm run test:grok-all",
+        "npm run test:opencode-go-failover-behavior",
+        "git diff --check"
+      ],
+      "risks": [
+        "Mock-only tests miss OAuth callback or real quota differences",
+        "Docs overstate support for unsupported account regions",
+        "Existing unrelated worktree changes are overwritten"
+      ],
+      "parallelizable": false,
+      "localReview": { "required": true, "reviewer": "checker" }
+    }
+  ],
+  "execution": {
+    "mode": "mixed",
+    "maxParallel": 3,
+    "groups": [
+      { "id": "bootstrap", "relation": "serial", "subtaskIds": ["KIRO-01"] },
+      { "id": "foundation", "relation": "parallel", "dependencies": ["bootstrap"], "subtaskIds": ["KIRO-02", "KIRO-03"] },
+      { "id": "quota", "relation": "barrier", "dependencies": ["foundation"], "subtaskIds": ["KIRO-04"] },
+      { "id": "runtime-ui", "relation": "parallel", "dependencies": ["quota"], "subtaskIds": ["KIRO-05", "KIRO-06", "KIRO-07"] },
+      { "id": "integration", "relation": "barrier", "dependencies": ["runtime-ui"], "subtaskIds": ["KIRO-08"] }
+    ]
+  }
+}
+```
+
+## 验证命令
+
+```bash
+npm run lint
+node_modules/.bin/tsc --noEmit
+npm run test:kiro-provider
+npm run test:kiro-accounts
+npm run test:kiro-quota
+npm run test:kiro-failover-adapter
+npm run test:kiro-failover-runtime
+npm run test:provider-usage-compact
+npm run test:chatgpt-usage-panel
+npm run test:chatgpt-failover-contract
+npm run test:grok-all
+npm run test:opencode-go-failover-behavior
+git diff --check
+```
+
+不直接运行 `next build`；发布验证才使用 `npm run build`。
+
+## 评审门禁
+
+- 缺 UI设计员 HTML原型或用户审批：不得进入 implementing。
+- 新增任意猜测 endpoint、任意 credential URL、raw upstream投影、未知账号盲切：停止并上报。
+- 修改 GPT/Grok/OpenCode生产 classifier或语义：必须另行确认。
+- checker必须实际浏览器验证 Models与 topbar，不得只读源码。
+
+## 回滚
+
+1. 关闭 Kiro panel/failover与 compact设置止血。
+2. 从统一 provider列表移除 Kiro，隐藏 Kiro API/UI；保留用户账号文件。
+3. 回滚共享 trigger时恢复 GPT/Grok原 trigger，但不删除 Kiro存储和 quota cache。
+4. 无历史 JSONL/ledger迁移，无需数据回写。

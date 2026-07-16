@@ -3,7 +3,7 @@
  *
  * Every Web entrypoint that creates a ResourceLoader, calls
  * `createAgentSessionServices`, or bootstraps Auth/Models must include these
- * factories so dynamic providers (currently grok-cli) are consistently
+ * factories so dynamic providers (currently grok-cli and kiro) are consistently
  * registered in the process-global pi-ai OAuth registry and in each
  * ModelRegistry instance.
  *
@@ -11,15 +11,17 @@
  *
  * Any `ModelRegistry.create()` or `ModelRegistry.refresh()` call must be fed
  * through a path that loads these factories first; otherwise a cold
- * registry-reset can remove grok-cli from the global pi-ai provider set.
+ * registry-reset can remove grok-cli / kiro from the global pi-ai provider set.
  */
 
 import { createJiti } from "jiti";
 import type { ExtensionFactory, InlineExtension } from "@earendil-works/pi-coding-agent";
 
-// pi-grok-cli publishes TypeScript source with ESM-style `.js` specifiers.
-// Loading it through jiti keeps the extension in the server runtime instead
-// of asking Next/Turbopack to resolve its source tree as an application module.
+// pi-grok-cli and pi-kiro-provider publish TypeScript source with ESM-style
+// `.js` specifiers. Loading them through jiti keeps the extensions in the
+// server runtime instead of asking Next/Turbopack to resolve their source
+// trees as application modules.
+
 /**
  * Named inline extension wrapping the pi-grok-cli default factory.
  *
@@ -30,12 +32,39 @@ import type { ExtensionFactory, InlineExtension } from "@earendil-works/pi-codin
 export const grokCliExtension: InlineExtension = {
   name: "pi-grok-cli",
   factory: async (api) => {
-    // Use jiti's async loader so its ESM helper is not synchronously required
-    // while Pi's own extension loader is initializing in another module thread.
-    const loaded = await createJiti(import.meta.url, { interopDefault: true }).import("pi-grok-cli");
-    const factory = (loaded as { default?: ExtensionFactory }).default;
-    if (typeof factory !== "function") throw new Error("pi-grok-cli did not export an extension factory");
-    await factory(api);
+    try {
+      // Use jiti's async loader so its ESM helper is not synchronously required
+      // while Pi's own extension loader is initializing in another module thread.
+      const loaded = await createJiti(import.meta.url, { interopDefault: true }).import("pi-grok-cli");
+      const factory = (loaded as { default?: ExtensionFactory }).default;
+      if (typeof factory !== "function") throw new Error("pi-grok-cli did not export an extension factory");
+      await factory(api);
+    } catch {
+      // Best-effort per provider: a Grok load failure must not block Kiro or
+      // native providers. Models/Auth diagnostics surface the missing provider.
+    }
+  },
+};
+
+/**
+ * Named inline extension wrapping the pi-kiro-provider default factory.
+ *
+ * The extension registers the `kiro` provider and OAuth methods (Builder ID /
+ * Google / GitHub). Only the package public default export is used — never
+ * private `src/` paths.
+ */
+export const kiroProviderExtension: InlineExtension = {
+  name: "pi-kiro-provider",
+  factory: async (api) => {
+    try {
+      const loaded = await createJiti(import.meta.url, { interopDefault: true }).import("pi-kiro-provider");
+      const factory = (loaded as { default?: ExtensionFactory }).default;
+      if (typeof factory !== "function") throw new Error("pi-kiro-provider did not export an extension factory");
+      await factory(api);
+    } catch {
+      // Best-effort per provider: a Kiro load failure must not block Grok or
+      // native providers. Models/Auth diagnostics surface the missing provider.
+    }
   },
 };
 
@@ -53,17 +82,27 @@ export const grokSessionAccountExtension: InlineExtension = {
 };
 
 /**
- * Return the standard Web extension factory list with Grok prepended.
+ * Fixed Web provider extension list (Grok + Kiro).
  *
- * Order: Grok provider registration → `extra` factories (YPI Studio,
- * Browser Share, Studio child guard, etc.).
+ * Always load both before any call-site `extra` factories so ModelRegistry
+ * refresh cannot drop either provider from the process-global set.
+ */
+export function webProviderExtensions(): InlineExtension[] {
+  return [grokCliExtension, kiroProviderExtension];
+}
+
+/**
+ * Return the standard Web extension factory list with fixed providers prepended.
+ *
+ * Order: Grok → Kiro → `extra` factories (YPI Studio, Browser Share, Studio
+ * child guard, etc.).
  *
  * Main inference no longer injects a session-bound Authorization header;
  * Grok requests use the global Active account from auth.json, reloaded into
  * live wrappers after Activate / auto-failover.
  */
 export function webExtensionFactories(extra: InlineExtension[] = []): InlineExtension[] {
-  return [grokCliExtension, ...extra];
+  return [...webProviderExtensions(), ...extra];
 }
 
 // ---------------------------------------------------------------------------
@@ -71,53 +110,74 @@ export function webExtensionFactories(extra: InlineExtension[] = []): InlineExte
 // ---------------------------------------------------------------------------
 
 /**
- * One-shot promise that ensures grok-cli is registered in the process-global
- * pi-ai OAuth/provider registry before any standalone `ModelRegistry.create()`
- * call.  Without this, a cold `ModelRegistry` that later calls `refresh()`
- * can reset the global registry and drop grok-cli.
+ * One-shot promise that ensures fixed Web providers (Grok + Kiro) are
+ * registered in the process-global pi-ai OAuth/provider registry before any
+ * standalone `ModelRegistry.create()` call. Without this, a cold
+ * `ModelRegistry` that later calls `refresh()` can reset the global registry
+ * and drop grok-cli / kiro.
  *
  * This is intentionally lightweight: it creates a temporary services bundle
- * purely to trigger extension loading, then discards the services.  The
+ * purely to trigger extension loading, then discards the services. The
  * extension registration is durable in the process-global pi-ai registry.
  */
-let _grokBootstrapPromise: Promise<void> | null = null;
+let _webProvidersBootstrapPromise: Promise<void> | null = null;
 
-export function ensureGrokBootstrapped(): Promise<void> {
-  if (_grokBootstrapPromise) return _grokBootstrapPromise;
-  _grokBootstrapPromise = _bootstrapGrokOnce();
-  return _grokBootstrapPromise;
+export function ensureWebProvidersBootstrapped(): Promise<void> {
+  if (_webProvidersBootstrapPromise) return _webProvidersBootstrapPromise;
+  _webProvidersBootstrapPromise = _bootstrapWebProvidersOnce();
+  return _webProvidersBootstrapPromise;
 }
 
-async function _bootstrapGrokOnce(): Promise<void> {
+/**
+ * @deprecated Prefer `ensureWebProvidersBootstrapped()`. Alias retained so
+ * older Grok-named call sites and tests keep working during migration.
+ */
+export function ensureGrokBootstrapped(): Promise<void> {
+  return ensureWebProvidersBootstrapped();
+}
+
+async function _bootstrapWebProvidersOnce(): Promise<void> {
   try {
     const { createAgentSessionServices, getAgentDir } = await import("@earendil-works/pi-coding-agent");
-    // Create a throwaway services bundle just to load grok-cli into the
-    // process-global pi-ai registry.  We do NOT keep the returned services
+    // Create a throwaway services bundle just to load fixed providers into the
+    // process-global pi-ai registry. We do NOT keep the returned services
     // alive — the registry side effect is all we need.
     await createAgentSessionServices({
       cwd: process.cwd(),
       agentDir: getAgentDir(),
-      resourceLoaderOptions: { extensionFactories: [grokCliExtension] },
+      resourceLoaderOptions: { extensionFactories: webProviderExtensions() },
     });
   } catch {
-    // Best-effort only.  If the extension cannot load (missing dep, bad
+    // Best-effort only. If the extension cannot load (missing dep, bad
     // permutation, etc.), other providers continue working and the Models /
     // Auth APIs will surface the error through their own diagnostics.
   }
 }
 
 /**
- * Create a ModelRegistry whose `refresh()` preserves grok-cli in the global
- * pi-ai provider set.  Prefer `createAgentSessionServices` with the Grok
- * extension for richer call sites; use this helper only when you genuinely
- * need a bare `ModelRegistry` (e.g. when offline api-key management must not
- * depend on a full session-services load).
+ * Create a ModelRegistry whose `refresh()` preserves fixed Web providers
+ * (Grok + Kiro) in the global pi-ai provider set. Prefer
+ * `createAgentSessionServices` with `webExtensionFactories()` for richer call
+ * sites; use this helper only when you genuinely need a bare `ModelRegistry`
+ * (e.g. when offline api-key management must not depend on a full
+ * session-services load).
+ */
+export async function createWebProviderAwareModelRegistry(
+  authStorage: import("@earendil-works/pi-coding-agent").AuthStorage,
+  modelsPath?: string,
+): Promise<import("@earendil-works/pi-coding-agent").ModelRegistry> {
+  const { ModelRegistry } = await import("@earendil-works/pi-coding-agent");
+  await ensureWebProvidersBootstrapped();
+  return ModelRegistry.create(authStorage, modelsPath);
+}
+
+/**
+ * @deprecated Prefer `createWebProviderAwareModelRegistry()`. Alias retained
+ * for compatibility with older Grok-named call sites and tests.
  */
 export async function createGrokAwareModelRegistry(
   authStorage: import("@earendil-works/pi-coding-agent").AuthStorage,
   modelsPath?: string,
 ): Promise<import("@earendil-works/pi-coding-agent").ModelRegistry> {
-  const { ModelRegistry } = await import("@earendil-works/pi-coding-agent");
-  await ensureGrokBootstrapped();
-  return ModelRegistry.create(authStorage, modelsPath);
+  return createWebProviderAwareModelRegistry(authStorage, modelsPath);
 }

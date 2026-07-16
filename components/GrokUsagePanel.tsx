@@ -12,6 +12,12 @@ import {
   type GrokQuotaErrorCode,
 } from "./GrokQuotaView";
 import { iconFlowAttrs } from "./iconFlow";
+import {
+  ProviderUsageTrigger,
+  type ProviderUsageCompactSummary,
+  type ProviderUsageDisplayMode,
+  type ProviderUsageRingItem,
+} from "./ProviderUsageTrigger";
 
 const ACCOUNT_CACHE_POLL_INTERVAL_MS = 30_000;
 const GROK_PROVIDER_ID = "grok-cli";
@@ -59,78 +65,6 @@ function formatRelativeAge(ageMs: number | null | undefined, queriedAt: string |
   return formatRelativeAge(Date.now() - timestamp, null);
 }
 
-function UsageRing({
-  percent,
-  label,
-  title,
-  size = 17,
-}: {
-  percent: number | null;
-  label: string;
-  title: string;
-  size?: number;
-}) {
-  const utilization = percent === null ? 0 : Math.min(Math.max(percent, 0), 100);
-  const color = percent === null ? "var(--text-dim)" : grokUtilizationColor(utilization);
-  const background = percent === null
-    ? "conic-gradient(rgba(148,163,184,0.25) 0deg, rgba(148,163,184,0.25) 360deg)"
-    : `conic-gradient(${color} ${utilization * 3.6}deg, rgba(148,163,184,0.18) 0deg)`;
-
-  return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-      <span
-        style={{
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          background,
-          border: "1px solid rgba(148,163,184,0.35)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxSizing: "border-box",
-        }}
-      >
-        <span
-          style={{
-            width: Math.max(6, Math.floor(size * 0.48)),
-            height: Math.max(6, Math.floor(size * 0.48)),
-            borderRadius: "50%",
-            background: "var(--bg-panel)",
-            opacity: 0.92,
-          }}
-        />
-      </span>
-      <span style={{ fontSize: 9, color: "var(--text-dim)", fontWeight: 700 }}>
-        {percent === null ? `${label} —` : `${label} ${Math.round(utilization)}%`}
-      </span>
-    </span>
-  );
-}
-
-function StatusDot({ tone }: { tone: "success" | "warning" | "danger" | "muted" }) {
-  const color = tone === "success"
-    ? "#4ade80"
-    : tone === "warning"
-      ? "#fbbf24"
-      : tone === "danger"
-        ? "#fb7185"
-        : "var(--text-dim)";
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 6,
-        height: 6,
-        borderRadius: "50%",
-        background: color,
-        boxShadow: tone === "success" ? "0 0 8px rgba(74,222,128,0.48)" : undefined,
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
 function buildLocalNetworkError(accountId: string): GrokQuotaResultV1 {
   return {
     kind: "grok_subscription_quota",
@@ -150,9 +84,12 @@ function buildLocalNetworkError(accountId: string): GrokQuotaResultV1 {
 
 export function GrokUsagePanel({
   onOpenModels,
+  displayMode = "full",
 }: {
   /** Optional hook so AppShell can open Models → Grok without hard coupling. */
   onOpenModels?: () => void;
+  /** Global top-bar density from usage.providerPanelsCompact. */
+  displayMode?: ProviderUsageDisplayMode;
 } = {}) {
   const panelDomId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -460,7 +397,7 @@ export function GrokUsagePanel({
     onOpenModels?.();
   }, [onOpenModels]);
 
-  const compact = useMemo(() => {
+  const fullStatus = useMemo(() => {
     if (refreshing) {
       return { status: "正在刷新…", tone: "muted" as const, showSpinner: true };
     }
@@ -506,6 +443,62 @@ export function GrokUsagePanel({
 
   const monthlyPercent = quota?.monthly ? quota.monthly.utilization : null;
   const weeklyPercent = quota?.weekly ? quota.weekly.usedPercent : null;
+
+  const rings = useMemo((): ProviderUsageRingItem[] => {
+    const items: ProviderUsageRingItem[] = [{
+      percent: account ? monthlyPercent : null,
+      label: "月",
+      title: monthlyPercent === null ? "月度用量未知" : `月度已使用 ${Math.round(monthlyPercent)}%`,
+      color: monthlyPercent === null ? undefined : grokUtilizationColor(monthlyPercent),
+    }];
+    if (weeklyPercent !== null) {
+      items.push({
+        percent: weeklyPercent,
+        label: "周",
+        title: `周度已使用 ${Math.round(weeklyPercent)}%`,
+        color: grokUtilizationColor(weeklyPercent),
+      });
+    }
+    return items;
+  }, [account, monthlyPercent, weeklyPercent]);
+
+  const compactProjection = useMemo(() => {
+    const summaries: ProviderUsageCompactSummary[] = [];
+    let fallback: string | null = null;
+    let loading = false;
+
+    if (refreshing || (accountsLoading && !account && !quota) || (quotaLoading && !quota?.monthly)) {
+      loading = true;
+      fallback = "加载中";
+    } else if (accountsError && !account) {
+      fallback = "错误";
+    } else if (!account) {
+      fallback = "登录";
+    } else if (quota?.reauthRequired) {
+      fallback = "需登录";
+    } else if (quota && !quota.success && !quota.monthly) {
+      fallback = "错误";
+    } else if (monthlyPercent !== null || weeklyPercent !== null) {
+      if (monthlyPercent !== null) {
+        summaries.push({
+          label: "月",
+          value: `${Math.round(monthlyPercent)}%`,
+          title: `月度已使用 ${Math.round(monthlyPercent)}%`,
+        });
+      }
+      if (weeklyPercent !== null) {
+        summaries.push({
+          label: "周",
+          value: `${Math.round(weeklyPercent)}%`,
+          title: `周度已使用 ${Math.round(weeklyPercent)}%`,
+        });
+      }
+    } else if (account) {
+      fallback = "额度未知";
+    }
+
+    return { summaries, fallback, loading };
+  }, [account, accountsError, accountsLoading, monthlyPercent, quota, quotaLoading, refreshing, weeklyPercent]);
   const cacheLabel = quota ? grokCacheStateLabel(quota.cache.state) : accountsLoading ? "加载中" : "无缓存";
   const queriedLabel = (() => {
     if (accountsLoading && !quota) return "正在读取…";
@@ -523,65 +516,24 @@ export function GrokUsagePanel({
     : accountsError;
 
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
-      <button
-        ref={triggerRef}
-        type="button"
+    <div className="grok-usage-panel" style={{ position: "relative", display: "flex", alignItems: "center", height: "100%", flexShrink: 0 }}>
+      <ProviderUsageTrigger
+        buttonRef={triggerRef}
+        className="grok-usage-panel__trigger"
+        providerLabel="Grok"
+        open={open}
+        displayMode={displayMode}
+        tone={fullStatus.tone}
+        statusText={fullStatus.status}
+        loading={fullStatus.showSpinner || compactProjection.loading}
+        rings={rings}
+        compactSummaries={compactProjection.summaries}
+        compactFallback={compactProjection.fallback}
         onClick={() => setOpen((value) => !value)}
         title="Grok 用量"
         aria-label="Grok 用量"
-        aria-expanded={open}
         aria-controls={panelDomId}
-        style={{
-          height: 26,
-          display: "flex",
-          alignItems: "center",
-          gap: 7,
-          padding: "0 9px",
-          borderRadius: 999,
-          border: open ? "1px solid rgba(96,165,250,0.58)" : "1px solid rgba(148,163,184,0.28)",
-          background: open ? "rgba(96,165,250,0.08)" : "rgba(15,23,42,0.10)",
-          backdropFilter: "blur(10px)",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 11,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontWeight: 800, color: "var(--text)" }}>Grok</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          {compact.showSpinner ? (
-            <span
-              aria-hidden="true"
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                border: "1.5px solid rgba(148,163,184,0.35)",
-                borderTopColor: "var(--accent)",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
-          ) : (
-            <StatusDot tone={compact.tone} />
-          )}
-          <span>{compact.status}</span>
-        </span>
-        <UsageRing
-          percent={account ? monthlyPercent : null}
-          label="月"
-          title={monthlyPercent === null ? "月度用量未知" : `月度已使用 ${Math.round(monthlyPercent)}%`}
-        />
-        {weeklyPercent !== null && (
-          <UsageRing
-            percent={weeklyPercent}
-            label="周"
-            title={`周度已使用 ${Math.round(weeklyPercent)}%`}
-          />
-        )}
-      </button>
+      />
 
       {open && (
         <section

@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-15T09:00:47.373Z",
+  "updatedAt": "2026-07-16T02:03:02.627Z",
   "entries": [
+    {
+      "id": "20260716-100302-仿-grok-接入-kiro-提供商并支持顶栏额度简要显示",
+      "title": "仿 Grok 接入 Kiro 提供商并支持顶栏额度简要显示",
+      "taskId": "20260715-180240-仿-grok-接入-kiro-提供商并支持顶栏额度简要显示",
+      "taskKey": "archived:2026-07:20260715-180240-仿-grok-接入-kiro-提供商并支持顶栏额度简要显示",
+      "workflowId": "feature-dev",
+      "summary": "## 已完成 - 验证 `pi-kiro-provider@0.2.2` npm发布物、OAuth凭据 shape、jiti/external要求、metering与错误 metadata。 - 验证 Kiro真实额度数据源：AWS官方 `AmazonCodeWhispererService.GetUsageLimits`；同作者 `pi-multi-auth`已有实现证据。 - 完成 `brief.md`、`prd.md`、`design.md`、`implement.md`、`checks.md`。 - `implement.md`包含8项 schemaVersion 2 DAG机器计划，`maxConcurrency=3`。 - `ui.md`包含 UI设计员可直接执行的 HTML原型契约。 - `plan-review.md`已填充规划摘要，但明确标为“暂不可审批”。 ## 关键决策 - Kiro与 Grok统一 jiti动态 provider bootstrap；所有 registry入口必须审计。 - OAuth复用 opaque saved-account store，Kiro token refresh单独实现 CAS。 - quota使用官方 GetUsageLimits，不用 per-turn metering估算。 - Kiro自动切号为独立 Path B；unknown/stale候选 fail-closed。 - 顶部简要模式为全局开关，只压缩 trigger，详细 popover保留。 ## 阻塞 当前 delegated architect会话没有 `ypi_studio_subagent`、implementation-plan update或 transition工具，无法： 1. 合法派发 `ui-designer`； 2. 保存 task-level `implementationPlan`； 3. transition到 `awaiting_approval`。 未直接编辑 `task.json`，未伪造 HTML原型或用户审批…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260715-180240-仿-grok-接入-kiro-提供商并支持顶栏额度简要显示",
+      "knowledgePath": ".ypi/knowledge/20260716-100302-仿-grok-接入-kiro-提供商并支持顶栏额度简要显示.md",
+      "createdAt": "2026-07-16T02:03:02.627Z",
+      "archivedAt": "2026-07-16T02:03:02.627Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260715-170047-完善计费模块并下线旧-session-统计计费",
       "title": "完善计费模块并下线旧 session 统计计费",

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stat } from "fs/promises";
 import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
+import { webExtensionFactories } from "@/lib/pi-provider-extensions";
 import {
   buildModelPriceListResponse,
   applyPricePatch,
@@ -66,9 +67,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return errorResponse(403, "Access denied");
     }
 
-    // Create ModelRegistry for the given cwd
+    // Create ModelRegistry for the given cwd with fixed Web providers loaded
+    // so refresh cannot drop grok-cli / kiro from the process-global set.
     const agentDir = getAgentDir();
-    const services = await createAgentSessionServices({ cwd, agentDir });
+    const services = await createAgentSessionServices({
+      cwd,
+      agentDir,
+      resourceLoaderOptions: { extensionFactories: webExtensionFactories() },
+    });
     const registry = services.modelRegistry;
 
     // Read models.json raw for override/custom-model detection

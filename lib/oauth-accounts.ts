@@ -15,14 +15,17 @@ import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
 
 import {
   getOAuthAccountAdapter,
+  KIRO_PROVIDER_ID,
   maskAccountId,
   type OAuthAccountProviderAdapter,
 } from "./oauth-account-providers";
+import { withKiroProviderLock } from "./kiro-account-lock";
 
 // Re-export for backward compatibility
 export {
   OPENAI_CODEX_PROVIDER_ID,
   GROK_CLI_PROVIDER_ID,
+  KIRO_PROVIDER_ID,
   getOAuthAccountAdapter,
   isSupportedOAuthAccountProvider,
   maskAccountId,
@@ -113,7 +116,7 @@ export interface OAuthAccountImportResult extends OAuthAccountsList {
  * A saved OAuth credential returned by `readOAuthAccountCredential`.
  *
  * The `accountId` field is the provider-native real account id (ChatGPT account
- * id for openai-codex, refresh-derived hash for grok-cli).  The opaque storage
+ * id for openai-codex, refresh-derived hash for grok-cli/kiro).  The opaque storage
  * id is exposed as the non-enumerable `storageId` property.
  */
 export interface SavedOAuthCredential extends Record<string, unknown> {
@@ -447,7 +450,7 @@ async function clearActiveAccount(provider: string): Promise<void> {
  *
  * The returned credential has `accountId` set to the provider-native real
  * account id (ChatGPT account id for openai-codex, refresh-derived hash for
- * grok-cli) and a non-enumerable `storageId` property for the opaque key.
+ * grok-cli/kiro) and a non-enumerable `storageId` property for the opaque key.
  */
 export async function readOAuthAccountCredential(
   provider: string,
@@ -548,7 +551,7 @@ export async function syncActiveOAuthAccountCredential(
  * Import one or more OAuth credentials from external formats (raw / CPA / sub2api).
  *
  * Only providers whose adapter declares `supportsCredentialImport: true` accept
- * this operation; grok-cli returns a client error.
+ * this operation; grok-cli and kiro return a client error.
  */
 export async function importOAuthAccountCredential(
   provider: string,
@@ -745,31 +748,41 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P
 /**
  * Activate a saved account so it becomes the default for new sessions and
  * is mirrored to `auth.json` for Pi's model availability checks.
+ *
+ * For Kiro, Activate shares the provider-level lock with token refresh so a
+ * concurrent non-active refresh cannot overwrite the newly activated mirror.
  */
 export async function activateOAuthAccount(provider: string, accountId: string): Promise<OAuthAccountsList> {
   getAdapter(provider);
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
 
-  const authStorage = AuthStorage.create();
-  await syncActiveOAuthAccountCredential(provider, authStorage);
+  const run = async (): Promise<OAuthAccountsList> => {
+    const authStorage = AuthStorage.create();
+    await syncActiveOAuthAccountCredential(provider, authStorage);
 
-  const credential = await readOAuthAccountCredential(provider, normalizedAccountId);
-  // AuthStorage.set expects AuthCredential (which requires type:"oauth" for
-  // OAuth entries).  grok-cli credentials from pi-grok-cli lack this sentinel
-  // but are otherwise compatible with Pi's OAuth credential contract.
-  const authCredential = (credential as Record<string, unknown>).type
-    ? credential
-    : { ...credential, type: "oauth" as const };
-  authStorage.set(provider, authCredential as unknown as import("@earendil-works/pi-coding-agent").OAuthCredential);
-  if (authStorage.drainErrors().length > 0) {
-    throw new OAuthAccountStoreError("Failed to update active OAuth credential", 500);
+    const credential = await readOAuthAccountCredential(provider, normalizedAccountId);
+    // AuthStorage.set expects AuthCredential (which requires type:"oauth" for
+    // OAuth entries).  grok-cli / kiro credentials from their providers lack this
+    // sentinel but are otherwise compatible with Pi's OAuth credential contract.
+    const authCredential = (credential as Record<string, unknown>).type
+      ? credential
+      : { ...credential, type: "oauth" as const };
+    authStorage.set(provider, authCredential as unknown as import("@earendil-works/pi-coding-agent").OAuthCredential);
+    if (authStorage.drainErrors().length > 0) {
+      throw new OAuthAccountStoreError("Failed to update active OAuth credential", 500);
+    }
+    await saveOAuthAccountCredential(provider, credential, {
+      markActive: true,
+      recordActivation: true,
+      storageId: normalizedAccountId,
+    });
+
+    return listOAuthAccounts(provider);
+  };
+
+  if (provider === KIRO_PROVIDER_ID) {
+    return withKiroProviderLock(run);
   }
-  await saveOAuthAccountCredential(provider, credential, {
-    markActive: true,
-    recordActivation: true,
-    storageId: normalizedAccountId,
-  });
-
-  return listOAuthAccounts(provider);
+  return run();
 }

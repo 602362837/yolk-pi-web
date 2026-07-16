@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yolk Pi Web · Kiro 顶栏/多账号/额度 + 全局简要显示 HTML 原型</title>
+  <style>
+    :root {
+      --bg: #191919;
+      --bg-panel: #242424;
+      --bg-hover: #303030;
+      --bg-selected: #373737;
+      --bg-subtle: rgba(255,255,255,.045);
+      --surface: rgba(148,163,184,.065);
+      --border: #3b3b3b;
+      --text: #e8e8e8;
+      --text-muted: #a3a8b2;
+      --text-dim: #737985;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --shadow: 0 20px 58px rgba(0,0,0,.46), 0 0 0 1px rgba(255,255,255,.025);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 76% 0, rgba(96,165,250,.10), transparent 33rem),
+        radial-gradient(circle at 8% 92%, rgba(251,191,36,.055), transparent 28rem),
+        #121212;
+      font: 13px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button { font: inherit; }
+    button:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed !important; }
+    .hidden { display: none !important; }
+
+    .prototype-head {
+      position: sticky;
+      inset: 0 0 auto;
+      z-index: 1200;
+      min-height: 72px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(17,17,17,.86);
+      backdrop-filter: blur(18px);
+    }
+    .prototype-title { min-width: 220px; }
+    .prototype-title strong { display: block; font-size: 14px; }
+    .prototype-title span { color: var(--text-muted); font-size: 11px; }
+    .control-area { display: flex; flex-direction: column; gap: 7px; align-items: flex-end; }
+    .control-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+    .control-label { align-self: center; margin-right: 3px; color: var(--text-dim); font-size: 10px; font-weight: 800; }
+    
+    .demo-btn, .secondary-btn, .danger-btn, .primary-btn, .icon-btn, .small-btn, .link-btn {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: rgba(36,36,36,.92);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .demo-btn { min-height: 28px; padding: 4px 8px; font-size: 10px; }
+    .demo-btn:hover, .secondary-btn:hover, .icon-btn:hover, .small-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .demo-btn.active { color: var(--accent); border-color: rgba(96,165,250,.52); background: rgba(96,165,250,.11); }
+    .primary-btn { min-height: 34px; padding: 6px 11px; color: #0b1220; border-color: var(--accent); background: var(--accent); font-weight: 850; }
+    .primary-btn:hover { background: var(--accent-hover); }
+    .secondary-btn { min-height: 32px; padding: 5px 10px; }
+    .danger-btn { min-height: 30px; padding: 5px 9px; color: var(--danger); border-color: rgba(251,113,133,.34); background: transparent; font-size: 10px; font-weight: 800; }
+    .danger-btn:hover { background: rgba(251,113,133,.08); }
+    .icon-btn { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; font-size: 16px; }
+    .small-btn { min-height: 29px; padding: 4px 8px; color: var(--accent); font-size: 10px; font-weight: 800; }
+    .link-btn { padding: 3px 0; border: 0; background: transparent; color: var(--accent); font-size: 10px; font-weight: 800; text-align: left; }
+
+    main { padding: 24px 14px 76px; }
+    .stage-wrap { max-width: 1230px; margin: 0 auto; }
+    .stage-meta {
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .viewport-badge { color: var(--accent); font-family: var(--font-mono); font-weight: 800; white-space: nowrap; }
+    
+    .app-frame {
+      position: relative;
+      width: 100%;
+      height: min(700px, calc(100vh - 190px));
+      min-height: 600px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.11);
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.25s ease;
+    }
+    
+    /* Top bar layout */
+    .topbar {
+      height: 38px;
+      background: #1e1e1e;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      user-select: none;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 12px; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    
+    /* Usage Pill styles */
+    .usage-pill {
+      height: 26px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 9px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 11px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .usage-pill:hover {
+      background: rgba(255,255,255,0.06);
+    }
+    .usage-pill.active {
+      border: 1px solid rgba(96, 165, 250, 0.48) !important;
+      background: rgba(96, 165, 250, 0.08) !important;
+    }
+    .usage-label { font-weight: 800; color: var(--text); }
+    .usage-status { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); }
+    
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .status-dot.success { background: var(--success); box-shadow: 0 0 8px rgba(74,222,128,0.48); }
+    .status-dot.warning { background: var(--warning); box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+    .status-dot.danger { background: var(--danger); box-shadow: 0 0 8px rgba(251,113,133,0.4); }
+    .status-dot.muted { background: var(--text-dim); }
+
+    .usage-ring-outer {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .usage-ring {
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      border: 1px solid rgba(148,163,184,0.35);
+      display: inline-flex;
+      align-items: center;
+      justify: center;
+      box-sizing: border-box;
+      position: relative;
+    }
+    .usage-ring-inner {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--bg-panel);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.92;
+    }
+    .usage-ring-num {
+      font-size: 9px;
+      color: var(--text-dim);
+      font-weight: 700;
+    }
+
+    /* Content Area & Sidebar */
+    .app-main { display: flex; flex: 1; min-height: 0; }
+    .sidebar {
+      width: 240px;
+      background: #161616;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 6px;
+      overflow-y: auto;
+    }
+    .sidebar-item {
+      padding: 7px 10px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+    .sidebar-item.active { background: var(--bg-selected); color: var(--text); font-weight: 600; }
+    .workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #131313;
+      min-width: 0;
+      position: relative;
+    }
+
+    /* Chat View */
+    .chat-view { display: flex; flex-direction: column; height: 100%; }
+    .chat-messages {
+      flex: 1;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+    .message.assistant {
+      align-self: flex-start;
+      background: #202020;
+      border: 1px solid var(--border);
+    }
+    .message.user {
+      align-self: flex-end;
+      background: rgba(96,165,250,0.15);
+      border: 1px solid rgba(96,165,250,0.25);
+    }
+    .chat-input-area {
+      padding: 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      outline: none;
+    }
+
+    /* Floating Panel */
+    .floating-panel {
+      position: fixed;
+      width: min(392px, calc(100vw - 16px));
+      max-height: min(680px, calc(100vh - 80px));
+      overflow-y: auto;
+      border: 1px solid rgba(148,163,184,0.30);
+      background: rgba(30,30,30,0.92);
+      backdrop-filter: blur(20px);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 1500;
+    }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; }
+    .panel-title { font-weight: 800; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+    .panel-subtitle { font-size: 11px; color: var(--text-dim); }
+    
+    /* Quota Grid */
+    .quota-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .quota-card {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .quota-label { font-size: 10px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; }
+    .quota-value { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 4px; }
+    .progress-bar-bg { height: 6px; border-radius: 99px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 99px; }
+
+    /* Account badge */
+    .account-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .account-badge-active {
+      color: var(--success);
+      font-size: 10px;
+      font-weight: 800;
+      margin-left: auto;
+    }
+
+    /* Models / Settings View */
+    .models-config { padding: 20px; display: flex; flex-direction: column; gap: 20px; height: 100%; overflow-y: auto; }
+    .config-title { font-size: 16px; font-weight: 800; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+    
+    /* Settings layout: Left Sidebar + Right Content */
+    .settings-layout {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+    }
+    .settings-nav {
+      width: 160px;
+      border-right: 1px solid var(--border);
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: var(--bg-subtle);
+      flex-shrink: 0;
+    }
+    .settings-nav-item {
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .settings-nav-item:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    .settings-nav-item.active {
+      background: var(--bg-selected);
+      color: var(--text);
+      font-weight: 700;
+    }
+    .settings-content {
+      flex: 1;
+      padding: 20px 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .models-list { display: flex; flex-direction: column; gap: 10px; }
+    .model-group {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--bg-panel);
+    }
+    .model-group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .model-group-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    
+    .account-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .account-row:last-child { border-bottom: none; }
+    
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .text-input {
+      padding: 8px 12px;
+      background: #161616;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      outline: none;
+    }
+
+    /* Settings view specific styles */
+    .settings-view { padding: 0; display: flex; flex-direction: column; height: 100%; }
+    .toggle-field {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .toggle-info { display: flex; flex-direction: column; gap: 3px; max-width: 80%; }
+    .toggle-label { font-weight: 600; font-size: 13px; }
+    .toggle-desc { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+    
+    /* Toggle switch styling */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--border);
+      transition: .2s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(18px); }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+
+  <!-- Prototype Head / Controllers -->
+  <header class="prototype-head">
+    <div class="prototype-title">
+      <strong>Yolk Pi Web · Kiro &amp; 全局简要模式原型</strong>
+      <span>UI 设计员交付 · 覆盖 GPT / Grok / Kiro 三提供商顶栏、多账号、额度与自动切号</span>
+    </div>
+    
+    <div class="control-area">
+      <div class="control-row">
+        <span class="control-label">视口尺寸:</span>
+        <button class="demo-btn active" onclick="setViewport('desktop', this)">🖥️ 桌面</button>
+        <button class="demo-btn" onclick="setViewport('640', this)">📱 640px</button>
+        <button class="demo-btn" onclick="setViewport('375', this)">📱 375px</button>
+        <button class="demo-btn" onclick="setViewport('320', this)">📱 320px</button>
+      </div>
+      <div class="control-row">
+        <span class="control-label">显示模式:</span>
+        <button class="demo-btn" id="ctrl-compact-full" onclick="toggleCompactMode(false, this)">完整 (Full)</button>
+        <button class="demo-btn active" id="ctrl-compact-compact" onclick="toggleCompactMode(true, this)">简要 (Compact)</button>
+      </div>
+      <div class="control-row">
+        <span class="control-label">Kiro 状态:</span>
+        <button class="demo-btn" onclick="setKiroState('no_account', this)">无账号</button>
+        <button class="demo-btn" onclick="setKiroState('loading', this)">加载中</button>
+        <button class="demo-btn active" onclick="setKiroState('live', this)">实时正常</button>
+        <button class="demo-btn" onclick="setKiroState('stale', this)">缓存陈旧</button>
+        <button class="demo-btn" onclick="setKiroState('reauth', this)">需登录</button>
+        <button class="demo-btn" onclick="setKiroState('unavailable', this)">不可用</button>
+      </div>
+      <div class="control-row">
+        <span class="control-label">跳转视图:</span>
+        <button class="demo-btn active" onclick="setView('chat', this)">💬 聊天窗口</button>
+        <button class="demo-btn" onclick="setView('models', this)">🤖 Models 配置</button>
+        <button class="demo-btn" onclick="setView('settings', this)">⚙️ Settings 设置</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage-wrap">
+      <div class="stage-meta">
+        <span>当前预览视口: <span id="current-viewport-label" class="viewport-badge">Desktop (100% 宽度)</span></span>
+        <span>HTML 自包含原型门禁 · 符合 <code style="font-family: var(--font-mono)">ui.md</code> 契约</span>
+      </div>
+
+      <!-- App container frame -->
+      <div class="app-frame" id="app-container">
+        
+        <!-- App Top Bar -->
+        <header class="topbar">
+          <div class="topbar-left">
+            <span style="color: var(--accent)">𝝅</span> yolk-pi-web
+          </div>
+          <div class="topbar-right" id="topbar-pills-container">
+            
+            <!-- GPT Pill -->
+            <button class="usage-pill" id="gpt-pill" onclick="togglePanel('gpt')" style="border: 1px solid rgba(148,163,184,0.28); background: rgba(15,23,42,0.1);">
+              <span class="usage-label">GPT</span>
+              <span class="usage-status" id="gpt-status">
+                <span class="status-dot success"></span>
+                <span class="status-text">实时</span>
+              </span>
+              <!-- Tiers -->
+              <span class="usage-ring-outer" id="gpt-r1">
+                <span class="usage-ring" style="background: conic-gradient(var(--accent) 151.2deg, rgba(148,163,184,0.18) 0deg)">
+                  <span class="usage-ring-inner"></span>
+                </span>
+                <span class="usage-ring-num">5h 42%</span>
+              </span>
+              <span class="usage-ring-outer" id="gpt-r2">
+                <span class="usage-ring" style="background: conic-gradient(var(--accent) 64.8deg, rgba(148,163,184,0.18) 0deg)">
+                  <span class="usage-ring-inner"></span>
+                </span>
+                <span class="usage-ring-num">周 18%</span>
+              </span>
+            </button>
+
+            <!-- Grok Pill -->
+            <button class="usage-pill" id="grok-pill" onclick="togglePanel('grok')" style="border: 1px solid rgba(148,163,184,0.28); background: rgba(15,23,42,0.1);">
+              <span class="usage-label">Grok</span>
+              <span class="usage-status" id="grok-status">
+                <span class="status-dot success"></span>
+                <span class="status-text">已缓存 · 2分钟</span>
+              </span>
+              <!-- Tiers -->
+              <span class="usage-ring-outer" id="grok-r1">
+                <span class="usage-ring" style="background: conic-gradient(var(--accent) 226.8deg, rgba(148,163,184,0.18) 0deg)">
+                  <span class="usage-ring-inner"></span>
+                </span>
+                <span class="usage-ring-num">月 63%</span>
+              </span>
+              <span class="usage-ring-outer" id="grok-r2">
+                <span class="usage-ring" style="background: conic-gradient(var(--accent) 43.2deg, rgba(148,163,184,0.18) 0deg)">
+                  <span class="usage-ring-inner"></span>
+                </span>
+                <span class="usage-ring-num">周 12%</span>
+              </span>
+            </button>
+
+            <!-- Kiro Pill -->
+            <button class="usage-pill" id="kiro-pill" onclick="togglePanel('kiro')" style="border: 1px solid rgba(148,163,184,0.28); background: rgba(15,23,42,0.1);">
+              <span class="usage-label">Kiro</span>
+              <span class="usage-status" id="kiro-status-container">
+                <span class="status-dot success" id="kiro-status-dot"></span>
+                <span class="status-text" id="kiro-status-text">实时</span>
+              </span>
+              <!-- Kiro Main Quota metrics -->
+              <span class="usage-ring-outer" id="kiro-r1">
+                <span class="usage-ring" id="kiro-ring-graphic" style="background: conic-gradient(var(--accent) 270deg, rgba(148,163,184,0.18) 0deg)">
+                  <span class="usage-ring-inner"></span>
+                </span>
+                <span class="usage-ring-num" id="kiro-ring-num">75%</span>
+              </span>
+              <span id="kiro-compact-val" style="font-size: 9px; color: var(--text-dim); font-weight: 700; margin-left: 2px;">剩余 125M</span>
+            </button>
+
+          </div>
+        </header>
+
+        <!-- Main Body -->
+        <div class="app-main">
+          
+          <!-- Sidebar -->
+          <nav class="sidebar">
+            <div class="sidebar-item active" id="sb-chat" onclick="setView('chat', null)">💬 Chat 会话</div>
+            <div class="sidebar-item" id="sb-models" onclick="setView('models', null)">🤖 Models / API Key</div>
+            <div class="sidebar-item" id="sb-settings" onclick="setView('settings', null)">⚙️ Web UI 设置</div>
+            <div style="margin-top: auto; border-top: 1px solid var(--border); padding-top: 8px;">
+              <span style="color: var(--text-dim); font-size: 11px;">Active Workspace:</span>
+              <div style="font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted)">pi-agent-web</div>
+            </div>
+          </nav>
+
+          <!-- Workspace (Dynamic view content) -->
+          <div class="workspace">
+            
+            <!-- View 1: Chat -->
+            <div class="chat-view" id="view-chat">
+              <div class="chat-messages">
+                <div class="message assistant">
+                  你好！我是蛋黄派 Pi 编码助手。我已经支持了 Kiro 提供商的模型对话，并集成了多账号 Quota 与自动切号。
+                </div>
+                <div class="message user">
+                  展示一下 Kiro 账号额度以及顶部的简要模式切换。
+                </div>
+                <div class="message assistant">
+                  请在顶部控制台切换“显示模式”为<strong>简要 (Compact)</strong> 或<strong>完整 (Full)</strong> 查看顶栏效果；或点击右侧 Models/Settings 菜单进行高级配置。
+                </div>
+                <div class="message assistant" id="failover-notice" style="display: none; border-color: rgba(234,179,8,0.25); background: rgba(234,179,8,0.05)">
+                  <span style="color: var(--warning); font-weight: 700;">[Kiro 账号切换通知]</span> 检测到当前 Active 账号已达到 AWS 额度上限。正在自动切换到备用账号 <code>Kiro-Social-GitHub</code>，并自动安全重试同一 turn 一次...
+                </div>
+              </div>
+              <div class="chat-input-area">
+                <input type="text" class="chat-input" placeholder="输入消息，或使用 / 触发快捷工具..." value="在当前分支中接入 AWS Kiro 额度服务">
+                <button class="primary-btn" style="min-height: auto; padding: 0 16px;">发送</button>
+              </div>
+            </div>
+
+            <!-- View 2: Models -->
+            <div class="models-config hidden" id="view-models">
+              <div class="config-title">Models &amp; OAuth 账号配置</div>
+              
+              <!-- Grok accounts (existing model) -->
+              <div class="model-group">
+                <div class="model-group-header">
+                  <div class="model-group-title">𝕏 Grok-cli OAuth Provider</div>
+                  <span style="font-size: 11px; color: var(--success)">已连接 (2 账号)</span>
+                </div>
+                <div class="account-row">
+                  <div>
+                    <strong>Grok-Work-Active</strong>
+                    <div style="font-size: 10px; color: var(--text-dim); font-family: var(--font-mono)">grok-4c9a...</div>
+                  </div>
+                  <span class="account-badge-active">Active</span>
+                </div>
+              </div>
+
+              <!-- Kiro accounts (newly added model) -->
+              <div class="model-group" style="margin-top: 14px;">
+                <div class="model-group-header">
+                  <div class="model-group-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent); vertical-align: middle;">
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    </svg>
+                    AWS Kiro Provider
+                  </div>
+                  <span style="font-size: 11px; color: var(--success)" id="kiro-models-connection-status">已连接 (3 账号)</span>
+                </div>
+
+                <!-- Account Explainer Note -->
+                <div style="font-size: 11px; color: var(--text-dim); background: var(--bg-subtle); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); line-height: 1.5; margin-bottom: 12px;">
+                  <strong style="color: var(--text)">账号激活说明：</strong>
+                  Activate 只设置 Kiro 的 <strong>全局当前 Active</strong>，不属于锁定。切换将作用于所有 live/new Session 后续请求，in-flight 请求不换 Token。若已开启 Settings 中的自动切号，额度不足时会自动切换到其他有效备用账号。
+                </div>
+
+                <!-- Account List -->
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;" id="kiro-account-list-container">
+                  
+                  <div class="account-row" style="background: rgba(255,255,255,0.02); border-radius: 6px; padding: 10px; border: 1px solid var(--border)">
+                    <div style="display: flex; flex-direction: column; gap: 2;">
+                      <span style="font-weight: 700;">Kiro-Builder-ID (工作主账号)</span>
+                      <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim)">kiro-id-8b2c-active</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="account-badge-active" style="margin-left: 0; padding: 2px 6px; background: rgba(74,222,128,0.1); border-radius: 4px; border: 1px solid rgba(74,222,128,0.2)">Active</span>
+                      <button class="secondary-btn" style="min-height: 24px; padding: 2px 6px; font-size: 10px;" disabled>删除保护</button>
+                    </div>
+                  </div>
+
+                  <div class="account-row" style="background: rgba(255,255,255,0.01); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04)">
+                    <div style="display: flex; flex-direction: column; gap: 2;">
+                      <span>Kiro-Social-GitHub (社交备用账号)</span>
+                      <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim)">kiro-id-d4e5-github</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <button class="small-btn" onclick="activateKiroAccount('kiro-id-d4e5-github')">激活 (Activate)</button>
+                      <button class="danger-btn" style="min-height: 24px; padding: 2px 6px;" onclick="deleteKiroAccount('kiro-id-d4e5-github')">删除</button>
+                    </div>
+                  </div>
+
+                  <div class="account-row" style="background: rgba(255,255,255,0.01); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04)">
+                    <div style="display: flex; flex-direction: column; gap: 2;">
+                      <span>Kiro-Social-Google (测试开发账号)</span>
+                      <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim)">kiro-id-a1b2-google</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <button class="small-btn" onclick="activateKiroAccount('kiro-id-a1b2-google')">激活 (Activate)</button>
+                      <button class="danger-btn" style="min-height: 24px; padding: 2px 6px;" onclick="deleteKiroAccount('kiro-id-a1b2-google')">删除</button>
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Add account & Quota query area -->
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
+                  <button class="primary-btn" style="flex: 1;" onclick="alert('进入 AWS OAuth 登录流: AWS Builder ID / Google / GitHub')">➕ 添加 Kiro 账号</button>
+                  <button class="secondary-btn" style="flex: 1;" onclick="refreshKiroQuotaInModels()">🔄 刷新当前 Kiro 额度</button>
+                </div>
+
+                <!-- Detailed quota card inside Models -->
+                <div id="models-kiro-quota-section" style="margin-top: 14px;">
+                  <!-- Injected by JS based on Kiro State -->
+                </div>
+
+              </div>
+            </div>
+
+            <!-- View 3: Settings -->
+            <div class="settings-view hidden" id="view-settings">
+              <div class="settings-layout">
+                <!-- Settings Left Sidebar -->
+                <div class="settings-nav">
+                  <div class="settings-nav-item" id="set-nav-yolk" onclick="setSettingsSection('yolk')">蛋黄𝝅</div>
+                  <div class="settings-nav-item" id="set-nav-worktree" onclick="setSettingsSection('worktree')">WorkTree</div>
+                  <div class="settings-nav-item" id="set-nav-studio" onclick="setSettingsSection('studio')">Studio</div>
+                  <div class="settings-nav-item active" id="set-nav-usage" onclick="setSettingsSection('usage')">Usage</div>
+                  <div class="settings-nav-item" id="set-nav-chatgpt" onclick="setSettingsSection('chatgpt')">ChatGPT</div>
+                  <div class="settings-nav-item" id="set-nav-opencodeGo" onclick="setSettingsSection('opencodeGo')">OpenCode Go</div>
+                  <div class="settings-nav-item" id="set-nav-grok" onclick="setSettingsSection('grok')">Grok</div>
+                  <div class="settings-nav-item" id="set-nav-kiro" onclick="setSettingsSection('kiro')">Kiro</div>
+                  <div class="settings-nav-item" id="set-nav-editor" onclick="setSettingsSection('editor')">Editor</div>
+                  <div class="settings-nav-item" id="set-nav-trellis" onclick="setSettingsSection('trellis')">Trellis</div>
+                  <div class="settings-nav-item" id="set-nav-diagnostics" onclick="setSettingsSection('diagnostics')">诊断</div>
+                </div>
+
+                <!-- Settings Right Content -->
+                <div class="settings-content">
+                  
+                  <!-- Section: yolk (Placeholder) -->
+                  <div id="set-sec-yolk" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">蛋黄𝝅 默认配置</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">新会话默认聊天行为与模型预设。</p>
+                    <div style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: var(--bg-subtle)">
+                      已按生产环境 Settings 比例占位。
+                    </div>
+                  </div>
+
+                  <!-- Section: worktree (Placeholder) -->
+                  <div id="set-sec-worktree" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">WorkTree 默认配置</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">新建 WorkTree 与分支时的默认规则。</p>
+                    <div style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: var(--bg-subtle)">
+                      已按生产环境 Settings 比例占位。
+                    </div>
+                  </div>
+
+                  <!-- Section: studio (Placeholder) -->
+                  <div id="set-sec-studio" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">Studio 成员模型</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">YPI Studio 成员运行时的专属模型与思考预设。</p>
+                    <div style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: var(--bg-subtle)">
+                      已按生产环境 Settings 比例占位。
+                    </div>
+                  </div>
+
+                  <!-- Section: Usage -->
+                  <div id="set-sec-usage">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">Usage 额度展示设置</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">控制聊天顶栏用量悬浮小组件的全局展示形态。保存到 <code style="font-family: var(--font-mono); font-size: 10px; color: var(--text)">~/.pi/agent/pi-web.json</code></p>
+                    
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">顶部额度组件简要显示 (Compact Mode)</span>
+                        <span class="toggle-desc">开启后，GPT、Grok、Kiro 顶栏的 Trigger 将被折叠为更紧凑的标识以及摘要，从而给顶栏留出更多空间。点击简要 Pill 仍能展开完整的详细用量面板。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" id="settings-compact-switch" onchange="toggleCompactFromSettings(this.checked)">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Section: ChatGPT -->
+                  <div id="set-sec-chatgpt" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">ChatGPT</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">控制 ChatGPT/Codex 账号相关显示。保存到 <code style="font-family: var(--font-mono); font-size: 10px; color: var(--text)">~/.pi/agent/pi-web.json</code></p>
+                    
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">ChatGPT 用量悬浮面板</span>
+                        <span class="toggle-desc">开启后顶部右侧会显示当前激活 ChatGPT/Codex 账号的半透明用量入口。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" checked disabled>
+                        <span class="slider" style="background-color: var(--accent)"></span>
+                      </label>
+                    </div>
+
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">额度耗尽时自动切换可用账号</span>
+                        <span class="toggle-desc">运行中遇到明确额度/用量耗尽时，后端会在全局锁内切换到下一个可用账号并安全重试一次。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" checked disabled>
+                        <span class="slider" style="background-color: var(--accent)"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Section: OpenCode Go -->
+                  <div id="set-sec-opencodeGo" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">OpenCode Go</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">控制 OpenCode Go 托管 API Key 的自动轮换配置。</p>
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">额度不足/账号不可用时自动切换</span>
+                        <span class="toggle-desc">遇到明确额度、月度限制或账号永久失效时，自动在进程锁内切换并安全重试。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" checked disabled>
+                        <span class="slider" style="background-color: var(--accent)"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Section: Grok -->
+                  <div id="set-sec-grok" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">Grok</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">控制 Grok CLI 全局 Active 账号的自动轮换与顶部用量入口。保存到 <code style="font-family: var(--font-mono); font-size: 10px; color: var(--text)">~/.pi/agent/pi-web.json</code></p>
+                    
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">Grok 用量悬浮面板</span>
+                        <span class="toggle-desc">开启后顶部右侧会显示当前全局 Active Grok 账号的半透明用量入口；展开后可查看月度/可选周额度。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" checked disabled>
+                        <span class="slider" style="background-color: var(--accent)"></span>
+                      </label>
+                    </div>
+
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">明确限额或限流时自动切换可用账号</span>
+                        <span class="toggle-desc">开启后仅对 grok-cli 生效：当明确识别为额度耗尽或 429 限流时，在进程锁内切换全局 Active 并安全重试同一 turn 一次。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" checked disabled>
+                        <span class="slider" style="background-color: var(--accent)"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Section: Kiro -->
+                  <div id="set-sec-kiro" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">Kiro</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">
+                      控制 Kiro 全局 Active 账号的自动轮换与顶栏用量组件。Models 的 Activate 只设置当前全局 Active，不属于锁定；账号管理仍在 Models 中完成。
+                      保存到 <code style="font-family: var(--font-mono); font-size: 10px; color: var(--text)">~/.pi/agent/pi-web.json</code>
+                    </p>
+                    
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">Kiro 用量悬浮面板</span>
+                        <span class="toggle-desc">开启后，将在顶栏显示当前 Kiro Active 账号的用量指示。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" id="settings-kiro-panel-switch" checked onchange="toggleKiroPanelVisibility(this.checked)">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+
+                    <div class="toggle-field">
+                      <div class="toggle-info">
+                        <span class="toggle-label">明确限额或限流时自动切换可用账号</span>
+                        <span class="toggle-desc">开启后，当当前运行账号遭遇 AWS 明确限额 (如 MONTHLY_REQUEST_COUNT_EXCEEDED 等) 或明确 429 限流时，系统将在文件锁保护内自动切换到其余有效备用账号，重试当前 turn 1次。未知/陈旧/失效账号将触发 Fail-closed 保护，不会被盲切。</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" id="settings-kiro-failover-switch" checked onchange="toggleFailoverNotice(this.checked)">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+
+                    <div style="padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-subtle); color: var(--text-dim); font-size: 11px; line-height: 1.5; margin-top: 10px;">
+                      候选账号需要有效凭证，且 remaining &gt; 0；若存在 AWS 额度限制，且额度缓存/查询结果在允许新鲜度内、无需 reauth。手动 Activate 的账号同样参与自动轮换。
+                    </div>
+                  </div>
+
+                  <!-- Section: editor (Placeholder) -->
+                  <div id="set-sec-editor" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">编辑器</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">Monaco 自定义快捷键和编辑器基本配置。</p>
+                    <div style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: var(--bg-subtle)">
+                      已按生产环境 Settings 比例占位。
+                    </div>
+                  </div>
+
+                  <!-- Section: trellis (Placeholder) -->
+                  <div id="set-sec-trellis" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">Trellis</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">启用右侧工作流抽屉与辅助模型。</p>
+                    <div style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: var(--bg-subtle)">
+                      已按生产环境 Settings 比例占位。
+                    </div>
+                  </div>
+
+                  <!-- Section: diagnostics (Placeholder) -->
+                  <div id="set-sec-diagnostics" class="hidden">
+                    <h3 style="margin: 0 0 5px; font-size: 15px; color: var(--text)">诊断</h3>
+                    <p style="margin: 0 0 14px; color: var(--text-muted); font-size: 11.5px;">内存诊断与进程快照导出。</p>
+                    <div style="padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); background: var(--bg-subtle)">
+                      已按生产环境 Settings 比例占位。
+                    </div>
+                  </div>
+
+                  <!-- Bottom Save Button Area -->
+                  <div style="margin-top: auto; display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border)">
+                    <button class="primary-btn" onclick="alert('设置已保存！')">保存设置</button>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Popover Panels (Only show one at a time) -->
+        
+        <!-- GPT popover -->
+        <div class="floating-panel hidden" id="panel-gpt" style="top: 45px; right: 240px;">
+          <div class="panel-header">
+            <span class="panel-title">
+              <span class="status-dot success"></span>
+              ChatGPT / Codex 用量
+            </span>
+            <button class="icon-btn" style="width: 20px; height: 20px; border: none; background: transparent; font-size: 12px;" onclick="closeAllPanels()">✕</button>
+          </div>
+          <div class="account-badge">
+            <div>
+              <strong>Active Account:</strong> <code>chatgpt-work-id</code>
+            </div>
+            <span class="account-badge-active">全局活动</span>
+          </div>
+          <div class="quota-grid">
+            <div class="quota-card">
+              <span class="quota-label">5 小时限制</span>
+              <span class="quota-value">42% <small style="font-size: 10px; font-weight: normal; color: var(--text-muted)">已使用 (17 / 40 次)</small></span>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: 42%; background: var(--accent);"></div>
+              </div>
+              <span class="panel-subtitle">倒计时 2小时 15分钟 重置</span>
+            </div>
+            <div class="quota-card">
+              <span class="quota-label">7 天限制</span>
+              <span class="quota-value">18% <small style="font-size: 10px; font-weight: normal; color: var(--text-muted)">已使用 (9 / 50 次)</small></span>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: 18%; background: var(--accent);"></div>
+              </div>
+              <span class="panel-subtitle">重置于 2026-07-20</span>
+            </div>
+          </div>
+          <button class="secondary-btn" style="font-size: 11px; min-height: 28px;" onclick="setView('models')">账号与额度管理</button>
+        </div>
+
+        <!-- Grok popover -->
+        <div class="floating-panel hidden" id="panel-grok" style="top: 45px; right: 140px;">
+          <div class="panel-header">
+            <span class="panel-title">
+              <span class="status-dot success"></span>
+              Grok 订阅额度
+            </span>
+            <button class="icon-btn" style="width: 20px; height: 20px; border: none; background: transparent; font-size: 12px;" onclick="closeAllPanels()">✕</button>
+          </div>
+          <div class="account-badge">
+            <div>
+              <strong>Active Account:</strong> <code>grok-4c9a...</code>
+            </div>
+            <span class="account-badge-active">全局活动</span>
+          </div>
+          <div class="quota-grid">
+            <div class="quota-card">
+              <span class="quota-label">月度额度</span>
+              <span class="quota-value">63% <small style="font-size: 10px; font-weight: normal; color: var(--text-muted)">已使用 (315 / 500 次)</small></span>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: 63%; background: var(--accent);"></div>
+              </div>
+              <span class="panel-subtitle">剩余 185次 · 2026-07-31 重置</span>
+            </div>
+          </div>
+          <button class="secondary-btn" style="font-size: 11px; min-height: 28px;" onclick="setView('models')">账号与额度管理</button>
+        </div>
+
+        <!-- Kiro popover -->
+        <div class="floating-panel hidden" id="panel-kiro" style="top: 45px; right: 8px;">
+          <!-- Injected dynamically by JS based on current Kiro State -->
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // State representation variables
+    let currentViewport = 'desktop';
+    let isCompact = true; // start with compact as requested by contract
+    let kiroState = 'live';
+    let currentView = 'chat';
+    let currentKiroActiveAccount = 'kiro-id-8b2c-active';
+    let autoFailoverEnabled = true;
+
+    // Quota definitions
+    const kiroQuotaData = {
+      live: {
+        success: true,
+        reauthRequired: false,
+        queriedAt: '刚刚',
+        buckets: [
+          { label: 'AWS Credits (额度点数)', used: 375.5, limit: 500.0, remaining: 124.5, percent: 75.1, unit: 'USD' },
+          { label: 'Agentic Requests (智能体调用)', used: 12, limit: 50, remaining: 38, percent: 24, unit: '次' }
+        ],
+        error: null
+      },
+      stale: {
+        success: true,
+        reauthRequired: false,
+        queriedAt: '2 小时前',
+        buckets: [
+          { label: 'AWS Credits (额度点数)', used: 375.5, limit: 500.0, remaining: 124.5, percent: 75.1, unit: 'USD' },
+          { label: 'Agentic Requests (智能体调用)', used: 12, limit: 50, remaining: 38, percent: 24, unit: '次' }
+        ],
+        error: { code: 'network', message: 'AWS 额度服务临时连接超时，已展示缓存数据。', retryable: true }
+      },
+      loading: {
+        success: false,
+        reauthRequired: false,
+        queriedAt: null,
+        buckets: [],
+        error: null
+      },
+      no_account: {
+        success: false,
+        reauthRequired: false,
+        queriedAt: null,
+        buckets: [],
+        error: null
+      },
+      reauth: {
+        success: false,
+        reauthRequired: true,
+        queriedAt: '1 天前',
+        buckets: [],
+        error: { code: 'unauthorized', message: 'Kiro OAuth refresh token has expired or is invalid. Please login again.', retryable: false }
+      },
+      unavailable: {
+        success: false,
+        reauthRequired: false,
+        queriedAt: null,
+        buckets: [],
+        error: { code: 'invalid_payload', message: 'AWS CodeWhispererGetUsageLimits returned ValidationException for region us-west-2.', retryable: false }
+      }
+    };
+
+    function setViewport(sz, btn) {
+      currentViewport = sz;
+      const frame = document.getElementById('app-container');
+      const label = document.getElementById('current-viewport-label');
+      
+      // Update UI active buttons
+      const btns = btn.parentNode.querySelectorAll('button');
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (sz === 'desktop') {
+        frame.style.width = '100%';
+        label.innerText = 'Desktop (100% 宽度)';
+      } else {
+        frame.style.width = sz + 'px';
+        label.innerText = sz + 'px (窄屏视口仿真)';
+      }
+      
+      // Reposition panels on resize simulation
+      closeAllPanels();
+    }
+
+    function toggleCompactMode(val, btn) {
+      isCompact = val;
+      
+      // Update buttons
+      document.getElementById('ctrl-compact-full').classList.toggle('active', !val);
+      document.getElementById('ctrl-compact-compact').classList.toggle('active', val);
+      document.getElementById('settings-compact-switch').checked = val;
+
+      const topbar = document.getElementById('topbar-pills-container');
+      const gptPill = document.getElementById('gpt-pill');
+      const grokPill = document.getElementById('grok-pill');
+      const kiroPill = document.getElementById('kiro-pill');
+      
+      const gptStatus = document.getElementById('gpt-status');
+      const grokStatus = document.getElementById('grok-status');
+      const kiroStatus = document.getElementById('kiro-status-container');
+
+      const gptR1 = document.getElementById('gpt-r1');
+      const gptR2 = document.getElementById('gpt-r2');
+      const grokR1 = document.getElementById('grok-r1');
+      const grokR2 = document.getElementById('grok-r2');
+      const kiroR1 = document.getElementById('kiro-r1');
+      const kiroCompactVal = document.getElementById('kiro-compact-val');
+
+      if (isCompact) {
+        // Hide full texts, simplify trigger information
+        gptStatus.classList.add('hidden');
+        grokStatus.classList.add('hidden');
+        kiroStatus.classList.add('hidden');
+        
+        gptR1.querySelector('.usage-ring-num').innerText = '5h 42%';
+        gptR2.querySelector('.usage-ring-num').innerText = '周 18%';
+        grokR1.querySelector('.usage-ring-num').innerText = '月 63%';
+        grokR2.querySelector('.usage-ring-num').innerText = '周 12%';
+        
+        if (kiroState === 'live' || kiroState === 'stale') {
+          kiroCompactVal.classList.remove('hidden');
+          kiroR1.classList.remove('hidden');
+        }
+      } else {
+        // Show status badges and full texts
+        gptStatus.classList.remove('hidden');
+        grokStatus.classList.remove('hidden');
+        kiroStatus.classList.remove('hidden');
+
+        gptR1.querySelector('.usage-ring-num').innerText = '5h 42%';
+        gptR2.querySelector('.usage-ring-num').innerText = '周 18%';
+        grokR1.querySelector('.usage-ring-num').innerText = '月 63%';
+        grokR2.querySelector('.usage-ring-num').innerText = '周 12%';
+        
+        kiroCompactVal.classList.add('hidden');
+      }
+
+      // Sync Kiro state display since it affects the compact texts
+      setKiroState(kiroState, null);
+    }
+
+    function toggleCompactFromSettings(checked) {
+      const btn = checked 
+        ? document.getElementById('ctrl-compact-compact') 
+        : document.getElementById('ctrl-compact-full');
+      toggleCompactMode(checked, btn);
+    }
+
+    function setKiroState(state, btn) {
+      kiroState = state;
+      if (btn) {
+        const btns = btn.parentNode.querySelectorAll('button');
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+
+      const kiroPill = document.getElementById('kiro-pill');
+      const kiroStatusDot = document.getElementById('kiro-status-dot');
+      const kiroStatusText = document.getElementById('kiro-status-text');
+      const kiroR1 = document.getElementById('kiro-r1');
+      const kiroCompactVal = document.getElementById('kiro-compact-val');
+
+      // Update Kiro Top Pill visual state
+      if (state === 'no_account') {
+        kiroStatusDot.className = 'status-dot muted';
+        kiroStatusText.innerText = '未登录';
+        kiroR1.classList.add('hidden');
+        kiroCompactVal.innerText = '登录';
+        if (isCompact) {
+          kiroCompactVal.classList.remove('hidden');
+        }
+      } else if (state === 'loading') {
+        kiroStatusDot.className = 'status-dot muted';
+        kiroStatusText.innerText = '正在刷新…';
+        kiroR1.classList.add('hidden');
+        kiroCompactVal.innerText = '加载中';
+        if (isCompact) {
+          kiroCompactVal.classList.remove('hidden');
+        }
+      } else if (state === 'reauth') {
+        kiroStatusDot.className = 'status-dot danger';
+        kiroStatusText.innerText = '需重新登录';
+        kiroR1.classList.add('hidden');
+        kiroCompactVal.innerText = '需登录';
+        if (isCompact) {
+          kiroCompactVal.classList.remove('hidden');
+        }
+      } else if (state === 'unavailable') {
+        kiroStatusDot.className = 'status-dot warning';
+        kiroStatusText.innerText = '不可用';
+        kiroR1.classList.add('hidden');
+        kiroCompactVal.innerText = '不可用';
+        if (isCompact) {
+          kiroCompactVal.classList.remove('hidden');
+        }
+      } else if (state === 'live') {
+        kiroStatusDot.className = 'status-dot success';
+        kiroStatusText.innerText = '实时';
+        kiroR1.classList.remove('hidden');
+        document.getElementById('kiro-ring-num').innerText = '75%';
+        document.getElementById('kiro-ring-graphic').style.background = 'conic-gradient(var(--accent) 270deg, rgba(148,163,184,0.18) 0deg)';
+        kiroCompactVal.innerText = '剩余 125M';
+        if (isCompact) {
+          kiroCompactVal.classList.remove('hidden');
+        } else {
+          kiroCompactVal.classList.add('hidden');
+        }
+      } else if (state === 'stale') {
+        kiroStatusDot.className = 'status-dot warning';
+        kiroStatusText.innerText = '已缓存 · 2小时前';
+        kiroR1.classList.remove('hidden');
+        document.getElementById('kiro-ring-num').innerText = '75%';
+        document.getElementById('kiro-ring-graphic').style.background = 'conic-gradient(var(--warning) 270deg, rgba(148,163,184,0.18) 0deg)';
+        kiroCompactVal.innerText = '已缓存';
+        if (isCompact) {
+          kiroCompactVal.classList.remove('hidden');
+        } else {
+          kiroCompactVal.classList.add('hidden');
+        }
+      }
+
+      // Re-render panels & Models
+      renderKiroPanel();
+      renderKiroModelsQuota();
+    }
+
+    function setView(view, btn) {
+      currentView = view;
+      
+      // Update sidebar visual
+      const items = document.querySelectorAll('.sidebar-item');
+      items.forEach(i => i.classList.remove('active'));
+      document.getElementById('sb-' + view).classList.add('active');
+
+      // Update actual view visible states
+      document.getElementById('view-chat').classList.add('hidden');
+      document.getElementById('view-models').classList.add('hidden');
+      document.getElementById('view-settings').classList.add('hidden');
+
+      document.getElementById('view-' + view).classList.remove('hidden');
+      
+      closeAllPanels();
+
+      if (view === 'settings') {
+        // Default to usage section when showing settings
+        setSettingsSection('usage');
+      }
+    }
+
+    function setSettingsSection(secId) {
+      // Toggle sidebar/navigation items in Settings
+      const navItems = document.querySelectorAll('.settings-nav-item');
+      navItems.forEach(item => item.classList.remove('active'));
+      document.getElementById('set-nav-' + secId).classList.add('active');
+
+      // Toggle active sub-view section container in Settings
+      const sections = [
+        'yolk', 'worktree', 'studio', 'usage', 'chatgpt', 
+        'opencodeGo', 'grok', 'kiro', 'editor', 'trellis', 'diagnostics'
+      ];
+      sections.forEach(sec => {
+        const el = document.getElementById('set-sec-' + sec);
+        if (el) {
+          if (sec === secId) {
+            el.classList.remove('hidden');
+          } else {
+            el.classList.add('hidden');
+          }
+        }
+      });
+    }
+
+    function toggleKiroPanelVisibility(checked) {
+      const pill = document.getElementById('kiro-pill');
+      if (checked) {
+        pill.classList.remove('hidden');
+      } else {
+        pill.classList.add('hidden');
+        closeAllPanels();
+      }
+      // Keep both panel switch toggles synced (sidebar view vs direct top panel)
+      const switches = ['settings-kiro-panel-switch'];
+      switches.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = checked;
+      });
+    }
+
+    function toggleFailoverNotice(checked) {
+      autoFailoverEnabled = checked;
+      const notice = document.getElementById('failover-notice');
+      if (checked && currentKiroActiveAccount !== 'kiro-id-8b2c-active') {
+        notice.classList.remove('hidden');
+        notice.style.display = 'block';
+      } else {
+        notice.classList.add('hidden');
+        notice.style.display = 'none';
+      }
+      
+      const el = document.getElementById('settings-kiro-failover-switch');
+      if (el) el.checked = checked;
+    }
+
+    function togglePanel(provider) {
+      const gpt = document.getElementById('panel-gpt');
+      const grok = document.getElementById('panel-grok');
+      const kiro = document.getElementById('panel-kiro');
+      
+      const gptPill = document.getElementById('gpt-pill');
+      const grokPill = document.getElementById('grok-pill');
+      const kiroPill = document.getElementById('kiro-pill');
+
+      let targetPanel = null;
+      if (provider === 'gpt') targetPanel = gpt;
+      if (provider === 'grok') targetPanel = grok;
+      if (provider === 'kiro') targetPanel = kiro;
+
+      const wasOpen = !targetPanel.classList.contains('hidden');
+
+      closeAllPanels();
+
+      if (!wasOpen) {
+        targetPanel.classList.remove('hidden');
+        if (provider === 'gpt') gptPill.classList.add('active');
+        if (provider === 'grok') grokPill.classList.add('active');
+        if (provider === 'kiro') kiroPill.classList.add('active');
+      }
+    }
+
+    function closeAllPanels() {
+      document.getElementById('panel-gpt').classList.add('hidden');
+      document.getElementById('panel-grok').classList.add('hidden');
+      document.getElementById('panel-kiro').classList.add('hidden');
+
+      document.getElementById('gpt-pill').classList.remove('active');
+      document.getElementById('grok-pill').classList.remove('active');
+      document.getElementById('kiro-pill').classList.remove('active');
+    }
+
+    // Dynamic rendering of Kiro Popover panel content
+    function renderKiroPanel() {
+      const panel = document.getElementById('panel-kiro');
+      const activeObj = getActiveAccountInfo();
+      const quota = kiroQuotaData[kiroState];
+
+      let content = `
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent); vertical-align: middle;">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            AWS Kiro 订阅额度
+          </span>
+          <button class="icon-btn" style="width: 20px; height: 20px; border: none; background: transparent; font-size: 12px;" onclick="closeAllPanels()">✕</button>
+        </div>
+      `;
+
+      if (kiroState === 'no_account') {
+        content += `
+          <div style="text-align: center; padding: 20px 0; color: var(--text-dim);">
+            <p style="margin: 0 0 10px;">当前未配置 AWS Kiro 凭证。</p>
+            <button class="small-btn" onclick="setView('models')">配置 Kiro 账号</button>
+          </div>
+        `;
+      } else {
+        content += `
+          <div class="account-badge">
+            <div style="min-width: 0; flex: 1;">
+              <strong style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${activeObj.label}">${activeObj.label}</strong>
+              <code style="font-size: 10px; color: var(--text-dim); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${activeObj.id}">${activeObj.id}</code>
+            </div>
+            <span class="account-badge-active">全局当前</span>
+          </div>
+        `;
+
+        if (kiroState === 'loading') {
+          content += `
+            <div style="text-align: center; padding: 16px; color: var(--text-muted); font-size: 12px;">
+              🔄 正在从 AWS CodeWhispererGetUsageLimits 读取配额...
+            </div>
+          `;
+        } else if (kiroState === 'reauth') {
+          content += `
+            <div style="font-size: 12px; color: #f87171; line-height: 1.5; padding: 8px 10px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); border-radius: 6px;">
+              ⚠️ Kiro Builder ID/OAuth 认证凭证已过期失效。需在 <strong>Models</strong> 重新登录。
+            </div>
+          `;
+        } else if (kiroState === 'unavailable') {
+          content += `
+            <div style="font-size: 12px; color: #fb923c; line-height: 1.5; padding: 8px 10px; background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.15); border-radius: 6px;">
+              ⚠️ AWS 额度服务不可用或该地区不支持：GetUsageLimits 校验失败。<br>
+              <span style="font-size: 10px; color: var(--text-dim)">错误码: ValidationException (Region limit)</span>
+            </div>
+          `;
+        } else {
+          // Success states (live or stale)
+          if (quota.error) {
+            content += `
+              <div style="font-size: 11px; color: var(--warning); padding: 6px 10px; background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.15); border-radius: 6px; line-height: 1.4;">
+                ⚠️ 额度刷新失败。展示上次陈旧缓存：${quota.error.message}
+              </div>
+            `;
+          }
+
+          content += `<div class="quota-grid">`;
+          quota.buckets.forEach(b => {
+            const barColor = b.percent > 80 ? 'var(--warning)' : 'var(--accent)';
+            content += `
+              <div class="quota-card">
+                <span class="quota-label">${b.label}</span>
+                <span class="quota-value">
+                  ${Math.round(b.percent)}% 
+                  <small style="font-size: 10px; font-weight: normal; color: var(--text-muted)">
+                    已用 ${b.used} / 限额 ${b.limit} ${b.unit}
+                  </small>
+                </span>
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" style="width: ${b.percent}%; background: ${barColor};"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim);">
+                  <span>剩余: ${(b.limit - b.used).toFixed(1)} ${b.unit}</span>
+                  <span>倒计时: 次月1日重置</span>
+                </div>
+              </div>
+            `;
+          });
+          content += `</div>`;
+        }
+
+        content += `
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <button class="secondary-btn" style="flex: 1; font-size: 11px; min-height: 28px;" onclick="refreshKiroQuota(true)">🔄 刷新额度</button>
+            <button class="secondary-btn" style="flex: 1; font-size: 11px; min-height: 28px;" onclick="setView('models')">⚙️ 账号管理</button>
+          </div>
+        `;
+      }
+
+      panel.innerHTML = content;
+    }
+
+    function getActiveAccountInfo() {
+      if (currentKiroActiveAccount === 'kiro-id-8b2c-active') {
+        return { id: 'kiro-id-8b2c-active', label: 'Kiro-Builder-ID (工作主账号)' };
+      } else if (currentKiroActiveAccount === 'kiro-id-d4e5-github') {
+        return { id: 'kiro-id-d4e5-github', label: 'Kiro-Social-GitHub (社交备用账号)' };
+      } else {
+        return { id: 'kiro-id-a1b2-google', label: 'Kiro-Social-Google (测试开发账号)' };
+      }
+    }
+
+    function activateKiroAccount(id) {
+      currentKiroActiveAccount = id;
+      alert('账号激活成功！全局请求已映射到新凭证。');
+      
+      // If we activated a backup account and automatic failover warning simulation is on
+      if (autoFailoverEnabled && id !== 'kiro-id-8b2c-active') {
+        document.getElementById('failover-notice').style.display = 'block';
+        document.getElementById('failover-notice').classList.remove('hidden');
+      } else {
+        document.getElementById('failover-notice').style.display = 'none';
+        document.getElementById('failover-notice').classList.add('hidden');
+      }
+      
+      // Re-render
+      renderKiroAccountList();
+      setKiroState(kiroState, null);
+    }
+
+    function deleteKiroAccount(id) {
+      if (confirm('确定要删除此保存的凭证吗？')) {
+        alert('账号凭证已彻底从 0600 加密目录中移除。');
+      }
+    }
+
+    function renderKiroAccountList() {
+      const container = document.getElementById('kiro-account-list-container');
+      
+      const accounts = [
+        { key: 'kiro-id-8b2c-active', label: 'Kiro-Builder-ID (工作主账号)' },
+        { key: 'kiro-id-d4e5-github', label: 'Kiro-Social-GitHub (社交备用账号)' },
+        { key: 'kiro-id-a1b2-google', label: 'Kiro-Social-Google (测试开发账号)' }
+      ];
+
+      let content = '';
+      accounts.forEach(acc => {
+        const isActive = acc.key === currentKiroActiveAccount;
+        content += `
+          <div class="account-row" style="background: ${isActive ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'}; border-radius: 6px; padding: 10px; border: ${isActive ? '1px solid var(--border)' : '1px solid rgba(255,255,255,0.04)'}">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="${isActive ? 'font-weight: 700;' : ''}">${acc.label}</span>
+              <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-dim)">${acc.key}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              ${isActive 
+                ? `<span class="account-badge-active" style="margin-left: 0; padding: 2px 6px; background: rgba(74,222,128,0.1); border-radius: 4px; border: 1px solid rgba(74,222,128,0.2)">Active</span>
+                   <button class="secondary-btn" style="min-height: 24px; padding: 2px 6px; font-size: 10px;" disabled>删除保护</button>`
+                : `<button class="small-btn" onclick="activateKiroAccount('${acc.key}')">激活 (Activate)</button>
+                   <button class="danger-btn" style="min-height: 24px; padding: 2px 6px;" onclick="deleteKiroAccount('${acc.key}')">删除</button>`
+              }
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = content;
+    }
+
+    // Re-render Kiro Quota card inside Models config view
+    function renderKiroModelsQuota() {
+      const container = document.getElementById('models-kiro-quota-section');
+      const quota = kiroQuotaData[kiroState];
+      
+      if (kiroState === 'no_account') {
+        container.innerHTML = '';
+        return;
+      }
+
+      let content = `
+        <div style="border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel); padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 11px; fontWeight: 600; color: var(--text-dim); text-transform: uppercase;">当前活跃账号额度指标 (GetUsageLimits)</span>
+              <span style="font-size: 11px; color: var(--text-dim);">
+                ${kiroState === 'loading' ? '正在刷新…' : `更新于 ${quota.queriedAt || '刚刚'}`}
+              </span>
+            </div>
+          </div>
+      `;
+
+      if (kiroState === 'reauth') {
+        content += `
+          <div style="font-size: 12px; color: #f87171; line-height: 1.5; padding: 8px 10px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); border-radius: 6px;">
+            需要重新登录：AWS 身份认证已过期失效。
+          </div>
+        `;
+      } else if (kiroState === 'unavailable') {
+        content += `
+          <div style="font-size: 12px; color: #fb923c; line-height: 1.5; padding: 8px 10px; background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.15); border-radius: 6px;">
+            额度信息不可用：该账户类型在此 Region (us-west-2) 不支持 AWS CodeWhispererGetUsageLimits API 详情返回。
+          </div>
+        `;
+      } else if (kiroState === 'loading') {
+        content += `
+          <div style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 12px;">
+            正在向 AWS 请求实时额度数据...
+          </div>
+        `;
+      } else {
+        if (quota.error) {
+          content += `
+            <div style="font-size: 11px; color: var(--warning); padding: 8px 10px; background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.15); border-radius: 6px;">
+              额度刷新超时已降级。展示上次陈旧缓存：${quota.error.message}
+            </div>
+          `;
+        }
+
+        quota.buckets.forEach(b => {
+          const color = b.percent > 80 ? 'var(--warning)' : 'var(--accent)';
+          content += `
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 11px; color: var(--text-dim);">${b.label}</span>
+                <span style="font-size: 13px; font-weight: 700; color: ${color}">
+                  ${b.used} / ${b.limit} ${b.unit} (${Math.round(b.percent)}%)
+                </span>
+              </div>
+              <div role="progressbar" aria-label="${b.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(b.percent)}" style="height: 6px; border-radius: 99px; background: var(--bg); border: 1px solid var(--border); overflow: hidden;">
+                <div style="height: 100%; width: ${b.percent}%; background: ${color}; border-radius: 99px;"></div>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      content += `</div>`;
+      container.innerHTML = content;
+    }
+
+    function refreshKiroQuota(fromPanel) {
+      const orig = kiroState;
+      setKiroState('loading', null);
+      setTimeout(() => {
+        setKiroState(orig, null);
+      }, 1000);
+    }
+
+    function refreshKiroQuotaInModels() {
+      refreshKiroQuota(false);
+    }
+
+    // Keyboard ESC close hook
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeAllPanels();
+      }
+    });
+
+    // Outside click hook
+    document.addEventListener('mousedown', (e) => {
+      const topbar = document.getElementById('topbar-pills-container');
+      const isPill = e.target.closest('.usage-pill');
+      const isPanel = e.target.closest('.floating-panel');
+      if (!isPill && !isPanel) {
+        closeAllPanels();
+      }
+    });
+
+    // Initial load
+    setKiroState('live', null);
+    toggleCompactMode(isCompact, document.getElementById('ctrl-compact-compact'));
+  </script>
+
+</body>
+</html>

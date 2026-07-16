@@ -81,7 +81,9 @@ test("retired pin extension no longer overrides Authorization", () => {
 
 test("exports webExtensionFactories() helper without session pin", () => {
   assertIncludes(peSource, "export function webExtensionFactories", "exports webExtensionFactories");
-  assertIncludes(peSource, "return [grokCliExtension, ...extra]", "prepends only grokCliExtension");
+  assertIncludes(peSource, "return [...webProviderExtensions(), ...extra]", "prepends fixed provider list");
+  assertIncludes(peSource, "export function webProviderExtensions", "exports webProviderExtensions");
+  assertIncludes(peSource, "return [grokCliExtension, kiroProviderExtension]", "fixed list is Grok then Kiro");
   assertNotIncludes(peSource, "[grokCliExtension, grokSessionAccountExtension", "session pin not wired");
 });
 
@@ -90,21 +92,23 @@ test("webExtensionFactories documents global Active auth path", () => {
   assertIncludes(peSource, "Main inference no longer injects a session-bound Authorization header", "pin retired documented");
 });
 
-test("exports ensureGrokBootstrapped() for cold-start safety", () => {
-  assertIncludes(peSource, "export function ensureGrokBootstrapped", "exports ensureGrokBootstrapped");
-  assertIncludes(peSource, "_grokBootstrapPromise", "uses single-flight promise");
+test("exports ensureWebProvidersBootstrapped() with Grok-named alias", () => {
+  assertIncludes(peSource, "export function ensureWebProvidersBootstrapped", "exports ensureWebProvidersBootstrapped");
+  assertIncludes(peSource, "export function ensureGrokBootstrapped", "retains ensureGrokBootstrapped alias");
+  assertIncludes(peSource, "_webProvidersBootstrapPromise", "uses single-flight promise");
 });
 
-test("ensureGrokBootstrapped creates services to load extension", () => {
+test("ensureWebProvidersBootstrapped creates services to load fixed providers", () => {
   assertIncludes(peSource, "createAgentSessionServices", "calls createAgentSessionServices");
-  assertIncludes(peSource, "[grokCliExtension]", "registers grok extension for bootstrap");
+  assertIncludes(peSource, "webProviderExtensions()", "registers fixed provider list for bootstrap");
   assertIncludes(peSource, "// Best-effort only", "catches errors gracefully");
 });
 
-test("exports createGrokAwareModelRegistry", () => {
-  assertIncludes(peSource, "export async function createGrokAwareModelRegistry", "exports helper");
-  assertIncludes(peSource, "await ensureGrokBootstrapped()", "bootstraps before registry create");
-  assertIncludes(peSource, "ModelRegistry.create(", "creates grok-aware registry");
+test("exports createWebProviderAwareModelRegistry with Grok-named alias", () => {
+  assertIncludes(peSource, "export async function createWebProviderAwareModelRegistry", "exports helper");
+  assertIncludes(peSource, "export async function createGrokAwareModelRegistry", "retains createGrokAwareModelRegistry alias");
+  assertIncludes(peSource, "await ensureWebProvidersBootstrapped()", "bootstraps before registry create");
+  assertIncludes(peSource, "ModelRegistry.create(", "creates provider-aware registry");
 });
 
 // ============================================================================
@@ -173,24 +177,24 @@ test("app/api/auth/logout/[provider]/route.ts uses webExtensionFactories", () =>
   assertIncludes(source, "webExtensionFactories", "logout route uses factory helper");
 });
 
-test("app/api/auth/api-key/[provider]/route.ts uses createGrokAwareModelRegistry", () => {
+test("app/api/auth/api-key/[provider]/route.ts uses createWebProviderAwareModelRegistry", () => {
   const source = read("app/api/auth/api-key/[provider]/route.ts");
-  assertIncludes(source, "createGrokAwareModelRegistry", "api-key route uses grok-aware registry");
+  assertIncludes(source, "createWebProviderAwareModelRegistry", "api-key route uses provider-aware registry");
 });
 
-test("app/api/auth/all-providers/route.ts uses createGrokAwareModelRegistry", () => {
+test("app/api/auth/all-providers/route.ts uses createWebProviderAwareModelRegistry", () => {
   const source = read("app/api/auth/all-providers/route.ts");
-  assertIncludes(source, "createGrokAwareModelRegistry", "all-providers route uses grok-aware registry");
+  assertIncludes(source, "createWebProviderAwareModelRegistry", "all-providers route uses provider-aware registry");
 });
 
-test("app/api/terminal/env/assist/route.ts uses grokCliExtension", () => {
+test("app/api/terminal/env/assist/route.ts uses webExtensionFactories", () => {
   const source = read("app/api/terminal/env/assist/route.ts");
-  assertIncludes(source, "grokCliExtension", "terminal assist uses grok extension");
+  assertIncludes(source, "webExtensionFactories", "terminal assist uses unified provider factories");
 });
 
-test("app/api/trellis/workflow/assist/route.ts uses grokCliExtension", () => {
+test("app/api/trellis/workflow/assist/route.ts uses webExtensionFactories", () => {
   const source = read("app/api/trellis/workflow/assist/route.ts");
-  assertIncludes(source, "grokCliExtension", "trellis assist uses grok extension");
+  assertIncludes(source, "webExtensionFactories", "trellis assist uses unified provider factories");
 });
 
 // ============================================================================
@@ -205,12 +209,12 @@ test("pi-provider-extensions documents the refresh invariant", () => {
   assertIncludes(peSource, "must be fed", "documented requirement");
 });
 
-test("createGrokAwareModelRegistry bootstraps before ModelRegistry.create", () => {
-  // Extract the createGrokAwareModelRegistry function body only.
+test("createWebProviderAwareModelRegistry bootstraps before ModelRegistry.create", () => {
+  // Extract the createWebProviderAwareModelRegistry function body only.
   // Comments earlier in the file also mention ModelRegistry.create.
-  const fnStart = peSource.indexOf("export async function createGrokAwareModelRegistry");
+  const fnStart = peSource.indexOf("export async function createWebProviderAwareModelRegistry");
   const fnBody = peSource.slice(fnStart);
-  const ensureCall = fnBody.indexOf("await ensureGrokBootstrapped()");
+  const ensureCall = fnBody.indexOf("await ensureWebProvidersBootstrapped()");
   const createCall = fnBody.indexOf("ModelRegistry.create(");
   const orderOk = ensureCall > 0 && createCall > 0 && ensureCall < createCall;
   if (!orderOk) {
@@ -219,14 +223,10 @@ test("createGrokAwareModelRegistry bootstraps before ModelRegistry.create", () =
   assert.ok(orderOk, "bootstrap runs before registry create");
 });
 
-test("deepseek-balance.ts uses ModelRegistry.create — documented risk", () => {
+test("deepseek-balance.ts bootstraps fixed providers before ModelRegistry.create", () => {
   const source = read("lib/deepseek-balance.ts");
-  // This file has ModelRegistry.create without grok bootstrap;
-  // it's a known gap that should be tracked.
   assertIncludes(source, "ModelRegistry.create", "has bare registry create");
-  // The test is informational — if future work changes this file, this test
-  // alerts that the Grok bootstrap invariant may need updating.
-  console.log("    (info) bare ModelRegistry.create in deepseek-balance.ts — tracked");
+  assertIncludes(source, "ensureWebProvidersBootstrapped", "bootstraps fixed providers first");
 });
 
 test("no source file uses ModelRegistry.create without factory path except deepseek-balance", () => {
@@ -249,9 +249,15 @@ test("no source file uses ModelRegistry.create without factory path except deeps
   for (const f of files) {
     try {
       const source = read(f.path);
-      // These files should use webExtensionFactories or createGrokAwareModelRegistry,
+      // These files should use webExtensionFactories or createWebProviderAwareModelRegistry,
       // not bare ModelRegistry.create.
-      if (source.includes("ModelRegistry.create") && !source.includes("webExtensionFactories") && !source.includes("createGrokAwareModelRegistry") && !source.includes("pi-provider-extensions")) {
+      if (
+        source.includes("ModelRegistry.create") &&
+        !source.includes("webExtensionFactories") &&
+        !source.includes("createWebProviderAwareModelRegistry") &&
+        !source.includes("createGrokAwareModelRegistry") &&
+        !source.includes("pi-provider-extensions")
+      ) {
         console.log(`    (info) ${f.name} has bare ModelRegistry.create — tracked`);
       }
     } catch {
@@ -349,7 +355,7 @@ test("grok-subscription-quota.ts imports token resolver, not pi-grok-cli", () =>
 
 console.log("\n=== Error handling ===");
 
-test("ensureGrokBootstrapped survives missing dependency gracefully", () => {
+test("ensureWebProvidersBootstrapped survives missing dependency gracefully", () => {
   // The catch block should not rethrow
   assertIncludes(peSource, "catch {", "bootstrap has error handler");
   assertIncludes(peSource, "// Best-effort only", "bootstrap is best-effort");

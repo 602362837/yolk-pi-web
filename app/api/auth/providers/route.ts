@@ -18,6 +18,7 @@ export async function GET() {
     "openai-codex": "ChatGPT Plus/Pro",
     "github-copilot": "GitHub Copilot",
     "grok-cli": "Grok CLI (SuperGrok / X Premium)",
+    kiro: "Kiro (Builder ID / Google / GitHub)",
   };
 
   const result = await Promise.all(

@@ -9,6 +9,8 @@ See `package.json` for exact versions.
 | `next`, `react`, `react-dom` | Web application framework/runtime. |
 | `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai` | In-process pi AgentSession and AI provider integration. |
 | `pi-grok-cli` | SuperGrok / X Premium OAuth provider, model catalog, inference, and request adapter. Integrated as a fixed, full extension; Web adds multi-account storage, global Active live reload, optional auto-failover, and quota management on top. |
+| `pi-kiro-provider` | AWS Kiro OAuth provider (`kiro`) with Builder ID / Google / GitHub login methods and model catalog. Loaded like Grok via jiti (package ships TypeScript source); Web adds multi-account storage, GetUsageLimits quota, optional Path B auto-failover, and top-bar usage. Fixed at `^0.2.2`. |
+| `jiti` | Runtime TypeScript loader used only for fixed provider packages (`pi-grok-cli`, `pi-kiro-provider`) so Next/Turbopack never statically compiles their source trees. Listed in `next.config.ts` `serverExternalPackages`. |
 | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-raw`, `rehype-sanitize`, `rehype-katex`, `katex` | Markdown, raw HTML sanitization, and math rendering. |
 | `react-syntax-highlighter` | Code block highlighting. |
 | `mermaid` | Diagram rendering. |
@@ -73,6 +75,51 @@ Auth-related API routes live under `app/api/auth/`. Provider tokens and API-key 
 #### Rollback
 
 Remove Grok from `webExtensionFactories()` and hide Grok UI/API entries. Saved accounts and quota cache are preserved but inactive. `auth.json["grok-cli"]` is only cleared on explicit user disconnect.
+
+### Kiro OAuth, Quota, Auto-Failover & Compact Top-bar
+
+`pi-kiro-provider@0.2.2` provides the `kiro` provider + OAuth methods. Web layers on top (symmetric to Grok, but independent modules and Path B controller):
+
+- **Provider bootstrap** (`lib/pi-provider-extensions.ts`): Fixed list is always `[grokCliExtension, kiroProviderExtension]` via `webProviderExtensions()` / `webExtensionFactories()`. Cold paths use `ensureWebProvidersBootstrapped()` and `createWebProviderAwareModelRegistry()` (deprecated Grok-named aliases remain). Every ResourceLoader / Models / Auth / Studio SDK child / Skills / Commands / assist route must load this list so registry refresh cannot drop either provider. Per-provider jiti load failures are isolated.
+- **OAuth saved accounts** (`lib/oauth-account-providers.ts` `kiroAdapter` + `lib/oauth-accounts.ts`): Opaque storage ids, metadata-only `accounts.json`, per-account `0600` secrets, `0700` dirs, soft-delete to `deleted/`. No credential JSON import. Display hints never include access/refresh/`clientSecret`/full `profileArn`. Active mirror to `auth.json` uses compare-and-set.
+- **Token refresh** (`lib/kiro-account-token.ts`): Per-account single-flight, file lock, atomic 0600 write, `forceRefresh`, active-mirror CAS. Uses registered OAuth provider refresh (`getOAuthApiKey("kiro", …)`).
+- **Quota** (`lib/kiro-subscription-quota.ts`): Official AWS CodeWhisperer only:
+  - `POST https://q.<validated-commercial-region>.amazonaws.com/`
+  - `X-Amz-Target: AmazonCodeWhispererService.GetUsageLimits`
+  - Primary body `{ origin: "AI_EDITOR", resourceType: "CREDIT", isEmailRequired: false, profileArn? }`; at most one `ValidationException` minimal fallback body.
+  - Strict allowlist parser for `usageBreakdownList` / `usageBreakdown` (precision-first used/limit, remaining, utilization, reset, subscription title, primary CREDIT bucket).
+  - 60s fresh / 24h stale normalized cache (`.quota-cache.json`), per-account single-flight, 10s timeout, one 401 force-refresh retry.
+  - Wire type `KiroQuotaResultV1` only; never returns userInfo/email/overage raw/profileArn/tokens/upstream body/URL/path. Unknown/missing buckets stay unavailable (never fake 0%).
+  - `GET /api/auth/quota/kiro` (+ optional `accountId`, `refresh=1`); `POST` → 405; `Cache-Control: no-store`.
+- **Auto-failover Path B** (`lib/kiro-account-failover.ts`, outer patch in `lib/rpc-manager.ts`): Default off (`kiro.autoFailover`). Chain order: **Kiro → Grok → OpenCode Go → ChatGPT → Pi native**. Only explicit AWS quota reasons / explicit rate-limit semantics trigger; hard-negatives include `INSUFFICIENT_MODEL_CAPACITY`, bare 429/403, network/timeout/5xx, auth/reauth, context/content/model. Candidates require credential + **fresh/live** primary remaining > 0 (stale/unknown/reauth **fail-closed**). Process lock, Active double-check, TOCTOU, cooldown, max 1 switch + 1 retry per turn. SSE `kiro_account_failover` projects only status/reason/retry/safe message (no account ids).
+- **Top-bar & compact mode**: `components/KiroUsagePanel.tsx` gated by `kiro.usagePanelEnabled` (default off). Global `usage.providerPanelsCompact` (default false) compresses GPT/Grok/Kiro triggers together via pure `components/ProviderUsageTrigger.tsx` (provider + ≤2 summaries; click still opens detailed popover). AppShell single host order **GPT → Grok → Kiro** with one right-padding reserve. Settings: compact under Usage; Kiro panel/failover under Kiro section (peer of ChatGPT/Grok).
+- **Models UI**: Capability-driven OAuth branch in `ModelsConfig` for Builder ID / Google / GitHub, multi-account Active semantics, and `KiroQuotaView` buckets (no Reset credits / JSON import).
+
+#### Account data layout
+
+```text
+~/.pi/agent/auth-accounts/kiro/
+  accounts.json               # 0600 — metadata only (no secrets)
+  <opaque-storage-id>.json    # 0600 — full OAuth credential (Builder ID / social shape preserved server-side)
+  .quota-cache.json           # 0600 — normalized GetUsageLimits cache only
+  deleted/                    # soft-deleted credentials
+```
+
+#### Key invariants
+
+- Never statically import `pi-kiro-provider` TypeScript source into Next app modules; only jiti default factory + `serverExternalPackages`.
+- Never accept arbitrary quota URLs from credentials; region is commercial-AWS-format only, host is always `q.<region>.amazonaws.com`.
+- Do not use streaming `meteringEvent` as subscription quota.
+- Non-active token refresh never overwrites Active `auth.json` mirror.
+- Failover candidates with unknown/stale quota are rejected (fail-closed).
+- Compact mode is global; per-provider `usagePanelEnabled` still controls mount/polling independently.
+
+#### Rollback
+
+1. Ops stop-bleed: set `kiro.usagePanelEnabled=false`, `kiro.autoFailover.enabled=false`, optional `usage.providerPanelsCompact=false` in `pi-web.json` (no restart required for next turn / next panel mount).
+2. Provider-layer: remove Kiro from `webProviderExtensions()` and hide Kiro Models/Auth/Settings/topbar branches; Grok and native providers keep working.
+3. Preserve `auth-accounts/kiro/` and normalized quota cache; do not bulk-delete user credentials.
+4. No Session JSONL / usage-ledger migration exists for Kiro, so no data rewrite rollback.
 
 ## Skills and Commands
 

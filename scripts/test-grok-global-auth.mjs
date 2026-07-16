@@ -43,8 +43,9 @@ const models = read("components/ModelsConfig.tsx");
 
 console.log("\n=== pin retired from main inference ===");
 
-test("webExtensionFactories only includes grokCliExtension", () => {
-  assertIncludes(extensions, "return [grokCliExtension, ...extra]", "factories without session pin");
+test("webExtensionFactories only includes fixed providers without session pin", () => {
+  assertIncludes(extensions, "return [...webProviderExtensions(), ...extra]", "factories without session pin");
+  assertIncludes(extensions, "return [grokCliExtension, kiroProviderExtension]", "fixed list is Grok then Kiro");
   assertNotIncludes(extensions, "return [grokCliExtension, grokSessionAccountExtension, ...extra]", "old pin wiring gone");
 });
 

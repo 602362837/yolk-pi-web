@@ -1,5 +1,5 @@
 import { AuthStorage } from "@earendil-works/pi-coding-agent";
-import { createGrokAwareModelRegistry } from "@/lib/pi-provider-extensions";
+import { createWebProviderAwareModelRegistry } from "@/lib/pi-provider-extensions";
 import {
   isManagedApiKeyProvider,
   getApiKeyProviderSummary,
@@ -23,7 +23,7 @@ interface ProviderListItem {
 
 export async function GET() {
   const authStorage = AuthStorage.create();
-  const registry = await createGrokAwareModelRegistry(authStorage);
+  const registry = await createWebProviderAwareModelRegistry(authStorage);
   const all = registry.getAll();
 
   // Deduplicate by provider, skip OAuth-only providers and custom providers (source=models_json_key)

@@ -25,6 +25,8 @@ const jiti = createJiti(import.meta.url, {
 const tests = [
   "lib/oauth-account-storage.test.ts",
   "lib/oauth-account-grok.test.ts",
+  "lib/oauth-account-kiro.test.ts",
+  "lib/kiro-account-token.test.ts",
 ];
 
 let failures = 0;
