@@ -22,6 +22,7 @@ import {
 import { attemptChatGptAccountFailover, getActiveOpenAICodexAccountId, type ChatGptAccountFailoverTurnBudget } from "./chatgpt-account-failover";
 import { attemptOpencodeGoAccountFailover, getActiveOpencodeGoAccountId, type OpencodeGoFailoverTurnBudget } from "./opencode-go-account-failover";
 import { attemptGrokAccountFailover, getActiveGrokFailoverAccountId, type GrokAccountFailoverTurnBudget } from "./grok-account-failover";
+import { attemptKiroAccountFailover, getActiveKiroFailoverAccountId, type KiroAccountFailoverTurnBudget } from "./kiro-account-failover";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 import {
   isBudgetExpired,
@@ -238,6 +239,7 @@ export class AgentSessionWrapper {
     this.patchChatGptAccountFailover();
     this.patchOpencodeGoAccountFailover();
     this.patchGrokAccountFailover();
+    this.patchKiroAccountFailover();
   }
 
   get sessionId(): string {
@@ -435,8 +437,8 @@ export class AgentSessionWrapper {
   }
 
   /**
-   * Path B: Grok-only outer patch. Chain order:
-   *   grok → opencode-go → chatgpt → original pi SDK
+   * Path B: Grok-only patch. Chain order after Kiro is applied:
+   *   kiro → grok → opencode-go → chatgpt → original pi SDK
    * Non-grok providers pass through without mutating ChatGPT/OpenCode results.
    */
   private patchGrokAccountFailover(): void {
@@ -522,6 +524,115 @@ export class AgentSessionWrapper {
           ) {
             innerAny.agent.state.messages = messages.slice(0, -1);
           }
+          return true;
+        }
+      }
+
+      if (
+        assistantMessage?.stopReason
+        && assistantMessage.stopReason !== "error"
+      ) {
+        budget.attempts = 0;
+        budget.switches = 0;
+      }
+
+      return false;
+    };
+  }
+
+  /**
+   * Path B: Kiro-only outermost patch. Chain order:
+   *   kiro → grok → opencode-go → chatgpt → original pi SDK
+   * Non-kiro providers pass through without mutating other failover results.
+   */
+  private patchKiroAccountFailover(): void {
+    const inner = this.inner as AgentSessionLike & {
+      _handlePostAgentRun?: () => Promise<boolean>;
+      _runAgentPrompt?: (...args: unknown[]) => Promise<void>;
+      _lastAssistantMessage?: unknown;
+      _piWebKiroFailoverPatched?: boolean;
+    };
+    const innerAny = inner as unknown as {
+      agent?: { state?: { messages?: unknown[] } };
+      model?: { provider?: string; id?: string };
+    };
+    if (inner._piWebKiroFailoverPatched || typeof inner._handlePostAgentRun !== "function") return;
+    inner._piWebKiroFailoverPatched = true;
+
+    const originalPostRun = inner._handlePostAgentRun.bind(inner);
+    const originalRunAgentPrompt =
+      typeof inner._runAgentPrompt === "function"
+        ? inner._runAgentPrompt.bind(inner)
+        : null;
+
+    const budget: KiroAccountFailoverTurnBudget = { attempts: 0, switches: 0 };
+    let runTriggerAccountId: string | null = null;
+
+    if (originalRunAgentPrompt) {
+      inner._runAgentPrompt = async (...args: unknown[]) => {
+        // Bind budget lifecycle to the outer user turn. Terminal non-retry
+        // outcomes must not leave residual attempts that block the next turn.
+        budget.attempts = 0;
+        budget.switches = 0;
+        runTriggerAccountId =
+          innerAny.model?.provider === "kiro"
+            ? await getActiveKiroFailoverAccountId().catch(() => null)
+            : null;
+        try {
+          await originalRunAgentPrompt(...args);
+        } finally {
+          runTriggerAccountId = null;
+        }
+      };
+    }
+
+    inner._handlePostAgentRun = async () => {
+      const assistantMessage = inner._lastAssistantMessage as
+        | { role?: string; stopReason?: string }
+        | undefined;
+
+      const shouldContinue = await originalPostRun();
+      if (shouldContinue) return true;
+
+      if (
+        assistantMessage?.role === "assistant"
+        && assistantMessage.stopReason === "error"
+      ) {
+        const result = await attemptKiroAccountFailover({
+          provider: innerAny.model?.provider,
+          message: assistantMessage,
+          budget,
+          reloadAuthState: reloadRpcAuthState,
+          triggerAccountId: runTriggerAccountId,
+        });
+
+        if (
+          result.status !== "not_kiro"
+          && result.status !== "not_eligible"
+          && result.status !== "disabled"
+        ) {
+          this.emitEvent({
+            type: "kiro_account_failover",
+            sessionId: this.sessionId,
+            status: result.status,
+            reason: result.reason,
+            provider: result.provider,
+            retry: result.retry,
+            message: result.message,
+            // Never project account ids / tokens / paths to the client.
+          });
+        }
+
+        if (result.retry) {
+          const messages = innerAny.agent?.state?.messages;
+          if (
+            Array.isArray(messages)
+            && messages[messages.length - 1] === assistantMessage
+            && innerAny.agent?.state
+          ) {
+            innerAny.agent.state.messages = messages.slice(0, -1);
+          }
+          // Keep budget for the same-turn retry; do not reset here.
           return true;
         }
       }

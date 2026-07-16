@@ -127,7 +127,9 @@ await test("ChatGptUsagePanel source contract: shell, cache sources, safety, API
   // Prop + AppShell wiring
   assert.match(panel, /onOpenModels\?: \(\) => void/);
   assert.match(panel, /onOpenModels\?\.\(\)/);
-  assert.match(appShell, /ChatGptUsagePanelHost onOpenModels=\{\(\) => setModelsConfigOpen\(true\)\}/);
+  assert.match(appShell, /ChatGptUsagePanelHost[\s\S]*?onOpenModels=\{\(\) => setModelsConfigOpen\(true\)\}/);
+  assert.match(appShell, /displayMode=\{providerUsageDisplayMode\}/);
+  assert.match(appShell, /showKiroUsage &&/);
   assert.match(appShell, /showChatGptUsage &&/);
   assert.match(appShell, /showGrokUsage &&/);
   assert.match(appShell, /app-top-usage-panel/);
@@ -162,9 +164,11 @@ await test("ChatGptUsagePanel source contract: shell, cache sources, safety, API
   assert.match(panel, /min\(392px, calc\(100vw - 16px\)\)/);
   assert.match(panel, /role="dialog"/);
   assert.match(panel, /aria-live="polite"/);
-  assert.match(panel, /aria-expanded=\{open\}/);
+  // aria-expanded is owned by ProviderUsageTrigger from open prop; panel still wires aria-controls.
+  assert.match(panel, /open=\{open\}/);
   assert.match(panel, /aria-controls=\{panelDomId\}/);
   assert.match(panel, /role="progressbar"/);
+  assert.match(read("components/ProviderUsageTrigger.tsx"), /aria-expanded=\{open\}/);
   assert.match(panel, /Escape/);
   assert.match(panel, /triggerRef\.current\?\.focus\(\)/);
 

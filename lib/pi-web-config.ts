@@ -126,6 +126,12 @@ export interface PiWebStudioConfig {
 export interface PiWebUsageConfig {
   /** Whether Chat top-bar session_rollup may include archived sessions. Does not control the global ledger. */
   includeArchived: boolean;
+  /**
+   * Global compact mode for GPT/Grok/Kiro top-bar usage triggers.
+   * Only compresses the trigger summary; detailed popovers stay available.
+   * Default false preserves the existing full trigger layout.
+   */
+  providerPanelsCompact: boolean;
   /** Models explicitly marked as free by the user. Stored as provider:model pairs. */
   explicitFreeModels: Array<{ provider: string; model: string }>;
   /** AI assistant policy for model price suggestion (structured extraction from bounded evidence). */
@@ -174,6 +180,21 @@ export interface PiWebGrokConfig {
   /** Top-right Grok usage pill; default off so upgrades do not mount or poll. */
   usagePanelEnabled: boolean;
   autoFailover: PiWebGrokAutoFailoverConfig;
+}
+
+export interface PiWebKiroAutoFailoverConfig {
+  enabled: boolean;
+  maxAttemptsPerTurn: number;
+  maxAccountSwitchesPerTurn: number;
+  quotaCacheMaxAgeMs: number;
+  exhaustedCooldownMs: number;
+  minSwitchIntervalMs: number;
+}
+
+export interface PiWebKiroConfig {
+  /** Top-right Kiro usage pill; default off so upgrades do not mount or poll. */
+  usagePanelEnabled: boolean;
+  autoFailover: PiWebKiroAutoFailoverConfig;
 }
 
 export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "cmd" | "powershell" | "pwsh" | "custom";
@@ -227,6 +248,7 @@ export interface PiWebConfig {
   chatgpt: PiWebChatGptConfig;
   opencodeGo: PiWebOpencodeGoConfig;
   grok: PiWebGrokConfig;
+  kiro: PiWebKiroConfig;
   editor: PiWebEditorConfig;
 }
 
@@ -240,6 +262,7 @@ export interface PiWebConfigPatch {
   chatgpt?: unknown;
   opencodeGo?: unknown;
   grok?: unknown;
+  kiro?: unknown;
   editor?: unknown;
 }
 
@@ -280,6 +303,7 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
   },
   usage: {
     includeArchived: true,
+    providerPanelsCompact: false,
     explicitFreeModels: [],
     pricingAssistant: {
       model: { mode: "followMain" },
@@ -344,6 +368,17 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     },
   },
   grok: {
+    usagePanelEnabled: false,
+    autoFailover: {
+      enabled: false,
+      maxAttemptsPerTurn: 1,
+      maxAccountSwitchesPerTurn: 1,
+      quotaCacheMaxAgeMs: 5 * 60 * 1000,
+      exhaustedCooldownMs: 30 * 60 * 1000,
+      minSwitchIntervalMs: 10 * 1000,
+    },
+  },
+  kiro: {
     usagePanelEnabled: false,
     autoFailover: {
       enabled: false,
@@ -815,6 +850,18 @@ function readGrokAutoFailoverConfig(value: unknown, fallback: PiWebGrokAutoFailo
   };
 }
 
+function readKiroAutoFailoverConfig(value: unknown, fallback: PiWebKiroAutoFailoverConfig): PiWebKiroAutoFailoverConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    maxAttemptsPerTurn: readInteger(root.maxAttemptsPerTurn, fallback.maxAttemptsPerTurn),
+    maxAccountSwitchesPerTurn: readInteger(root.maxAccountSwitchesPerTurn, fallback.maxAccountSwitchesPerTurn),
+    quotaCacheMaxAgeMs: readInteger(root.quotaCacheMaxAgeMs, fallback.quotaCacheMaxAgeMs),
+    exhaustedCooldownMs: readInteger(root.exhaustedCooldownMs, fallback.exhaustedCooldownMs),
+    minSwitchIntervalMs: readInteger(root.minSwitchIntervalMs, fallback.minSwitchIntervalMs),
+  };
+}
+
 function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const defaults = DEFAULT_PI_WEB_CONFIG;
   const root = isRecord(raw) ? raw : {};
@@ -827,6 +874,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const chatgpt = isRecord(root.chatgpt) ? root.chatgpt : {};
   const opencodeGo = isRecord(root.opencodeGo) ? root.opencodeGo : {};
   const grok = isRecord(root.grok) ? root.grok : {};
+  const kiro = isRecord(root.kiro) ? root.kiro : {};
   const editor = isRecord(root.editor) ? root.editor : {};
   const editorShortcuts = isRecord(editor.shortcuts) ? editor.shortcuts : {};
   const terminalEnv: Record<string, string> = {};
@@ -847,6 +895,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     usage: {
       // Retired usage.statsSource is ignored on read; ledger is always the global Usage source.
       includeArchived: readBoolean(usage.includeArchived, defaults.usage.includeArchived),
+      providerPanelsCompact: readBoolean(usage.providerPanelsCompact, defaults.usage.providerPanelsCompact),
       explicitFreeModels: readExplicitFreeModels(usage.explicitFreeModels),
       pricingAssistant: readSubagentPolicy(usage.pricingAssistant, defaults.usage.pricingAssistant),
       pricingAssistantFallback: readSubagentPolicy(usage.pricingAssistantFallback, defaults.usage.pricingAssistantFallback),
@@ -878,6 +927,10 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     grok: {
       usagePanelEnabled: readBoolean(grok.usagePanelEnabled, defaults.grok.usagePanelEnabled),
       autoFailover: readGrokAutoFailoverConfig(grok.autoFailover, defaults.grok.autoFailover),
+    },
+    kiro: {
+      usagePanelEnabled: readBoolean(kiro.usagePanelEnabled, defaults.kiro.usagePanelEnabled),
+      autoFailover: readKiroAutoFailoverConfig(kiro.autoFailover, defaults.kiro.autoFailover),
     },
     editor: {
       kind: editor.kind === "monaco" ? "monaco" : defaults.editor.kind,
@@ -1219,6 +1272,9 @@ export function validatePiWebUsageConfig(value: unknown): PiWebUsageConfig {
   return {
     // Retired usage.statsSource is not projected; next save strips it from disk.
     includeArchived: requireBoolean(value.includeArchived, "usage.includeArchived"),
+    providerPanelsCompact: value.providerPanelsCompact === undefined
+      ? DEFAULT_PI_WEB_CONFIG.usage.providerPanelsCompact
+      : requireBoolean(value.providerPanelsCompact, "usage.providerPanelsCompact"),
     explicitFreeModels: readExplicitFreeModels(value.explicitFreeModels),
     pricingAssistant: value.pricingAssistant === undefined
       ? DEFAULT_PI_WEB_CONFIG.usage.pricingAssistant
@@ -1489,6 +1545,29 @@ export function validatePiWebGrokConfig(value: unknown): PiWebGrokConfig {
   };
 }
 
+function validateKiroAutoFailoverConfig(value: unknown): PiWebKiroAutoFailoverConfig {
+  if (value === undefined) return DEFAULT_PI_WEB_CONFIG.kiro.autoFailover;
+  if (!isRecord(value)) throw new PiWebConfigValidationError("kiro.autoFailover must be an object");
+  return {
+    enabled: requireBoolean(value.enabled, "kiro.autoFailover.enabled"),
+    maxAttemptsPerTurn: requireIntegerInRange(value.maxAttemptsPerTurn, "kiro.autoFailover.maxAttemptsPerTurn", 0, 3),
+    maxAccountSwitchesPerTurn: requireIntegerInRange(value.maxAccountSwitchesPerTurn, "kiro.autoFailover.maxAccountSwitchesPerTurn", 0, 3),
+    quotaCacheMaxAgeMs: requireIntegerInRange(value.quotaCacheMaxAgeMs, "kiro.autoFailover.quotaCacheMaxAgeMs", 0, 24 * 60 * 60 * 1000),
+    exhaustedCooldownMs: requireIntegerInRange(value.exhaustedCooldownMs, "kiro.autoFailover.exhaustedCooldownMs", 0, 24 * 60 * 60 * 1000),
+    minSwitchIntervalMs: requireIntegerInRange(value.minSwitchIntervalMs, "kiro.autoFailover.minSwitchIntervalMs", 0, 60 * 60 * 1000),
+  };
+}
+
+export function validatePiWebKiroConfig(value: unknown): PiWebKiroConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("kiro config must be an object");
+  }
+  return {
+    usagePanelEnabled: requireBoolean(value.usagePanelEnabled, "kiro.usagePanelEnabled"),
+    autoFailover: validateKiroAutoFailoverConfig(value.autoFailover),
+  };
+}
+
 export function validatePiWebEditorConfig(value: unknown): PiWebEditorConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("editor config must be an object");
@@ -1549,8 +1628,9 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasChatGpt = Object.prototype.hasOwnProperty.call(patch, "chatgpt");
   const hasOpencodeGo = Object.prototype.hasOwnProperty.call(patch, "opencodeGo");
   const hasGrok = Object.prototype.hasOwnProperty.call(patch, "grok");
+  const hasKiro = Object.prototype.hasOwnProperty.call(patch, "kiro");
   const hasEditor = Object.prototype.hasOwnProperty.call(patch, "editor");
-  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasGrok && !hasEditor) {
+  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasGrok && !hasKiro && !hasEditor) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
@@ -1563,7 +1643,10 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const normalizedWorktree = hasWorktree ? validatePiWebWorktreeConfig(patch.worktree) : undefined;
   const normalizedTrellis = hasTrellis ? validatePiWebTrellisConfig(patch.trellis) : undefined;
   const normalizedStudio = hasStudio ? validatePiWebStudioConfig(patch.studio) : undefined;
-  const normalizedUsage = hasUsage ? validatePiWebUsageConfig(patch.usage) : undefined;
+  const normalizedUsage = hasUsage ? validatePiWebUsageConfig(isRecord(patch.usage) ? {
+    ...currentConfig.usage,
+    ...patch.usage,
+  } : patch.usage) : undefined;
   const normalizedTerminal = hasTerminal ? validatePiWebTerminalConfig(patch.terminal) : undefined;
   const normalizedChatGpt = hasChatGpt ? validatePiWebChatGptConfig(isRecord(chatGptPatch) ? {
     ...currentConfig.chatgpt,
@@ -1589,6 +1672,13 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
       ? (patch.grok as Record<string, unknown>).autoFailover
       : currentConfig.grok.autoFailover,
   } : patch.grok) : undefined;
+  const normalizedKiro = hasKiro ? validatePiWebKiroConfig(isRecord(patch.kiro) ? {
+    ...currentConfig.kiro,
+    ...patch.kiro,
+    autoFailover: Object.prototype.hasOwnProperty.call(patch.kiro, "autoFailover")
+      ? (patch.kiro as Record<string, unknown>).autoFailover
+      : currentConfig.kiro.autoFailover,
+  } : patch.kiro) : undefined;
   const normalizedEditor = hasEditor ? validatePiWebEditorConfig(patch.editor) : undefined;
   const nextRaw: Record<string, unknown> = { ...raw };
 
@@ -1667,6 +1757,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.grok = {
       ...previousGrok,
       ...normalizedGrok,
+    };
+  }
+
+  if (normalizedKiro) {
+    const previousKiro = isRecord(raw.kiro) ? raw.kiro : {};
+    nextRaw.kiro = {
+      ...previousKiro,
+      ...normalizedKiro,
     };
   }
 

@@ -119,6 +119,46 @@ Bare HTTP status alone, fuzzy help text that merely mentions limit/rate, network
 
 If `GROK_CLI_OAUTH_TOKEN` (or related fixed env tokens) override managed OAuth for actual requests, auto-failover refuses to report a fake switch and surfaces a display-safe notice without leaking the token.
 
+## Kiro Provider, Quota, Auto Failover & Compact Top-bar
+
+Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independent OAuth multi-account, AWS GetUsageLimits quota, and Path B auto-failover. It does **not** share Grok/ChatGPT classifier or quota modules.
+
+### Kiro missing from Models / Auth after cold start
+
+1. Confirm `pi-kiro-provider` is installed and listed in `next.config.ts` `serverExternalPackages` with `jiti`.
+2. Confirm the process loaded `webProviderExtensions()` / `ensureWebProvidersBootstrapped()` — opening Chat is **not** required; cold `/api/models` and `/api/auth/providers` should list `kiro`.
+3. If only Grok appears, check server logs for a per-provider jiti load failure; a Kiro load error must not take down Grok, but Kiro will be absent until the package/load issue is fixed.
+4. After any code path that calls bare `ModelRegistry.create/refresh`, migrate it to `createWebProviderAwareModelRegistry()` so refresh cannot drop fixed providers.
+
+### Quota shows “额度暂不可用” / unavailable
+
+- Endpoint is only `https://q.<validated-commercial-region>.amazonaws.com/` + `AmazonCodeWhispererService.GetUsageLimits`. Arbitrary credential URLs are rejected.
+- Unsupported region, `ValidationException` after the single fallback body, empty/malformed buckets, or schema drift all project **unavailable** (never fake 0%). Chat and account management still work.
+- Stale cache may still render last-success numbers with a stale warning; **auto-failover candidates require fresh/live remaining > 0** (fail-closed on stale/unknown/reauth).
+- 401: server force-refreshes the account token once and retries GetUsageLimits once. Persistent reauth surfaces “需登录” and blocks failover candidates.
+- Manual force refresh: Models/top-bar refresh with `?refresh=1`.
+
+### Auto-failover does not switch
+
+1. Settings → Kiro → enable **明确限额或限流时自动切换可用账号** (`kiro.autoFailover.enabled`).
+2. Error must be an explicit AWS quota reason / explicit rate-limit shape. Hard-negatives that **never** switch: `INSUFFICIENT_MODEL_CAPACITY`, bare 429/403, network/timeout/5xx, auth/reauth, context/content/model errors.
+3. Need another account with readable credential and fresh/live primary remaining > 0.
+4. Per-turn budget is 1 switch + 1 retry; concurrent sessions share `globalThis.__piKiroFailover` so only one real Activate occurs.
+
+### Rollback / stop-bleed
+
+1. Settings → Kiro: turn off usage panel and auto-failover; Settings → Usage: turn off **顶部额度组件简要显示** if needed (`usage.providerPanelsCompact=false`).
+2. Provider-layer: remove Kiro from `webProviderExtensions()` and hide Kiro UI/API branches; Grok continues.
+3. Keep `~/.pi/agent/auth-accounts/kiro/` credentials and `.quota-cache.json`; do not bulk-delete.
+4. Failover state is independent of GPT/Grok/OpenCode (`__piKiroFailover` vs `__piGrokFailover` / `__piChatGptFailover` / `__piOpencodeGoFailover`).
+
+### Compact top-bar looks wrong
+
+- Compact is **global**: one `usage.providerPanelsCompact` switch affects all enabled provider triggers together.
+- Provider visibility remains independent (`chatgpt|grok|kiro.usagePanelEnabled`).
+- Host order is always GPT → Grok → Kiro inside a single `.app-top-usage-panel` with one right-padding reserve.
+- Compact trigger click still opens the same detailed popover (refresh / Activate / Models recovery preserved).
+
 
 ## YPI Studio DAG and Async Runs
 

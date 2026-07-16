@@ -13,6 +13,7 @@ import type {
   PiWebConfig,
   PiWebEditorConfig,
   PiWebGrokConfig,
+  PiWebKiroConfig,
   PiWebOpencodeGoConfig,
   PiWebSubagentAgentConfig,
   PiWebSubagentDifficultyTier,
@@ -89,7 +90,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "grok" | "editor" | "trellis" | "diagnostics";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "grok" | "kiro" | "editor" | "trellis" | "diagnostics";
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -733,7 +734,8 @@ function studioConfigsEqual(a: PiWebStudioConfig | null, b: PiWebStudioConfig | 
 
 function usageConfigsEqual(a: PiWebUsageConfig | null, b: PiWebUsageConfig | null): boolean {
   if (!a || !b) return a === b;
-  return a.includeArchived === b.includeArchived;
+  return a.includeArchived === b.includeArchived
+    && a.providerPanelsCompact === b.providerPanelsCompact;
 }
 
 function terminalConfigsEqual(a: PiWebTerminalConfig | null, b: PiWebTerminalConfig | null): boolean {
@@ -752,6 +754,11 @@ function opencodeGoConfigsEqual(a: PiWebOpencodeGoConfig | null, b: PiWebOpencod
 }
 
 function grokConfigsEqual(a: PiWebGrokConfig | null, b: PiWebGrokConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function kiroConfigsEqual(a: PiWebKiroConfig | null, b: PiWebKiroConfig | null): boolean {
   if (!a || !b) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -807,6 +814,8 @@ export function SettingsConfig({
   const [savedOpencodeGo, setSavedOpencodeGo] = useState<PiWebOpencodeGoConfig | null>(null);
   const [grok, setGrok] = useState<PiWebGrokConfig | null>(null);
   const [savedGrok, setSavedGrok] = useState<PiWebGrokConfig | null>(null);
+  const [kiro, setKiro] = useState<PiWebKiroConfig | null>(null);
+  const [savedKiro, setSavedKiro] = useState<PiWebKiroConfig | null>(null);
   const [editor, setEditor] = useState<PiWebEditorConfig | null>(null);
   const [savedEditor, setSavedEditor] = useState<PiWebEditorConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -825,8 +834,8 @@ export function SettingsConfig({
 
 
   const dirty = useMemo(
-    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !grokConfigsEqual(grok, savedGrok) || !editorConfigsEqual(editor, savedEditor),
-    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, grok, savedGrok, editor, savedEditor],
+    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !grokConfigsEqual(grok, savedGrok) || !kiroConfigsEqual(kiro, savedKiro) || !editorConfigsEqual(editor, savedEditor),
+    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, grok, savedGrok, kiro, savedKiro, editor, savedEditor],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -856,6 +865,8 @@ export function SettingsConfig({
       setSavedOpencodeGo(data.config.opencodeGo);
       setGrok(data.config.grok);
       setSavedGrok(data.config.grok);
+      setKiro(data.config.kiro);
+      setSavedKiro(data.config.kiro);
       setEditor(data.config.editor);
       setSavedEditor(data.config.editor);
       setConfigPath(data.path);
@@ -1118,6 +1129,11 @@ export function SettingsConfig({
     setNotice(null);
   }, []);
 
+  const updateKiro = useCallback((patch: Partial<PiWebKiroConfig>) => {
+    setKiro((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
   const updateEditor = useCallback((patch: Partial<PiWebEditorConfig>) => {
     setEditor((prev) => prev ? { ...prev, ...patch } : prev);
     setNotice(null);
@@ -1305,6 +1321,8 @@ export function SettingsConfig({
     setSavedOpencodeGo(config.opencodeGo);
     setGrok(config.grok);
     setSavedGrok(config.grok);
+    setKiro(config.kiro);
+    setSavedKiro(config.kiro);
     setEditor(config.editor);
     setSavedEditor(config.editor);
     setConfigPath(path);
@@ -1313,7 +1331,7 @@ export function SettingsConfig({
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor) return false;
+    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -1321,7 +1339,7 @@ export function SettingsConfig({
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, editor }),
+        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, kiro, editor }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -1334,10 +1352,10 @@ export function SettingsConfig({
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, editor]);
+  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, kiro, editor]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Grok/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Grok/Kiro/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -1351,6 +1369,7 @@ export function SettingsConfig({
     setChatgpt(defaults.chatgpt);
     setOpencodeGo(defaults.opencodeGo);
     setGrok(defaults.grok);
+    setKiro(defaults.kiro);
     setEditor(defaults.editor);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
@@ -1488,6 +1507,7 @@ export function SettingsConfig({
             {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量与自动切换")}
             {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
             {renderSectionButton("grok", "Grok", "Grok 全局 Active 与自动切号")}
+            {renderSectionButton("kiro", "Kiro", "Kiro 全局 Active 与自动切号")}
             {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
             {renderSectionButton("diagnostics", "诊断", "内存诊断快照")}
@@ -1496,7 +1516,7 @@ export function SettingsConfig({
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && grok && editor ? (
+            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && grok && kiro && editor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -1713,6 +1733,18 @@ export function SettingsConfig({
                       description="开启后聊天顶栏 Session rollup 会同时读取 sessions 与 sessions-archive；关闭后只统计当前存活的 sessions。已删除的 session 文件不会参与统计。不影响独立调用账本。"
                       checked={usage.includeArchived}
                       onChange={(includeArchived) => updateUsage({ includeArchived })}
+                    />
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>顶部额度组件</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制聊天顶栏用量悬浮小组件的全局展示形态。各提供商是否显示仍由 ChatGPT / Grok / Kiro 分节独立控制。
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="顶部额度组件简要显示 (Compact Mode)"
+                      description="开启后，GPT、Grok、Kiro 顶栏的 Trigger 将被折叠为更紧凑的标识以及摘要，从而给顶栏留出更多空间。点击简要 Pill 仍能展开完整的详细用量面板。"
+                      checked={usage.providerPanelsCompact}
+                      onChange={(providerPanelsCompact) => updateUsage({ providerPanelsCompact })}
                     />
                   </div>
                 ) : section === "modelPrices" ? (
@@ -1997,6 +2029,32 @@ export function SettingsConfig({
                     />
                     <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
                       候选账号需要有效凭证，且 monthly remaining &gt; 0；若存在 weekly 则 usedPercent &lt; 100，且额度缓存/查询结果在允许新鲜度内、无需 reauth。固定环境 token 覆盖托管 OAuth 时不会伪称切换成功。
+                    </div>
+                  </div>
+                ) : section === "kiro" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Kiro</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制 Kiro 全局 Active 账号的自动轮换与顶栏用量组件。Models 的 Activate 只设置当前全局 Active，不属于锁定；账号管理仍在 Models 中完成。
+                        保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="Kiro 用量悬浮面板"
+                      description="默认关闭。开启后，将在顶栏显示当前 Kiro Active 账号的用量指示；展开后可查看订阅额度 bucket、缓存状态、手动刷新并切换账号。"
+                      checked={kiro.usagePanelEnabled}
+                      onChange={(usagePanelEnabled) => updateKiro({ usagePanelEnabled })}
+                    />
+                    <ToggleField
+                      label="明确限额或限流时自动切换可用账号"
+                      description="默认关闭。开启后仅对 kiro 生效：当当前运行账号遭遇 AWS 明确限额（如 MONTHLY_REQUEST_COUNT、OVERAGE_REQUEST_LIMIT_EXCEEDED、CONVERSATION_LIMIT_EXCEEDED、DAILY_REQUEST_COUNT）或明确 rate-limit 文案时，系统会在进程锁保护内自动切换到其余有效备用账号，并安全重试当前 turn 一次。未知/陈旧/失效账号触发 Fail-closed，不会被盲切。裸 429、网络错误、timeout、5xx、auth/reauth、context、content、model 错误以及 INSUFFICIENT_MODEL_CAPACITY 不会触发。切换影响所有普通 live/new Session 的后续请求；已发出的 in-flight 请求不换 token。每 turn 默认最多 1 次切号 / 1 次重试；并发时后进入者复用新 Active，不级联切第三账号。"
+                      checked={kiro.autoFailover.enabled}
+                      onChange={(enabled) => updateKiro({ autoFailover: { ...kiro.autoFailover, enabled } })}
+                    />
+                    <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
+                      候选账号需要有效凭证且无需 reauth，并具备 fresh/live 的 primary 额度 remaining &gt; 0。额度未知或仅 stale 时不会作为自动切号候选。全局顶部简要显示开关在 Usage 分节统一配置。
                     </div>
                   </div>
                 ) : section === "editor" ? (
@@ -2404,8 +2462,8 @@ export function SettingsConfig({
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>

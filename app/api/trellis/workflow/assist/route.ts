@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { completeSimple, type AssistantMessage } from "@earendil-works/pi-ai/compat";
 import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { grokCliExtension } from "@/lib/pi-provider-extensions";
+import { webExtensionFactories } from "@/lib/pi-provider-extensions";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { readPiWebConfig } from "@/lib/pi-web-config";
 import type { PiWebSubagentRunPolicy } from "@/lib/pi-web-config";
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const services = await createAgentSessionServices({ cwd: input.cwd, agentDir: getAgentDir(), resourceLoaderOptions: { extensionFactories: [grokCliExtension] } });
+    const services = await createAgentSessionServices({ cwd: input.cwd, agentDir: getAgentDir(), resourceLoaderOptions: { extensionFactories: webExtensionFactories() } });
     const config = readPiWebConfig();
     const defaultProvider = services.settingsManager.getDefaultProvider();
     const defaultModelId = services.settingsManager.getDefaultModel();

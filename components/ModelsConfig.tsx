@@ -7,6 +7,7 @@ import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdo
 import { ActionFlowIcon } from "./ActionFlowIcon";
 import { ChatGptWarmupDialog } from "./ChatGptWarmupDialog";
 import { GrokQuotaView } from "./GrokQuotaView";
+import { KiroQuotaView } from "./KiroQuotaView";
 import { iconFlowAttrs } from "./iconFlow";
 import { SelectDropdown } from "./SelectDropdown";
 import { usePrompt } from "./AppPromptProvider";
@@ -89,6 +90,7 @@ const PROVIDER_ICONS: Record<string, { Icon: IconComponent; hasColor: boolean }>
   "together":               { Icon: TogetherColorIcon,    hasColor: true },
   "grok":                   { Icon: GrokIcon,             hasColor: false },
   "grok-cli":               { Icon: GrokIcon,             hasColor: false },
+  "kiro":                   { Icon: AwsColorIcon,         hasColor: true },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -973,6 +975,7 @@ function OAuthAccountsView({
   quotaResetting,
   deletingAccountId,
   selectedAccountId,
+  hideCodexQuotaSummary = false,
   onRefresh,
   onSelect,
   onActivate,
@@ -992,6 +995,8 @@ function OAuthAccountsView({
   quotaResetting: boolean;
   deletingAccountId: string | null;
   selectedAccountId: string | null;
+  /** Hide Codex-only reset-credit / mini pie summary (Grok/Kiro). */
+  hideCodexQuotaSummary?: boolean;
   onRefresh: () => void;
   onSelect: (account: OAuthAccountSummary) => void;
   onActivate: (accountId: string) => void;
@@ -1053,12 +1058,14 @@ function OAuthAccountsView({
                   <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
                   <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
                   {account.extraInfo && <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, fontSize: 10, color: account.quotaCache?.error ? "#fb923c" : "var(--text-dim)" }}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                      Reset: {accountQuotaResetText(account)}{account.quotaCache?.queriedAt ? ` · ${formatQuotaQueriedAt(account.quotaCache.queriedAt)}` : ""}
-                    </span>
-                    <AccountQuotaMiniCharts account={account} />
-                  </div>
+                  {!hideCodexQuotaSummary && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, fontSize: 10, color: account.quotaCache?.error ? "#fb923c" : "var(--text-dim)" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                        Reset: {accountQuotaResetText(account)}{account.quotaCache?.queriedAt ? ` · ${formatQuotaQueriedAt(account.quotaCache.queriedAt)}` : ""}
+                      </span>
+                      <AccountQuotaMiniCharts account={account} />
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => onSelect(account)}
@@ -1430,13 +1437,15 @@ function AddAccountDialog({
 
 // ── Grok Delete Confirmation Dialog ──────────────────────────────────────────
 
-function GrokDeleteConfirmDialog({
+function ManagedOAuthDeleteConfirmDialog({
+  providerLabel,
   account,
   allAccounts,
   deleting,
   onConfirm,
   onClose,
 }: {
+  providerLabel: string;
   account: OAuthAccountSummary;
   allAccounts: OAuthAccountSummary[];
   deleting: boolean;
@@ -1485,7 +1494,7 @@ function GrokDeleteConfirmDialog({
         <div style={{ background: "var(--bg-panel)", padding: "10px 12px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}>
           <strong style={{ display: "block", marginBottom: 6, color: "var(--text)" }}>系统提示：</strong>
           <p style={{ margin: 0, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            删除后，Grok 请求会继续使用当前全局 Active 账号的凭证。
+            删除后，{providerLabel} 请求会继续使用当前全局 Active 账号的凭证。
             不会导致会话数据丢失。
           </p>
         </div>
@@ -1527,13 +1536,20 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const { confirm, prompt } = usePrompt();
   const isManagedAccounts = provider.authMode === "managed_accounts";
   const isGrok = provider.id === "grok-cli";
+  const isKiro = provider.id === "kiro";
   const isCodex = provider.id === "openai-codex";
+  // Capability-driven OAuth branches (avoid cloning a second Grok-only tree for Kiro).
+  const supportsGlobalActiveSemantics = isGrok || isKiro;
+  const supportsOAuthMethodPicker = isGrok || isKiro;
+  const supportsProtectedDelete = isGrok || isKiro;
+  const hideCodexQuotaSummary = isGrok || isKiro;
 
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
-  // Shared quota state — Codex uses SubscriptionQuota, Grok uses GrokQuotaResultV1
+  // Shared quota state — Codex uses SubscriptionQuota; Grok/Kiro use provider-specific V1 results
   const [quota, setQuota] = useState<SubscriptionQuota | null>(null);
   const [grokQuota, setGrokQuota] = useState<import("@/lib/grok-subscription-quota").GrokQuotaResultV1 | null>(null);
+  const [kiroQuota, setKiroQuota] = useState<import("@/lib/kiro-subscription-quota").KiroQuotaResultV1 | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
   const [quotaResetting, setQuotaResetting] = useState(false);
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
@@ -1548,11 +1564,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [addAccountDialogView, setAddAccountDialogView] = useState<"method" | "json" | null>(null);
   const [warmupDialogOpen, setWarmupDialogOpen] = useState(false);
-  // Grok login method selection
-  const [showGrokLoginMethods, setShowGrokLoginMethods] = useState(false);
-  // Grok delete dialog states
-  const [grokDeleteAccount, setGrokDeleteAccount] = useState<OAuthAccountSummary | null>(null);
-  const [grokDeleteDeleting, setGrokDeleteDeleting] = useState(false);
+  // Provider-capability login method selection (Grok local methods / Kiro Builder ID·Google·GitHub)
+  const [showLoginMethods, setShowLoginMethods] = useState(false);
+  // Preferred Kiro method id to auto-answer the provider's onSelect prompt
+  const preferredKiroMethodRef = useRef<"builder-id" | "google" | "github" | null>(null);
+  // Protected delete dialog states (Grok / Kiro Active protection)
+  const [protectedDeleteAccount, setProtectedDeleteAccount] = useState<OAuthAccountSummary | null>(null);
+  const [protectedDeleteDeleting, setProtectedDeleteDeleting] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1568,6 +1586,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setInputValue("");
     setQuota(null);
     setGrokQuota(null);
+    setKiroQuota(null);
     setQuotaLoading(false);
     setQuotaResetting(false);
     setAccounts([]);
@@ -1582,9 +1601,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setDeletingAccountId(null);
     setAddAccountDialogView(null);
     setWarmupDialogOpen(false);
-    setShowGrokLoginMethods(false);
-    setGrokDeleteAccount(null);
-    setGrokDeleteDeleting(false);
+    setShowLoginMethods(false);
+    preferredKiroMethodRef.current = null;
+    setProtectedDeleteAccount(null);
+    setProtectedDeleteDeleting(false);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
   }, [provider.id]);
@@ -1673,6 +1693,26 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isGrok]);
 
+  // Kiro quota loader — GetUsageLimits wire projection only (no secrets/raw body)
+  const loadKiroQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
+    if (!isKiro || (!provider.loggedIn && !force && accounts.length === 0)) return;
+    const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
+    setQuotaLoading(true);
+    try {
+      const refreshParam = force ? "&refresh=1" : "";
+      const accountQuery = quotaAccountId ? `?accountId=${encodeURIComponent(quotaAccountId)}${refreshParam}` : refreshParam ? `?refresh=1` : "";
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`);
+      const data = await res.json() as import("@/lib/kiro-subscription-quota").KiroQuotaResultV1;
+      setKiroQuota(data);
+      void loadAccounts();
+    } catch (error) {
+      setKiroQuota(null);
+      setAccountsError(error instanceof Error ? error.message : "Failed to load Kiro quota");
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isKiro, accounts.length]);
+
   useEffect(() => {
     if (provider.id === "openai-codex" && provider.loggedIn) {
       void loadQuota();
@@ -1684,6 +1724,12 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       void loadGrokQuota();
     }
   }, [provider.id, provider.loggedIn, isGrok, loadGrokQuota]);
+
+  useEffect(() => {
+    if (isKiro && (provider.loggedIn || accounts.length > 0)) {
+      void loadKiroQuota();
+    }
+  }, [provider.id, provider.loggedIn, isKiro, loadKiroQuota, accounts.length]);
 
   const handleLogin = useCallback((accountMode: "login" | "add" = "login") => {
     eventSourceRef.current?.close();
@@ -1717,7 +1763,27 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       } else if (data.type === "prompt_request") {
         setLoginState({ phase: "prompt", message: data.message!, placeholder: data.placeholder ?? null, token: data.token! });
       } else if (data.type === "select_request") {
-        setLoginState({ phase: "select", message: data.message!, options: data.options ?? [], token: data.token! });
+        const preferred = preferredKiroMethodRef.current;
+        const options = data.options ?? [];
+        if (preferred && options.some((option) => option.id === preferred)) {
+          preferredKiroMethodRef.current = null;
+          setLoginState({ phase: "progress", message: "Continuing…" });
+          void fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: data.token!, code: preferred }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const d = await res.json().catch(() => ({})) as { error?: string };
+              setLoginState({ phase: "error", message: d.error ?? `Server error ${res.status}` });
+            }
+          }).catch((e) => {
+            setLoginState({ phase: "error", message: e instanceof Error ? e.message : "Network error" });
+          });
+        } else {
+          preferredKiroMethodRef.current = null;
+          setLoginState({ phase: "select", message: data.message!, options, token: data.token! });
+        }
       } else if (data.type === "progress") {
         setLoginState({ phase: "progress", message: data.message! });
       } else if (data.type === "success") {
@@ -1725,10 +1791,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         setLoginState({ phase: "success", message: data.message ?? (accountMode === "add" ? "Account saved successfully." : "Connected successfully.") });
         onRefresh();
         void loadAccounts();
-        if (provider.loggedIn) {
-          if (isGrok) void loadGrokQuota(true);
-          else void loadQuota();
-        }
+        if (isGrok) void loadGrokQuota(true);
+        else if (isKiro) void loadKiroQuota(true);
+        else if (provider.loggedIn) void loadQuota();
       } else if (data.type === "error") {
         es.close();
         setLoginState({ phase: "error", message: data.message! });
@@ -1741,13 +1806,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       es.close();
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "Connection lost" });
     };
-  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, isGrok]);
+  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, loadKiroQuota, isGrok, isKiro]);
 
   const handleLogout = useCallback(async () => {
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     setQuota(null);
     setGrokQuota(null);
+    setKiroQuota(null);
     setSelectedQuotaAccountId(null);
     onRefresh();
     void loadAccounts();
@@ -1794,8 +1860,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const handleSelectQuotaAccount = useCallback((account: OAuthAccountSummary) => {
     setSelectedQuotaAccountId(account.accountId);
     if (isGrok) void loadGrokQuota(true, account.accountId);
+    else if (isKiro) void loadKiroQuota(true, account.accountId);
     else void loadQuota(true, account.accountId);
-  }, [loadQuota, loadGrokQuota, isGrok]);
+  }, [loadQuota, loadGrokQuota, loadKiroQuota, isGrok, isKiro]);
 
   const handleActivateAccount = useCallback(async (accountId: string) => {
     setActivatingAccountId(accountId);
@@ -1813,6 +1880,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       setLoginState({ phase: "success", message: "Account activated." });
       onRefresh();
       if (isGrok) await loadGrokQuota(true, accountId);
+      else if (isKiro) await loadKiroQuota(true, accountId);
       else await loadQuota(true, accountId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to activate account";
@@ -1821,7 +1889,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setActivatingAccountId(null);
     }
-  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, isGrok]);
+  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, loadKiroQuota, isGrok, isKiro]);
 
   const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
     const nextLabel = await prompt({
@@ -1892,6 +1960,33 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setGrokQuota(data);
         await loadAccounts();
         setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error?.message ?? "Quota query failed.") });
+      } else if (isKiro) {
+        const data = await res.json().catch(() => ({})) as import("@/lib/kiro-subscription-quota").KiroQuotaResultV1;
+        // Prefer fixed allowlisted codes over raw upstream messages.
+        const safeMessage = data.error
+          ? (data.error.code === "unauthorized"
+            ? "Kiro 登录已失效，需要重新登录。"
+            : data.error.code === "unsupported_region"
+              ? "当前账号 Region 不受支持，无法查询额度。"
+              : data.error.code === "rate_limited"
+                ? "额度服务暂时限流。请稍后重试。"
+                : data.error.code === "access_denied"
+                  ? "当前账号无权查询额度。"
+                  : data.error.code === "invalid_payload"
+                    ? "额度服务返回了无法识别的数据。"
+                    : data.success
+                      ? "额度刷新失败，正在展示上次成功数据。"
+                      : "额度暂不可用。请稍后重试。")
+          : null;
+        if (!res.ok && !data.success && !data.buckets?.length) {
+          throw new Error(safeMessage ?? `HTTP ${res.status}`);
+        }
+        if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setKiroQuota(data);
+        await loadAccounts();
+        setLoginState({
+          phase: data.success ? "success" : "error",
+          message: data.success ? "Account quota refreshed." : (safeMessage ?? "Quota query failed."),
+        });
       } else {
         const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
         if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -1906,7 +2001,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setRefreshingQuotaAccountId(null);
     }
-  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok]);
+  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok, isKiro]);
 
   const handleResetQuota = useCallback(async () => {
     const quotaAccountId = selectedQuotaAccountId;
@@ -1940,20 +2035,20 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [confirm, loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId]);
 
-  // Grok delete flow: opens a custom dialog with active-account protection
-  const handleGrokDeleteClick = useCallback((account: OAuthAccountSummary) => {
-    setGrokDeleteAccount(account);
-    setGrokDeleteDeleting(false);
+  // Protected delete flow (Grok / Kiro): custom dialog with Active-account protection
+  const handleProtectedDeleteClick = useCallback((account: OAuthAccountSummary) => {
+    setProtectedDeleteAccount(account);
+    setProtectedDeleteDeleting(false);
   }, []);
 
-  const handleGrokDeleteConfirm = useCallback(async () => {
-    if (!grokDeleteAccount) return;
-    setGrokDeleteDeleting(true);
+  const handleProtectedDeleteConfirm = useCallback(async () => {
+    if (!protectedDeleteAccount) return;
+    setProtectedDeleteDeleting(true);
     setAccountsError(null);
     try {
-      if (grokDeleteAccount.active) {
-        // Must activate another account first
-        const replacement = accounts.find((a) => a.accountId !== grokDeleteAccount.accountId);
+      if (protectedDeleteAccount.active) {
+        // Must activate another account first so Active is never silently dropped.
+        const replacement = accounts.find((a) => a.accountId !== protectedDeleteAccount.accountId);
         if (replacement) {
           const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}/activate`, {
             method: "POST",
@@ -1969,26 +2064,29 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       const deleteRes = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId: grokDeleteAccount.accountId }),
+        body: JSON.stringify({ accountId: protectedDeleteAccount.accountId }),
       });
       const deleteData = await deleteRes.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
       if (!deleteRes.ok) throw new Error(deleteData.error ?? `HTTP ${deleteRes.status}`);
       setAccounts(deleteData.accounts ?? []);
       if (deleteData.activeAccountId) setSelectedQuotaAccountId(deleteData.activeAccountId);
-      else if (selectedQuotaAccountId === grokDeleteAccount.accountId) setSelectedQuotaAccountId(null);
+      else if (selectedQuotaAccountId === protectedDeleteAccount.accountId) setSelectedQuotaAccountId(null);
+      if (isKiro && selectedQuotaAccountId === protectedDeleteAccount.accountId) setKiroQuota(null);
+      if (isGrok && selectedQuotaAccountId === protectedDeleteAccount.accountId) setGrokQuota(null);
       setLoginState({ phase: "success", message: "Account deleted." });
-      setGrokDeleteAccount(null);
+      setProtectedDeleteAccount(null);
+      onRefresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete account";
       setAccountsError(message);
     } finally {
-      setGrokDeleteDeleting(false);
+      setProtectedDeleteDeleting(false);
     }
-  }, [grokDeleteAccount, accounts, provider.id, selectedQuotaAccountId]);
+  }, [protectedDeleteAccount, accounts, provider.id, selectedQuotaAccountId, isGrok, isKiro, onRefresh]);
 
   const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
-    if (isGrok) {
-      handleGrokDeleteClick(account);
+    if (supportsProtectedDelete) {
+      handleProtectedDeleteClick(account);
       return;
     }
     const confirmed = await confirm({
@@ -2018,7 +2116,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setDeletingAccountId(null);
     }
-  }, [confirm, provider.id, isGrok, handleGrokDeleteClick]);
+  }, [confirm, provider.id, supportsProtectedDelete, handleProtectedDeleteClick]);
 
   const selectedQuotaAccount = accounts.find((account) => account.accountId === selectedQuotaAccountId)
     ?? accounts.find((account) => account.active)
@@ -2028,17 +2126,25 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     loginState.phase === "auth" || loginState.phase === "device_code" ||
     loginState.phase === "prompt" || loginState.phase === "select";
 
-  // Grok login: start with method selection, then call handleLogin("add")
-  const handleGrokLoginStart = useCallback(() => {
-    setShowGrokLoginMethods(true);
+  // Capability-driven login: method picker for Grok/Kiro, then SSE OAuth flow
+  const handleManagedLoginStart = useCallback(() => {
+    setShowLoginMethods(true);
   }, []);
 
   const handleGrokLoginMethod = useCallback((method: "browser" | "device" | "grok_build") => {
-    setShowGrokLoginMethods(false);
+    setShowLoginMethods(false);
     if (method === "grok_build") {
       // Grok Build existing credential — handled by the SSE flow picking up ~/.grok/auth.json
     }
     // Both browser and device code flow through the SSE login; Grok always uses add mode
+    handleLogin("add");
+  }, [handleLogin]);
+
+  const handleKiroLoginMethod = useCallback((method: "builder-id" | "google" | "github") => {
+    setShowLoginMethods(false);
+    // Remember the chosen method so the SSE select_request can be auto-answered
+    // without a second click. Falls back to the select UI if options differ.
+    preferredKiroMethodRef.current = method;
     handleLogin("add");
   }, [handleLogin]);
 
@@ -2056,28 +2162,38 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         </div>
       </div>
 
-      {/* Active semantics for Grok */}
-      {isGrok && (
+      {/* Active semantics for Grok / Kiro */}
+      {supportsGlobalActiveSemantics && (
         <div style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-panel)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", lineHeight: 1.5 }}>
           <strong style={{ color: "var(--text)" }}>账号激活说明：</strong>
-          Activate 只设置 Grok 的<strong>全局当前 Active</strong>，不是锁定账号。切换后，所有普通运行中 Session 和新 Session 的<strong>后续请求</strong>都会使用该账号；已经发出的 in-flight 请求不会中途更换 token。手动 Active 的账号若返回明确限额或限流，且 Settings 中开启了自动切号，仍会自动轮换到可用账号并重试。
+          {isKiro
+            ? <>
+                Activate 只设置 Kiro 的<strong>全局当前 Active</strong>，不属于锁定。切换将作用于所有 live/new Session 后续请求，in-flight 请求不换 Token。若已开启 Settings 中的自动切号，额度不足时会自动切换到其他有效备用账号。
+              </>
+            : <>
+                Activate 只设置 Grok 的<strong>全局当前 Active</strong>，不是锁定账号。切换后，所有普通运行中 Session 和新 Session 的<strong>后续请求</strong>都会使用该账号；已经发出的 in-flight 请求不会中途更换 token。手动 Active 的账号若返回明确限额或限流，且 Settings 中开启了自动切号，仍会自动轮换到可用账号并重试。
+              </>}
         </div>
       )}
 
       {/* Status */}
       <div style={{ minHeight: 48 }}>
-        {loginState.phase === "idle" && !showGrokLoginMethods && (
+        {loginState.phase === "idle" && !showLoginMethods && (
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            {provider.loggedIn
+            {provider.loggedIn || accounts.length > 0
               ? (isGrok
                 ? `已连接 ${accounts.length} 个 Grok 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
-                : "Already connected. You can re-login or disconnect.")
-              : `Connect your ${provider.name} account.`}
+                : isKiro
+                  ? `已连接 ${accounts.length} 个 Kiro 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
+                  : "Already connected. You can re-login or disconnect.")
+              : isKiro
+                ? "连接 AWS Kiro 账号（Builder ID / Google / GitHub）。"
+                : `Connect your ${provider.name} account.`}
           </p>
         )}
 
         {/* Grok login method selection */}
-        {isGrok && showGrokLoginMethods && loginState.phase === "idle" && (
+        {isGrok && showLoginMethods && loginState.phase === "idle" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 2 }}>选择连接方式</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 8 }}>
@@ -2107,7 +2223,46 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
               若设置了 <code style={{ fontFamily: "var(--font-mono)" }}>GROK_CLI_OAUTH_TOKEN</code> 环境变量，系统将使用只读凭证，但不支持多账号隔离管理及自动 Token 刷新。
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={() => setShowGrokLoginMethods(false)} style={{ padding: "4px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>取消</button>
+              <button onClick={() => setShowLoginMethods(false)} style={{ padding: "4px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>取消</button>
+            </div>
+          </div>
+        )}
+
+        {/* Kiro login method selection — Builder ID / Google / GitHub */}
+        {isKiro && showLoginMethods && loginState.phase === "idle" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 2 }}>选择 Kiro 登录方式</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => handleKiroLoginMethod("builder-id")}
+                style={{ padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700 }}>🪪 AWS Builder ID</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)" }}>官方 Builder ID 设备/浏览器授权</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleKiroLoginMethod("google")}
+                style={{ padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700 }}>🔵 Google</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)" }}>社交登录 · OAuth 回调</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleKiroLoginMethod("github")}
+                style={{ padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", cursor: "pointer", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700 }}>🐙 GitHub</span>
+                <span style={{ fontSize: 10, color: "var(--text-dim)" }}>社交登录 · OAuth 回调</span>
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", background: "rgba(234,179,8,0.05)", borderLeft: "3px solid var(--warning)", padding: "6px 10px", borderRadius: "0 4px 4px 0", lineHeight: 1.5 }}>
+              不支持 JSON 凭据导入。登录后系统仅保存 opaque 账号元数据；access / refresh / clientSecret / profileArn 不会出现在浏览器。
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setShowLoginMethods(false)} style={{ padding: "4px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>取消</button>
             </div>
           </div>
         )}
@@ -2196,23 +2351,24 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {isWorking ? (
           <button
-            onClick={() => { eventSourceRef.current?.close(); setLoginState({ phase: "idle" }); }}
+            onClick={() => { eventSourceRef.current?.close(); preferredKiroMethodRef.current = null; setLoginState({ phase: "idle" }); }}
             style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
             Cancel
           </button>
         ) : (
           <>
-            {/* Grok-specific: Show "添加账号" as primary, login method selection on click */}
-            {isGrok ? (
+            {/* Capability-driven: Grok/Kiro use method picker + add mode; Codex keeps Login/Add Account */}
+            {supportsOAuthMethodPicker ? (
               <button
-                onClick={handleGrokLoginStart}
+                type="button"
+                onClick={handleManagedLoginStart}
                 style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               >
-                ➕ 添加账号
+                {isKiro ? "➕ 添加 Kiro 账号" : "➕ 添加账号"}
               </button>
             ) : (
               <>
@@ -2231,6 +2387,16 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                   </button>
                 )}
               </>
+            )}
+            {isKiro && (provider.loggedIn || accounts.length > 0) && selectedQuotaAccount && (
+              <button
+                type="button"
+                onClick={() => void loadKiroQuota(true)}
+                disabled={quotaLoading}
+                style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: quotaLoading ? "var(--text-dim)" : "var(--accent)", cursor: quotaLoading ? "default" : "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                {quotaLoading ? "刷新中…" : "🔄 刷新当前 Kiro 额度"}
+              </button>
             )}
             {provider.loggedIn && (
               <button
@@ -2254,11 +2420,20 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         />
       )}
 
+      {isKiro && (provider.loggedIn || accounts.length > 0) && (
+        <KiroQuotaView
+          quota={kiroQuota}
+          loading={quotaLoading}
+          account={selectedQuotaAccount}
+          onRefresh={() => loadKiroQuota(true)}
+        />
+      )}
+
       {provider.id === "openai-codex" && provider.loggedIn && (
         <OAuthQuotaView quota={quota} loading={quotaLoading} account={selectedQuotaAccount} resetting={quotaResetting} onRefresh={loadQuota} onReset={handleResetQuota} />
       )}
 
-      {/* Accounts — shared for both managed-account providers */}
+      {/* Accounts — shared for managed-account OAuth providers */}
       {isManagedAccounts && (
         <OAuthAccountsView
           accounts={accounts}
@@ -2271,6 +2446,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           quotaResetting={quotaResetting}
           deletingAccountId={deletingAccountId}
           selectedAccountId={selectedQuotaAccount?.accountId ?? null}
+          hideCodexQuotaSummary={hideCodexQuotaSummary}
           onRefresh={loadAccounts}
           onSelect={handleSelectQuotaAccount}
           onActivate={handleActivateAccount}
@@ -2316,14 +2492,15 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         />
       )}
 
-      {/* Grok delete confirmation dialog */}
-      {isGrok && grokDeleteAccount && (
-        <GrokDeleteConfirmDialog
-          account={grokDeleteAccount}
+      {/* Protected delete confirmation dialog (Grok / Kiro Active protection) */}
+      {supportsProtectedDelete && protectedDeleteAccount && (
+        <ManagedOAuthDeleteConfirmDialog
+          providerLabel={isKiro ? "Kiro" : "Grok"}
+          account={protectedDeleteAccount}
           allAccounts={accounts}
-          deleting={grokDeleteDeleting}
-          onConfirm={handleGrokDeleteConfirm}
-          onClose={() => { if (!grokDeleteDeleting) setGrokDeleteAccount(null); }}
+          deleting={protectedDeleteDeleting}
+          onConfirm={handleProtectedDeleteConfirm}
+          onClose={() => { if (!protectedDeleteDeleting) setProtectedDeleteAccount(null); }}
         />
       )}
     </div>

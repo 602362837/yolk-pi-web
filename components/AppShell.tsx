@@ -14,8 +14,13 @@ import { SkillsConfig } from "./SkillsConfig";
 import { UsageProviderModelTable } from "./UsageProviderModelTable";
 import { ChatGptUsagePanel } from "./ChatGptUsagePanel";
 import { GrokUsagePanel } from "./GrokUsagePanel";
+import { KiroUsagePanel } from "./KiroUsagePanel";
+import type { ProviderUsageDisplayMode } from "./ProviderUsageTrigger";
 // GPT-USAGE-02 wires Models recovery now; GPT-USAGE-01 owns accepting/using onOpenModels inside the panel.
-type ProviderUsagePanelProps = { onOpenModels?: () => void };
+type ProviderUsagePanelProps = {
+  onOpenModels?: () => void;
+  displayMode?: ProviderUsageDisplayMode;
+};
 const ChatGptUsagePanelHost = ChatGptUsagePanel as unknown as (props?: ProviderUsagePanelProps) => ReactNode;
 import { SubagentPanel } from "./SubagentPanel";
 import { SettingsConfig } from "./SettingsConfig";
@@ -791,7 +796,11 @@ function AppShellContent() {
   const rightPanelTogglePadding = rightPanelOpen ? 12 : 48 + 36 + (trellisEnabled ? 36 : 0);
   const showChatGptUsage = webConfig?.chatgpt.usagePanelEnabled === true;
   const showGrokUsage = webConfig?.grok.usagePanelEnabled === true;
-  const showAnyProviderUsage = showChatGptUsage || showGrokUsage;
+  const showKiroUsage = webConfig?.kiro.usagePanelEnabled === true;
+  const showAnyProviderUsage = showChatGptUsage || showGrokUsage || showKiroUsage;
+  // Global compact mode from Settings → Usage; detail popovers stay full.
+  const providerUsageDisplayMode: ProviderUsageDisplayMode =
+    webConfig?.usage.providerPanelsCompact === true ? "compact" : "full";
   const browserTitleCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd;
   const browserTitleGit = selectedSession?.cwd === browserTitleCwd ? selectedSession.git : activeCwdGit;
   const browserTitleProjectContext = projectContextMatchesBrowserTitle(activeProjectContext, selectedSession, newSessionProjectContext, browserTitleCwd)
@@ -1459,10 +1468,22 @@ function AppShellContent() {
               }}
             >
               {showChatGptUsage && (
-                <ChatGptUsagePanelHost onOpenModels={() => setModelsConfigOpen(true)} />
+                <ChatGptUsagePanelHost
+                  onOpenModels={() => setModelsConfigOpen(true)}
+                  displayMode={providerUsageDisplayMode}
+                />
               )}
               {showGrokUsage && (
-                <GrokUsagePanel onOpenModels={() => setModelsConfigOpen(true)} />
+                <GrokUsagePanel
+                  onOpenModels={() => setModelsConfigOpen(true)}
+                  displayMode={providerUsageDisplayMode}
+                />
+              )}
+              {showKiroUsage && (
+                <KiroUsagePanel
+                  onOpenModels={() => setModelsConfigOpen(true)}
+                  displayMode={providerUsageDisplayMode}
+                />
               )}
             </div>
           )}
