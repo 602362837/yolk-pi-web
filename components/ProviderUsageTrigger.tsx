@@ -60,10 +60,16 @@ export interface ProviderUsageTriggerProps
   /** Show spinner instead of status dot (full) or beside fallback (compact). */
   loading?: boolean;
   /**
-   * Preferred shared N-ring unit (outer → inner). When present, Full and Compact
-   * both render this primitive instead of parallel rings or text chips.
+   * Preferred shared N-ring unit (outer → inner period layers). When present and
+   * ringUnits is empty, Full and Compact render this single primitive.
    */
   ringUnit?: ProviderUsageRingUnit | null;
+  /**
+   * Independent side-by-side ring units (model groups). When length > 1, each
+   * unit is rendered as its own single (or period N-ring) instance — never
+   * merged into one concentric Flash/Opus unit. Takes precedence over ringUnit.
+   */
+  ringUnits?: readonly ProviderUsageRingUnit[] | null;
   /**
    * @deprecated Transitional parallel rings when ringUnit is absent.
    * USAGE-AGG-03/04/05 should migrate to ringUnit.
@@ -188,6 +194,8 @@ function ringBoxSize(size: RingGeometrySize): number {
 }
 
 function centerMaskSize(layerCount: number, size: RingGeometrySize): number {
+  // Original UI v6 geometry: center disc sized for readable label + percent
+  // while leaving a clear used-arc rim (matches pre-regression aggregate look).
   if (size === "small") {
     if (layerCount <= 1) return 21;
     if (layerCount === 2) return 18.5;
@@ -465,8 +473,10 @@ export function ProviderUsageRingUnitView({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            lineHeight: 1.1,
+            lineHeight: 1.05,
             pointerEvents: "none",
+            zIndex: 2,
+            overflow: "visible",
           }}
         >
           <span
@@ -523,6 +533,7 @@ export function ProviderUsageTrigger({
   statusText,
   loading = false,
   ringUnit = null,
+  ringUnits = null,
   rings = [],
   compactSummaries = [],
   compactFallback = null,
@@ -534,11 +545,67 @@ export function ProviderUsageTrigger({
   ...buttonProps
 }: ProviderUsageTriggerProps) {
   const isCompact = displayMode === "compact";
-  const hasRingUnit = Boolean(ringUnit && ringUnit.layers.length > 0);
+  // Prefer independent multi-unit slots (model groups) over single ringUnit.
+  const resolvedRingUnits: ProviderUsageRingUnit[] =
+    ringUnits && ringUnits.length > 0
+      ? [...ringUnits]
+      : ringUnit && ringUnit.layers.length > 0
+        ? [ringUnit]
+        : [];
+  const hasRingUnit = resolvedRingUnits.length > 0;
+  const multiIndependent = resolvedRingUnits.length > 1;
   const summaries = compactSummaries.slice(0, 2);
   const showCompactFallback =
     isCompact && !hasRingUnit && summaries.length === 0 && Boolean(compactFallback);
   const ringSize: RingGeometrySize = isCompact ? "small" : "large";
+
+  const ringRow = hasRingUnit ? (
+    <span
+      className="provider-usage-trigger__ring-units"
+      data-ring-count={resolvedRingUnits.length}
+      data-multi-independent={multiIndependent ? "true" : "false"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: multiIndependent ? 4 : 0,
+        flexShrink: 0,
+      }}
+    >
+      {resolvedRingUnits.map((unit, index) => {
+        const short = unit.layers[0]?.shortLabel?.trim() || "";
+        const showMiniLabel = multiIndependent && short.length > 0;
+        return (
+          <span
+            key={`${unit.centerLayerId}:${index}`}
+            className="provider-usage-trigger__ring-slot"
+            data-ring-slot={index}
+            data-center-layer={unit.centerLayerId}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              flexShrink: 0,
+            }}
+          >
+            {showMiniLabel ? (
+              <span
+                className="provider-usage-trigger__ring-slot-label"
+                style={{
+                  fontSize: isCompact ? 9 : 10,
+                  fontWeight: 700,
+                  color: "var(--text-dim)",
+                  lineHeight: 1,
+                }}
+              >
+                {short}
+              </span>
+            ) : null}
+            <ProviderUsageRingUnitView unit={unit} size={ringSize} />
+          </span>
+        );
+      })}
+    </span>
+  ) : null;
 
   return (
     <button
@@ -551,6 +618,8 @@ export function ProviderUsageTrigger({
       data-display-mode={displayMode}
       data-open={open ? "true" : "false"}
       data-has-ring-unit={hasRingUnit ? "true" : "false"}
+      data-ring-count={resolvedRingUnits.length}
+      data-multi-independent={multiIndependent ? "true" : "false"}
       aria-expanded={open}
       style={{
         height: hasRingUnit ? 32 : 26,
@@ -587,8 +656,8 @@ export function ProviderUsageTrigger({
               {statusText ? <span>{statusText}</span> : null}
             </span>
           )}
-          {hasRingUnit && ringUnit ? (
-            <ProviderUsageRingUnitView unit={ringUnit} size={ringSize} />
+          {hasRingUnit ? (
+            ringRow
           ) : (
             rings.map((ring) => (
               <LegacyUsageRing key={`${ring.label}:${ring.title}`} {...ring} />
@@ -600,10 +669,10 @@ export function ProviderUsageTrigger({
       {isCompact && (
         <span className="provider-usage-trigger__compact" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
           {loading && !hasRingUnit && summaries.length === 0 ? <Spinner /> : null}
-          {hasRingUnit && ringUnit ? (
+          {hasRingUnit ? (
             <>
               {loading ? <Spinner /> : null}
-              <ProviderUsageRingUnitView unit={ringUnit} size="small" />
+              {ringRow}
             </>
           ) : summaries.length > 0 ? (
             <span className="provider-usage-trigger__summaries" style={{ display: "inline-flex", alignItems: "center", gap: 0, fontSize: 10, color: "var(--text-dim)", fontWeight: 700 }}>

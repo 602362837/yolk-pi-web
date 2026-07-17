@@ -55,22 +55,27 @@ test("Kiro controller is separate module with own process state", () => {
   assertNotIncludes(chatgpt, "kiro", "chatgpt module unchanged re kiro");
 });
 
-test("patch chain: kiro outer wraps grok wraps opencode wraps chatgpt", () => {
+test("patch chain: kiro wraps grok wraps opencode wraps chatgpt (antigravity may be outer)", () => {
   assertIncludes(rpc, "this.patchChatGptAccountFailover()", "chatgpt patch");
   assertIncludes(rpc, "this.patchOpencodeGoAccountFailover()", "opencode patch");
   assertIncludes(rpc, "this.patchGrokAccountFailover()", "grok patch");
   assertIncludes(rpc, "this.patchKiroAccountFailover()", "kiro patch");
+  // Kiro remains outside Grok; Antigravity (if present) is outermost.
   assertIncludes(rpc, "kiro → grok → opencode-go → chatgpt → original pi SDK", "order docs");
 
   const ctorStart = rpc.indexOf("constructor(public readonly inner: AgentSessionLike");
-  const ctorBody = rpc.slice(ctorStart, ctorStart + 450);
+  const ctorBody = rpc.slice(ctorStart, ctorStart + 550);
   const chatgptIdx = ctorBody.indexOf("this.patchChatGptAccountFailover()");
   const opencodeIdx = ctorBody.indexOf("this.patchOpencodeGoAccountFailover()");
   const grokIdx = ctorBody.indexOf("this.patchGrokAccountFailover()");
   const kiroIdx = ctorBody.indexOf("this.patchKiroAccountFailover()");
+  const antigravityIdx = ctorBody.indexOf("this.patchAntigravityAccountFailover()");
   assert.ok(chatgptIdx >= 0 && opencodeIdx > chatgptIdx, "opencode after chatgpt");
   assert.ok(grokIdx > opencodeIdx, "grok after opencode");
-  assert.ok(kiroIdx > grokIdx, "kiro after grok (outermost)");
+  assert.ok(kiroIdx > grokIdx, "kiro after grok");
+  if (antigravityIdx >= 0) {
+    assert.ok(antigravityIdx > kiroIdx, "antigravity after kiro when present");
+  }
 });
 
 test("Kiro patch only acts on kiro; non-kiro pass through", () => {

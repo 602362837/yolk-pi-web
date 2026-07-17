@@ -19,7 +19,7 @@ export const QUOTA_TIER_LABELS: Record<string, string> = {
 /** Chinese compact labels for the GPT top-bar usage pill (5h / week). */
 export const GPT_QUOTA_TIER_COMPACT_LABELS: Record<string, string> = {
   five_hour: "5 小时",
-  seven_day: "周",
+  seven_day: "7d",
 };
 
 /** Chinese expanded labels for GPT quota window cards. */

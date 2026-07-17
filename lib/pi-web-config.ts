@@ -203,6 +203,21 @@ export interface PiWebKiroConfig {
   autoFailover: PiWebKiroAutoFailoverConfig;
 }
 
+export interface PiWebAntigravityAutoFailoverConfig {
+  enabled: boolean;
+  maxAttemptsPerTurn: number;
+  maxAccountSwitchesPerTurn: number;
+  quotaCacheMaxAgeMs: number;
+  exhaustedCooldownMs: number;
+  minSwitchIntervalMs: number;
+}
+
+export interface PiWebAntigravityConfig {
+  /** Top-right Antigravity usage pill; default off so upgrades do not mount or poll. */
+  usagePanelEnabled: boolean;
+  autoFailover: PiWebAntigravityAutoFailoverConfig;
+}
+
 export type PiWebTerminalShell = "zsh" | "bash" | "sh" | "cmd" | "powershell" | "pwsh" | "custom";
 
 export interface PiWebTerminalConfig {
@@ -255,6 +270,7 @@ export interface PiWebConfig {
   opencodeGo: PiWebOpencodeGoConfig;
   grok: PiWebGrokConfig;
   kiro: PiWebKiroConfig;
+  antigravity: PiWebAntigravityConfig;
   editor: PiWebEditorConfig;
 }
 
@@ -269,6 +285,7 @@ export interface PiWebConfigPatch {
   opencodeGo?: unknown;
   grok?: unknown;
   kiro?: unknown;
+  antigravity?: unknown;
   editor?: unknown;
 }
 
@@ -386,6 +403,17 @@ export const DEFAULT_PI_WEB_CONFIG: PiWebConfig = {
     },
   },
   kiro: {
+    usagePanelEnabled: false,
+    autoFailover: {
+      enabled: false,
+      maxAttemptsPerTurn: 1,
+      maxAccountSwitchesPerTurn: 1,
+      quotaCacheMaxAgeMs: 5 * 60 * 1000,
+      exhaustedCooldownMs: 30 * 60 * 1000,
+      minSwitchIntervalMs: 10 * 1000,
+    },
+  },
+  antigravity: {
     usagePanelEnabled: false,
     autoFailover: {
       enabled: false,
@@ -869,6 +897,18 @@ function readKiroAutoFailoverConfig(value: unknown, fallback: PiWebKiroAutoFailo
   };
 }
 
+function readAntigravityAutoFailoverConfig(value: unknown, fallback: PiWebAntigravityAutoFailoverConfig): PiWebAntigravityAutoFailoverConfig {
+  const root = isRecord(value) ? value : {};
+  return {
+    enabled: readBoolean(root.enabled, fallback.enabled),
+    maxAttemptsPerTurn: readInteger(root.maxAttemptsPerTurn, fallback.maxAttemptsPerTurn),
+    maxAccountSwitchesPerTurn: readInteger(root.maxAccountSwitchesPerTurn, fallback.maxAccountSwitchesPerTurn),
+    quotaCacheMaxAgeMs: readInteger(root.quotaCacheMaxAgeMs, fallback.quotaCacheMaxAgeMs),
+    exhaustedCooldownMs: readInteger(root.exhaustedCooldownMs, fallback.exhaustedCooldownMs),
+    minSwitchIntervalMs: readInteger(root.minSwitchIntervalMs, fallback.minSwitchIntervalMs),
+  };
+}
+
 function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const defaults = DEFAULT_PI_WEB_CONFIG;
   const root = isRecord(raw) ? raw : {};
@@ -882,6 +922,7 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
   const opencodeGo = isRecord(root.opencodeGo) ? root.opencodeGo : {};
   const grok = isRecord(root.grok) ? root.grok : {};
   const kiro = isRecord(root.kiro) ? root.kiro : {};
+  const antigravity = isRecord(root.antigravity) ? root.antigravity : {};
   const editor = isRecord(root.editor) ? root.editor : {};
   const editorShortcuts = isRecord(editor.shortcuts) ? editor.shortcuts : {};
   const terminalEnv: Record<string, string> = {};
@@ -939,6 +980,10 @@ function normalizePiWebConfig(raw: unknown): PiWebConfig {
     kiro: {
       usagePanelEnabled: readBoolean(kiro.usagePanelEnabled, defaults.kiro.usagePanelEnabled),
       autoFailover: readKiroAutoFailoverConfig(kiro.autoFailover, defaults.kiro.autoFailover),
+    },
+    antigravity: {
+      usagePanelEnabled: readBoolean(antigravity.usagePanelEnabled, defaults.antigravity.usagePanelEnabled),
+      autoFailover: readAntigravityAutoFailoverConfig(antigravity.autoFailover, defaults.antigravity.autoFailover),
     },
     editor: {
       kind: editor.kind === "monaco" ? "monaco" : defaults.editor.kind,
@@ -1579,6 +1624,29 @@ export function validatePiWebKiroConfig(value: unknown): PiWebKiroConfig {
   };
 }
 
+function validateAntigravityAutoFailoverConfig(value: unknown): PiWebAntigravityAutoFailoverConfig {
+  if (value === undefined) return DEFAULT_PI_WEB_CONFIG.antigravity.autoFailover;
+  if (!isRecord(value)) throw new PiWebConfigValidationError("antigravity.autoFailover must be an object");
+  return {
+    enabled: requireBoolean(value.enabled, "antigravity.autoFailover.enabled"),
+    maxAttemptsPerTurn: requireIntegerInRange(value.maxAttemptsPerTurn, "antigravity.autoFailover.maxAttemptsPerTurn", 0, 3),
+    maxAccountSwitchesPerTurn: requireIntegerInRange(value.maxAccountSwitchesPerTurn, "antigravity.autoFailover.maxAccountSwitchesPerTurn", 0, 3),
+    quotaCacheMaxAgeMs: requireIntegerInRange(value.quotaCacheMaxAgeMs, "antigravity.autoFailover.quotaCacheMaxAgeMs", 0, 24 * 60 * 60 * 1000),
+    exhaustedCooldownMs: requireIntegerInRange(value.exhaustedCooldownMs, "antigravity.autoFailover.exhaustedCooldownMs", 0, 24 * 60 * 60 * 1000),
+    minSwitchIntervalMs: requireIntegerInRange(value.minSwitchIntervalMs, "antigravity.autoFailover.minSwitchIntervalMs", 0, 60 * 60 * 1000),
+  };
+}
+
+export function validatePiWebAntigravityConfig(value: unknown): PiWebAntigravityConfig {
+  if (!isRecord(value)) {
+    throw new PiWebConfigValidationError("antigravity config must be an object");
+  }
+  return {
+    usagePanelEnabled: requireBoolean(value.usagePanelEnabled, "antigravity.usagePanelEnabled"),
+    autoFailover: validateAntigravityAutoFailoverConfig(value.autoFailover),
+  };
+}
+
 export function validatePiWebEditorConfig(value: unknown): PiWebEditorConfig {
   if (!isRecord(value)) {
     throw new PiWebConfigValidationError("editor config must be an object");
@@ -1640,8 +1708,9 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
   const hasOpencodeGo = Object.prototype.hasOwnProperty.call(patch, "opencodeGo");
   const hasGrok = Object.prototype.hasOwnProperty.call(patch, "grok");
   const hasKiro = Object.prototype.hasOwnProperty.call(patch, "kiro");
+  const hasAntigravity = Object.prototype.hasOwnProperty.call(patch, "antigravity");
   const hasEditor = Object.prototype.hasOwnProperty.call(patch, "editor");
-  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasGrok && !hasKiro && !hasEditor) {
+  if (!hasYolk && !hasWorktree && !hasTrellis && !hasStudio && !hasUsage && !hasTerminal && !hasChatGpt && !hasOpencodeGo && !hasGrok && !hasKiro && !hasAntigravity && !hasEditor) {
     throw new PiWebConfigValidationError("no supported config sections provided");
   }
 
@@ -1690,6 +1759,13 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
       ? (patch.kiro as Record<string, unknown>).autoFailover
       : currentConfig.kiro.autoFailover,
   } : patch.kiro) : undefined;
+  const normalizedAntigravity = hasAntigravity ? validatePiWebAntigravityConfig(isRecord(patch.antigravity) ? {
+    ...currentConfig.antigravity,
+    ...patch.antigravity,
+    autoFailover: Object.prototype.hasOwnProperty.call(patch.antigravity, "autoFailover")
+      ? (patch.antigravity as Record<string, unknown>).autoFailover
+      : currentConfig.antigravity.autoFailover,
+  } : patch.antigravity) : undefined;
   const normalizedEditor = hasEditor ? validatePiWebEditorConfig(patch.editor) : undefined;
   const nextRaw: Record<string, unknown> = { ...raw };
 
@@ -1776,6 +1852,14 @@ export function writePiWebConfigPatch(patch: PiWebConfigPatch): PiWebConfigReadR
     nextRaw.kiro = {
       ...previousKiro,
       ...normalizedKiro,
+    };
+  }
+
+  if (normalizedAntigravity) {
+    const previousAntigravity = isRecord(raw.antigravity) ? raw.antigravity : {};
+    nextRaw.antigravity = {
+      ...previousAntigravity,
+      ...normalizedAntigravity,
     };
   }
 

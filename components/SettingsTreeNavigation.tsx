@@ -26,6 +26,7 @@ export type SettingsSection =
   | "opencodeGo"
   | "grok"
   | "kiro"
+  | "antigravity"
   | "editor"
   | "trellis"
   | "diagnostics";
@@ -43,13 +44,14 @@ export type SettingsGroupId =
 
 export type SettingsExpandedGroups = ReadonlySet<SettingsGroupId>;
 
-export type SettingsProviderSection = "chatgpt" | "opencodeGo" | "grok" | "kiro";
+export type SettingsProviderSection = "chatgpt" | "opencodeGo" | "grok" | "kiro" | "antigravity";
 
 const PROVIDER_SECTIONS: readonly SettingsProviderSection[] = [
   "chatgpt",
   "opencodeGo",
   "grok",
   "kiro",
+  "antigravity",
 ];
 
 const PROVIDER_SECTION_SET = new Set<string>(PROVIDER_SECTIONS);
@@ -107,6 +109,7 @@ export function ancestorGroupsForView(view: SettingsView): SettingsGroupId[] {
     case "opencodeGo":
     case "grok":
     case "kiro":
+    case "antigravity":
       return ["modelsUsage", "providers"];
     case "terminal":
     case "editor":
@@ -239,6 +242,7 @@ export function flattenVisibleTreeNodes(expanded: SettingsExpandedGroups): Focus
         opencodeGo: { label: "OpenCode Go", description: "OpenCode Go 自动切换与账号管理", icon: "O" },
         grok: { label: "Grok", description: "Grok 全局 Active 与自动切号", icon: "X" },
         kiro: { label: "Kiro", description: "Kiro 全局 Active 与自动切号", icon: "K" },
+        antigravity: { label: "Antigravity", description: "Antigravity 全局 Active 与自动切号", icon: "A" },
       };
       for (const section of PROVIDER_SECTIONS) {
         const meta = providerMeta[section];
@@ -731,6 +735,11 @@ export function SettingsTreeNavigation({
                         label: "Grok",
                         description: "Grok 全局 Active 与自动切号",
                         icon: "X",
+                      },
+                      antigravity: {
+                        label: "Antigravity",
+                        description: "Antigravity 全局 Active 与自动切号",
+                        icon: "A",
                       },
                       kiro: {
                         label: "Kiro",

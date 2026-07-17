@@ -49,7 +49,7 @@ export function buildGrokUsageWindowCandidates(
       : null;
     candidates.push({
       id: "grok-week",
-      shortLabel: "周",
+      shortLabel: "7d",
       fullLabel: "周额度",
       percent,
       title: percent === null

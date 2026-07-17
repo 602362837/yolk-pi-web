@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Provider, Multi-account Quota & Failover UI Prototype</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-panel: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.1);
+      --danger-border: rgba(239, 68, 68, 0.2);
+      --warning: #eab308;
+      --warning-bg: rgba(234, 179, 8, 0.1);
+      --warning-border: rgba(234, 179, 8, 0.2);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.1);
+      --success-border: rgba(16, 185, 129, 0.2);
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* Light Theme overrides if needed, but we design for yolk-pi dark theme base */
+    .theme-light {
+      --bg: #f8fafc;
+      --bg-panel: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --danger-bg: rgba(239, 68, 68, 0.05);
+      --warning-bg: rgba(234, 179, 8, 0.05);
+      --success-bg: rgba(16, 185, 129, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #020617;
+      color: var(--text);
+      line-height: 1.5;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      min-height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 15px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .controller-panel {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .controller-panel label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .controller-panel select, .controller-panel button {
+      padding: 6px 12px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .controller-panel select:focus, .controller-panel button:focus {
+      outline: 2px solid var(--accent);
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    @media (min-width: 1024px) {
+      .demo-grid {
+        grid-template-columns: 350px 1fr;
+      }
+    }
+
+    .sidebar-views {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .main-view {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .view-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .view-title span.badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: normal;
+    }
+
+    /* App Shell Header Simulation */
+    .app-header {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .logo-sim {
+      font-weight: bold;
+      color: var(--accent);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Standalone / Compact Rings display */
+    .topbar-providers {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .provider-trigger {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      user-select: none;
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .provider-trigger:hover, .provider-trigger.active {
+      background-color: var(--bg);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .provider-trigger.danger {
+      color: var(--danger);
+    }
+
+    .provider-trigger.warning {
+      color: var(--warning);
+    }
+
+    .ring-svg {
+      width: 14px;
+      height: 14px;
+      transform: rotate(-90deg);
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 2.5;
+    }
+
+    .ring-fg {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.35s;
+    }
+
+    .ring-fg.warning {
+      stroke: var(--warning);
+    }
+
+    .ring-fg.danger {
+      stroke: var(--danger);
+    }
+
+    /* Aggregate Panel Sim */
+    .aggregate-dropdown {
+      position: absolute;
+      top: 50px;
+      right: 20px;
+      width: 480px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      padding: 15px;
+      display: none;
+    }
+
+    .aggregate-dropdown.show {
+      display: block;
+    }
+
+    .aggregate-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 10px;
+    }
+
+    .aggregate-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      min-width: 0;
+    }
+
+    .aggregate-header {
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    .aggregate-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 24px;
+      min-width: 0;
+    }
+
+    .aggregate-cell span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Modal / Popup Detail views */
+    .usage-detail-popover {
+      position: absolute;
+      top: 50px;
+      right: 20px;
+      width: 320px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      z-index: 101;
+      padding: 12px;
+      display: none;
+    }
+
+    .usage-detail-popover.show {
+      display: block;
+    }
+
+    /* Models Panel Details view */
+    .models-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .models-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+
+    .models-tab {
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .models-tab:hover {
+      color: var(--text);
+    }
+
+    .models-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .risk-banner {
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .risk-banner.warning {
+      background-color: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning);
+    }
+
+    .risk-banner.danger {
+      background-color: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: #f87171;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      background-color: var(--bg);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: var(--border);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background-color: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: #f87171;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    .btn-sm {
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    /* Accounts List */
+    .accounts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .account-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .account-row:hover {
+      border-color: var(--text-dim);
+    }
+
+    .account-row.active {
+      border-color: var(--success);
+      box-shadow: 0 0 0 1px var(--success);
+    }
+
+    .account-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .status-dot.active {
+      background-color: var(--success);
+    }
+
+    .status-dot.loading {
+      background-color: var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+
+    .account-details {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .account-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .quota-view-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background-color: var(--bg);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .quota-bar-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .quota-bar-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11px;
+    }
+
+    .quota-model-name {
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    .quota-values {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .progress-bar {
+      height: 6px;
+      border-radius: 3px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background-color: var(--accent);
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+
+    .quota-bar-sub {
+      font-size: 9px;
+      color: var(--text-dim);
+    }
+
+    .cache-status-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 5px;
+    }
+
+    /* Settings Panel Simulator */
+    .settings-layout {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 15px;
+      min-height: 250px;
+    }
+
+    .settings-nav {
+      border-right: 1px solid var(--border);
+      padding-right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .settings-nav-item {
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .settings-nav-item:hover {
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    .settings-nav-item.active {
+      background-color: var(--bg);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .settings-content {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .settings-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      color: var(--text);
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 11px;
+    }
+
+    .setting-control {
+      margin-top: 3px;
+    }
+
+    .setting-label-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .setting-label {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .setting-desc {
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Chat SSE Notice Simulation */
+    .chat-view {
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 15px;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      justify-content: flex-end;
+    }
+
+    .chat-bubble {
+      max-width: 80%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    .chat-bubble.assistant {
+      align-self: flex-start;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .chat-bubble.user {
+      align-self: flex-end;
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .system-notification {
+      align-self: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--warning);
+      background-color: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .system-notification.danger {
+      color: #f87171;
+      background-color: var(--danger-bg);
+      border-color: var(--danger-border);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Toggle switch CSS */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 28px;
+      height: 16px;
+    }
+
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--border);
+      transition: .2s;
+      border-radius: 16px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 12px;
+      width: 12px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+
+    input:focus + .slider {
+      box-shadow: 0 0 1px var(--accent);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(12px);
+    }
+
+    /* Interactive UI helper labels */
+    .interactive-guide {
+      font-size: 11px;
+      color: var(--accent);
+      background-color: rgba(59, 130, 246, 0.1);
+      border: 1px dashed var(--accent);
+      padding: 6px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Manual OAuth Input Section */
+    .oauth-input-panel {
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .oauth-input-panel label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .oauth-input-panel input {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      color: var(--text);
+      font-size: 11px;
+      width: 100%;
+    }
+
+    .oauth-input-panel input:focus {
+      outline: 1px solid var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Antigravity Provider 多账号、额度与自动切号 UI 原型</h1>
+    <p>蛋黄派工作室 YPI Studio — UI 设计员交付件（交互、状态与验收门禁）</p>
+  </header>
+
+  <!-- Prototype State Controller -->
+  <div class="controller-panel">
+    <div class="interactive-guide" style="flex: 1 1 100%; margin-bottom: 0;">
+      <strong>交互沙盒控制台：</strong> 切换下方的“测试场景”可以直接模拟整个 Web 系统的状态流转（顶栏、Models账号列表、用量额度、自动切号提示等）。
+    </div>
+    
+    <label>
+      测试场景
+      <select id="state-select" onchange="applyState(this.value)">
+        <option value="no_account">no_account (未连接账号)</option>
+        <option value="loading">loading (加载中/刷新中)</option>
+        <option value="live_single_window">live_single_window (独立模型单 ring)</option>
+        <option value="live_multi_model">live_multi_model (多模型/详情模式)</option>
+        <option value="fresh">fresh (缓存新鲜)</option>
+        <option value="stale">stale (缓存过期展示上一次数据)</option>
+        <option value="reauth">reauth (需登录/Token过期)</option>
+        <option value="invalid_project">invalid_project (非法的 GCP projectId / 拒绝访问)</option>
+        <option value="switching">switching (正在执行切号重试)</option>
+        <option value="no_usable_account">no_usable_account (切号失败/无可用额度账号)</option>
+      </select>
+    </label>
+
+    <label>
+      窗口宽度
+      <select id="viewport-select" onchange="applyViewport(this.value)">
+        <option value="desktop">Desktop (自适应桌面)</option>
+        <option value="w640">640px (窄版平板)</option>
+        <option value="w375">375px (手机/窄屏)</option>
+        <option value="w320">320px (超窄屏)</option>
+      </select>
+    </label>
+
+    <label>
+      全局用量显示配置
+      <select id="usage-config-select" onchange="applyUsageConfig(this.value)">
+        <option value="compact">Compact (紧凑折叠)</option>
+        <option value="aggregate">Aggregate (表格列聚合)</option>
+      </select>
+    </label>
+    
+    <button onclick="toggleTheme()" class="btn btn-sm">切换深浅色主题</button>
+  </div>
+
+  <!-- Simulated Shell View -->
+  <div id="simulated-viewport" style="display: flex; flex-direction: column; gap: 20px; transition: width 0.3s; margin: 0 auto; width: 100%;">
+    
+    <!-- C. APP SHELL TOPBAR -->
+    <div class="app-header">
+      <div class="header-left">
+        <span class="logo-sim">ypi</span>
+        <span style="color: var(--text-dim)">/</span>
+        <span style="font-size: 12px; color: var(--text-muted)">工作区: default</span>
+      </div>
+
+      <!-- Standalone Compact/Full Bar -->
+      <div class="header-right">
+        <div class="topbar-providers">
+          <!-- GPT -->
+          <button class="provider-trigger" title="GPT 额度: 剩余 76%">
+            <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="7.5"/></svg>
+            <span>GPT</span>
+          </button>
+          
+          <!-- Grok -->
+          <button class="provider-trigger" title="Grok 额度: 剩余 45%">
+            <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg warning" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="17.2"/></svg>
+            <span>Grok</span>
+          </button>
+
+          <!-- Kiro -->
+          <button class="provider-trigger" title="Kiro 额度: 剩余 12%">
+            <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg danger" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="27.6"/></svg>
+            <span>Kiro</span>
+          </button>
+
+          <!-- Antigravity Trigger (Standalone / Compact / Status indicator) -->
+          <button id="antigravity-trigger" class="provider-trigger" onclick="toggleUsageDetail()" aria-expanded="false" aria-controls="antigravity-popover">
+            <!-- Dynamic icon and text generated by js -->
+          </button>
+        </div>
+        
+        <!-- Toggle Button for Aggregate Table -->
+        <button class="btn btn-sm" onclick="toggleAggregate()" id="agg-panel-btn">聚合额度面板</button>
+      </div>
+
+      <!-- Standalone Usage Popover Panel -->
+      <div class="usage-detail-popover" id="antigravity-popover" role="dialog" aria-label="Antigravity 额度详情">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:6px;">
+          <span style="font-size:11px; font-weight:600; text-transform:uppercase;">Antigravity 额度详情</span>
+          <button class="btn btn-sm" style="padding:1px 5px; font-size:10px;" onclick="closePopovers()">关闭</button>
+        </div>
+        <div id="popover-content" style="display:flex; flex-direction:column; gap:8px;">
+          <!-- JS generated list of models inside topbar details -->
+        </div>
+        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--text-dim);">
+          <span id="popover-active-acc">活跃账号: None</span>
+          <a href="#" onclick="showSection('models'); closePopovers(); return false;" style="color:var(--accent); text-decoration:none;">账号管理</a>
+        </div>
+      </div>
+
+      <!-- Aggregate Popover Panel (Updated with Antigravity Column 4) -->
+      <div class="aggregate-dropdown" id="aggregate-popover" role="dialog" aria-label="全局用量聚合面板">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:6px;">
+          <span style="font-size:12px; font-weight:600;">多提供商额度聚合看板 (无跨提供商累加总和)</span>
+          <button class="btn btn-sm" style="padding:1px 5px; font-size:10px;" onclick="closePopovers()">关闭</button>
+        </div>
+        <div class="aggregate-grid">
+          <!-- Col 1: GPT -->
+          <div class="aggregate-col">
+            <div class="aggregate-header">GPT (1)</div>
+            <div class="aggregate-cell">
+              <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="7.5"/></svg>
+              <span>76% 可用</span>
+            </div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">3h 剩余</div>
+          </div>
+          <!-- Col 2: Grok -->
+          <div class="aggregate-col">
+            <div class="aggregate-header">Grok (2)</div>
+            <div class="aggregate-cell">
+              <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg warning" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="17.2"/></svg>
+              <span>45% 可用</span>
+            </div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">1.5h 剩余</div>
+          </div>
+          <!-- Col 3: Kiro -->
+          <div class="aggregate-col">
+            <div class="aggregate-header">Kiro (3)</div>
+            <div class="aggregate-cell">
+              <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg danger" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="27.6"/></svg>
+              <span>12% 可用</span>
+            </div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">20m 剩余</div>
+          </div>
+          <!-- Col 4: Antigravity (Aggregate integration) -->
+          <div class="aggregate-col" id="aggregate-antigravity-col">
+            <!-- Dynamic aggregate cell -->
+          </div>
+        </div>
+        <div style="font-size:10px; color:var(--text-dim); text-align:right;">
+          提示：用量聚合看板为平铺独立监控，不进行跨提供商的百分比求和或平均数计算。
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Simulator Layout Workspace -->
+    <div class="demo-grid">
+      
+      <!-- LEFT SIDEBAR / VIEWS -->
+      <div class="sidebar-views">
+        
+        <!-- A. MODELS CONFIGURATION SECTION -->
+        <div class="main-view" id="section-models">
+          <div class="view-title">
+            <span>Models 账号配置</span>
+            <span class="badge" style="background-color: var(--border); color: var(--text-muted)">模型提供商</span>
+          </div>
+
+          <div class="models-layout">
+            <div class="models-nav">
+              <div class="models-tab" onclick="alert('非本原型展示范围')">ChatGPT</div>
+              <div class="models-tab" onclick="alert('非本原型展示范围')">Grok</div>
+              <div class="models-tab" onclick="alert('非本原型展示范围')">Kiro</div>
+              <div class="models-tab active">Antigravity</div>
+            </div>
+
+            <!-- Risk Warning Banner -->
+            <div class="risk-banner warning">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-weight:600;">
+                <span>⚠️ 安全与非官方通道提示 (Antigravity Scope)</span>
+              </div>
+              <div class="setting-desc">
+                本组件使用非官方 Google Cloud Code 通道进行模型调用与额度刷新。OAuth 授权将获得 <strong>cloud-platform (GCP 完整资源读写)</strong> 等宽 scope 权限。请确保已知悉非官方 SLA 限制与官方 IDE 客户端模拟风险。本系统绝对不会收集或上报您的 client_secret、token 凭证或 projectId。
+              </div>
+            </div>
+
+            <!-- OAuth Login Trigger -->
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; gap:10px;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="simulateOAuthFlow()">
+                  添加 Antigravity 账号 (OAuth 登录)
+                </button>
+              </div>
+              <p style="font-size:10px; color:var(--text-dim); line-height:1.3;">
+                说明：由于 callback 强制绑定 127.0.0.1 (Loopback 安全策略)，远程 Web 部署用户可在 OAuth 流程失败后，手工粘贴 Redirect URL 完成绑定。不支持 Credential JSON 导入。
+              </p>
+            </div>
+
+            <!-- Manual OAuth Input Section (Mock UI state recovery helper) -->
+            <div id="manual-oauth-paste" class="oauth-input-panel hidden">
+              <label for="redirect-url-input">手工粘贴 OAuth Redirect URL 以恢复绑定</label>
+              <div style="display:flex; gap:8px; margin-top:4px;">
+                <input type="text" id="redirect-url-input" placeholder="http://localhost:51121/oauth-callback?state=...&code=..." />
+                <button class="btn btn-primary btn-sm" onclick="completeManualOAuth()">提交</button>
+              </div>
+              <span style="font-size:9px; color:var(--warning)">检测到授权回调端口 127.0.0.1 阻断，系统已安全解密 state params 并丢弃 secret value。</span>
+            </div>
+
+            <!-- Saved Accounts List -->
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <span style="font-size:11px; font-weight:600; color:var(--text-muted)">已存账号列表</span>
+              
+              <div class="accounts-list" id="accounts-list-container">
+                <!-- JS generated account rows -->
+              </div>
+            </div>
+
+            <!-- Quota Cards View inside Models Config -->
+            <div id="models-quota-card" class="quota-view-card">
+              <!-- JS generated Quota info -->
+            </div>
+
+          </div>
+        </div>
+
+        <!-- B. SETTINGS PANEL SECTION -->
+        <div class="main-view" id="section-settings">
+          <div class="view-title">
+            <span>Settings 系统设置</span>
+            <span class="badge" style="background-color: var(--border); color: var(--text-muted)">全局配置</span>
+          </div>
+
+          <div class="settings-layout">
+            <div class="settings-nav">
+              <div class="settings-nav-item" onclick="alert('非本原型展示范围')">常规设置</div>
+              <div class="settings-nav-item" onclick="alert('非本原型展示范围')">ChatGPT</div>
+              <div class="settings-nav-item" onclick="alert('非本原型展示范围')">Grok</div>
+              <div class="settings-nav-item" onclick="alert('非本原型展示范围')">Kiro</div>
+              <div class="settings-nav-item active">Antigravity</div>
+            </div>
+
+            <div class="settings-content">
+              <div class="settings-section-title">Antigravity 策略与额度控制</div>
+              
+              <!-- Switch 1: panel enabled -->
+              <div class="setting-row">
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" id="settings-panel-enabled" onchange="togglePanelConfig(this.checked)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="setting-label-col">
+                  <span class="setting-label">显示 Antigravity 用量悬浮面板</span>
+                  <span class="setting-desc">在顶栏提供独立的用量环、多模型额度列与详细配额信息展示。默认关闭。</span>
+                </div>
+              </div>
+
+              <!-- Switch 2: failover enabled -->
+              <div class="setting-row">
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" id="settings-failover-enabled" onchange="toggleFailoverConfig(this.checked)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="setting-label-col">
+                  <span class="setting-label">明确限额或限流时自动切换可用账号 (Auto-Failover)</span>
+                  <span class="setting-desc">检测到 RESOURCE_EXHAUSTED、rate_limit_exceeded、too many requests 等明确配额限流错误时，无缝切换到备用有效账号并单次重试当前 turn。默认关闭。</span>
+                </div>
+              </div>
+
+              <div class="risk-banner warning" style="margin-top: 10px;">
+                <div style="font-weight:600;">ℹ️ Fail-closed 降级与安全设计说明</div>
+                <div class="setting-desc">
+                  自动切号对模型感知 (Model-aware)。候选账号必须具有当前请求模型的 fresh 且 <strong>remainingFraction > 0</strong> 额度；若仅其他模型有额度、或对应配额状态过期 (stale) / 无法识别 (unknown)，切号模块将安全阻断 (fail-closed) 以防产生盲切或 token 损耗。
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT PANEL: CHAT WINDOW & SSE NOTIFICATIONS SIMULATOR -->
+      <div class="main-view">
+        <div class="view-title">
+          <span>Chat 终端与自动切号日志 (SSE Live Feedback)</span>
+          <span class="badge" style="background-color: var(--border); color: var(--text-muted)">Runtime SSE</span>
+        </div>
+
+        <div class="chat-view">
+          
+          <div class="chat-bubble user">
+            请帮我分析一下这段 Kubernetes 部署清单文件...
+          </div>
+
+          <!-- Dynamic Chat/SSE status elements -->
+          <div id="chat-stream-response" class="chat-bubble assistant">
+            <!-- Simulated response -->
+          </div>
+
+          <div id="chat-sse-notification" class="system-notification hidden">
+            <!-- Dynamic SSE event toast notification -->
+          </div>
+
+          <div id="chat-input-area" style="border-top: 1px solid var(--border); padding-top: 10px; display:flex; gap: 8px;">
+            <input type="text" disabled placeholder="正在使用当前 Active 账号进行对话推理..." style="flex:1; background-color:var(--bg-panel); border:1px solid var(--border); color:var(--text-dim); padding:6px 12px; font-size:12px; border-radius:4px;" />
+            <button class="btn btn-primary btn-sm" disabled>发送</button>
+          </div>
+
+        </div>
+        
+        <div style="font-size:11px; color:var(--text-dim); line-height:1.4;">
+          <strong>SSE 状态保护验收点：</strong> 发生切号事件时，流式 SSE 事件 <code>antigravity_account_failover</code> 中<strong>绝对禁止</strong>投影 raw token、refresh 密钥、GCP projectId、文件物理路径或原始未脱敏上游异常。
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // State store definition matching standard contracts
+    const dataStore = {
+      theme: 'dark',
+      panelEnabled: false,
+      failoverEnabled: false,
+      activeState: 'no_account',
+      selectedAccountIndex: 0,
+      accounts: [
+        {
+          id: 'acc-google-1',
+          displayName: 'work-team-leader@company.com',
+          maskedAccountId: 'antigravity-3a8c1f9e2b',
+          active: true,
+          remark: '主开发账号',
+          extraInfo: 'Project: internal-prod-9a',
+          quota: {
+            success: true,
+            cache: { state: 'live', queriedAt: new Date().toISOString(), ageMs: 2000 },
+            models: [
+              { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', publicModelIds: ['gemini-1.5-pro'], remainingFraction: 0.85, usedPercent: 15, resetsAt: '2026-07-16T22:00:00Z' },
+              { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet', publicModelIds: ['claude-3.5-sonnet'], remainingFraction: 0.40, usedPercent: 60, resetsAt: '2026-07-16T19:30:00Z' }
+            ]
+          }
+        },
+        {
+          id: 'acc-google-2',
+          displayName: 'personal-backup-dev@gmail.com',
+          maskedAccountId: 'antigravity-f8d2b93a0c',
+          active: false,
+          remark: '备用额度号',
+          extraInfo: 'Project: backup-sandbox-8c',
+          quota: {
+            success: true,
+            cache: { state: 'fresh', queriedAt: new Date(Date.now() - 30000).toISOString(), ageMs: 30000 },
+            models: [
+              { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', publicModelIds: ['gemini-1.5-pro'], remainingFraction: 0.95, usedPercent: 5, resetsAt: '2026-07-17T08:00:00Z' },
+              { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet', publicModelIds: ['claude-3.5-sonnet'], remainingFraction: 0.00, usedPercent: 100, resetsAt: '2026-07-16T18:15:00Z' }
+            ]
+          }
+        }
+      ]
+    };
+
+    function applyState(stateName) {
+      dataStore.activeState = stateName;
+      renderAll();
+    }
+
+    function applyViewport(mode) {
+      const container = document.getElementById('simulated-viewport');
+      if (mode === 'desktop') {
+        container.style.width = '100%';
+      } else if (mode === 'w640') {
+        container.style.width = '640px';
+      } else if (mode === 'w375') {
+        container.style.width = '375px';
+      } else if (mode === 'w320') {
+        container.style.width = '320px';
+      }
+    }
+
+    function applyUsageConfig(mode) {
+      if (mode === 'compact') {
+        document.getElementById('settings-panel-enabled').checked = false;
+        togglePanelConfig(false);
+      } else {
+        document.getElementById('settings-panel-enabled').checked = true;
+        togglePanelConfig(true);
+      }
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      if (body.classList.contains('theme-light')) {
+        body.classList.remove('theme-light');
+        dataStore.theme = 'dark';
+      } else {
+        body.classList.add('theme-light');
+        dataStore.theme = 'light';
+      }
+    }
+
+    function togglePanelConfig(checked) {
+      dataStore.panelEnabled = checked;
+      document.getElementById('settings-panel-enabled').checked = checked;
+      renderAll();
+    }
+
+    function toggleFailoverConfig(checked) {
+      dataStore.failoverEnabled = checked;
+      document.getElementById('settings-failover-enabled').checked = checked;
+      renderAll();
+    }
+
+    function toggleUsageDetail() {
+      const popover = document.getElementById('antigravity-popover');
+      const isVisible = popover.style.display === 'block';
+      closePopovers();
+      if (!isVisible) {
+        popover.style.display = 'block';
+        document.getElementById('antigravity-trigger').setAttribute('aria-expanded', 'true');
+      }
+    }
+
+    function toggleAggregate() {
+      const popover = document.getElementById('aggregate-popover');
+      const isVisible = popover.style.display === 'block';
+      closePopovers();
+      if (!isVisible) {
+        popover.style.display = 'block';
+      }
+    }
+
+    function closePopovers() {
+      document.getElementById('antigravity-popover').style.display = 'none';
+      document.getElementById('aggregate-popover').style.display = 'none';
+      document.getElementById('antigravity-trigger').setAttribute('aria-expanded', 'false');
+    }
+
+    function selectAccount(index) {
+      dataStore.selectedAccountIndex = index;
+      renderAll();
+    }
+
+    function activateAccount(index) {
+      dataStore.accounts.forEach((acc, i) => {
+        acc.active = (i === index);
+      });
+      renderAll();
+    }
+
+    function simulateOAuthFlow() {
+      const pastePanel = document.getElementById('manual-oauth-paste');
+      pastePanel.classList.remove('hidden');
+      alert("已拉起 Google 授权回调监听服务...\n[本机测试] 将自动打开 OAuth 授权页面。\n[远程代理] 如检测到端口阻断，请在控制台下方手动粘贴 Redirect URL 进行安全回调。");
+    }
+
+    function completeManualOAuth() {
+      const inputVal = document.getElementById('redirect-url-input').value;
+      if (!inputVal) {
+        alert("请输入合法的 Redirect URL");
+        return;
+      }
+      
+      // Simulate adding a new account safely
+      const newAcc = {
+        id: 'acc-google-' + (dataStore.accounts.length + 1),
+        displayName: 'newly-bound-team@domain.com',
+        maskedAccountId: 'antigravity-2e4a6f9c99',
+        active: false,
+        remark: '手工绑定账号',
+        extraInfo: 'Project: newly-linked-4b',
+        quota: {
+          success: true,
+          cache: { state: 'live', queriedAt: new Date().toISOString(), ageMs: 100 },
+          models: [
+            { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', publicModelIds: ['gemini-1.5-pro'], remainingFraction: 0.90, usedPercent: 10, resetsAt: '2026-07-17T12:00:00Z' }
+          ]
+        }
+      };
+
+      dataStore.accounts.push(newAcc);
+      document.getElementById('manual-oauth-paste').classList.add('hidden');
+      document.getElementById('redirect-url-input').value = '';
+      dataStore.selectedAccountIndex = dataStore.accounts.length - 1;
+      alert("账号绑定成功！projectId 已安全写入服务端私密文件夹，多账号已成功写入隔离存储。");
+      renderAll();
+    }
+
+    function deleteAccount(index) {
+      const acc = dataStore.accounts[index];
+      if (acc.active) {
+        alert("⚠️ 无法删除当前活跃 (Active) 账号！请先在其他账号执行 Activate 或切换后再行删除。");
+        return;
+      }
+      if (confirm(`确认要删除账号 ${acc.displayName} 吗？`)) {
+        dataStore.accounts.splice(index, 1);
+        if (dataStore.selectedAccountIndex >= dataStore.accounts.length) {
+          dataStore.selectedAccountIndex = Math.max(0, dataStore.accounts.length - 1);
+        }
+        renderAll();
+      }
+    }
+
+    function triggerRefreshQuota() {
+      const originalState = dataStore.activeState;
+      applyState('loading');
+      setTimeout(() => {
+        applyState(originalState);
+        alert("额度强制刷新完成 (10s Egress Timeout 保护已通过)");
+      }, 800);
+    }
+
+    // Main Renderer
+    function renderAll() {
+      const state = dataStore.activeState;
+      const trigger = document.getElementById('antigravity-trigger');
+      const popoverContent = document.getElementById('popover-content');
+      const popoverActiveAcc = document.getElementById('popover-active-acc');
+      const aggregateAntigravityCol = document.getElementById('aggregate-antigravity-col');
+      const accountsListContainer = document.getElementById('accounts-list-container');
+      const modelsQuotaCard = document.getElementById('models-quota-card');
+      const chatStreamResponse = document.getElementById('chat-stream-response');
+      const chatSseNotification = document.getElementById('chat-sse-notification');
+
+      // Sync active state configs
+      const activeAccount = dataStore.accounts.find(a => a.active) || null;
+      const selectedAccount = dataStore.accounts[dataStore.selectedAccountIndex] || null;
+
+      // 1. Render AppShell Trigger Button (C. 顶栏)
+      if (!dataStore.panelEnabled) {
+        trigger.className = "provider-trigger hidden";
+        document.getElementById('agg-panel-btn').classList.add('hidden');
+      } else {
+        trigger.className = "provider-trigger";
+        document.getElementById('agg-panel-btn').classList.remove('hidden');
+
+        if (state === 'no_account') {
+          trigger.classList.add('warning');
+          trigger.innerHTML = `<span>Antigravity 登录</span>`;
+        } else if (state === 'loading') {
+          trigger.innerHTML = `<span>加载中...</span>`;
+        } else if (state === 'reauth') {
+          trigger.classList.add('danger');
+          trigger.innerHTML = `<span>需登录</span>`;
+        } else if (state === 'invalid_project') {
+          trigger.classList.add('danger');
+          trigger.innerHTML = `<span>不可用</span>`;
+        } else if (state === 'switching') {
+          trigger.classList.add('warning');
+          trigger.innerHTML = `<span>正在切换...</span>`;
+        } else if (state === 'no_usable_account') {
+          trigger.classList.add('danger');
+          trigger.innerHTML = `<span>无可用额度</span>`;
+        } else if (state === 'stale') {
+          trigger.classList.add('warning');
+          trigger.innerHTML = `
+            <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg warning" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="15.7"/></svg>
+            <span>缓存过期</span>
+          `;
+        } else if (state === 'live_single_window' && activeAccount) {
+          // Display single ring for single model
+          trigger.innerHTML = `
+            <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="4.7"/></svg>
+            <span>Antigravity (85%)</span>
+          `;
+        } else {
+          // live_multi_model or fresh (Detail-only fallback)
+          trigger.innerHTML = `<span>多模型/详情</span>`;
+        }
+      }
+
+      // 2. Render Topbar popover details
+      popoverActiveAcc.textContent = activeAccount ? `活跃账号: ${activeAccount.displayName.split('@')[0]}` : "活跃账号: 无";
+      if (state === 'no_account') {
+        popoverContent.innerHTML = `<div style="font-size:11px; color:var(--text-dim);">未绑定任何 Google 账号，请在 Models 界面执行授权绑定。</div>`;
+      } else if (state === 'reauth') {
+        popoverContent.innerHTML = `<div style="font-size:11px; color:var(--danger);">凭证已过期。需要重新登录以恢复额度感知。</div>`;
+      } else if (state === 'invalid_project') {
+        popoverContent.innerHTML = `<div style="font-size:11px; color:var(--danger);">GCP 项目 ID 验证失败，请确认权限并重新绑定。</div>`;
+      } else if (state === 'loading') {
+        popoverContent.innerHTML = `<div style="font-size:11px; color:var(--text-dim);">正在向 Google Cloud 端点刷新配额中...</div>`;
+      } else if (activeAccount) {
+        let listHtml = '';
+        activeAccount.quota.models.forEach(m => {
+          listHtml += `
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+              <span style="color:var(--text-muted);">${m.label}</span>
+              <span style="font-family:var(--font-mono); font-weight:bold;">${m.usedPercent}% (剩余 ${Math.round(m.remainingFraction*100)}%)</span>
+            </div>
+          `;
+        });
+        popoverContent.innerHTML = listHtml;
+      }
+
+      // 3. Render Aggregate column 4
+      if (!dataStore.panelEnabled) {
+        aggregateAntigravityCol.classList.add('hidden');
+      } else {
+        aggregateAntigravityCol.classList.remove('hidden');
+        if (state === 'no_account') {
+          aggregateAntigravityCol.innerHTML = `
+            <div class="aggregate-header">Antigravity (4)</div>
+            <div class="aggregate-cell" style="color: var(--warning);">登录</div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">—</div>
+          `;
+        } else if (state === 'reauth') {
+          aggregateAntigravityCol.innerHTML = `
+            <div class="aggregate-header">Antigravity (4)</div>
+            <div class="aggregate-cell" style="color: var(--danger);">需登录</div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">—</div>
+          `;
+        } else if (state === 'invalid_project') {
+          aggregateAntigravityCol.innerHTML = `
+            <div class="aggregate-header">Antigravity (4)</div>
+            <div class="aggregate-cell" style="color: var(--danger);">不可用</div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">—</div>
+          `;
+        } else if (state === 'loading') {
+          aggregateAntigravityCol.innerHTML = `
+            <div class="aggregate-header">Antigravity (4)</div>
+            <div class="aggregate-cell">加载中...</div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">—</div>
+          `;
+        } else if (state === 'live_single_window') {
+          aggregateAntigravityCol.innerHTML = `
+            <div class="aggregate-header">Antigravity (4)</div>
+            <div class="aggregate-cell">
+              <svg class="ring-svg"><circle class="ring-bg" cx="7" cy="7" r="5"/><circle class="ring-fg" cx="7" cy="7" r="5" stroke-dasharray="31.4" stroke-dashoffset="4.7"/></svg>
+              <span>85% 可用</span>
+            </div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">2.5h 剩余</div>
+          `;
+        } else {
+          // multi model detail-only fallback
+          aggregateAntigravityCol.innerHTML = `
+            <div class="aggregate-header">Antigravity (4)</div>
+            <div class="aggregate-cell" style="color: var(--text-muted); font-size:10px;">多模型/详情</div>
+            <div class="aggregate-cell" style="color: var(--text-dim);">无单一指标</div>
+          `;
+        }
+      }
+
+      // 4. Render Saved Accounts List (Models Config Panel A)
+      if (state === 'no_account' || dataStore.accounts.length === 0) {
+        accountsListContainer.innerHTML = `<div style="font-size:12px; color:var(--text-dim); text-align:center; padding:15px;">暂无已绑定的 Google 账号。</div>`;
+      } else {
+        let accHtml = '';
+        dataStore.accounts.forEach((acc, index) => {
+          const isSelected = index === dataStore.selectedAccountIndex;
+          const isActive = acc.active;
+          const isRowActive = isSelected ? 'active' : '';
+          
+          accHtml += `
+            <div class="account-row ${isRowActive}" onclick="selectAccount(${index})">
+              <div class="account-info">
+                <span class="status-dot ${isActive ? 'active' : ''}"></span>
+                <div class="account-details">
+                  <span class="account-title" title="${acc.displayName}">${acc.displayName}</span>
+                  <span class="account-sub" title="${acc.maskedAccountId}">${acc.maskedAccountId}</span>
+                  <span style="font-size:9px; color:var(--text-dim); margin-top:2px;">${acc.remark} · ${acc.extraInfo}</span>
+                </div>
+              </div>
+              <div class="account-actions">
+                ${isActive 
+                  ? `<span style="font-size:10px; color:var(--success); font-weight:600; padding: 2px 5px;">Active</span>`
+                  : `<button class="btn btn-sm btn-primary" style="padding: 2px 6px;" onclick="event.stopPropagation(); activateAccount(${index})">激活</button>`
+                }
+                <button class="btn btn-sm btn-danger" style="padding: 2px 6px;" onclick="event.stopPropagation(); deleteAccount(${index})">删除</button>
+              </div>
+            </div>
+          `;
+        });
+        accountsListContainer.innerHTML = accHtml;
+      }
+
+      // 5. Render Quota Card details (Models Config Panel A)
+      if (state === 'no_account' || !selectedAccount) {
+        modelsQuotaCard.innerHTML = `<div style="font-size:11px; color:var(--text-dim);">绑定账号并选中后，此处将安全投影获取的 Google fetchAvailableModels 指标看板。</div>`;
+      } else {
+        const qData = selectedAccount.quota;
+        const buckets = qData.models;
+        
+        let quotaHtml = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase;">
+                Antigravity 额度指标 (fetchAvailableModels)
+              </span>
+              <span style="font-size:10px; color:var(--text-dim);">
+                ${state === 'loading' 
+                  ? '数据正在异步刷新中...' 
+                  : `配额缓存状态：${state === 'stale' ? '⚠️ 已过期' : '✅ 正常新鲜'} (更新于: ${qData.cache.queriedAt.substring(11,19)})`
+                }
+              </span>
+            </div>
+            <button class="btn btn-sm" onclick="triggerRefreshQuota()" ${state === 'loading' ? 'disabled' : ''}>强制刷新</button>
+          </div>
+        `;
+
+        if (state === 'reauth') {
+          quotaHtml += `
+            <div class="risk-banner danger">
+              <strong>⚠️ 账号凭证登录失效 (401 Unauthorized)</strong>
+              <span>GCP Access Token 已失效且无法自动 refresh。请重新登录授权以恢复此账号服务。</span>
+            </div>
+          `;
+        } else if (state === 'invalid_project') {
+          quotaHtml += `
+            <div class="risk-banner danger">
+              <strong>⚠️ 项目 ID 验证失败 / 无访问权限 (403 Access Denied)</strong>
+              <span>该授权账号没有 Google Cloud Code Assist 对应 API 控制台的项目授权。</span>
+            </div>
+          `;
+        } else if (state === 'loading') {
+          quotaHtml += `
+            <div style="font-size:11px; color:var(--text-dim); text-align:center; padding:15px;">
+              正在连接 Google 鉴权与配额网关...
+            </div>
+          `;
+        } else {
+          // Render model bars
+          buckets.forEach(b => {
+            const isModelStale = (state === 'stale');
+            const usedVal = isModelStale ? b.usedPercent : b.usedPercent;
+            const remainingFraction = isModelStale ? b.remainingFraction : b.remainingFraction;
+            
+            quotaHtml += `
+              <div class="quota-bar-wrapper">
+                <div class="quota-bar-info">
+                  <span class="quota-model-name">${b.label}</span>
+                  <span class="quota-values" style="color: ${remainingFraction === 0 ? 'var(--danger)' : 'var(--accent)'}">
+                    使用率 ${usedVal}% <span style="color:var(--text-dim); font-size:10px;">/ 剩余 ${Math.round(remainingFraction*100)}%</span>
+                  </span>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-label="${b.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${usedVal}">
+                  <div class="progress-fill" style="width: ${usedVal}%; background-color: ${remainingFraction === 0 ? 'var(--danger)' : 'var(--accent)'}"></div>
+                </div>
+                <div class="quota-bar-sub">
+                  安全重置时间：${b.resetsAt.substring(0, 10)} ${b.resetsAt.substring(11, 19)} UTC (不参与顶栏 N-ring 时序排序)
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        quotaHtml += `
+          <div class="cache-status-footer">
+            <span class="status-dot active" style="background-color: ${state === 'stale' ? 'var(--warning)' : 'var(--success)'}"></span>
+            <span>缓存新鲜度: ${state === 'stale' ? '30m 前缓存' : '30s 内实时'} (Egress 60s 缓存写入锁定已生效)</span>
+          </div>
+        `;
+
+        modelsQuotaCard.innerHTML = quotaHtml;
+      }
+
+      // 6. Render Chat SSE Simulator & Response Copy
+      if (state === 'no_account') {
+        chatStreamResponse.innerHTML = `<span style="color:var(--danger)">[错误] 未检测到有效的 Active Google Antigravity 账号配置。请在 Models 进行配置授权。</span>`;
+        chatSseNotification.classList.add('hidden');
+      } else if (state === 'reauth') {
+        chatStreamResponse.innerHTML = `<span style="color:var(--danger)">[错误] API 请求遇到 401 Unauthorized。Active 账号需要重新登录。</span>`;
+        chatSseNotification.classList.add('hidden');
+      } else if (state === 'invalid_project') {
+        chatStreamResponse.innerHTML = `<span style="color:var(--danger)">[错误] 403 Forbidden / Project Invalid。无法验证您的项目授权范围。</span>`;
+        chatSseNotification.classList.add('hidden');
+      } else if (state === 'switching') {
+        chatStreamResponse.innerHTML = `<span style="color:var(--warning)">[警告] RESOURCE_EXHAUSTED (Gemini 1.5 Pro) 额度已耗尽。系统正在捕获该错误事件...</span>`;
+        
+        chatSseNotification.classList.remove('hidden');
+        chatSseNotification.className = "system-notification";
+        chatSseNotification.innerHTML = `
+          <div>
+            <strong>[SSE 事件] antigravity_account_failover</strong><br/>
+            <span>原因: RESOURCE_EXHAUSTED | 已检测到 Active 账号额度耗尽。<br/>正在自动安全切号并单次重试当前对话 turn。</span>
+          </div>
+        `;
+      } else if (state === 'no_usable_account') {
+        chatStreamResponse.innerHTML = `<span style="color:var(--danger)">[错误] RESOURCE_EXHAUSTED (Claude 3.5 Sonnet) 额度已耗尽。</span>`;
+        
+        chatSseNotification.classList.remove('hidden');
+        chatSseNotification.className = "system-notification danger";
+        chatSseNotification.innerHTML = `
+          <div>
+            <strong>[SSE 阻断] fail-closed</strong><br/>
+            <span>原因: 没有满足 fresh 且 remaining > 0 的可用候选备用账号。<br/>切号模块已安全熔断，未进行盲目多重切换重试。</span>
+          </div>
+        `;
+      } else {
+        // live single, multi, fresh, stale
+        chatStreamResponse.innerHTML = `
+          <span>根据您的 Kubernetes YAML 配置清单，我建议进行以下优化以提供更好的可用性：</span>
+          <pre style="font-family:var(--font-mono); font-size:10px; margin-top:5px; padding:5px; background:var(--bg); border:1px solid var(--border); overflow:auto;">
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yolk-pi-web
+spec:
+  replicas: 3 # 提升副本数以保障高可用
+          </pre>
+        `;
+        chatSseNotification.classList.add('hidden');
+      }
+    }
+
+    // Initialize Page
+    function init() {
+      applyState('no_account');
+      togglePanelConfig(false);
+      toggleFailoverConfig(false);
+    }
+    
+    init();
+  </script>
+</body>
+</html>

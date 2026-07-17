@@ -294,7 +294,7 @@ export function buildChatGptUsageWindowCandidates(
       tier.name === "five_hour"
         ? "5h"
         : tier.name === "seven_day"
-          ? "周"
+          ? "7d"
           : compactLabel;
     const fullLabel = panelLabel;
     let title: string;

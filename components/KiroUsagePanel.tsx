@@ -629,7 +629,7 @@ export function KiroUsagePanel({
     return {
       key: "kiro",
       label: "Kiro",
-      order: 3,
+      order: 2,
       risk,
       loading,
       ringUnit,

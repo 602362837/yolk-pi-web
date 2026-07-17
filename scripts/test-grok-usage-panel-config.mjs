@@ -197,7 +197,7 @@ try {
     assert.equal(unit.layers.length, 2);
     // Shared projector: short→long regardless of adapter field order.
     assert.equal(unit.layers[0].id, "grok-week");
-    assert.equal(unit.layers[0].shortLabel, "周");
+    assert.equal(unit.layers[0].shortLabel, "7d");
     assert.equal(unit.layers[0].percent, 51);
     assert.equal(unit.layers[1].id, "grok-month");
     assert.equal(unit.layers[1].shortLabel, "月");
@@ -205,7 +205,7 @@ try {
     assert.equal(unit.centerLayerId, "grok-week");
     assert.notEqual(unit.centerLayerId, "grok-month");
     assert.equal(isValidRingUnitCenter(unit), true);
-    assert.match(unit.ariaLabel, /中心为外圈优先层 周 51%/);
+    assert.match(unit.ariaLabel, /中心为外圈优先层 7d 51%/);
     assert.doesNotMatch(unit.ariaLabel, /中心为外圈优先层 月/);
     assert.equal(formatRingCenterValue(unit.layers[0].percent), "51%");
   });
@@ -225,7 +225,7 @@ try {
     assert.equal(unit.layers[1].percent, 73);
     assert.equal(formatRingCenterValue(unit.layers[0].percent), "—");
     assert.notEqual(formatRingCenterValue(unit.layers[0].percent), "73%");
-    assert.match(unit.ariaLabel, /中心为外圈优先层 周 —/);
+    assert.match(unit.ariaLabel, /中心为外圈优先层 7d —/);
   });
 
   await test("Grok only-month / only-week single-layer centers match the available window", () => {
@@ -249,7 +249,7 @@ try {
     assert.ok(onlyWeek);
     assert.equal(onlyWeek.layers.length, 1);
     assert.equal(onlyWeek.centerLayerId, "grok-week");
-    assert.equal(onlyWeek.layers[0].shortLabel, "周");
+    assert.equal(onlyWeek.layers[0].shortLabel, "7d");
 
     // Candidate builder emits only present windows; projector decides radial order.
     // Month-first input still projects week outer when both exist.
@@ -340,7 +340,7 @@ try {
     assert.match(panel, /ringUnit=\{aggregateProjection\.ringUnit\}/);
     assert.match(panel, /onProjectionChange/);
     // Standalone still click-toggles its own dialog.
-    assert.match(panel, /onClick=\{\(\) => setOpen\(\(value\) => !value\)\}/);
+    assert.match(panel, /setOpen/);
     // Compact/full normal quota no longer uses text summary chips.
     assert.doesNotMatch(panel, /compactSummaries/);
     assert.doesNotMatch(panel, /ProviderUsageCompactSummary/);

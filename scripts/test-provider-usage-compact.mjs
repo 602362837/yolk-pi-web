@@ -9,7 +9,7 @@
  * - Aggregate hover/focus columns shell (no accordion / no fetch / no total ring)
  * - Theme tokens + panel large ring (≥ trigger 30px) + responsive column breakpoints
  * - GPT/Grok/Kiro actual-window adapters via shared projector
- * - Single app-top-usage-panel host, GPT→Grok→Kiro order, one right padding
+ * - Single app-top-usage-panel host, GPT→Grok→Kiro→Antigravity order, one right padding
  * - KiroUsagePanel accountId/generation guards and safe short fallbacks (no 0% invent)
  * - No secret/raw payload projection in Kiro panel source
  *
@@ -119,7 +119,7 @@ await test("shared N-ring contract: center outermost + independent tone + clamp"
   const single = createProviderUsageRingUnit({
     layers: [{
       id: "gpt-week",
-      shortLabel: "周",
+      shortLabel: "7d",
       fullLabel: "周额度",
       percent: 37,
       title: "周额度已使用 37%",
@@ -142,7 +142,7 @@ await test("shared N-ring contract: center outermost + independent tone + clamp"
       },
       {
         id: "gpt-week",
-        shortLabel: "周",
+        shortLabel: "7d",
         fullLabel: "周额度",
         percent: 37,
         title: "周额度已使用 37%",
@@ -169,7 +169,7 @@ await test("shared N-ring contract: center outermost + independent tone + clamp"
       },
       {
         id: "gpt-week",
-        shortLabel: "周",
+        shortLabel: "7d",
         fullLabel: "周额度",
         percent: 37,
         title: "周额度已使用 37%",
@@ -186,7 +186,7 @@ await test("shared N-ring contract: center outermost + independent tone + clamp"
     layers: [
       {
         id: "grok-week",
-        shortLabel: "周",
+        shortLabel: "7d",
         fullLabel: "周额度",
         percent: 51,
         title: "周额度已使用 51%",
@@ -202,7 +202,7 @@ await test("shared N-ring contract: center outermost + independent tone + clamp"
     providerLabel: "Grok",
   });
   assert.equal(grok.centerLayerId, "grok-week");
-  assert.match(grok.ariaLabel, /中心为外圈优先层 周 51%/);
+  assert.match(grok.ariaLabel, /中心为外圈优先层 7d 51%/);
 
   // 3 layers all rendered, no +N
   const triple = createProviderUsageRingUnit({
@@ -379,7 +379,7 @@ await test("shared projector: permutation, only-one, unknown/tie, outer unknown 
   // known + unknown → known ring(s), unknown detail-only
   const knownPlusUnknown = projectProviderUsageWindows([
     cand({ id: "unk", shortLabel: "Other", fullLabel: "Other bucket" }),
-    cand({ id: "week", shortLabel: "周", durationEvidence: "weekly", percent: 51 }),
+    cand({ id: "week", shortLabel: "7d", durationEvidence: "weekly", percent: 51 }),
     cand({ id: "hour", shortLabel: "h", durationEvidence: "hourly", percent: 10 }),
   ]);
   assert.equal(knownPlusUnknown.mode, "ordered-multi");
@@ -390,7 +390,7 @@ await test("shared projector: permutation, only-one, unknown/tie, outer unknown 
   // one known + unknown multi → degraded-single
   const degraded = projectProviderUsageWindows([
     cand({ id: "u1", shortLabel: "A", fullLabel: "Alpha limits" }),
-    cand({ id: "week-only", shortLabel: "周", durationEvidence: "week", percent: 22 }),
+    cand({ id: "week-only", shortLabel: "7d", durationEvidence: "week", percent: 22 }),
     cand({ id: "u2", shortLabel: "B", fullLabel: "Beta remaining" }),
   ]);
   assert.equal(degraded.mode, "degraded-single");
@@ -449,7 +449,7 @@ await test("shared projector: permutation, only-one, unknown/tie, outer unknown 
       percent: null,
       unknownCenterValue: "余 80",
     }),
-    cand({ id: "inner", shortLabel: "周", durationEvidence: "7d", percent: 37 }),
+    cand({ id: "inner", shortLabel: "7d", durationEvidence: "7d", percent: 37 }),
   ]);
   assert.equal(outerUnknown.mode, "ordered-multi");
   assert.equal(outerUnknown.ringUnit.centerLayerId, "outer");
@@ -467,7 +467,7 @@ await test("shared projector: permutation, only-one, unknown/tie, outer unknown 
 
   // Invalid / absent candidates filtered out
   const filtered = projectProviderUsageWindows([
-    cand({ id: "ok", shortLabel: "周", durationEvidence: "week", present: true, trusted: true }),
+    cand({ id: "ok", shortLabel: "7d", durationEvidence: "week", present: true, trusted: true }),
     cand({ id: "ghost", shortLabel: "5h", durationEvidence: "5h", present: false, trusted: true }),
     cand({ id: "unsafe", shortLabel: "月", durationEvidence: "month", present: true, trusted: false }),
     { id: "", shortLabel: "x", fullLabel: "x", title: "x", present: true, trusted: true, percent: 1, durationMs: null },
@@ -548,28 +548,37 @@ await test("ProviderUsageAggregatePanel is hover/focus columns shell without fet
   assert.match(panel, /triggerRef\.current\.focus/);
 });
 
-await test("AppShell mounts GPT→Grok→Kiro with one host and global displayMode", () => {
+await test("AppShell mounts GPT→Grok→Kiro→Antigravity with one host and global displayMode", () => {
   const appShell = read("components/AppShell.tsx");
   assert.match(appShell, /import \{ KiroUsagePanel \} from "\.\/KiroUsagePanel"/);
+  assert.match(appShell, /import \{ AntigravityUsagePanel \} from "\.\/AntigravityUsagePanel"/);
   assert.match(appShell, /showKiroUsage = webConfig\?\.kiro\.usagePanelEnabled === true/);
-  assert.match(appShell, /showAnyProviderUsage = showChatGptUsage \|\| showGrokUsage \|\| showKiroUsage/);
+  assert.match(appShell, /showAntigravityUsage = webConfig\?\.antigravity\.usagePanelEnabled === true/);
+  assert.match(
+    appShell,
+    /showAnyProviderUsage = showChatGptUsage \|\| showGrokUsage \|\| showKiroUsage \|\| showAntigravityUsage/,
+  );
   assert.match(appShell, /providerUsageDisplayMode/);
   // Compact applies only when not aggregated (aggregate presentation priority).
   assert.match(appShell, /!providerUsageAggregated && webConfig\?\.usage\.providerPanelsCompact === true \? "compact" : "full"/);
   assert.match(appShell, /app-top-usage-panel/);
   assert.match(appShell, /showAnyProviderUsage \? 12 : rightPanelTogglePadding/);
 
-  // Standalone order: GPT then Grok then Kiro in the single host (JSX-mutex with aggregate).
+  // Standalone order: GPT then Grok then Kiro then Antigravity in the single host.
   const gptIdx = appShell.indexOf("<ChatGptUsagePanel");
   const grokIdx = appShell.indexOf("<GrokUsagePanel");
   const kiroIdx = appShell.indexOf("<KiroUsagePanel");
-  assert.ok(gptIdx > 0 && grokIdx > gptIdx && kiroIdx > grokIdx, "expected GPT → Grok → Kiro mount order");
+  const antiIdx = appShell.indexOf("<AntigravityUsagePanel");
+  assert.ok(
+    gptIdx > 0 && grokIdx > gptIdx && kiroIdx > grokIdx && antiIdx > kiroIdx,
+    "expected GPT → Grok → Kiro → Antigravity mount order",
+  );
 
   assert.match(appShell, /displayMode=\{providerUsageDisplayMode\}/);
   // Only one paddingRight assignment on the usage host.
   const hostBlock = appShell.slice(
     appShell.indexOf("app-top-usage-panel"),
-    appShell.indexOf("app-top-usage-panel") + 1400,
+    appShell.indexOf("app-top-usage-panel") + 1800,
   );
   assert.equal((hostBlock.match(/paddingRight/g) || []).length, 1);
 });
@@ -586,7 +595,8 @@ await test("ChatGptUsagePanel keeps 5h/week schema and accepts displayMode", () 
   assert.match(panel, /projectProviderUsageWindows/);
   assert.match(panel, /gpt-week/);
   assert.match(panel, /gpt-5h/);
-  assert.match(panel, /["']周["']/);
+  assert.match(panel, /["']7d["']/);
+  assert.match(panel, /周额度/);
   assert.match(panel, /["']5h["']/);
   assert.doesNotMatch(panel, /hasFiveHour[\s\S]{0,120}layers\.push/);
   assert.doesNotMatch(panel, /compactSummaries|summaries\.push|ProviderUsageCompactSummary/);
@@ -607,7 +617,7 @@ await test("GrokUsagePanel keeps month/week schema and accepts displayMode", () 
   assert.match(panel, /displayMode = "full"/);
   assert.match(panel, /ProviderUsageTrigger/);
   assert.match(projection, /shortLabel: "月"/);
-  assert.match(projection, /shortLabel: "周"/);
+  assert.match(projection, /shortLabel: "7d"/);
   assert.match(projection, /buildGrokUsageRingUnit|projectProviderUsageWindows/);
   assert.match(projection, /buildGrokUsageWindowCandidates/);
   assert.match(projection, /id: "grok-month"/);

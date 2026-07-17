@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
  * Stable provider section ids stay aligned with SettingsSection.
  */
 
-export type SettingsProviderSection = "chatgpt" | "opencodeGo" | "grok" | "kiro";
+export type SettingsProviderSection = "chatgpt" | "opencodeGo" | "grok" | "kiro" | "antigravity";
 
 export interface SettingsProviderHubChatGptDraft {
   usagePanelEnabled: boolean;
@@ -32,11 +32,17 @@ export interface SettingsProviderHubKiroDraft {
   autoFailoverEnabled: boolean;
 }
 
+export interface SettingsProviderHubAntigravityDraft {
+  usagePanelEnabled: boolean;
+  autoFailoverEnabled: boolean;
+}
+
 export interface SettingsProviderHubProps {
   chatgpt: SettingsProviderHubChatGptDraft;
   opencodeGo: SettingsProviderHubOpencodeGoDraft;
   grok: SettingsProviderHubGrokDraft;
   kiro: SettingsProviderHubKiroDraft;
+  antigravity: SettingsProviderHubAntigravityDraft;
   onOpenProvider: (section: SettingsProviderSection) => void;
 }
 
@@ -141,6 +147,16 @@ function buildGrokRows(draft: SettingsProviderHubGrokDraft): StatusRow[] {
   ];
 }
 
+function buildAntigravityRows(draft: SettingsProviderHubAntigravityDraft): StatusRow[] {
+  const usage = booleanStatus(draft.usagePanelEnabled);
+  const failover = booleanStatus(draft.autoFailoverEnabled);
+  return [
+    { label: "顶部用量面板", value: usage.value, tone: usage.tone },
+    { label: "限额/限流自动切换", value: failover.value, tone: failover.tone },
+    { label: "Global Active", value: "Models", tone: "models" },
+  ];
+}
+
 function buildKiroRows(draft: SettingsProviderHubKiroDraft): StatusRow[] {
   const usage = booleanStatus(draft.usagePanelEnabled);
   const failover = booleanStatus(draft.autoFailoverEnabled);
@@ -156,6 +172,7 @@ export function SettingsProviderHub({
   opencodeGo,
   grok,
   kiro,
+  antigravity,
   onOpenProvider,
 }: SettingsProviderHubProps): ReactNode {
   return (
@@ -204,6 +221,14 @@ export function SettingsProviderHub({
           title="Kiro"
           description="AWS GetUsageLimits 与账号轮换策略"
           rows={buildKiroRows(kiro)}
+          onOpen={onOpenProvider}
+        />
+        <ProviderCard
+          section="antigravity"
+          mark="A"
+          title="Antigravity"
+          description="Cloud Code 多账号额度与 model-aware 切号"
+          rows={buildAntigravityRows(antigravity)}
           onOpen={onOpenProvider}
         />
       </div>
