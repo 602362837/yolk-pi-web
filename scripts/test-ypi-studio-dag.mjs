@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  approveYpiStudioImprovementPlanFromWidget,
+  approveYpiStudioPlanFromWidget,
   archiveYpiStudioTask,
   bindYpiStudioTaskToContext,
   claimYpiStudioImprovementSubtask,
@@ -12,6 +14,7 @@ import {
   getNextYpiStudioImplementationSubtask,
   getYpiStudioTaskDetail,
   implementationCounts,
+  isYpiStudioWidgetStartUserAcceptanceBody,
   listYpiStudioTaskHtmlPrototypeFileNames,
   normalizeImplementationPlan,
   propagateBlockedDependents,
@@ -21,11 +24,13 @@ import {
   recordYpiStudioSubagentRun,
   recordYpiStudioUserApproval,
   refreshDerivedImplementationDAG,
+  requestYpiStudioPlanChangesFromWidget,
   resolveYpiStudioImprovementDisposition,
   resolveYpiStudioImprovementRelativeFile,
   reviseYpiStudioImprovementPlan,
   selectNextYpiStudioImplementationSubtask,
   selectReadyYpiStudioImplementationSubtasks,
+  startYpiStudioUserAcceptanceFromWidget,
   transitionYpiStudioImprovement,
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
@@ -35,7 +40,13 @@ import {
   ypiStudioTaskPlanReviewFileExists,
   YpiStudioTaskSecurityError,
 } from "../lib/ypi-studio-tasks.ts";
-import { resolveYpiStudioTaskForSession } from "../lib/ypi-studio-session-link.ts";
+import {
+  buildYpiStudioRequestPlanChangesContinuationCommand,
+  parseYpiStudioSessionIdFromContextId,
+  resolveYpiStudioRequestPlanChangesContinuation,
+  resolveYpiStudioSessionAutocontinueCommand,
+  resolveYpiStudioTaskForSession,
+} from "../lib/ypi-studio-session-link.ts";
 import {
   countActiveYpiStudioChildRunsForSession,
   registerYpiStudioChildRun,
@@ -2196,6 +2207,498 @@ function assertBoundedQuickPreviews(projection) {
     if (projection.improvements?.instances?.length) {
       assert.ok(projection.improvements.instances.every((item) => item.canAccept !== true));
     }
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+// --- Widget start_user_acceptance domain helper (SUA-DOMAIN-01) ---
+
+{
+  const body = {
+    cwd: "/tmp",
+    action: "start_user_acceptance",
+    contextId: "pi_session",
+    expectedRevision: 1,
+  };
+  assert.equal(isYpiStudioWidgetStartUserAcceptanceBody(body), true);
+  assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...body, override: true }), false, "override rejected");
+  assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...body, expectedRevision: 1.5 }), false);
+  assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...body, expectedRevision: "1" }), false);
+  assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...body, action: "approve_plan" }), false);
+}
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-start-ua-"));
+  try {
+    const contextId = "pi_widget_start_ua";
+    const task = createYpiStudioTask({ cwd, title: "Widget start UA", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
+    transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "checking", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "review", override: true, contextId });
+
+    let detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "review");
+    const revision = detail.meta.planRevision ?? 1;
+    const grantBefore = detail.meta.approvalGrant;
+
+    // Wrong context: zero write
+    assert.throws(
+      () => startYpiStudioUserAcceptanceFromWidget(task.id, {
+        cwd, action: "start_user_acceptance", contextId: "pi_other_session", expectedRevision: revision,
+      }),
+      /not bound to this session context/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "review");
+
+    // Stale revision: zero write
+    assert.throws(
+      () => startYpiStudioUserAcceptanceFromWidget(task.id, {
+        cwd, action: "start_user_acceptance", contextId, expectedRevision: revision + 99,
+      }),
+      /plan revision changed/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "review");
+
+    // Unresolved improvements: zero write
+    const withImp = createYpiStudioImprovement(task.id, {
+      cwd, action: "create_improvement", title: "Block UA", feedback: "still open", contextId,
+    });
+    assert.equal(withImp.status, "waiting_for_improvements");
+    // Parent may leave review when creating improvements; force back to review with unresolved instance.
+    transitionYpiStudioTask(task.id, { cwd, to: "review", override: true, contextId });
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "review");
+    assert.ok(detail.improvements?.instances?.some((inst) => inst.status !== "accepted" && inst.status !== "accepted_not_doing"));
+    assert.throws(
+      () => startYpiStudioUserAcceptanceFromWidget(task.id, {
+        cwd, action: "start_user_acceptance", contextId, expectedRevision: detail.meta.planRevision ?? 1,
+      }),
+      /zero unresolved improvements/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "review", "unresolved must not leave review");
+
+    // Resolve the improvement so clean review can proceed
+    const impId = detail.improvements.instances[0].id;
+    transitionYpiStudioImprovement(task.id, {
+      cwd, action: "transition_improvement", improvementId: impId, to: "cancelled", contextId,
+    });
+    resolveYpiStudioImprovementDisposition(task.id, {
+      cwd,
+      action: "resolve_improvement_disposition",
+      improvementId: impId,
+      disposition: "accepted_not_doing",
+      reason: "Not needed for UA domain test",
+      contextId,
+    });
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    // Parent may auto-reconcile; ensure review + clean for happy path.
+    if (detail.status !== "review") {
+      transitionYpiStudioTask(task.id, { cwd, to: "review", override: true, contextId });
+      detail = getYpiStudioTaskDetail(cwd, task.id);
+    }
+    assert.equal(detail.status, "review");
+    assert.ok((detail.improvements?.instances ?? []).every((inst) => inst.status === "accepted" || inst.status === "accepted_not_doing"));
+
+    const accepted = startYpiStudioUserAcceptanceFromWidget(task.id, {
+      cwd,
+      action: "start_user_acceptance",
+      contextId,
+      expectedRevision: detail.meta.planRevision ?? 1,
+    });
+    assert.equal(accepted.status, "user_acceptance");
+    assert.ok(!accepted.completedAt, "must not complete");
+    assert.ok(!accepted.archived, "must not archive");
+    assert.deepEqual(accepted.meta.approvalGrant, grantBefore, "must not write/clear plan grant");
+    assert.equal(accepted.currentMember, "main");
+
+    const eventsPath = join(cwd, ".ypi", "tasks", task.id, "events.jsonl");
+    const events = readFileSync(eventsPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    const startEvent = events.find((ev) => ev.type === "transition" && ev.data?.action === "start_user_acceptance");
+    assert.ok(startEvent, "auditable start_user_acceptance transition event");
+    assert.equal(startEvent.from, "review");
+    assert.equal(startEvent.to, "user_acceptance");
+    assert.equal(startEvent.data.source, "user-widget");
+    assert.equal(startEvent.data.contextId, contextId);
+
+    // Wrong status after success: zero partial write / no re-entry
+    assert.throws(
+      () => startYpiStudioUserAcceptanceFromWidget(task.id, {
+        cwd, action: "start_user_acceptance", contextId, expectedRevision: accepted.meta.planRevision ?? 1,
+      }),
+      /requires status review/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "user_acceptance");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+// --- Widget decision CTA domain helpers (CTA-DOMAIN-01) ---
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-approve-plan-"));
+  try {
+    const contextId = "pi_widget_approve_plan";
+    const task = createYpiStudioTask({ cwd, title: "Widget approve plan", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+
+    // Wrong context: zero write
+    assert.throws(
+      () => approveYpiStudioPlanFromWidget(task.id, {
+        cwd, action: "approve_plan", contextId: "pi_other_session", expectedRevision: 1,
+      }),
+      /not bound to this session context/,
+    );
+    let detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "awaiting_approval");
+    assert.equal(detail.meta.approvalGrant, undefined);
+
+    // Stale revision: zero write
+    assert.throws(
+      () => approveYpiStudioPlanFromWidget(task.id, {
+        cwd, action: "approve_plan", contextId, expectedRevision: 99,
+      }),
+      /plan revision changed/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "awaiting_approval");
+    assert.equal(detail.meta.approvalGrant, undefined);
+
+    // Happy path: one user-widget grant + atomic implementing
+    const approved = approveYpiStudioPlanFromWidget(task.id, {
+      cwd, action: "approve_plan", contextId, expectedRevision: 1,
+    });
+    assert.equal(approved.status, "implementing");
+    assert.equal(approved.meta.approvalGrant?.source, "user-widget");
+    assert.equal(approved.meta.approvalGrant?.contextId, contextId);
+    assert.ok(approved.meta.approvalGrant?.inputHash);
+
+    // Second approve conflicts on status; no double transition
+    assert.throws(
+      () => approveYpiStudioPlanFromWidget(task.id, {
+        cwd, action: "approve_plan", contextId, expectedRevision: 1,
+      }),
+      /requires status awaiting_approval/,
+    );
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-request-changes-"));
+  try {
+    const contextId = "pi_widget_request_changes";
+    const task = createYpiStudioTask({ cwd, title: "Widget request changes", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    // Pre-seed a chat grant so request_changes must clear it.
+    recordYpiStudioUserApproval(cwd, contextId, "确认，开始实现");
+    let detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.ok(detail.meta.approvalGrant);
+
+    assert.throws(
+      () => requestYpiStudioPlanChangesFromWidget(task.id, {
+        cwd, action: "request_plan_changes", contextId, expectedRevision: 1, feedback: "   ",
+      }),
+      /non-empty feedback/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "awaiting_approval");
+    assert.ok(detail.meta.approvalGrant, "blank feedback must not clear grant");
+
+    const changed = requestYpiStudioPlanChangesFromWidget(task.id, {
+      cwd,
+      action: "request_plan_changes",
+      contextId,
+      expectedRevision: 1,
+      feedback: "请补充 Checks 与 HTML 原型链接",
+    });
+    assert.equal(changed.status, "planning");
+    assert.equal(changed.meta.approvalGrant, undefined);
+    assert.equal(changed.meta.planRevision, 2);
+    assert.equal(changed.currentMember, "architect");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-imp-approve-"));
+  try {
+    const contextId = "pi_widget_imp_approve";
+    const task = createYpiStudioTask({ cwd, title: "Widget improvement approve", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
+    transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "checking", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "review", override: true, contextId });
+
+    const created = createYpiStudioImprovement(task.id, {
+      cwd, action: "create_improvement", title: "Widget imp", feedback: "need fix", contextId,
+    });
+    const impId = created.improvements.instances[0].id;
+    const instDir = join(cwd, ".ypi", "tasks", task.id, "improvements", impId);
+    writeFileSync(join(instDir, "plan-review.md"), "# Improvement Plan Review\n\nApprove this improvement.\n", "utf8");
+    transitionYpiStudioImprovement(task.id, {
+      cwd, action: "transition_improvement", improvementId: impId, to: "waiting_plan_approval", contextId, reason: "Ready",
+    });
+
+    // Missing material gate: zero write
+    writeFileSync(join(instDir, "plan-review.md"), "TBD\n", "utf8");
+    assert.throws(
+      () => approveYpiStudioImprovementPlanFromWidget(task.id, {
+        cwd, action: "approve_improvement_plan", contextId, expectedRevision: 1, improvementId: impId,
+      }),
+      /plan-review\.md is empty|TBD placeholder/,
+    );
+    let detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "waiting_for_improvements");
+    assert.equal(detail.improvements.instances[0].status, "waiting_plan_approval");
+    assert.equal(detail.improvements.instances[0].approval?.approvedAt, undefined);
+
+    writeFileSync(join(instDir, "plan-review.md"), "# Improvement Plan Review\n\nApprove this improvement.\n", "utf8");
+
+    // Wrong improvement id: zero write
+    assert.throws(
+      () => approveYpiStudioImprovementPlanFromWidget(task.id, {
+        cwd, action: "approve_improvement_plan", contextId, expectedRevision: 1, improvementId: "does-not-exist",
+      }),
+      /Improvement not found/,
+    );
+
+    const approved = approveYpiStudioImprovementPlanFromWidget(task.id, {
+      cwd, action: "approve_improvement_plan", contextId, expectedRevision: 1, improvementId: impId,
+    });
+    assert.equal(approved.status, "waiting_for_improvements", "parent stays waiting_for_improvements");
+    const inst = approved.improvements.instances[0];
+    assert.equal(inst.status, "implementing");
+    assert.equal(inst.approval?.source, "user-widget");
+    assert.equal(inst.approval?.contextId, contextId);
+    assert.equal(inst.approval?.revision, 1);
+    assert.ok(inst.approval?.approvedAt);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // user-widget grant remains readable by the existing implementation gate
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-grant-compat-"));
+  try {
+    const contextId = "pi_widget_grant_compat";
+    const task = createYpiStudioTask({ cwd, title: "Widget grant compat", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    const approved = approveYpiStudioPlanFromWidget(task.id, {
+      cwd, action: "approve_plan", contextId, expectedRevision: 1,
+    });
+    assert.equal(approved.status, "implementing");
+    assert.equal(approved.meta.approvalGrant?.source, "user-widget");
+    // Historical chat path still works independently
+    const chatTask = createYpiStudioTask({ cwd, title: "Chat grant still works", workflowId: "feature-dev", contextId: "pi_chat_grant_still" });
+    writePlanReview(cwd, chatTask.id, "pi_chat_grant_still");
+    transitionYpiStudioTask(chatTask.id, { cwd, to: "awaiting_approval", override: true, contextId: "pi_chat_grant_still" });
+    const chatApproved = recordYpiStudioUserApproval(cwd, "pi_chat_grant_still", "确认，开始实现");
+    assert.equal(chatApproved?.meta.approvalGrant?.source, "user-input");
+    const transitioned = transitionYpiStudioTask(chatTask.id, {
+      cwd, to: "implementing", override: true, contextId: "pi_chat_grant_still", reason: "用户批准开始实现",
+    });
+    assert.equal(transitioned.status, "implementing");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+// --- Widget decision continuation helpers (CTA-CONTINUATION-03) ---
+
+{
+  // Main implementing autocontinue: ready + free slots, no improvementId.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-cont-main-"));
+  try {
+    const contextId = "pi_cont_main_session";
+    const task = createYpiStudioTask({ cwd, title: "Main cont", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    updateYpiStudioImplementationPlan(task.id, {
+      cwd,
+      action: "update_implementation_plan",
+      contextId,
+      implementationPlan: {
+        schemaVersion: 2,
+        maxConcurrency: 2,
+        subtasks: [
+          { id: "A", title: "Main A", order: 10, dependsOn: [] },
+          { id: "B", title: "Main B", order: 20, dependsOn: [] },
+        ],
+      },
+    });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    approveYpiStudioPlanFromWidget(task.id, {
+      cwd, action: "approve_plan", contextId, expectedRevision: 1,
+    });
+    const detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "implementing");
+    const sessionId = parseYpiStudioSessionIdFromContextId(contextId);
+    assert.equal(sessionId, "cont_main_session");
+    const sessionFilePath = join(cwd, ".ypi", ".runtime", "sessions", `${contextId}.json`);
+    const link = resolveYpiStudioTaskForSession({ cwd, sessionId, sessionFilePath, entries: [] });
+    const command = resolveYpiStudioSessionAutocontinueCommand({ cwd, primaryTask: link.task });
+    assert.ok(command, "main ready+slots should project autocontinue");
+    assert.equal(command.type, "studio_autocontinue");
+    assert.equal(command.taskId, task.id);
+    assert.equal(command.improvementId, undefined);
+    assert.ok(command.availableSlots >= 1);
+    assert.ok(command.readySubtaskCount >= 1);
+    assert.match(String(command.stateKey), /:/);
+    // Same stateKey payload should be stable for 30s dedupe on the RPC side.
+    const again = resolveYpiStudioSessionAutocontinueCommand({ cwd, primaryTask: link.task });
+    assert.equal(again.stateKey, command.stateKey);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // Improvement implementing autocontinue: must include improvementId and not claim main DAG.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-cont-imp-"));
+  try {
+    const contextId = "pi_cont_imp_session";
+    const mainPlan = {
+      schemaVersion: 2,
+      maxConcurrency: 1,
+      subtasks: [
+        { id: "MAIN_A", title: "Main A", order: 10, dependsOn: [] },
+      ],
+    };
+    const { task, instance } = setupImprovementImplementing(cwd, contextId, "Imp cont", {
+      schemaVersion: 2,
+      maxConcurrency: 1,
+      subtasks: [
+        { id: "IMP_A", title: "Instance A", order: 10, dependsOn: [] },
+      ],
+    }, mainPlan);
+    // Parent detail after setup: waiting_for_improvements with instance implementing.
+    const detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "waiting_for_improvements");
+    assert.equal(detail.improvements.instances[0].status, "implementing");
+    // Main plan still has ready MAIN_A, but continuation must scope to instance.
+    assert.equal(detail.implementationProgress.subtasks.MAIN_A.status, "ready");
+
+    const sessionId = parseYpiStudioSessionIdFromContextId(contextId);
+    const sessionFilePath = join(cwd, ".ypi", ".runtime", "sessions", `${contextId}.json`);
+    const link = resolveYpiStudioTaskForSession({ cwd, sessionId, sessionFilePath, entries: [] });
+    const command = resolveYpiStudioSessionAutocontinueCommand({ cwd, primaryTask: link.task });
+    assert.ok(command, "improvement ready+slots should project autocontinue");
+    assert.equal(command.type, "studio_autocontinue");
+    assert.equal(command.taskId, detail.id);
+    assert.equal(command.improvementId, instance.id);
+    assert.equal(command.displayId, instance.displayId);
+    assert.ok(String(command.stateKey).includes(`imp:${instance.id}`));
+    assert.match(String(command.reason), /instance DAG/);
+    // Prompt builder path is covered by command shape; claim path remains improvement-scoped.
+    const next = getNextYpiStudioImplementationSubtask(cwd, detail.id, {
+      limit: 5,
+      improvementId: command.improvementId,
+    });
+    assert.deepEqual(next.subtasks.map((item) => item.id), ["IMP_A"]);
+    assert.ok(!next.subtasks.some((item) => item.id === "MAIN_A"));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // request_plan_changes continuation: fixed studio_user_action with bounded feedback; no task mutation.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-cont-request-"));
+  try {
+    const contextId = "pi_cont_request_session";
+    const task = createYpiStudioTask({ cwd, title: "Request cont", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    const changed = requestYpiStudioPlanChangesFromWidget(task.id, {
+      cwd,
+      action: "request_plan_changes",
+      contextId,
+      expectedRevision: 1,
+      feedback: "请补充 Checks 与 HTML 原型",
+    });
+    assert.equal(changed.status, "planning");
+    assert.equal(changed.meta.planRevision, 2);
+
+    const resolved = resolveYpiStudioRequestPlanChangesContinuation({
+      contextId,
+      taskId: changed.id,
+      feedback: "请补充 Checks 与 HTML 原型",
+      revisionFrom: 1,
+      revisionTo: 2,
+      updatedAt: changed.updatedAt,
+    });
+    assert.ok(resolved);
+    assert.equal(resolved.sessionId, "cont_request_session");
+    assert.equal(resolved.command.type, "studio_user_action");
+    assert.equal(resolved.command.action, "request_plan_changes");
+    assert.equal(resolved.command.taskId, changed.id);
+    assert.equal(resolved.command.feedback, "请补充 Checks 与 HTML 原型");
+    assert.equal(resolved.command.revisionFrom, 1);
+    assert.equal(resolved.command.revisionTo, 2);
+
+    // Continuation builder is pure: re-reading task shows planning still, grant cleared.
+    const after = getYpiStudioTaskDetail(cwd, changed.id);
+    assert.equal(after.status, "planning");
+    assert.equal(after.meta.approvalGrant, undefined);
+
+    // Non-session context yields null (no throw).
+    assert.equal(
+      resolveYpiStudioRequestPlanChangesContinuation({
+        contextId: "pi_transcript_abc",
+        taskId: changed.id,
+        feedback: "x",
+        revisionFrom: 1,
+        revisionTo: 2,
+      }),
+      null,
+    );
+
+    // Stable command shape for dedupe key consumers.
+    const cmd = buildYpiStudioRequestPlanChangesContinuationCommand({
+      taskId: changed.id,
+      feedback: "  keep  ",
+      revisionFrom: 1,
+      revisionTo: 2,
+      updatedAt: "t1",
+    });
+    assert.equal(cmd.feedback, "keep");
+    assert.ok(String(cmd.stateKey).includes("r1->2"));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // Non-decision phases project no autocontinue command.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-cont-idle-"));
+  try {
+    const contextId = "pi_cont_idle_session";
+    const task = createYpiStudioTask({ cwd, title: "Idle cont", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    const sessionId = parseYpiStudioSessionIdFromContextId(contextId);
+    const sessionFilePath = join(cwd, ".ypi", ".runtime", "sessions", `${contextId}.json`);
+    const link = resolveYpiStudioTaskForSession({ cwd, sessionId, sessionFilePath, entries: [] });
+    assert.equal(link.task?.status, "awaiting_approval");
+    assert.equal(resolveYpiStudioSessionAutocontinueCommand({ cwd, primaryTask: link.task }), null);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

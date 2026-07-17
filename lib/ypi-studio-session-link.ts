@@ -3,6 +3,7 @@ import type { SessionEntry, AgentMessage, ToolResultMessage, AssistantMessage, T
 import {
   getYpiStudioTaskDetail,
   getYpiStudioTaskIdForContext,
+  implementationCounts,
   listYpiStudioTaskHtmlPrototypeFileNames,
   listYpiStudioTasks,
   ypiStudioTaskPlanReviewFileExists,
@@ -20,6 +21,7 @@ import type {
   YpiStudioTaskWidgetProjection,
   YpiStudioWidgetQuickPreview,
   YpiStudioWidgetQuickPreviewApprovalState,
+  YpiStudioWidgetUserAction,
   YpiStudioWorkflowState,
   YpiStudioTaskWidgetSubagentRun,
   YpiStudioSubagentRunStatus,
@@ -416,6 +418,116 @@ export function canAcceptMainTask(input: {
     && input.unresolvedImprovementCount === 0;
 }
 
+/** Max decision CTAs projected per task card (one primary + one secondary). */
+const WIDGET_USER_ACTIONS_MAX = 2;
+
+/** Bound display copy so descriptors stay sparse and never carry long free text. */
+function boundWidgetTargetLabel(value: string, max = 120): string {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+/**
+ * Project sparse, allowlisted Phase 1 decision CTAs for the session widget.
+ * Visibility is advisory only; write paths revalidate binding/status/revision/material gates.
+ * Never emits endpoints, PATCH bodies, artifact content, feedback, or paths.
+ */
+export function buildWidgetUserActions(detail: {
+  status: string;
+  archived?: boolean;
+  title: string;
+  meta?: { planRevision?: number } | null;
+  improvements?: {
+    instances?: Array<{
+      id: string;
+      displayId?: string;
+      title?: string;
+      status: string;
+      approval?: { revision?: number } | null;
+    }>;
+  } | null;
+}): YpiStudioWidgetUserAction[] {
+  if (detail.archived) return [];
+
+  if (detail.status === "awaiting_approval") {
+    const revision = typeof detail.meta?.planRevision === "number" && Number.isFinite(detail.meta.planRevision)
+      ? detail.meta.planRevision
+      : 1;
+    const targetLabel = boundWidgetTargetLabel(`${detail.title} · Revision ${revision}`);
+    const actions: YpiStudioWidgetUserAction[] = [
+      {
+        id: `main:approve:r${revision}`,
+        kind: "approve_plan",
+        label: "批准并开始实现",
+        role: "primary",
+        requiresConfirmation: true,
+        expectedRevision: revision,
+        targetLabel,
+      },
+      {
+        id: `main:request_changes:r${revision}`,
+        kind: "request_plan_changes",
+        label: "需要修改",
+        role: "secondary",
+        requiresConfirmation: true,
+        expectedRevision: revision,
+        targetLabel,
+      },
+    ];
+    return actions.slice(0, WIDGET_USER_ACTIONS_MAX);
+  }
+
+  if (detail.status === "waiting_for_improvements") {
+    const firstWaitingPlan = (detail.improvements?.instances ?? []).find(
+      (instance) => instance.status === "waiting_plan_approval",
+    );
+    if (!firstWaitingPlan?.id) return [];
+
+    const revision = typeof firstWaitingPlan.approval?.revision === "number"
+      && Number.isFinite(firstWaitingPlan.approval.revision)
+      ? firstWaitingPlan.approval.revision
+      : 1;
+    const displayId = (firstWaitingPlan.displayId || firstWaitingPlan.id).trim() || firstWaitingPlan.id;
+    const title = (firstWaitingPlan.title || displayId).trim() || displayId;
+    return [{
+      id: `improvement:${firstWaitingPlan.id}:approve:r${revision}`,
+      kind: "approve_improvement_plan",
+      label: "批准该改进计划",
+      role: "primary",
+      requiresConfirmation: true,
+      expectedRevision: revision,
+      improvementId: firstWaitingPlan.id,
+      displayId,
+      targetLabel: boundWidgetTargetLabel(`${displayId} · ${title} · Revision ${revision}`),
+    }];
+  }
+
+  // Enter existing user_acceptance from clean review only. Advisory; write path rechecks.
+  // Do not project on parentStatus alone (e.g. review_ready while still waiting_for_improvements).
+  if (detail.status === "review") {
+    const unresolvedCount = (detail.improvements?.instances ?? []).filter(
+      (instance) => !["accepted", "accepted_not_doing"].includes(instance.status),
+    ).length;
+    if (unresolvedCount > 0) return [];
+
+    const revision = typeof detail.meta?.planRevision === "number" && Number.isFinite(detail.meta.planRevision)
+      ? detail.meta.planRevision
+      : 1;
+    return [{
+      id: `main:start_user_acceptance:r${revision}`,
+      kind: "start_user_acceptance",
+      label: "开始用户验收",
+      role: "primary",
+      requiresConfirmation: true,
+      expectedRevision: revision,
+      targetLabel: boundWidgetTargetLabel(`主任务 · ${detail.title}`),
+    }];
+  }
+
+  return [];
+}
+
 function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioTaskWidgetProjection | null {
   const detail = getYpiStudioTaskDetail(cwd, summary.key);
   if (!detail) return null;
@@ -489,6 +601,7 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
   })() : undefined;
 
   const quickPreviews = buildWidgetQuickPreviews(cwd, detail);
+  const userActions = buildWidgetUserActions(detail);
   const unresolvedImprovementCount = improvementSummary?.unresolved ?? 0;
   // Omit false so older clients and sparse JSON stay quiet; UI checks === true.
   const canAcceptMain = canAcceptMainTask({
@@ -520,6 +633,8 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
       missing: detail.progress.missingArtifacts,
     },
     quickPreviews: quickPreviews.length > 0 ? quickPreviews : undefined,
+    // Sparse additive field: omit when empty so older clients stay quiet.
+    userActions: userActions.length > 0 ? userActions : undefined,
     steps,
     subagents: buildSubagents(cwd, detail),
     events: detail.events.slice(-5).reverse().map((event) => ({ type: event.type, at: event.at, message: event.message, from: event.from, to: event.to, member: event.member, artifact: event.artifact })),
@@ -679,4 +794,160 @@ export function resolveYpiStudioTaskForSession(options: ResolveOptions): YpiStud
   };
   if (Object.keys(diagnostics).length > 0) result.diagnostics = diagnostics;
   return result;
+}
+
+/**
+ * Session-route helper: resolve primary-task autocontinue command.
+ * - Main implementing: ready + free slots on the primary task main DAG.
+ * - waiting_for_improvements: first implementing improvement with ready + free slots
+ *   on the instance DAG only (never main plan).
+ * Returns null when no continuation should fire. Safe: never throws on missing plan;
+ * never rolls back user decisions.
+ */
+export function resolveYpiStudioSessionAutocontinueCommand(options: {
+  cwd: string;
+  primaryTask: YpiStudioTaskWidgetProjection | null | undefined;
+}): Record<string, unknown> | null {
+  const primaryTask = options.primaryTask;
+  if (!primaryTask || primaryTask.archived) return null;
+
+  if (primaryTask.status === "implementing") {
+    const projection = primaryTask.implementationProjection;
+    if (!projection) return null;
+    const counts = projection.statusCounts;
+    const activeCount = (counts?.running ?? 0) + (counts?.queued ?? 0);
+    const readyCount = counts?.ready ?? 0;
+    const availableSlots = Math.max(0, projection.maxConcurrency - activeCount);
+    if (readyCount <= 0 || availableSlots <= 0) return null;
+    return {
+      type: "studio_autocontinue",
+      taskId: primaryTask.id,
+      readySubtaskCount: readyCount,
+      availableSlots,
+      stateKey: `${primaryTask.updatedAt}:${activeCount}:${readyCount}:${availableSlots}:${projection.nextSubtaskIds?.join(",") ?? ""}`,
+      reason: "studio-task poll observed ready main subtasks with free concurrency slots (primary task only)",
+    };
+  }
+
+  if (primaryTask.status !== "waiting_for_improvements") return null;
+
+  const detail = getYpiStudioTaskDetail(options.cwd, primaryTask.id);
+  if (!detail || detail.archived || detail.status !== "waiting_for_improvements") return null;
+
+  // First implementing improvement with a plan that has ready work + free slots.
+  const instances = detail.improvements?.instances ?? [];
+  for (const instance of instances) {
+    if (instance.status !== "implementing") continue;
+    const plan = instance.implementationPlan;
+    const progress = instance.implementationProgress;
+    if (!plan || !progress) continue;
+    const counts = implementationCounts(progress);
+    const activeCount = (counts.running ?? 0) + (counts.queued ?? 0);
+    const readyCount = counts.ready ?? 0;
+    const maxConcurrency = Math.max(1, plan.maxConcurrency ?? plan.execution?.maxParallel ?? 1);
+    const availableSlots = Math.max(0, maxConcurrency - activeCount);
+    if (readyCount <= 0 || availableSlots <= 0) continue;
+    const nextIds = progress.nextSubtaskIds ?? (progress.nextSubtaskId ? [progress.nextSubtaskId] : []);
+    const revision = instance.approval?.revision ?? 1;
+    return {
+      type: "studio_autocontinue",
+      taskId: detail.id,
+      improvementId: instance.id,
+      displayId: instance.displayId,
+      readySubtaskCount: readyCount,
+      availableSlots,
+      stateKey: `imp:${instance.id}:r${revision}:${instance.updatedAt}:${activeCount}:${readyCount}:${availableSlots}:${nextIds.join(",")}`,
+      reason: `studio-task poll observed ready improvement ${instance.displayId} subtasks with free concurrency slots (primary task only; instance DAG)`,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Map a session-class contextId (`pi_<sessionId>`) back to the raw session id for RPC lookup.
+ * Transcript/process contexts are not live RPC wrappers and return null.
+ */
+export function parseYpiStudioSessionIdFromContextId(contextId: string): string | null {
+  if (typeof contextId !== "string" || !contextId.startsWith("pi_")) return null;
+  if (contextId.startsWith("pi_transcript_") || contextId.startsWith("pi_process_")) return null;
+  const sessionId = contextId.slice("pi_".length);
+  return sessionId || null;
+}
+
+/**
+ * Best-effort studio_user_action command after request_plan_changes.
+ * Feedback must already be persisted; this only wakes the bound session.
+ * Callers (task PATCH route) should send via getRpcSession(sessionId)?.send(command).catch(() => {})
+ * and never roll back the persisted planning decision if the wrapper is missing/busy.
+ */
+export function buildYpiStudioRequestPlanChangesContinuationCommand(options: {
+  taskId: string;
+  feedback: string;
+  revisionFrom: number;
+  revisionTo: number;
+  updatedAt?: string;
+}): Record<string, unknown> {
+  const feedback = options.feedback.trim().slice(0, 2000);
+  return {
+    type: "studio_user_action",
+    taskId: options.taskId,
+    action: "request_plan_changes",
+    feedback,
+    revisionFrom: options.revisionFrom,
+    revisionTo: options.revisionTo,
+    stateKey: `${options.updatedAt ?? ""}:r${options.revisionFrom}->${options.revisionTo}:${feedback.slice(0, 80)}`,
+    reason: "widget request_plan_changes persisted; wake architect planning",
+  };
+}
+
+/**
+ * Resolve sessionId + studio_user_action command after a successful request_plan_changes mutation.
+ * Returns null only when contextId is not a live session-class id.
+ */
+export function resolveYpiStudioRequestPlanChangesContinuation(options: {
+  contextId: string;
+  taskId: string;
+  feedback: string;
+  revisionFrom: number;
+  revisionTo: number;
+  updatedAt?: string;
+}): { sessionId: string; command: Record<string, unknown> } | null {
+  const sessionId = parseYpiStudioSessionIdFromContextId(options.contextId);
+  if (!sessionId) return null;
+  return {
+    sessionId,
+    command: buildYpiStudioRequestPlanChangesContinuationCommand({
+      taskId: options.taskId,
+      feedback: options.feedback,
+      revisionFrom: options.revisionFrom,
+      revisionTo: options.revisionTo,
+      updatedAt: options.updatedAt,
+    }),
+  };
+}
+
+/**
+ * One-shot helper for task PATCH after a successful request_plan_changes mutation.
+ * Lazy-imports getRpcSession to keep session-link free of circular startup deps with rpc-manager.
+ * Never throws; never rolls back the already-persisted planning decision.
+ */
+export function bestEffortContinueAfterWidgetRequestPlanChanges(options: {
+  contextId: string;
+  taskId: string;
+  feedback: string;
+  revisionFrom: number;
+  revisionTo: number;
+  updatedAt?: string;
+}): void {
+  try {
+    const resolved = resolveYpiStudioRequestPlanChangesContinuation(options);
+    if (!resolved) return;
+    // Dynamic import avoids a static cycle: rpc-manager -> extension -> tasks/session-link.
+    void import("./rpc-manager").then(({ bestEffortSendStudioCommand }) => {
+      bestEffortSendStudioCommand(resolved.sessionId, resolved.command);
+    }).catch(() => {});
+  } catch {
+    // Recoverable from bound chat.
+  }
 }

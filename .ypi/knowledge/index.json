@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-16T09:36:43.679Z",
+  "updatedAt": "2026-07-17T01:37:21.076Z",
   "entries": [
+    {
+      "id": "20260717-093721-任务浮窗在用户决策节点提供可点击-cta",
+      "title": "任务浮窗在用户决策节点提供可点击 CTA",
+      "taskId": "20260716-174251-任务浮窗在用户决策节点提供可点击-cta",
+      "taskKey": "archived:2026-07:20260716-174251-任务浮窗在用户决策节点提供可点击-cta",
+      "workflowId": "feature-dev",
+      "summary": "## 已完成 - 基于现有 source/docs 完成 [brief.md](brief.md)、[prd.md](prd.md)、[ui.md](ui.md)、[design.md](design.md)、[implement.md](implement.md)、[checks.md](checks.md) 与 [plan-review.md](plan-review.md)。 - 默认范围收敛为 Phase 1：主计划批准/需要修改、改进计划批准、服务端 action 投影、原子写入与续推。 - `implement.md` 包含 5 项 schemaVersion 2 DAG，`maxConcurrency=2`；计划已保存到 task state，任务现停在 `planning`。 ## 当前阻塞 当前 delegated member 环境未提供 `ypi_studio_subagent` / `ypi_studio_wait`，无法真实派发 UI 设计员。HTML 原型门禁未完成，因此任务不能进入 `awaiting_approval`。 ## 主会话下一步 1. 派发 `ui-designer`，要求交付 `studio-widget-decision-cta-prototype.html` 并更新 `ui.md`、`plan-review.md`。 2. 验证 HTML task-local 安全预览与审批书相对链接。 3. 请求用户确认 Phase 1 范围、需要修改必填说明、每卡最多两项 action，以及 HTML/DAG/Checks。 4. 用户批准后确认已保存的 implementationPlan 并合法进入 implementing；不要提前派 implementer。 ## 未修改 未修改任何生产代码，未 commit/push/merge。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260716-174251-任务浮窗在用户决策节点提供可点击-cta",
+      "knowledgePath": ".ypi/knowledge/20260717-093721-任务浮窗在用户决策节点提供可点击-cta.md",
+      "createdAt": "2026-07-17T01:37:21.076Z",
+      "archivedAt": "2026-07-17T01:37:21.076Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260716-173643-设置项归拢为树形导航并提供商摘要卡-studio-一级",
       "title": "设置项归拢为树形导航并提供商摘要卡（Studio 一级）",

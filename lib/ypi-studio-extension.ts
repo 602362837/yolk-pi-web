@@ -263,7 +263,9 @@ function hasRecordedApprovalGrant(task: { meta?: unknown }, key: string | null):
   const contextId = str(grant.contextId);
   const source = str(grant.source);
   const approvedAt = str(grant.approvedAt);
-  if (contextId !== key || source !== "user-input" || !approvedAt) return false;
+  if (contextId !== key || !approvedAt) return false;
+  // Accept both chat (user-input) and widget (user-widget) grants; unknown sources remain rejected.
+  if (source !== "user-input" && source !== "user-widget") return false;
   const gate = isObj(task.meta.approvalGate) ? task.meta.approvalGate : null;
   const enteredAt = str(gate?.enteredAt);
   if (!enteredAt) return true;

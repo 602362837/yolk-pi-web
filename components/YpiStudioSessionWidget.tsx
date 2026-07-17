@@ -16,6 +16,7 @@ import type {
   YpiStudioTaskWidgetSubagentRun,
   YpiStudioWidgetQuickPreview,
   YpiStudioWidgetQuickPreviewApprovalState,
+  YpiStudioWidgetUserAction,
 } from "@/lib/ypi-studio-types";
 
 // ── Props ──
@@ -53,6 +54,10 @@ const BALL_POSITION_KEY = "pi-web:ypi-studio-session-widget-ball-position:v1";
 const EXPANDED_STATE_KEY = "pi-web:ypi-studio-session-widget-expanded";
 /** Marker suffix in acceptingKey for main-task accept in-flight state. */
 const MAIN_ACCEPT_KEY = "__main__";
+/** Prefix for decision-action in-flight keys: `decision:<actionId>`. */
+const DECISION_KEY_PREFIX = "decision:";
+/** Server-side feedback max length for request_plan_changes (mirror domain helper). */
+const PLAN_CHANGE_FEEDBACK_MAX = 2000;
 const DEFAULT_MARGIN = 18;
 const DRAG_THRESHOLD_PX = 4;
 const MOBILE_MEDIA = "(max-width: 640px)";
@@ -518,6 +523,79 @@ function acceptableImprovementsForTask(task: YpiStudioTaskWidgetProjection): Acc
     }));
 }
 
+/**
+ * Server-projected decision CTAs only. Never invent actions from status.
+ * Cap at 2 (one primary + one secondary) to match the projection contract.
+ */
+function userActionsForTask(task: YpiStudioTaskWidgetProjection): YpiStudioWidgetUserAction[] {
+  if (task.archived || task.status === "archived") return [];
+  const actions = task.userActions ?? [];
+  if (!Array.isArray(actions) || actions.length === 0) return [];
+  return actions
+    .filter((action): action is YpiStudioWidgetUserAction => {
+      if (!action || typeof action !== "object") return false;
+      if (typeof action.id !== "string" || !action.id.trim()) return false;
+      if (typeof action.label !== "string" || !action.label.trim()) return false;
+      if (action.role !== "primary" && action.role !== "secondary") return false;
+      if (typeof action.expectedRevision !== "number" || !Number.isFinite(action.expectedRevision)) return false;
+      if (typeof action.targetLabel !== "string") return false;
+      return (
+        action.kind === "approve_plan"
+        || action.kind === "request_plan_changes"
+        || action.kind === "approve_improvement_plan"
+        || action.kind === "start_user_acceptance"
+      );
+    })
+    .slice(0, 2);
+}
+
+function decisionRegionTitle(actions: YpiStudioWidgetUserAction[]): string {
+  const kinds = new Set(actions.map((action) => action.kind));
+  if (kinds.has("approve_plan") || kinds.has("request_plan_changes")) {
+    return "👉 需要你的决定: 主任务计划批准";
+  }
+  if (kinds.has("approve_improvement_plan")) {
+    return "👉 需要你的决定: 改进计划批准";
+  }
+  if (kinds.has("start_user_acceptance")) {
+    return "👉 需要你的决定: 开始用户验收";
+  }
+  return "👉 需要你的决定";
+}
+
+function decisionBusyLabel(kind: YpiStudioWidgetUserAction["kind"]): string {
+  if (kind === "approve_plan") return "批准中…";
+  if (kind === "approve_improvement_plan") return "批准中…";
+  if (kind === "request_plan_changes") return "提交中…";
+  if (kind === "start_user_acceptance") return "进入中…";
+  return "处理中…";
+}
+
+function safeWidgetDecisionErrorMessage(status: number, payload: { error?: string; code?: string }): string {
+  const serverMessage = typeof payload.error === "string" ? payload.error.trim() : "";
+  const safeServer = serverMessage
+    && !serverMessage.includes("/")
+    && serverMessage.length <= 220
+    ? serverMessage
+    : "";
+  if (status === 409) {
+    return safeServer || "状态或版本已变化，已刷新最新任务";
+  }
+  if (status === 422) {
+    return safeServer || "审批材料或原型证据不完整，请打开资料后重试";
+  }
+  if (status === 404) {
+    return safeServer || "任务或改进项不存在，已刷新";
+  }
+  if (status === 403) {
+    return safeServer || "工作区未授权，无法写入";
+  }
+  if (status === 400) {
+    return safeServer || "请求无效，请刷新后重试";
+  }
+  return safeServer || `决策失败（HTTP ${status}）`;
+}
+
 type QuickPreviewAction = {
   key: string;
   kind: YpiStudioWidgetQuickPreview["kind"];
@@ -676,6 +754,8 @@ function TaskCard({
   acceptingImprovementId,
   onAcceptMainTask,
   acceptingMainTask = false,
+  onDecisionAction,
+  decidingActionId = null,
   acceptWriteBusy = false,
 }: {
   candidate: YpiStudioSessionTaskLinkCandidate;
@@ -693,7 +773,10 @@ function TaskCard({
   acceptingImprovementId?: string | null;
   onAcceptMainTask?: () => void;
   acceptingMainTask?: boolean;
-  /** True while any accept write (improvement or main) is in flight. */
+  /** Server-projected decision CTA handler (plan approve / request changes / improvement plan approve). */
+  onDecisionAction?: (action: YpiStudioWidgetUserAction) => void;
+  decidingActionId?: string | null;
+  /** True while any widget write (decision or accept) is in flight. */
   acceptWriteBusy?: boolean;
 }) {
   const task = candidate.task;
@@ -708,6 +791,10 @@ function TaskCard({
   const improvementWaiting = task.status === "waiting_for_improvements" || (improvements && improvementUnresolved > 0);
   const quickActions = quickPreviewActionsForTask(task);
   const acceptableImprovements = acceptableImprovementsForTask(task);
+  const decisionActions = userActionsForTask(task);
+  const waitingPlanApprovalCount = (improvements?.instances ?? []).filter(
+    (inst) => inst.status === "waiting_plan_approval",
+  ).length;
   const isArchivedReadOnly = Boolean(task.archived || task.status === "archived");
   // Prefer server projection; fall back to the pure gate so a sparse/stale
   // payload without canAcceptMain still shows the main-task accept control.
@@ -886,9 +973,11 @@ function TaskCard({
               className={`ypi-studio-widget-plan-review-btn is-${entry.tone}${entry.kind === "prototype" ? " is-prototype" : ""}`}
               aria-label={entry.ariaLabel}
               title={entry.title}
+              disabled={acceptWriteBusy}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
+                if (acceptWriteBusy) return;
                 if (entry.prototype) {
                   onOpenPrototype?.({
                     taskKey: task.key,
@@ -906,6 +995,71 @@ function TaskCard({
               <span className="ypi-studio-widget-plan-review-btn-state">{entry.stateWord}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/*
+        Phase 1 decision region — additive only, after read-only previews.
+        Renders only server-projected userActions; never invents CTAs from status.
+      */}
+      {!isArchivedReadOnly && decisionActions.length > 0 && (
+        <div
+          className="ypi-studio-decision-section"
+          role="group"
+          aria-label="需要你的决定"
+        >
+          <div className="ypi-decision-header">
+            <div className="ypi-decision-target-title" title={decisionRegionTitle(decisionActions)}>
+              <span>{decisionRegionTitle(decisionActions)}</span>
+            </div>
+            <span
+              className="ypi-decision-target-revision"
+              title={decisionActions[0]?.targetLabel}
+            >
+              Rev. {decisionActions[0]?.expectedRevision}
+            </span>
+          </div>
+          {decisionActions[0]?.targetLabel && (
+            <div className="ypi-decision-target-meta" title={decisionActions[0].targetLabel}>
+              {decisionActions[0].targetLabel}
+            </div>
+          )}
+          <div className="ypi-decision-buttons">
+            {decisionActions.map((action) => {
+              const busy = decidingActionId === action.id;
+              const isPrimary = action.role === "primary";
+              const ariaObject = action.kind === "approve_improvement_plan"
+                ? `${action.displayId ?? action.improvementId ?? ""} ${action.targetLabel}`.trim()
+                : action.targetLabel;
+              const ariaLabel = action.kind === "start_user_acceptance"
+                ? `${action.label}，进入 user_acceptance，不是结果验收 · ${ariaObject}`
+                : `${action.label} · ${ariaObject}`;
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  className={`ypi-decision-btn ${isPrimary ? "is-primary" : "is-secondary"}${busy ? " is-busy" : ""}`}
+                  disabled={acceptWriteBusy || Boolean(decidingActionId)}
+                  aria-busy={busy || undefined}
+                  aria-label={ariaLabel}
+                  title={action.targetLabel}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (acceptWriteBusy || decidingActionId) return;
+                    onDecisionAction?.(action);
+                  }}
+                >
+                  {busy ? decisionBusyLabel(action.kind) : action.label}
+                </button>
+              );
+            })}
+          </div>
+          {waitingPlanApprovalCount > 1 && decisionActions.some((a) => a.kind === "approve_improvement_plan") && (
+            <div className="ypi-decision-imp-list-hint" role="note">
+              其余 {waitingPlanApprovalCount - 1} 项改进计划请在详情中查看
+            </div>
+          )}
         </div>
       )}
 
@@ -974,7 +1128,7 @@ export function YpiStudioSessionWidget({
 }: Props) {
   void _onOpenFile;
   const isMobile = useMobile();
-  const { confirm, confirmChoice, toast } = usePrompt();
+  const { confirm, confirmChoice, prompt, toast } = usePrompt();
   const [expanded, setExpanded] = useState(() => readExpandedState());
   const [panelPosition, setPanelPosition] = useState<WidgetPosition | null>(null);
   const [ballPosition, setBallPosition] = useState<WidgetPosition | null>(null);
@@ -982,6 +1136,7 @@ export function YpiStudioSessionWidget({
   const [ballDragging, setBallDragging] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [attentionSequence, setAttentionSequence] = useState(0);
+  /** Shared in-flight key for decision CTAs and result-acceptance writes. */
   const [acceptingKey, setAcceptingKey] = useState<string | null>(null);
   const acceptingInFlightRef = useRef(false);
 
@@ -1273,6 +1428,293 @@ export function YpiStudioSessionWidget({
       setAcceptingKey(null);
     }
   }, [confirmChoice, contextId, cwd, onTaskChanged, toast]);
+
+  /**
+   * Decision CTAs: approve_plan / request_plan_changes / approve_improvement_plan /
+   * start_user_acceptance. Confirm or require feedback first; PATCH explicit action bodies;
+   * never optimistic transition. Shares acceptingInFlight with result-acceptance writes.
+   */
+  const handleDecisionAction = useCallback(async (
+    taskKey: string,
+    taskTitle: string,
+    action: YpiStudioWidgetUserAction,
+  ) => {
+    if (acceptingInFlightRef.current) return;
+    if (!cwd?.trim()) {
+      toast({ message: "无法决策：缺少工作区 cwd", tone: "error" });
+      return;
+    }
+    if (!contextId?.trim()) {
+      toast({ message: "无法决策：当前会话未绑定 contextId", tone: "error" });
+      return;
+    }
+
+    let feedback: string | undefined;
+
+    if (action.kind === "approve_plan") {
+      const confirmed = await confirm({
+        title: "批准并开始实现",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <p style={{ margin: 0 }}>
+              你正在<strong>批准主任务计划</strong>（不是结果验收）。确认后将写入
+              {" "}
+              <code style={{ fontSize: 12 }}>source: user-widget</code>
+              {" "}
+              审批记录，并从
+              {" "}
+              <code style={{ fontSize: 12 }}>awaiting_approval</code>
+              {" "}
+              进入
+              {" "}
+              <code style={{ fontSize: 12 }}>implementing</code>
+              ，Studio 会继续既有编排。
+            </p>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(37,99,235,0.35)",
+                background: "rgba(37,99,235,0.08)",
+                color: "var(--text)",
+                fontSize: 12,
+              }}
+            >
+              <div><strong>确认对象：</strong>主任务「{taskTitle}」</div>
+              <div style={{ marginTop: 4 }}><strong>Revision：</strong>{action.expectedRevision}</div>
+              <div style={{ marginTop: 4 }}><strong>目标：</strong>{action.targetLabel}</div>
+            </div>
+          </div>
+        ) as ReactNode,
+        confirmLabel: "批准并开始实现",
+        cancelLabel: "取消",
+        intent: "default",
+      });
+      if (!confirmed) return;
+    } else if (action.kind === "approve_improvement_plan") {
+      const displayId = action.displayId?.trim() || action.improvementId || "改进项";
+      const confirmed = await confirm({
+        title: "批准改进计划",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <p style={{ margin: 0 }}>
+              这是<strong>改进计划批准</strong>，不是改进结果验收，也不是主任务验收。
+              确认后仅该改进实例进入
+              {" "}
+              <code style={{ fontSize: 12 }}>implementing</code>
+              ，并续推其 instance DAG；主任务保持
+              {" "}
+              <code style={{ fontSize: 12 }}>waiting_for_improvements</code>
+              。
+            </p>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(245,158,11,0.45)",
+                background: "rgba(245,158,11,0.1)",
+                color: "#92400e",
+                fontSize: 12,
+              }}
+            >
+              <div><strong>确认对象：</strong>{displayId}</div>
+              <div style={{ marginTop: 4 }}><strong>目标：</strong>{action.targetLabel}</div>
+              <div style={{ marginTop: 4 }}><strong>Revision：</strong>{action.expectedRevision}</div>
+            </div>
+          </div>
+        ) as ReactNode,
+        confirmLabel: "批准该改进计划",
+        cancelLabel: "取消",
+        intent: "default",
+      });
+      if (!confirmed) return;
+    } else if (action.kind === "request_plan_changes") {
+      const value = await prompt({
+        title: "需要修改当前计划？",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <p style={{ margin: 0 }}>
+              请写明需要架构师调整的内容。提交后任务退回
+              {" "}
+              <code style={{ fontSize: 12 }}>planning</code>
+              ，旧批准清除，Revision 递增。空说明不会写入。
+            </p>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(245,158,11,0.45)",
+                background: "rgba(245,158,11,0.1)",
+                color: "#92400e",
+                fontSize: 12,
+              }}
+            >
+              <div><strong>对象：</strong>主任务「{taskTitle}」</div>
+              <div style={{ marginTop: 4 }}><strong>当前 Revision：</strong>{action.expectedRevision}</div>
+            </div>
+          </div>
+        ) as ReactNode,
+        confirmLabel: "提交修改要求",
+        cancelLabel: "取消",
+        required: true,
+        placeholder: "请具体写明需要修改的内容和调整建议…",
+        validate: (raw) => {
+          const trimmed = raw.trim();
+          if (!trimmed) return "请填写修改说明";
+          if (trimmed.length > PLAN_CHANGE_FEEDBACK_MAX) {
+            return `修改说明最多 ${PLAN_CHANGE_FEEDBACK_MAX} 字`;
+          }
+          return null;
+        },
+        intent: "danger",
+      });
+      if (value == null) return;
+      feedback = value.trim();
+      if (!feedback) {
+        toast({ message: "请填写修改说明", tone: "error" });
+        return;
+      }
+    } else if (action.kind === "start_user_acceptance") {
+      const confirmed = await confirm({
+        title: "开始用户验收？",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <p style={{ margin: 0 }}>
+              你正在把主任务从
+              {" "}
+              <code style={{ fontSize: 12 }}>review</code>
+              {" "}
+              推进到
+              {" "}
+              <code style={{ fontSize: 12 }}>user_acceptance</code>
+              。
+              <strong>这不是结果验收</strong>，
+              <strong>不会</strong>
+              将任务标记为
+              {" "}
+              <code style={{ fontSize: 12 }}>completed</code>
+              {" "}
+              或归档。进入后请再点「确认主任务已验收完成」。
+            </p>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(37,99,235,0.35)",
+                background: "rgba(37,99,235,0.08)",
+                color: "var(--text)",
+                fontSize: 12,
+              }}
+            >
+              <div><strong>确认对象：</strong>主任务「{taskTitle}」</div>
+              <div style={{ marginTop: 4 }}><strong>目标：</strong>{action.targetLabel}</div>
+              <div style={{ marginTop: 4 }}><strong>Revision：</strong>{action.expectedRevision}</div>
+            </div>
+          </div>
+        ) as ReactNode,
+        confirmLabel: "开始用户验收",
+        cancelLabel: "取消",
+        intent: "default",
+      });
+      if (!confirmed) return;
+    } else {
+      // Unknown kind: never invent a write path.
+      return;
+    }
+
+    acceptingInFlightRef.current = true;
+    setAcceptingKey(`${taskKey}:${DECISION_KEY_PREFIX}${action.id}`);
+    try {
+      let body: Record<string, unknown>;
+      if (action.kind === "approve_plan") {
+        body = {
+          cwd,
+          action: "approve_plan",
+          contextId,
+          expectedRevision: action.expectedRevision,
+        };
+      } else if (action.kind === "request_plan_changes") {
+        body = {
+          cwd,
+          action: "request_plan_changes",
+          contextId,
+          expectedRevision: action.expectedRevision,
+          feedback,
+        };
+      } else if (action.kind === "start_user_acceptance") {
+        body = {
+          cwd,
+          action: "start_user_acceptance",
+          contextId,
+          expectedRevision: action.expectedRevision,
+        };
+      } else {
+        if (!action.improvementId?.trim()) {
+          throw new Error("改进计划批准缺少 improvementId");
+        }
+        body = {
+          cwd,
+          action: "approve_improvement_plan",
+          contextId,
+          expectedRevision: action.expectedRevision,
+          improvementId: action.improvementId,
+        };
+      }
+
+      const res = await fetch(`/api/studio/tasks/${encodeURIComponent(taskKey)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; code?: string };
+      if (!res.ok) {
+        throw Object.assign(new Error(safeWidgetDecisionErrorMessage(res.status, data)), {
+          status: res.status,
+        });
+      }
+
+      if (action.kind === "approve_plan") {
+        toast({
+          message: "计划已批准，Studio 将继续编排实现",
+          tone: "success",
+        });
+      } else if (action.kind === "approve_improvement_plan") {
+        const displayId = action.displayId?.trim() || action.improvementId || "改进项";
+        toast({
+          message: `已批准 ${displayId} 改进计划，实例 DAG 将继续执行`,
+          tone: "success",
+        });
+      } else if (action.kind === "start_user_acceptance") {
+        toast({
+          message: "已进入用户验收，请再确认主任务已验收完成",
+          tone: "success",
+        });
+      } else {
+        toast({
+          message: "修改反馈已落库，任务已退回 planning",
+          tone: "success",
+        });
+      }
+      onTaskChanged?.(taskKey);
+    } catch (error) {
+      const status = typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 0;
+      const message = error instanceof Error ? error.message : String(error);
+      const conflictish = status === 409 || /状态或版本已变化|revision|not bound|conflict/i.test(message);
+      toast({
+        message: conflictish
+          ? (message || "状态或版本已变化，已刷新最新任务")
+          : `决策失败：${message}`,
+        tone: "error",
+      });
+      // Always refresh so stale CTAs / revision do not linger.
+      onTaskChanged?.(taskKey);
+    } finally {
+      acceptingInFlightRef.current = false;
+      setAcceptingKey(null);
+    }
+  }, [confirm, contextId, cwd, onTaskChanged, prompt, toast]);
 
   const panelRef = useRef<HTMLElement | null>(null);
   const ballRef = useRef<HTMLDivElement | null>(null);
@@ -1582,6 +2024,14 @@ export function YpiStudioSessionWidget({
                     ? acceptingKey.slice(c.task.key.length + 1)
                     : null;
                   const acceptingMainTask = taskAcceptSuffix === MAIN_ACCEPT_KEY;
+                  const decidingActionId = taskAcceptSuffix?.startsWith(DECISION_KEY_PREFIX)
+                    ? taskAcceptSuffix.slice(DECISION_KEY_PREFIX.length)
+                    : null;
+                  const acceptingImprovementId = taskAcceptSuffix
+                    && !acceptingMainTask
+                    && !decidingActionId
+                    ? taskAcceptSuffix
+                    : null;
                   return (
                     <TaskCard
                       key={c.task.key}
@@ -1594,13 +2044,15 @@ export function YpiStudioSessionWidget({
                       onAcceptImprovement={(improvement) => {
                         void handleAcceptImprovement(c.task.key, improvement);
                       }}
-                      acceptingImprovementId={
-                        taskAcceptSuffix && !acceptingMainTask ? taskAcceptSuffix : null
-                      }
+                      acceptingImprovementId={acceptingImprovementId}
                       onAcceptMainTask={() => {
                         void handleAcceptMainTask(c.task.key, c.task.title);
                       }}
                       acceptingMainTask={acceptingMainTask}
+                      onDecisionAction={(action) => {
+                        void handleDecisionAction(c.task.key, c.task.title, action);
+                      }}
+                      decidingActionId={decidingActionId}
                       acceptWriteBusy={Boolean(acceptingKey)}
                     />
                   );
@@ -1732,6 +2184,14 @@ export function YpiStudioSessionWidget({
             ? acceptingKey.slice(c.task.key.length + 1)
             : null;
           const acceptingMainTask = taskAcceptSuffix === MAIN_ACCEPT_KEY;
+          const decidingActionId = taskAcceptSuffix?.startsWith(DECISION_KEY_PREFIX)
+            ? taskAcceptSuffix.slice(DECISION_KEY_PREFIX.length)
+            : null;
+          const acceptingImprovementId = taskAcceptSuffix
+            && !acceptingMainTask
+            && !decidingActionId
+            ? taskAcceptSuffix
+            : null;
           return (
             <TaskCard
               key={c.task.key}
@@ -1744,13 +2204,15 @@ export function YpiStudioSessionWidget({
               onAcceptImprovement={(improvement) => {
                 void handleAcceptImprovement(c.task.key, improvement);
               }}
-              acceptingImprovementId={
-                taskAcceptSuffix && !acceptingMainTask ? taskAcceptSuffix : null
-              }
+              acceptingImprovementId={acceptingImprovementId}
               onAcceptMainTask={() => {
                 void handleAcceptMainTask(c.task.key, c.task.title);
               }}
               acceptingMainTask={acceptingMainTask}
+              onDecisionAction={(action) => {
+                void handleDecisionAction(c.task.key, c.task.title, action);
+              }}
+              decidingActionId={decidingActionId}
               acceptWriteBusy={Boolean(acceptingKey)}
             />
           );

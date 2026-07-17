@@ -8,6 +8,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  approveYpiStudioPlanFromWidget,
   archiveYpiStudioTask,
   assertTaskBoundToContext,
   bindYpiStudioTaskToContext,
@@ -362,6 +363,34 @@ withTempCwd("ypi-studio-own-approval-transfer-", (cwd) => {
   assert.equal(reapproved?.meta.approvalGrant?.contextId, s2Ctx);
   const implementing = transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId: s2Ctx });
   assert.equal(implementing.status, "implementing");
+});
+
+// Widget approve_plan cannot reuse a transferred/old session context
+withTempCwd("ypi-studio-own-widget-approve-transfer-", (cwd) => {
+  const s1Ctx = "pi_widget_approval_s1";
+  const s2Ctx = "pi_widget_approval_s2";
+  const task = createYpiStudioTask({ cwd, title: "Widget approval transfer", workflowId: "feature-dev", contextId: s1Ctx });
+  transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId: s1Ctx });
+  writePlanReview(cwd, task.id, s1Ctx);
+  transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId: s1Ctx });
+
+  bindYpiStudioTaskToContext(cwd, task.id, s2Ctx);
+  assert.throws(
+    () => approveYpiStudioPlanFromWidget(task.id, {
+      cwd, action: "approve_plan", contextId: s1Ctx, expectedRevision: 1,
+    }),
+    /not bound/i,
+  );
+  const stillAwaiting = getYpiStudioTaskDetail(cwd, task.id);
+  assert.equal(stillAwaiting?.status, "awaiting_approval");
+  assert.equal(stillAwaiting?.meta.approvalGrant, undefined);
+
+  const approved = approveYpiStudioPlanFromWidget(task.id, {
+    cwd, action: "approve_plan", contextId: s2Ctx, expectedRevision: 1,
+  });
+  assert.equal(approved.status, "implementing");
+  assert.equal(approved.meta.approvalGrant?.source, "user-widget");
+  assert.equal(approved.meta.approvalGrant?.contextId, s2Ctx);
 });
 
 // ---------------------------------------------------------------------------

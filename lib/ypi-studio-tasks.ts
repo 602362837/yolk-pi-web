@@ -76,6 +76,11 @@ import type {
   YpiStudioImprovementArtifactUpdateBody,
   YpiStudioImprovementPlanUpdateBody,
   YpiStudioImprovementSubtaskClaimBody,
+  YpiStudioApprovalGrantSource,
+  YpiStudioWidgetApprovePlanBody,
+  YpiStudioWidgetRequestPlanChangesBody,
+  YpiStudioWidgetApproveImprovementPlanBody,
+  YpiStudioWidgetStartUserAcceptanceBody,
 } from "./ypi-studio-types";
 import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 
@@ -1083,12 +1088,16 @@ function isApprovalGate(value: unknown): value is YpiStudioApprovalGate {
     && (value.contextId === undefined || typeof value.contextId === "string");
 }
 
+function isApprovalGrantSource(value: unknown): value is YpiStudioApprovalGrantSource {
+  return value === "user-input" || value === "user-widget";
+}
+
 function isApprovalGrant(value: unknown): value is YpiStudioApprovalGrant {
   return isRecord(value)
     && optionalString(value.approvedAt) !== undefined
     && optionalString(value.contextId) !== undefined
     && optionalString(value.inputHash) !== undefined
-    && value.source === "user-input";
+    && isApprovalGrantSource(value.source);
 }
 
 function isAfterIso(candidate: string, baseline: string): boolean {
@@ -1142,8 +1151,55 @@ function approvalGate(enteredAt: string, from: string, contextId?: string): YpiS
   return { enteredAt, contextId, from, to: "awaiting_approval" };
 }
 
-function approvalGrant(approvedAt: string, contextId: string, inputText: string): YpiStudioApprovalGrant {
-  return { approvedAt, contextId, inputHash: hashText(inputText), source: "user-input" };
+function approvalGrant(
+  approvedAt: string,
+  contextId: string,
+  inputText: string,
+  source: YpiStudioApprovalGrantSource = "user-input",
+): YpiStudioApprovalGrant {
+  return { approvedAt, contextId, inputHash: hashText(inputText), source };
+}
+
+/** Canonical intent string for widget grants so inputHash remains auditable without storing arbitrary UI payloads. */
+function widgetApprovalIntent(parts: {
+  taskId: string;
+  action: "approve_plan" | "approve_improvement_plan";
+  revision: number;
+  contextId: string;
+  improvementId?: string;
+}): string {
+  return [
+    parts.taskId,
+    parts.action,
+    parts.improvementId ?? "",
+    `r${parts.revision}`,
+    parts.contextId,
+  ].join("|");
+}
+
+const WIDGET_PLAN_CHANGE_FEEDBACK_MAX = 2000;
+
+function normalizeWidgetPlanChangeFeedback(feedback: unknown): string {
+  if (typeof feedback !== "string") {
+    throw new Error("request_plan_changes requires non-empty feedback describing the needed plan changes.");
+  }
+  const normalized = feedback.replace(/\r\n/g, "\n").trim();
+  if (!normalized) {
+    throw new Error("request_plan_changes requires non-empty feedback describing the needed plan changes.");
+  }
+  if (normalized.length > WIDGET_PLAN_CHANGE_FEEDBACK_MAX) {
+    throw new Error(`request_plan_changes feedback must be at most ${WIDGET_PLAN_CHANGE_FEEDBACK_MAX} characters.`);
+  }
+  return normalized;
+}
+
+function assertExpectedRevision(actual: number, expected: number, label: string): void {
+  if (!Number.isFinite(expected) || Math.floor(expected) !== expected) {
+    throw new Error(`${label}: expectedRevision must be an integer.`);
+  }
+  if (actual !== expected) {
+    throw new Error(`${label}: plan revision changed (expected ${expected}, current ${actual}). Refresh and retry.`);
+  }
 }
 
 function slugify(value: string): string {
@@ -1268,6 +1324,7 @@ function normalizeImprovementInstance(value: unknown, displayId: string, now: st
     approvedAt: optionalString(value.approval.approvedAt),
     contextId: optionalString(value.approval.contextId),
     inputHash: optionalString(value.approval.inputHash),
+    source: isApprovalGrantSource(value.approval.source) ? value.approval.source : undefined,
   } : undefined;
   const acceptance = isRecord(value.acceptance) ? {
     acceptedAt: optionalString(value.acceptance.acceptedAt),
@@ -2635,6 +2692,7 @@ export function recordYpiStudioImprovementApproval(cwd: string, taskIdOrKey: str
       approvedAt: now,
       contextId,
       inputHash: hashText(inputText),
+      source: "user-input",
     };
     instance.updatedAt = now;
     record.raw.updatedAt = now;
@@ -2646,7 +2704,7 @@ export function recordYpiStudioImprovementApproval(cwd: string, taskIdOrKey: str
       at: now,
       taskId: record.raw.id,
       message: `User approved improvement ${instance.displayId} plan (revision ${revision})`,
-      data: { improvementId: instance.id, displayId: instance.displayId, revision, contextId },
+      data: { improvementId: instance.id, displayId: instance.displayId, revision, contextId, source: "user-input" },
     });
 
     if (contextId) writeRuntimePointer(ctx, contextId, record.raw.id);
@@ -2930,13 +2988,325 @@ export function recordYpiStudioUserApproval(cwd: string, contextId: string, inpu
     record.raw.meta = {
       ...record.raw.meta,
       approvalGate: existingGate,
-      approvalGrant: approvalGrant(approvedAt, contextId, inputText),
+      approvalGrant: approvalGrant(approvedAt, contextId, inputText, "user-input"),
     };
     record.raw.updatedAt = approvedAt;
     writeTaskJson(record.dirPath, record.raw);
-    appendTaskEvent(record.dirPath, { type: "note", at: approvedAt, taskId: record.raw.id, message: "User approved Studio plan", data: { contextId, approvalGate: existingGate } });
+    appendTaskEvent(record.dirPath, { type: "note", at: approvedAt, taskId: record.raw.id, message: "User approved Studio plan", data: { contextId, approvalGate: existingGate, source: "user-input" } });
     writeRuntimePointer(ctx, contextId, record.raw.id);
     return getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+  });
+}
+
+/**
+ * Atomically approve the main plan from the session widget.
+ * Single lock: binding/status/revision/material gate → user-widget grant → implementing.
+ * Does not compose public lock-taking helpers. override is not part of this contract.
+ */
+export function approveYpiStudioPlanFromWidget(taskIdOrKey: string, body: YpiStudioWidgetApprovePlanBody): YpiStudioTaskDetail {
+  if (!body?.contextId || typeof body.contextId !== "string" || !body.contextId.trim()) {
+    throw new Error("approve_plan requires a bound session contextId.");
+  }
+  if (!isYpiStudioSessionContextId(body.contextId)) {
+    throw new Error("approve_plan requires a session-class contextId (pi_<sessionId>).");
+  }
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot approve plans from the widget");
+    if (record.raw.status !== "awaiting_approval") {
+      throw new Error(`approve_plan requires status awaiting_approval. Current status: ${record.raw.status}`);
+    }
+    assertTaskBoundToContext(record.raw, body.contextId);
+    const revision = record.raw.meta.planRevision ?? 1;
+    assertExpectedRevision(revision, body.expectedRevision, "approve_plan");
+    assertPlanReviewReadyForApproval(record, ctx.workspaceRoot);
+
+    const existingGate = isApprovalGate(record.raw.meta.approvalGate)
+      ? record.raw.meta.approvalGate
+      : approvalGate(record.raw.updatedAt, "unknown", body.contextId);
+    const approvedAt = isoAfter(existingGate.enteredAt);
+    const intent = widgetApprovalIntent({
+      taskId: record.raw.id,
+      action: "approve_plan",
+      revision,
+      contextId: body.contextId,
+    });
+    const grant = approvalGrant(approvedAt, body.contextId, intent, "user-widget");
+
+    const workflow = readYpiStudioWorkflow(ctx.cwd, record.raw.workflowId) ?? getYpiStudioWorkflowOrDefault(ctx.cwd, record.raw.workflowId);
+    const from = record.raw.status;
+    const to = "implementing";
+    const transition = findYpiStudioTransition(workflow, from, to);
+    if (!transition && !workflow.states[to]) throw new Error(`Invalid Studio transition: ${from} -> ${to}`);
+    if (!workflow.states[to]) throw new Error(`Unknown workflow state: ${to}`);
+
+    // Pre-write approval gate revalidation (same as transition path) without nested locks.
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGate: existingGate,
+      approvalGrant: grant,
+    };
+    assertYpiStudioImplementationApproved(record.raw, body.contextId);
+
+    const updatedAt = approvedAt;
+    record.raw.status = to;
+    record.raw.updatedAt = updatedAt;
+    record.raw.currentMember = workflow.states[to]?.owner;
+    if (workflow.terminalStatuses.includes(to)) record.raw.completedAt = updatedAt;
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "transition",
+      at: updatedAt,
+      taskId: record.raw.id,
+      from,
+      to,
+      message: "User approved Studio plan from widget",
+      data: {
+        source: "user-widget",
+        action: "approve_plan",
+        contextId: body.contextId,
+        revision,
+        approvalGate: existingGate,
+      },
+    });
+    writeRuntimePointer(ctx, body.contextId, record.raw.id);
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after widget plan approval");
+    return detail;
+  });
+}
+
+/**
+ * Atomically request plan changes from the session widget.
+ * Requires non-empty bounded feedback; returns to planning, clears grant, bumps revision.
+ * Dedicated safe rollback edge — no override in contract.
+ */
+export function requestYpiStudioPlanChangesFromWidget(taskIdOrKey: string, body: YpiStudioWidgetRequestPlanChangesBody): YpiStudioTaskDetail {
+  if (!body?.contextId || typeof body.contextId !== "string" || !body.contextId.trim()) {
+    throw new Error("request_plan_changes requires a bound session contextId.");
+  }
+  if (!isYpiStudioSessionContextId(body.contextId)) {
+    throw new Error("request_plan_changes requires a session-class contextId (pi_<sessionId>).");
+  }
+  const feedback = normalizeWidgetPlanChangeFeedback(body.feedback);
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot request plan changes from the widget");
+    if (record.raw.status !== "awaiting_approval") {
+      throw new Error(`request_plan_changes requires status awaiting_approval. Current status: ${record.raw.status}`);
+    }
+    assertTaskBoundToContext(record.raw, body.contextId);
+    const currentRevision = record.raw.meta.planRevision ?? 1;
+    assertExpectedRevision(currentRevision, body.expectedRevision, "request_plan_changes");
+
+    const workflow = readYpiStudioWorkflow(ctx.cwd, record.raw.workflowId) ?? getYpiStudioWorkflowOrDefault(ctx.cwd, record.raw.workflowId);
+    const from = record.raw.status;
+    const to = "planning";
+    if (!workflow.states[to]) throw new Error(`Unknown workflow state: ${to}`);
+
+    const updatedAt = nowIso();
+    const nextRevision = currentRevision + 1;
+    record.raw.status = to;
+    record.raw.updatedAt = updatedAt;
+    record.raw.currentMember = workflow.states[to]?.owner ?? "architect";
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGrant: undefined,
+      planRevision: nextRevision,
+    };
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "transition",
+      at: updatedAt,
+      taskId: record.raw.id,
+      from,
+      to,
+      message: "User requested plan changes from widget",
+      data: {
+        source: "user-widget",
+        action: "request_plan_changes",
+        contextId: body.contextId,
+        revisionFrom: currentRevision,
+        revisionTo: nextRevision,
+        feedback,
+      },
+    });
+    writeRuntimePointer(ctx, body.contextId, record.raw.id);
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after widget request plan changes");
+    return detail;
+  });
+}
+
+/**
+ * Atomically approve one improvement plan from the session widget.
+ * Single parent-task lock: ownership/binding/status/revision/material → user-widget approval → implementing.
+ * Parent remains waiting_for_improvements; does not touch main implementationPlan/progress.
+ */
+export function approveYpiStudioImprovementPlanFromWidget(taskIdOrKey: string, body: YpiStudioWidgetApproveImprovementPlanBody): YpiStudioTaskDetail {
+  if (!body?.contextId || typeof body.contextId !== "string" || !body.contextId.trim()) {
+    throw new Error("approve_improvement_plan requires a bound session contextId.");
+  }
+  if (!isYpiStudioSessionContextId(body.contextId)) {
+    throw new Error("approve_improvement_plan requires a session-class contextId (pi_<sessionId>).");
+  }
+  if (!body.improvementId || typeof body.improvementId !== "string" || !body.improvementId.trim()) {
+    throw new Error("approve_improvement_plan requires improvementId.");
+  }
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot approve improvement plans from the widget");
+    if (record.raw.status !== "waiting_for_improvements") {
+      throw new Error(`approve_improvement_plan requires parent status waiting_for_improvements. Current status: ${record.raw.status}`);
+    }
+    assertTaskBoundToContext(record.raw, body.contextId);
+
+    const improvements = record.raw.improvements;
+    if (!improvements?.instances?.length) throw new Error("Task has no improvements");
+    const index = improvements.instances.findIndex((inst) => inst.id === body.improvementId);
+    if (index === -1) throw new Error(`Improvement not found: ${body.improvementId}`);
+
+    const instance = improvements.instances[index];
+    if (instance.status !== "waiting_plan_approval") {
+      throw new Error(`Improvement ${instance.displayId} must be in waiting_plan_approval to approve from widget. Current status: ${instance.status}`);
+    }
+
+    const revision = instance.approval?.revision ?? 1;
+    assertExpectedRevision(revision, body.expectedRevision, `approve_improvement_plan ${instance.displayId}`);
+
+    const instanceDir = improvementInstanceDir(record.dirPath, instance.id);
+    assertImprovementPlanReviewReady(instance, instanceDir, ctx.workspaceRoot);
+    assertImprovementUIEvidence(instance, instanceDir, ctx.workspaceRoot);
+
+    const allowedTargets = IMPROVEMENT_TRANSITIONS.get(instance.status);
+    if (!allowedTargets?.has("implementing")) {
+      throw new Error(`Invalid improvement transition from ${instance.status} to implementing`);
+    }
+
+    const now = isoAfter(instance.updatedAt);
+    const intent = widgetApprovalIntent({
+      taskId: record.raw.id,
+      action: "approve_improvement_plan",
+      revision,
+      contextId: body.contextId,
+      improvementId: instance.id,
+    });
+    const previousStatus = instance.status;
+    instance.approval = {
+      revision,
+      approvedAt: now,
+      contextId: body.contextId,
+      inputHash: hashText(intent),
+      source: "user-widget",
+    };
+    instance.status = "implementing";
+    instance.updatedAt = now;
+    record.raw.updatedAt = now;
+    // Parent stays waiting_for_improvements; do not mutate main implementationPlan/progress.
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "improvement",
+      at: now,
+      taskId: record.raw.id,
+      message: `User approved improvement ${instance.displayId} plan from widget (revision ${revision})`,
+      data: {
+        source: "user-widget",
+        action: "approve_improvement_plan",
+        improvementId: instance.id,
+        displayId: instance.displayId,
+        from: previousStatus,
+        to: "implementing",
+        revision,
+        contextId: body.contextId,
+      },
+    });
+    writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after widget improvement plan approval");
+    return detail;
+  });
+}
+
+/**
+ * Atomically start user acceptance from the session widget.
+ * Single lock: binding/status=review/unresolved==0/revision CAS → user_acceptance.
+ * Does not write plan approvalGrant, complete, or archive. No override contract.
+ */
+export function startYpiStudioUserAcceptanceFromWidget(
+  taskIdOrKey: string,
+  body: YpiStudioWidgetStartUserAcceptanceBody,
+): YpiStudioTaskDetail {
+  if (!body?.contextId || typeof body.contextId !== "string" || !body.contextId.trim()) {
+    throw new Error("start_user_acceptance requires a bound session contextId.");
+  }
+  if (!isYpiStudioSessionContextId(body.contextId)) {
+    throw new Error("start_user_acceptance requires a session-class contextId (pi_<sessionId>).");
+  }
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot start user acceptance from the widget");
+    if (record.raw.status !== "review") {
+      throw new Error(`start_user_acceptance requires status review. Current status: ${record.raw.status}`);
+    }
+    assertTaskBoundToContext(record.raw, body.contextId);
+
+    const unresolved = record.raw.improvements?.instances?.filter((inst) => isImprovementUnresolved(inst.status)) ?? [];
+    if (unresolved.length > 0) {
+      const ids = unresolved.map((inst) => inst.displayId).join(", ");
+      throw new Error(
+        `start_user_acceptance requires zero unresolved improvements. Still unresolved: ${ids}.`,
+      );
+    }
+
+    const revision = record.raw.meta.planRevision ?? 1;
+    assertExpectedRevision(revision, body.expectedRevision, "start_user_acceptance");
+
+    const workflow = readYpiStudioWorkflow(ctx.cwd, record.raw.workflowId) ?? getYpiStudioWorkflowOrDefault(ctx.cwd, record.raw.workflowId);
+    const from = record.raw.status;
+    const to = "user_acceptance";
+    const transition = findYpiStudioTransition(workflow, from, to);
+    if (!transition) throw new Error(`Invalid Studio transition: ${from} -> ${to}`);
+    if (!workflow.states[to]) throw new Error(`Unknown workflow state: ${to}`);
+
+    // Do not create or clear approvalGrant; only advance status into user_acceptance.
+    const updatedAt = nowIso();
+    record.raw.status = to;
+    record.raw.updatedAt = updatedAt;
+    record.raw.currentMember = workflow.states[to]?.owner;
+    // user_acceptance is not a terminal workflow status; never mark completed/archived here.
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "transition",
+      at: updatedAt,
+      taskId: record.raw.id,
+      from,
+      to,
+      message: "User started user acceptance from widget",
+      data: {
+        source: "user-widget",
+        action: "start_user_acceptance",
+        contextId: body.contextId,
+        revision,
+      },
+    });
+    writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after widget start user acceptance");
+    return detail;
   });
 }
 
@@ -3616,4 +3986,50 @@ export function isYpiStudioImprovementRevisionBody(value: unknown): value is Ypi
     && (value.implementationPlan === undefined || isRecord(value.implementationPlan))
     && (value.artifactUpdates === undefined || (isRecord(value.artifactUpdates) && Object.values(value.artifactUpdates).every((v) => typeof v === "string")))
     && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
+function isFiniteInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Math.floor(value) === value;
+}
+
+/** Explicit widget approve_plan body. Rejects override and unknown action shapes. */
+export function isYpiStudioWidgetApprovePlanBody(value: unknown): value is YpiStudioWidgetApprovePlanBody {
+  return isRecord(value)
+    && value.action === "approve_plan"
+    && typeof value.cwd === "string"
+    && typeof value.contextId === "string"
+    && isFiniteInteger(value.expectedRevision)
+    && value.override === undefined;
+}
+
+/** Explicit widget request_plan_changes body. Feedback must be a string (emptiness validated in helper). */
+export function isYpiStudioWidgetRequestPlanChangesBody(value: unknown): value is YpiStudioWidgetRequestPlanChangesBody {
+  return isRecord(value)
+    && value.action === "request_plan_changes"
+    && typeof value.cwd === "string"
+    && typeof value.contextId === "string"
+    && isFiniteInteger(value.expectedRevision)
+    && typeof value.feedback === "string"
+    && value.override === undefined;
+}
+
+/** Explicit widget approve_improvement_plan body. */
+export function isYpiStudioWidgetApproveImprovementPlanBody(value: unknown): value is YpiStudioWidgetApproveImprovementPlanBody {
+  return isRecord(value)
+    && value.action === "approve_improvement_plan"
+    && typeof value.cwd === "string"
+    && typeof value.contextId === "string"
+    && typeof value.improvementId === "string"
+    && isFiniteInteger(value.expectedRevision)
+    && value.override === undefined;
+}
+
+/** Explicit widget start_user_acceptance body. Rejects override and unknown action shapes. */
+export function isYpiStudioWidgetStartUserAcceptanceBody(value: unknown): value is YpiStudioWidgetStartUserAcceptanceBody {
+  return isRecord(value)
+    && value.action === "start_user_acceptance"
+    && typeof value.cwd === "string"
+    && typeof value.contextId === "string"
+    && isFiniteInteger(value.expectedRevision)
+    && value.override === undefined;
 }

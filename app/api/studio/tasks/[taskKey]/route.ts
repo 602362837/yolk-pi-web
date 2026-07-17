@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { canonicalizeCwd } from "@/lib/cwd";
+import { bestEffortContinueAfterWidgetRequestPlanChanges } from "@/lib/ypi-studio-session-link";
 import {
+  approveYpiStudioImprovementPlanFromWidget,
+  approveYpiStudioPlanFromWidget,
   archiveYpiStudioTask,
   bindYpiStudioTaskToContext,
   claimYpiStudioImprovementSubtask,
@@ -22,9 +25,15 @@ import {
   isYpiStudioTaskImplementationSubtaskUpdateBody,
   isYpiStudioTaskArtifactUpdateBody,
   isYpiStudioTaskTransitionBody,
+  isYpiStudioWidgetApproveImprovementPlanBody,
+  isYpiStudioWidgetApprovePlanBody,
+  isYpiStudioWidgetRequestPlanChangesBody,
+  isYpiStudioWidgetStartUserAcceptanceBody,
   recordYpiStudioImprovementApproval,
+  requestYpiStudioPlanChangesFromWidget,
   resolveYpiStudioImprovementDisposition,
   reviseYpiStudioImprovementPlan,
+  startYpiStudioUserAcceptanceFromWidget,
   transitionYpiStudioImprovement,
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
@@ -36,6 +45,14 @@ import {
 } from "@/lib/ypi-studio-tasks";
 
 export const dynamic = "force-dynamic";
+
+type StudioWidgetActionErrorCode =
+  | "bad_request"
+  | "forbidden"
+  | "not_found"
+  | "conflict"
+  | "unprocessable"
+  | "internal";
 
 async function resolveAuthorizedCwd(cwd: string): Promise<string | NextResponse> {
   const allowedRoots = await getAllowedRoots();
@@ -55,6 +72,49 @@ function isBindBody(value: unknown): value is { cwd: string; contextId: string; 
     && typeof (value as { cwd?: unknown }).cwd === "string"
     && typeof (value as { contextId?: unknown }).contextId === "string"
     && (value as { action?: unknown }).action === "bind";
+}
+
+/**
+ * Map domain helper failures for Phase 1 widget decision actions to stable HTTP + code.
+ * Keeps messages safe (no absolute paths / stack) and never exposes material bodies.
+ */
+function mapWidgetDecisionError(error: unknown): {
+  status: number;
+  code: StudioWidgetActionErrorCode;
+  error: string;
+} {
+  if (error instanceof YpiStudioTaskSecurityError) {
+    return { status: 400, code: "bad_request", error: error.message || "Invalid request" };
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const safe = message && !message.includes("/") && message.length <= 300
+    ? message
+    : "Widget decision failed";
+
+  if (/Task not found|Improvement not found/i.test(message)) {
+    return { status: 404, code: "not_found", error: safe };
+  }
+  if (
+    /not bound to this session context|requires a bound session contextId|requires a session-class contextId/i.test(message)
+    || /Archived tasks cannot/i.test(message)
+    || /requires status|requires parent status|must be in waiting_plan_approval|plan revision changed|expectedRevision must be an integer|requires zero unresolved improvements/i.test(message)
+  ) {
+    return { status: 409, code: "conflict", error: safe };
+  }
+  if (
+    /plan-review|HTML prototype|TBD placeholder|meaningful content|ui\.md indicates|requires non-empty feedback|feedback must be at most/i.test(message)
+  ) {
+    return { status: 422, code: "unprocessable", error: safe };
+  }
+  if (/requires improvementId|Invalid Studio transition|Unknown workflow state|Task has no improvements/i.test(message)) {
+    return { status: 400, code: "bad_request", error: safe };
+  }
+  return { status: 500, code: "internal", error: "Widget decision failed" };
+}
+
+function widgetDecisionErrorResponse(error: unknown): NextResponse {
+  const mapped = mapWidgetDecisionError(error);
+  return NextResponse.json({ error: mapped.error, code: mapped.code }, { status: mapped.status });
 }
 
 export async function GET(
@@ -99,6 +159,56 @@ export async function PATCH(
     if (isBindBody(body)) {
       const task = bindYpiStudioTaskToContext(authorizedCwd, taskKey, body.contextId);
       return NextResponse.json({ task });
+    }
+    // Explicit widget decision actions must match before loose transition bodies so
+    // approve_*/request_plan_changes never fall through to transitionYpiStudioTask.
+    if (isYpiStudioWidgetApprovePlanBody(body)) {
+      try {
+        const task = approveYpiStudioPlanFromWidget(taskKey, { ...body, cwd: authorizedCwd });
+        return NextResponse.json({ task });
+      } catch (error) {
+        return widgetDecisionErrorResponse(error);
+      }
+    }
+    if (isYpiStudioWidgetRequestPlanChangesBody(body)) {
+      try {
+        const task = requestYpiStudioPlanChangesFromWidget(taskKey, { ...body, cwd: authorizedCwd });
+        // Best-effort wake of the bound session to re-run planning. Never roll back the
+        // already-persisted planning decision if the RPC wrapper is missing/busy.
+        const revisionFrom = body.expectedRevision;
+        const revisionTo = typeof task.meta?.planRevision === "number"
+          ? task.meta.planRevision
+          : revisionFrom + 1;
+        bestEffortContinueAfterWidgetRequestPlanChanges({
+          contextId: body.contextId,
+          taskId: task.id,
+          feedback: typeof body.feedback === "string" ? body.feedback : "",
+          revisionFrom,
+          revisionTo,
+          updatedAt: task.updatedAt,
+        });
+        return NextResponse.json({ task });
+      } catch (error) {
+        return widgetDecisionErrorResponse(error);
+      }
+    }
+    if (isYpiStudioWidgetApproveImprovementPlanBody(body)) {
+      try {
+        const task = approveYpiStudioImprovementPlanFromWidget(taskKey, { ...body, cwd: authorizedCwd });
+        return NextResponse.json({ task });
+      } catch (error) {
+        return widgetDecisionErrorResponse(error);
+      }
+    }
+    // Explicit start_user_acceptance must match before loose transition bodies.
+    // No autocontinue: user_acceptance waits for the main-accept CTA.
+    if (isYpiStudioWidgetStartUserAcceptanceBody(body)) {
+      try {
+        const task = startYpiStudioUserAcceptanceFromWidget(taskKey, { ...body, cwd: authorizedCwd });
+        return NextResponse.json({ task });
+      } catch (error) {
+        return widgetDecisionErrorResponse(error);
+      }
     }
     if (isYpiStudioTaskArtifactUpdateBody(body)) {
       const task = updateYpiStudioTaskArtifact(taskKey, { ...body, cwd: authorizedCwd });

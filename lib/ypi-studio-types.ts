@@ -529,12 +529,15 @@ export interface YpiStudioApprovalGate {
   to: "awaiting_approval";
 }
 
+/** Allowlisted approval grant sources. Historical grants use user-input; widget CTAs write user-widget. */
+export type YpiStudioApprovalGrantSource = "user-input" | "user-widget";
+
 export interface YpiStudioApprovalGrant {
   approvedAt: string;
   /** Must match the bound Studio context key (normally pi_<sessionId>) used by input hooks and task binding. */
   contextId: string;
   inputHash: string;
-  source: "user-input";
+  source: YpiStudioApprovalGrantSource;
 }
 
 export interface YpiStudioTaskMeta extends Record<string, unknown> {
@@ -577,6 +580,8 @@ export interface YpiStudioImprovementInstance {
     approvedAt?: string;
     contextId?: string;
     inputHash?: string;
+    /** Present on new widget/chat grants; historical records may omit source. */
+    source?: YpiStudioApprovalGrantSource;
   };
   acceptance?: {
     acceptedAt?: string;
@@ -842,6 +847,34 @@ export interface YpiStudioWidgetQuickPreview {
   displayId?: string;
 }
 
+/** Fixed widget decision action kinds. Frontend must not invent additional kinds. */
+export type YpiStudioWidgetUserActionKind =
+  | "approve_plan"
+  | "request_plan_changes"
+  | "approve_improvement_plan"
+  | "start_user_acceptance";
+
+export type YpiStudioWidgetUserActionRole = "primary" | "secondary";
+
+/**
+ * Sparse, allowlisted decision descriptor projected by the server.
+ * Never carries endpoints, arbitrary PATCH bodies, artifact content, feedback, transcripts, or paths.
+ */
+export interface YpiStudioWidgetUserAction {
+  /** Stable id scoped by target + revision, e.g. main:approve:r1 / improvement:<id>:approve:r2. */
+  id: string;
+  kind: YpiStudioWidgetUserActionKind;
+  label: string;
+  role: YpiStudioWidgetUserActionRole;
+  requiresConfirmation: true;
+  expectedRevision: number;
+  /** Required for improvement-scoped plan approval. */
+  improvementId?: string;
+  displayId?: string;
+  /** Bounded display copy for the decision target; never feedback/body/path. */
+  targetLabel: string;
+}
+
 export interface YpiStudioTaskWidgetProjection {
   key: string;
   id: string;
@@ -877,6 +910,11 @@ export interface YpiStudioTaskWidgetProjection {
    * Never includes Markdown/HTML bodies, feedback, or transcript content.
    */
   quickPreviews?: YpiStudioWidgetQuickPreview[];
+  /**
+   * Additive Phase 1 decision CTAs. Sparse, max 2 items, fixed enum descriptors only.
+   * Visibility is advisory; write paths revalidate binding/status/revision/material gates.
+   */
+  userActions?: YpiStudioWidgetUserAction[];
   steps: YpiStudioTaskWidgetStep[];
   subagents: YpiStudioTaskWidgetSubagentRun[];
   events?: YpiStudioTaskWidgetEvent[];
@@ -1149,6 +1187,40 @@ export interface YpiStudioTaskTransitionBody {
   reason?: string;
   contextId?: string;
   override?: boolean;
+}
+
+/** Explicit widget decision body: approve main plan and enter implementing. No override field. */
+export interface YpiStudioWidgetApprovePlanBody {
+  cwd: string;
+  action: "approve_plan";
+  contextId: string;
+  expectedRevision: number;
+}
+
+/** Explicit widget decision body: request plan changes and return to planning. No override field. */
+export interface YpiStudioWidgetRequestPlanChangesBody {
+  cwd: string;
+  action: "request_plan_changes";
+  contextId: string;
+  expectedRevision: number;
+  feedback: string;
+}
+
+/** Explicit widget decision body: approve one improvement plan instance. No override field. */
+export interface YpiStudioWidgetApproveImprovementPlanBody {
+  cwd: string;
+  action: "approve_improvement_plan";
+  contextId: string;
+  expectedRevision: number;
+  improvementId: string;
+}
+
+/** Explicit widget decision body: enter user_acceptance from review. No override/reason. */
+export interface YpiStudioWidgetStartUserAcceptanceBody {
+  cwd: string;
+  action: "start_user_acceptance";
+  contextId: string;
+  expectedRevision: number;
 }
 
 export interface YpiStudioTaskArtifactUpdateBody {
