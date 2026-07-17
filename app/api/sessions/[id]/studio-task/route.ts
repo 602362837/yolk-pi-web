@@ -3,7 +3,10 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { resolveSessionPath } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
-import { resolveYpiStudioTaskForSession } from "@/lib/ypi-studio-session-link";
+import {
+  resolveYpiStudioSessionAutocontinueCommand,
+  resolveYpiStudioTaskForSession,
+} from "@/lib/ypi-studio-session-link";
 import { YpiStudioTaskSecurityError } from "@/lib/ypi-studio-tasks";
 import type { YpiStudioSessionTasksLinkResult } from "@/lib/ypi-studio-types";
 import type { SessionEntry } from "@/lib/types";
@@ -34,24 +37,11 @@ export async function GET(
     }
 
     const result: YpiStudioSessionTasksLinkResult = resolveYpiStudioTaskForSession({ cwd, sessionId: id, sessionFilePath: filePath, entries, leafId });
-    // Autocontinue only for the primary implementing task to avoid multi-task accidental dispatch.
-    const primaryTask = result.task;
-    if (primaryTask && !primaryTask.archived && primaryTask.status === "implementing") {
-      const projection = primaryTask.implementationProjection;
-      const counts = projection?.statusCounts;
-      const activeCount = (counts?.running ?? 0) + (counts?.queued ?? 0);
-      const readyCount = counts?.ready ?? 0;
-      const availableSlots = projection ? Math.max(0, projection.maxConcurrency - activeCount) : 0;
-      if (readyCount > 0 && availableSlots > 0) {
-        getRpcSession(id)?.send({
-          type: "studio_autocontinue",
-          taskId: primaryTask.id,
-          readySubtaskCount: readyCount,
-          availableSlots,
-          stateKey: `${primaryTask.updatedAt}:${activeCount}:${readyCount}:${availableSlots}:${projection?.nextSubtaskIds?.join(",") ?? ""}`,
-          reason: "studio-task poll observed ready subtasks with free concurrency slots (primary task only)",
-        }).catch(() => {});
-      }
+    // Best-effort autocontinue for primary task only (main implementing or first implementing improvement).
+    // Continuation failure never mutates task state / grants.
+    const command = resolveYpiStudioSessionAutocontinueCommand({ cwd, primaryTask: result.task });
+    if (command) {
+      getRpcSession(id)?.send(command).catch(() => {});
     }
     return NextResponse.json(result);
   } catch (error) {

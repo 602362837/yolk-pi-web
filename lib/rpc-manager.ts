@@ -171,7 +171,20 @@ function ypiStudioContinuationKeys(sessionId: string, sessionFile?: string): str
   ].filter(Boolean);
 }
 
-function buildYpiStudioReadyContinuationPrompt(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; completionReady?: boolean; checkingReady?: boolean; checkerRunId?: string; checkerStatus?: string; checkerSummary?: string; reason?: string }): string {
+function buildYpiStudioReadyContinuationPrompt(input: {
+  taskId: string;
+  readySubtaskCount?: number;
+  availableSlots?: number;
+  completionReady?: boolean;
+  checkingReady?: boolean;
+  checkerRunId?: string;
+  checkerStatus?: string;
+  checkerSummary?: string;
+  reason?: string;
+  /** When set, continuation is scoped to this improvement instance DAG only. */
+  improvementId?: string;
+  displayId?: string;
+}): string {
   if (input.checkingReady) {
     return [
       "YPI Studio checker 子代理已结束，请继续自动收口，不要等待用户输入。",
@@ -183,6 +196,26 @@ function buildYpiStudioReadyContinuationPrompt(input: { taskId: string; readySub
       input.reason ? `- reason: ${input.reason}` : undefined,
       "",
       "请按现有 Studio 状态机继续：先调用 ypi_studio_subagent(action=collect, runId=<checkerRunId>) 幂等收集 checker 结果，再读取 ypi_studio_task(action=current) 的默认 compact 摘要。若 checker 通过且无 remaining/needs-work 项，transition 到 completed 并总结；若 checker 指出 needs work / blocker / remaining findings，不要假装完成，说明需要处理的问题并按工作流回到 implementing 或请求用户决策。不要为了收口读取 full detail。",
+    ].filter(Boolean).join("\n");
+  }
+  if (input.improvementId) {
+    const display = input.displayId ?? input.improvementId;
+    return [
+      `YPI Studio 改进项 ${display} 的 implementationPlan 仍有 ready 子任务且存在空闲并发槽，请继续自动推进该改进实例，不要等待用户输入。`,
+      "",
+      `- taskId: ${input.taskId}`,
+      `- improvementId: ${input.improvementId}`,
+      `- displayId: ${display}`,
+      typeof input.readySubtaskCount === "number" ? `- readySubtaskCount: ${input.readySubtaskCount}` : undefined,
+      typeof input.availableSlots === "number" ? `- availableSlots: ${input.availableSlots}` : undefined,
+      input.reason ? `- reason: ${input.reason}` : undefined,
+      "",
+      "严格限定在该 improvement 实例 DAG：",
+      "1. 先调用 ypi_studio_task(action=current) 或 ypi_studio_task(action=get, taskId=<上面的 taskId>) 获取 compact 摘要，确认父任务仍是 waiting_for_improvements。",
+      "2. 调用 ypi_studio_task(action=implementation_next, improvementId=<上面的 improvementId>, limit=<available slots>) 查看该实例 ready batch。",
+      "3. 使用 ypi_studio_task(action=claim_improvement_subtask, improvementId=<上面的 improvementId>, limit=<available slots>, status=running) 或按 ready id 连续 claim，随后为每个 claimed subtaskId 启动一个 async ypi_studio_subagent(action=start, mode=async, member=<instance owner or implementer>, improvementId=<上面的 improvementId>, subtaskId=<该子任务id>)，直到槽位满或无 ready。",
+      "4. 每个 run 只处理一个 subtaskId；不要 claim 或启动主任务 implementationPlan 子任务；不要调用 claim_implementation_subtask。",
+      "5. 启动后调用 ypi_studio_wait(runIds=<started run ids>)。只有 compact 摘要不足时才请求 full detail。",
     ].filter(Boolean).join("\n");
   }
   return [
@@ -199,6 +232,33 @@ function buildYpiStudioReadyContinuationPrompt(input: { taskId: string; readySub
     input.completionReady
       ? "请按现有 Studio 状态机继续：优先使用注入摘要和 ypi_studio_task(action=current) 的默认 compact 摘要确认状态；若 task 仍是 implementing 且全部 implementation subtasks 都 done/skipped、无 active run，自动 transition 到 checking，并派发 checker；检查完成后按工作流完成或说明需要用户处理。不要为了收口读取 full detail。"
       : "请按现有 Studio 状态机继续：先调用 ypi_studio_task(action=current) 或 ypi_studio_task(action=get, taskId=<上面的 taskId>) 获取默认 compact 摘要；若 task 仍是 implementing，调用 implementation_next(limit=<available slots>)，claim ready 子任务，并为每个 claimed subtaskId 启动一个 async implementer，直到 maxConcurrency 填满或无 ready。每个 implementer run 只处理一个 subtaskId。只有 compact 摘要不足时才请求 full detail。",
+  ].filter(Boolean).join("\n");
+}
+
+/** Fixed prompt after widget request_plan_changes; feedback is already persisted server-side. */
+function buildYpiStudioUserActionContinuationPrompt(input: {
+  taskId: string;
+  action: string;
+  feedback?: string;
+  revisionFrom?: number;
+  revisionTo?: number;
+  reason?: string;
+}): string {
+  return [
+    "YPI Studio 用户已在会话浮窗请求修改计划。该决定已落库（status=planning，旧 grant 已清除，planRevision 已提升）。请继续自动重跑架构规划，不要等待用户再次输入批准文案。",
+    "",
+    `- taskId: ${input.taskId}`,
+    `- action: ${input.action}`,
+    typeof input.revisionFrom === "number" ? `- revisionFrom: ${input.revisionFrom}` : undefined,
+    typeof input.revisionTo === "number" ? `- revisionTo: ${input.revisionTo}` : undefined,
+    input.feedback ? `- feedback: ${input.feedback}` : undefined,
+    input.reason ? `- reason: ${input.reason}` : undefined,
+    "",
+    "请按现有 Studio 状态机继续：",
+    "1. 调用 ypi_studio_task(action=current) 或 ypi_studio_task(action=get, taskId=<上面的 taskId>) 确认任务已回到 planning。",
+    "2. 根据上面的 feedback 更新/重写规划产物（brief/prd/design/implement/checks/ui/plan-review 等），必要时派发 architect。",
+    "3. 规划完成后写 plan-review.md、保存 implementationPlan，transition 到 awaiting_approval，然后停止本轮等待用户确认。",
+    "4. 不要在本轮直接进入 implementing；不要伪造批准。",
   ].filter(Boolean).join("\n");
 }
 
@@ -755,15 +815,50 @@ export class AgentSessionWrapper {
     return this.scheduleStudioFollowUp(buildYpiStudioChildContinuationPrompt(payload));
   }
 
-  private scheduleStudioReadyContinuation(input: { taskId: string; readySubtaskCount?: number; availableSlots?: number; completionReady?: boolean; checkingReady?: boolean; checkerRunId?: string; checkerStatus?: string; checkerSummary?: string; stateKey?: string; reason?: string }): { queued: boolean; skippedReason?: string } {
+  private scheduleStudioReadyContinuation(input: {
+    taskId: string;
+    readySubtaskCount?: number;
+    availableSlots?: number;
+    completionReady?: boolean;
+    checkingReady?: boolean;
+    checkerRunId?: string;
+    checkerStatus?: string;
+    checkerSummary?: string;
+    stateKey?: string;
+    reason?: string;
+    improvementId?: string;
+    displayId?: string;
+  }): { queued: boolean; skippedReason?: string } {
     if (!this._alive) return { queued: false, skippedReason: "session_not_alive" };
     this.resetIdleTimer();
-    const key = `${input.taskId}:${input.stateKey ?? "ready"}`;
+    // Dedupe key includes task + optional improvement scope + stateKey (revision/ready/slots).
+    const scope = input.improvementId ? `improvement:${input.improvementId}` : "main";
+    const key = `${input.taskId}:${scope}:${input.stateKey ?? "ready"}`;
     const now = Date.now();
     const last = this.studioAutoContinueKeys.get(key) ?? 0;
     if (now - last < 30_000) return { queued: false, skippedReason: "recently_queued" };
     this.studioAutoContinueKeys.set(key, now);
     this.scheduleStudioFollowUp(buildYpiStudioReadyContinuationPrompt(input));
+    return { queued: true };
+  }
+
+  private scheduleStudioUserActionContinuation(input: {
+    taskId: string;
+    action: string;
+    feedback?: string;
+    revisionFrom?: number;
+    revisionTo?: number;
+    stateKey?: string;
+    reason?: string;
+  }): { queued: boolean; skippedReason?: string } {
+    if (!this._alive) return { queued: false, skippedReason: "session_not_alive" };
+    this.resetIdleTimer();
+    const key = `${input.taskId}:user_action:${input.action}:${input.stateKey ?? "action"}`;
+    const now = Date.now();
+    const last = this.studioAutoContinueKeys.get(key) ?? 0;
+    if (now - last < 30_000) return { queued: false, skippedReason: "recently_queued" };
+    this.studioAutoContinueKeys.set(key, now);
+    this.scheduleStudioFollowUp(buildYpiStudioUserActionContinuationPrompt(input));
     return { queued: true };
   }
 
@@ -904,6 +999,24 @@ export class AgentSessionWrapper {
           checkerRunId: typeof command.checkerRunId === "string" ? command.checkerRunId : undefined,
           checkerStatus: typeof command.checkerStatus === "string" ? command.checkerStatus : undefined,
           checkerSummary: typeof command.checkerSummary === "string" ? command.checkerSummary : undefined,
+          stateKey: typeof command.stateKey === "string" ? command.stateKey : undefined,
+          reason: typeof command.reason === "string" ? command.reason : undefined,
+          improvementId: typeof command.improvementId === "string" ? command.improvementId : undefined,
+          displayId: typeof command.displayId === "string" ? command.displayId : undefined,
+        });
+      }
+
+      case "studio_user_action": {
+        const taskId = typeof command.taskId === "string" ? command.taskId : "";
+        const action = typeof command.action === "string" ? command.action : "";
+        if (!taskId) throw new Error("taskId is required");
+        if (!action) throw new Error("action is required");
+        return this.scheduleStudioUserActionContinuation({
+          taskId,
+          action,
+          feedback: typeof command.feedback === "string" ? command.feedback : undefined,
+          revisionFrom: typeof command.revisionFrom === "number" ? command.revisionFrom : undefined,
+          revisionTo: typeof command.revisionTo === "number" ? command.revisionTo : undefined,
           stateKey: typeof command.stateKey === "string" ? command.stateKey : undefined,
           reason: typeof command.reason === "string" ? command.reason : undefined,
         });
@@ -1119,6 +1232,19 @@ function getRegistry(): Map<string, AgentSessionWrapper> {
 function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string }>> {
   if (!globalThis.__piStartLocks) globalThis.__piStartLocks = new Map();
   return globalThis.__piStartLocks;
+}
+
+/**
+ * Best-effort Studio continuation delivery. Missing/busy wrappers fail soft;
+ * never throws to the caller so legal widget decisions are not rolled back.
+ */
+export function bestEffortSendStudioCommand(sessionId: string, command: Record<string, unknown>): void {
+  if (!sessionId || !command || typeof command !== "object") return;
+  try {
+    getRpcSession(sessionId)?.send(command).catch(() => {});
+  } catch {
+    // Wrapper teardown races are recoverable from the bound chat.
+  }
 }
 
 export function getRpcSession(sessionId: string): AgentSessionWrapper | undefined {

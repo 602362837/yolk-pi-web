@@ -8,6 +8,15 @@ import { TerminalSshCredentialEditor } from "./TerminalSshCredentialEditor";
 import { TerminalSshProfileEditor } from "./TerminalSshProfileEditor";
 import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
 import { ModelPricesConfig } from "./ModelPricesConfig";
+import { SettingsProviderHub } from "./SettingsProviderHub";
+import {
+  DEFAULT_SETTINGS_EXPANDED_GROUPS,
+  expandAncestorsForView,
+  SettingsTreeNavigation,
+  type SettingsExpandedGroups,
+  type SettingsSection,
+  type SettingsView,
+} from "./SettingsTreeNavigation";
 import type {
   PiWebChatGptConfig,
   PiWebConfig,
@@ -90,7 +99,8 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "grok" | "kiro" | "editor" | "trellis" | "diagnostics";
+export type { SettingsSection } from "./SettingsTreeNavigation";
+
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -788,7 +798,11 @@ export function SettingsConfig({
   studioFocusMember?: StudioFocusMember;
   studioFocusField?: "model" | "thinking";
 }) {
-  const [section, setSection] = useState<SettingsSection>(initialSection ?? "yolk");
+  // External callers still pass real SettingsSection only; providerHub is a local virtual view.
+  const [view, setView] = useState<SettingsView>(initialSection ?? "yolk");
+  const [expandedGroups, setExpandedGroups] = useState<SettingsExpandedGroups>(() =>
+    expandAncestorsForView(new Set(DEFAULT_SETTINGS_EXPANDED_GROUPS), initialSection ?? "yolk"),
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [configPath, setConfigPath] = useState("");
@@ -930,7 +944,9 @@ export function SettingsConfig({
 
   useEffect(() => {
     if (!initialSection) return;
-    setSection(initialSection);
+    // Deep-link / external section sync: expand stable ancestors first, then select the leaf.
+    setExpandedGroups((prev) => expandAncestorsForView(prev, initialSection));
+    setView(initialSection);
   }, [initialSection]);
 
   useEffect(() => {
@@ -939,25 +955,73 @@ export function SettingsConfig({
   }, [studioFocusMember?.id]);
 
   useEffect(() => {
-    if (loading || section !== "studio" || !studioFocusMember?.id) return;
+    if (loading || view !== "studio" || !studioFocusMember?.id) return;
     const target = studioMemberRowRefs.current[studioFocusMember.id];
     if (!target) return;
     target.scrollIntoView({ block: "center", behavior: "smooth" });
     const timer = window.setTimeout(() => setHighlightedStudioMember(null), 2200);
     return () => window.clearTimeout(timer);
-  }, [loading, section, studioFocusMember?.id]);
+  }, [loading, view, studioFocusMember?.id]);
 
   useEffect(() => {
     setTrellisOutput(null);
   }, [cwd]);
 
   useEffect(() => {
-    if (section !== "trellis" && section !== "terminal" && section !== "studio" && section !== "yolk") return;
+    // Model/status loading still keys on real sections only — never providerHub.
+    if (view !== "trellis" && view !== "terminal" && view !== "studio" && view !== "yolk") return;
     const controller = new AbortController();
-    if (section === "trellis") void loadTrellisStatus(controller.signal);
+    if (view === "trellis") void loadTrellisStatus(controller.signal);
     void loadModels(controller.signal);
     return () => controller.abort();
-  }, [section, loadModels, loadTrellisStatus]);
+  }, [view, loadModels, loadTrellisStatus]);
+
+  const handleSelectView = useCallback((nextView: SettingsView) => {
+    setExpandedGroups((prev) => expandAncestorsForView(prev, nextView));
+    setView(nextView);
+  }, []);
+
+  const handleExpandedGroupsChange = useCallback((next: SettingsExpandedGroups) => {
+    setExpandedGroups(next);
+  }, []);
+
+  const openProviderHub = useCallback(() => {
+    handleSelectView("providerHub");
+  }, [handleSelectView]);
+
+  const openProviderDetail = useCallback(
+    (section: "chatgpt" | "opencodeGo" | "grok" | "kiro") => {
+      handleSelectView(section);
+    },
+    [handleSelectView],
+  );
+
+  const renderProviderBackLink = useCallback(
+    () => (
+      <button
+        type="button"
+        className="settings-provider-back"
+        onClick={openProviderHub}
+        style={{
+          alignSelf: "flex-start",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          margin: 0,
+          padding: "4px 0",
+          border: "none",
+          background: "none",
+          color: "var(--accent)",
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: "pointer",
+        }}
+      >
+        ← 返回提供商策略
+      </button>
+    ),
+    [openProviderHub],
+  );
 
   const updateYolk = useCallback((patch: Partial<PiWebYolkConfig>) => {
     setYolk((prev) => {
@@ -1416,31 +1480,6 @@ export function SettingsConfig({
     onClose();
   }, [cwd, dirty, onClose, onOpenTerminalCommand, saveConfig, terminalEnabled, trellis]);
 
-  const renderSectionButton = (id: SettingsSection, label: string, description: string) => {
-    const active = section === id;
-    return (
-      <button
-        key={id}
-        onClick={() => setSection(id)}
-        style={{
-          width: "100%",
-          textAlign: "left",
-          padding: "8px 10px",
-          borderRadius: 8,
-          border: active ? "1px solid rgba(37,99,235,0.25)" : "1px solid transparent",
-          background: active ? "var(--bg-selected)" : "transparent",
-          color: active ? "var(--accent)" : "var(--text-muted)",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-        title={description}
-      >
-        {label}
-      </button>
-    );
-  };
-
   const trellisBusy = !!trellisAction || saving;
   const trellisBlockingReason = !cwd
     ? "请先选择工作区。"
@@ -1472,7 +1511,9 @@ export function SettingsConfig({
         className="pi-modal-panel settings-modal-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(760px, calc(100vw - 40px))",
+          width: "min(960px, calc(100vw - 40px))",
+          // Fixed height: content-driven maxHeight caused panel resize flicker when switching tree leaves.
+          height: "min(720px, calc(100vh - 40px))",
           maxHeight: "calc(100vh - 40px)",
           overflow: "hidden",
           background: "var(--bg-panel)",
@@ -1483,7 +1524,7 @@ export function SettingsConfig({
           flexDirection: "column",
         }}
       >
-        <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, color: "var(--text)" }}>设置</h2>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)" }}>配置 yolk pi web 行为。保存后动态生效，无需重启。</p>
@@ -1497,24 +1538,28 @@ export function SettingsConfig({
           </button>
         </div>
 
-        <div className="settings-modal-body" style={{ display: "flex", minHeight: 0 }}>
-          <div style={{ width: 150, borderRight: "1px solid var(--border)", padding: 10, background: "var(--bg-subtle)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-            {renderSectionButton("yolk", "蛋黄𝝅", "新会话默认聊天行为")}
-            {renderSectionButton("worktree", "WorkTree", "New WorkTree 默认配置")}
-            {renderSectionButton("studio", "Studio", "YPI Studio 成员模型")}
-            {renderSectionButton("usage", "Usage", "Usage 统计范围")}
-            {renderSectionButton("modelPrices", "模型价格", "模型价格配置与智能填写")}
-            {renderSectionButton("terminal", "Terminal", "Web 终端设置")}
-            {renderSectionButton("chatgpt", "ChatGPT", "ChatGPT 用量与自动切换")}
-            {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
-            {renderSectionButton("grok", "Grok", "Grok 全局 Active 与自动切号")}
-            {renderSectionButton("kiro", "Kiro", "Kiro 全局 Active 与自动切号")}
-            {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
-            {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
-            {renderSectionButton("diagnostics", "诊断", "内存诊断快照")}
+        <div className="settings-modal-body" style={{ display: "flex", minHeight: 0, flex: 1 }}>
+          <div
+            className="settings-tree-nav-panel"
+            style={{
+              width: 216,
+              borderRight: "1px solid var(--border)",
+              padding: 10,
+              background: "var(--bg-subtle)",
+              flexShrink: 0,
+              overflow: "auto",
+              minWidth: 0,
+            }}
+          >
+            <SettingsTreeNavigation
+              activeView={view}
+              expandedGroups={expandedGroups}
+              onExpandedGroupsChange={handleExpandedGroupsChange}
+              onSelectView={handleSelectView}
+            />
           </div>
 
-          <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
+          <div className="settings-modal-content" style={{ padding: 18, overflow: "auto", flex: 1, minWidth: 0 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
             ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && grok && kiro && editor ? (
@@ -1522,7 +1567,7 @@ export function SettingsConfig({
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
 
-                {section === "yolk" ? (
+                {view === "yolk" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>蛋黄𝝅 默认配置</h3>
@@ -1573,7 +1618,7 @@ export function SettingsConfig({
                       </div>
                     </Field>
                   </div>
-                ) : section === "worktree" ? (
+                ) : view === "worktree" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>New WorkTree 默认配置</h3>
@@ -1624,7 +1669,7 @@ export function SettingsConfig({
                       </div>
                     </div>
                   </div>
-                ) : section === "studio" ? (
+                ) : view === "studio" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>YPI Studio 成员运行策略</h3>
@@ -1720,7 +1765,7 @@ export function SettingsConfig({
                       固定解析链：工具入参 model/thinking &gt; 成员配置 &gt; 默认策略 &gt; 主会话 &gt; Pi 默认。成员 id 会先规范化为小写；unset 不作为最终策略，成员 unset 会落到默认策略，默认 unset 会按 followMain → Pi default 回退。所有 fallback 与 warning 会显示在 Chat transcript/final details。YPI child 进程会设置 Trellis 子进程禁用标志，避免成员流程受 Trellis 注入影响。
                     </div>
                   </div>
-                ) : section === "usage" ? (
+                ) : view === "usage" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Session rollup</h3>
@@ -1770,9 +1815,29 @@ export function SettingsConfig({
                       </div>
                     ) : null}
                   </div>
-                ) : section === "modelPrices" ? (
+                ) : view === "modelPrices" ? (
                   <ModelPricesConfig cwd={cwd} />
-                ) : section === "terminal" ? (
+                ) : view === "providerHub" ? (
+                  <SettingsProviderHub
+                    chatgpt={{
+                      usagePanelEnabled: chatgpt.usagePanelEnabled,
+                      autoFailoverEnabled: chatgpt.autoFailover.enabled,
+                      autoRefreshEnabled: chatgpt.autoRefreshEnabled,
+                    }}
+                    opencodeGo={{
+                      autoFailoverEnabled: opencodeGo.autoFailover.enabled,
+                    }}
+                    grok={{
+                      usagePanelEnabled: grok.usagePanelEnabled,
+                      autoFailoverEnabled: grok.autoFailover.enabled,
+                    }}
+                    kiro={{
+                      usagePanelEnabled: kiro.usagePanelEnabled,
+                      autoFailoverEnabled: kiro.autoFailover.enabled,
+                    }}
+                    onOpenProvider={openProviderDetail}
+                  />
+                ) : view === "terminal" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Web 终端</h3>
@@ -1953,10 +2018,11 @@ export function SettingsConfig({
                     <TerminalSshProfileEditor ssh={terminal.ssh} credentials={terminalCredentials} onChange={updateTerminalSsh} />
                     <TerminalKnownHostsPanel />
                   </div>
-                ) : section === "chatgpt" ? (
+                ) : view === "chatgpt" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>ChatGPT</h3>
+                      {renderProviderBackLink()}
+                      <h3 style={{ margin: "4px 0 0", color: "var(--text)", fontSize: 15 }}>ChatGPT</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
                         控制 ChatGPT/Codex 账号相关显示。账号预热计划在 Models 的 Warm up 弹窗中管理，并同样保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
                         {exists ? "" : "（保存时会自动创建）"}
@@ -2008,10 +2074,11 @@ export function SettingsConfig({
                       文件锁过期判断跟随配置：锁超过约 2 × 总刷新间隔未更新时，启动器会把它视为 stale 并尝试接管。
                     </div>
                   </div>
-                ) : section === "opencodeGo" ? (
+                ) : view === "opencodeGo" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>OpenCode Go</h3>
+                      {renderProviderBackLink()}
+                      <h3 style={{ margin: "4px 0 0", color: "var(--text)", fontSize: 15 }}>OpenCode Go</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
                         控制 OpenCode Go（Zen Go）托管 API Key 多账号的自动切换行为。账号的 Enable/Disable 管理在 Models → OpenCode Go 账号列表中操作。
                         保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
@@ -2028,10 +2095,11 @@ export function SettingsConfig({
                       只有 enabled 账号才会参与 failover。disabled 账号不会作为候选，也不能被激活。被自动禁用的账号可在 Models 中 Enable 恢复，但不会自动重新激活。
                     </div>
                   </div>
-                ) : section === "grok" ? (
+                ) : view === "grok" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Grok</h3>
+                      {renderProviderBackLink()}
+                      <h3 style={{ margin: "4px 0 0", color: "var(--text)", fontSize: 15 }}>Grok</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
                         控制 Grok CLI 全局 Active 账号的自动轮换与顶部用量入口。Models 的 Activate 只设置当前全局 Active，不是锁定；账号管理仍在 Models 中完成。
                         保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
@@ -2054,10 +2122,11 @@ export function SettingsConfig({
                       候选账号需要有效凭证，且 monthly remaining &gt; 0；若存在 weekly 则 usedPercent &lt; 100，且额度缓存/查询结果在允许新鲜度内、无需 reauth。固定环境 token 覆盖托管 OAuth 时不会伪称切换成功。
                     </div>
                   </div>
-                ) : section === "kiro" ? (
+                ) : view === "kiro" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Kiro</h3>
+                      {renderProviderBackLink()}
+                      <h3 style={{ margin: "4px 0 0", color: "var(--text)", fontSize: 15 }}>Kiro</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
                         控制 Kiro 全局 Active 账号的自动轮换与顶栏用量组件。Models 的 Activate 只设置当前全局 Active，不属于锁定；账号管理仍在 Models 中完成。
                         保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
@@ -2080,7 +2149,7 @@ export function SettingsConfig({
                       候选账号需要有效凭证且无需 reauth，并具备 fresh/live 的 primary 额度 remaining &gt; 0。额度未知或仅 stale 时不会作为自动切号候选。全局顶部简要显示开关在 Usage 分节统一配置。
                     </div>
                   </div>
-                ) : section === "editor" ? (
+                ) : view === "editor" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>编辑器</h3>
@@ -2163,7 +2232,7 @@ export function SettingsConfig({
                       <div style={{ marginTop: 8 }}>这些是 Monaco 自带编辑行为，不写入 yolk pi web 配置；上面的开关只控制 yolk pi web 额外接管的快捷键/鼠标手势。</div>
                     </div>
                   </div>
-                ) : section === "diagnostics" ? (
+                ) : view === "diagnostics" ? (
                   <DiagnosticsPanel />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -2467,7 +2536,7 @@ export function SettingsConfig({
           </div>
         </div>
 
-        <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 10, flexShrink: 0 }}>
           <button
             onClick={resetToDefaults}
             disabled={!defaults || loading || saving}

@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YPI Studio 任务浮窗用户决策 CTA 原型交互演示</title>
+  <style>
+    /* 基础复位与主题系统 */
+    :root {
+      --bg-app: #f4f4f5;
+      --bg-panel: #ffffff;
+      --bg-card: rgba(255, 255, 255, 0.85);
+      --border-color: rgba(0, 0, 0, 0.08);
+      --text-main: #18181b;
+      --text-muted: #71717a;
+      --text-dim: #a1a1aa;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-bg: rgba(37, 99, 235, 0.1);
+      --glass-blur: blur(12px);
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      
+      --color-green: #16a34a;
+      --color-green-bg: rgba(22, 163, 74, 0.1);
+      --color-green-border: rgba(22, 163, 74, 0.3);
+      --color-orange: #d97706;
+      --color-orange-bg: rgba(217, 119, 6, 0.1);
+      --color-orange-border: rgba(217, 119, 6, 0.3);
+      --color-red: #dc2626;
+      
+      --widget-width: 360px;
+    }
+
+    [data-theme="dark"] {
+      --bg-app: #09090b;
+      --bg-panel: #18181b;
+      --bg-card: rgba(24, 24, 27, 0.75);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #eddcd2; /* 蛋黄派偏暖浅色字 */
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --accent: #f59e0b; /* 蛋黄黄 */
+      --accent-hover: #d97706;
+      --accent-bg: rgba(245, 158, 11, 0.12);
+      --glass-blur: blur(20px);
+      --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -10px rgba(0, 0, 0, 0.5);
+      
+      --color-green: #22c55e;
+      --color-green-bg: rgba(34, 197, 94, 0.12);
+      --color-green-border: rgba(34, 197, 94, 0.4);
+      --color-orange: #f59e0b;
+      --color-orange-bg: rgba(245, 158, 11, 0.12);
+      --color-orange-border: rgba(245, 158, 11, 0.4);
+      --color-red: #ef4444;
+    }
+
+    /* 减弱动画支持 */
+    .reduced-motion {
+      --transition-speed: 0s !important;
+      animation: none !important;
+      transition: none !important;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* 控制面板布局 */
+    #control-panel {
+      width: 320px;
+      background-color: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 6px;
+      color: var(--accent);
+    }
+
+    h2 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .control-group {
+      background: rgba(0, 0, 0, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    [data-theme="dark"] .control-group {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      padding: 6px 4px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .radio-label:hover {
+      background: rgba(127, 127, 127, 0.05);
+    }
+    .radio-label input {
+      accent-color: var(--accent);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      padding: 8px 4px;
+      cursor: pointer;
+    }
+    .checkbox-label input {
+      accent-color: var(--accent);
+    }
+
+    /* 演示区域布局 */
+    #demo-viewport {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 40px;
+      background: radial-gradient(circle, var(--border-color) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    /* 容器宽度控制器 */
+    .viewport-container {
+      position: relative;
+      transition: width 0.3s ease;
+      width: var(--widget-width);
+      max-width: 100%;
+    }
+
+    .viewport-container.mobile-view {
+      --widget-width: 320px;
+      border: 6px solid #27272a;
+      border-radius: 24px;
+      height: 640px;
+      background: #000;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end; /* 移动端 bottom sheet 贴底 */
+    }
+
+    .mobile-frame-header {
+      display: none;
+      height: 30px;
+      background: #27272a;
+      color: #71717a;
+      font-size: 10px;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .mobile-view .mobile-frame-header {
+      display: flex;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 12;
+    }
+
+    .mobile-screen-content {
+      display: none;
+      flex-grow: 1;
+      background: var(--bg-app);
+      padding: 12px;
+      overflow-y: auto;
+      padding-top: 36px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .mobile-view .mobile-screen-content {
+      display: block;
+    }
+
+    .mobile-pill {
+      display: none;
+      width: 100px;
+      height: 4px;
+      background: #a1a1aa;
+      border-radius: 99px;
+      margin: 8px auto;
+    }
+    .mobile-view .mobile-pill {
+      display: block;
+    }
+
+    /* YPI Studio 浮窗样式 (Desktop 360px 宽度) */
+    .ypi-studio-widget-panel-visual {
+      background: var(--bg-card);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+      width: 100%;
+      position: relative;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .mobile-view .ypi-studio-widget-panel-visual {
+      border-radius: 16px 16px 0 0;
+      border-bottom: none;
+      box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 浮窗拖动手柄 */
+    .ypi-widget-header-drag {
+      height: 8px;
+      margin: -6px -6px 6px -6px;
+      cursor: grab;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .ypi-widget-header-drag::after {
+      content: "";
+      width: 32px;
+      height: 3px;
+      background: var(--border-color);
+      border-radius: 2px;
+    }
+
+    /* 标题区域 */
+    .ypi-studio-task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .ypi-studio-task-title-wrap {
+      min-width: 0;
+      flex-grow: 1;
+    }
+    .ypi-studio-task-eyebrow {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .ypi-studio-task-title {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-main);
+    }
+    .ypi-studio-task-detail-button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .ypi-studio-task-detail-button:hover {
+      background: var(--border-color);
+      color: var(--text-main);
+    }
+    .ypi-studio-task-detail-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    /* 流程轨道：与生产一致的 8 站 2×4 grid（Brief…Archived），禁止压成 4 站 */
+    .ypi-studio-workflow-rail {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px 0;
+      width: 100%;
+      min-width: 0;
+      margin: 2px 0 8px;
+      padding: 10px 6px 7px;
+      border: 1px solid var(--border-color);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--bg-panel) 72%, transparent);
+      overflow: visible;
+    }
+    .ypi-studio-workflow-rail-segment {
+      display: flex;
+      align-items: flex-start;
+      width: 100%;
+      min-width: 0;
+    }
+    .ypi-studio-workflow-rail-station {
+      display: grid;
+      justify-items: center;
+      gap: 2px;
+      min-width: 0;
+      flex: 0 0 auto;
+    }
+    .ypi-studio-workflow-rail-node {
+      width: 15px;
+      height: 15px;
+      border-radius: 999px;
+      border: 1px solid var(--text-dim);
+      background: var(--bg-panel);
+      display: grid;
+      place-items: center;
+      font-size: 8px;
+      font-weight: 900;
+      color: var(--text-dim);
+      line-height: 1;
+      transition: all 0.2s;
+    }
+    .ypi-studio-workflow-rail-node.is-done {
+      border-color: var(--color-green);
+      background: var(--color-green);
+      color: white;
+    }
+    .ypi-studio-workflow-rail-node.is-current {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 0 0 3px var(--accent-bg);
+    }
+    .ypi-studio-workflow-rail-node.is-attention {
+      border-color: var(--color-orange);
+      background: var(--color-orange);
+      color: #1f2937;
+      box-shadow: 0 0 0 3px var(--color-orange-bg);
+    }
+    .ypi-studio-workflow-rail-label {
+      font-size: 8px;
+      font-weight: 800;
+      color: var(--text-dim);
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ypi-studio-workflow-rail-station.is-done .ypi-studio-workflow-rail-label {
+      color: var(--color-green);
+    }
+    .ypi-studio-workflow-rail-station.is-current .ypi-studio-workflow-rail-label {
+      color: var(--accent);
+      font-weight: 900;
+    }
+    .ypi-studio-workflow-rail-station.is-attention .ypi-studio-workflow-rail-label {
+      color: var(--color-orange);
+      font-weight: 900;
+    }
+    .ypi-studio-workflow-rail-line {
+      flex: 1 1 auto;
+      min-width: 6px;
+      height: 2px;
+      margin: 7px 2px 0 3px;
+      background: var(--border-color);
+    }
+    .ypi-studio-workflow-rail-line.is-done {
+      background: var(--color-green);
+    }
+    .ypi-studio-workflow-rail-line.is-hidden {
+      visibility: hidden;
+    }
+
+    /* 只读资料区 */
+    .ypi-studio-quick-preview-section {
+      border-top: 1px dashed var(--border-color);
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+    .ypi-section-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .ypi-studio-widget-plan-action-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .ypi-studio-widget-plan-review-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-main);
+      transition: all 0.2s;
+      min-height: 28px;
+    }
+    .ypi-studio-widget-plan-review-btn:hover {
+      background: var(--border-color);
+    }
+    .ypi-studio-widget-plan-review-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .ypi-studio-widget-plan-review-btn-icon {
+      font-size: 11px;
+      margin-right: 4px;
+    }
+    .ypi-studio-widget-plan-review-btn-label {
+      font-size: 10px;
+      font-weight: 700;
+      flex-grow: 1;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ypi-studio-widget-plan-review-btn-state {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: var(--border-color);
+      color: var(--text-muted);
+    }
+    .ypi-studio-widget-plan-review-btn.is-attention .ypi-studio-widget-plan-review-btn-state {
+      background: var(--color-orange-bg);
+      color: var(--color-orange);
+    }
+    .ypi-studio-widget-plan-review-btn.is-success .ypi-studio-widget-plan-review-btn-state {
+      background: var(--color-green-bg);
+      color: var(--color-green);
+    }
+
+    /* 用户决策区 (NEW DESIGNED AREA) */
+    .ypi-studio-decision-section {
+      border-top: 1px solid var(--border-color);
+      padding-top: 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      background: rgba(245, 158, 11, 0.03); /* 微弱暖色背景提示决策 */
+      border-radius: 6px;
+      padding: 8px;
+    }
+    [data-theme="dark"] .ypi-studio-decision-section {
+      background: rgba(245, 158, 11, 0.04);
+    }
+    .ypi-decision-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .ypi-decision-target-title {
+      font-size: 10px;
+      font-weight: 900;
+      color: var(--color-orange);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .ypi-decision-target-revision {
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--text-muted);
+      background: var(--border-color);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    
+    /* 决策按钮组 */
+    .ypi-decision-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* 主 CTA */
+    .ypi-btn-primary {
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.2;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    .ypi-btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+    .ypi-btn-primary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .ypi-btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* 次 CTA */
+    .ypi-btn-secondary {
+      width: 100%;
+      min-height: 32px;
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-panel);
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.2;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .ypi-btn-secondary:hover:not(:disabled) {
+      background: var(--border-color);
+    }
+    .ypi-btn-secondary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .ypi-btn-secondary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* 移动端排版适配：横向排列或全宽 */
+    .mobile-view .ypi-decision-buttons {
+      gap: 8px;
+    }
+    .mobile-view .ypi-btn-primary {
+      min-height: 44px; /* 移动端最小 44px 热区 */
+      font-size: 13px;
+    }
+    .mobile-view .ypi-btn-secondary {
+      min-height: 44px;
+      font-size: 13px;
+    }
+
+    /* Busy 忙碌状态样式 */
+    .is-busy {
+      position: relative;
+      cursor: wait !important;
+    }
+    .is-busy .spinner-icon {
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 改进计划指示 */
+    .ypi-decision-imp-list-hint {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    /* 改进摘要 + 结果验收（现有能力，必须保留） */
+    .ypi-studio-widget-improvement {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 6px 0;
+      padding: 7px 8px;
+      border: 1px solid var(--color-orange-border);
+      border-radius: 8px;
+      background: var(--color-orange-bg);
+    }
+    .ypi-studio-widget-improvement-title {
+      color: var(--color-orange);
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .ypi-studio-widget-improvement-meta {
+      color: var(--color-orange);
+      font-size: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ypi-studio-widget-accept-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .ypi-studio-widget-accept-btn {
+      width: 100%;
+      min-height: 30px;
+      padding: 6px 8px;
+      border: 1px solid var(--color-orange);
+      border-radius: 6px;
+      background: var(--color-orange);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* 主任务结果验收（现有能力，必须保留） */
+    .ypi-studio-widget-main-accept {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin: 6px 0;
+      padding: 8px;
+      border: 1px solid var(--color-green-border);
+      border-radius: 8px;
+      background: var(--color-green-bg);
+    }
+    .ypi-studio-widget-main-accept-meta {
+      overflow: hidden;
+      color: var(--color-green);
+      font-size: 10px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ypi-studio-widget-main-accept-btn {
+      width: 100%;
+      min-height: 30px;
+      padding: 6px 8px;
+      border: 1px solid var(--color-green);
+      border-radius: 6px;
+      background: var(--color-green);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .ypi-studio-widget-main-accept-btn:hover:not(:disabled) {
+      filter: brightness(0.9);
+    }
+    .ypi-existing-slot {
+      display: none;
+    }
+    .ypi-existing-slot.is-visible {
+      display: block;
+    }
+
+    /* 归档只读徽章 */
+    .ypi-studio-widget-archived-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin: 4px 0;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: rgba(127, 127, 127, 0.15);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 800;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* 运行时与状态区域 */
+    .ypi-runtime-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    /* AppPrompt 对话框模拟层 */
+    .app-prompt-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      border-radius: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .mobile-view .app-prompt-overlay {
+      border-radius: 16px 16px 0 0;
+    }
+    .app-prompt-overlay.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .app-prompt-dialog {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: var(--shadow);
+      transform: scale(0.9);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .app-prompt-overlay.is-visible .app-prompt-dialog {
+      transform: scale(1);
+    }
+    .app-prompt-body {
+      padding: 14px;
+    }
+    .app-prompt-title {
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+    .app-prompt-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+    
+    /* 需要修改输入框 */
+    .app-prompt-textarea {
+      width: 100%;
+      height: 70px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-app);
+      color: var(--text-main);
+      padding: 8px;
+      font-size: 11px;
+      font-family: inherit;
+      resize: none;
+      margin-bottom: 6px;
+      outline: none;
+    }
+    .app-prompt-textarea:focus {
+      border-color: var(--accent);
+    }
+    .app-prompt-error-msg {
+      color: var(--color-red);
+      font-size: 10px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      display: none;
+    }
+
+    .app-prompt-foot {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border-color);
+      background: rgba(127, 127, 127, 0.02);
+      border-radius: 0 0 10px 10px;
+    }
+    .app-prompt-btn-confirm {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .app-prompt-btn-confirm:hover {
+      background: var(--accent-hover);
+    }
+    .app-prompt-btn-cancel {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-panel);
+      color: var(--text-main);
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .app-prompt-btn-cancel:hover {
+      background: var(--border-color);
+    }
+
+    /* 移动端确认框纵向排列适配 */
+    .mobile-view .app-prompt-dialog {
+      max-width: 100%;
+      border-radius: 12px;
+    }
+    .mobile-view .app-prompt-foot {
+      grid-template-columns: 1fr;
+    }
+    .mobile-view .app-prompt-btn-confirm {
+      min-height: 40px;
+      order: 1; /* 确认放上方方便触达 */
+    }
+    .mobile-view .app-prompt-btn-cancel {
+      min-height: 40px;
+      order: 2;
+    }
+
+    /* Toast 通知模拟 */
+    .simulated-toast {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--color-orange-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      box-shadow: var(--shadow);
+      z-index: 150;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(-50px);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .simulated-toast.is-visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .simulated-toast-icon {
+      color: var(--color-orange);
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .simulated-toast-text {
+      font-size: 11px;
+      font-weight: 700;
+      flex-grow: 1;
+    }
+    .simulated-toast-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    /* 状态特征栏样式 */
+    .state-badge {
+      display: inline-flex;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--border-color);
+      color: var(--text-muted);
+      align-items: center;
+      gap: 4px;
+    }
+    .state-badge.is-waiting {
+      background: var(--color-orange-bg);
+      color: var(--color-orange);
+    }
+
+    /* 辅助文本 */
+    .helper-card {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-top: 16px;
+      padding: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+    .helper-card code {
+      background: rgba(0, 0, 0, 0.05);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    [data-theme="dark"] .helper-card code {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 控制面板 -->
+  <div id="control-panel">
+    <div>
+      <h1>YPI Studio 浮窗决策 CTA</h1>
+      <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">UI 原型交互演示 - 覆盖多种系统决策状态及无障碍选项</p>
+    </div>
+
+    <!-- 演示场景选择 -->
+    <div class="control-group">
+      <h2>1. 任务决策场景</h2>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="main-awaiting" checked>
+        <span>主计划待批准</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="imp-awaiting">
+        <span>改进计划待批准</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="multiple-imp">
+        <span>多改进等待计划审批</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="conflict-stale">
+        <span>版本冲突/陈旧</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="imp-result-accept">
+        <span>现有：改进结果待验收</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="main-result-accept">
+        <span>现有：主任务结果待验收</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="non-decision">
+        <span>非决策阶段 (执行中/只读)</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="scene" value="archived-state">
+        <span>归档只读状态</span>
+      </label>
+    </div>
+
+    <!-- 主题与布局 -->
+    <div class="control-group">
+      <h2>2. 界面与主题</h2>
+      <label class="radio-label">
+        <input type="radio" name="theme" value="dark" checked>
+        <span>深色模式 (Dark)</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="theme" value="light">
+        <span>浅色模式 (Light)</span>
+      </label>
+      <div style="height: 10px;"></div>
+      <label class="radio-label">
+        <input type="radio" name="width" value="desktop" checked>
+        <span>桌面浮窗 (360px)</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="width" value="mobile">
+        <span>移动端 Bottom Sheet</span>
+      </label>
+    </div>
+
+    <!-- 无障碍特征 -->
+    <div class="control-group">
+      <h2>3. 无障碍选项</h2>
+      <label class="checkbox-label">
+        <input type="checkbox" id="toggle-reduced-motion">
+        <span>减弱动画 (Reduced Motion)</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="toggle-keyboard-focus">
+        <span>激活键盘聚焦样式指示</span>
+      </label>
+    </div>
+
+    <div class="helper-card">
+      <strong>UI 设计员提议要点：</strong>
+      <ul>
+        <li><strong>资料区与决策区分区</strong>：预览按钮（计划/原型）常驻且GET只读；决策按钮独立出现。</li>
+        <li><strong>每卡最多一主一次</strong>：清晰呈现主批准和次退回，移动端热区增大为 <code>44px</code>。</li>
+        <li><strong>CAS 冲突保障</strong>： expectedRevision 冲突时，前端接收冲突提示并自动刷新为新状态，杜绝乐观迁移风险。</li>
+        <li><strong>现有能力保全</strong>：改进结果验收 / 主任务验收 / rail / runtime 必须保留；新决策区是叠加，不是替换。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 演示区域 -->
+  <div id="demo-viewport">
+    
+    <!-- 模拟 Toast -->
+    <div id="toast" class="simulated-toast">
+      <span class="simulated-toast-icon">⚠️</span>
+      <span id="toast-text" class="simulated-toast-text">状态或版本已变化，已刷新最新任务</span>
+      <button type="button" class="simulated-toast-close" onclick="hideToast()">×</button>
+    </div>
+
+    <!-- 主视图容器 -->
+    <div id="viewport-container" class="viewport-container">
+      <div class="mobile-frame-header">📱 移动端 Bottom Sheet 预览模式</div>
+      <div class="mobile-screen-content">
+        <p>绑定会话：pi_session_20260716_active</p>
+        <p style="margin-top:8px;">这是主聊天的背景内容模拟。在窄屏下，点击 Studio 悬浮卡将以贴底 Bottom Sheet 形式呈现当前任务状态与决策操作。</p>
+      </div>
+
+      <!-- Studio 任务卡面板开始 -->
+      <div id="studio-widget" class="ypi-studio-widget-panel-visual">
+        <!-- 拖拽把手 -->
+        <div class="ypi-widget-header-drag" title="可拖动区域"></div>
+
+        <!-- 任务头部 -->
+        <div class="ypi-studio-task-header">
+          <div class="ypi-studio-task-title-wrap">
+            <div class="ypi-studio-task-eyebrow">Studio 任务进行中</div>
+            <div class="ypi-studio-task-title" title="任务浮窗在用户决策节点提供可点击 CTA">任务浮窗在用户决策节点提供可点击 CTA</div>
+          </div>
+          <button class="ypi-studio-task-detail-button" title="查看任务详情 (↗)" aria-label="查看详情">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+          </button>
+        </div>
+
+        <!-- 工作轨道：生产 8 站 Brief→Design→Implement→Checks→Review→User Acc.→Completed→Archived -->
+        <div class="ypi-studio-workflow-rail is-eight-station" aria-label="Workflow 进度：Brief、Design、Implement、Checks、Review、User Acceptance、Completed、Archived">
+          <div class="ypi-studio-workflow-rail-segment" data-stage="brief">
+            <div class="ypi-studio-workflow-rail-station is-done">
+              <div class="ypi-studio-workflow-rail-node is-done">✓</div>
+              <span class="ypi-studio-workflow-rail-label" title="Brief">Brief</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-done" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="design">
+            <div class="ypi-studio-workflow-rail-station is-current">
+              <div class="ypi-studio-workflow-rail-node is-current">●</div>
+              <span class="ypi-studio-workflow-rail-label" title="Design">Design</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="implement">
+            <div class="ypi-studio-workflow-rail-station">
+              <div class="ypi-studio-workflow-rail-node">○</div>
+              <span class="ypi-studio-workflow-rail-label" title="Implement">Implement</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="checks">
+            <div class="ypi-studio-workflow-rail-station">
+              <div class="ypi-studio-workflow-rail-node">○</div>
+              <span class="ypi-studio-workflow-rail-label" title="Checks">Checks</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line is-hidden" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="review">
+            <div class="ypi-studio-workflow-rail-station">
+              <div class="ypi-studio-workflow-rail-node">○</div>
+              <span class="ypi-studio-workflow-rail-label" title="Review">Review</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="user_acceptance">
+            <div class="ypi-studio-workflow-rail-station">
+              <div class="ypi-studio-workflow-rail-node">○</div>
+              <span class="ypi-studio-workflow-rail-label" title="User Acceptance">User Acc.</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="completed">
+            <div class="ypi-studio-workflow-rail-station">
+              <div class="ypi-studio-workflow-rail-node">○</div>
+              <span class="ypi-studio-workflow-rail-label" title="Completed">Completed</span>
+            </div>
+            <span class="ypi-studio-workflow-rail-line" aria-hidden="true"></span>
+          </div>
+          <div class="ypi-studio-workflow-rail-segment" data-stage="archived">
+            <div class="ypi-studio-workflow-rail-station">
+              <div class="ypi-studio-workflow-rail-node">○</div>
+              <span class="ypi-studio-workflow-rail-label" title="Archived">Archived</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 现有：改进摘要 + 结果验收（资料区之前，必须保留） -->
+        <div id="existing-improvement-slot" class="ypi-existing-slot" aria-label="改进结果验收（现有能力）">
+          <div class="ypi-studio-widget-improvement">
+            <div class="ypi-studio-widget-improvement-title">待处理改进 1 项</div>
+            <div class="ypi-studio-widget-improvement-meta">阻塞：IMP-023 改进结果待验收</div>
+            <div class="ypi-studio-widget-improvement-meta">下一步：请验收 IMP-023</div>
+            <div class="ypi-studio-widget-accept-item">
+              <div class="ypi-studio-widget-improvement-meta">! IMP-023 改进结果待验收</div>
+              <button type="button" class="ypi-studio-widget-accept-btn" title="结果验收，不是计划审批">确认该改进任务已完成</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 现有：主任务结果验收（必须保留） -->
+        <div id="existing-main-accept-slot" class="ypi-existing-slot" aria-label="主任务结果验收（现有能力）">
+          <div class="ypi-studio-widget-main-accept">
+            <div class="ypi-studio-widget-main-accept-meta">✓ 改进已完成 · 请确认主任务验收</div>
+            <button type="button" class="ypi-studio-widget-main-accept-btn" title="主任务结果验收，不是计划审批">确认主任务已验收完成</button>
+          </div>
+        </div>
+
+        <!-- 只读资料区 -->
+        <div class="ypi-studio-quick-preview-section">
+          <div class="ypi-section-label">只读审查材料</div>
+          <div class="ypi-studio-widget-plan-action-row">
+            <button type="button" class="ypi-studio-widget-plan-review-btn is-success" aria-label="查看计划审批书" title="计划审批书已就绪 · 点击查看 (只读预览，不影响批准)">
+              <span class="ypi-studio-widget-plan-review-btn-icon">📄</span>
+              <span class="ypi-studio-widget-plan-review-btn-label">计划审批书</span>
+              <span class="ypi-studio-widget-plan-review-btn-state">就绪</span>
+            </button>
+            <button type="button" class="ypi-studio-widget-plan-review-btn is-attention is-prototype" aria-label="查看 HTML 原型" title="HTML 原型需要审阅 · 点击打开只读预览">
+              <span class="ypi-studio-widget-plan-review-btn-icon">🎨</span>
+              <span class="ypi-studio-widget-plan-review-btn-label">HTML 原型</span>
+              <span class="ypi-studio-widget-plan-review-btn-state">待批准</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 用户决策区 (本期新增；不得替换上方现有区块) -->
+        <div id="decision-block" class="ypi-studio-decision-section">
+          <div class="ypi-decision-header">
+            <div id="decision-title" class="ypi-decision-target-title">
+              <span>👉 需要你的决定: 主任务计划</span>
+            </div>
+            <span id="decision-revision" class="ypi-decision-target-revision">Rev. 2</span>
+          </div>
+
+          <div id="decision-buttons-container" class="ypi-decision-buttons">
+            <!-- 动态生成按钮 -->
+          </div>
+        </div>
+
+        <!-- 运行时状态 -->
+        <div class="ypi-runtime-row">
+          <span class="state-badge is-waiting" id="runtime-status-badge">等待用户批准</span>
+          <span style="color: var(--text-dim); margin-left: auto;">PI 编排已暂停</span>
+        </div>
+
+        <!-- 移动端贴底 pill -->
+        <div class="mobile-pill"></div>
+
+        <!-- AppPrompt 对话框 -->
+        <div id="prompt-overlay" class="app-prompt-overlay">
+          <div class="app-prompt-dialog">
+            <div class="app-prompt-body">
+              <div id="prompt-title" class="app-prompt-title">批准并开始实现</div>
+              <div id="prompt-desc" class="app-prompt-desc">你正在批准主任务「任务浮窗在用户决策节点提供可点击 CTA」的 Rev. 2 计划。这会授权 Studio 会话继续编排执行并开始拉取实现子任务。</div>
+              
+              <!-- 退回修改输入框 -->
+              <div id="prompt-input-area" style="display: none;">
+                <textarea id="prompt-feedback-input" class="app-prompt-textarea" placeholder="请具体写明需要修改的内容和调整建议..."></textarea>
+                <div id="prompt-error" class="app-prompt-error-msg">请填写修改说明后再提交</div>
+              </div>
+            </div>
+            <div class="app-prompt-foot">
+              <button type="button" id="prompt-confirm" class="app-prompt-btn-confirm">确认</button>
+              <button type="button" id="prompt-cancel" class="app-prompt-btn-cancel" onclick="closePrompt()">取消</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <!-- Studio 任务卡面板结束 -->
+
+    </div>
+  </div>
+
+  <!-- 原型交互脚本 -->
+  <script>
+    // 状态数据定义
+    // 8 stations: Brief, Design, Implement, Checks, Review, User Acc., Completed, Archived
+    // Values: done | current | attention | pending
+    const states = {
+      "main-awaiting": {
+        railStatus: ["done", "attention", "pending", "pending", "pending", "pending", "pending", "pending"],
+        previewStates: { plan: "就绪", planTone: "success", proto: "待批准", protoTone: "attention" },
+        hasDecision: true,
+        decisionTitle: "👉 需要你的决定: 主任务计划批准",
+        revision: "Rev. 2",
+        runtimeBadge: "等待用户批准",
+        runtimeBadgeClass: "is-waiting",
+        buttons: [
+          { label: "批准并开始实现", class: "ypi-btn-primary", action: "approve_main" },
+          { label: "需要修改", class: "ypi-btn-secondary", action: "request_changes" }
+        ]
+      },
+      "imp-awaiting": {
+        railStatus: ["done", "done", "done", "done", "done", "attention", "pending", "pending"],
+        previewStates: { plan: "就绪", planTone: "success", proto: "IMP-023待批", protoTone: "attention" },
+        hasDecision: true,
+        decisionTitle: "👉 需要你的决定: 改进计划批准",
+        revision: "IMP-023 · Rev. 1",
+        runtimeBadge: "等待改进批准",
+        runtimeBadgeClass: "is-waiting",
+        buttons: [
+          { label: "批准该改进计划 (IMP-023)", class: "ypi-btn-primary", action: "approve_imp" },
+          { label: "详情退回", class: "ypi-btn-secondary", action: "request_changes" }
+        ]
+      },
+      "multiple-imp": {
+        railStatus: ["done", "done", "done", "done", "done", "attention", "pending", "pending"],
+        previewStates: { plan: "就绪", planTone: "success", proto: "多项待批", protoTone: "attention" },
+        hasDecision: true,
+        decisionTitle: "👉 需要你的决定: 改进计划批准",
+        revision: "IMP-023 · Rev. 1",
+        runtimeBadge: "等待改进批准",
+        runtimeBadgeClass: "is-waiting",
+        buttons: [
+          { label: "批准改进计划 (IMP-023)", class: "ypi-btn-primary", action: "approve_imp" }
+        ],
+        extraHint: "ℹ️ 另有 1 个改进项等待计划批准，批准此项后将显示下一项。"
+      },
+      "conflict-stale": {
+        railStatus: ["done", "attention", "pending", "pending", "pending", "pending", "pending", "pending"],
+        previewStates: { plan: "已过期", planTone: "attention", proto: "待更新", protoTone: "attention" },
+        hasDecision: true,
+        decisionTitle: "⚠️ 存在冲突 / 陈旧版本",
+        revision: "期待 Rev. 2",
+        runtimeBadge: "数据陈旧",
+        runtimeBadgeClass: "is-waiting",
+        buttons: [
+          { label: "刷新并获取最新计划", class: "ypi-btn-primary", action: "trigger_refresh" }
+        ]
+      },
+      "imp-result-accept": {
+        railStatus: ["done", "done", "done", "done", "done", "attention", "pending", "pending"],
+        previewStates: { plan: "已批准", planTone: "success", proto: "已批准", protoTone: "success" },
+        hasDecision: false,
+        showImprovementAccept: true,
+        runtimeBadge: "改进结果待验收",
+        runtimeBadgeClass: "is-waiting"
+      },
+      "main-result-accept": {
+        railStatus: ["done", "done", "done", "done", "done", "current", "pending", "pending"],
+        previewStates: { plan: "已批准", planTone: "success", proto: "已批准", protoTone: "success" },
+        hasDecision: false,
+        showMainAccept: true,
+        runtimeBadge: "主任务结果待验收",
+        runtimeBadgeClass: "is-waiting"
+      },
+      "non-decision": {
+        railStatus: ["done", "done", "current", "pending", "pending", "pending", "pending", "pending"],
+        previewStates: { plan: "已批准", planTone: "success", proto: "已批准", protoTone: "success" },
+        hasDecision: false,
+        runtimeBadge: "实现员运行中",
+        runtimeBadgeClass: ""
+      },
+      "archived-state": {
+        railStatus: ["done", "done", "done", "done", "done", "done", "done", "done"],
+        previewStates: { plan: "只读归档", planTone: "readonly", proto: "只读归档", protoTone: "readonly" },
+        hasDecision: false,
+        isArchived: true,
+        runtimeBadge: "已归档只读",
+        runtimeBadgeClass: ""
+      }
+    };
+
+    let activeScene = "main-awaiting";
+    let isWriteBusy = false;
+
+    // 获取DOM引用
+    const sceneRadios = document.querySelectorAll('input[name="scene"]');
+    const themeRadios = document.querySelectorAll('input[name="theme"]');
+    const widthRadios = document.querySelectorAll('input[name="width"]');
+    const motionCheckbox = document.getElementById('toggle-reduced-motion');
+    const focusCheckbox = document.getElementById('toggle-keyboard-focus');
+    
+    const viewportContainer = document.getElementById('viewport-container');
+    const studioWidget = document.getElementById('studio-widget');
+    const decisionBlock = document.getElementById('decision-block');
+    const decisionTitle = document.getElementById('decision-title');
+    const decisionRevision = document.getElementById('decision-revision');
+    const decisionButtonsContainer = document.getElementById('decision-buttons-container');
+    const runtimeBadge = document.getElementById('runtime-status-badge');
+    
+    // 对话框DOM
+    const promptOverlay = document.getElementById('prompt-overlay');
+    const promptTitle = document.getElementById('prompt-title');
+    const promptDesc = document.getElementById('prompt-desc');
+    const promptInputArea = document.getElementById('prompt-input-area');
+    const promptFeedbackInput = document.getElementById('prompt-feedback-input');
+    const promptConfirmBtn = document.getElementById('prompt-confirm');
+    const promptError = document.getElementById('prompt-error');
+    
+    // Toast DOM
+    const toast = document.getElementById('toast');
+    const toastText = document.getElementById('toast-text');
+
+    // 绑定控制器事件
+    sceneRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        switchScene(e.target.value);
+      });
+    });
+
+    themeRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        document.documentElement.setAttribute('data-theme', e.target.value);
+      });
+    });
+
+    widthRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (e.target.value === 'mobile') {
+          viewportContainer.classList.add('mobile-view');
+        } else {
+          viewportContainer.classList.remove('mobile-view');
+        }
+      });
+    });
+
+    motionCheckbox.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        document.body.classList.add('reduced-motion');
+      } else {
+        document.body.classList.remove('reduced-motion');
+      }
+    });
+
+    focusCheckbox.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        // 强行渲染聚焦样式以便检查
+        document.querySelectorAll('button').forEach(btn => btn.style.outline = '2px solid var(--accent)');
+      } else {
+        document.querySelectorAll('button').forEach(btn => btn.style.outline = '');
+      }
+    });
+
+    // 场景切换主逻辑
+    function switchScene(sceneName) {
+      activeScene = sceneName;
+      const data = states[sceneName];
+      if (!data) return;
+
+      // 1. 8 站工作轨道（与生产 WORKFLOW_RAIL_STAGES 一致）
+      const stations = document.querySelectorAll('.ypi-studio-workflow-rail-station');
+      const nodes = document.querySelectorAll('.ypi-studio-workflow-rail-node');
+      const lines = document.querySelectorAll('.ypi-studio-workflow-rail-line');
+      const nodeGlyph = { done: '✓', current: '●', attention: '!', pending: '○' };
+
+      data.railStatus.forEach((status, idx) => {
+        if (!stations[idx] || !nodes[idx]) return;
+        const tone = status === 'pending' ? 'unknown' : status;
+        stations[idx].className = `ypi-studio-workflow-rail-station is-${status === 'pending' ? 'pending' : status}`;
+        nodes[idx].className = `ypi-studio-workflow-rail-node is-${status === 'pending' ? '' : status}`.trim().replace(/\s+/g, ' ');
+        if (status === 'pending') {
+          nodes[idx].className = 'ypi-studio-workflow-rail-node';
+        } else {
+          nodes[idx].className = `ypi-studio-workflow-rail-node is-${status}`;
+        }
+        nodes[idx].textContent = nodeGlyph[status] || '○';
+
+        if (lines[idx]) {
+          const hideWrap = idx === 3; // Checks is last of first row; hide connector before second row
+          const lineDone = status === 'done' || (data.railStatus[idx + 1] && data.railStatus[idx + 1] !== 'pending' && status !== 'pending');
+          lines[idx].className = `ypi-studio-workflow-rail-line${hideWrap ? ' is-hidden' : ''}${status === 'done' ? ' is-done' : ''}`;
+          void lineDone;
+        }
+      });
+      // row-end connector after Checks stays hidden; last station has no line
+      if (lines[3]) lines[3].classList.add('is-hidden');
+      // mark connectors before current as done for readability
+      data.railStatus.forEach((status, idx) => {
+        if (!lines[idx] || idx === 3) return;
+        if (status === 'done') lines[idx].classList.add('is-done');
+      });
+
+      // 2. 只读资料区状态文字渲染
+      const planBtn = document.querySelectorAll('.ypi-studio-widget-plan-review-btn')[0];
+      const protoBtn = document.querySelectorAll('.ypi-studio-widget-plan-review-btn')[1];
+      
+      if (planBtn && protoBtn) {
+        planBtn.className = `ypi-studio-widget-plan-review-btn is-${data.previewStates.planTone}`;
+        planBtn.querySelector('.ypi-studio-widget-plan-review-btn-state').innerText = data.previewStates.plan;
+        
+        protoBtn.className = `ypi-studio-widget-plan-review-btn is-${data.previewStates.protoTone} is-prototype`;
+        protoBtn.querySelector('.ypi-studio-widget-plan-review-btn-state').innerText = data.previewStates.proto;
+      }
+
+      // 3. 现有能力插槽 + 决策区渲染（决策区不得替换现有验收区）
+      const archivedBadge = studioWidget.querySelector('.ypi-studio-widget-archived-badge');
+      if (archivedBadge) archivedBadge.remove();
+      const improvementSlot = document.getElementById('existing-improvement-slot');
+      const mainAcceptSlot = document.getElementById('existing-main-accept-slot');
+      if (improvementSlot) {
+        improvementSlot.classList.toggle('is-visible', Boolean(data.showImprovementAccept));
+      }
+      if (mainAcceptSlot) {
+        mainAcceptSlot.classList.toggle('is-visible', Boolean(data.showMainAccept));
+      }
+
+      if (data.hasDecision) {
+        decisionBlock.style.display = 'block';
+        decisionTitle.querySelector('span').innerText = data.decisionTitle;
+        decisionRevision.innerText = data.revision;
+        
+        // 清空并重新生成按钮
+        decisionButtonsContainer.innerHTML = '';
+        data.buttons.forEach(btnInfo => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = btnInfo.class;
+          btn.innerText = btnInfo.label;
+          btn.setAttribute('aria-label', `${btnInfo.label} (${data.revision})`);
+          
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleActionClick(btnInfo.action, btnInfo.label);
+          });
+          decisionButtonsContainer.appendChild(btn);
+        });
+
+        // 插入额外提示（若有）
+        if (data.extraHint) {
+          const hint = document.createElement('div');
+          hint.className = 'ypi-decision-imp-list-hint';
+          hint.innerHTML = data.extraHint;
+          decisionButtonsContainer.appendChild(hint);
+        }
+      } else {
+        decisionBlock.style.display = 'none';
+        if (data.isArchived) {
+          // 在适当位置增加归档只读徽章
+          const badge = document.createElement('div');
+          badge.className = 'ypi-studio-widget-archived-badge';
+          badge.innerHTML = '▣ 已归档 · 只读';
+          decisionBlock.parentNode.insertBefore(badge, decisionBlock);
+        }
+      }
+
+      // 4. 运行时底栏
+      runtimeBadge.innerText = data.runtimeBadge;
+      runtimeBadge.className = `state-badge ${data.runtimeBadgeClass}`;
+
+      // 若处于 busy 状态时强制禁用所有操作
+      if (isWriteBusy) {
+        setWidgetBusy(true);
+      } else {
+        setWidgetBusy(false);
+      }
+    }
+
+    // 决策按钮点击逻辑
+    function handleActionClick(action, label) {
+      if (isWriteBusy) return;
+
+      if (action === 'trigger_refresh') {
+        showToast("正在重新同步最新计划版本...", 1500);
+        setTimeout(() => {
+          // 并发冲突恢复演示，切回正常审批状态
+          document.querySelector('input[value="main-awaiting"]').checked = true;
+          switchScene("main-awaiting");
+          showToast("任务状态已同步为最新 Rev. 2", 2000);
+        }, 1200);
+        return;
+      }
+
+      openPrompt(action, label);
+    }
+
+    // 打开 AppPrompt 对话框模拟
+    function openPrompt(action, label) {
+      promptInputArea.style.display = 'none';
+      promptFeedbackInput.value = '';
+      promptError.style.display = 'none';
+      
+      if (action === 'approve_main') {
+        promptTitle.innerText = "批准并开始实现";
+        promptDesc.innerText = "你正在批准主任务「任务浮窗在用户决策节点提供可点击 CTA」的 Rev. 2 计划。这会授权 Studio 会话继续编排执行并开始拉取实现子任务。此操作具有审计标记 (source: user-widget)。";
+        promptConfirmBtn.onclick = () => confirmAction('approve_main');
+      } 
+      else if (action === 'approve_imp') {
+        promptTitle.innerText = "批准改进计划";
+        promptDesc.innerText = "你正在批准改进项 IMP-023 的实现计划。这会授权 Studio 派发该改进项专属的 instance DAG 子任务进行局部修复，不会抢占或伪造主任务 DAG。";
+        promptConfirmBtn.onclick = () => confirmAction('approve_imp');
+      } 
+      else if (action === 'request_changes') {
+        promptTitle.innerText = "需要修改当前计划？";
+        promptDesc.innerText = "请写明需要架构师/修改人员调整的内容。提交后，任务状态将退回到设计 (planning) 阶段，已授予的计划批准将清除，Revision 版本将递增。";
+        promptInputArea.style.display = 'block';
+        promptConfirmBtn.onclick = () => {
+          const val = promptFeedbackInput.value.trim();
+          if (!val) {
+            promptError.style.display = 'block';
+            return;
+          }
+          confirmAction('request_changes', val);
+        };
+      }
+
+      promptOverlay.classList.add('is-visible');
+      if (action === 'request_changes') {
+        promptFeedbackInput.focus();
+      } else {
+        promptConfirmBtn.focus();
+      }
+    }
+
+    // 关闭对话框
+    function closePrompt() {
+      promptOverlay.classList.remove('is-visible');
+    }
+
+    // 确认写入操作
+    function confirmAction(action, feedback = '') {
+      closePrompt();
+      setWidgetBusy(true);
+
+      if (action === 'approve_main') {
+        setTimeout(() => {
+          setWidgetBusy(false);
+          showToast("✓ 计划已批准，Studio 已恢复编排并开始实现 (implementing)", 3000);
+          // 切换场景到非决策/执行状态
+          document.querySelector('input[value="non-decision"]').checked = true;
+          switchScene("non-decision");
+        }, 1500);
+      } 
+      else if (action === 'approve_imp') {
+        setTimeout(() => {
+          setWidgetBusy(false);
+          showToast("✓ 改进项 IMP-023 计划已批准，实例 DAG 已进入执行", 3000);
+          // 演示只剩下主卡只读或返回非决策
+          document.querySelector('input[value="non-decision"]').checked = true;
+          switchScene("non-decision");
+        }, 1500);
+      } 
+      else if (action === 'request_changes') {
+        setTimeout(() => {
+          setWidgetBusy(false);
+          showToast(`✓ 修改反馈已落库，任务已退回 planning`, 3500);
+          // 模拟退回规划场景 (演示没有伪 CTA 的普通中间状态)
+          document.querySelector('input[value="non-decision"]').checked = true;
+          switchScene("non-decision");
+        }, 1500);
+      }
+    }
+
+    // 设置浮窗忙碌状态 (全部按钮禁用与 spinner 展示)
+    function setWidgetBusy(busy) {
+      isWriteBusy = busy;
+      const primaryBtn = decisionButtonsContainer.querySelector('.ypi-btn-primary');
+      const secondaryBtn = decisionButtonsContainer.querySelector('.ypi-btn-secondary');
+      
+      if (busy) {
+        if (primaryBtn) {
+          primaryBtn.disabled = true;
+          primaryBtn.classList.add('is-busy');
+          primaryBtn.innerHTML = `<span class="spinner-icon">⌛</span> 写入处理中...`;
+        }
+        if (secondaryBtn) {
+          secondaryBtn.disabled = true;
+        }
+        // 禁用常驻只读预览行按钮，防止 busy 期间乱序点击
+        document.querySelectorAll('.ypi-studio-widget-plan-review-btn').forEach(btn => btn.disabled = true);
+      } else {
+        // 恢复
+        if (primaryBtn) {
+          const currentData = states[activeScene].buttons.find(b => b.class.includes('primary'));
+          if (currentData) {
+            primaryBtn.disabled = false;
+            primaryBtn.classList.remove('is-busy');
+            primaryBtn.innerHTML = currentData.label;
+          }
+        }
+        if (secondaryBtn) {
+          secondaryBtn.disabled = false;
+        }
+        document.querySelectorAll('.ypi-studio-widget-plan-review-btn').forEach(btn => btn.disabled = false);
+      }
+    }
+
+    // Toast 提示
+    function showToast(text, duration = 3000) {
+      toastText.innerText = text;
+      toast.classList.add('is-visible');
+      setTimeout(() => {
+        hideToast();
+      }, duration);
+    }
+
+    function hideToast() {
+      toast.classList.remove('is-visible');
+    }
+
+    // 按 Escape 键取消对话框，不影响浮窗关闭
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closePrompt();
+        hideToast();
+      }
+    });
+
+    // 初始化默认场景
+    switchScene("main-awaiting");
+  </script>
+</body>
+</html>
