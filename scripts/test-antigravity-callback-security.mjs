@@ -38,6 +38,10 @@ function assertIncludes(source, needle, label) {
   assert.ok(source.includes(needle), `${label}: expected to include ${JSON.stringify(needle)}`);
 }
 
+function assertNotIncludes(source, needle, label) {
+  assert.ok(!source.includes(needle), `${label}: expected NOT to include ${JSON.stringify(needle)}`);
+}
+
 async function loadWebProviderExtensionsModule() {
   // Load via jiti so TypeScript path aliases are not required.
   const jiti = createJiti(import.meta.url, { interopDefault: true });
@@ -92,7 +96,9 @@ await test("loader source forces env before jiti import and restores afterwards"
   const { readFileSync } = await import("node:fs");
   const source = readFileSync(join(root, "lib/pi-provider-extensions.ts"), "utf8");
   assertIncludes(source, "process.env[envKey] = resolveAntigravityOAuthCallbackHost(previous)", "forces env");
-  assertIncludes(source, "createJiti(join(process.cwd(), \"package.json\"), { interopDefault: true })", "jiti anchored at app package root");
+  assertIncludes(source, "createRuntimeJiti", "jiti helper avoids import.meta.url bake-in");
+  assertIncludes(source, "resolveRuntimePackageAnchor", "jiti anchors at process.cwd()/package.json");
+  assertNotIncludes(source, "createJiti(import.meta.url", "no import.meta.url jiti anchor");
   assertIncludes(source, "antigravityJitiImportCandidates", "candidate import fallbacks");
   assertIncludes(source, "if (previous === undefined) delete process.env[envKey];", "restores unset");
   assertIncludes(source, "else process.env[envKey] = previous;", "restores previous");

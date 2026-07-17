@@ -269,6 +269,25 @@ git fetch upstream main
 
 Project-level release guidance is also available as the Pi skill `.pi/skills/yolk-release-publish/SKILL.md`; use it when bumping versions, tagging, pushing, or publishing `@alan-zhao/yolk-pi-web` / `ypi`.
 
+### Dependency pinning (required for published installs)
+
+Local development is protected by `package-lock.json`. **Published npm installs do not use the repo lockfile** unless the package ships an `npm-shrinkwrap.json`.
+
+This package therefore:
+
+1. Pins critical runtime deps to **exact versions** in `package.json` (no `^` / `~` for `@earendil-works/pi-*`, `pi-grok-cli`, `pi-kiro-provider`, `jiti`).
+2. Ships `npm-shrinkwrap.json` in the published `files` list so `npm install -g` / `npx` resolve the same tree as the release machine.
+3. Rewrites `.next/required-server-files.{json,js}` `appDir` to the install directory at `ypi` startup (`bin/server-runner.js`), because Next bakes the build-host absolute path into that manifest.
+4. Loads provider TypeScript packages (`pi-grok-cli`, `pi-kiro-provider`, `@yofriadi/pi-antigravity-oauth`) through jiti anchored at `process.cwd()/package.json` — **never** `import.meta.url` alone — so production bundles do not embed the build machine path.
+
+After changing those pins, regenerate shrinkwrap before publish:
+
+```bash
+npm install
+npm shrinkwrap
+# confirm package.json, package-lock.json, and npm-shrinkwrap.json agree on pi-* versions
+```
+
 Before publishing, authenticate and validate the release bundle:
 
 ```bash
@@ -276,7 +295,7 @@ npm whoami
 npm run lint
 node_modules/.bin/tsc --noEmit
 npm run build
-npm pack --dry-run
+npm pack --dry-run   # must list npm-shrinkwrap.json + bin/ + .next/
 ```
 
 Publish the current version:

@@ -187,11 +187,9 @@ test("fixed provider list is Grok → Kiro → Antigravity", () => {
   assertIncludes(pe, "resolveAntigravityPackageExtensionEntry", "extension entry resolver");
   assertIncludes(pe, "antigravityJitiImportCandidates", "jiti candidate list");
   // Production anchors jiti at app package.json (Next-safe) and imports candidates.
-  assertIncludes(
-    pe,
-    'createJiti(join(process.cwd(), "package.json"), { interopDefault: true })',
-    "jiti antigravity factory",
-  );
+  assertIncludes(pe, "createRuntimeJiti", "jiti antigravity factory helper");
+  assertIncludes(pe, "resolveRuntimePackageAnchor", "jiti package-root anchor");
+  assertNotIncludes(pe, "createJiti(import.meta.url", "no import.meta.url jiti anchor");
   assertIncludes(pe, "await jiti.import(candidate)", "jiti import candidate");
   assertIncludes(pe, "ANTIGRAVITY_OAUTH_CALLBACK_HOST", "loopback constant");
   assertIncludes(pe, 'ANTIGRAVITY_OAUTH_CALLBACK_HOST = "127.0.0.1"', "forced loopback");

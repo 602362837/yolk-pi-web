@@ -120,6 +120,47 @@ function openBrowser(url) {
  * Callers are responsible for forwarding stdout and handling exit if they
  * need custom behavior (ypi forwards stdout to its own stdout).
  */
+/**
+ * Next writes the build-machine absolute project path into
+ * `.next/required-server-files.{json,js}` as `appDir`. Rewrite it to the
+ * current package directory so `ypi` works after npm install on another machine.
+ * Relative entries under `files` are unchanged.
+ */
+function ensurePortableRequiredServerFiles(pkgDir) {
+  const targets = [
+    path.join(pkgDir, ".next", "required-server-files.json"),
+    path.join(pkgDir, ".next", "required-server-files.js"),
+  ];
+  for (const target of targets) {
+    if (!fs.existsSync(target)) continue;
+    try {
+      if (target.endsWith(".json")) {
+        const data = JSON.parse(fs.readFileSync(target, "utf8"));
+        if (!data || typeof data !== "object") continue;
+        if (data.appDir === pkgDir) continue;
+        data.appDir = pkgDir;
+        if (typeof data.relativeAppDir !== "string") data.relativeAppDir = "";
+        fs.writeFileSync(target, `${JSON.stringify(data)}\n`, "utf8");
+        continue;
+      }
+      // required-server-files.js: self.__SERVER_FILES_MANIFEST={...}
+      const raw = fs.readFileSync(target, "utf8");
+      const prefix = "self.__SERVER_FILES_MANIFEST=";
+      const idx = raw.indexOf(prefix);
+      if (idx === -1) continue;
+      const jsonText = raw.slice(idx + prefix.length).replace(/;\s*$/, "");
+      const data = JSON.parse(jsonText);
+      if (!data || typeof data !== "object") continue;
+      if (data.appDir === pkgDir) continue;
+      data.appDir = pkgDir;
+      if (typeof data.relativeAppDir !== "string") data.relativeAppDir = "";
+      fs.writeFileSync(target, `${prefix}${JSON.stringify(data)}\n`, "utf8");
+    } catch {
+      // Best-effort only; Next can still start if appDir is unused for route loading.
+    }
+  }
+}
+
 function startNextServer({
   pkgDir,
   port,
@@ -136,6 +177,8 @@ function startNextServer({
     console.error("Build artifacts not found. Please report this issue.");
     process.exit(1);
   }
+
+  ensurePortableRequiredServerFiles(pkgDir);
 
   const nextBin = resolveNextBin(pkgDir);
   const nextArgs = ["start", "-p", String(port ?? DEFAULT_PORT)];
@@ -169,6 +212,7 @@ module.exports = {
   parseServerArgs,
   resolveNextBin,
   createRuntimeEnv,
+  ensurePortableRequiredServerFiles,
   openBrowser,
   startNextServer,
 };

@@ -19,13 +19,77 @@ import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { createJiti } from "jiti";
+import { createJiti, type Jiti } from "jiti";
 import type { ExtensionFactory, InlineExtension } from "@earendil-works/pi-coding-agent";
 
 // pi-grok-cli, pi-kiro-provider, and @yofriadi/pi-antigravity-oauth publish
 // TypeScript source with ESM-style `.js` / `.ts` specifiers. Loading them
 // through jiti keeps the extensions in the server runtime instead of asking
 // Next/Turbopack to resolve their source trees as application modules.
+//
+// Runtime anchors must NEVER use import.meta.url as the sole jiti/createRequire
+// base. Next production bundles rewrite import.meta.url to the build-machine
+// absolute path, which breaks npm installs on other machines.
+
+/** package.json path used as the stable jiti / createRequire anchor. */
+export function resolveRuntimePackageAnchor(cwd: string = process.cwd()): string {
+  return join(cwd, "package.json");
+}
+
+/**
+ * Create a jiti loader anchored at the running package root (process.cwd()).
+ *
+ * `ypi` / `next start` set cwd to the package directory, so this resolves
+ * published dependencies from that install's node_modules without baking
+ * build-time absolute paths into the production bundle.
+ */
+export function createRuntimeJiti(cwd: string = process.cwd()): Jiti {
+  return createJiti(resolveRuntimePackageAnchor(cwd), { interopDefault: true });
+}
+
+/**
+ * Resolve an installed package's package.json without relying on import.meta.url.
+ *
+ * Prefer createRequire(process.cwd()/package.json), then walk node_modules from
+ * cwd upward. Path-based fallbacks keep npm global / npx installs working even
+ * when webpack mangles createRequire call sites.
+ */
+export function resolveInstalledPackageJson(
+  packageName: string,
+  cwd: string = process.cwd(),
+): string {
+  const errors: string[] = [];
+  const segments = packageName.split("/").filter(Boolean);
+  if (segments.length === 0) {
+    throw new Error(`Invalid package name: ${packageName}`);
+  }
+
+  try {
+    const resolved = createRequire(resolveRuntimePackageAnchor(cwd)).resolve(
+      `${packageName}/package.json`,
+    );
+    if (typeof resolved === "string" && resolved.length > 0 && existsSync(resolved)) {
+      return resolved;
+    }
+    errors.push(`createRequire resolved missing path: ${String(resolved)}`);
+  } catch (err) {
+    errors.push(`createRequire: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  let dir = cwd;
+  for (let i = 0; i < 12; i++) {
+    const candidate = join(dir, "node_modules", ...segments, "package.json");
+    if (existsSync(candidate)) return candidate;
+    errors.push(`missing: ${candidate}`);
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  throw new Error(
+    `Unable to resolve ${packageName}/package.json (${errors.join(" | ")})`,
+  );
+}
 
 /** Fixed Antigravity OAuth callback bind host (loopback only). */
 export const ANTIGRAVITY_OAUTH_CALLBACK_HOST = "127.0.0.1";
@@ -54,28 +118,8 @@ export function resolveAntigravityOAuthCallbackHost(
  * Never hardcode private package internals beyond that declared entry.
  */
 function resolveAntigravityPackageJsonPath(): string {
-  const errors: string[] = [];
-  // Next/Turbopack can make import.meta.url resolve from a virtual module graph.
-  // Prefer package.json from process.cwd() and fall back to import.meta.url / cwd node_modules.
-  const resolvers: Array<() => string> = [
-    () => createRequire(join(process.cwd(), "package.json")).resolve("@yofriadi/pi-antigravity-oauth/package.json"),
-    () => createRequire(import.meta.url).resolve("@yofriadi/pi-antigravity-oauth/package.json"),
-    () => join(process.cwd(), "node_modules", "@yofriadi", "pi-antigravity-oauth", "package.json"),
-  ];
-  for (const resolve of resolvers) {
-    try {
-      const pkgJsonPath = resolve();
-      if (typeof pkgJsonPath === "string" && pkgJsonPath.length > 0 && existsSync(pkgJsonPath)) {
-        return pkgJsonPath;
-      }
-      errors.push(`resolved missing path: ${String(pkgJsonPath)}`);
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : String(err));
-    }
-  }
-  throw new Error(
-    `Unable to resolve @yofriadi/pi-antigravity-oauth/package.json (${errors.join(" | ")})`,
-  );
+  // Never anchor on import.meta.url — production bundles bake the build host path.
+  return resolveInstalledPackageJson("@yofriadi/pi-antigravity-oauth");
 }
 
 export function resolveAntigravityPackageExtensionEntry(): string {
@@ -130,9 +174,8 @@ export function loadAntigravityExtensionFactory(): Promise<ExtensionFactory> {
     process.env[envKey] = resolveAntigravityOAuthCallbackHost(previous);
     try {
       const entry = resolveAntigravityPackageExtensionEntry();
-      // Anchor jiti at the app package root so Next virtual import.meta.url cannot
-      // prevent resolving a source-only package that has no main/exports map.
-      const jiti = createJiti(join(process.cwd(), "package.json"), { interopDefault: true });
+      // Anchor jiti at the running package root (not import.meta.url).
+      const jiti = createRuntimeJiti();
       const candidates = antigravityJitiImportCandidates(entry);
       const loadErrors: string[] = [];
       for (const candidate of candidates) {
@@ -184,7 +227,7 @@ export const grokCliExtension: InlineExtension = {
     try {
       // Use jiti's async loader so its ESM helper is not synchronously required
       // while Pi's own extension loader is initializing in another module thread.
-      const loaded = await createJiti(import.meta.url, { interopDefault: true }).import("pi-grok-cli");
+      const loaded = await createRuntimeJiti().import("pi-grok-cli");
       const factory = (loaded as { default?: ExtensionFactory }).default;
       if (typeof factory !== "function") throw new Error("pi-grok-cli did not export an extension factory");
       await factory(api);
@@ -206,7 +249,7 @@ export const kiroProviderExtension: InlineExtension = {
   name: "pi-kiro-provider",
   factory: async (api) => {
     try {
-      const loaded = await createJiti(import.meta.url, { interopDefault: true }).import("pi-kiro-provider");
+      const loaded = await createRuntimeJiti().import("pi-kiro-provider");
       const factory = (loaded as { default?: ExtensionFactory }).default;
       if (typeof factory !== "function") throw new Error("pi-kiro-provider did not export an extension factory");
       await factory(api);

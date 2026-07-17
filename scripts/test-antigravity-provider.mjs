@@ -101,7 +101,9 @@ test("forces loopback host before first Antigravity jiti import", () => {
   assertIncludes(peSource, "export function resolveAntigravityOAuthCallbackHost", "host policy export");
   assertIncludes(peSource, "export function loadAntigravityExtensionFactory", "loader export");
   assertIncludes(peSource, "process.env[envKey] = resolveAntigravityOAuthCallbackHost(previous)", "forces host before import");
-  assertIncludes(peSource, "createJiti(join(process.cwd(), \"package.json\"), { interopDefault: true })", "jiti anchored at app package root");
+  assertIncludes(peSource, "createRuntimeJiti", "jiti helper avoids import.meta.url bake-in");
+  assertIncludes(peSource, "resolveRuntimePackageAnchor", "jiti anchors at process.cwd()/package.json");
+  assertNotIncludes(peSource, "createJiti(import.meta.url", "no import.meta.url jiti anchor");
   assertIncludes(peSource, "antigravityJitiImportCandidates", "has jiti candidate fallbacks for source-only package");
 });
 
