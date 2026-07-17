@@ -25,7 +25,9 @@ import type {
   AntigravityQuotaGroupAggregate,
   AntigravityQuotaGroupVariant,
 } from "@/lib/antigravity-quota-groups";
-import { ANTIGRAVITY_PROVIDER_ID } from "@/lib/oauth-account-providers";
+// Client-safe provider id. Do not import the server-only OAuth adapter module here:
+// it depends on node:crypto and would be bundled into this client component.
+const ANTIGRAVITY_PROVIDER_ID = "google-antigravity";
 import { ActionFlowIcon } from "./ActionFlowIcon";
 import { iconFlowAttrs } from "./iconFlow";
 import type { ProviderUsageAggregateProjection } from "./ProviderUsagePanelContract";
