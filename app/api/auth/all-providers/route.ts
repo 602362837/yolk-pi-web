@@ -1,9 +1,8 @@
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
-import { createWebProviderAwareModelRegistry } from "@/lib/pi-provider-extensions";
 import {
   isManagedApiKeyProvider,
   getApiKeyProviderSummary,
 } from "@/lib/api-key-accounts";
+import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +21,8 @@ interface ProviderListItem {
 }
 
 export async function GET() {
-  const authStorage = AuthStorage.create();
-  const registry = await createWebProviderAwareModelRegistry(authStorage);
-  const all = registry.getAll();
+  const runtime = await getWebModelRuntime();
+  const all = runtime.getModels();
 
   // Deduplicate by provider, skip OAuth-only providers and custom providers (source=models_json_key)
   const seen = new Set<string>();
@@ -34,10 +32,11 @@ export async function GET() {
     if (seen.has(m.provider)) continue;
     seen.add(m.provider);
     if (OAUTH_PROVIDER_IDS.has(m.provider)) continue;
-    const status = registry.getProviderAuthStatus(m.provider);
+    const status = runtime.getProviderAuthStatus(m.provider);
     // Skip providers whose key comes from models.json (those are custom providers)
     if (status.source === "models_json_key") continue;
-    const displayName = registry.getProviderDisplayName(m.provider);
+    const providerMeta = runtime.getProvider(m.provider);
+    const displayName = providerMeta?.name ?? m.provider;
     const modelCount = all.filter((x) => x.provider === m.provider).length;
 
     const item: ProviderListItem = {

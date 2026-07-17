@@ -10,8 +10,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { access, chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AuthStorage, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import type { Credential } from "@earendil-works/pi-ai";
+import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
+import {
+  getWebCredentialStore,
+  type WebCredentialStore,
+} from "@/lib/web-credential-store";
 
 import {
   getOAuthAccountAdapter,
@@ -473,8 +478,12 @@ export async function readOAuthAccountCredential(
 }
 
 /**
- * Resolve an active access token for a saved account, refreshing through
- * Pi's registered OAuth provider when necessary.
+ * Resolve an access token for a saved account, refreshing when necessary.
+ *
+ * Extension providers (Grok/Kiro/Antigravity) use the public OAuth compatibility
+ * helper after fixed-provider preload. Builtin OAuth providers (openai-codex)
+ * use an isolated ModelRuntime with an in-memory credential so Active is not
+ * overwritten when refreshing a non-active saved account.
  */
 export async function getOAuthAccountAccessToken(
   provider: string,
@@ -484,13 +493,41 @@ export async function getOAuthAccountAccessToken(
   if (Date.now() >= credential.expires && !credential.refresh.trim()) {
     throw new Error("OAuth access token expired and no refresh token is available. Please re-import the credential or log in again.");
   }
-  const result = await getOAuthApiKey(provider, { [provider]: credential });
-  if (!result?.apiKey) return undefined;
-  // Refreshes must overwrite the credential's originating saved-account path.
-  await saveOAuthAccountCredential(provider, { ...credential, ...result.newCredentials }, {
-    storageId: credentialStorageId(credential),
-  }).catch(() => {});
-  return result.apiKey;
+
+  // Prefer legacy compatibility refresh for third-party extension providers.
+  // Do not overwrite an already-registered mock/provider table entry.
+  const { getOAuthProvider } = await import("./pi-ai-oauth-compat");
+  if (!getOAuthProvider(provider)) {
+    const { ensureWebProvidersBootstrapped } = await import("./pi-provider-extensions");
+    await ensureWebProvidersBootstrapped();
+  }
+  const compatResult = await getOAuthApiKey(provider, { [provider]: credential }).catch(() => null);
+  if (compatResult?.apiKey) {
+    await saveOAuthAccountCredential(provider, { ...credential, ...compatResult.newCredentials }, {
+      storageId: credentialStorageId(credential),
+    }).catch(() => {});
+    return compatResult.apiKey;
+  }
+
+  // Builtin OAuth path (e.g. openai-codex): isolated runtime + in-memory store.
+  const { createInMemoryWebCredentialStore } = await import("./web-credential-store");
+  const { createWebModelRuntime } = await import("./web-model-runtime");
+  const memory = createInMemoryWebCredentialStore({
+    [provider]: { type: "oauth", ...credential } as unknown as Credential,
+  });
+  const runtime = await createWebModelRuntime({ credentials: memory });
+  const auth = await runtime.getAuth(provider);
+  const apiKey = auth?.auth.apiKey;
+  if (!apiKey) return undefined;
+
+  // If runtime refreshed the token, persist the new credential back to the account file.
+  const refreshed = await memory.read(provider);
+  if (refreshed && refreshed.type === "oauth") {
+    await saveOAuthAccountCredential(provider, refreshed, {
+      storageId: credentialStorageId(credential),
+    }).catch(() => {});
+  }
+  return apiKey;
 }
 
 /**
@@ -526,22 +563,23 @@ export async function saveOAuthAccountCredential(
 }
 
 /**
- * Sync the active credential from `authStorage` (auth.json) into the
+ * Sync the active credential from auth.json (via CredentialStore) into the
  * saved-account store.  Returns the active account summary, or null if
  * no valid credential exists.
  */
 export async function syncActiveOAuthAccountCredential(
   provider: string,
-  authStorage = AuthStorage.create(),
+  credentials?: WebCredentialStore | { read(providerId: string): Promise<Credential | undefined> },
 ): Promise<OAuthAccountSummary | null> {
   const adapter = getAdapter(provider);
-  const credential = authStorage.get(provider);
+  const store = credentials ?? await getWebCredentialStore();
+  const credential = await store.read(provider);
   if (!adapter.isCredential(credential)) {
     await clearActiveAccount(provider);
     return null;
   }
 
-  // AuthStorage deliberately holds a plain Pi credential without a storage id.
+  // Active auth.json holds a plain Pi credential without a storage id.
   // The active metadata pointer is authoritative for an existing managed account.
   const metadata = await readMetadata(provider);
   const activeStorageId = metadata.activeAccountId && await pathExists(credentialPath(provider, metadata.activeAccountId))
@@ -762,19 +800,19 @@ export async function activateOAuthAccount(provider: string, accountId: string):
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
 
   const run = async (): Promise<OAuthAccountsList> => {
-    const authStorage = AuthStorage.create();
-    await syncActiveOAuthAccountCredential(provider, authStorage);
+    const store = await getWebCredentialStore();
+    await syncActiveOAuthAccountCredential(provider, store);
 
     const credential = await readOAuthAccountCredential(provider, normalizedAccountId);
-    // AuthStorage.set expects AuthCredential (which requires type:"oauth" for
-    // OAuth entries).  grok-cli / kiro / antigravity credentials from their
-    // providers lack this sentinel but are otherwise compatible with Pi's
-    // OAuth credential contract.
+    // CredentialStore expects type:"oauth" for OAuth entries. grok-cli / kiro /
+    // antigravity credentials from their providers lack this sentinel but are
+    // otherwise compatible with Pi's OAuth credential contract.
     const authCredential = (credential as Record<string, unknown>).type
       ? credential
       : { ...credential, type: "oauth" as const };
-    authStorage.set(provider, authCredential as unknown as import("@earendil-works/pi-coding-agent").OAuthCredential);
-    if (authStorage.drainErrors().length > 0) {
+    try {
+      await store.modify(provider, async () => authCredential as unknown as Credential);
+    } catch {
       throw new OAuthAccountStoreError("Failed to update active OAuth credential", 500);
     }
     await saveOAuthAccountCredential(provider, credential, {

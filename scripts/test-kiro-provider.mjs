@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * kiro-provider-bootstrap — cold-start, registry, and entry-point audit tests
+ * kiro-provider-bootstrap — cold-start, ModelRuntime, and entry-point audit tests
  *
  * Validates that `pi-kiro-provider` is fixed into the unified Web provider
- * bootstrap (`lib/pi-provider-extensions.ts`) without static Next/Turbopack
- * imports of its TypeScript source tree, and that Grok remains co-loaded.
+ * bootstrap (`lib/pi-provider-extensions.ts` + `lib/web-model-runtime.ts`)
+ * without static Next/Turbopack imports of its TypeScript source tree, and that
+ * Grok remains co-loaded on the *target* ModelRuntime.
  *
  * - Source-code inspection only — no pi SDK imports, no network, no real agent dir.
- * - Verifies jiti + serverExternalPackages + call-site coverage.
- * - Confirms no deep imports of package private paths.
+ * - Verifies jiti + serverExternalPackages + ModelRuntime call-site coverage.
+ * - Confirms no deep imports of package private paths and no AuthStorage path.
  *
  * Run: node scripts/test-kiro-provider.mjs
  */
@@ -77,12 +78,13 @@ test("pi-kiro-provider is installed with TypeScript package entry", () => {
 });
 
 // ============================================================================
-// 2. pi-provider-extensions contracts
+// 2. pi-provider-extensions + web-model-runtime contracts
 // ============================================================================
 
 console.log("\n=== pi-provider-extensions.ts contracts ===");
 
 const peSource = read("lib/pi-provider-extensions.ts");
+const runtimeSource = read("lib/web-model-runtime.ts");
 
 test("exports kiroProviderExtension loaded via jiti only", () => {
   assertIncludes(peSource, "export const kiroProviderExtension", "exports kiroProviderExtension");
@@ -115,17 +117,26 @@ test("webExtensionFactories prepends both fixed providers", () => {
   assertNotIncludes(peSource, "[grokCliExtension, grokSessionAccountExtension", "session pin not wired");
 });
 
-test("provider-neutral bootstrap helpers exist with Grok aliases", () => {
+test("provider-neutral bootstrap is legacy OAuth preload; registry helper hard-fails", () => {
   assertIncludes(peSource, "export function ensureWebProvidersBootstrapped", "exports ensureWebProvidersBootstrapped");
   assertIncludes(peSource, "export function ensureGrokBootstrapped", "retains ensureGrokBootstrapped alias");
   assertIncludes(peSource, "export async function createWebProviderAwareModelRegistry", "exports createWebProviderAwareModelRegistry");
   assertIncludes(peSource, "export async function createGrokAwareModelRegistry", "retains createGrokAwareModelRegistry alias");
-  assertIncludes(peSource, "await ensureWebProvidersBootstrapped()", "bootstraps before registry create");
-  assertIncludes(peSource, "webProviderExtensions()", "bootstrap loads fixed provider list");
+  assertIncludes(peSource, "was removed for pi SDK 0.80.10", "hard-fail message");
+  assertIncludes(peSource, "NOT a ModelRuntime catalog guarantee", "documents non-catalog role");
+  assertIncludes(peSource, "createWebAgentSessionServices", "bootstrap uses services helper");
+  const codeOnly = peSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/\bModelRegistry\.create\s*\(/.test(codeOnly), "no executable ModelRegistry.create path");
+});
+
+test("web-model-runtime injects fixed providers into target ModelRuntime", () => {
+  assertIncludes(runtimeSource, "createWebAgentSessionServices", "services helper");
+  assertIncludes(runtimeSource, "getWebModelRuntime", "admin runtime");
+  assertIncludes(runtimeSource, "webExtensionFactories(", "session factories");
+  assertIncludes(runtimeSource, "webProviderExtensions()", "admin fixed providers");
 });
 
 test("per-provider load failure is isolated", () => {
-  // Each named extension factory must catch its own load errors.
   const grokFactory = peSource.slice(
     peSource.indexOf("export const grokCliExtension"),
     peSource.indexOf("export const kiroProviderExtension"),
@@ -140,61 +151,89 @@ test("per-provider load failure is isolated", () => {
   );
   assertIncludes(grokFactory, "catch {", "Grok factory isolates failures");
   assertIncludes(kiroFactory, "catch {", "Kiro factory isolates failures");
-  assertIncludes(antigravityFactory, "catch {", "Antigravity factory isolates failures");
+  assert.ok(
+    antigravityFactory.includes("catch {") || antigravityFactory.includes("catch (err)"),
+    "Antigravity factory isolates failures",
+  );
   assertIncludes(peSource, "Best-effort per provider", "documents per-provider isolation");
 });
 
 // ============================================================================
-// 3. Entry-point audit — every boot path uses unified factories
+// 3. Entry-point audit — ModelRuntime paths
 // ============================================================================
 
 console.log("\n=== Entry point audit ===");
 
-const unifiedFactoryFiles = [
+const sessionServiceFiles = [
   { path: "lib/rpc-manager.ts", label: "rpc-manager" },
   { path: "lib/ypi-studio-child-session-runner.ts", label: "studio child runner" },
   { path: "app/api/models/route.ts", label: "models route" },
-  { path: "app/api/auth/providers/route.ts", label: "auth providers route" },
-  { path: "app/api/auth/login/[provider]/route.ts", label: "auth login route" },
-  { path: "app/api/auth/logout/[provider]/route.ts", label: "auth logout route" },
-  { path: "app/api/skills/route.ts", label: "skills route" },
-  { path: "app/api/commands/route.ts", label: "commands route" },
   { path: "app/api/terminal/env/assist/route.ts", label: "terminal env assist" },
   { path: "app/api/trellis/workflow/assist/route.ts", label: "trellis workflow assist" },
-  { path: "app/api/model-prices/route.ts", label: "model-prices route" },
   { path: "app/api/model-prices/suggest/route.ts", label: "model-prices suggest route" },
 ];
 
-for (const file of unifiedFactoryFiles) {
-  test(`${file.label} uses webExtensionFactories`, () => {
+for (const file of sessionServiceFiles) {
+  test(`${file.label} uses createWebAgentSessionServices`, () => {
+    const source = read(file.path);
+    assertIncludes(source, "createWebAgentSessionServices", `${file.label} uses services helper`);
+    assertNotIncludes(source, "ModelRegistry.create", `${file.label} does not use ModelRegistry.create`);
+    assertNotIncludes(source, "extensionFactories: [grokCliExtension]", `${file.label} does not pass Grok-only list`);
+  });
+}
+
+const adminRuntimeFiles = [
+  { path: "app/api/auth/providers/route.ts", label: "auth providers route" },
+  { path: "app/api/auth/login/[provider]/route.ts", label: "auth login route" },
+  { path: "app/api/auth/logout/[provider]/route.ts", label: "auth logout route" },
+  { path: "app/api/auth/api-key/[provider]/route.ts", label: "api-key route" },
+  { path: "app/api/auth/all-providers/route.ts", label: "all-providers route" },
+  { path: "app/api/model-prices/route.ts", label: "model-prices route" },
+];
+
+for (const file of adminRuntimeFiles) {
+  test(`${file.label} uses getWebModelRuntime or createWebModelRuntime`, () => {
+    const source = read(file.path);
+    assert.ok(
+      source.includes("getWebModelRuntime") || source.includes("createWebModelRuntime"),
+      `${file.label} uses ModelRuntime factory`,
+    );
+    assertNotIncludes(source, "createWebProviderAwareModelRegistry(", `${file.label} does not call removed registry helper`);
+    assertNotIncludes(source, "ModelRegistry.create", `${file.label} does not use ModelRegistry.create`);
+  });
+}
+
+const loaderOnlyFiles = [
+  { path: "app/api/skills/route.ts", label: "skills route" },
+  { path: "app/api/commands/route.ts", label: "commands route" },
+];
+
+for (const file of loaderOnlyFiles) {
+  test(`${file.label} uses webExtensionFactories for ResourceLoader`, () => {
     const source = read(file.path);
     assertIncludes(source, "webExtensionFactories", `${file.label} uses unified factories`);
     assertNotIncludes(source, "extensionFactories: [grokCliExtension]", `${file.label} does not pass Grok-only list`);
   });
 }
 
-const registryHelperFiles = [
-  { path: "app/api/auth/api-key/[provider]/route.ts", label: "api-key route" },
-  { path: "app/api/auth/all-providers/route.ts", label: "all-providers route" },
-  { path: "app/api/models-config/test/route.ts", label: "models-config test route" },
-];
+test("models-config test uses temporary isolated runtime", () => {
+  const source = read("app/api/models-config/test/route.ts");
+  assertIncludes(source, "createTemporaryWebModelRuntimeServices", "temporary runtime helper");
+  assertNotIncludes(source, "createWebProviderAwareModelRegistry", "no removed registry helper");
+  assertNotIncludes(source, "ModelRegistry.create", "no ModelRegistry.create");
+});
 
-for (const file of registryHelperFiles) {
-  test(`${file.label} uses createWebProviderAwareModelRegistry`, () => {
-    const source = read(file.path);
-    assertIncludes(source, "createWebProviderAwareModelRegistry", `${file.label} uses provider-aware registry`);
-  });
-}
-
-test("deepseek-balance bootstraps fixed providers before bare registry create", () => {
+test("deepseek-balance uses getWebModelRuntime (no bare registry create)", () => {
   const source = read("lib/deepseek-balance.ts");
-  assertIncludes(source, "ensureWebProvidersBootstrapped", "uses provider-neutral bootstrap");
-  assertIncludes(source, "ModelRegistry.create", "creates registry after bootstrap");
+  assertIncludes(source, "getWebModelRuntime", "uses admin ModelRuntime");
+  assertNotIncludes(source, "ModelRegistry.create", "no ModelRegistry.create");
+  assertNotIncludes(source, "ensureWebProvidersBootstrapped", "does not rely on process-global bootstrap for catalog");
 });
 
 test("no production source statically imports pi-kiro-provider", () => {
   const files = [
     "lib/pi-provider-extensions.ts",
+    "lib/web-model-runtime.ts",
     "lib/rpc-manager.ts",
     "lib/ypi-studio-child-session-runner.ts",
     "lib/deepseek-balance.ts",
@@ -226,17 +265,16 @@ test("no production source statically imports pi-kiro-provider", () => {
 
 console.log("\n=== Cold-start / refresh safety ===");
 
-test("documents registry-reset risk for fixed providers", () => {
-  assertIncludes(peSource, "registry-reset can remove grok-cli / kiro / google-antigravity", "documents fixed providers");
-  assertIncludes(peSource, "must be fed", "documents requirement");
+test("documents target-runtime fixed-provider invariant", () => {
+  assertIncludes(peSource, "Fixed providers must be injected into the ModelRuntime", "documents target-runtime requirement");
+  assertIncludes(peSource, "Grok/Kiro/Antigravity", "documents all three fixed providers");
+  assertIncludes(peSource, "Do not treat a throwaway global bootstrap as a guarantee", "documents non-global bootstrap");
 });
 
-test("createWebProviderAwareModelRegistry bootstraps before ModelRegistry.create", () => {
-  const fnStart = peSource.indexOf("export async function createWebProviderAwareModelRegistry");
-  const fnBody = peSource.slice(fnStart);
-  const ensureCall = fnBody.indexOf("await ensureWebProvidersBootstrapped()");
-  const createCall = fnBody.indexOf("ModelRegistry.create(");
-  assert.ok(ensureCall > 0 && createCall > 0 && ensureCall < createCall, "bootstrap runs before registry create");
+test("runtime helper is the only catalog registration path", () => {
+  assertIncludes(runtimeSource, "createWebAgentSessionServices", "canonical services helper");
+  assertIncludes(peSource, "Prefer", "documents prefer ModelRuntime helpers");
+  assertIncludes(peSource, "getWebModelRuntime", "points to getWebModelRuntime");
 });
 
 // ============================================================================

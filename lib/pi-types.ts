@@ -120,10 +120,13 @@ export interface AgentSessionLike {
   readonly autoCompactionEnabled: boolean;
   readonly autoRetryEnabled: boolean;
   readonly model: ModelLike | undefined;
-  readonly modelRegistry: {
-    find: (provider: string, modelId: string) => ModelLike | undefined;
-    refresh?: () => void;
-    authStorage?: { reload?: () => void };
+  /**
+   * 0.80.8+ ModelRuntime surface used by Chat set_model / live auth reload.
+   * Credential store internals are intentionally not exposed here.
+   */
+  readonly modelRuntime: {
+    getModel: (provider: string, modelId: string) => ModelLike | undefined;
+    refresh: (options?: { allowNetwork?: boolean }) => Promise<unknown> | unknown;
   };
   readonly sessionManager: SessionManager;
   readonly settingsManager: SettingsManager;

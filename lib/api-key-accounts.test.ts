@@ -14,7 +14,18 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { AuthStorage, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getWebCredentialStore } from "./web-credential-store";
+
+async function setAuthCredential(provider: string, credential: { type: "api_key"; key: string }) {
+  const store = await getWebCredentialStore();
+  await store.modify(provider, async () => credential);
+}
+
+async function readAuthCredential(provider: string) {
+  const store = await getWebCredentialStore();
+  return store.read(provider);
+}
 import {
   activateApiKeyAccount,
   createApiKeyAccount,
@@ -120,7 +131,7 @@ async function main(): Promise<void> {
     console.log("\n=== summary does not trigger legacy import ===");
 
     await test("summary sees legacy credential without creating account store", async () => {
-      AuthStorage.create().set("xai", { type: "api_key", key: LEGACY_XAI_KEY });
+      await setAuthCredential("xai", { type: "api_key", key: LEGACY_XAI_KEY });
       const summary = await getApiKeyProviderSummary("xai");
       ok(summary);
       strictEqual(summary!.authMode, "managed_accounts");
@@ -226,7 +237,7 @@ async function main(): Promise<void> {
       const active = activated.accounts.find((a) => a.accountId === secondAccountId);
       strictEqual(active?.active, true);
 
-      const auth = AuthStorage.create().get("xai");
+      const auth = await readAuthCredential("xai");
       strictEqual(auth?.type, "api_key");
       strictEqual(
         auth && auth.type === "api_key" ? auth.key : null,
@@ -251,7 +262,7 @@ async function main(): Promise<void> {
       const revealed = await revealApiKeyAccount("xai", secondAccountId);
       strictEqual(revealed.apiKey, UPDATED_XAI_KEY);
 
-      const auth = AuthStorage.create().get("xai");
+      const auth = await readAuthCredential("xai");
       strictEqual(
         auth && auth.type === "api_key" ? auth.key : null,
         UPDATED_XAI_KEY,
@@ -275,7 +286,7 @@ async function main(): Promise<void> {
       strictEqual(afterDelete.activeAccountId, importedAccountId);
       strictEqual(afterDelete.accounts[0].active, true);
 
-      const auth = AuthStorage.create().get("xai");
+      const auth = await readAuthCredential("xai");
       strictEqual(
         auth && auth.type === "api_key" ? auth.key : null,
         LEGACY_XAI_KEY,
@@ -289,7 +300,7 @@ async function main(): Promise<void> {
       strictEqual(empty.activeAccountId, null);
       deepStrictEqual(empty.accounts, []);
 
-      const auth = AuthStorage.create().get("xai");
+      const auth = await readAuthCredential("xai");
       strictEqual(auth, undefined, "last-delete must clear xAI from auth storage");
 
       const authJson = await readAuthJson(agentDir);
@@ -344,9 +355,9 @@ async function main(): Promise<void> {
       // Delete all xAI accounts; opencode-go must remain configured.
       await deleteApiKeyAccount("xai", xaiAfter.accounts[0].accountId);
       strictEqual((await listApiKeyAccounts("xai")).accountCount, 0);
-      strictEqual(AuthStorage.create().get("xai"), undefined);
+      strictEqual(await readAuthCredential("xai"), undefined);
       strictEqual((await listApiKeyAccounts("opencode-go")).accountCount, 2);
-      const ogStill = AuthStorage.create().get("opencode-go");
+      const ogStill = await readAuthCredential("opencode-go");
       strictEqual(
         ogStill && ogStill.type === "api_key" ? ogStill.key : null,
         OPENCODE_KEY_SAME_AS_SECOND,

@@ -18,10 +18,12 @@
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AuthStorage, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import type { Credential } from "@earendil-works/pi-ai";
+import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
 import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
 import { listOAuthAccounts } from "./oauth-accounts";
+import { getWebCredentialStore } from "./web-credential-store";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -103,12 +105,10 @@ async function atomicWriteJson(dir: string, filename: string, data: unknown): Pr
 
 /**
  * Update auth.json for grok-cli only when `storageId` is still the active
- * account, using a compare-and-set read under the AuthStorage file lock.
+ * account, using a compare-and-set re-read before CredentialStore.modify.
  */
 async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<void> {
   try {
-    const authStorage = AuthStorage.create();
-
     // Determine the current active storage id from the accounts list
     let currentActiveStorageId: string | null = null;
     try {
@@ -122,15 +122,13 @@ async function mirrorActiveCredentialIfActive(storageId: string, credential: Rec
     // Only mirror if the refreshed account is still the active one.
     if (currentActiveStorageId !== storageId) return;
 
-    // AuthStorage.set expects an AuthCredential.  grok-cli credentials from
-    // pi-grok-cli lack the "type":"oauth" sentinel but are otherwise compatible.
+    // CredentialStore expects type:"oauth". grok-cli credentials from
+    // pi-grok-cli lack the sentinel but are otherwise compatible.
     const authCredential = (credential as Record<string, unknown>).type
       ? credential
       : { ...credential, type: "oauth" as const };
-    authStorage.set(GROK_CLI_PROVIDER_ID, authCredential as unknown as import("@earendil-works/pi-coding-agent").OAuthCredential);
-    if (authStorage.drainErrors().length > 0) {
-      // Non-fatal; the saved-account credential is already updated.
-    }
+    const store = await getWebCredentialStore();
+    await store.modify(GROK_CLI_PROVIDER_ID, async () => authCredential as Credential);
   } catch {
     // Mirror update is best-effort; never let it break the token resolution.
   }
@@ -153,10 +151,18 @@ async function refreshGrokCredential(
     throw new Error("Grok OAuth access token expired and no refresh token is available. Please re-authenticate.");
   }
 
-  // Use pi-ai's OAuth machinery.  It calls the registered grok-cli OAuth
-  // provider's refreshToken(), which performs the actual xAI token refresh.
+  // Use the public OAuth compatibility helper. It calls the registered grok-cli
+  // OAuth provider's refreshToken(), which performs the actual xAI token refresh.
+  // ensureWebProvidersBootstrapped must have run so the provider table is populated.
+  // Only cold-load fixed providers when the process-global OAuth table lacks this
+  // provider — tests may register a mock first and must not be overwritten.
+  const { getOAuthProvider } = await import("./pi-ai-oauth-compat");
+  if (!getOAuthProvider(GROK_CLI_PROVIDER_ID)) {
+    const { ensureWebProvidersBootstrapped } = await import("./pi-provider-extensions");
+    await ensureWebProvidersBootstrapped();
+  }
   const result = await getOAuthApiKey(GROK_CLI_PROVIDER_ID, {
-    [GROK_CLI_PROVIDER_ID]: currentCredential as import("@earendil-works/pi-ai/oauth").OAuthCredentials,
+    [GROK_CLI_PROVIDER_ID]: currentCredential as import("@earendil-works/pi-ai").OAuthCredentials,
   });
 
   if (!result?.apiKey) {

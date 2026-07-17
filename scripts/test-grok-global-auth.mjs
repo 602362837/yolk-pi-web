@@ -79,17 +79,19 @@ test("historical header field remains parseable but deprecated", () => {
 console.log("\n=== live reload / global Active ===");
 
 test("reloadRpcAuthState refreshes same-identity model descriptor without setModel", () => {
-  assertIncludes(rpc, "export function reloadRpcAuthState", "export");
-  assertIncludes(rpc, "modelRegistry.refresh", "refresh");
+  assertIncludes(rpc, "export async function reloadRpcAuthState", "async export");
+  assertIncludes(rpc, "runtime.refresh({ allowNetwork: false })", "offline runtime refresh");
+  assertIncludes(rpc, "runtime.getModel(provider, modelId)", "same-id model lookup");
   assertIncludes(rpc, "cleanupSessionResources", "cleanup");
-  assertIncludes(rpc, "live.model = refreshed", "in-memory replace");
+  assertIncludes(rpc, "agentState.model = refreshed", "in-memory replace");
   // Ensure we do not call setModel inside reload (comments may mention setModel).
-  const reloadStart = rpc.indexOf("export function reloadRpcAuthState");
+  const reloadStart = rpc.indexOf("export async function reloadRpcAuthState");
   const reloadEnd = rpc.indexOf("export function destroyRpcSessionsForCwd");
-  const body = rpc.slice(reloadStart, reloadEnd > 0 ? reloadEnd : reloadStart + 2000);
+  const body = rpc.slice(reloadStart, reloadEnd > 0 ? reloadEnd : reloadStart + 4000);
   const codeOnly = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   assert.ok(!/\bsetModel\s*\(/.test(codeOnly), "no setModel call in reload body");
   assert.ok(!/model_change/.test(codeOnly), "no model_change in reload code");
+  assert.ok(!/modelRegistry/.test(codeOnly), "no modelRegistry in reload body");
 });
 
 test("Models UI describes global Active, not session pin", () => {

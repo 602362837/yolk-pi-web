@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * grok-provider-bootstrap — cold-start, registry, and entry-point audit tests
+ * grok-provider-bootstrap — cold-start, ModelRuntime, and entry-point audit tests
  *
  * Validates that the unified provider extension system (`lib/pi-provider-extensions.ts`)
- * is correctly wired into every Web boot path and that the Grok extension factories
- * meet security / isolation / correctness contracts.
+ * and provider-aware ModelRuntime helpers (`lib/web-model-runtime.ts`) are correctly
+ * wired into every Web boot path and that the Grok extension factories meet
+ * security / isolation / correctness contracts for pi SDK 0.80.10+.
  *
  * - Source-code inspection only — no pi SDK imports, no network, no real agent dir.
- * - Verifies all entry points use webExtensionFactories() or ensureGrokBootstrapped().
- * - Checks registry refresh order safety.
- * - Validates secret-free code paths.
+ * - Verifies catalog/request paths use createWebAgentSessionServices / getWebModelRuntime.
+ * - Rejects regressions to AuthStorage / ModelRegistry.create / old services fields.
  *
  * Run: node scripts/test-grok-provider.mjs
  */
@@ -58,6 +58,7 @@ function assertNotIncludes(source, needle, label) {
 console.log("\n=== pi-provider-extensions.ts exports ===");
 
 const peSource = read("lib/pi-provider-extensions.ts");
+const runtimeSource = read("lib/web-model-runtime.ts");
 
 test("exports grokCliExtension with factory from pi-grok-cli", () => {
   assertIncludes(peSource, "export const grokCliExtension", "exports grokCliExtension");
@@ -96,23 +97,32 @@ test("webExtensionFactories documents global Active auth path", () => {
   assertIncludes(peSource, "Main inference no longer injects a session-bound Authorization header", "pin retired documented");
 });
 
-test("exports ensureWebProvidersBootstrapped() with Grok-named alias", () => {
+test("exports ensureWebProvidersBootstrapped() as legacy OAuth preload only", () => {
   assertIncludes(peSource, "export function ensureWebProvidersBootstrapped", "exports ensureWebProvidersBootstrapped");
   assertIncludes(peSource, "export function ensureGrokBootstrapped", "retains ensureGrokBootstrapped alias");
   assertIncludes(peSource, "_webProvidersBootstrapPromise", "uses single-flight promise");
-});
-
-test("ensureWebProvidersBootstrapped creates services to load fixed providers", () => {
-  assertIncludes(peSource, "createAgentSessionServices", "calls createAgentSessionServices");
-  assertIncludes(peSource, "webProviderExtensions()", "registers fixed provider list for bootstrap");
+  assertIncludes(peSource, "NOT a ModelRuntime catalog guarantee", "documents non-catalog role");
+  assertIncludes(peSource, "createWebAgentSessionServices", "bootstrap uses services helper");
   assertIncludes(peSource, "// Best-effort only", "catches errors gracefully");
 });
 
-test("exports createWebProviderAwareModelRegistry with Grok-named alias", () => {
+test("createWebProviderAwareModelRegistry is a hard-fail migration stub", () => {
   assertIncludes(peSource, "export async function createWebProviderAwareModelRegistry", "exports helper");
   assertIncludes(peSource, "export async function createGrokAwareModelRegistry", "retains createGrokAwareModelRegistry alias");
-  assertIncludes(peSource, "await ensureWebProvidersBootstrapped()", "bootstraps before registry create");
-  assertIncludes(peSource, "ModelRegistry.create(", "creates provider-aware registry");
+  assertIncludes(peSource, "was removed for pi SDK 0.80.10", "hard-fail message");
+  assertIncludes(peSource, "use getWebModelRuntime()", "points to ModelRuntime");
+  // Comments may mention the removed API; executable ModelRegistry.create calls must not remain.
+  const codeOnly = peSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/\bModelRegistry\.create\s*\(/.test(codeOnly), "no executable ModelRegistry.create path remains");
+});
+
+test("web-model-runtime registers fixed providers on the target runtime", () => {
+  assertIncludes(runtimeSource, "export async function createWebModelRuntime", "createWebModelRuntime");
+  assertIncludes(runtimeSource, "export async function getWebModelRuntime", "getWebModelRuntime");
+  assertIncludes(runtimeSource, "export async function createWebAgentSessionServices", "createWebAgentSessionServices");
+  assertIncludes(runtimeSource, "webExtensionFactories(", "services helper feeds factories");
+  assertIncludes(runtimeSource, "webProviderExtensions()", "admin runtime uses fixed providers");
+  assertIncludes(runtimeSource, "createAgentSessionServices", "SDK services entry");
 });
 
 // ============================================================================
@@ -127,7 +137,6 @@ test("pi-provider-extensions does not deep-import pi-grok-cli/src", () => {
 });
 
 test("pi-provider-extensions loads pi-grok-cli only via jiti dynamic import", () => {
-  // Static ESM import is avoided; jiti.import("pi-grok-cli") is the only load site.
   const staticImports = peSource.match(/from\s+["']pi-grok-cli["']/g) || [];
   assert.strictEqual(staticImports.length, 0, "no static import from pi-grok-cli");
   assertIncludes(peSource, 'import("pi-grok-cli")', "jiti dynamic import of pi-grok-cli");
@@ -146,129 +155,118 @@ test("grok-subscription-quota does not deep-import pi-grok-cli", () => {
 });
 
 // ============================================================================
-// 3. Entry point audit — every boot path uses common factory
+// 3. Entry point audit — every catalog/request path uses ModelRuntime helpers
 // ============================================================================
 
-console.log("\n=== Entry point audit ===");
+console.log("\n=== Entry point audit (ModelRuntime) ===");
 
-test("rpc-manager.ts uses webExtensionFactories", () => {
-  const source = read("lib/rpc-manager.ts");
-  assertIncludes(source, "webExtensionFactories", "rpc-manager uses factory helper");
-});
+const sessionServiceFiles = [
+  { path: "lib/rpc-manager.ts", label: "rpc-manager" },
+  { path: "lib/ypi-studio-child-session-runner.ts", label: "studio child runner" },
+  { path: "app/api/models/route.ts", label: "models route" },
+  { path: "app/api/terminal/env/assist/route.ts", label: "terminal assist" },
+  { path: "app/api/trellis/workflow/assist/route.ts", label: "trellis assist" },
+  { path: "app/api/model-prices/suggest/route.ts", label: "model-prices suggest" },
+];
 
-test("ypi-studio-child-session-runner.ts uses webExtensionFactories", () => {
-  const source = read("lib/ypi-studio-child-session-runner.ts");
-  assertIncludes(source, "webExtensionFactories", "child runner uses factory helper");
-});
+for (const file of sessionServiceFiles) {
+  test(`${file.label} uses createWebAgentSessionServices`, () => {
+    const source = read(file.path);
+    assertIncludes(source, "createWebAgentSessionServices", `${file.label} uses services helper`);
+    assertNotIncludes(source, "ModelRegistry.create", `${file.label} does not use ModelRegistry.create`);
+    assertNotIncludes(source, "services.modelRegistry", `${file.label} does not use services.modelRegistry`);
+  });
+}
 
-test("app/api/models/route.ts uses webExtensionFactories", () => {
-  const source = read("app/api/models/route.ts");
-  assertIncludes(source, "webExtensionFactories", "models route uses factory helper");
-});
+const adminRuntimeFiles = [
+  { path: "app/api/auth/providers/route.ts", label: "auth providers route" },
+  { path: "app/api/auth/logout/[provider]/route.ts", label: "auth logout route" },
+  { path: "app/api/auth/api-key/[provider]/route.ts", label: "api-key route" },
+  { path: "app/api/auth/all-providers/route.ts", label: "all-providers route" },
+  { path: "app/api/model-prices/route.ts", label: "model-prices route" },
+  { path: "lib/deepseek-balance.ts", label: "deepseek-balance" },
+];
 
-test("app/api/auth/providers/route.ts uses webExtensionFactories", () => {
-  const source = read("app/api/auth/providers/route.ts");
-  assertIncludes(source, "webExtensionFactories", "providers route uses factory helper");
-});
+for (const file of adminRuntimeFiles) {
+  test(`${file.label} uses getWebModelRuntime`, () => {
+    const source = read(file.path);
+    assertIncludes(source, "getWebModelRuntime", `${file.label} uses getWebModelRuntime`);
+    assertNotIncludes(source, "ModelRegistry.create", `${file.label} does not use ModelRegistry.create`);
+    assertNotIncludes(source, "createWebProviderAwareModelRegistry(", `${file.label} does not call removed registry helper`);
+  });
+}
 
-test("app/api/auth/login/[provider]/route.ts uses webExtensionFactories", () => {
+test("auth login route uses ModelRuntime login + isolated add-account store", () => {
   const source = read("app/api/auth/login/[provider]/route.ts");
-  assertIncludes(source, "webExtensionFactories", "login route uses factory helper");
+  assertIncludes(source, "getWebModelRuntime", "normal login uses admin runtime");
+  assertIncludes(source, "createWebModelRuntime", "add-account uses isolated runtime");
+  assertIncludes(source, "createInMemoryWebCredentialStore", "add-account uses memory credential store");
+  assertIncludes(source, "createWebAgentSessionServices", "add-account registers fixed providers on target runtime");
+  assertIncludes(source, "runtime.login(provider, \"oauth\"", "uses ModelRuntime.login");
+  assertNotIncludes(source, "ModelRegistry.create", "no ModelRegistry.create");
+  assertNotIncludes(source, "AuthStorage", "no AuthStorage");
 });
 
-test("app/api/auth/logout/[provider]/route.ts uses webExtensionFactories", () => {
-  const source = read("app/api/auth/logout/[provider]/route.ts");
-  assertIncludes(source, "webExtensionFactories", "logout route uses factory helper");
+test("models-config test uses temporary isolated runtime", () => {
+  const source = read("app/api/models-config/test/route.ts");
+  assertIncludes(source, "createTemporaryWebModelRuntimeServices", "temporary runtime helper");
+  assertIncludes(source, "services.modelRuntime", "uses modelRuntime");
+  assertNotIncludes(source, "createWebProviderAwareModelRegistry", "no removed registry helper");
+  assertNotIncludes(source, "ModelRegistry.create", "no ModelRegistry.create");
 });
 
-test("app/api/auth/api-key/[provider]/route.ts uses createWebProviderAwareModelRegistry", () => {
-  const source = read("app/api/auth/api-key/[provider]/route.ts");
-  assertIncludes(source, "createWebProviderAwareModelRegistry", "api-key route uses provider-aware registry");
-});
-
-test("app/api/auth/all-providers/route.ts uses createWebProviderAwareModelRegistry", () => {
-  const source = read("app/api/auth/all-providers/route.ts");
-  assertIncludes(source, "createWebProviderAwareModelRegistry", "all-providers route uses provider-aware registry");
-});
-
-test("app/api/terminal/env/assist/route.ts uses webExtensionFactories", () => {
-  const source = read("app/api/terminal/env/assist/route.ts");
-  assertIncludes(source, "webExtensionFactories", "terminal assist uses unified provider factories");
-});
-
-test("app/api/trellis/workflow/assist/route.ts uses webExtensionFactories", () => {
-  const source = read("app/api/trellis/workflow/assist/route.ts");
-  assertIncludes(source, "webExtensionFactories", "trellis assist uses unified provider factories");
+test("skills/commands still use webExtensionFactories for ResourceLoader only", () => {
+  const skills = read("app/api/skills/route.ts");
+  const commands = read("app/api/commands/route.ts");
+  assertIncludes(skills, "webExtensionFactories", "skills uses factories for loader");
+  assertIncludes(commands, "webExtensionFactories", "commands uses factories for loader");
+  assertNotIncludes(skills, "ModelRegistry.create", "skills no ModelRegistry.create");
+  assertNotIncludes(commands, "ModelRegistry.create", "commands no ModelRegistry.create");
 });
 
 // ============================================================================
-// 4. Registry refresh order safety
+// 4. Stale-API negative audit
 // ============================================================================
 
-console.log("\n=== Registry refresh order safety ===");
+console.log("\n=== Stale AuthStorage / ModelRegistry contract ===");
 
-test("pi-provider-extensions documents the refresh invariant", () => {
-  // The file header must mention that refresh() can reset global state
-  assertIncludes(peSource, "registry-reset can remove grok-cli / kiro / google-antigravity", "documented registry reset risk");
-  assertIncludes(peSource, "must be fed", "documented requirement");
-});
-
-test("createWebProviderAwareModelRegistry bootstraps before ModelRegistry.create", () => {
-  // Extract the createWebProviderAwareModelRegistry function body only.
-  // Comments earlier in the file also mention ModelRegistry.create.
-  const fnStart = peSource.indexOf("export async function createWebProviderAwareModelRegistry");
-  const fnBody = peSource.slice(fnStart);
-  const ensureCall = fnBody.indexOf("await ensureWebProvidersBootstrapped()");
-  const createCall = fnBody.indexOf("ModelRegistry.create(");
-  const orderOk = ensureCall > 0 && createCall > 0 && ensureCall < createCall;
-  if (!orderOk) {
-    console.log(`    (info) fnStart=${fnStart} ensureCall=${ensureCall} createCall=${createCall}`);
-  }
-  assert.ok(orderOk, "bootstrap runs before registry create");
-});
-
-test("deepseek-balance.ts bootstraps fixed providers before ModelRegistry.create", () => {
-  const source = read("lib/deepseek-balance.ts");
-  assertIncludes(source, "ModelRegistry.create", "has bare registry create");
-  assertIncludes(source, "ensureWebProvidersBootstrapped", "bootstraps fixed providers first");
-});
-
-test("no source file uses ModelRegistry.create without factory path except deepseek-balance", () => {
-  // Audit: grep all source files for ModelRegistry.create that don't
-  // come from pi-provider-extensions.  We accept deepseek-balance as the
-  // only known bare case.
-  // This is an existence test, not a runtime assertion.
+test("application runtime code has no AuthStorage import from coding-agent root", () => {
   const files = [
-    { path: "lib/rpc-manager.ts", name: "rpc-manager" },
-    { path: "lib/ypi-studio-child-session-runner.ts", name: "child-runner" },
-    { path: "app/api/models/route.ts", name: "models" },
-    { path: "app/api/auth/providers/route.ts", name: "providers" },
-    { path: "app/api/auth/login/[provider]/route.ts", name: "login" },
-    { path: "app/api/auth/logout/[provider]/route.ts", name: "logout" },
-    { path: "app/api/auth/api-key/[provider]/route.ts", name: "api-key" },
-    { path: "app/api/auth/all-providers/route.ts", name: "all-providers" },
-    { path: "app/api/terminal/env/assist/route.ts", name: "terminal-assist" },
-    { path: "app/api/trellis/workflow/assist/route.ts", name: "trellis-assist" },
+    "lib/rpc-manager.ts",
+    "lib/ypi-studio-child-session-runner.ts",
+    "lib/oauth-accounts.ts",
+    "lib/api-key-accounts.ts",
+    "lib/deepseek-balance.ts",
+    "lib/web-model-runtime.ts",
+    "lib/web-credential-store.ts",
+    "app/api/models/route.ts",
+    "app/api/auth/providers/route.ts",
+    "app/api/auth/login/[provider]/route.ts",
+    "app/api/auth/logout/[provider]/route.ts",
+    "app/api/auth/api-key/[provider]/route.ts",
+    "app/api/auth/all-providers/route.ts",
   ];
-  for (const f of files) {
-    try {
-      const source = read(f.path);
-      // These files should use webExtensionFactories or createWebProviderAwareModelRegistry,
-      // not bare ModelRegistry.create.
-      if (
-        source.includes("ModelRegistry.create") &&
-        !source.includes("webExtensionFactories") &&
-        !source.includes("createWebProviderAwareModelRegistry") &&
-        !source.includes("createGrokAwareModelRegistry") &&
-        !source.includes("pi-provider-extensions")
-      ) {
-        console.log(`    (info) ${f.name} has bare ModelRegistry.create — tracked`);
-      }
-    } catch {
-      // File doesn't exist — skip
-    }
+  for (const path of files) {
+    const source = read(path);
+    const codeOnly = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+    assert.ok(
+      !/import\s*\{[^}]*\bAuthStorage\b[^}]*\}\s*from\s*["']@earendil-works\/pi-coding-agent["']/.test(source),
+      `${path} must not import AuthStorage from coding-agent root`,
+    );
+    assert.ok(!/\bModelRegistry\.create\s*\(/.test(codeOnly), `${path} must not call ModelRegistry.create`);
+    assert.ok(!/\bservices\.authStorage\b/.test(codeOnly), `${path} must not use services.authStorage`);
+    assert.ok(!/\bservices\.modelRegistry\b/.test(codeOnly), `${path} must not use services.modelRegistry`);
+    assert.ok(!/\binner\.modelRegistry\b/.test(codeOnly), `${path} must not use inner.modelRegistry`);
   }
-  console.log("    (info) bare ModelRegistry.create audit complete");
+});
+
+test("rpc-manager and studio child use services.modelRuntime", () => {
+  const rpc = read("lib/rpc-manager.ts");
+  const studio = read("lib/ypi-studio-child-session-runner.ts");
+  assertIncludes(rpc, "createWebAgentSessionServices", "rpc services helper");
+  assertIncludes(rpc, "modelRuntime", "rpc modelRuntime");
+  assertIncludes(studio, "createWebAgentSessionServices", "studio services helper");
+  assertIncludes(studio, "services.modelRuntime", "studio modelRuntime");
 });
 
 // ============================================================================
@@ -331,8 +329,6 @@ console.log("\n=== Module boundary audit ===");
 
 test("oauth-accounts.ts does not import pi-grok-cli as a module", () => {
   const source = read("lib/oauth-accounts.ts");
-  // Comments may reference pi-grok-cli for documentation; the important
-  // check is that there's no import/require statement.
   assertNotIncludes(source, 'from "pi-grok-cli"', "no pi-grok-cli import");
   assertNotIncludes(source, "from 'pi-grok-cli'", "no pi-grok-cli import (single quote)");
   assertNotIncludes(source, 'require("pi-grok-cli")', "no pi-grok-cli require");
@@ -360,7 +356,6 @@ test("grok-subscription-quota.ts imports token resolver, not pi-grok-cli", () =>
 console.log("\n=== Error handling ===");
 
 test("ensureWebProvidersBootstrapped survives missing dependency gracefully", () => {
-  // The catch block should not rethrow
   assertIncludes(peSource, "catch {", "bootstrap has error handler");
   assertIncludes(peSource, "// Best-effort only", "bootstrap is best-effort");
 });

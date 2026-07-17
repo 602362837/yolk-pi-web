@@ -170,9 +170,12 @@ test("deleteOAuthAccount prevents active account deletion (409)", () => {
   assertIncludes(oaSource, "metadata.activeAccountId === normalizedAccountId", "checks active status");
 });
 
-test("activateOAuthAccount mirrors to AuthStorage (auth.json)", () => {
-  assertIncludes(oaSource, "authStorage.set(", "mirrors to auth.json");
+test("activateOAuthAccount mirrors via CredentialStore.modify (auth.json)", () => {
+  assertIncludes(oaSource, "getWebCredentialStore", "uses Web CredentialStore");
+  assertIncludes(oaSource, "store.modify(provider", "mirrors via store.modify");
   assertIncludes(oaSource, 'type: "oauth"', "adds type:oauth sentinel for Pi compatibility");
+  assertNotIncludes(oaSource, "authStorage.set(", "no AuthStorage.set path");
+  assertNotIncludes(oaSource, "AuthStorage", "no AuthStorage import/usage");
 });
 
 test("Atomic writes use tmp + rename", () => {

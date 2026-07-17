@@ -336,7 +336,7 @@ async function main(): Promise<void> {
         registerOAuthProvider,
         unregisterOAuthProvider,
         getOAuthProvider,
-      } = await import("@earendil-works/pi-ai/oauth");
+      } = await import("./pi-ai-oauth-compat");
 
       let refreshTokenCalls = 0;
       const previous = getOAuthProvider("kiro");
@@ -346,7 +346,7 @@ async function main(): Promise<void> {
         async login() {
           throw new Error("login not used");
         },
-        async refreshToken(credentials) {
+        async refreshToken(credentials: import("@earendil-works/pi-ai").OAuthCredentials) {
           refreshTokenCalls += 1;
           await new Promise((resolve) => setTimeout(resolve, 40));
           return {
@@ -356,7 +356,7 @@ async function main(): Promise<void> {
             type: "oauth" as const,
           };
         },
-        getApiKey(credentials) {
+        getApiKey(credentials: import("@earendil-works/pi-ai").OAuthCredentials) {
           return typeof credentials.access === "string" ? credentials.access : "";
         },
       });
@@ -375,7 +375,7 @@ async function main(): Promise<void> {
         const { getKiroAccessToken } = await import(
           pathToFileURL(join(process.cwd(), "lib/kiro-account-token.ts")).href
         );
-        const { AuthStorage } = await import("@earendil-works/pi-coding-agent");
+        const { getWebCredentialStore } = await import("./web-credential-store");
 
         ok(__kiroLockUsesFsPrimitivesForTests(), "lock uses fs mkdir primitives");
 
@@ -418,7 +418,7 @@ async function main(): Promise<void> {
 
         listed = await listOAuthAccounts(KIRO_PROVIDER_ID);
         strictEqual(listed.activeAccountId, second.accountId, "Activate must win Active metadata");
-        const mirroredB = AuthStorage.create().get(KIRO_PROVIDER_ID) as Record<string, unknown> | null;
+        const mirroredB = await (await getWebCredentialStore()).read(KIRO_PROVIDER_ID) as Record<string, unknown> | null;
         ok(mirroredB, "auth.json must have kiro credential");
         const mirroredBAccess = String(mirroredB?.access ?? "");
         strictEqual(String(mirroredB?.refresh ?? ""), "prod-refresh-b", "auth.json mirror must be newly activated account");
@@ -444,7 +444,7 @@ async function main(): Promise<void> {
 
         listed = await listOAuthAccounts(KIRO_PROVIDER_ID);
         strictEqual(listed.activeAccountId, first.accountId, "Activate A must win Active metadata");
-        const mirroredA = AuthStorage.create().get(KIRO_PROVIDER_ID) as Record<string, unknown> | null;
+        const mirroredA = await (await getWebCredentialStore()).read(KIRO_PROVIDER_ID) as Record<string, unknown> | null;
         ok(mirroredA, "auth.json must have kiro credential after Activate A");
         const mirroredAAccess = String(mirroredA?.access ?? "");
         strictEqual(String(mirroredA?.refresh ?? ""), "prod-refresh-a", "auth.json must mirror activated A credential");

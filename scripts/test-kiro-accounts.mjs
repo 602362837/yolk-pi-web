@@ -120,7 +120,9 @@ test("opaque storage id allocation remains acct_ based", () => {
 
 test("activateOAuthAccount still mirrors type:oauth for provider-native credentials", () => {
   assertIncludes(oaSource, 'type: "oauth"', "adds type:oauth sentinel for Pi compatibility");
-  assertIncludes(oaSource, "authStorage.set(", "mirrors to auth.json");
+  assertIncludes(oaSource, "getWebCredentialStore", "uses Web CredentialStore");
+  assertIncludes(oaSource, "store.modify(provider", "mirrors via store.modify");
+  assertNotIncludes(oaSource, "authStorage.set(", "no AuthStorage.set path");
 });
 
 test("delete-active protection remains in generic store", () => {
@@ -229,8 +231,11 @@ test("providers route includes Kiro display name", () => {
 
 test("login route supports add-account mode for any supported OAuth provider", () => {
   assertIncludes(loginRoute, "isSupportedOAuthAccountProvider(provider)", "checks provider support");
-  assertIncludes(loginRoute, "saveOAuthAccountCredential(provider, authStorage.get(provider))", "saves managed account");
+  assertIncludes(loginRoute, "createInMemoryWebCredentialStore", "add-account uses isolated memory store");
+  assertIncludes(loginRoute, "createWebModelRuntime", "add-account uses isolated ModelRuntime");
+  assertIncludes(loginRoute, "saveOAuthAccountCredential(provider, credential", "saves managed account from login credential");
   assertIncludes(loginRoute, "reloadRpcAuthState()", "reloads live auth after login");
+  assertNotIncludes(loginRoute, "authStorage.get(", "no AuthStorage.get path");
 });
 
 test("accounts routes stay generic and do not hard-code kiro secrets", () => {

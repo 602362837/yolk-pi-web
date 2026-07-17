@@ -1,17 +1,16 @@
-import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { isSupportedOAuthAccountProvider, listOAuthAccounts, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
-import { webExtensionFactories } from "@/lib/pi-provider-extensions";
+import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
 
+function providerHasOAuth(provider: { auth?: { oauth?: unknown } } | undefined): boolean {
+  return Boolean(provider?.auth?.oauth);
+}
+
 export async function GET() {
-  const services = await createAgentSessionServices({
-    cwd: process.cwd(),
-    agentDir: getAgentDir(),
-    resourceLoaderOptions: { extensionFactories: webExtensionFactories() },
-  });
-  const authStorage = services.authStorage;
-  const providers = authStorage.getOAuthProviders();
+  const runtime = await getWebModelRuntime({ agentDir: getAgentDir() });
+  const providers = runtime.getProviders().filter((p) => providerHasOAuth(p));
 
   const EXCLUDED = new Set(["anthropic"]);
   const DISPLAY_NAMES: Record<string, string> = {
@@ -31,7 +30,7 @@ export async function GET() {
         let activeAccountDisplayName: string | null = null;
 
         if (isSupportedOAuthAccountProvider(p.id)) {
-          await syncActiveOAuthAccountCredential(p.id, authStorage).catch(() => {});
+          await syncActiveOAuthAccountCredential(p.id).catch(() => {});
           try {
             const accounts = await listOAuthAccounts(p.id);
             accountCount = accounts.accounts.length;
@@ -41,11 +40,26 @@ export async function GET() {
             // Account store not initialized yet; fall through to single-auth mode.
           }
         }
-        const loggedIn = authStorage.has(p.id);
+
+        // Prefer async auth check (may refresh status); fall back to stored credential presence.
+        let loggedIn = false;
+        try {
+          const check = await runtime.checkAuth(p.id);
+          loggedIn = Boolean(check);
+        } catch {
+          const status = runtime.getProviderAuthStatus(p.id);
+          loggedIn = status.configured === true && status.source === "stored";
+        }
+
+        // Historical wire field: extension oauth used to expose usesCallbackServer.
+        // 0.80.10 Provider.auth.oauth no longer surfaces it publicly; default false.
+        const usesCallbackServer =
+          (p.auth?.oauth as { usesCallbackServer?: boolean } | undefined)?.usesCallbackServer ?? false;
+
         const base = {
           id: p.id,
           name: DISPLAY_NAMES[p.id] ?? p.name,
-          usesCallbackServer: p.usesCallbackServer ?? false,
+          usesCallbackServer,
           loggedIn,
         };
         if (authMode) {

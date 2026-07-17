@@ -99,7 +99,8 @@ console.log("\n=== UI contracts ===");
 
 test("Settings Grok toggle uses explicit limit language", () => {
   assertIncludes(settings, "明确限额或限流时自动切换可用账号", "toggle label");
-  assertIncludes(settings, "section === \"grok\"", "section");
+  assertIncludes(settings, 'view === "grok"', "grok leaf view");
+  assertIncludes(settings, "updateGrok({ autoFailover:", "grok failover write");
   assertNotIncludes(settings, "普通 rate limit 不触发", "old absolute exclusion gone");
 });
 

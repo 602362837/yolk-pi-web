@@ -91,6 +91,8 @@
     "test:grok-usage-panel": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-grok-usage-panel-config.mjs",
     "test:grok-all": "npm run test:grok-provider && npm run test:grok-accounts && npm run test:grok-quota && npm run test:grok-session-isolation && npm run test:oauth-accounts && npm run test:grok-global-auth && npm run test:grok-failover-adapter && npm run test:grok-failover-runtime",
     "test:api-key-accounts": "node scripts/run-api-key-accounts-test.mjs",
+    "test:web-credential-store": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-web-credential-store.mjs",
+    "test:web-model-runtime": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-web-model-runtime.mjs",
     "test:oauth-accounts": "node scripts/run-oauth-account-tests.mjs",
     "test:grok-session-isolation": "npx tsx lib/grok-session-isolation.test.ts",
     "test:usage-rollup": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-usage-stats-rollup.mjs",
@@ -104,9 +106,9 @@
     "release": "npm run release:patch"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.80.7",
-    "@earendil-works/pi-ai": "0.80.7",
-    "@earendil-works/pi-coding-agent": "0.80.7",
+    "@earendil-works/pi-agent-core": "0.80.10",
+    "@earendil-works/pi-ai": "0.80.10",
+    "@earendil-works/pi-coding-agent": "0.80.10",
     "@lobehub/icons": "^5.6.0",
     "@lydell/node-pty": "^1.2.0-beta.12",
     "@monaco-editor/react": "^4.7.0",

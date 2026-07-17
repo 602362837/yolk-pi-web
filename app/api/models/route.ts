@@ -1,7 +1,7 @@
 import { stat } from "fs/promises";
-import { createAgentSessionServices, getAgentDir, type SettingsManager } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type SettingsManager } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { webExtensionFactories } from "@/lib/pi-provider-extensions";
+import { createWebAgentSessionServices } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +36,16 @@ export async function GET(req: Request) {
 
   try {
     const agentDir = getAgentDir();
-    const services = await createAgentSessionServices({ cwd, agentDir, resourceLoaderOptions: { extensionFactories: webExtensionFactories() } });
-    const registry = services.modelRegistry;
-    const available = registry.getAvailable();
-    modelList = available.map((m: { id: string; name: string; provider: string }) => {
-      const providerDisplayName = registry.getProviderDisplayName(m.provider);
+    // Admin listing only needs fixed providers; avoid loading project extensions.
+    const services = await createWebAgentSessionServices({
+      cwd,
+      agentDir,
+      fixedProvidersOnly: true,
+    });
+    const runtime = services.modelRuntime;
+    const available = await runtime.getAvailable();
+    modelList = available.map((m) => {
+      const providerDisplayName = runtime.getProvider(m.provider)?.name;
       return {
         id: m.id,
         name: m.name,
