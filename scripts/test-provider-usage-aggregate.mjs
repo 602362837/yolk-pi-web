@@ -5,7 +5,7 @@
  * Covers:
  * - usage.providerPanelsAggregated default false
  * - AppShell JSX mutual exclusion (aggregate vs standalone, no CSS hide)
- * - GPT → Grok → Kiro order, single host / right padding
+ * - GPT → Grok → Kiro → Antigravity order, single host / right padding
  * - Shared N-ring centers (GPT 5h, Grok week, Kiro 1/N)
  * - Aggregate hover/focus shell: 220ms grace, Escape suppression, columns
  * - No total ring, no dual owner remount path, projection safety
@@ -100,35 +100,43 @@ await test("AppShell reads providerPanelsAggregated and JSX-mutex mounts aggrega
   assert.match(appShell, /displayMode=\{providerUsageDisplayMode\}/);
 });
 
-await test("AppShell aggregate columns ordered GPT → Grok → Kiro with one owner each", () => {
+await test("AppShell aggregate columns ordered GPT → Grok → Kiro → Antigravity with one owner each", () => {
   const appShell = read("components/AppShell.tsx");
 
   // Projection state owners (single instance per enabled key).
   assert.match(appShell, /gptAggregateProjection/);
   assert.match(appShell, /grokAggregateProjection/);
   assert.match(appShell, /kiroAggregateProjection/);
+  assert.match(appShell, /antigravityAggregateProjection/);
   assert.match(appShell, /setGptAggregateProjection/);
   assert.match(appShell, /setGrokAggregateProjection/);
   assert.match(appShell, /setKiroAggregateProjection/);
+  assert.match(appShell, /setAntigravityAggregateProjection/);
 
   // Stable detail owners memoized so projection updates do not remount panels.
   assert.match(appShell, /gptAggregateDetail = useMemo/);
   assert.match(appShell, /grokAggregateDetail = useMemo/);
   assert.match(appShell, /kiroAggregateDetail = useMemo/);
+  assert.match(appShell, /antigravityAggregateDetail = useMemo/);
 
-  // Column push order GPT → Grok → Kiro.
+  // Column push order GPT → Grok → Kiro → Antigravity.
   const gptPush = appShell.indexOf('key: "gpt"');
   const grokPush = appShell.indexOf('key: "grok"');
   const kiroPush = appShell.indexOf('key: "kiro"');
-  assert.ok(gptPush > 0 && grokPush > gptPush && kiroPush > grokPush, "expected GPT → Grok → Kiro column construction");
+  const antiPush = appShell.indexOf('key: "antigravity"');
+  assert.ok(
+    gptPush > 0 && grokPush > gptPush && kiroPush > grokPush && antiPush > kiroPush,
+    "expected GPT → Grok → Kiro → Antigravity column construction",
+  );
 
   // Standalone branch still wires displayMode for Full/Compact click detail.
   const standaloneBlockStart = appShell.indexOf("providerUsageAggregated ? (");
-  const standaloneBlock = appShell.slice(standaloneBlockStart, standaloneBlockStart + 2500);
+  const standaloneBlock = appShell.slice(standaloneBlockStart, standaloneBlockStart + 3200);
   assert.match(standaloneBlock, /displayMode=\{providerUsageDisplayMode\}/);
   assert.match(standaloneBlock, /<ChatGptUsagePanel/);
   assert.match(standaloneBlock, /<GrokUsagePanel/);
   assert.match(standaloneBlock, /<KiroUsagePanel/);
+  assert.match(standaloneBlock, /<AntigravityUsagePanel/);
 
   // Aggregate shell does not fetch.
   assert.doesNotMatch(appShell, /ProviderUsageAggregatePanel[\s\S]{0,200}fetch\(/);
@@ -195,7 +203,7 @@ await test("GPT adapter: actual tiers → outer shortest 5h / center outer; unkn
 
   const candidates = (tiers) => tiers.map((tier) => ({
     id: tier.name === "five_hour" ? "gpt-5h" : "gpt-week",
-    shortLabel: tier.name === "five_hour" ? "5h" : "周",
+    shortLabel: tier.name === "five_hour" ? "5h" : "7d",
     fullLabel: tier.name === "five_hour" ? "5 小时额度" : "7 天额度",
     percent: Number.isFinite(tier.utilization) ? tier.utilization : null,
     title: tier.name === "five_hour" ? "5 小时" : "周额度",
@@ -410,15 +418,24 @@ await test("Compact is ring-first; no normal text summary chips in provider pane
   const chatgpt = read("components/ChatGptUsagePanel.tsx");
   const grok = read("components/GrokUsagePanel.tsx");
   const kiro = read("components/KiroUsagePanel.tsx");
+  const antigravity = read("components/AntigravityUsagePanel.tsx");
   const trigger = read("components/ProviderUsageTrigger.tsx");
+  const aggregatePanel = read("components/ProviderUsageAggregatePanel.tsx");
 
   assert.doesNotMatch(chatgpt, /compactSummaries/);
   assert.doesNotMatch(grok, /compactSummaries/);
+  assert.doesNotMatch(antigravity, /compactSummaries/);
   // Trigger may still accept compactSummaries for fallback compatibility, but providers must not build them.
   assert.match(trigger, /ringUnit/);
+  assert.match(trigger, /ringUnits/);
   assert.match(chatgpt, /ringUnit=\{ringUnit\}/);
   assert.match(grok, /ringUnit=\{aggregateProjection\.ringUnit\}/);
   assert.match(kiro, /ringUnit=\{ringProjection\.ringUnit\}/);
+  assert.match(antigravity, /ringUnit=\{aggregateProjection\.ringUnit\}/);
+  // Antigravity multi-group: independent ringUnits (never Flash/Opus concentric).
+  assert.match(antigravity, /ringUnits=\{aggregateProjection\.ringUnits/);
+  assert.match(aggregatePanel, /resolveAggregateRingUnits/);
+  assert.match(aggregatePanel, /data-multi-independent/);
 });
 
 await test("projection allowlist safety in contract + provider aggregate projections", () => {
@@ -433,7 +450,9 @@ await test("projection allowlist safety in contract + provider aggregate project
     "components/ChatGptUsagePanel.tsx",
     "components/GrokUsagePanel.tsx",
     "components/KiroUsagePanel.tsx",
+    "components/AntigravityUsagePanel.tsx",
     "components/GrokUsageProjection.ts",
+    "lib/antigravity-usage-ring.ts",
   ]) {
     const src = read(file);
     // Aggregate projection objects must not spread raw quota / account payloads.
@@ -444,12 +463,17 @@ await test("projection allowlist safety in contract + provider aggregate project
 
   const kiro = read("components/KiroUsagePanel.tsx");
   assert.doesNotMatch(kiro, /profileArn|clientSecret|access_token|refresh_token/);
+  const antigravity = read("components/AntigravityUsagePanel.tsx");
+  // Projection/runtime must not reference secret field names (comments may mention privacy).
+  assert.doesNotMatch(antigravity, /\baccess_token\b|\brefresh_token\b|\bclientSecret\b|\bclient_secret\b/);
+  assert.doesNotMatch(antigravity, /projection\.projectId|params\.set\(["']projectId|body\.projectId/);
 
   // Top-bar detail may show only safe display fields, never arbitrary account metadata.
   for (const file of [
     "components/ChatGptUsagePanel.tsx",
     "components/GrokUsagePanel.tsx",
     "components/KiroUsagePanel.tsx",
+    "components/AntigravityUsagePanel.tsx",
   ]) {
     const src = read(file);
     assert.doesNotMatch(src, /maskedAccountId\}\{(?:account|item)\.label/);

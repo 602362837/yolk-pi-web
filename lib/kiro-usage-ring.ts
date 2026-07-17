@@ -68,7 +68,7 @@ function shortLabelForKiroEvidence(evidence: string, fallbackLabel: string): str
     if (key.includes("7d") || key.includes("seven_day")) return "7d";
     return "Daily";
   }
-  if (key.includes("week")) return "周";
+  if (key.includes("week")) return "7d";
   if (key.includes("month")) return "月";
   if (key.includes("year")) return "年";
   const trimmed = fallbackLabel.trim();

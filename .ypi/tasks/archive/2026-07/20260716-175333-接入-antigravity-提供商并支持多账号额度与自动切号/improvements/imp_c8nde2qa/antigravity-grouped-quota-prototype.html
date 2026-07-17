@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IMP-001 Antigravity 组额度 · 双独立圆环原型</title>
+<style>
+  :root {
+    --bg: #0b1220; --panel: #121a2b; --border: #243047; --text: #e8eefc;
+    --muted: #93a0b8; --accent: #3b82f6; --opus: #a78bfa; --warn: #fbbf24;
+    --danger: #fb7185; --ok: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0 0 6px; font-size: 18px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .note { margin-top: 10px; padding: 10px 12px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; font-size: 12px; color: #cbd5e1; }
+  .note strong { color: #fde68a; }
+  .wrong { text-decoration: line-through; color: #f87171; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border); align-items: center; }
+  .controls label { font-size: 12px; color: var(--muted); }
+  select, button { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  main { display: grid; gap: 16px; padding: 16px 20px 40px; }
+  .stage { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .stage h2 { margin: 0 0 10px; font-size: 14px; }
+  .topbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; background: #0d1524; }
+  .provider { font-weight: 800; font-size: 13px; }
+  .rings { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .ring-slot { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 52px; }
+  .ring-slot .lbl { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: .04em; }
+  .ring-slot .val { font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 800; }
+  .ring { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; position: relative; }
+  .ring svg { width: 40px; height: 40px; transform: rotate(-90deg); }
+  .ring .center { position: absolute; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .fallback { font-size: 12px; color: var(--warn); font-weight: 700; }
+  .agg { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 10px; }
+  @media (max-width: 900px) { .agg { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 520px) { .agg { grid-template-columns: 1fr; } }
+  .col { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #0d1524; }
+  .col h3 { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .detail { margin-top: 12px; }
+  details.group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: #0d1524; }
+  details.group summary { cursor: pointer; list-style: none; padding: 10px 12px; display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; }
+  details.group summary::-webkit-details-marker { display: none; }
+  .group-meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .variants { padding: 0 12px 10px; display: grid; gap: 6px; }
+  .variant { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #cbd5e1; padding: 6px 8px; border-radius: 6px; background: #111827; }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .badge.warn { border-color: #854d0e; color: #fde68a; }
+  .badge.danger { border-color: #9f1239; color: #fecdd3; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 720px) { .compare { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #0d1524; font-size: 12px; }
+  .card.bad { border-color: #7f1d1d; }
+  .card.good { border-color: #14532d; }
+  .muted { color: var(--muted); }
+  footer { padding: 0 20px 24px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>IMP-001 原型：Antigravity 模型组额度</h1>
+  <p>两组额度 = <strong>两个独立圆环并排</strong>。共享 N-ring 的内外层只表示<strong>不同周期</strong>（5h / 7d），不能拿 Flash / Opus 当内外环。</p>
+  <div class="note">
+    <strong>纠正：</strong>
+    <span class="wrong">错误：同一圆环 outer=Flash、inner=Opus</span>
+    &nbsp;→&nbsp;
+    <strong>正确：</strong> [Flash 独立环] [Opus 独立环]
+    <br/>当前上游仅 per-model remainingFraction + resetTime；组内不做伪造 5h/7d 周期环。组值采用保守聚合 max(used)/min(remaining)。
+  </div>
+</header>
+
+<div class="controls">
+  <label>状态
+    <select id="state">
+      <option value="double">live · Flash+Opus 双独立环</option>
+      <option value="single-flash">live · 仅 Flash</option>
+      <option value="single-opus">live · 仅 Opus</option>
+      <option value="other">仅其他组 · 多模型</option>
+      <option value="loading">加载中</option>
+      <option value="stale">缓存过期（仍显示环）</option>
+      <option value="reauth">需登录</option>
+      <option value="noacc">无账号</option>
+      <option value="nousable">无可用额度</option>
+    </select>
+  </label>
+  <label>宽度
+    <select id="width">
+      <option value="100%">桌面</option>
+      <option value="640px">640</option>
+      <option value="375px">375</option>
+      <option value="320px">320</option>
+    </select>
+  </label>
+  <button type="button" id="toggle-expand">展开/折叠全部组</button>
+</div>
+
+<main id="frame" style="max-width:100%;margin:0 auto;">
+  <section class="stage">
+    <h2>Standalone 顶栏（Full）</h2>
+    <div class="topbar" id="topbar"></div>
+  </section>
+
+  <section class="stage">
+    <h2>Aggregate 第四列示意</h2>
+    <div class="agg" id="agg"></div>
+  </section>
+
+  <section class="stage">
+    <h2>额度详情（按组，非重复单模型）</h2>
+    <div id="badges"></div>
+    <div class="detail" id="detail"></div>
+  </section>
+
+  <section class="stage">
+    <h2>几何语义对照</h2>
+    <div class="compare">
+      <div class="card good">
+        <strong>正确 · 双独立环</strong>
+        <p class="muted">两个模型组 = 两个 ring 实例并排。每个环只有 1 层（除非同组内有可信周期证据）。</p>
+        <div class="rings" style="margin-top:8px;">
+          <div class="ring-slot"><div class="lbl">Flash</div><div class="ring" data-static="85" data-color="var(--accent)"></div><div class="val">85%</div></div>
+          <div class="ring-slot"><div class="lbl">Opus</div><div class="ring" data-static="12" data-color="var(--opus)"></div><div class="val">12%</div></div>
+        </div>
+      </div>
+      <div class="card bad">
+        <strong>错误 · 同心内外环表示两组</strong>
+        <p class="muted">内外层语义是周期，不是模型组。不要把 Opus 画成 Flash 的内环。</p>
+        <div style="margin-top:8px;font-size:28px;line-height:1;opacity:.85;">◎<span style="font-size:18px;position:relative;left:-18px;top:-2px;color:var(--opus)">○</span></div>
+        <p class="muted">outer=Flash / inner=Opus ← 禁止</p>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>审批材料：plan-review.md · 本原型仅示意，无真实 token/projectId。</footer>
+
+<script>
+const GROUPS = {
+  double: [
+    { id:'gemini-3-flash', label:'Gemini 3 Flash 组', short:'Flash', used:85, color:'var(--accent)', variants:[
+      {id:'gemini-3.5-flash', used:80, rem:20},
+      {id:'gemini-3-flash-agent', used:85, rem:15},
+      {id:'gemini-3.5-flash-low', used:72, rem:28},
+    ]},
+    { id:'claude-opus', label:'Claude Opus 组', short:'Opus', used:12, color:'var(--opus)', variants:[
+      {id:'claude-opus-4-6-thinking', used:12, rem:88},
+      {id:'claude-opus-4-6', used:10, rem:90},
+    ]},
+    { id:'claude-sonnet', label:'Claude Sonnet 组', short:'Sonnet', used:40, color:'#38bdf8', variants:[
+      {id:'claude-sonnet-4-6', used:40, rem:60},
+    ]},
+  ],
+  'single-flash': [
+    { id:'gemini-3-flash', label:'Gemini 3 Flash 组', short:'Flash', used:63, color:'var(--accent)', variants:[
+      {id:'gemini-3-flash-agent', used:63, rem:37},
+    ]},
+  ],
+  'single-opus': [
+    { id:'claude-opus', label:'Claude Opus 组', short:'Opus', used:91, color:'var(--opus)', variants:[
+      {id:'claude-opus-4-6-thinking', used:91, rem:9},
+    ]},
+  ],
+  other: [
+    { id:'gemini-pro', label:'Gemini Pro 组', short:'Pro', used:55, color:'#34d399', variants:[
+      {id:'gemini-3.1-pro', used:55, rem:45},
+    ]},
+  ],
+};
+
+function ringSVG(percent, color) {
+  const p = Math.max(0, Math.min(100, percent));
+  const r = 15.5, c = 2 * Math.PI * r, dash = (p/100)*c;
+  return `<svg viewBox="0 0 40 40" aria-hidden="true">
+    <circle cx="20" cy="20" r="${r}" fill="none" stroke="rgba(148,163,184,.25)" stroke-width="4"/>
+    <circle cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="4"
+      stroke-linecap="round" stroke-dasharray="${dash} ${c-dash}"/>
+  </svg><span class="center">${Math.round(p)}%</span>`;
+}
+
+function paintStaticRings() {
+  document.querySelectorAll('.ring[data-static]').forEach(el => {
+    el.innerHTML = ringSVG(Number(el.dataset.static), el.dataset.color || 'var(--accent)');
+  });
+}
+
+function renderRingSlots(groups) {
+  const priority = groups.filter(g => g.id === 'gemini-3-flash' || g.id === 'claude-opus');
+  if (!priority.length) return `<span class="fallback">多模型</span>`;
+  return `<div class="rings">${priority.map(g => `
+    <div class="ring-slot" title="${g.label}（保守）已使用 ${g.used}%">
+      <div class="lbl">${g.short}</div>
+      <div class="ring">${ringSVG(g.used, g.color)}</div>
+      <div class="val">${g.used}%</div>
+    </div>`).join('')}</div>`;
+}
+
+function render() {
+  const state = document.getElementById('state').value;
+  const topbar = document.getElementById('topbar');
+  const agg = document.getElementById('agg');
+  const detail = document.getElementById('detail');
+  const badges = document.getElementById('badges');
+
+  let body = '';
+  let groups = [];
+  let badge = '';
+
+  if (state === 'loading') {
+    body = `<span class="provider">Antigravity</span><span class="fallback">加载中…</span>`;
+    badge = `<span class="badge">loading</span>`;
+  } else if (state === 'reauth') {
+    body = `<span class="provider">Antigravity</span><span class="fallback">需登录</span>`;
+    badge = `<span class="badge danger">reauth</span>`;
+  } else if (state === 'noacc') {
+    body = `<span class="provider">Antigravity</span><span class="fallback">登录</span>`;
+    badge = `<span class="badge">no account</span>`;
+  } else if (state === 'nousable') {
+    body = `<span class="provider">Antigravity</span><span class="fallback">无可用额度</span>`;
+    badge = `<span class="badge danger">no usable</span>`;
+  } else {
+    const key = state === 'stale' ? 'double' : state;
+    groups = GROUPS[key] || GROUPS.double;
+    body = `<span class="provider">Antigravity</span>${renderRingSlots(groups)}`;
+    if (state === 'stale') badge = `<span class="badge warn">缓存过期 · 组环仍显示</span>`;
+    else if (state === 'other') badge = `<span class="badge">仅其他组 · 无优先环</span>`;
+    else if (state === 'double') badge = `<span class="badge">dual-independent · 非 concentric</span>`;
+    else badge = `<span class="badge">single independent</span>`;
+  }
+
+  topbar.innerHTML = body;
+  badges.innerHTML = badge;
+
+  // aggregate columns
+  const cols = [
+    {name:'GPT', html:'<span class="muted">…</span>'},
+    {name:'Grok', html:'<span class="muted">…</span>'},
+    {name:'Kiro', html:'<span class="muted">…</span>'},
+    {name:'Antigravity', html: (state==='loading'||state==='reauth'||state==='noacc'||state==='nousable')
+      ? `<span class="fallback">${topbar.querySelector('.fallback')?.textContent||''}</span>`
+      : renderRingSlots(groups)},
+  ];
+  agg.innerHTML = cols.map(c => `<div class="col"><h3>${c.name}</h3>${c.html}</div>`).join('');
+
+  // detail groups
+  if (!groups.length) {
+    detail.innerHTML = `<p class="muted">此状态下不展示额度组列表（或需重新登录）。</p>`;
+    return;
+  }
+  detail.innerHTML = groups.map(g => `
+    <details class="group">
+      <summary>
+        <span>${g.label} <span class="muted">· 保守聚合</span></span>
+        <span class="group-meta">已用 ${g.used}% · 剩余 ${100-g.used}%</span>
+      </summary>
+      <div class="variants">
+        ${g.variants.map(v => `
+          <div class="variant">
+            <code>${v.id}</code>
+            <span>已用 ${v.used}% · 剩余 ${v.rem}%</span>
+          </div>`).join('')}
+      </div>
+    </details>`).join('');
+}
+
+document.getElementById('state').addEventListener('change', render);
+document.getElementById('width').addEventListener('change', (e) => {
+  document.getElementById('frame').style.maxWidth = e.target.value;
+});
+document.getElementById('toggle-expand').addEventListener('click', () => {
+  const all = [...document.querySelectorAll('details.group')];
+  const open = all.some(d => !d.open);
+  all.forEach(d => { d.open = open; });
+});
+paintStaticRings();
+render();
+</script>
+</body>
+</html>

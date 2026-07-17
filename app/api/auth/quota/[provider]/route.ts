@@ -1,7 +1,12 @@
 import { consumeOAuthAccountResetCredit, consumeOAuthProviderResetCredit, getOAuthAccountSubscriptionQuota, getOAuthProviderSubscriptionQuota } from "@/lib/subscription-quota";
 import { getGrokAccountSubscriptionQuota, getGrokActiveSubscriptionQuota, type GrokQuotaResultV1 } from "@/lib/grok-subscription-quota";
 import { getKiroAccountSubscriptionQuota, getKiroActiveSubscriptionQuota, type KiroQuotaResultV1 } from "@/lib/kiro-subscription-quota";
-import { GROK_CLI_PROVIDER_ID, KIRO_PROVIDER_ID } from "@/lib/oauth-account-providers";
+import {
+  getAntigravityAccountSubscriptionQuota,
+  getAntigravityActiveSubscriptionQuota,
+  type AntigravityQuotaResultV1,
+} from "@/lib/antigravity-subscription-quota";
+import { ANTIGRAVITY_PROVIDER_ID, GROK_CLI_PROVIDER_ID, KIRO_PROVIDER_ID } from "@/lib/oauth-account-providers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,6 +27,7 @@ function accountIdFromBody(body: unknown): string | null {
  * - openai-codex: 返回 ChatGPT Codex SubscriptionQuota。
  * - grok-cli: 返回 GrokQuotaResultV1（月度+可选周额度，缓存状态，安全投影）。
  * - kiro: 返回 KiroQuotaResultV1（GetUsageLimits buckets，缓存状态，安全投影）。
+ * - google-antigravity: 返回 AntigravityQuotaResultV1（按模型 remainingFraction，缓存状态，安全投影）。
  *
  * @param req 当前 HTTP 请求对象。
  * @param context Next.js 动态路由参数，包含 provider 标识。
@@ -69,6 +75,24 @@ export async function GET(
     });
   }
 
+  // ── Google Antigravity ─────────────────────────────────────────────────
+  if (provider === ANTIGRAVITY_PROVIDER_ID) {
+    const url = new URL(req.url);
+    const accountId = url.searchParams.get("accountId")?.trim();
+    const forceRefresh = url.searchParams.get("refresh") === "1";
+    const result: AntigravityQuotaResultV1 = accountId
+      ? await getAntigravityAccountSubscriptionQuota(accountId, { forceRefresh })
+      : await getAntigravityActiveSubscriptionQuota({ forceRefresh });
+    const status = result.success ? 200 : result.reauthRequired ? 401 : 502;
+    return new Response(JSON.stringify(result), {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
   // ── OpenAI Codex / other ───────────────────────────────────────────────
   const accountId = new URL(req.url).searchParams.get("accountId");
   const quota = accountId?.trim()
@@ -80,7 +104,7 @@ export async function GET(
 /**
  * 消耗一个 OAuth provider 的 Codex rate-limit reset credit 并刷新订阅额度。
  *
- * grok-cli / kiro 不支持 reset-credit 消费，POST 返回 405。
+ * grok-cli / kiro / google-antigravity 不支持 reset-credit 消费，POST 返回 405。
  *
  * @param req 当前 HTTP 请求对象，可包含可选 accountId。
  * @param context Next.js 动态路由参数，包含 provider 标识。
@@ -126,6 +150,34 @@ export async function POST(
         error: {
           code: "upstream" as const,
           message: "Kiro does not support reset-credit consumption. Use GET to view quota.",
+          retryable: false,
+        },
+      }),
+      {
+        status: 405,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
+
+  // google-antigravity does not support reset-credit consumption
+  if (provider === ANTIGRAVITY_PROVIDER_ID) {
+    return new Response(
+      JSON.stringify({
+        kind: "antigravity_subscription_quota",
+        schemaVersion: 1,
+        success: false,
+        provider: "google-antigravity",
+        accountId: "",
+        models: [],
+        cache: { state: "none", queriedAt: null, ageMs: null },
+        reauthRequired: false,
+        error: {
+          code: "upstream" as const,
+          message: "Antigravity does not support reset-credit consumption. Use GET to view quota.",
           retryable: false,
         },
       }),

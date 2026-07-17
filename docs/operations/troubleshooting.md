@@ -113,7 +113,7 @@ Bare HTTP status alone, fuzzy help text that merely mentions limit/rate, network
 
 1. Settings → Grok → turn off **明确限额或限流时自动切换可用账号**, or set `grok.autoFailover.enabled` to `false` in `pi-web.json`.
 2. Takes effect on the next turn; no restart required.
-3. ChatGPT/OpenCode Go failover state is independent (`__piChatGptFailover` / `__piOpencodeGoFailover` vs `__piGrokFailover`).
+3. ChatGPT/OpenCode Go/Kiro/Antigravity failover state is independent (`__piChatGptFailover` / `__piOpencodeGoFailover` / `__piKiroFailover` / `__piAntigravityFailover` vs `__piGrokFailover`).
 
 ### Fixed token bypass
 
@@ -148,16 +148,60 @@ Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independen
 ### Rollback / stop-bleed
 
 1. Settings → Usage: turn off **模型用量组件聚合** (`usage.providerPanelsAggregated=false`) to leave the aggregate path and restore standalone Full/Compact immediately; Compact preference is retained and re-applies. Optionally turn off **顶部额度组件简要显示** (`usage.providerPanelsCompact=false`). Settings → Kiro: turn off usage panel and auto-failover if needed.
-2. Provider-layer: remove Kiro from `webProviderExtensions()` and hide Kiro UI/API branches; Grok continues.
+2. Provider-layer: remove Kiro from `webProviderExtensions()` and hide Kiro UI/API branches; Grok/Antigravity continue.
 3. Keep `~/.pi/agent/auth-accounts/kiro/` credentials and `.quota-cache.json`; do not bulk-delete. Aggregate/compact flags never delete credentials or quota cache.
-4. Failover state is independent of GPT/Grok/OpenCode (`__piKiroFailover` vs `__piGrokFailover` / `__piChatGptFailover` / `__piOpencodeGoFailover`).
+4. Failover state is independent of GPT/Grok/OpenCode/Antigravity (`__piKiroFailover` vs `__piGrokFailover` / `__piChatGptFailover` / `__piOpencodeGoFailover` / `__piAntigravityFailover`).
+
+## Antigravity Provider, Per-Model Quota, Auto Failover & Top-bar
+
+Antigravity is a fixed Web provider (`@yofriadi/pi-antigravity-oauth@0.3.0` via jiti, provider id `google-antigravity`) with independent OAuth multi-account, fixed `fetchAvailableModels` per-model quota, and model-aware Path B auto-failover. It does **not** share Grok/Kiro classifier or quota modules and does **not** use `pi-antigravity-rotator`.
+
+### Antigravity missing from Models / Auth after cold start
+
+1. Confirm `@yofriadi/pi-antigravity-oauth@0.3.0` is installed and listed in `next.config.ts` `serverExternalPackages` with `jiti`.
+2. Confirm the process loaded `webProviderExtensions()` / `ensureWebProvidersBootstrapped()` — opening Chat is **not** required; cold `/api/models` and `/api/auth/providers` should list `google-antigravity`.
+3. If only Grok/Kiro appear, check server logs for a per-provider jiti load failure; an Antigravity load error must not take down the others.
+4. After any code path that calls bare `ModelRegistry.create/refresh`, migrate it to `createWebProviderAwareModelRegistry()` so refresh cannot drop fixed providers.
+5. OAuth callback must bind `127.0.0.1:51121` only. Web forces `PI_OAUTH_CALLBACK_HOST=127.0.0.1` before first package import; do not widen to non-loopback. Remote browsers use Models manual redirect-URL paste.
+
+### Quota shows unavailable / invalid project / reauth
+
+- Endpoint is only `POST https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels` with server-side `{"project":"<projectId>"}`. Arbitrary credential URLs/headers are rejected.
+- `remainingFraction` is remaining ratio; used percent is `100 × (1 − remaining)`. Invalid/missing remaining is rejected (never fake 0%).
+- Empty/malformed models map, invalid project (403), network/timeout project as unavailable/access denied/invalid project with fixed safe copy.
+- Stale cache may still render last-success model windows with a stale warning; **auto-failover candidates require fresh/live matching-model remaining > 0** (fail-closed on stale/unknown/reauth/unmapped).
+- 401: server force-refreshes the account token once and retries once. Persistent reauth surfaces “需登录” and blocks failover candidates.
+- Default project `rising-fact-p41fc` alone never proves the account/model is healthy.
+- Manual force refresh: Models/top-bar with `?refresh=1`.
+
+### Auto-failover does not switch
+
+1. Settings → Antigravity → enable **明确限额或限流时自动切换可用账号** (`antigravity.autoFailover.enabled`).
+2. Error must be explicit RESOURCE_EXHAUSTED / quota exhausted/exceeded / quota reset markers / rate_limit_exceeded / too many requests. Hard-negatives that **never** switch: bare 429 / `Cloud Code Assist API error (429)`, 401/403, auth/token/project, network/timeout/abort, 5xx/capacity, context/content/model.
+3. Need another account with readable credential and **fresh/live quota for the current public model’s accepted keys** (`remainingFraction > 0` via the fixed 0.3.0 mapping). Quota only on other models is not enough — including **same UI group** siblings (e.g. Opus 4.5 remaining does not prove Opus 4.6 usable). Failover is **not group-aware**; top-bar group remaining is display-only.
+4. Per-turn budget is 1 switch + 1 retry; concurrent sessions share `globalThis.__piAntigravityFailover` so only one real Activate occurs.
+
+### Top-bar shows two rings / one ring / “多模型”
+
+- **Two independent rings** (Flash | Opus side-by-side) when both priority groups have safe data. Each ring is a single-layer group unit with **conservative** max(used); they are **not** concentric period outer/inner layers.
+- **One independent ring** when only one priority group is present (do not invent a fake 0% sibling).
+- **“多模型/详情”** when no priority group is present but other groups/models have data, or loading/reauth/unavailable paths need safe copy. `resetTime` is display-only and never becomes duration evidence.
+- Do not invent a total/average percent across groups or models. Period multi-layer N-ring (5h/7d) is unrelated to Flash/Opus grouping.
+
+### Rollback / stop-bleed
+
+1. Settings → Antigravity: turn off usage panel and auto-failover. Settings → Usage: optionally turn off aggregate/compact.
+2. UI-only: stop multi `ringUnits` rendering and fall back to flat multi-model detail-only; group helpers may remain unused. Do not delete credentials/cache.
+3. Provider-layer: remove Antigravity from `webProviderExtensions()` and hide Antigravity UI/API branches; Grok/Kiro continue. When removing aggregate column 4, keep GPT→Grok→Kiro contract.
+4. Keep `~/.pi/agent/auth-accounts/google-antigravity/` credentials and `.quota-cache.json`; do not bulk-delete.
+5. Failover state is independent (`__piAntigravityFailover` vs Kiro/Grok/GPT/OpenCode).
 
 ### Compact top-bar looks wrong
 
 - Compact is **global** and **standalone-only**: one `usage.providerPanelsCompact` switch affects all enabled provider triggers together when aggregate is off.
 - When aggregate is on, Compact is disabled in Settings but its boolean is not rewritten; turn aggregate off to re-apply Compact.
-- Provider visibility remains independent (`chatgpt|grok|kiro.usagePanelEnabled`).
-- Host order is always GPT → Grok → Kiro inside a single `.app-top-usage-panel` with one right-padding reserve.
+- Provider visibility remains independent (`chatgpt|grok|kiro|antigravity.usagePanelEnabled`).
+- Host order is always GPT → Grok → Kiro → Antigravity inside a single `.app-top-usage-panel` with one right-padding reserve.
 - Standalone Full/Compact use shared N-ring (not text summary chips); click still opens the same detailed popover (refresh / Activate / Models recovery preserved).
 - Ring layout comes from actual account windows + shared projector (short→long outer→inner, center = outermost). Missing windows are not filled with empty 5h/7d/week/month tracks.
 
@@ -165,7 +209,7 @@ Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independen
 
 - Aggregate is **global**: `usage.providerPanelsAggregated` (default false). When true, AppShell mounts only `ProviderUsageAggregatePanel` — never CSS-hide standalone panels.
 - Open is hover/focus (not click-primary accordion). Leaving both trigger and panel schedules a fixed **220ms** close; Escape uses focus-suppression so restore focus does not instantly reopen.
-- Panel is non-accordion provider columns (1–3 desktop, ≤640px max 2, ≤420px single); there is no total ring/percent and no “refresh all”.
+- Panel is non-accordion provider columns (1–4 desktop in GPT→Grok→Kiro→Antigravity order, ≤640px max 2, ≤420px single); there is no total ring/percent and no “refresh all”.
 - Theme: panel/close/column/status colors must follow light/dark usage tokens (`--usage-panel-*` / status tokens in `app/globals.css`). Fixed night surfaces like `rgba(11,15,25,.98)` or `#1e293b` close buttons are regressions.
 - Ring sizes: aggregate trigger 30px; column-header rings target 40px (minimum 38px, not flex-shrunk below). Center text uses high-contrast tokens; outer unknown percent stays label + `—` (or same-bucket remaining) and never borrows an inner layer.
 - Network: each enabled provider should still own one accounts/quota client instance. If requests double, confirm aggregate/standalone JSX mutual exclusion and that disabled providers are not mounted.
@@ -177,8 +221,9 @@ Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independen
 - Outer = shortest **trusted** duration; center always follows final outer (`layers[0]` / `centerLayerId`).
 - Single window (e.g. GPT only-7d, Grok only-week, single unknown-duration) is a single ring with that window as center.
 - Multi-window unknown duration or same-duration ties stay in detail with “另有窗口仅在详情展示”; all-unknown multi shows no ring + safe “详情” fallback (not array-order center).
-- Duration evidence is only explicit positive duration or strict period tokens/labels (`5h`, `7d`, `weekly`, `90m`, …). `Limits`, `quota`, remaining, resetAt, resourceType, percent, provider name, and array/field/id order are **not** duration — Kiro must not treat `Limits` as 90d.
-- When live provider data cannot prove duration for multi-window accounts, detail-only degradation is correct; do not loosen evidence just to force multi-rings.
+- Antigravity is special: priority model **groups** render as **independent side-by-side rings** (Flash | Opus), not period concentric layers. Non-priority multi-model remains detail-only (“多模型”). `resetTime` is never duration evidence.
+- Duration evidence is only explicit positive duration or strict period tokens/labels (`5h`, `7d`, `weekly`, `90m`, …). `Limits`, `quota`, remaining, resetAt, resourceType, percent, provider name, and array/field/id order are **not** duration — Kiro must not treat `Limits` as 90d; Antigravity must not treat `resetTime` as duration.
+- When live provider data cannot prove duration for multi-window **period** accounts, detail-only degradation is correct; do not loosen evidence just to force multi-rings. Do not encode model groups as concentric period layers.
 
 
 ## YPI Studio DAG and Async Runs

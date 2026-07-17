@@ -3,24 +3,173 @@
  *
  * Every Web entrypoint that creates a ResourceLoader, calls
  * `createAgentSessionServices`, or bootstraps Auth/Models must include these
- * factories so dynamic providers (currently grok-cli and kiro) are consistently
- * registered in the process-global pi-ai OAuth registry and in each
- * ModelRegistry instance.
+ * factories so dynamic providers (currently grok-cli, kiro, and
+ * google-antigravity) are consistently registered in the process-global pi-ai
+ * OAuth registry and in each ModelRegistry instance.
  *
  * ## Invariant
  *
  * Any `ModelRegistry.create()` or `ModelRegistry.refresh()` call must be fed
  * through a path that loads these factories first; otherwise a cold
- * registry-reset can remove grok-cli / kiro from the global pi-ai provider set.
+ * registry-reset can remove grok-cli / kiro / google-antigravity from the
+ * global pi-ai provider set.
  */
 
+import { createRequire } from "node:module";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
 import type { ExtensionFactory, InlineExtension } from "@earendil-works/pi-coding-agent";
 
-// pi-grok-cli and pi-kiro-provider publish TypeScript source with ESM-style
-// `.js` specifiers. Loading them through jiti keeps the extensions in the
-// server runtime instead of asking Next/Turbopack to resolve their source
-// trees as application modules.
+// pi-grok-cli, pi-kiro-provider, and @yofriadi/pi-antigravity-oauth publish
+// TypeScript source with ESM-style `.js` / `.ts` specifiers. Loading them
+// through jiti keeps the extensions in the server runtime instead of asking
+// Next/Turbopack to resolve their source trees as application modules.
+
+/** Fixed Antigravity OAuth callback bind host (loopback only). */
+export const ANTIGRAVITY_OAUTH_CALLBACK_HOST = "127.0.0.1";
+
+/** Env var read by @yofriadi/pi-antigravity-oauth at module import time. */
+export const ANTIGRAVITY_OAUTH_CALLBACK_HOST_ENV = "PI_OAUTH_CALLBACK_HOST";
+
+/**
+ * Resolve the Antigravity OAuth callback host policy.
+ *
+ * Always returns loopback. Unset or non-loopback environment values must not
+ * widen the listener surface — the package captures this env var as a module
+ * constant on first import, so the Web loader forces the safe value first.
+ */
+export function resolveAntigravityOAuthCallbackHost(
+  _envValue?: string | undefined,
+): string {
+  return ANTIGRAVITY_OAUTH_CALLBACK_HOST;
+}
+
+/**
+ * Resolve the package's declared public Pi extension entry.
+ *
+ * `@yofriadi/pi-antigravity-oauth@0.3.0` ships TypeScript source without a
+ * package `main`/`exports` map; the only public entry is `pi.extensions[0]`.
+ * Never hardcode private package internals beyond that declared entry.
+ */
+function resolveAntigravityPackageJsonPath(): string {
+  const errors: string[] = [];
+  // Next/Turbopack can make import.meta.url resolve from a virtual module graph.
+  // Prefer package.json from process.cwd() and fall back to import.meta.url / cwd node_modules.
+  const resolvers: Array<() => string> = [
+    () => createRequire(join(process.cwd(), "package.json")).resolve("@yofriadi/pi-antigravity-oauth/package.json"),
+    () => createRequire(import.meta.url).resolve("@yofriadi/pi-antigravity-oauth/package.json"),
+    () => join(process.cwd(), "node_modules", "@yofriadi", "pi-antigravity-oauth", "package.json"),
+  ];
+  for (const resolve of resolvers) {
+    try {
+      const pkgJsonPath = resolve();
+      if (typeof pkgJsonPath === "string" && pkgJsonPath.length > 0 && existsSync(pkgJsonPath)) {
+        return pkgJsonPath;
+      }
+      errors.push(`resolved missing path: ${String(pkgJsonPath)}`);
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  throw new Error(
+    `Unable to resolve @yofriadi/pi-antigravity-oauth/package.json (${errors.join(" | ")})`,
+  );
+}
+
+export function resolveAntigravityPackageExtensionEntry(): string {
+  const pkgJsonPath = resolveAntigravityPackageJsonPath();
+  const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as {
+    pi?: { extensions?: unknown };
+  };
+  const entry = Array.isArray(pkg.pi?.extensions) ? pkg.pi.extensions[0] : null;
+  if (typeof entry !== "string" || entry.length === 0) {
+    throw new Error("@yofriadi/pi-antigravity-oauth did not declare a pi.extensions entry");
+  }
+  const absoluteEntry = join(dirname(pkgJsonPath), entry);
+  if (!existsSync(absoluteEntry)) {
+    throw new Error(`@yofriadi/pi-antigravity-oauth extension entry missing: ${absoluteEntry}`);
+  }
+  return absoluteEntry;
+}
+
+/** Specifiers tried by jiti after package entry resolution (package has no main/exports). */
+export function antigravityJitiImportCandidates(absoluteEntry: string): string[] {
+  const candidates = [
+    absoluteEntry,
+    isAbsolute(absoluteEntry) ? pathToFileURL(absoluteEntry).href : absoluteEntry,
+    // Package has no main/exports; the public TS entry is the only stable import path.
+    "@yofriadi/pi-antigravity-oauth/src/index.ts",
+  ];
+  return [...new Set(candidates.filter((value) => typeof value === "string" && value.length > 0))];
+}
+
+/**
+ * One-shot / single-flight loader for the Antigravity public extension factory.
+ *
+ * Forces `PI_OAUTH_CALLBACK_HOST=127.0.0.1` before the first jiti import so the
+ * package's import-time `CALLBACK_HOST` constant cannot bind a non-loopback
+ * interface. Concurrent callers share the same promise so env mutation stays
+ * consistent for the critical section.
+ */
+let _antigravityFactoryPromise: Promise<ExtensionFactory> | null = null;
+
+let _lastAntigravityLoadError: string | null = null;
+
+/** Last Antigravity jiti load error message (null when healthy). Diagnostics only. */
+export function getLastAntigravityProviderLoadError(): string | null {
+  return _lastAntigravityLoadError;
+}
+
+export function loadAntigravityExtensionFactory(): Promise<ExtensionFactory> {
+  if (_antigravityFactoryPromise) return _antigravityFactoryPromise;
+  const run = (async (): Promise<ExtensionFactory> => {
+    const envKey = ANTIGRAVITY_OAUTH_CALLBACK_HOST_ENV;
+    const previous = process.env[envKey];
+    process.env[envKey] = resolveAntigravityOAuthCallbackHost(previous);
+    try {
+      const entry = resolveAntigravityPackageExtensionEntry();
+      // Anchor jiti at the app package root so Next virtual import.meta.url cannot
+      // prevent resolving a source-only package that has no main/exports map.
+      const jiti = createJiti(join(process.cwd(), "package.json"), { interopDefault: true });
+      const candidates = antigravityJitiImportCandidates(entry);
+      const loadErrors: string[] = [];
+      for (const candidate of candidates) {
+        try {
+          const loaded = await jiti.import(candidate);
+          const factory = (loaded as { default?: ExtensionFactory }).default;
+          if (typeof factory !== "function") {
+            throw new Error("@yofriadi/pi-antigravity-oauth did not export an extension factory");
+          }
+          _lastAntigravityLoadError = null;
+          return factory;
+        } catch (err) {
+          loadErrors.push(`${candidate}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      throw new Error(
+        `Failed to jiti-import @yofriadi/pi-antigravity-oauth (${loadErrors.join(" | ")})`,
+      );
+    } finally {
+      // Module-level CALLBACK_HOST already captured the forced loopback value.
+      // Restore the process env so other code sees the pre-import value.
+      if (previous === undefined) delete process.env[envKey];
+      else process.env[envKey] = previous;
+    }
+  })();
+  // Single-flight: concurrent callers share this promise. On failure, clear so
+  // a later attempt can retry instead of permanently caching rejection.
+  _antigravityFactoryPromise = run.then(
+    (factory) => factory,
+    (err) => {
+      _antigravityFactoryPromise = null;
+      _lastAntigravityLoadError = err instanceof Error ? err.message : String(err);
+      throw err;
+    },
+  );
+  return _antigravityFactoryPromise;
+}
 
 /**
  * Named inline extension wrapping the pi-grok-cli default factory.
@@ -62,8 +211,36 @@ export const kiroProviderExtension: InlineExtension = {
       if (typeof factory !== "function") throw new Error("pi-kiro-provider did not export an extension factory");
       await factory(api);
     } catch {
-      // Best-effort per provider: a Kiro load failure must not block Grok or
-      // native providers. Models/Auth diagnostics surface the missing provider.
+      // Best-effort per provider: a Kiro load failure must not block Grok,
+      // Antigravity, or native providers. Models/Auth diagnostics surface the
+      // missing provider.
+    }
+  },
+};
+
+/**
+ * Named inline extension wrapping the @yofriadi/pi-antigravity-oauth default
+ * factory (provider id `google-antigravity`).
+ *
+ * Only the package's declared public Pi extension entry is loaded. Before the
+ * first jiti import, the loader forces OAuth callback bind host to loopback
+ * under a single-flight critical section. Remote Web users still use the
+ * existing manual redirect URL paste path when browser localhost is not the
+ * server.
+ */
+export const antigravityProviderExtension: InlineExtension = {
+  name: "@yofriadi/pi-antigravity-oauth",
+  factory: async (api) => {
+    try {
+      const factory = await loadAntigravityExtensionFactory();
+      await factory(api);
+    } catch (err) {
+      // Best-effort per provider: an Antigravity load failure must not block
+      // Grok, Kiro, or native providers. Log once-per-failure so silent Next
+      // resolution issues are visible in the server log.
+      const message = err instanceof Error ? err.message : String(err);
+      _lastAntigravityLoadError = message;
+      console.error("[pi-web] failed to load google-antigravity provider:", message);
     }
   },
 };
@@ -82,20 +259,20 @@ export const grokSessionAccountExtension: InlineExtension = {
 };
 
 /**
- * Fixed Web provider extension list (Grok + Kiro).
+ * Fixed Web provider extension list (Grok → Kiro → Antigravity).
  *
- * Always load both before any call-site `extra` factories so ModelRegistry
- * refresh cannot drop either provider from the process-global set.
+ * Always load all three before any call-site `extra` factories so ModelRegistry
+ * refresh cannot drop any fixed provider from the process-global set.
  */
 export function webProviderExtensions(): InlineExtension[] {
-  return [grokCliExtension, kiroProviderExtension];
+  return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension];
 }
 
 /**
  * Return the standard Web extension factory list with fixed providers prepended.
  *
- * Order: Grok → Kiro → `extra` factories (YPI Studio, Browser Share, Studio
- * child guard, etc.).
+ * Order: Grok → Kiro → Antigravity → `extra` factories (YPI Studio, Browser
+ * Share, Studio child guard, etc.).
  *
  * Main inference no longer injects a session-bound Authorization header;
  * Grok requests use the global Active account from auth.json, reloaded into
@@ -110,11 +287,11 @@ export function webExtensionFactories(extra: InlineExtension[] = []): InlineExte
 // ---------------------------------------------------------------------------
 
 /**
- * One-shot promise that ensures fixed Web providers (Grok + Kiro) are
- * registered in the process-global pi-ai OAuth/provider registry before any
- * standalone `ModelRegistry.create()` call. Without this, a cold
- * `ModelRegistry` that later calls `refresh()` can reset the global registry
- * and drop grok-cli / kiro.
+ * One-shot promise that ensures fixed Web providers (Grok + Kiro +
+ * Antigravity) are registered in the process-global pi-ai OAuth/provider
+ * registry before any standalone `ModelRegistry.create()` call. Without this,
+ * a cold `ModelRegistry` that later calls `refresh()` can reset the global
+ * registry and drop grok-cli / kiro / google-antigravity.
  *
  * This is intentionally lightweight: it creates a temporary services bundle
  * purely to trigger extension loading, then discards the services. The
@@ -156,7 +333,7 @@ async function _bootstrapWebProvidersOnce(): Promise<void> {
 
 /**
  * Create a ModelRegistry whose `refresh()` preserves fixed Web providers
- * (Grok + Kiro) in the global pi-ai provider set. Prefer
+ * (Grok + Kiro + Antigravity) in the global pi-ai provider set. Prefer
  * `createAgentSessionServices` with `webExtensionFactories()` for richer call
  * sites; use this helper only when you genuinely need a bare `ModelRegistry`
  * (e.g. when offline api-key management must not depend on a full

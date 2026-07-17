@@ -108,7 +108,7 @@ export const PROVIDER_USAGE_DETAIL_ONLY_NOTE = "另有窗口仅在详情展示";
 /** Short safe fallback when multi-window projection yields no ring. */
 export const PROVIDER_USAGE_DETAIL_ONLY_FALLBACK = "详情";
 
-export type ProviderUsageKey = "gpt" | "grok" | "kiro";
+export type ProviderUsageKey = "gpt" | "grok" | "kiro" | "antigravity";
 
 /** Aggregate risk channel (not a composite percent). */
 export type ProviderUsageRisk = "danger" | "warning" | "normal" | "muted";
@@ -119,16 +119,37 @@ export type ProviderUsageRisk = "danger" | "warning" | "normal" | "muted";
  */
 export interface ProviderUsageAggregateProjection {
   key: ProviderUsageKey;
-  label: "GPT" | "Grok" | "Kiro";
-  /** Display order among enabled providers (lower first; GPT→Grok→Kiro). */
+  label: "GPT" | "Grok" | "Kiro" | "Antigravity";
+  /** Display order among enabled providers (lower first; GPT→Grok→Kiro→Antigravity). */
   order: number;
   risk: ProviderUsageRisk;
   loading: boolean;
   ringUnit: ProviderUsageRingUnit | null;
-  /** Short fallback when ringUnit is null (login / reauth / error / unknown). */
+  /**
+   * Optional independent side-by-side ring units (model groups, not periods).
+   * When length > 1, Trigger/Aggregate render each unit separately — never pack
+   * them as concentric layers of one ProviderUsageRingUnit.
+   * Prefer this over ringUnit for multi-group providers (e.g. Antigravity Flash|Opus).
+   * Single-unit providers may omit this and keep ringUnit only.
+   */
+  ringUnits?: readonly ProviderUsageRingUnit[] | null;
+  /** Short fallback when ringUnit/ringUnits are empty (login / reauth / error / unknown). */
   fallback: string | null;
   /** Safe trigger segment title. */
   title: string;
+}
+
+/**
+ * Resolve independent ring units from an aggregate projection.
+ * Prefer ringUnits when present; fall back to single ringUnit for legacy adapters.
+ */
+export function resolveAggregateRingUnits(
+  projection: Pick<ProviderUsageAggregateProjection, "ringUnit" | "ringUnits">,
+): ProviderUsageRingUnit[] {
+  if (projection.ringUnits && projection.ringUnits.length > 0) {
+    return [...projection.ringUnits];
+  }
+  return projection.ringUnit ? [projection.ringUnit] : [];
 }
 
 /** Fixed grace delay before aggregate hover/focus close (ms). */
@@ -611,6 +632,7 @@ export const PROVIDER_USAGE_FORBIDDEN_PROJECTION_FIELDS = [
   "clientSecret",
   "access_token",
   "refresh_token",
+  "projectId",
   "rawError",
   "rawBody",
   "rawResponse",

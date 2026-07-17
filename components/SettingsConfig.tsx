@@ -12,6 +12,7 @@ import type {
   PiWebChatGptConfig,
   PiWebConfig,
   PiWebEditorConfig,
+  PiWebAntigravityConfig,
   PiWebGrokConfig,
   PiWebKiroConfig,
   PiWebOpencodeGoConfig,
@@ -90,7 +91,7 @@ const TEMPLATE_VARIABLES = [
   { token: "{yyyyMMdd-HHmmss}", description: "创建时刻，格式如 20260625-153012" },
 ];
 
-type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "grok" | "kiro" | "editor" | "trellis" | "diagnostics";
+type SettingsSection = "yolk" | "worktree" | "studio" | "usage" | "modelPrices" | "terminal" | "chatgpt" | "opencodeGo" | "grok" | "kiro" | "antigravity" | "editor" | "trellis" | "diagnostics";
 type StudioFocusMember = { id: string; name?: string };
 type SubagentThinkingOption = PiWebSubagentRunPolicy["thinking"];
 
@@ -764,6 +765,11 @@ function kiroConfigsEqual(a: PiWebKiroConfig | null, b: PiWebKiroConfig | null):
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function antigravityConfigsEqual(a: PiWebAntigravityConfig | null, b: PiWebAntigravityConfig | null): boolean {
+  if (!a || !b) return a === b;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function editorConfigsEqual(a: PiWebEditorConfig | null, b: PiWebEditorConfig | null): boolean {
   if (!a || !b) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);
@@ -817,6 +823,8 @@ export function SettingsConfig({
   const [savedGrok, setSavedGrok] = useState<PiWebGrokConfig | null>(null);
   const [kiro, setKiro] = useState<PiWebKiroConfig | null>(null);
   const [savedKiro, setSavedKiro] = useState<PiWebKiroConfig | null>(null);
+  const [antigravity, setAntigravity] = useState<PiWebAntigravityConfig | null>(null);
+  const [savedAntigravity, setSavedAntigravity] = useState<PiWebAntigravityConfig | null>(null);
   const [editor, setEditor] = useState<PiWebEditorConfig | null>(null);
   const [savedEditor, setSavedEditor] = useState<PiWebEditorConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -835,8 +843,8 @@ export function SettingsConfig({
 
 
   const dirty = useMemo(
-    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !grokConfigsEqual(grok, savedGrok) || !kiroConfigsEqual(kiro, savedKiro) || !editorConfigsEqual(editor, savedEditor),
-    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, grok, savedGrok, kiro, savedKiro, editor, savedEditor],
+    () => !yolkConfigsEqual(yolk, savedYolk) || !worktreeConfigsEqual(worktree, savedWorktree) || !trellisConfigsEqual(trellis, savedTrellis) || !studioConfigsEqual(studio, savedStudio) || !usageConfigsEqual(usage, savedUsage) || !terminalConfigsEqual(terminal, savedTerminal) || !chatGptConfigsEqual(chatgpt, savedChatgpt) || !opencodeGoConfigsEqual(opencodeGo, savedOpencodeGo) || !grokConfigsEqual(grok, savedGrok) || !kiroConfigsEqual(kiro, savedKiro) || !antigravityConfigsEqual(antigravity, savedAntigravity) || !editorConfigsEqual(editor, savedEditor),
+    [yolk, savedYolk, worktree, savedWorktree, trellis, savedTrellis, studio, savedStudio, usage, savedUsage, terminal, savedTerminal, chatgpt, savedChatgpt, opencodeGo, savedOpencodeGo, grok, savedGrok, kiro, savedKiro, antigravity, savedAntigravity, editor, savedEditor],
   );
 
   const loadConfig = useCallback(async (signal?: AbortSignal) => {
@@ -868,6 +876,8 @@ export function SettingsConfig({
       setSavedGrok(data.config.grok);
       setKiro(data.config.kiro);
       setSavedKiro(data.config.kiro);
+      setAntigravity(data.config.antigravity);
+      setSavedAntigravity(data.config.antigravity);
       setEditor(data.config.editor);
       setSavedEditor(data.config.editor);
       setConfigPath(data.path);
@@ -1135,6 +1145,11 @@ export function SettingsConfig({
     setNotice(null);
   }, []);
 
+  const updateAntigravity = useCallback((patch: Partial<PiWebAntigravityConfig>) => {
+    setAntigravity((prev) => prev ? { ...prev, ...patch } : prev);
+    setNotice(null);
+  }, []);
+
   const updateEditor = useCallback((patch: Partial<PiWebEditorConfig>) => {
     setEditor((prev) => prev ? { ...prev, ...patch } : prev);
     setNotice(null);
@@ -1324,6 +1339,8 @@ export function SettingsConfig({
     setSavedGrok(config.grok);
     setKiro(config.kiro);
     setSavedKiro(config.kiro);
+    setAntigravity(config.antigravity);
+    setSavedAntigravity(config.antigravity);
     setEditor(config.editor);
     setSavedEditor(config.editor);
     setConfigPath(path);
@@ -1332,7 +1349,7 @@ export function SettingsConfig({
   }, [onConfigChange]);
 
   const saveConfig = useCallback(async (successNotice?: string): Promise<boolean> => {
-    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor) return false;
+    if (!yolk || !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor) return false;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -1340,7 +1357,7 @@ export function SettingsConfig({
       const res = await fetch("/api/web-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, kiro, editor }),
+        body: JSON.stringify({ yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, kiro, antigravity, editor }),
       });
       const data = await res.json() as WebConfigResponse & { success?: boolean };
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -1353,10 +1370,10 @@ export function SettingsConfig({
     } finally {
       setSaving(false);
     }
-  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, kiro, editor]);
+  }, [applyLoadedConfig, yolk, worktree, trellis, studio, usage, terminal, chatgpt, opencodeGo, grok, kiro, antigravity, editor]);
 
   const handleSave = useCallback(async () => {
-    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Grok/Kiro/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
+    await saveConfig("设置已保存。蛋黄𝝅/Studio/Usage/ChatGPT/OpenCode Go/Grok/Kiro/Antigravity/Trellis/Editor 设置会立即生效，WorkTree 设置会用于下一次创建 New WorkTree。");
   }, [saveConfig]);
 
   const resetToDefaults = useCallback(() => {
@@ -1371,6 +1388,7 @@ export function SettingsConfig({
     setOpencodeGo(defaults.opencodeGo);
     setGrok(defaults.grok);
     setKiro(defaults.kiro);
+    setAntigravity(defaults.antigravity);
     setEditor(defaults.editor);
     setNotice("已在表单中恢复默认值，点击保存后会写入 pi-web.json。");
   }, [defaults]);
@@ -1509,6 +1527,7 @@ export function SettingsConfig({
             {renderSectionButton("opencodeGo", "OpenCode Go", "OpenCode Go 自动切换与账号管理")}
             {renderSectionButton("grok", "Grok", "Grok 全局 Active 与自动切号")}
             {renderSectionButton("kiro", "Kiro", "Kiro 全局 Active 与自动切号")}
+            {renderSectionButton("antigravity", "Antigravity", "Antigravity 全局 Active 与自动切号")}
             {renderSectionButton("editor", "Editor", "文件编辑器和快捷键")}
             {renderSectionButton("trellis", "Trellis", "Trellis 面板开关")}
             {renderSectionButton("diagnostics", "诊断", "内存诊断快照")}
@@ -1517,7 +1536,7 @@ export function SettingsConfig({
           <div style={{ padding: 18, overflow: "auto", flex: 1 }}>
             {loading ? (
               <div style={{ color: "var(--text-muted)", fontSize: 13 }}>正在加载设置…</div>
-            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && grok && kiro && editor ? (
+            ) : yolk && worktree && trellis && studio && usage && terminal && chatgpt && opencodeGo && grok && kiro && antigravity && editor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {error && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: 12, overflowWrap: "anywhere" }}>{error}</div>}
                 {notice && <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(37,99,235,0.12)", color: "var(--accent)", fontSize: 12, overflowWrap: "anywhere" }}>{notice}</div>}
@@ -1738,12 +1757,12 @@ export function SettingsConfig({
                     <div>
                       <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>顶部额度组件</h3>
                       <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-                        控制聊天顶栏用量悬浮小组件的全局展示形态。各提供商是否显示仍由 ChatGPT / Grok / Kiro 分节独立控制。
+                        控制聊天顶栏用量悬浮小组件的全局展示形态。各提供商是否显示仍由 ChatGPT / Grok / Kiro / Antigravity 分节独立控制。
                       </p>
                     </div>
                     <ToggleField
                       label="模型用量组件聚合"
-                      description="开启后，Chat 顶栏用一个聚合入口承载所有已启用的 GPT / Grok / Kiro 用量组件；关闭后恢复各提供商独立挂载。默认关闭。"
+                      description="开启后，Chat 顶栏用一个聚合入口承载所有已启用的 GPT / Grok / Kiro / Antigravity 用量组件；关闭后恢复各提供商独立挂载。默认关闭。"
                       checked={usage.providerPanelsAggregated}
                       onChange={(providerPanelsAggregated) => updateUsage({ providerPanelsAggregated })}
                     />
@@ -1751,7 +1770,7 @@ export function SettingsConfig({
                       label="顶部额度组件简要显示 (Compact Mode)"
                       description={usage.providerPanelsAggregated
                         ? "聚合开启时 Compact 不参与呈现；当前勾选值会保留，关闭聚合后恢复生效。"
-                        : "开启后，GPT、Grok、Kiro 顶栏的 Trigger 使用更紧凑的 N-ring 用量单元，从而给顶栏留出更多空间。点击简要 Pill 仍能展开完整的详细用量面板。"}
+                        : "开启后，GPT、Grok、Kiro、Antigravity 顶栏的 Trigger 使用更紧凑的 N-ring 用量单元，从而给顶栏留出更多空间。点击简要 Pill 仍能展开完整的详细用量面板。"}
                       checked={usage.providerPanelsCompact}
                       onChange={(providerPanelsCompact) => updateUsage({ providerPanelsCompact })}
                       disabled={usage.providerPanelsAggregated}
@@ -2078,6 +2097,41 @@ export function SettingsConfig({
                     />
                     <div style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text-dim)", fontSize: 11, lineHeight: 1.5 }}>
                       候选账号需要有效凭证且无需 reauth，并具备 fresh/live 的 primary 额度 remaining &gt; 0。额度未知或仅 stale 时不会作为自动切号候选。全局顶部简要显示开关在 Usage 分节统一配置。
+                    </div>
+                  </div>
+                ) : section === "antigravity" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "var(--text)", fontSize: 15 }}>Antigravity</h3>
+                      <p style={{ margin: "5px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+                        控制 Antigravity 全局 Active 账号的自动轮换与顶栏用量组件。Models 的 Activate 只设置当前全局 Active，不属于锁定；账号管理仍在 Models 中完成。
+                        保存到 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text)", overflowWrap: "anywhere" }}>{configPath}</code>
+                        {exists ? "" : "（保存时会自动创建）"}
+                      </p>
+                    </div>
+                    <ToggleField
+                      label="显示 Antigravity 用量悬浮面板"
+                      description="默认关闭。开启后，将在顶栏提供独立的用量环、多模型额度列与详细配额信息展示；展开后可查看按模型剩余/已用比例、缓存状态、手动刷新并切换账号。"
+                      checked={antigravity.usagePanelEnabled}
+                      onChange={(usagePanelEnabled) => updateAntigravity({ usagePanelEnabled })}
+                    />
+                    <ToggleField
+                      label="明确限额或限流时自动切换可用账号"
+                      description="默认关闭。开启后仅对 google-antigravity 生效：当错误明确识别为 RESOURCE_EXHAUSTED、quota exhausted/exceeded、quotaResetDelay/TimeStamp、rate_limit_exceeded 或 too many requests 时，系统会在进程锁保护内自动切换到其余有效备用账号，并安全重试当前 turn 一次。未知/陈旧/无效 project/无法映射当前模型触发 Fail-closed，不会被盲切。裸 429、网络错误、timeout、5xx、auth/reauth、project invalid、context、content、model 错误不会触发。切换影响所有普通 live/new Session 的后续请求；已发出的 in-flight 请求不换 token。每 turn 默认最多 1 次切号 / 1 次重试；并发时后进入者复用新 Active，不级联切第三账号。"
+                      checked={antigravity.autoFailover.enabled}
+                      onChange={(enabled) => updateAntigravity({ autoFailover: { ...antigravity.autoFailover, enabled } })}
+                    />
+                    <div style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      border: "1px solid color-mix(in srgb, var(--warning, #d97706) 35%, var(--border))",
+                      background: "color-mix(in srgb, var(--warning, #d97706) 12%, var(--bg-subtle))",
+                      color: "var(--text-muted)",
+                      fontSize: 11,
+                      lineHeight: 1.5,
+                    }}>
+                      <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Fail-closed 降级与安全设计说明</div>
+                      自动切号对模型感知 (Model-aware)。候选账号必须具有当前请求模型的 fresh/live 且 remainingFraction &gt; 0 额度；若仅其他模型有额度、或对应配额状态过期 (stale) / 无法识别 (unknown)，切号模块将安全阻断 (fail-closed) 以防产生盲切或 token 损耗。该通道为非官方 Cloud Code/Antigravity 路径，OAuth 可能包含 GCP cloud-platform 等宽 scope；全局顶部简要显示开关在 Usage 分节统一配置。
                     </div>
                   </div>
                 ) : section === "editor" ? (
@@ -2485,8 +2539,8 @@ export function SettingsConfig({
             </button>
             <button
               onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {saving ? "正在保存…" : "保存"}
             </button>

@@ -5,7 +5,7 @@ import type { SlashCommandEntry } from "@/app/api/commands/route";
 import type { AttachedFile } from "@/lib/types";
 import { encodeFilePathForApi, getFileName, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 import { buildTrellisTaskResumePrompt, type TrellisTaskChatContext } from "@/lib/trellis-chat-context";
-import type { GrokFailoverNotice, KiroFailoverNotice, OpencodeGoFailoverNotice } from "@/hooks/useAgentSession";
+import type { AntigravityFailoverNotice, GrokFailoverNotice, KiroFailoverNotice, OpencodeGoFailoverNotice } from "@/hooks/useAgentSession";
 import { ModelSelect, type ModelSelectOption } from "./ModelSelect";
 import { SelectDropdown, type SelectDropdownOption } from "./SelectDropdown";
 import { ActionFlowIcon } from "./ActionFlowIcon";
@@ -52,6 +52,7 @@ interface Props {
   opencodeGoFailoverNotice?: OpencodeGoFailoverNotice | null;
   grokFailoverNotice?: GrokFailoverNotice | null;
   kiroFailoverNotice?: KiroFailoverNotice | null;
+  antigravityFailoverNotice?: AntigravityFailoverNotice | null;
   soundEnabled?: boolean;
   onSoundToggle?: () => void;
   autoScrollEnabled?: boolean;
@@ -409,6 +410,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   opencodeGoFailoverNotice,
   grokFailoverNotice,
   kiroFailoverNotice,
+  antigravityFailoverNotice,
   soundEnabled, onSoundToggle,
   autoScrollEnabled, onAutoScrollToggle,
 }: Props, ref) {
@@ -1249,6 +1251,40 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </svg>
               <span>
                 {kiroFailoverNotice.retrying ? `Retrying… — ${kiroFailoverNotice.message}` : kiroFailoverNotice.message}
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Antigravity global Active failover notice — terminal statuses must not claim Retrying */}
+        {antigravityFailoverNotice && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              marginBottom: 8, padding: "6px 10px",
+              background: antigravityFailoverNotice.retrying ? "rgba(234,179,8,0.08)" : "rgba(37,99,235,0.06)",
+              border: antigravityFailoverNotice.retrying ? "1px solid rgba(234,179,8,0.25)" : "1px solid rgba(37,99,235,0.2)",
+              borderRadius: 6, fontSize: 12, color: "var(--text)",
+              display: "flex", flexDirection: "column", gap: 4,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.75 }}>
+                {antigravityFailoverNotice.retrying ? (
+                  <>
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </>
+                ) : (
+                  <>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </>
+                )}
+              </svg>
+              <span>
+                {antigravityFailoverNotice.retrying ? `Retrying… — ${antigravityFailoverNotice.message}` : antigravityFailoverNotice.message}
               </span>
             </div>
           </div>

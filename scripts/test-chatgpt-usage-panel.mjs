@@ -72,7 +72,7 @@ await test("Models English tier labels stay 5h/7d", () => {
 
 await test("GPT Chinese compact/panel tier labels keep real windows", () => {
   assert.equal(GPT_QUOTA_TIER_COMPACT_LABELS.five_hour, "5 小时");
-  assert.equal(GPT_QUOTA_TIER_COMPACT_LABELS.seven_day, "周");
+  assert.equal(GPT_QUOTA_TIER_COMPACT_LABELS.seven_day, "7d");
   assert.equal(GPT_QUOTA_TIER_PANEL_LABELS.five_hour, "5 小时额度");
   assert.equal(GPT_QUOTA_TIER_PANEL_LABELS.seven_day, "7 天额度");
   assert.equal(Object.keys(GPT_QUOTA_TIER_COMPACT_LABELS).includes("month"), false);
@@ -264,7 +264,7 @@ await test("GPT N-ring adapter: actual tiers → projector, outer shortest / cen
       }
       return {
         id: "gpt-week",
-        shortLabel: "周",
+        shortLabel: "7d",
         fullLabel: GPT_QUOTA_TIER_PANEL_LABELS.seven_day,
         percent,
         title: percent === null ? "7 天额度未知" : `周额度已使用 ${Math.round(percent)}%`,
@@ -375,7 +375,8 @@ await test("ChatGptUsagePanel uses ringUnit, aggregate presentation, no compact 
   assert.match(panel, /ringUnit=\{ringUnit\}/);
   assert.match(panel, /gpt-week/);
   assert.match(panel, /gpt-5h/);
-  assert.match(panel, /["']周["']/);
+  assert.match(panel, /["']7d["']/);
+  assert.match(panel, /周额度|7 天额度/);
   assert.match(panel, /["']5h["']/);
   // No fixed [5h,7d] push order in adapter.
   assert.doesNotMatch(panel, /hasFiveHour[\s\S]{0,120}layers\.push/);

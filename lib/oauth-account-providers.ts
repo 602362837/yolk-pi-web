@@ -15,6 +15,7 @@ import { convertOAuthAccountCredentialWithWarnings, type OAuthAccountImportMode 
 export const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
 export const GROK_CLI_PROVIDER_ID = "grok-cli";
 export const KIRO_PROVIDER_ID = "kiro";
+export const ANTIGRAVITY_PROVIDER_ID = "google-antigravity";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -338,12 +339,67 @@ export const kiroAdapter: OAuthAccountProviderAdapter = {
   maskAccountId,
 };
 
+// ─── Antigravity Adapter ─────────────────────────────────────────────────────
+
+function isAntigravityCredential(value: unknown): boolean {
+  // Antigravity credentials from @yofriadi/pi-antigravity-oauth require
+  // access / refresh / projectId / finite expires. Optional email and future
+  // unknown fields may exist in the secret file only. No type:"oauth" sentinel.
+  return isRecord(value)
+    && isNonEmptyString(value.access)
+    && isNonEmptyString(value.refresh)
+    && isNonEmptyString(value.projectId)
+    && typeof value.expires === "number"
+    && Number.isFinite(value.expires);
+}
+
+function deriveAntigravityRealAccountId(credential: Record<string, unknown>): string {
+  // Hash the refresh token for diagnostics only; never use projectId as an id.
+  // Filesystem keys remain random opaque storage ids.
+  const refresh = typeof credential.refresh === "string" ? credential.refresh : "";
+  const hash = createHash("sha256").update(refresh).digest("hex").slice(0, 16);
+  return `antigravity-${hash}`;
+}
+
+function deriveAntigravityDisplayHint(credential: Record<string, unknown>): string | null {
+  // Prefer explicit safe email from credential, then JWT claims. Never return
+  // projectId, tokens, refresh, or raw upstream fields.
+  if (isNonEmptyString(credential.email)) {
+    const email = normalizeEmail(credential.email);
+    if (email) return email;
+  }
+  if (typeof credential.access === "string") {
+    const claims = decodeJwtPayload(credential.access);
+    if (claims) {
+      const email = typeof claims.email === "string" ? claims.email.trim() || null : null;
+      if (email) return email;
+      const name = typeof claims.name === "string" ? claims.name.trim() || null : null;
+      if (name) return name;
+    }
+  }
+  return null;
+}
+
+export const antigravityAdapter: OAuthAccountProviderAdapter = {
+  id: ANTIGRAVITY_PROVIDER_ID,
+  displayName: "Antigravity (Gemini 3, Claude, GPT-OSS)",
+  isCredential: isAntigravityCredential,
+  deriveRealAccountId: deriveAntigravityRealAccountId,
+  deriveDisplayHint: deriveAntigravityDisplayHint,
+  supportsCredentialImport: false,
+  normalizeImportCredential() {
+    throw new Error("Credential import is not supported for google-antigravity. Use OAuth login instead.");
+  },
+  maskAccountId,
+};
+
 // ─── Adapter Registry ────────────────────────────────────────────────────────
 
 const adapters = new Map<string, OAuthAccountProviderAdapter>([
   [OPENAI_CODEX_PROVIDER_ID, openAICodexAdapter],
   [GROK_CLI_PROVIDER_ID, grokCliAdapter],
   [KIRO_PROVIDER_ID, kiroAdapter],
+  [ANTIGRAVITY_PROVIDER_ID, antigravityAdapter],
 ]);
 
 /**

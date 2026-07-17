@@ -305,7 +305,10 @@ try {
     assert.match(settings, /providerPanelsCompact/);
     assert.match(settings, /providerPanelsAggregated/);
     assert.match(settings, /updateKiro/);
-    assert.match(settings, /kiro,\s*editor/);
+    // Antigravity may sit between Kiro and Editor as a peer section.
+    assert.match(settings, /kiro(?:\s*,\s*antigravity)?\s*,\s*editor/);
+    assert.match(settings, /ChatGPT \/ Grok \/ Kiro/);
+    assert.match(settings, /GPT(?:、|,)\s*Grok(?:、|,)\s*Kiro/);
 
     // Compact/aggregate must live in the Usage section, not be duplicated under Kiro.
     const usageSectionStart = settings.indexOf('section === "usage"');

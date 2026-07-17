@@ -6,6 +6,7 @@ import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, convertOAuthAccountC
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay } from "@/lib/quota-display";
 import { ActionFlowIcon } from "./ActionFlowIcon";
 import { ChatGptWarmupDialog } from "./ChatGptWarmupDialog";
+import { AntigravityQuotaView } from "./AntigravityQuotaView";
 import { GrokQuotaView } from "./GrokQuotaView";
 import { KiroQuotaView } from "./KiroQuotaView";
 import { iconFlowAttrs } from "./iconFlow";
@@ -91,6 +92,7 @@ const PROVIDER_ICONS: Record<string, { Icon: IconComponent; hasColor: boolean }>
   "grok":                   { Icon: GrokIcon,             hasColor: false },
   "grok-cli":               { Icon: GrokIcon,             hasColor: false },
   "kiro":                   { Icon: AwsColorIcon,         hasColor: true },
+  "google-antigravity":     { Icon: GoogleColorIcon,      hasColor: true },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1537,19 +1539,21 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const isManagedAccounts = provider.authMode === "managed_accounts";
   const isGrok = provider.id === "grok-cli";
   const isKiro = provider.id === "kiro";
+  const isAntigravity = provider.id === "google-antigravity";
   const isCodex = provider.id === "openai-codex";
-  // Capability-driven OAuth branches (avoid cloning a second Grok-only tree for Kiro).
-  const supportsGlobalActiveSemantics = isGrok || isKiro;
+  // Capability-driven OAuth branches (avoid cloning disconnected trees per provider).
+  const supportsGlobalActiveSemantics = isGrok || isKiro || isAntigravity;
   const supportsOAuthMethodPicker = isGrok || isKiro;
-  const supportsProtectedDelete = isGrok || isKiro;
-  const hideCodexQuotaSummary = isGrok || isKiro;
+  const supportsProtectedDelete = isGrok || isKiro || isAntigravity;
+  const hideCodexQuotaSummary = isGrok || isKiro || isAntigravity;
 
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
   const [inputValue, setInputValue] = useState("");
-  // Shared quota state — Codex uses SubscriptionQuota; Grok/Kiro use provider-specific V1 results
+  // Shared quota state — Codex uses SubscriptionQuota; Grok/Kiro/Antigravity use provider-specific V1 results
   const [quota, setQuota] = useState<SubscriptionQuota | null>(null);
   const [grokQuota, setGrokQuota] = useState<import("@/lib/grok-subscription-quota").GrokQuotaResultV1 | null>(null);
   const [kiroQuota, setKiroQuota] = useState<import("@/lib/kiro-subscription-quota").KiroQuotaResultV1 | null>(null);
+  const [antigravityQuota, setAntigravityQuota] = useState<import("@/lib/antigravity-subscription-quota").AntigravityQuotaResultV1 | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
   const [quotaResetting, setQuotaResetting] = useState(false);
   const [accounts, setAccounts] = useState<OAuthAccountSummary[]>([]);
@@ -1568,11 +1572,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [showLoginMethods, setShowLoginMethods] = useState(false);
   // Preferred Kiro method id to auto-answer the provider's onSelect prompt
   const preferredKiroMethodRef = useRef<"builder-id" | "google" | "github" | null>(null);
-  // Protected delete dialog states (Grok / Kiro Active protection)
+  // Protected delete dialog states (Grok / Kiro / Antigravity Active protection)
   const [protectedDeleteAccount, setProtectedDeleteAccount] = useState<OAuthAccountSummary | null>(null);
   const [protectedDeleteDeleting, setProtectedDeleteDeleting] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Antigravity quota race guards — clear old data and reject stale responses on account switch.
+  const antigravityQuotaAbortRef = useRef<AbortController | null>(null);
+  const antigravityQuotaGenerationRef = useRef(0);
 
   useEffect(() => {
     if (loginState.phase === "auth" || loginState.phase === "prompt") {
@@ -1587,6 +1594,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setQuota(null);
     setGrokQuota(null);
     setKiroQuota(null);
+    setAntigravityQuota(null);
     setQuotaLoading(false);
     setQuotaResetting(false);
     setAccounts([]);
@@ -1607,10 +1615,16 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setProtectedDeleteDeleting(false);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
+    antigravityQuotaAbortRef.current?.abort();
+    antigravityQuotaAbortRef.current = null;
+    antigravityQuotaGenerationRef.current += 1;
   }, [provider.id]);
 
   useEffect(() => {
-    return () => { eventSourceRef.current?.close(); };
+    return () => {
+      eventSourceRef.current?.close();
+      antigravityQuotaAbortRef.current?.abort();
+    };
   }, []);
 
   const loadAccounts = useCallback(async () => {
@@ -1713,6 +1727,43 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isKiro, accounts.length]);
 
+  // Antigravity quota loader — fetchAvailableModels projection only (no secrets/raw body/projectId)
+  const loadAntigravityQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
+    if (!isAntigravity || (!provider.loggedIn && !force && accounts.length === 0)) return;
+    const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
+    const generation = ++antigravityQuotaGenerationRef.current;
+    antigravityQuotaAbortRef.current?.abort();
+    const controller = new AbortController();
+    antigravityQuotaAbortRef.current = controller;
+    // Immediately clear previous-account quota so stale values cannot flash.
+    setAntigravityQuota(null);
+    setQuotaLoading(true);
+    try {
+      const refreshParam = force ? "&refresh=1" : "";
+      const accountQuery = quotaAccountId
+        ? `?accountId=${encodeURIComponent(quotaAccountId)}${refreshParam}`
+        : refreshParam
+          ? `?refresh=1`
+          : "";
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`, {
+        signal: controller.signal,
+      });
+      const data = await res.json() as import("@/lib/antigravity-subscription-quota").AntigravityQuotaResultV1;
+      if (generation !== antigravityQuotaGenerationRef.current) return;
+      if (quotaAccountId && data.accountId && data.accountId !== quotaAccountId) return;
+      setAntigravityQuota(data);
+      void loadAccounts();
+    } catch (error) {
+      if (controller.signal.aborted || generation !== antigravityQuotaGenerationRef.current) return;
+      setAntigravityQuota(null);
+      setAccountsError(error instanceof Error ? error.message : "Failed to load Antigravity quota");
+    } finally {
+      if (generation === antigravityQuotaGenerationRef.current) {
+        setQuotaLoading(false);
+      }
+    }
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isAntigravity, accounts.length]);
+
   useEffect(() => {
     if (provider.id === "openai-codex" && provider.loggedIn) {
       void loadQuota();
@@ -1730,6 +1781,12 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       void loadKiroQuota();
     }
   }, [provider.id, provider.loggedIn, isKiro, loadKiroQuota, accounts.length]);
+
+  useEffect(() => {
+    if (isAntigravity && (provider.loggedIn || accounts.length > 0)) {
+      void loadAntigravityQuota();
+    }
+  }, [provider.id, provider.loggedIn, isAntigravity, loadAntigravityQuota, accounts.length]);
 
   const handleLogin = useCallback((accountMode: "login" | "add" = "login") => {
     eventSourceRef.current?.close();
@@ -1793,6 +1850,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         void loadAccounts();
         if (isGrok) void loadGrokQuota(true);
         else if (isKiro) void loadKiroQuota(true);
+        else if (isAntigravity) void loadAntigravityQuota(true);
         else if (provider.loggedIn) void loadQuota();
       } else if (data.type === "error") {
         es.close();
@@ -1806,7 +1864,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       es.close();
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "Connection lost" });
     };
-  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, loadKiroQuota, isGrok, isKiro]);
+  }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
 
   const handleLogout = useCallback(async () => {
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
@@ -1814,6 +1872,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setQuota(null);
     setGrokQuota(null);
     setKiroQuota(null);
+    setAntigravityQuota(null);
+    antigravityQuotaAbortRef.current?.abort();
+    antigravityQuotaGenerationRef.current += 1;
     setSelectedQuotaAccountId(null);
     onRefresh();
     void loadAccounts();
@@ -1861,8 +1922,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setSelectedQuotaAccountId(account.accountId);
     if (isGrok) void loadGrokQuota(true, account.accountId);
     else if (isKiro) void loadKiroQuota(true, account.accountId);
+    else if (isAntigravity) void loadAntigravityQuota(true, account.accountId);
     else void loadQuota(true, account.accountId);
-  }, [loadQuota, loadGrokQuota, loadKiroQuota, isGrok, isKiro]);
+  }, [loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
 
   const handleActivateAccount = useCallback(async (accountId: string) => {
     setActivatingAccountId(accountId);
@@ -1881,6 +1943,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       onRefresh();
       if (isGrok) await loadGrokQuota(true, accountId);
       else if (isKiro) await loadKiroQuota(true, accountId);
+      else if (isAntigravity) await loadAntigravityQuota(true, accountId);
       else await loadQuota(true, accountId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to activate account";
@@ -1889,7 +1952,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setActivatingAccountId(null);
     }
-  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, loadKiroQuota, isGrok, isKiro]);
+  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
 
   const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
     const nextLabel = await prompt({
@@ -1987,6 +2050,35 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           phase: data.success ? "success" : "error",
           message: data.success ? "Account quota refreshed." : (safeMessage ?? "Quota query failed."),
         });
+      } else if (isAntigravity) {
+        const data = await res.json().catch(() => ({})) as import("@/lib/antigravity-subscription-quota").AntigravityQuotaResultV1;
+        // Prefer fixed allowlisted codes over raw upstream messages / projectId.
+        const safeMessage = data.error
+          ? (data.error.code === "unauthorized"
+            ? "Antigravity 登录已失效，需要重新登录。"
+            : data.error.code === "invalid_project"
+              ? "当前账号的 Google Cloud Code 项目不可用或无访问权限。"
+              : data.error.code === "access_denied"
+                ? "当前账号无权查询额度。"
+                : data.error.code === "rate_limited"
+                  ? "额度服务暂时限流。请稍后重试。"
+                  : data.error.code === "invalid_payload"
+                    ? "额度服务返回了无法识别的数据。"
+                    : data.success
+                      ? "额度刷新失败，正在展示上次成功数据。"
+                      : "额度暂不可用。请稍后重试。")
+          : null;
+        if (!res.ok && !data.success && !data.models?.length) {
+          throw new Error(safeMessage ?? `HTTP ${res.status}`);
+        }
+        if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) {
+          if (!data.accountId || data.accountId === account.accountId) setAntigravityQuota(data);
+        }
+        await loadAccounts();
+        setLoginState({
+          phase: data.success ? "success" : "error",
+          message: data.success ? "Account quota refreshed." : (safeMessage ?? "Quota query failed."),
+        });
       } else {
         const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
         if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -2001,7 +2093,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setRefreshingQuotaAccountId(null);
     }
-  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok, isKiro]);
+  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok, isKiro, isAntigravity]);
 
   const handleResetQuota = useCallback(async () => {
     const quotaAccountId = selectedQuotaAccountId;
@@ -2073,6 +2165,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       else if (selectedQuotaAccountId === protectedDeleteAccount.accountId) setSelectedQuotaAccountId(null);
       if (isKiro && selectedQuotaAccountId === protectedDeleteAccount.accountId) setKiroQuota(null);
       if (isGrok && selectedQuotaAccountId === protectedDeleteAccount.accountId) setGrokQuota(null);
+      if (isAntigravity && selectedQuotaAccountId === protectedDeleteAccount.accountId) {
+        setAntigravityQuota(null);
+        antigravityQuotaAbortRef.current?.abort();
+        antigravityQuotaGenerationRef.current += 1;
+      }
       setLoginState({ phase: "success", message: "Account deleted." });
       setProtectedDeleteAccount(null);
       onRefresh();
@@ -2082,7 +2179,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } finally {
       setProtectedDeleteDeleting(false);
     }
-  }, [protectedDeleteAccount, accounts, provider.id, selectedQuotaAccountId, isGrok, isKiro, onRefresh]);
+  }, [protectedDeleteAccount, accounts, provider.id, selectedQuotaAccountId, isGrok, isKiro, isAntigravity, onRefresh]);
 
   const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
     if (supportsProtectedDelete) {
@@ -2162,7 +2259,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         </div>
       </div>
 
-      {/* Active semantics for Grok / Kiro */}
+      {/* Active semantics for Grok / Kiro / Antigravity */}
       {supportsGlobalActiveSemantics && (
         <div style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-panel)", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", lineHeight: 1.5 }}>
           <strong style={{ color: "var(--text)" }}>账号激活说明：</strong>
@@ -2170,9 +2267,23 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             ? <>
                 Activate 只设置 Kiro 的<strong>全局当前 Active</strong>，不属于锁定。切换将作用于所有 live/new Session 后续请求，in-flight 请求不换 Token。若已开启 Settings 中的自动切号，额度不足时会自动切换到其他有效备用账号。
               </>
-            : <>
-                Activate 只设置 Grok 的<strong>全局当前 Active</strong>，不是锁定账号。切换后，所有普通运行中 Session 和新 Session 的<strong>后续请求</strong>都会使用该账号；已经发出的 in-flight 请求不会中途更换 token。手动 Active 的账号若返回明确限额或限流，且 Settings 中开启了自动切号，仍会自动轮换到可用账号并重试。
-              </>}
+            : isAntigravity
+              ? <>
+                  Activate 只设置 Antigravity 的<strong>全局当前 Active</strong>，不是锁定账号。切换后作用于所有 live/new Session 的后续请求；已经发出的 in-flight 请求不会中途更换 token。自动切号默认关闭，且必须对当前请求模型具备 fresh/live 可用额度，否则 fail-closed。
+                </>
+              : <>
+                  Activate 只设置 Grok 的<strong>全局当前 Active</strong>，不是锁定账号。切换后，所有普通运行中 Session 和新 Session 的<strong>后续请求</strong>都会使用该账号；已经发出的 in-flight 请求不会中途更换 token。手动 Active 的账号若返回明确限额或限流，且 Settings 中开启了自动切号，仍会自动轮换到可用账号并重试。
+                </>}
+        </div>
+      )}
+
+      {/* Antigravity non-official channel / wide-scope disclosure (approved prototype) */}
+      {isAntigravity && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)", background: "rgba(234,179,8,0.06)", padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(234,179,8,0.25)", lineHeight: 1.55 }}>
+          <strong style={{ color: "var(--text)" }}>⚠️ 安全与非官方通道提示 (Antigravity Scope)</strong>
+          <div style={{ marginTop: 4 }}>
+            本组件使用非官方 Google Cloud Code 通道进行模型调用与额度刷新。OAuth 授权将获得 <strong>cloud-platform (GCP 完整资源读写)</strong> 等宽 scope 权限。请确保已知悉非官方 SLA 限制与官方 IDE 客户端模拟风险。本系统绝对不会收集或上报您的 client_secret、token 凭证或 projectId。
+          </div>
         </div>
       )}
 
@@ -2185,10 +2296,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 ? `已连接 ${accounts.length} 个 Grok 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
                 : isKiro
                   ? `已连接 ${accounts.length} 个 Kiro 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
-                  : "Already connected. You can re-login or disconnect.")
+                  : isAntigravity
+                    ? `已连接 ${accounts.length} 个 Antigravity 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
+                    : "Already connected. You can re-login or disconnect.")
               : isKiro
                 ? "连接 AWS Kiro 账号（Builder ID / Google / GitHub）。"
-                : `Connect your ${provider.name} account.`}
+                : isAntigravity
+                  ? "通过 Google OAuth 添加 Antigravity 账号。callback 强制绑定 127.0.0.1；远程访问可在授权后手工粘贴 Redirect URL。不支持 Credential JSON 导入。"
+                  : `Connect your ${provider.name} account.`}
           </p>
         )}
 
@@ -2310,7 +2425,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") submitCode(loginState.token, inputValue); }}
-                placeholder={loginState.phase === "auth" ? "http://localhost:1455/auth/callback?code=…" : (loginState.placeholder ?? "Enter value…")}
+                placeholder={loginState.phase === "auth"
+                  ? (isAntigravity
+                    ? "http://localhost:51121/oauth-callback?state=…&code=…"
+                    : "http://localhost:1455/auth/callback?code=…")
+                  : (loginState.placeholder ?? "Enter value…")}
                 style={{ flex: 1, padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
               />
               <button
@@ -2361,7 +2480,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           </button>
         ) : (
           <>
-            {/* Capability-driven: Grok/Kiro use method picker + add mode; Codex keeps Login/Add Account */}
+            {/* Capability-driven: Grok/Kiro use method picker + add mode; Antigravity single OAuth add; Codex keeps Login/Add Account */}
             {supportsOAuthMethodPicker ? (
               <button
                 type="button"
@@ -2369,6 +2488,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               >
                 {isKiro ? "➕ 添加 Kiro 账号" : "➕ 添加账号"}
+              </button>
+            ) : isAntigravity ? (
+              <button
+                type="button"
+                onClick={() => handleLogin("add")}
+                style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                ➕ 添加 Antigravity 账号 (OAuth 登录)
               </button>
             ) : (
               <>
@@ -2396,6 +2523,16 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: quotaLoading ? "var(--text-dim)" : "var(--accent)", cursor: quotaLoading ? "default" : "pointer", fontSize: 12, fontWeight: 600 }}
               >
                 {quotaLoading ? "刷新中…" : "🔄 刷新当前 Kiro 额度"}
+              </button>
+            )}
+            {isAntigravity && (provider.loggedIn || accounts.length > 0) && selectedQuotaAccount && (
+              <button
+                type="button"
+                onClick={() => void loadAntigravityQuota(true)}
+                disabled={quotaLoading}
+                style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: quotaLoading ? "var(--text-dim)" : "var(--accent)", cursor: quotaLoading ? "default" : "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                {quotaLoading ? "刷新中…" : "🔄 刷新当前 Antigravity 额度"}
               </button>
             )}
             {provider.loggedIn && (
@@ -2426,6 +2563,15 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           loading={quotaLoading}
           account={selectedQuotaAccount}
           onRefresh={() => loadKiroQuota(true)}
+        />
+      )}
+
+      {isAntigravity && (provider.loggedIn || accounts.length > 0) && (
+        <AntigravityQuotaView
+          quota={antigravityQuota}
+          loading={quotaLoading}
+          account={selectedQuotaAccount}
+          onRefresh={() => loadAntigravityQuota(true)}
         />
       )}
 
@@ -2492,10 +2638,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         />
       )}
 
-      {/* Protected delete confirmation dialog (Grok / Kiro Active protection) */}
+      {/* Protected delete confirmation dialog (Grok / Kiro / Antigravity Active protection) */}
       {supportsProtectedDelete && protectedDeleteAccount && (
         <ManagedOAuthDeleteConfirmDialog
-          providerLabel={isKiro ? "Kiro" : "Grok"}
+          providerLabel={isAntigravity ? "Antigravity" : isKiro ? "Kiro" : "Grok"}
           account={protectedDeleteAccount}
           allAccounts={accounts}
           deleting={protectedDeleteDeleting}

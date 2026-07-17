@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
     "jiti",
     "pi-grok-cli",
     "pi-kiro-provider",
+    "@yofriadi/pi-antigravity-oauth",
     "@earendil-works/pi-coding-agent",
     "@earendil-works/pi-ai",
     "@earendil-works/pi-agent-core",

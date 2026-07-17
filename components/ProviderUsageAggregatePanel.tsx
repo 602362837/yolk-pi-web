@@ -13,12 +13,56 @@ import {
 } from "react";
 import {
   PROVIDER_USAGE_AGGREGATE_CLOSE_GRACE_MS,
+  resolveAggregateRingUnits,
   resolveOverallProviderUsageRisk,
   type ProviderUsageAggregateProjection,
   type ProviderUsageKey,
   type ProviderUsageRisk,
+  type ProviderUsageRingUnit,
 } from "./ProviderUsagePanelContract";
 import { ProviderUsageRingUnitView } from "./ProviderUsageTrigger";
+
+/** Side-by-side independent rings for multi-group providers (never concentric merge). */
+function AggregateRingUnitsView({
+  units,
+  size,
+}: {
+  units: readonly ProviderUsageRingUnit[];
+  size: "small" | "large";
+}) {
+  if (units.length === 0) return null;
+  const multi = units.length > 1;
+  return (
+    <span
+      className="provider-usage-aggregate__ring-units"
+      data-ring-count={units.length}
+      data-multi-independent={multi ? "true" : "false"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: multi ? 4 : 0,
+        flexShrink: 0,
+      }}
+    >
+      {units.map((unit, index) => (
+        <span
+          key={`${unit.centerLayerId}:${index}`}
+          className="provider-usage-aggregate__ring-slot"
+          data-ring-slot={index}
+          data-center-layer={unit.centerLayerId}
+          title={unit.ariaLabel}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <ProviderUsageRingUnitView unit={unit} size={size} />
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export interface ProviderUsageAggregateColumn {
   /** Allowlisted projection for the trigger segment + column header. */
@@ -32,7 +76,7 @@ export interface ProviderUsageAggregateColumn {
 }
 
 export interface ProviderUsageAggregatePanelProps {
-  /** Enabled provider columns, already ordered GPT → Grok → Kiro. */
+  /** Enabled provider columns, already ordered GPT → Grok → Kiro → Antigravity. */
   columns: readonly ProviderUsageAggregateColumn[];
   /**
    * Open Models (or similar) for a provider. Shell closes aggregate first.
@@ -213,6 +257,19 @@ export function ProviderUsageAggregatePanel({
 
   const handleTriggerPointerLeave = useCallback(() => {
     pointerInsideTriggerRef.current = false;
+    // Focus can remain on the trigger after pointer leave; do not keep the panel
+    // open solely because of sticky focus when the pointer has left both surfaces.
+    if (!pointerInsidePanelRef.current) {
+      focusInsideTriggerRef.current = false;
+      focusInsidePanelRef.current = false;
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement
+        && (containsNode(triggerRef.current, active) || containsNode(panelRef.current, active))
+      ) {
+        active.blur();
+      }
+    }
     scheduleClose();
   }, [scheduleClose]);
 
@@ -224,6 +281,18 @@ export function ProviderUsageAggregatePanel({
 
   const handlePanelPointerLeave = useCallback(() => {
     pointerInsidePanelRef.current = false;
+    // Panel columns contain focusable buttons; sticky focus inside the panel was
+    // keeping anyOpenReason() true after the pointer left, so the popover never
+    // closed. Clear focus ownership on pointer leave unless the pointer is still
+    // on the trigger.
+    if (!pointerInsideTriggerRef.current) {
+      focusInsidePanelRef.current = false;
+      focusInsideTriggerRef.current = false;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && containsNode(panelRef.current, active)) {
+        active.blur();
+      }
+    }
     scheduleClose();
   }, [scheduleClose]);
 
@@ -285,7 +354,8 @@ export function ProviderUsageAggregatePanel({
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
     const gutter = 8;
-    const maxWidth = Math.min(920, Math.max(280, window.innerWidth - gutter * 2));
+    // Wider desktop max so four provider columns can sit side-by-side.
+    const maxWidth = Math.min(1100, Math.max(280, window.innerWidth - gutter * 2));
     // Prefer aligning to trigger right edge; clamp within viewport.
     const right = Math.max(gutter, window.innerWidth - rect.right);
     const top = Math.min(rect.bottom + 8, window.innerHeight - gutter);
@@ -431,9 +501,12 @@ export function ProviderUsageAggregatePanel({
               <span style={{ fontWeight: 800, color: "var(--text-muted)" }}>{projection.label}</span>
               {projection.loading ? (
                 <Spinner />
-              ) : projection.ringUnit ? (
-                // Trigger segments stay 30px small rings.
-                <ProviderUsageRingUnitView unit={projection.ringUnit} size="small" />
+              ) : resolveAggregateRingUnits(projection).length > 0 ? (
+                // Trigger segments stay 30px small rings; multi-group = side-by-side.
+                <AggregateRingUnitsView
+                  units={resolveAggregateRingUnits(projection)}
+                  size="small"
+                />
               ) : (
                 <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)" }}>
                   {projection.fallback ?? "—"}
@@ -542,8 +615,8 @@ export function ProviderUsageAggregatePanel({
               display: "grid",
               gap: 16,
               width: "100%",
-              // Desktop 1–3 columns; media queries in globals.css refine narrow viewports.
-              gridTemplateColumns: `repeat(${Math.min(3, columnCount)}, minmax(0, 1fr))`,
+              // Desktop 1–4 columns; media queries in globals.css refine narrow viewports.
+              gridTemplateColumns: `repeat(${Math.min(4, columnCount)}, minmax(0, 1fr))`,
             }}
           >
             {sortedColumns.map(({ projection, detail }) => (
@@ -583,9 +656,13 @@ export function ProviderUsageAggregatePanel({
                     </span>
                     {projection.loading ? <Spinner /> : null}
                   </div>
-                  {projection.ringUnit ? (
+                  {resolveAggregateRingUnits(projection).length > 0 ? (
                     // Panel column header uses large 40px rings (≥ trigger 30px).
-                    <ProviderUsageRingUnitView unit={projection.ringUnit} size="large" />
+                    // Multi-group providers render independent rings side-by-side.
+                    <AggregateRingUnitsView
+                      units={resolveAggregateRingUnits(projection)}
+                      size="large"
+                    />
                   ) : (
                     <span className="provider-usage-aggregate__column-fallback">
                       {projection.fallback ?? "—"}

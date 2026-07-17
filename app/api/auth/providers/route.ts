@@ -19,6 +19,7 @@ export async function GET() {
     "github-copilot": "GitHub Copilot",
     "grok-cli": "Grok CLI (SuperGrok / X Premium)",
     kiro: "Kiro (Builder ID / Google / GitHub)",
+    "google-antigravity": "Antigravity (Gemini 3, Claude, GPT-OSS)",
   };
 
   const result = await Promise.all(

@@ -83,7 +83,11 @@ test("exports webExtensionFactories() helper without session pin", () => {
   assertIncludes(peSource, "export function webExtensionFactories", "exports webExtensionFactories");
   assertIncludes(peSource, "return [...webProviderExtensions(), ...extra]", "prepends fixed provider list");
   assertIncludes(peSource, "export function webProviderExtensions", "exports webProviderExtensions");
-  assertIncludes(peSource, "return [grokCliExtension, kiroProviderExtension]", "fixed list is Grok then Kiro");
+  assertIncludes(
+    peSource,
+    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]",
+    "fixed list is Grok then Kiro then Antigravity",
+  );
   assertNotIncludes(peSource, "[grokCliExtension, grokSessionAccountExtension", "session pin not wired");
 });
 
@@ -205,7 +209,7 @@ console.log("\n=== Registry refresh order safety ===");
 
 test("pi-provider-extensions documents the refresh invariant", () => {
   // The file header must mention that refresh() can reset global state
-  assertIncludes(peSource, "registry-reset can remove grok-cli", "documented registry reset risk");
+  assertIncludes(peSource, "registry-reset can remove grok-cli / kiro / google-antigravity", "documented registry reset risk");
   assertIncludes(peSource, "must be fed", "documented requirement");
 });
 

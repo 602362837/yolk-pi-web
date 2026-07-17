@@ -12,6 +12,7 @@ import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { UsageProviderModelTable } from "./UsageProviderModelTable";
+import { AntigravityUsagePanel } from "./AntigravityUsagePanel";
 import { ChatGptUsagePanel } from "./ChatGptUsagePanel";
 import { GrokUsagePanel } from "./GrokUsagePanel";
 import { KiroUsagePanel } from "./KiroUsagePanel";
@@ -345,6 +346,7 @@ function AppShellContent() {
   const [gptAggregateProjection, setGptAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
   const [grokAggregateProjection, setGrokAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
   const [kiroAggregateProjection, setKiroAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
+  const [antigravityAggregateProjection, setAntigravityAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [usageStatsOpen, setUsageStatsOpen] = useState(false);
   const [settingsConfigOpen, setSettingsConfigOpen] = useState(false);
@@ -897,7 +899,8 @@ function AppShellContent() {
   const showChatGptUsage = webConfig?.chatgpt.usagePanelEnabled === true;
   const showGrokUsage = webConfig?.grok.usagePanelEnabled === true;
   const showKiroUsage = webConfig?.kiro.usagePanelEnabled === true;
-  const showAnyProviderUsage = showChatGptUsage || showGrokUsage || showKiroUsage;
+  const showAntigravityUsage = webConfig?.antigravity.usagePanelEnabled === true;
+  const showAnyProviderUsage = showChatGptUsage || showGrokUsage || showKiroUsage || showAntigravityUsage;
   // Aggregate takes presentation priority; Compact is retained in config but unused while aggregated.
   const providerUsageAggregated = webConfig?.usage.providerPanelsAggregated === true;
   // Global compact mode from Settings → Usage; detail popovers stay full. Only applies standalone.
@@ -915,10 +918,14 @@ function AppShellContent() {
     if (!showKiroUsage) setKiroAggregateProjection(null);
   }, [showKiroUsage]);
   useEffect(() => {
+    if (!showAntigravityUsage) setAntigravityAggregateProjection(null);
+  }, [showAntigravityUsage]);
+  useEffect(() => {
     if (!providerUsageAggregated) {
       setGptAggregateProjection(null);
       setGrokAggregateProjection(null);
       setKiroAggregateProjection(null);
+      setAntigravityAggregateProjection(null);
       setProviderUsageAggregateCloseGeneration(0);
     }
   }, [providerUsageAggregated]);
@@ -958,6 +965,16 @@ function AppShellContent() {
         presentation="aggregate"
         onOpenModels={openModelsFromProviderUsage}
         onAggregateProjectionChange={setKiroAggregateProjection}
+      />
+    ),
+    [openModelsFromProviderUsage],
+  );
+  const antigravityAggregateDetail = useMemo(
+    () => (
+      <AntigravityUsagePanel
+        presentation="aggregate"
+        onOpenModels={openModelsFromProviderUsage}
+        onAggregateProjectionChange={setAntigravityAggregateProjection}
       />
     ),
     [openModelsFromProviderUsage],
@@ -1011,8 +1028,25 @@ function AppShellContent() {
         detail: kiroAggregateDetail,
       });
     }
+    if (showAntigravityUsage) {
+      columns.push({
+        projection: antigravityAggregateProjection ?? {
+          key: "antigravity",
+          label: "Antigravity",
+          order: 3,
+          risk: "muted",
+          loading: true,
+          ringUnit: null,
+          fallback: "加载中",
+          title: "Antigravity 用量",
+        },
+        detail: antigravityAggregateDetail,
+      });
+    }
     return columns;
   }, [
+    antigravityAggregateDetail,
+    antigravityAggregateProjection,
     gptAggregateDetail,
     gptAggregateProjection,
     grokAggregateDetail,
@@ -1020,6 +1054,7 @@ function AppShellContent() {
     kiroAggregateDetail,
     kiroAggregateProjection,
     providerUsageAggregated,
+    showAntigravityUsage,
     showChatGptUsage,
     showGrokUsage,
     showKiroUsage,
@@ -1697,6 +1732,12 @@ function AppShellContent() {
                   )}
                   {showKiroUsage && (
                     <KiroUsagePanel
+                      onOpenModels={openModelsFromProviderUsage}
+                      displayMode={providerUsageDisplayMode}
+                    />
+                  )}
+                  {showAntigravityUsage && (
+                    <AntigravityUsagePanel
                       onOpenModels={openModelsFromProviderUsage}
                       displayMode={providerUsageDisplayMode}
                     />

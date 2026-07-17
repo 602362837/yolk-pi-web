@@ -45,7 +45,7 @@ console.log("\n=== pin retired from main inference ===");
 
 test("webExtensionFactories only includes fixed providers without session pin", () => {
   assertIncludes(extensions, "return [...webProviderExtensions(), ...extra]", "factories without session pin");
-  assertIncludes(extensions, "return [grokCliExtension, kiroProviderExtension]", "fixed list is Grok then Kiro");
+  assertIncludes(extensions, "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]", "fixed list is Grok then Kiro then Antigravity");
   assertNotIncludes(extensions, "return [grokCliExtension, grokSessionAccountExtension, ...extra]", "old pin wiring gone");
 });
 

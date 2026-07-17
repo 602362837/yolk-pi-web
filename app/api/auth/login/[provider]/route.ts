@@ -1,5 +1,11 @@
 import { AuthStorage, createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { isSupportedOAuthAccountProvider, saveOAuthAccountCredential, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
+import { sanitizeAntigravityLoginError } from "@/lib/antigravity-account-token";
+import {
+  ANTIGRAVITY_PROVIDER_ID,
+  isSupportedOAuthAccountProvider,
+  saveOAuthAccountCredential,
+  syncActiveOAuthAccountCredential,
+} from "@/lib/oauth-accounts";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { webExtensionFactories } from "@/lib/pi-provider-extensions";
 
@@ -208,11 +214,14 @@ export async function GET(
           send(controller, { type: "success" });
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg !== "Login cancelled") {
-          send(controller, { type: "error", message: msg });
-        } else {
+        const rawMsg = err instanceof Error ? err.message : String(err);
+        if (rawMsg === "Login cancelled") {
           send(controller, { type: "cancelled" });
+        } else if (provider === ANTIGRAVITY_PROVIDER_ID) {
+          // Upstream token exchange may embed response text; never project it.
+          send(controller, { type: "error", message: sanitizeAntigravityLoginError(err) });
+        } else {
+          send(controller, { type: "error", message: rawMsg });
         }
       } finally {
         cleanup();

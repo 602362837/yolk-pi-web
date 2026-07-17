@@ -15,10 +15,12 @@ import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
 
 import {
   getOAuthAccountAdapter,
+  ANTIGRAVITY_PROVIDER_ID,
   KIRO_PROVIDER_ID,
   maskAccountId,
   type OAuthAccountProviderAdapter,
 } from "./oauth-account-providers";
+import { withAntigravityProviderLock } from "./antigravity-account-lock";
 import { withKiroProviderLock } from "./kiro-account-lock";
 
 // Re-export for backward compatibility
@@ -26,6 +28,7 @@ export {
   OPENAI_CODEX_PROVIDER_ID,
   GROK_CLI_PROVIDER_ID,
   KIRO_PROVIDER_ID,
+  ANTIGRAVITY_PROVIDER_ID,
   getOAuthAccountAdapter,
   isSupportedOAuthAccountProvider,
   maskAccountId,
@@ -749,8 +752,9 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P
  * Activate a saved account so it becomes the default for new sessions and
  * is mirrored to `auth.json` for Pi's model availability checks.
  *
- * For Kiro, Activate shares the provider-level lock with token refresh so a
- * concurrent non-active refresh cannot overwrite the newly activated mirror.
+ * For Kiro and Antigravity, Activate shares the provider-level lock with token
+ * refresh so a concurrent non-active refresh cannot overwrite the newly
+ * activated mirror.
  */
 export async function activateOAuthAccount(provider: string, accountId: string): Promise<OAuthAccountsList> {
   getAdapter(provider);
@@ -763,8 +767,9 @@ export async function activateOAuthAccount(provider: string, accountId: string):
 
     const credential = await readOAuthAccountCredential(provider, normalizedAccountId);
     // AuthStorage.set expects AuthCredential (which requires type:"oauth" for
-    // OAuth entries).  grok-cli / kiro credentials from their providers lack this
-    // sentinel but are otherwise compatible with Pi's OAuth credential contract.
+    // OAuth entries).  grok-cli / kiro / antigravity credentials from their
+    // providers lack this sentinel but are otherwise compatible with Pi's
+    // OAuth credential contract.
     const authCredential = (credential as Record<string, unknown>).type
       ? credential
       : { ...credential, type: "oauth" as const };
@@ -783,6 +788,9 @@ export async function activateOAuthAccount(provider: string, accountId: string):
 
   if (provider === KIRO_PROVIDER_ID) {
     return withKiroProviderLock(run);
+  }
+  if (provider === ANTIGRAVITY_PROVIDER_ID) {
+    return withAntigravityProviderLock(run);
   }
   return run();
 }

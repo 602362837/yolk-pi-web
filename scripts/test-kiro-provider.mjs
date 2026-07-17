@@ -61,10 +61,11 @@ test("package.json exposes test:kiro-provider script", () => {
   assert.ok(packageJson.scripts?.["test:kiro-provider"], "test:kiro-provider script exists");
 });
 
-test("next.config.ts externalizes jiti, pi-grok-cli, and pi-kiro-provider", () => {
+test("next.config.ts externalizes jiti, pi-grok-cli, pi-kiro-provider, and antigravity", () => {
   assertIncludes(nextConfig, '"jiti"', "externalizes jiti");
   assertIncludes(nextConfig, '"pi-grok-cli"', "externalizes pi-grok-cli");
   assertIncludes(nextConfig, '"pi-kiro-provider"', "externalizes pi-kiro-provider");
+  assertIncludes(nextConfig, '"@yofriadi/pi-antigravity-oauth"', "externalizes antigravity package");
 });
 
 test("pi-kiro-provider is installed with TypeScript package entry", () => {
@@ -100,7 +101,11 @@ test("does not deep-import pi-kiro-provider private paths", () => {
 test("Grok remains co-loaded with Kiro in fixed provider list", () => {
   assertIncludes(peSource, "export const grokCliExtension", "still exports grokCliExtension");
   assertIncludes(peSource, 'import("pi-grok-cli")', "still loads pi-grok-cli via jiti");
-  assertIncludes(peSource, "return [grokCliExtension, kiroProviderExtension]", "order is Grok then Kiro");
+  assertIncludes(
+    peSource,
+    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]",
+    "order is Grok then Kiro then Antigravity",
+  );
 });
 
 test("webExtensionFactories prepends both fixed providers", () => {
@@ -127,10 +132,15 @@ test("per-provider load failure is isolated", () => {
   );
   const kiroFactory = peSource.slice(
     peSource.indexOf("export const kiroProviderExtension"),
+    peSource.indexOf("export const antigravityProviderExtension"),
+  );
+  const antigravityFactory = peSource.slice(
+    peSource.indexOf("export const antigravityProviderExtension"),
     peSource.indexOf("export const grokSessionAccountExtension"),
   );
   assertIncludes(grokFactory, "catch {", "Grok factory isolates failures");
   assertIncludes(kiroFactory, "catch {", "Kiro factory isolates failures");
+  assertIncludes(antigravityFactory, "catch {", "Antigravity factory isolates failures");
   assertIncludes(peSource, "Best-effort per provider", "documents per-provider isolation");
 });
 
@@ -216,8 +226,8 @@ test("no production source statically imports pi-kiro-provider", () => {
 
 console.log("\n=== Cold-start / refresh safety ===");
 
-test("documents registry-reset risk for both fixed providers", () => {
-  assertIncludes(peSource, "registry-reset can remove grok-cli / kiro", "documents both providers");
+test("documents registry-reset risk for fixed providers", () => {
+  assertIncludes(peSource, "registry-reset can remove grok-cli / kiro / google-antigravity", "documents fixed providers");
   assertIncludes(peSource, "must be fed", "documents requirement");
 });
 
