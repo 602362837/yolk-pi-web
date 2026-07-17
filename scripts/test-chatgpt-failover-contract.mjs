@@ -91,7 +91,7 @@ test("process lock + double Active check + cooldown + circular order", () => {
 });
 
 test("reloadAuthState is invoked after Activate", () => {
-  assertIncludes(failover, "options.reloadAuthState()", "reload call");
+  assertIncludes(failover, "await options.reloadAuthState()", "awaited reload call");
   assertIncludes(failover, "activateOAuthAccount(OPENAI_CODEX_PROVIDER_ID, nextAccountId)", "activate call");
 });
 

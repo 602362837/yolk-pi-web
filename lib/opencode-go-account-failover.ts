@@ -300,7 +300,7 @@ export async function attemptOpencodeGoAccountFailover(options: {
   provider: string | undefined;
   message: unknown;
   budget: OpencodeGoFailoverTurnBudget;
-  reloadAuthState: () => void | number;
+  reloadAuthState: () => void | number | Promise<void | number>;
   triggerAccountId?: string | null;
 }): Promise<OpencodeGoFailoverResult> {
   const provider = options.provider ?? "";
@@ -464,7 +464,7 @@ export async function attemptOpencodeGoAccountFailover(options: {
     try {
       await activateApiKeyAccount(provider, nextAccountId);
       state.lastSwitchAt = now();
-      options.reloadAuthState();
+      await options.reloadAuthState();
       options.budget.switches += 1;
       // Add the candidate to attempted so the same turn won't try it again
       if (!options.budget.attemptedAccountIds.includes(nextAccountId)) {

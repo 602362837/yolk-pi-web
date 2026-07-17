@@ -320,7 +320,7 @@ export async function attemptKiroAccountFailover(options: {
   provider: string | undefined;
   message: unknown;
   budget: KiroAccountFailoverTurnBudget;
-  reloadAuthState: () => void | number;
+  reloadAuthState: () => void | number | Promise<void | number>;
   triggerAccountId?: string | null;
 }): Promise<KiroAccountFailoverResult> {
   const provider = options.provider ?? "";
@@ -415,7 +415,7 @@ export async function attemptKiroAccountFailover(options: {
 
     await activateOAuthAccount(KIRO_PROVIDER_ID, nextAccountId);
     state.lastSwitchAt = now();
-    options.reloadAuthState();
+    await options.reloadAuthState();
     options.budget.attempts += 1;
     options.budget.switches += 1;
     return {

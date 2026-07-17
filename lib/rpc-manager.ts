@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import { cacheSessionPath, invalidateSessionListSnapshots } from "./session-reader";
 
@@ -11,7 +11,7 @@ import { recordObservedUsage } from "./llm-usage-recorder";
 import type { Usage } from "@earendil-works/pi-ai/compat";
 import { createYpiStudioExtension } from "./ypi-studio-extension";
 import { createBrowserShareExtension } from "./browser-share-extension";
-import { webExtensionFactories } from "./pi-provider-extensions";
+import { createWebAgentSessionServices } from "./web-model-runtime";
 import {
   abortYpiStudioChildRunsForSession,
   countActiveYpiStudioChildRunsForSession,
@@ -1166,8 +1166,7 @@ export class AgentSessionWrapper {
 
       case "set_model": {
         const { provider, modelId } = command as { provider: string; modelId: string };
-        const registry = this.inner.modelRegistry;
-        const model = registry.find(provider, modelId);
+        const model = this.inner.modelRuntime.getModel(provider, modelId);
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         // Session-scoped Chat switch (IMP-002 plan A / MODEL-PIN-3):
         // SDK setModel still updates runtime model + JSONL model_change (and may
@@ -1447,49 +1446,66 @@ export function getActiveRpcSessionIds(): string[] {
   return ids;
 }
 
-export function reloadRpcAuthState(): number {
-  let count = 0;
-  for (const wrapper of getRegistry().values()) {
-    if (!wrapper.isAlive()) continue;
-    try {
-      const currentModel = wrapper.inner.model as
-        | { id?: string; provider?: string; [key: string]: unknown }
-        | undefined;
-      const provider = currentModel?.provider;
-      const modelId = currentModel?.id;
+/**
+ * Offline-refresh every live wrapper's ModelRuntime so the next request uses
+ * the current Active credential / model descriptors.
+ *
+ * - Awaitable: callers must wait before returning Activate/login/logout success.
+ * - Per-wrapper failure isolation: one bad session does not block others.
+ * - Same provider/id descriptor replacement only (no setModel / model_change).
+ * - Cleans provider session resources after refresh so sockets reconnect.
+ */
+export async function reloadRpcAuthState(): Promise<number> {
+  const wrappers = [...getRegistry().values()].filter((wrapper) => wrapper.isAlive());
+  const results = await Promise.all(
+    wrappers.map(async (wrapper) => {
+      try {
+        const currentModel = wrapper.inner.model as
+          | { id?: string; provider?: string; [key: string]: unknown }
+          | undefined;
+        const provider = currentModel?.provider;
+        const modelId = currentModel?.id;
+        const runtime = wrapper.inner.modelRuntime;
 
-      wrapper.inner.modelRegistry.authStorage?.reload?.();
-      wrapper.inner.modelRegistry.refresh?.();
+        await runtime.refresh({ allowNetwork: false });
 
-      // After registry refresh, Grok (and other dynamic) model descriptors may
-      // have updated baseUrl/headers. Replace the live in-memory model object
-      // for the same provider/id identity without calling setModel() so we do
-      // not persist a model_change entry or alter user defaults.
-      if (provider && modelId && currentModel) {
-        try {
-          const refreshed = wrapper.inner.modelRegistry.find(provider, modelId) as
-            | { id?: string; provider?: string; [key: string]: unknown }
-            | undefined;
-          if (
-            refreshed
-            && refreshed.provider === provider
-            && refreshed.id === modelId
-            && refreshed !== currentModel
-          ) {
-            const live = wrapper.inner as unknown as { model?: unknown };
-            live.model = refreshed;
+        // After offline refresh, dynamic model descriptors may carry updated
+        // baseUrl/headers. Replace the live in-memory model object for the same
+        // provider/id identity without calling setModel() so we do not persist a
+        // model_change entry or alter user defaults.
+        if (provider && modelId && currentModel) {
+          try {
+            const refreshed = runtime.getModel(provider, modelId) as
+              | { id?: string; provider?: string; [key: string]: unknown }
+              | undefined;
+            if (
+              refreshed
+              && refreshed.provider === provider
+              && refreshed.id === modelId
+              && refreshed !== currentModel
+            ) {
+              const agentState = (
+                wrapper.inner as unknown as {
+                  agent?: { state?: { model?: unknown } };
+                }
+              ).agent?.state;
+              if (agentState) agentState.model = refreshed;
+            }
+          } catch {
+            // Descriptor refresh is best-effort; runtime refresh already ran.
           }
-        } catch {
-          // Descriptor refresh is best-effort; auth reload already succeeded.
         }
-      }
 
-      count += 1;
-    } catch {
-      // Keep account activation best-effort for live wrappers; new requests/sessions
-      // still read the updated auth.json through fresh AuthStorage instances.
-    }
-  }
+        return 1;
+      } catch {
+        // Keep account activation best-effort for live wrappers; new sessions
+        // still construct a fresh ModelRuntime against the updated auth.json.
+        return 0;
+      }
+    }),
+  );
+
+  const count = results.reduce<number>((sum, value) => sum + value, 0);
 
   try {
     // OpenAI Codex keeps reusable WebSockets keyed by session id. After account
@@ -1534,31 +1550,38 @@ export async function startRpcSession(
   if (inflight) return inflight;
 
   const starting = (async () => {
-    const { SessionManager, getAgentDir, DefaultResourceLoader } = await import("@earendil-works/pi-coding-agent");
+    const { SessionManager, createAgentSessionFromServices, getAgentDir } = await import(
+      "@earendil-works/pi-coding-agent"
+    );
     const agentDir = getAgentDir();
 
     const sessionManager = sessionFile
       ? SessionManager.open(sessionFile, undefined)
       : SessionManager.create(cwd, undefined);
-    const resourceLoader = new DefaultResourceLoader({
+
+    // Isolated ModelRuntime per main Chat services/session so cwd-local
+    // extension providers cannot leak across sessions. Fixed providers
+    // (Grok → Kiro → Antigravity) plus YPI Studio / Browser Share extras
+    // register into this same target runtime before model selection.
+    const services = await createWebAgentSessionServices({
       cwd,
       agentDir,
-      extensionFactories: webExtensionFactories([createYpiStudioExtension(cwd, {
-        sessionId: sessionManager.getSessionId(),
-        sessionFile: sessionManager.getSessionFile() ?? undefined,
-      }), createBrowserShareExtension()]),
+      extraExtensions: [
+        createYpiStudioExtension(cwd, {
+          sessionId: sessionManager.getSessionId(),
+          sessionFile: sessionManager.getSessionFile() ?? undefined,
+        }),
+        createBrowserShareExtension(),
+      ],
     });
-    await resourceLoader.reload();
 
-    // Do NOT pass the `tools` parameter to createAgentSession.
+    // Do NOT pass the `tools` parameter to createAgentSessionFromServices.
     // The `tools` param acts as a global allowlist that filters out extension
     // tools (e.g. `subagent` from pi-subagents). Instead, let all built-in and
     // extension tools load, then control activation via setActiveToolsByName.
-    const { session: inner } = await createAgentSession({
-      cwd,
-      agentDir,
+    const { session: inner } = await createAgentSessionFromServices({
+      services,
       sessionManager,
-      resourceLoader,
     });
 
     // If specific tool names were requested (non-empty), narrow active tools now

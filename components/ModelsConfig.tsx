@@ -4267,7 +4267,13 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
 
   const providers = Object.entries(config.providers ?? {});
   const activeOAuth = oauthProviders.filter((p) => p.loggedIn);
-  const activeApiKey = apiKeyProviders.filter((p) => p.configured);
+  // A ModelRuntime OAuth credential also makes `/api/auth/all-providers` report
+  // `configured`. Show that provider in its OAuth section only; a logged-out
+  // OAuth provider with a separately configured API key remains visible here.
+  const activeOAuthIds = new Set(activeOAuth.map((p) => p.id));
+  const activeApiKey = apiKeyProviders.filter(
+    (p) => p.configured && !activeOAuthIds.has(p.id),
+  );
 
   // Resolve current detail
   const detailContent = (() => {

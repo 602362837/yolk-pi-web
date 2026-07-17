@@ -1,8 +1,10 @@
 /**
  * Model price configuration service.
  *
- * Reads resolved model pricing from the Pi ModelRegistry, generates sanitized
- * projections, and provides atomic write-path helpers for models.json.
+ * Reads resolved model pricing from a ModelRuntime-compatible catalog,
+ * generates sanitized projections, and provides atomic write-path helpers for
+ * models.json. Callers pass ModelRuntime (or a narrow catalog view); this
+ * module never constructs ModelRegistry.
  *
  * Security contract:
  * - Lists never contain secrets, API keys, absolute paths, or full models.json.
@@ -15,9 +17,27 @@ import { createHash, randomBytes } from "crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import type { Api } from "@earendil-works/pi-ai";
+
+/**
+ * Narrow catalog surface used by price listing / post-write verification.
+ * Satisfied by ModelRuntime without depending on the extension-only
+ * ModelRegistry facade.
+ */
+export interface ModelPriceCatalog {
+  getModels(providerId?: string): readonly Model<Api>[];
+  getModel(providerId: string, modelId: string): Model<Api> | undefined;
+  getProvider?(providerId: string): { name?: string } | undefined;
+}
+
+function providerDisplayName(
+  catalog: ModelPriceCatalog,
+  providerId: string,
+): string | undefined {
+  const name = catalog.getProvider?.(providerId)?.name;
+  return name && name !== providerId ? name : undefined;
+}
 
 import type {
   ModelPriceKind,
@@ -304,11 +324,11 @@ export function hasUserCostOverride(
 }
 
 /**
- * Build a sanitized price record from a Pi ModelRegistry model entry.
+ * Build a sanitized price record from a catalog model entry.
  */
 function buildPriceRecord(
   model: Model<Api>,
-  registry: ModelRegistry,
+  catalog: ModelPriceCatalog,
   parsedModelsJson: Record<string, unknown>,
   customModelIds: Map<string, Set<string>>,
   explicitFreeSet: Set<string>,
@@ -346,17 +366,13 @@ function buildPriceRecord(
     source = "builtin";
   }
 
-  const providerDisplayName = registry.getProviderDisplayName(providerId);
   const displayName = model.name && model.name !== model.id ? model.name : undefined;
 
   return {
     provider: providerId,
     model: modelId,
     displayName,
-    providerDisplayName:
-      providerDisplayName && providerDisplayName !== providerId
-        ? providerDisplayName
-        : undefined,
+    providerDisplayName: providerDisplayName(catalog, providerId),
     modelKind,
     status,
     resolved,
@@ -372,16 +388,16 @@ function buildPriceRecord(
  * absolute paths, full models.json content, auth details, or provider base URLs.
  */
 export function getModelPriceRecords(
-  registry: ModelRegistry,
+  catalog: ModelPriceCatalog,
   parsedModelsJson: Record<string, unknown>,
   revision: string,
 ): { models: ModelPriceRecord[]; explicitFreeModels: Array<{ provider: string; model: string }> } {
   const explicitFreeSet = getExplicitFreeModels();
   const customModelIds = getCustomModelIds(parsedModelsJson);
-  const allModels = registry.getAll();
+  const allModels = catalog.getModels();
 
   const records = allModels.map((model) =>
-    buildPriceRecord(model, registry, parsedModelsJson, customModelIds, explicitFreeSet, revision),
+    buildPriceRecord(model, catalog, parsedModelsJson, customModelIds, explicitFreeSet, revision),
   );
 
   // Sort: missing first, then configured, then builtin, then free; within each group sort by provider+model
@@ -412,12 +428,12 @@ export function getModelPriceRecords(
  * Build the full GET response.
  */
 export function buildModelPriceListResponse(
-  registry: ModelRegistry,
+  catalog: ModelPriceCatalog,
   parsedModelsJson: Record<string, unknown>,
   revision: string,
 ): ModelPriceListResponse {
   const { models, explicitFreeModels } = getModelPriceRecords(
-    registry,
+    catalog,
     parsedModelsJson,
     revision,
   );
@@ -843,13 +859,13 @@ export function applyPricePatch(request: ModelPricePatchRequest): ApplyPricePatc
 // ── Registry verification ─────────────────────────────────────────────────────
 
 /**
- * After writing models.json, create a fresh ModelRegistry (via the SDK)
- * and verify that resolved prices match the expected values.
+ * After writing models.json, verify resolved prices against a fresh catalog
+ * (typically an isolated temporary ModelRuntime that reloaded modelsPath).
  *
  * Returns a list of mismatches, or an empty array if all is well.
  */
 export function verifyResolvedPrices(
-  registry: ModelRegistry,
+  catalog: ModelPriceCatalog,
   changes: ModelPricePatchChange[],
 ): Array<{ provider: string; model: string; expected: PriceRates; actual: PriceRates }> {
   const mismatches: Array<{
@@ -860,7 +876,7 @@ export function verifyResolvedPrices(
   }> = [];
 
   for (const change of changes) {
-    const model = registry.find(change.provider, change.model);
+    const model = catalog.getModel(change.provider, change.model);
     if (!model) continue;
 
     const expected: PriceRates = {

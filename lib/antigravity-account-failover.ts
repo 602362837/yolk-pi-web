@@ -347,7 +347,7 @@ export async function attemptAntigravityAccountFailover(options: {
   provider: string | undefined;
   message: unknown;
   budget: AntigravityAccountFailoverTurnBudget;
-  reloadAuthState: () => void | number;
+  reloadAuthState: () => void | number | Promise<void | number>;
   triggerAccountId?: string | null;
   /** Public catalog model id for the failing request (model-aware gate). */
   publicModelId?: string | null;
@@ -502,7 +502,7 @@ export async function attemptAntigravityAccountFailover(options: {
 
     await activateOAuthAccount(ANTIGRAVITY_PROVIDER_ID, nextAccountId);
     state.lastSwitchAt = now();
-    options.reloadAuthState();
+    await options.reloadAuthState();
     options.budget.attempts += 1;
     options.budget.switches += 1;
     return {

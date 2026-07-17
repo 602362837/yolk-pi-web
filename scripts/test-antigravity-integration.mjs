@@ -182,8 +182,8 @@ test("fixed provider list is Grok → Kiro → Antigravity", () => {
   );
   assertIncludes(pe, 'import("pi-grok-cli")', "jiti grok");
   assertIncludes(pe, 'import("pi-kiro-provider")', "jiti kiro");
-  // Antigravity resolves package.json → pi.extensions entry, then jiti-imports candidates.
-  assertIncludes(pe, '@yofriadi/pi-antigravity-oauth/package.json', "package resolve");
+  // Antigravity resolves installed package.json → pi.extensions entry, then jiti-imports candidates.
+  assertIncludes(pe, 'resolveInstalledPackageJson("@yofriadi/pi-antigravity-oauth")', "package resolve");
   assertIncludes(pe, "resolveAntigravityPackageExtensionEntry", "extension entry resolver");
   assertIncludes(pe, "antigravityJitiImportCandidates", "jiti candidate list");
   // Production anchors jiti at app package.json (Next-safe) and imports candidates.
@@ -194,8 +194,9 @@ test("fixed provider list is Grok → Kiro → Antigravity", () => {
   assertIncludes(pe, "ANTIGRAVITY_OAUTH_CALLBACK_HOST", "loopback constant");
   assertIncludes(pe, 'ANTIGRAVITY_OAUTH_CALLBACK_HOST = "127.0.0.1"', "forced loopback");
   assertIncludes(pe, "PI_OAUTH_CALLBACK_HOST", "env key");
-  assertIncludes(pe, "export function ensureWebProvidersBootstrapped", "neutral bootstrap");
-  assertIncludes(pe, "export async function createWebProviderAwareModelRegistry", "neutral registry");
+  assertIncludes(pe, "export function ensureWebProvidersBootstrapped", "legacy OAuth bootstrap");
+  assertIncludes(pe, "export async function createWebProviderAwareModelRegistry", "migration stub retained");
+  assertIncludes(pe, "was removed for pi SDK 0.80.10", "registry helper hard-fails");
 });
 
 test("no application static private import of package src", () => {
@@ -221,20 +222,21 @@ test("no application static private import of package src", () => {
   assertIncludes(pe, "antigravityJitiImportCandidates", "candidate helper present");
 });
 
-test("key call sites use unified factories", () => {
-  const sites = [
-    ["lib/rpc-manager.ts", "webExtensionFactories"],
-    ["lib/ypi-studio-child-session-runner.ts", "webExtensionFactories"],
-    ["app/api/models/route.ts", "webExtensionFactories"],
-    ["app/api/auth/providers/route.ts", "webExtensionFactories"],
-    ["app/api/skills/route.ts", "webExtensionFactories"],
-    ["app/api/commands/route.ts", "webExtensionFactories"],
-    ["app/api/terminal/env/assist/route.ts", "webExtensionFactories"],
-    ["app/api/trellis/workflow/assist/route.ts", "webExtensionFactories"],
+test("key call sites use ModelRuntime helpers", () => {
+  const sessionSites = [
+    ["lib/rpc-manager.ts", "createWebAgentSessionServices"],
+    ["lib/ypi-studio-child-session-runner.ts", "createWebAgentSessionServices"],
+    ["app/api/models/route.ts", "createWebAgentSessionServices"],
+    ["app/api/terminal/env/assist/route.ts", "createWebAgentSessionServices"],
+    ["app/api/trellis/workflow/assist/route.ts", "createWebAgentSessionServices"],
   ];
-  for (const [path, needle] of sites) {
+  for (const [path, needle] of sessionSites) {
     assertIncludes(read(path), needle, path);
   }
+  assertIncludes(read("app/api/auth/providers/route.ts"), "getWebModelRuntime", "providers route");
+  assertIncludes(read("app/api/skills/route.ts"), "webExtensionFactories", "skills loader");
+  assertIncludes(read("app/api/commands/route.ts"), "webExtensionFactories", "commands loader");
+  assertIncludes(read("lib/web-model-runtime.ts"), "createWebAgentSessionServices", "runtime helper");
 });
 
 // ============================================================================
@@ -401,7 +403,11 @@ test("defaults: compact/aggregate off, antigravity panel off, failover off", () 
 });
 
 test("Settings places Antigravity section + global compact/aggregate copy", () => {
-  assertIncludes(settings, 'renderSectionButton("antigravity", "Antigravity"', "nav");
+  // Settings tree nav lives in SettingsTreeNavigation; SettingsConfig owns the leaf content.
+  const treeNav = read("components/SettingsTreeNavigation.tsx");
+  assertIncludes(treeNav, 'label: "Antigravity"', "nav label");
+  assertIncludes(treeNav, '"antigravity"', "nav section id");
+  assertIncludes(settings, 'view === "antigravity"', "antigravity leaf view");
   assertIncludes(settings, "顶部额度组件简要显示", "compact label");
   assertIncludes(settings, "模型用量组件聚合", "aggregate label");
   assertIncludes(settings, "updateUsage({ providerPanelsCompact", "global compact");

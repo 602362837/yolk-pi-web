@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-17T02:20:50.574Z",
+  "updatedAt": "2026-07-17T08:38:17.841Z",
   "entries": [
+    {
+      "id": "20260717-163817-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt",
+      "title": "将 pi SDK 从 0.80.7 升级到 0.80.10 并完成 Auth/ModelRuntime 适配迁移",
+      "taskId": "20260717-130153-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt",
+      "taskKey": "archived:2026-07:20260717-130153-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt",
+      "workflowId": "feature-dev",
+      "summary": "**Subtask:** SDK-07 (integrated validation + handoff) **Task:** `20260717-130153-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt` **Validated at:** 2026-07-17T05:46Z **Validator role:** implementer executing SDK-07 barrier (handoff ready for main/checker) **UI gate:** no UI surface change (see `ui.md`) **Git:** no commit / push / merge performed --- ## 1. What shipped Atomic upgrade of Pi core packages from exact `0.80.7` → exact **`0.80.10`**, plus full adapter migration off removed `AuthStorage` / `ModelRegistry.create()` / old services fields onto: 1. **Web-owned `CredentialStore`** over existing `auth.json` (one Active credential per provider). 2. **Provider-aware `ModelRuntime`** factories and a canonical `createWebAgentSessionServices()` helper that always registers fixed providers (Grok → Kiro → Antigravity) on the **target** runtime. 3. Full consumer migration: Auth / multi-acc…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260717-130153-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt",
+      "knowledgePath": ".ypi/knowledge/20260717-163817-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt.md",
+      "createdAt": "2026-07-17T08:38:17.841Z",
+      "archivedAt": "2026-07-17T08:38:17.841Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260717-102050-接入-antigravity-提供商并支持多账号额度与自动切号",
       "title": "接入 Antigravity 提供商并支持多账号额度与自动切号",

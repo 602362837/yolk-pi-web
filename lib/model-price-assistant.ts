@@ -13,9 +13,7 @@
  * - The assistant does NOT write to models.json or any file.
  */
 
-import { completeSimple } from "@earendil-works/pi-ai/compat";
-import type { Model, Api } from "@earendil-works/pi-ai";
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type {
   ModelPriceSuggestion,
   ModelPriceSuggestionEvidence,
@@ -141,7 +139,7 @@ function parseExtractionResult(raw: string): ExtractionResult | null {
 // ── Text extraction from AssistantMessage ─────────────────────────────────────
 
 function textFromAssistant(
-  message: Awaited<ReturnType<typeof completeSimple>>,
+  message: { content: Array<{ type: string; text?: string }> },
 ): string {
   return message.content
     .filter((block): block is { type: "text"; text: string } => block.type === "text")
@@ -183,7 +181,8 @@ function reasoningForCandidate(candidate: AssistantCandidate) {
 }
 
 interface RunAssistantOptions {
-  registry: ModelRegistry;
+  /** Provider-aware ModelRuntime used for model lookup and completeSimple. */
+  modelRuntime: ModelRuntime;
   defaultProvider: string;
   defaultModelId: string;
   primaryPolicy: PiWebSubagentRunPolicy;
@@ -198,7 +197,7 @@ interface RunAssistantOptions {
  * @param model - The target model id
  * @param excerpts - Bounded evidence excerpts (NEVER raw URLs or full pages)
  * @param evidenceUrls - Source evidence metadata for audit trail
- * @param options - Model registry and policy configuration
+ * @param options - ModelRuntime and policy configuration
  *
  * @returns A structured suggestion, or null if extraction failed.
  *   Never writes to any file.
@@ -240,27 +239,28 @@ export async function runPricingAssistant(
 
   const prompt = buildExtractionPrompt(provider, model, excerpts);
   const timeoutMs = options.timeoutMs ?? 20_000;
+  const runtime = options.modelRuntime;
 
   for (const candidate of candidates) {
     try {
-      const foundModel = options.registry.find(candidate.provider, candidate.modelId);
+      const foundModel = runtime.getModel(candidate.provider, candidate.modelId);
       if (!foundModel) continue;
 
-      const auth = await options.registry.getApiKeyAndHeaders(foundModel);
-      if (!auth.ok || !auth.apiKey) continue;
+      // Ensure the provider has configured auth before spending a request.
+      const auth = await runtime.getAuth(foundModel);
+      if (!auth?.auth?.apiKey) continue;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        const message = await completeSimple(foundModel as Model<Api>, {
+        // Prefer runtime.completeSimple so model headers/baseUrl/env are applied once.
+        const message = await runtime.completeSimple(foundModel, {
           systemPrompt: EXTRACTION_SYSTEM_PROMPT,
           messages: [
             { role: "user", content: prompt, timestamp: Date.now() },
           ],
         }, {
-          apiKey: auth.apiKey,
-          headers: auth.headers,
           maxTokens: 1000,
           reasoning: reasoningForCandidate(candidate),
           timeoutMs,

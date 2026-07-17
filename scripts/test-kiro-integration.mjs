@@ -109,32 +109,39 @@ console.log("\n=== bootstrap / registry ===");
 
 const pe = read("lib/pi-provider-extensions.ts");
 
-test("fixed provider list is Grok then Kiro", () => {
+test("fixed provider list is Grok then Kiro then Antigravity", () => {
   assertIncludes(pe, "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]", "order");
   assertIncludes(pe, 'import("pi-kiro-provider")', "jiti kiro");
   assertIncludes(pe, 'import("pi-grok-cli")', "jiti grok");
-  assertIncludes(pe, "export function ensureWebProvidersBootstrapped", "neutral bootstrap");
-  assertIncludes(pe, "export async function createWebProviderAwareModelRegistry", "neutral registry");
+  assertIncludes(pe, "export function ensureWebProvidersBootstrapped", "legacy OAuth bootstrap");
+  assertIncludes(pe, "was removed for pi SDK 0.80.10", "registry helper hard-fails");
 });
 
-test("key call sites use unified factories", () => {
-  const sites = [
-    ["lib/rpc-manager.ts", "webExtensionFactories"],
-    ["lib/ypi-studio-child-session-runner.ts", "webExtensionFactories"],
-    ["app/api/models/route.ts", "webExtensionFactories"],
-    ["app/api/auth/providers/route.ts", "webExtensionFactories"],
-    ["app/api/skills/route.ts", "webExtensionFactories"],
-    ["app/api/commands/route.ts", "webExtensionFactories"],
-    ["app/api/terminal/env/assist/route.ts", "webExtensionFactories"],
-    ["app/api/trellis/workflow/assist/route.ts", "webExtensionFactories"],
+test("key call sites use ModelRuntime helpers", () => {
+  const sessionSites = [
+    ["lib/rpc-manager.ts", "createWebAgentSessionServices"],
+    ["lib/ypi-studio-child-session-runner.ts", "createWebAgentSessionServices"],
+    ["app/api/models/route.ts", "createWebAgentSessionServices"],
+    ["app/api/terminal/env/assist/route.ts", "createWebAgentSessionServices"],
+    ["app/api/trellis/workflow/assist/route.ts", "createWebAgentSessionServices"],
   ];
-  for (const [path, needle] of sites) {
+  for (const [path, needle] of sessionSites) {
     assertIncludes(read(path), needle, path);
   }
-  // Bare ModelRegistry helpers that still exist must be the provider-aware wrapper.
+  const adminSites = [
+    ["app/api/auth/providers/route.ts", "getWebModelRuntime"],
+    ["app/api/auth/all-providers/route.ts", "getWebModelRuntime"],
+  ];
+  for (const [path, needle] of adminSites) {
+    assertIncludes(read(path), needle, path);
+  }
+  // ResourceLoader-only paths still use factories without ModelRegistry.
+  assertIncludes(read("app/api/skills/route.ts"), "webExtensionFactories", "skills");
+  assertIncludes(read("app/api/commands/route.ts"), "webExtensionFactories", "commands");
   const peSource = read("lib/pi-provider-extensions.ts");
-  assertIncludes(peSource, "createWebProviderAwareModelRegistry", "registry helper");
-  assertIncludes(peSource, "ensureWebProvidersBootstrapped", "bootstrap helper");
+  assertIncludes(peSource, "createWebProviderAwareModelRegistry", "migration stub retained");
+  assertIncludes(peSource, "ensureWebProvidersBootstrapped", "legacy bootstrap helper");
+  assertIncludes(read("lib/web-model-runtime.ts"), "createWebAgentSessionServices", "runtime helper");
 });
 
 // ============================================================================
@@ -258,12 +265,16 @@ test("defaults: compact off, kiro panel off, kiro failover off", () => {
 });
 
 test("Settings places compact in Usage and Kiro toggles in Kiro section", () => {
-  assertIncludes(settings, 'renderSectionButton("kiro", "Kiro"', "kiro nav");
+  // Settings tree nav lives in SettingsTreeNavigation; SettingsConfig owns the leaf content.
+  const treeNav = read("components/SettingsTreeNavigation.tsx");
+  assertIncludes(treeNav, 'label: "Kiro"', "kiro nav label");
+  assertIncludes(treeNav, '"kiro"', "kiro section id");
   assertIncludes(settings, "顶部额度组件简要显示", "compact label");
   assertIncludes(settings, "updateUsage({ providerPanelsCompact })", "global compact");
   assertIncludes(settings, "Kiro 用量悬浮面板", "kiro panel toggle");
   assertIncludes(settings, "updateKiro({ usagePanelEnabled", "kiro panel write");
   assertIncludes(settings, "updateKiro({ autoFailover:", "kiro failover write");
+  assertIncludes(settings, 'view === "kiro"', "kiro leaf view");
 });
 
 test("AppShell mounts GPT→Grok→Kiro with one host + global mode", () => {

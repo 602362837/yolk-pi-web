@@ -23,8 +23,10 @@
 
 import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AuthStorage, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { getOAuthApiKey } from "@earendil-works/pi-ai/oauth";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import type { Credential, OAuthCredentials } from "@earendil-works/pi-ai";
+import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
+import { getWebCredentialStore } from "@/lib/web-credential-store";
 import { isSupportedOAuthAccountProvider, KIRO_PROVIDER_ID } from "./oauth-account-providers";
 import { listOAuthAccounts } from "./oauth-accounts";
 import { withKiroProviderLock } from "./kiro-account-lock";
@@ -140,7 +142,7 @@ async function readActiveStorageId(): Promise<string | null> {
 /**
  * Update auth.json for kiro only when `storageId` is still the active
  * account. Re-reads active id under the provider lock (CAS), then uses
- * AuthStorage.set which itself holds the auth.json file lock.
+ * CredentialStore.modify which holds the auth.json file lock.
  */
 async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<void> {
   try {
@@ -149,16 +151,13 @@ async function mirrorActiveCredentialIfActive(storageId: string, credential: Rec
     const currentActiveStorageId = await readActiveStorageId();
     if (currentActiveStorageId !== storageId) return;
 
-    const authStorage = AuthStorage.create();
-    // AuthStorage.set expects an AuthCredential.  kiro credentials from
-    // pi-kiro-provider lack the "type":"oauth" sentinel but are otherwise compatible.
+    // CredentialStore expects type:"oauth". kiro credentials from
+    // pi-kiro-provider lack the sentinel but are otherwise compatible.
     const authCredential = (credential as Record<string, unknown>).type
       ? credential
       : { ...credential, type: "oauth" as const };
-    authStorage.set(KIRO_PROVIDER_ID, authCredential as unknown as import("@earendil-works/pi-coding-agent").OAuthCredential);
-    if (authStorage.drainErrors().length > 0) {
-      // Non-fatal; the saved-account credential is already updated.
-    }
+    const store = await getWebCredentialStore();
+    await store.modify(KIRO_PROVIDER_ID, async () => authCredential as Credential);
   } catch {
     // Mirror update is best-effort; never let it break the token resolution.
   }
@@ -181,10 +180,15 @@ async function refreshKiroCredential(
     throw new Error("Kiro OAuth access token expired and no refresh token is available. Please re-authenticate.");
   }
 
-  // Use pi-ai's OAuth machinery.  It calls the registered kiro OAuth
-  // provider's refreshToken(), which preserves Builder ID / social metadata.
+  // Use the public OAuth compatibility helper. It calls the registered kiro
+  // OAuth provider's refreshToken(), which preserves Builder ID / social metadata.
+  const { getOAuthProvider } = await import("./pi-ai-oauth-compat");
+  if (!getOAuthProvider(KIRO_PROVIDER_ID)) {
+    const { ensureWebProvidersBootstrapped } = await import("./pi-provider-extensions");
+    await ensureWebProvidersBootstrapped();
+  }
   const result = await getOAuthApiKey(KIRO_PROVIDER_ID, {
-    [KIRO_PROVIDER_ID]: currentCredential as import("@earendil-works/pi-ai/oauth").OAuthCredentials,
+    [KIRO_PROVIDER_ID]: currentCredential as OAuthCredentials,
   });
 
   if (!result?.apiKey) {

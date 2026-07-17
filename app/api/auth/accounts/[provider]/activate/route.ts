@@ -17,7 +17,8 @@ export async function POST(
 
   try {
     const result = await activateOAuthAccount(provider, body.accountId);
-    reloadRpcAuthState();
+    // SDK-03 will make reload fully async; Promise.resolve covers both shapes.
+    await Promise.resolve(reloadRpcAuthState());
     return Response.json(result);
   } catch (error) {
     const status = error instanceof OAuthAccountStoreError ? error.status : 500;

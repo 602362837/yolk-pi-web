@@ -1,4 +1,5 @@
-import { AuthStorage, createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
+import type { AuthEvent, AuthPrompt, AuthInteraction, Credential } from "@earendil-works/pi-ai";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { sanitizeAntigravityLoginError } from "@/lib/antigravity-account-token";
 import {
   ANTIGRAVITY_PROVIDER_ID,
@@ -7,7 +8,8 @@ import {
   syncActiveOAuthAccountCredential,
 } from "@/lib/oauth-accounts";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
-import { webExtensionFactories } from "@/lib/pi-provider-extensions";
+import { createInMemoryWebCredentialStore } from "@/lib/web-credential-store";
+import { createWebModelRuntime, getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,10 @@ declare global {
 function getCallbackRegistry() {
   if (!globalThis.__piLoginCallbacks) globalThis.__piLoginCallbacks = new Map();
   return globalThis.__piLoginCallbacks;
+}
+
+function providerHasOAuth(provider: { auth?: { oauth?: unknown } } | undefined): boolean {
+  return Boolean(provider?.auth?.oauth);
 }
 
 // POST /api/auth/login/[provider] — frontend sends redirect URL or auth code
@@ -62,7 +68,7 @@ export async function GET(
     controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
   };
 
-  // AbortController propagates client disconnect into authStorage.login()
+  // AbortController propagates client disconnect into runtime.login()
   const abort = new AbortController();
   req.signal.addEventListener("abort", () => abort.abort());
 
@@ -79,20 +85,32 @@ export async function GET(
         return;
       }
 
-      // Bootstrap Grok provider so it is visible in the global OAuth registry
-      // regardless of whether a chat session has been opened.
+      // Fixed providers (Grok/Kiro/Antigravity) register on the target runtime.
+      // add-account uses an isolated in-memory credential store so Active is untouched.
       const agentDir = getAgentDir();
-      const cwd = process.cwd();
-      const baseAuth = addAccountMode ? AuthStorage.inMemory() : AuthStorage.create();
-      const services = await createAgentSessionServices({
-        cwd,
-        agentDir,
-        authStorage: baseAuth,
-        resourceLoaderOptions: { extensionFactories: webExtensionFactories() },
-      });
-      const authStorage = services.authStorage;
-      const providers = authStorage.getOAuthProviders();
-      const providerInfo = providers.find((p) => p.id === provider);
+      const memoryCredentials = addAccountMode ? createInMemoryWebCredentialStore() : undefined;
+      const runtime = addAccountMode
+        ? await createWebModelRuntime({
+            agentDir,
+            credentials: memoryCredentials,
+          })
+        : await getWebModelRuntime({ agentDir });
+
+      // Ensure fixed extension providers are present on the admin runtime.
+      // getWebModelRuntime already registers them; createWebModelRuntime for
+      // add-account needs an explicit fixed-provider load.
+      if (addAccountMode) {
+        const { createWebAgentSessionServices } = await import("@/lib/web-model-runtime");
+        await createWebAgentSessionServices({
+          cwd: agentDir,
+          agentDir,
+          modelRuntime: runtime,
+          fixedProvidersOnly: true,
+        });
+      }
+
+      const providers = runtime.getProviders();
+      const providerInfo = providers.find((p) => p.id === provider && providerHasOAuth(p));
       if (!providerInfo) {
         send(controller, { type: "error", message: `Unknown provider: ${provider}` });
         controller.close();
@@ -149,46 +167,39 @@ export async function GET(
       // Also cancel on client disconnect
       abort.signal.addEventListener("abort", cleanup);
 
-      try {
-        await authStorage.login(provider, {
-          onAuth: (info: { url: string; instructions?: string }) => {
+      const interaction: AuthInteraction = {
+        signal: abort.signal,
+        notify(event: AuthEvent) {
+          if (event.type === "auth_url") {
             const request = getManualInputRequest();
             send(controller, {
               type: "auth",
-              url: info.url,
-              instructions: info.instructions ?? null,
+              url: event.url,
+              instructions: event.instructions ?? null,
               token: request.token,
             });
-          },
-          onDeviceCode: (info: {
-            userCode: string;
-            verificationUri: string;
-            intervalSeconds?: number;
-            expiresInSeconds?: number;
-          }) => {
+            return;
+          }
+          if (event.type === "device_code") {
             send(controller, {
               type: "device_code",
-              userCode: info.userCode,
-              verificationUri: info.verificationUri,
-              intervalSeconds: info.intervalSeconds ?? null,
-              expiresInSeconds: info.expiresInSeconds ?? null,
+              userCode: event.userCode,
+              verificationUri: event.verificationUri,
+              intervalSeconds: event.intervalSeconds ?? null,
+              expiresInSeconds: event.expiresInSeconds ?? null,
             });
-          },
-          onPrompt: async (prompt: { message: string; placeholder?: string }) => {
-            const request = getManualInputRequest();
-            send(controller, {
-              type: "prompt_request",
-              message: prompt.message,
-              placeholder: prompt.placeholder ?? null,
-              token: request.token,
-            });
-            const value = await request.promise;
-            return value;
-          },
-          onProgress: (message: string) => {
-            send(controller, { type: "progress", message });
-          },
-          onSelect: async (prompt: { message: string; options: { id: string; label: string }[] }) => {
+            return;
+          }
+          if (event.type === "progress") {
+            send(controller, { type: "progress", message: event.message });
+            return;
+          }
+          if (event.type === "info") {
+            send(controller, { type: "progress", message: event.message });
+          }
+        },
+        async prompt(prompt: AuthPrompt): Promise<string> {
+          if (prompt.type === "select") {
             const request = createClientInputRequest();
             send(controller, {
               type: "select_request",
@@ -197,20 +208,32 @@ export async function GET(
               token: request.token,
             });
             const value = await request.promise;
-            return value || undefined;
-          },
-          onManualCodeInput: () => getManualInputRequest().promise,
-          signal: abort.signal,
-        });
+            return value || "";
+          }
+
+          // text / secret / manual_code share the existing token + POST backfill path.
+          const request = getManualInputRequest();
+          send(controller, {
+            type: "prompt_request",
+            message: prompt.message,
+            placeholder: "placeholder" in prompt ? (prompt.placeholder ?? null) : null,
+            token: request.token,
+          });
+          return request.promise;
+        },
+      };
+
+      try {
+        const credential = await runtime.login(provider, "oauth", interaction);
 
         if (addAccountMode) {
-          const account = await saveOAuthAccountCredential(provider, authStorage.get(provider));
+          const account = await saveOAuthAccountCredential(provider, credential as Credential);
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {
           if (isSupportedOAuthAccountProvider(provider)) {
-            await syncActiveOAuthAccountCredential(provider, authStorage).catch(() => {});
+            await syncActiveOAuthAccountCredential(provider).catch(() => {});
           }
-          reloadRpcAuthState();
+          await Promise.resolve(reloadRpcAuthState());
           send(controller, { type: "success" });
         }
       } catch (err) {

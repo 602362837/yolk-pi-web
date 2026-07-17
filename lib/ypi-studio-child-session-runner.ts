@@ -2,7 +2,7 @@ import type { ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import { readSessionHeaderFromFile } from "./session-project-link";
 import { writeSessionHeader } from "./ypi-studio-child-session-header";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
-import { webExtensionFactories } from "./pi-provider-extensions";
+import { createWebAgentSessionServices } from "./web-model-runtime";
 import {
   appendYpiStudioSubagentTranscriptItem,
   finalizeYpiStudioSubagentTranscript,
@@ -220,14 +220,18 @@ function updateStudioChildHeader(filePath: string | undefined, patch: Partial<St
   }
 }
 
-function modelFromPolicyArg(policy: ResolvedYpiStudioMemberPolicy, modelRegistry: { find?: (provider: string, modelId: string) => unknown }, warnings: string[]): unknown {
+function modelFromPolicyArg(
+  policy: ResolvedYpiStudioMemberPolicy,
+  modelRuntime: { getModel?: (provider: string, modelId: string) => unknown },
+  warnings: string[],
+): unknown {
   const arg = policy.modelArg;
   if (!arg) return undefined;
   const slash = arg.indexOf("/");
   if (slash <= 0 || slash === arg.length - 1) return undefined;
   const provider = arg.slice(0, slash);
   const modelId = arg.slice(slash + 1);
-  const model = modelRegistry.find?.(provider, modelId);
+  const model = modelRuntime.getModel?.(provider, modelId);
   if (!model) warnings.push(`Configured Studio child model ${arg} was not found; using Pi default model.`);
   return model;
 }
@@ -598,19 +602,23 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
     }
 
     // Grok session pin is retired. Studio children use the global Active
-    // account via auth.json like normal sessions.
-
-    const services = await pi.createAgentSessionServices({
+    // account via auth.json like normal sessions. Each child gets an isolated
+    // ModelRuntime/services so cwd-local extension providers cannot leak from
+    // the parent Chat runtime; fixed providers still register on this target.
+    const services = await createWebAgentSessionServices({
       cwd: root,
       agentDir,
-      resourceLoaderOptions: {
-        extensionFactories: webExtensionFactories([createYpiStudioChildGuardExtension({ workspaceRoot: root, blockTaskJsonWrites: true })]),
-      },
+      extraExtensions: [
+        createYpiStudioChildGuardExtension({
+          workspaceRoot: root,
+          blockTaskJsonWrites: true,
+        }),
+      ],
     });
     for (const diagnostic of services.diagnostics ?? []) {
       if (diagnostic.type === "warning" || diagnostic.type === "error") addWarning(diagnostic.message);
     }
-    const model = modelFromPolicyArg(policy, services.modelRegistry, warnings);
+    const model = modelFromPolicyArg(policy, services.modelRuntime, warnings);
     const result = await pi.createAgentSessionFromServices({
       services,
       sessionManager,

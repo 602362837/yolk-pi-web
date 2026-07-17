@@ -93,7 +93,12 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
   const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
 
-  const oauth = await import("@earendil-works/pi-ai/oauth");
+  // Use the app oauth-compat registry (same path as production token refresh).
+  // pi-ai 0.80.8+ no longer exports a runtime registerOAuthProvider from
+  // @earendil-works/pi-ai/oauth.
+  const oauth = await jiti.import(
+    pathToFileURL(join(root, "lib/pi-ai-oauth-compat.ts")).href,
+  );
   const {
     registerOAuthProvider,
     unregisterOAuthProvider,
@@ -153,7 +158,13 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
     const { getAntigravityAccessToken } = await jiti.import(
       pathToFileURL(join(root, "lib/antigravity-account-token.ts")).href,
     );
-    const { AuthStorage } = await import("@earendil-works/pi-coding-agent");
+    const { getWebCredentialStore } = await jiti.import(
+      pathToFileURL(join(root, "lib/web-credential-store.ts")).href,
+    );
+    const readActiveMirror = async () => {
+      const store = await getWebCredentialStore();
+      return store.read(ANTIGRAVITY_PROVIDER_ID);
+    };
 
     const first = await saveOAuthAccountCredential(ANTIGRAVITY_PROVIDER_ID, {
       access: "prod-access-a",
@@ -193,7 +204,7 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
     listed = await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID);
     assert.equal(listed.activeAccountId, second.accountId, "Activate B must win Active metadata");
 
-    const mirroredB = AuthStorage.create().get(ANTIGRAVITY_PROVIDER_ID);
+    const mirroredB = await readActiveMirror();
     assert.ok(mirroredB, "auth.json must have google-antigravity credential");
     const mirroredBAccess = String(/** @type {Record<string, unknown>} */ (mirroredB).access ?? "");
     const mirroredBRefresh = String(/** @type {Record<string, unknown>} */ (mirroredB).refresh ?? "");
@@ -237,7 +248,7 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
     listed = await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID);
     assert.equal(listed.activeAccountId, first.accountId, "Activate A must win Active metadata");
 
-    const mirroredA = AuthStorage.create().get(ANTIGRAVITY_PROVIDER_ID);
+    const mirroredA = await readActiveMirror();
     assert.ok(mirroredA, "auth.json must have google-antigravity credential after Activate A");
     const mirroredAAccess = String(/** @type {Record<string, unknown>} */ (mirroredA).access ?? "");
     const mirroredARefresh = String(/** @type {Record<string, unknown>} */ (mirroredA).refresh ?? "");
@@ -280,7 +291,7 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
 
     listed = await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID);
     assert.equal(listed.activeAccountId, second.accountId, "late Activate after held refresh must still win Active");
-    const finalMirror = AuthStorage.create().get(ANTIGRAVITY_PROVIDER_ID);
+    const finalMirror = await readActiveMirror();
     assert.ok(finalMirror);
     assert.equal(
       String(/** @type {Record<string, unknown>} */ (finalMirror).refresh ?? ""),

@@ -1,5 +1,4 @@
-import { AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { ensureWebProvidersBootstrapped } from "@/lib/pi-provider-extensions";
+import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 const DEEPSEEK_PROVIDER_ID = "deepseek";
 const DEEPSEEK_BALANCE_URL = "https://api.deepseek.com/user/balance";
@@ -137,15 +136,14 @@ export async function getDeepSeekProviderBalance(provider: string): Promise<Deep
     return errorResult(provider, false, `Unsupported provider: ${provider}`);
   }
 
-  await ensureWebProvidersBootstrapped();
-  const authStorage = AuthStorage.create();
-  const registry = ModelRegistry.create(authStorage);
-  const status = registry.getProviderAuthStatus(provider);
+  const runtime = await getWebModelRuntime();
+  const status = runtime.getProviderAuthStatus(provider);
   if (!status.configured) return notConfiguredResult(provider);
 
   let apiKey: string | undefined;
   try {
-    apiKey = await registry.getApiKeyForProvider(provider);
+    const auth = await runtime.getAuth(provider);
+    apiKey = auth?.auth.apiKey;
   } catch (error) {
     return errorResult(provider, true, errorMessage(error));
   }

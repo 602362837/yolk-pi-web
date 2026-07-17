@@ -259,7 +259,7 @@ export async function attemptGrokAccountFailover(options: {
   provider: string | undefined;
   message: unknown;
   budget: GrokAccountFailoverTurnBudget;
-  reloadAuthState: () => void | number;
+  reloadAuthState: () => void | number | Promise<void | number>;
   triggerAccountId?: string | null;
 }): Promise<GrokAccountFailoverResult> {
   const provider = options.provider ?? "";
@@ -354,7 +354,7 @@ export async function attemptGrokAccountFailover(options: {
 
     await activateOAuthAccount(GROK_CLI_PROVIDER_ID, nextAccountId);
     state.lastSwitchAt = now();
-    options.reloadAuthState();
+    await options.reloadAuthState();
     options.budget.switches += 1;
     return {
       status: "switched",

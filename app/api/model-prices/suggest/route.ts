@@ -17,9 +17,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
-import { webExtensionFactories } from "@/lib/pi-provider-extensions";
+import { createWebAgentSessionServices } from "@/lib/web-model-runtime";
 import { readPiWebConfig } from "@/lib/pi-web-config";
 import {
   tryDeterministicMatch,
@@ -167,12 +167,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return errorResponse(403, "Access denied");
     }
 
-    // 3. Create services and read config (fixed Web providers always loaded)
+    // 3. Create fixed-provider services and read config
     const agentDir = getAgentDir();
-    const services = await createAgentSessionServices({
+    const services = await createWebAgentSessionServices({
       cwd,
       agentDir,
-      resourceLoaderOptions: { extensionFactories: webExtensionFactories() },
+      fixedProvidersOnly: true,
     });
     const config = readPiWebConfig();
     const defaultProvider = services.settingsManager.getDefaultProvider();
@@ -298,7 +298,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             evidenceUrls: t.evidenceUrls,
           })),
           {
-            registry: services.modelRegistry,
+            modelRuntime: services.modelRuntime,
             defaultProvider: effectiveDefaultProvider,
             defaultModelId: effectiveDefaultModelId,
             primaryPolicy: config.usage.pricingAssistant,

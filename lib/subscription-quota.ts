@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
 import { extractOpenAICodexAccountId, getOAuthAccountAccessToken, listOAuthAccounts, readOAuthAccountCredential, syncActiveOAuthAccountCredential, updateOAuthAccountQuotaCache } from "@/lib/oauth-accounts";
+import { getWebCredentialStore } from "@/lib/web-credential-store";
+import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export type CredentialStatus = "valid" | "expired" | "not_found" | "parse_error";
 
@@ -381,8 +382,8 @@ async function cacheAccountQuota(provider: string, storageId: string | null, quo
 async function resolveActiveOpenAICodexCredential(provider: string): Promise<ResolvedActiveCredential | SubscriptionQuota> {
   if (provider !== OPENAI_CODEX_PROVIDER) return quotaNotFound(provider);
 
-  const authStorage = AuthStorage.create();
-  const storedCredential = authStorage.get(provider) as StoredOAuthCredential | undefined;
+  const store = await getWebCredentialStore();
+  const storedCredential = await store.read(provider) as StoredOAuthCredential | undefined;
   if (storedCredential?.type !== "oauth") return quotaNotFound(provider);
   if (Date.now() >= storedCredential.expires && !storedCredential.refresh.trim()) {
     return quotaError(provider, "expired", "OAuth access token expired and no refresh token is available. Please re-import the credential or log in again.");
@@ -390,7 +391,11 @@ async function resolveActiveOpenAICodexCredential(provider: string): Promise<Res
 
   let accessToken: string | undefined;
   try {
-    accessToken = await authStorage.getApiKey(provider, { includeFallback: false });
+    // ModelRuntime.getAuth performs OAuth refresh under the credential store lock
+    // and applies provider headers/env through the canonical path.
+    const runtime = await getWebModelRuntime();
+    const auth = await runtime.getAuth(provider);
+    accessToken = auth?.auth.apiKey;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return quotaError(provider, "expired", message);
@@ -398,8 +403,8 @@ async function resolveActiveOpenAICodexCredential(provider: string): Promise<Res
 
   if (!accessToken) return quotaError(provider, "expired", "OAuth token unavailable. Please re-login.");
 
-  await syncActiveOAuthAccountCredential(provider, authStorage).catch(() => {});
-  const refreshedCredential = authStorage.get(provider) as StoredOAuthCredential | undefined;
+  await syncActiveOAuthAccountCredential(provider, store).catch(() => {});
+  const refreshedCredential = await store.read(provider) as StoredOAuthCredential | undefined;
   // The active entry is the saved-account identity. The credential account id remains
   // the real ChatGPT id and must never be used as a metadata/cache key.
   const activeStorageId = (await listOAuthAccounts(provider)).activeAccountId;

@@ -1,18 +1,18 @@
 /**
  * pi-provider-extensions — unified provider extension factory list
  *
- * Every Web entrypoint that creates a ResourceLoader, calls
- * `createAgentSessionServices`, or bootstraps Auth/Models must include these
- * factories so dynamic providers (currently grok-cli, kiro, and
- * google-antigravity) are consistently registered in the process-global pi-ai
- * OAuth registry and in each ModelRegistry instance.
+ * Every Web entrypoint that creates session services or a provider-aware
+ * ModelRuntime must include these factories so dynamic providers (currently
+ * grok-cli, kiro, and google-antigravity) register on the *target*
+ * ModelRuntime. Prefer `createWebAgentSessionServices` /
+ * `getWebModelRuntime` from `lib/web-model-runtime.ts` over process-global
+ * bootstrap side effects.
  *
  * ## Invariant
  *
- * Any `ModelRegistry.create()` or `ModelRegistry.refresh()` call must be fed
- * through a path that loads these factories first; otherwise a cold
- * registry-reset can remove grok-cli / kiro / google-antigravity from the
- * global pi-ai provider set.
+ * Fixed providers must be injected into the ModelRuntime that will serve the
+ * request. Do not treat a throwaway global bootstrap as a guarantee that a
+ * different runtime has Grok/Kiro/Antigravity registered.
  */
 
 import { createRequire } from "node:module";
@@ -37,14 +37,93 @@ export function resolveRuntimePackageAnchor(cwd: string = process.cwd()): string
 }
 
 /**
+ * Resolve an installed package entry for jiti alias maps without import.meta.url.
+ * Falls back through createRequire + node_modules walk, same as package.json.
+ */
+export function resolveInstalledPackageEntry(
+  packageName: string,
+  subpath: string = ".",
+  cwd: string = process.cwd(),
+): string {
+  const req = createRequire(resolveRuntimePackageAnchor(cwd));
+  try {
+    return req.resolve(subpath === "." ? packageName : `${packageName}/${subpath}`);
+  } catch {
+    // Some packages omit subpath exports that Node can still open by file path.
+  }
+  const pkgJson = resolveInstalledPackageJson(packageName, cwd);
+  const pkgDir = dirname(pkgJson);
+  if (subpath === "." || subpath === "") {
+    const pkg = JSON.parse(readFileSync(pkgJson, "utf8")) as {
+      module?: string;
+      main?: string;
+      exports?: unknown;
+    };
+    const main = typeof pkg.module === "string" ? pkg.module : typeof pkg.main === "string" ? pkg.main : "index.js";
+    return join(pkgDir, main);
+  }
+  // Known pi-ai subpaths used by the SDK extension loader.
+  const candidates = [
+    join(pkgDir, "dist", `${subpath}.js`),
+    join(pkgDir, "dist", subpath, "index.js"),
+    join(pkgDir, `${subpath}.js`),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return join(pkgDir, "dist", `${subpath}.js`);
+}
+
+function resolvePiAiOauthCompatEntry(cwd: string = process.cwd()): string {
+  // Prefer the app-owned shim so third-party fixed providers that still call
+  // registerOAuthProvider can finish pi.registerProvider on 0.80.10.
+  const localTs = join(cwd, "lib", "pi-ai-oauth-compat.ts");
+  if (existsSync(localTs)) return localTs;
+  // Production / published layouts may compile under different roots; fall back
+  // to the type-only package entry rather than crashing alias construction.
+  try {
+    return resolveInstalledPackageEntry("@earendil-works/pi-ai", "oauth", cwd);
+  } catch {
+    return localTs;
+  }
+}
+
+/**
  * Create a jiti loader anchored at the running package root (process.cwd()).
  *
  * `ypi` / `next start` set cwd to the package directory, so this resolves
  * published dependencies from that install's node_modules without baking
  * build-time absolute paths into the production bundle.
+ *
+ * Alias map mirrors the coding-agent extension loader for fixed providers:
+ * - `@earendil-works/pi-ai` → compat entry (legacy global API for extensions)
+ * - `@earendil-works/pi-ai/oauth` → Web runtime shim (registerOAuthProvider)
+ *
+ * Anchors never use import.meta.url alone so production bundles stay portable.
  */
 export function createRuntimeJiti(cwd: string = process.cwd()): Jiti {
-  return createJiti(resolveRuntimePackageAnchor(cwd), { interopDefault: true });
+  const alias: Record<string, string> = {};
+  try {
+    const piAiCompat = resolveInstalledPackageEntry("@earendil-works/pi-ai", "compat", cwd);
+    const piAiOauth = resolvePiAiOauthCompatEntry(cwd);
+    const piAiProviders = resolveInstalledPackageEntry("@earendil-works/pi-ai", "providers/all", cwd);
+    alias["@earendil-works/pi-ai"] = piAiCompat;
+    alias["@earendil-works/pi-ai/compat"] = piAiCompat;
+    alias["@earendil-works/pi-ai/oauth"] = piAiOauth;
+    alias["@earendil-works/pi-ai/providers/all"] = piAiProviders;
+    // Historical package renames still referenced by some extension sources.
+    alias["@mariozechner/pi-ai"] = piAiCompat;
+    alias["@mariozechner/pi-ai/compat"] = piAiCompat;
+    alias["@mariozechner/pi-ai/oauth"] = piAiOauth;
+    alias["@mariozechner/pi-ai/providers/all"] = piAiProviders;
+  } catch {
+    // Best-effort aliases; plain resolution still works for packages that do
+    // not need the compat surface.
+  }
+  return createJiti(resolveRuntimePackageAnchor(cwd), {
+    interopDefault: true,
+    ...(Object.keys(alias).length > 0 ? { alias } : {}),
+  });
 }
 
 /**
@@ -105,8 +184,10 @@ export const ANTIGRAVITY_OAUTH_CALLBACK_HOST_ENV = "PI_OAUTH_CALLBACK_HOST";
  * constant on first import, so the Web loader forces the safe value first.
  */
 export function resolveAntigravityOAuthCallbackHost(
-  _envValue?: string | undefined,
+  envValue?: string | undefined,
 ): string {
+  // Policy ignores the raw env value: only loopback is allowed.
+  void envValue;
   return ANTIGRAVITY_OAUTH_CALLBACK_HOST;
 }
 
@@ -304,8 +385,8 @@ export const grokSessionAccountExtension: InlineExtension = {
 /**
  * Fixed Web provider extension list (Grok → Kiro → Antigravity).
  *
- * Always load all three before any call-site `extra` factories so ModelRegistry
- * refresh cannot drop any fixed provider from the process-global set.
+ * Always load all three before any call-site `extra` factories so the target
+ * ModelRuntime receives every fixed provider registration.
  */
 export function webProviderExtensions(): InlineExtension[] {
   return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension];
@@ -326,19 +407,18 @@ export function webExtensionFactories(extra: InlineExtension[] = []): InlineExte
 }
 
 // ---------------------------------------------------------------------------
-// Cold-bootstrap guard for standalone ModelRegistry.create() callers
+// Legacy OAuth / cold-path bootstrap (NOT a ModelRuntime catalog guarantee)
 // ---------------------------------------------------------------------------
 
 /**
- * One-shot promise that ensures fixed Web providers (Grok + Kiro +
- * Antigravity) are registered in the process-global pi-ai OAuth/provider
- * registry before any standalone `ModelRegistry.create()` call. Without this,
- * a cold `ModelRegistry` that later calls `refresh()` can reset the global
- * registry and drop grok-cli / kiro / google-antigravity.
+ * One-shot promise that preloads fixed Web provider OAuth implementations into
+ * the process-global pi-ai registry for legacy token-compatibility paths that
+ * still call public OAuth helpers outside a target ModelRuntime.
  *
- * This is intentionally lightweight: it creates a temporary services bundle
- * purely to trigger extension loading, then discards the services. The
- * extension registration is durable in the process-global pi-ai registry.
+ * This is **not** a substitute for registering providers on the ModelRuntime
+ * that will serve Models/Auth/Chat requests. Prefer
+ * `createWebAgentSessionServices` / `getWebModelRuntime` from
+ * `lib/web-model-runtime.ts` for catalog and request auth.
  */
 let _webProvidersBootstrapPromise: Promise<void> | null = null;
 
@@ -349,8 +429,8 @@ export function ensureWebProvidersBootstrapped(): Promise<void> {
 }
 
 /**
- * @deprecated Prefer `ensureWebProvidersBootstrapped()`. Alias retained so
- * older Grok-named call sites and tests keep working during migration.
+ * @deprecated Prefer `ensureWebProvidersBootstrapped()` only for legacy OAuth
+ * preload. Alias retained so older Grok-named call sites and tests keep working.
  */
 export function ensureGrokBootstrapped(): Promise<void> {
   return ensureWebProvidersBootstrapped();
@@ -358,14 +438,15 @@ export function ensureGrokBootstrapped(): Promise<void> {
 
 async function _bootstrapWebProvidersOnce(): Promise<void> {
   try {
-    const { createAgentSessionServices, getAgentDir } = await import("@earendil-works/pi-coding-agent");
-    // Create a throwaway services bundle just to load fixed providers into the
-    // process-global pi-ai registry. We do NOT keep the returned services
-    // alive — the registry side effect is all we need.
-    await createAgentSessionServices({
+    // Prefer the provider-aware services helper so fixed factories land on a
+    // real ModelRuntime. The services bundle is discarded; only the process
+    // OAuth preload side effect is retained for legacy compatibility helpers.
+    const { createWebAgentSessionServices } = await import("./web-model-runtime");
+    const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
+    await createWebAgentSessionServices({
       cwd: process.cwd(),
       agentDir: getAgentDir(),
-      resourceLoaderOptions: { extensionFactories: webProviderExtensions() },
+      fixedProvidersOnly: true,
     });
   } catch {
     // Best-effort only. If the extension cannot load (missing dep, bad
@@ -375,29 +456,28 @@ async function _bootstrapWebProvidersOnce(): Promise<void> {
 }
 
 /**
- * Create a ModelRegistry whose `refresh()` preserves fixed Web providers
- * (Grok + Kiro + Antigravity) in the global pi-ai provider set. Prefer
- * `createAgentSessionServices` with `webExtensionFactories()` for richer call
- * sites; use this helper only when you genuinely need a bare `ModelRegistry`
- * (e.g. when offline api-key management must not depend on a full
- * session-services load).
+ * @deprecated Removed in the 0.80.10 migration. `ModelRegistry.create()` and
+ * public `AuthStorage` no longer exist. Use `getWebModelRuntime()` or
+ * `createWebAgentSessionServices()` from `lib/web-model-runtime.ts`.
+ *
+ * Retained as a hard error so cold call sites fail loudly during migration
+ * instead of silently using a half-upgraded path.
  */
 export async function createWebProviderAwareModelRegistry(
-  authStorage: import("@earendil-works/pi-coding-agent").AuthStorage,
-  modelsPath?: string,
-): Promise<import("@earendil-works/pi-coding-agent").ModelRegistry> {
-  const { ModelRegistry } = await import("@earendil-works/pi-coding-agent");
-  await ensureWebProvidersBootstrapped();
-  return ModelRegistry.create(authStorage, modelsPath);
+  ..._args: unknown[]
+): Promise<never> {
+  void _args;
+  throw new Error(
+    "createWebProviderAwareModelRegistry was removed for pi SDK 0.80.10; use getWebModelRuntime() or createWebAgentSessionServices()",
+  );
 }
 
 /**
- * @deprecated Prefer `createWebProviderAwareModelRegistry()`. Alias retained
- * for compatibility with older Grok-named call sites and tests.
+ * @deprecated See `createWebProviderAwareModelRegistry`.
  */
 export async function createGrokAwareModelRegistry(
-  authStorage: import("@earendil-works/pi-coding-agent").AuthStorage,
-  modelsPath?: string,
-): Promise<import("@earendil-works/pi-coding-agent").ModelRegistry> {
-  return createWebProviderAwareModelRegistry(authStorage, modelsPath);
+  ..._args: unknown[]
+): Promise<never> {
+  void _args;
+  return createWebProviderAwareModelRegistry();
 }

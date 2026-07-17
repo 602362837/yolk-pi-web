@@ -3,9 +3,9 @@
  *
  * Manages multiple API Key "accounts" per provider (currently: opencode-go, xai)
  * in a dedicated application-managed directory, keeping upstream pi SDK /
- * AuthStorage unaware of multi-account semantics.  The currently active
- * credential is always mirrored back to `auth.json` so runtime auth reads
- * continue to work through the existing `AuthStorage.get(provider)` contract.
+ * CredentialStore/ModelRuntime unaware of multi-account semantics.  The currently
+ * active credential is always mirrored back to `auth.json` so runtime auth reads
+ * continue to work through the Web CredentialStore / ModelRuntime.getAuth path.
  *
  * Security boundaries:
  * - Metadata files never contain plaintext keys (only masked previews and
@@ -19,7 +19,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { access, chmod, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AuthStorage, getAgentDir, type ApiKeyCredential } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import type { ApiKeyCredential } from "@earendil-works/pi-ai";
+import { getWebCredentialStore } from "@/lib/web-credential-store";
 
 // ---------------------------------------------------------------------------
 // Provider allowlist — only listed providers enter managed accounts mode.
@@ -366,16 +368,17 @@ async function mirrorActiveCredential(
   provider: string,
   action: { type: "set"; credential: ApiKeyCredential } | { type: "clear" },
 ): Promise<void> {
-  const authStorage = AuthStorage.create();
+  const store = await getWebCredentialStore();
   if (action.type === "set") {
-    authStorage.set(provider, action.credential);
+    await store.modify(provider, async () => action.credential);
   } else {
-    authStorage.remove(provider);
+    await store.delete(provider);
   }
   // Lazily import reloadRpcAuthState to avoid a static circular import
   // between this module and rpc-manager.
   const { reloadRpcAuthState } = await import("@/lib/rpc-manager");
-  reloadRpcAuthState();
+  // SDK-03 will make this fully async; Promise.resolve covers both shapes.
+  await Promise.resolve(reloadRpcAuthState());
 }
 
 // ---------------------------------------------------------------------------
@@ -393,8 +396,8 @@ async function mirrorActiveCredential(
 export async function importLegacyKeyIfNeeded(provider: string): Promise<boolean> {
   assertManagedProvider(provider);
 
-  const authStorage = AuthStorage.create();
-  const credential = authStorage.get(provider);
+  const store = await getWebCredentialStore();
+  const credential = await store.read(provider);
   if (!credential || credential.type !== "api_key" || !credential.key) return false;
 
   const fingerprint = fingerprintApiKey(credential.key);
@@ -828,8 +831,8 @@ export async function getApiKeyProviderSummary(
   // a legacy import on first access.  But for a lightweight summary, just
   // check whether auth.json has a credential.
   const hasLocalAccounts = metadata.accounts.length > 0;
-  const authStorage = AuthStorage.create();
-  const credential = authStorage.get(provider);
+  const store = await getWebCredentialStore();
+  const credential = await store.read(provider);
   const configured =
     hasLocalAccounts ||
     (credential?.type === "api_key" && typeof credential.key === "string");

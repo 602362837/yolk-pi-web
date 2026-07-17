@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { completeSimple, type AssistantMessage } from "@earendil-works/pi-ai/compat";
-import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { webExtensionFactories } from "@/lib/pi-provider-extensions";
+import type { AssistantMessage } from "@earendil-works/pi-ai/compat";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { createWebAgentSessionServices } from "@/lib/web-model-runtime";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { readPiWebConfig, type PiWebSubagentRunPolicy } from "@/lib/pi-web-config";
 
@@ -80,7 +80,12 @@ export async function POST(request: NextRequest) {
     const allowedRoots = await getAllowedRoots();
     if (!isPathAllowed(cwd, allowedRoots)) return NextResponse.json({ error: "Access denied" }, { status: 403 });
 
-    const services = await createAgentSessionServices({ cwd, agentDir: getAgentDir(), resourceLoaderOptions: { extensionFactories: webExtensionFactories() } });
+    const services = await createWebAgentSessionServices({
+      cwd,
+      agentDir: getAgentDir(),
+      fixedProvidersOnly: true,
+    });
+    const runtime = services.modelRuntime;
     const config = readPiWebConfig();
     const defaultProvider = services.settingsManager.getDefaultProvider();
     const defaultModelId = services.settingsManager.getDefaultModel();
@@ -93,18 +98,16 @@ export async function POST(request: NextRequest) {
     if (fallback && !candidates.some((item) => item.provider === fallback.provider && item.modelId === fallback.modelId && item.thinking === fallback.thinking)) candidates.push(fallback);
 
     for (const candidate of candidates) {
-      const model = services.modelRegistry.find(candidate.provider, candidate.modelId);
+      const model = runtime.getModel(candidate.provider, candidate.modelId);
       if (!model) continue;
-      const auth = await services.modelRegistry.getApiKeyAndHeaders(model);
-      if (!auth.ok || !auth.apiKey) continue;
+      const auth = await runtime.getAuth(model);
+      if (!auth?.auth?.apiKey) continue;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), ASSIST_TIMEOUT_MS);
       try {
-        const message = await completeSimple(model, {
+        const message = await runtime.completeSimple(model, {
           messages: [{ role: "user", content: buildPrompt(raw), timestamp: Date.now() }],
         }, {
-          apiKey: auth.apiKey,
-          headers: auth.headers,
           maxTokens: 2000,
           reasoning: reasoningForCandidate(candidate),
           timeoutMs: ASSIST_TIMEOUT_MS,

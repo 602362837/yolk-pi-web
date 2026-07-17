@@ -1,7 +1,7 @@
 /**
  * Model prices API — sanitized price listing and revision-gated patch.
  *
- * GET  — Lists resolved model prices from the Pi ModelRegistry (never
+ * GET  — Lists resolved model prices from a provider-aware ModelRuntime (never
  *         exposes secrets, absolute paths, or full models.json).
  * PATCH — Applies batched price changes to models.json with revision-based
  *         concurrency control (409 on conflict). Always returns no-store.
@@ -9,9 +9,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { stat } from "fs/promises";
-import { createAgentSessionServices, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
-import { webExtensionFactories } from "@/lib/pi-provider-extensions";
+import { getWebModelRuntime } from "@/lib/web-model-runtime";
 import {
   buildModelPriceListResponse,
   applyPricePatch,
@@ -67,21 +67,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return errorResponse(403, "Access denied");
     }
 
-    // Create ModelRegistry for the given cwd with fixed Web providers loaded
-    // so refresh cannot drop grok-cli / kiro from the process-global set.
+    // Fixed-provider administrative ModelRuntime (keyed cache; offline refresh).
+    // Does not load cwd-local project extensions.
     const agentDir = getAgentDir();
-    const services = await createAgentSessionServices({
-      cwd,
-      agentDir,
-      resourceLoaderOptions: { extensionFactories: webExtensionFactories() },
-    });
-    const registry = services.modelRegistry;
+    const runtime = await getWebModelRuntime({ agentDir, cwd });
 
     // Read models.json raw for override/custom-model detection
     const raw = readModelsJsonRaw();
 
     // Build the sanitized projection
-    const response = buildModelPriceListResponse(registry, raw.parsed, raw.revision);
+    const response = buildModelPriceListResponse(runtime, raw.parsed, raw.revision);
 
     return NextResponse.json(response, { headers: NO_STORE });
   } catch {

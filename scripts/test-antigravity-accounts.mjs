@@ -235,10 +235,13 @@ test("providers route includes Antigravity display name", () => {
 
 test("login route supports add-account mode and sanitizes Antigravity errors", () => {
   assertIncludes(loginRoute, "isSupportedOAuthAccountProvider(provider)", "checks provider support");
-  assertIncludes(loginRoute, "saveOAuthAccountCredential(provider, authStorage.get(provider))", "saves managed account");
+  assertIncludes(loginRoute, "createInMemoryWebCredentialStore", "add-account uses isolated memory store");
+  assertIncludes(loginRoute, "createWebModelRuntime", "add-account uses isolated ModelRuntime");
+  assertIncludes(loginRoute, "saveOAuthAccountCredential(provider, credential", "saves managed account from login credential");
   assertIncludes(loginRoute, "sanitizeAntigravityLoginError", "sanitizes Antigravity login errors");
   assertIncludes(loginRoute, "ANTIGRAVITY_PROVIDER_ID", "Antigravity-specific sanitization branch");
   assertIncludes(loginRoute, "reloadRpcAuthState()", "reloads live auth after login");
+  assertNotIncludes(loginRoute, "authStorage.get(", "no AuthStorage.get path");
 });
 
 test("accounts routes stay generic and do not hard-code secrets", () => {

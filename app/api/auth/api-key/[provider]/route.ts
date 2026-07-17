@@ -1,5 +1,3 @@
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
-import { createWebProviderAwareModelRegistry } from "@/lib/pi-provider-extensions";
 import { NextResponse } from "next/server";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import {
@@ -12,6 +10,8 @@ import {
   activateApiKeyAccount,
   ApiKeyAccountStoreError,
 } from "@/lib/api-key-accounts";
+import { getWebCredentialStore } from "@/lib/web-credential-store";
+import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +23,11 @@ type Params = { params: Promise<{ provider: string }> };
 // consumers can detect managed mode without calling /api/auth/all-providers.
 export async function GET(_req: Request, { params }: Params) {
   const { provider } = await params;
-  const authStorage = AuthStorage.create();
-  const registry = await createWebProviderAwareModelRegistry(authStorage);
-  const status = registry.getProviderAuthStatus(provider);
-  const displayName = registry.getProviderDisplayName(provider);
-  const models = registry.getAll().filter((m) => m.provider === provider).length;
+  const runtime = await getWebModelRuntime();
+  const status = runtime.getProviderAuthStatus(provider);
+  const providerMeta = runtime.getProvider(provider);
+  const displayName = providerMeta?.name ?? provider;
+  const models = runtime.getModels(provider).length;
 
   const base: Record<string, unknown> = {
     provider,
@@ -97,10 +97,10 @@ export async function POST(req: Request, { params }: Params) {
       return NextResponse.json({ success: true });
     }
 
-    // Single-key provider: original behaviour.
-    const authStorage = AuthStorage.create();
-    authStorage.set(provider, { type: "api_key", key: newKey });
-    reloadRpcAuthState();
+    // Single-key provider: original behaviour via CredentialStore.
+    const store = await getWebCredentialStore();
+    await store.modify(provider, async () => ({ type: "api_key" as const, key: newKey }));
+    await Promise.resolve(reloadRpcAuthState());
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof ApiKeyAccountStoreError) {
@@ -137,9 +137,9 @@ export async function DELETE(_req: Request, { params }: Params) {
       // the auth.json single key directly.
     }
 
-    const authStorage = AuthStorage.create();
-    authStorage.remove(provider);
-    reloadRpcAuthState();
+    const store = await getWebCredentialStore();
+    await store.delete(provider);
+    await Promise.resolve(reloadRpcAuthState());
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

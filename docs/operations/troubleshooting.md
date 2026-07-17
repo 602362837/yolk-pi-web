@@ -128,7 +128,7 @@ Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independen
 1. Confirm `pi-kiro-provider` is installed and listed in `next.config.ts` `serverExternalPackages` with `jiti`.
 2. Confirm the process loaded `webProviderExtensions()` / `ensureWebProvidersBootstrapped()` — opening Chat is **not** required; cold `/api/models` and `/api/auth/providers` should list `kiro`.
 3. If only Grok appears, check server logs for a per-provider jiti load failure; a Kiro load error must not take down Grok, but Kiro will be absent until the package/load issue is fixed.
-4. After any code path that calls bare `ModelRegistry.create/refresh`, migrate it to `createWebProviderAwareModelRegistry()` so refresh cannot drop fixed providers.
+4. After any code path that still constructs a catalog without `createWebAgentSessionServices` / `getWebModelRuntime`, migrate it so fixed providers register on the **target** `ModelRuntime`. Do not call removed `ModelRegistry.create()` or `createWebProviderAwareModelRegistry()`.
 
 ### Quota shows “额度暂不可用” / unavailable
 
@@ -161,7 +161,7 @@ Antigravity is a fixed Web provider (`@yofriadi/pi-antigravity-oauth@0.3.0` via 
 1. Confirm `@yofriadi/pi-antigravity-oauth@0.3.0` is installed and listed in `next.config.ts` `serverExternalPackages` with `jiti`.
 2. Confirm the process loaded `webProviderExtensions()` / `ensureWebProvidersBootstrapped()` — opening Chat is **not** required; cold `/api/models` and `/api/auth/providers` should list `google-antigravity`.
 3. If only Grok/Kiro appear, check server logs for a per-provider jiti load failure; an Antigravity load error must not take down the others.
-4. After any code path that calls bare `ModelRegistry.create/refresh`, migrate it to `createWebProviderAwareModelRegistry()` so refresh cannot drop fixed providers.
+4. After any code path that still constructs a catalog without `createWebAgentSessionServices` / `getWebModelRuntime`, migrate it so fixed providers register on the **target** `ModelRuntime`. Do not call removed `ModelRegistry.create()` or `createWebProviderAwareModelRegistry()`.
 5. OAuth callback must bind `127.0.0.1:51121` only. Web forces `PI_OAUTH_CALLBACK_HOST=127.0.0.1` before first package import; do not widen to non-loopback. Remote browsers use Models manual redirect-URL paste.
 
 ### Quota shows unavailable / invalid project / reauth
@@ -309,7 +309,7 @@ If `~/.pi/agent/models.json` contains JSONC comments (`// ...`), they will be **
 
 If the shared model selector only shows managed/built-in providers and every Custom provider from Settings → Models disappears:
 
-1. Check whether Pi rejected the whole `models.json`. From a Node process that can import `@earendil-works/pi-coding-agent`, inspect `modelRegistry.getError()` after `createAgentSessionServices(...)`.
+1. Check whether Pi rejected the whole `models.json`. From a Node process that can import the Web helpers, create a provider-aware runtime via `createWebAgentSessionServices(...)` / `getWebModelRuntime(...)` and inspect runtime/catalog load errors (do not call removed `ModelRegistry.create()`).
 2. A common failure is incomplete custom `cost` objects, for example only `input`/`output`/`cacheRead` without required `cacheWrite`. Pi schema validation then drops **all** custom providers/models, not just the invalid entry.
 3. Repair by adding the missing rate(s) on each custom model cost, typically `"cacheWrite": 0` when cache-write pricing is unused, then reload `/api/models`.
 4. Write paths now normalize this for custom models:

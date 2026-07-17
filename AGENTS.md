@@ -32,7 +32,7 @@ npm run dev     # http://localhost:30141
 | Change session lifecycle, branching, JSONL, or SSE | `docs/architecture/overview.md` | `lib/rpc-manager.ts`, `lib/session-reader.ts`, `hooks/useAgentSession.ts` |
 | Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code |
 | Deploy, publish, or debug runtime | `docs/deployment/README.md` | `docs/operations/troubleshooting.md`, `ecosystem.config.cjs`, proxy scripts |
-| Change dependencies or pi SDK integration | `docs/integrations/README.md` | `package.json` (exact pins for `@earendil-works/pi-*` / provider packages), `package-lock.json`, `npm-shrinkwrap.json`, installed pi docs under `node_modules/@earendil-works/pi-coding-agent/` |
+| Change dependencies or pi SDK integration | `docs/integrations/README.md` | `package.json` (exact pins for `@earendil-works/pi-*` / provider packages), `package-lock.json`, `npm-shrinkwrap.json`, `lib/web-credential-store.ts`, `lib/web-model-runtime.ts`, `lib/pi-provider-extensions.ts`, installed pi docs under `node_modules/@earendil-works/pi-coding-agent/` |
 
 ## Project Structure
 
@@ -56,6 +56,7 @@ npm run dev     # http://localhost:30141
 | Session browsing/parsing | `lib/session-reader.ts`, `app/api/sessions/**` | `docs/architecture/overview.md`, `docs/modules/api.md` |
 | Session changed-file sidecar (no Chat floating UI) | `lib/session-file-changes.ts`, `app/api/sessions/[id]/changes/**` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Project registry and project spaces | `lib/project-registry.ts`, `app/api/projects/**`, `components/SessionSidebar.tsx` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
+| Auth / ModelRuntime foundation (CredentialStore, provider-aware services) | `lib/web-credential-store.ts`, `lib/web-model-runtime.ts`, `lib/web-auth-config-value.ts`, `lib/pi-provider-extensions.ts` | `docs/integrations/README.md`, `docs/architecture/overview.md`, `docs/modules/library.md` |
 | Agent command lifecycle | `lib/rpc-manager.ts`, `app/api/agent/**` | `docs/architecture/overview.md` |
 | Chat/session UI state | `hooks/useAgentSession.ts`, `components/ChatWindow.tsx`, `components/ChatInput.tsx` | `docs/modules/frontend.md` |
 | Tool-call normalization | `lib/normalize.ts` | `docs/architecture/overview.md`, `docs/modules/library.md` |
@@ -83,7 +84,8 @@ Keep this section short and operational; detailed rationale belongs in `docs/arc
 - When changing event kinds, JSONL records, RPC payloads, config fields, or shared constants, search for all consumers first and update docs/tests/validation notes.
 - cacheWrite is deprecated: new events and aggregators zero it; wire types retain the field; historical ledger/session files are never rewritten.
 - Model prices are written only to `~/.pi/agent/models.json`; no separate price source. Use `lib/token-format.ts` for all token display; do not hand-roll locale/M formatting in UI components.
-- Keep critical runtime deps exact-pinned (`@earendil-works/pi-*`, provider packages, `jiti`) and ship `npm-shrinkwrap.json` so published installs match the release tree; do not reintroduce caret ranges for those packages without an SDK adapter plan.
+- Keep critical runtime deps exact-pinned (`@earendil-works/pi-*` at `0.80.10`, provider packages, `jiti`) and ship `npm-shrinkwrap.json` so published installs match the release tree; do not reintroduce caret ranges for those packages without an SDK adapter plan.
+- Use the Web `CredentialStore` + provider-aware `ModelRuntime` boundary only (`lib/web-credential-store.ts`, `lib/web-model-runtime.ts`); do not import root `AuthStorage`, call `ModelRegistry.create()`, or read `services.authStorage` / `services.modelRegistry` / `inner.modelRegistry`. Register fixed providers on the target runtime; session/Studio runtimes stay isolated.
 - Provider jiti loaders must anchor at `process.cwd()/package.json` (`createRuntimeJiti`); never rely on `import.meta.url` alone in production code paths.
 - Do not reset or overwrite unrelated user changes.
 
