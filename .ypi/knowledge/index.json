@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-17T08:38:17.841Z",
+  "updatedAt": "2026-07-18T12:19:30.289Z",
   "entries": [
+    {
+      "id": "20260718-201930-自定义-openai-兼容提供商支持从-models-端点同步模型列表",
+      "title": "自定义 OpenAI 兼容提供商支持从 /models 端点同步模型列表",
+      "taskId": "20260718-180415-自定义-openai-兼容提供商支持从-models-端点同步模型列表",
+      "taskKey": "archived:2026-07:20260718-180415-自定义-openai-兼容提供商支持从-models-端点同步模型列表",
+      "workflowId": "feature-dev",
+      "summary": "自定义 OpenAI-compatible provider 可从已保存 Base URL 的 /models（404/405 时 /v1/models）预览并确认后只追加 model id 到 models.json；共享 store revision/锁/原子写；API fail-closed 不接受任意 URL；UI 需二次确认；项目无全局 .btn 时需在同步样式内自带按钮样式。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260718-180415-自定义-openai-兼容提供商支持从-models-端点同步模型列表",
+      "knowledgePath": ".ypi/knowledge/20260718-201930-自定义-openai-兼容提供商支持从-models-端点同步模型列表.md",
+      "createdAt": "2026-07-18T12:19:30.289Z",
+      "archivedAt": "2026-07-18T12:19:30.289Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260717-163817-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt",
       "title": "将 pi SDK 从 0.80.7 升级到 0.80.10 并完成 Auth/ModelRuntime 适配迁移",

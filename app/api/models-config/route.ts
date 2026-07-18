@@ -1,13 +1,25 @@
+/**
+ * Models configuration API — read/write ~/.pi/agent/models.json.
+ *
+ * GET  — returns the models.json object body (legacy shape) plus
+ *        Cache-Control: no-store and ETag / X-Models-Config-Revision headers.
+ * PUT  — atomic write under the shared models.json write lock; optional
+ *        If-Match revision (409 on stale); always returns additive revision.
+ *
+ * Malformed on-disk models.json fails closed on PUT (does not overwrite with
+ * empty providers). Cost-rate normalization for custom models is preserved.
+ */
+
 import { NextResponse } from "next/server";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import {
+  mutateModelsJsonUnderLock,
+  readModelsJsonRaw,
+} from "@/lib/models-config-store";
 
 export const dynamic = "force-dynamic";
 
-function getModelsPath(): string {
-  return join(getAgentDir(), "models.json");
-}
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+const REVISION_HEADER = "X-Models-Config-Revision";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -52,34 +64,117 @@ function normalizeModelsJsonForWrite(data: Record<string, unknown>): Record<stri
   return { ...data, providers };
 }
 
-function readModelsJson(): Record<string, unknown> {
-  const path = getModelsPath();
-  if (!existsSync(path)) return { providers: {} };
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
-  } catch {
-    return { providers: {} };
-  }
+function revisionHeaders(revision: string): Record<string, string> {
+  return {
+    ...NO_STORE,
+    ETag: `"${revision}"`,
+    [REVISION_HEADER]: revision,
+  };
 }
 
-function writeModelsJson(data: Record<string, unknown>): void {
-  const path = getModelsPath();
-  const dir = dirname(path);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
+function parseIfMatchRevision(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const raw = header.trim();
+  if (!raw || raw === "*") return undefined;
+  // Support weak/strong ETag forms: W/"rev" or "rev" or bare rev.
+  const m = raw.match(/^(?:W\/)?"?([a-f0-9]{16})"?$/i);
+  if (m) return m[1].toLowerCase();
+  // Also accept bare opaque revision without quotes.
+  if (/^[a-f0-9]{16}$/i.test(raw)) return raw.toLowerCase();
+  return raw.replace(/^W\//i, "").replace(/^"|"$/g, "").trim() || undefined;
 }
 
 export async function GET() {
-  return NextResponse.json(readModelsJson());
+  const current = readModelsJsonRaw();
+  if (current.parseError) {
+    return NextResponse.json(
+      {
+        error: "models.json is invalid and cannot be loaded",
+        code: "models_config_invalid",
+      },
+      { status: 500, headers: revisionHeaders(current.revision) },
+    );
+  }
+
+  // Legacy body shape: raw config object. Missing file → empty providers.
+  const body = current.exists ? current.parsed : { providers: {} };
+  return NextResponse.json(body, { headers: revisionHeaders(current.revision) });
 }
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json() as Record<string, unknown>;
-    writeModelsJson(normalizeModelsJsonForWrite(body));
-    // Model registry refreshes on each /api/models request (no local cache to invalidate)
-    return NextResponse.json({ success: true });
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Request body must be valid JSON" },
+        { status: 400, headers: NO_STORE },
+      );
+    }
+
+    if (!isRecord(body)) {
+      return NextResponse.json(
+        { error: "Request body must be a JSON object" },
+        { status: 400, headers: NO_STORE },
+      );
+    }
+
+    const expectedRevision = parseIfMatchRevision(req.headers.get("if-match"));
+    const normalized = normalizeModelsJsonForWrite(body);
+
+    const outcome = await mutateModelsJsonUnderLock({
+      expectedRevision,
+      backup: true,
+      failClosedOnParseError: true,
+      mutate: () => ({
+        data: normalized,
+        result: true as const,
+      }),
+    });
+
+    if (!outcome.ok) {
+      if (outcome.status === "stale_revision") {
+        return NextResponse.json(
+          {
+            error:
+              "Revision conflict: models.json was modified by another request. " +
+              "Please reload and retry.",
+            code: "stale_revision",
+            currentRevision: outcome.revision,
+          },
+          { status: 409, headers: revisionHeaders(outcome.revision) },
+        );
+      }
+      if (outcome.status === "parse_error") {
+        return NextResponse.json(
+          {
+            error:
+              "models.json is invalid and cannot be overwritten. " +
+              "Fix or restore the file, then retry.",
+            code: "models_config_invalid",
+          },
+          { status: 500, headers: revisionHeaders(outcome.revision) },
+        );
+      }
+      return NextResponse.json(
+        {
+          error: "Failed to save models.json",
+          code: "write_failed",
+        },
+        { status: 500, headers: revisionHeaders(outcome.revision) },
+      );
+    }
+
+    // Additive revision field; success remains true for legacy clients.
+    return NextResponse.json(
+      { success: true, revision: outcome.revision },
+      { headers: revisionHeaders(outcome.revision) },
+    );
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json(
+      { error: String(error) },
+      { status: 500, headers: NO_STORE },
+    );
   }
 }

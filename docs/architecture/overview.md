@@ -219,12 +219,33 @@ Model pricing is configured by writing directly to Pi's single source of truth: 
 - **Explicit free models**: user marks a model as free. `cost` is written as 0 in `models.json` and the model is recorded in `pi-web.json` `usage.explicitFreeModels[]` so the UI can distinguish "missing price" from "intentionally free" without relying on zero-matches.
 
 **Safety invariants:**
-- The config service (`lib/model-price-config.ts`) never touches `apiKey`, `baseUrl`, `headers`, `compat`, or `tiers` fields. It does a minimal deep-merge of only the `cost.input/output/cacheRead` fields.
+- All models.json writers (ModelsConfig PUT, model-price PATCH, and OpenAI-compatible `/models` sync apply) share `lib/models-config-store.ts`: in-process queue + cross-process mkdir lock, opaque revision, atomic `tmp + rename`, best-effort `0600`, and pre-write backup. Nested lock acquisition is forbidden.
+- The price config service (`lib/model-price-config.ts`) never touches `apiKey`, `baseUrl`, `headers`, `compat`, or `tiers` fields. It does a minimal deep-merge of only the `cost.input/output/cacheRead` fields.
 - For custom `models[]` entries, if a `cost` object is written, the service fills missing schema-required rates (`input`/`output`/`cacheRead`/`cacheWrite`) with `0` so Pi ModelRuntime does not reject the entire `models.json`. Existing `cacheWrite` values are preserved; billing UI still does not manage cache-write pricing.
-- Writes use atomic `tmp + rename`, best-effort `0600` permissions, and an opaque revision hash for concurrency control (409 on stale revision).
-- Before and after each write, the service verifies the file can be read back and loads a fresh provider-aware `ModelRuntime` (or narrow catalog view) to confirm resolved prices match expectations. Partial failures roll back to the pre-write backup.
-- JSONC comments are stripped with `stripJsonComments()` on read and lost on write (clean JSON output). A backup file (`models.json.backup`) is saved before every write.
+- Writes use atomic `tmp + rename`, best-effort `0600` permissions, and an opaque revision hash for concurrency control (409 on stale revision / `If-Match`). Malformed models.json fails closed and is never overwritten with empty `{ providers: {} }`.
+- Before and after each price write, the service verifies the file can be read back and loads a fresh provider-aware `ModelRuntime` (or narrow catalog view) to confirm resolved prices match expectations. Partial failures roll back to the pre-write backup.
+- JSONC comments are stripped with `stripJsonComments()` on read and lost on write (clean JSON output). A backup file (`models.json.pi-price-backup`) is saved before every coordinated write.
 - The API projection (`ModelPriceListResponse`) never exposes `apiKey`, full `baseUrl`, headers, auth/account data, absolute paths, or the raw `models.json` content.
+- ModelsConfig GET keeps the legacy body shape and exposes revision via `ETag` / `X-Models-Config-Revision` only; PUT may send `If-Match` and always returns additive `revision`.
+
+### OpenAI-compatible `/models` sync invariants
+
+`POST /api/models-config/sync` discovers remote model ids for one saved custom OpenAI-compatible provider and merges new ids on confirmed user action. This is the third models.json writer alongside ModelsConfig PUT and model-price PATCH.
+
+**Provider eligibility (server-side, fail-closed):** target must exist in saved `models.json.providers`, must **not** be a Pi built-in provider or fixed extension (`grok-cli`/`kiro`/`google-antigravity`), must have provider-level `api` of `openai-completions` or `openai-responses`, and must have a valid `http(s)` baseUrl. Re-checked on every preview and apply.
+
+**SSRF / secret protection:** body accepts only `action`+`providerId` (preview) or those plus `previewId`/`revision`/`modelIds` (apply). Rejects `url`/`baseUrl`/`headers`/`apiKey`/`path`. Server reads baseUrl/credentials only from saved config. API/cache/errors never project secrets.
+
+**Endpoint discovery:** already-`/v1/models` or `/models` → use as-is. `/v1` → append `/models`. Otherwise → `/models` first, only 404/405 fall back to `/v1/models`. Other errors stop. `redirect: "manual"`, max 3 same-origin, cross-origin blocked.
+
+**Credentials:** auth.json `api_key` wins, models.json `apiKey` is fallback. OAuth is `unsupported_auth`. Custom Authorization headers preserved.
+
+**Preview (zero disk write):** bounded fetch (10s/1MiB/2000 models/256-byte id), in-memory cache (opaque id, 5min TTL, max 20 entries, fingerprint-only — no secrets).
+
+**Apply (shared lock, merge, verify):** validates preview/revision/fingerprint, merges under shared library lock, existing objects untouched, new ids append `{ id }` in remote order, only target provider changed. Atomic write + backup, fresh ModelRuntime verification with backup rollback on failure, best-effort live reload.
+
+**Scope exclusions:** never syncs built-in/fixed/non-OpenAI providers; never infers prices/context/capabilities; never deletes local models; never accepts arbitrary URLs.
+
 
 **Intelligent price suggestions** (suggest API) follow a two-phase pipeline:
 1. **Phase 1 — deterministic matching**: Fetches the OpenRouter public model catalog (`GET https://openrouter.ai/api/v1/models`, HTTPS-only allowlist) and performs exact model-id matching with price extraction. Alias/near-match results carry lower confidence.
