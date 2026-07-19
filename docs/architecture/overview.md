@@ -77,6 +77,7 @@ the status row, while the plain frame is a no-op.
 
 ## Key Boundaries
 
+- **Links domain** is a standalone subsystem isolated from all LLM auth (see [Links / GitHub OAuth Device Flow](#links--github-oauth-device-flow) below). It stores OAuth connection metadata and secrets under `~/.pi/agent/links/` and must never import `auth.json`, `auth-accounts/`, `auth-api-key-accounts/`, `CredentialStore`, `ModelRuntime`, or RPC auth reload modules.
 - Project Registry is the only top-level project list data source: `/api/projects` reads `~/.pi/agent/pi-web-projects.json` and never scans sessions to synthesize projects.
 - Sessions are project-space history records, not project records. Space session lists may filter session headers by `projectId`/`spaceId` and may show exact-cwd legacy sessions separately, but they must not backfill legacy headers automatically.
 - Session browsing does not create an AgentSession: API routes read `.jsonl` files through `lib/session-reader.ts`; the only write side effect is pruning stale sessions whose cwd points at a deleted WorkTree.
@@ -311,6 +312,106 @@ All token values in Usage, ledger, topbar, and message footers follow these conv
 - Session-scoped YPI Studio widgets use high-confidence exact `contextIds` matches (`pi_<sessionId>` / `pi_transcript_<hash>`) and ignore `pi_process_*` as widget evidence. After exclusive transfer, the previous session no longer has the task in `contextIds`, so it drops out of bound candidates even if the transcript still mentions the task (transcript hits stay diagnostics-only). A single session can still show multiple different bound tasks; exclusivity is per task, not per session. The floating multi-task card keeps a fixed 360px desktop width and a display-only eight-station rail (`Brief → Design → Implement → Checks → Review → User Acceptance → Completed → Archived`) driven by workflow/status evidence rather than planning-file presence; permanent plan/HTML quick actions come from additive `quickPreviews` descriptors, improvement/main result acceptance reuse existing task PATCH transitions (no parallel grant), and Phase 1 plan decision CTAs render only from additive `userActions` after the read-only preview strip without replacing rail/accept/preview/runtime blocks. The chat UI triggers a debounced session-task recheck when Studio tool progress/results expose a task id/key, recent preview changes, or display-limit flags, so newly created/rebound Studio tasks and live `t/s`/phase updates can surface without a full page reload.
 - When all tools are disabled, `lib/rpc-manager.ts` clears the agent system prompt.
 - Memory diagnostic snapshots are a bounded, read-only运维 capability — not a leak fix. `POST /api/diagnostics/memory-snapshot` (and the Settings → 诊断 button) capture one schema-v1 snapshot in the current server process and atomically write it to `<getAgentDir()>/diagnostics/`. The collector (`lib/memory-diagnostics.ts`) composes process/V8 metrics and bounded owner projections from `rpc-manager`, `ypi-studio-subagent-runtime`, `session-reader`, `browser-share-manager`, `terminal-manager`, and `session-file-changes` under a 5s cooperative deadline and a 5 MiB final-JSON cap (with a compact fallback that drops per-item samples but keeps totals). Capture is strictly read-only: no abort/destroy/cleanup/reset/GC, no session start/list, no content/tool-result/system-prompt/response-id/buffer/env/credential reads. OpenAI Codex WebSocket debug stats are queried **only for known active openai-codex sessions via public getters** and only numeric/boolean fields are kept (per-known-session coverage, not the full private map; previous response ids and error strings are never persisted). A process-global single-flight guard (`globalThis.__piMemoryDiagnosticSnapshotInFlight`) rejects concurrent triggers with `409 snapshot_in_progress`. The API/UI return **metadata only**; the full JSON is never sent over HTTP or rendered in the browser. The snapshot retains local workspace/session paths and ids (with a `privacy` block + share-before-review warning) to aid correlation. Files use input-free names `memory-<UTC compact>-pid<PID>-<8hex>.json`, written via same-directory tmp + `rename` with best-effort `0700`/`0600`. There is no automatic retention/list/download center; users delete files manually. Diagnostics are additive and do not change JSONL, task, session, or config formats.
+
+## Links / GitHub OAuth Device Flow
+
+The **Links** domain is a standalone subsystem isolated from all LLM auth — it never imports `auth.json`, `auth-accounts/`, `auth-api-key-accounts/`, `CredentialStore`, `ModelRuntime`, or RPC auth reload. P0 supports connecting multiple GitHub identities through **GitHub OAuth Device Flow** using a **product-owned GitHub OAuth App**.
+
+### Product Decisions
+
+- **Authorization path**: GitHub OAuth Device Flow only — no PAT input, no Authorization Code callback, no `gh auth` import.
+- **App identity**: Product-owned GitHub OAuth App with Device Flow enabled. Client id from server-only `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`; **no client secret** (Device Flow does not require one).
+- **Terminal user**: Does not create an OAuth App, does not paste PAT, does not configure client id/secrets.
+- **Scope**: Fixed `read:user` — no `repo`, `workflow`, or org management permissions.
+- **Multi-account**: Multiple distinct GitHub numeric user ids can be connected simultaneously.
+- **Duplicate identity**: Returns `409 duplicate_identity`; the new access token is not written locally. Users must disconnect first to reauthorize.
+- **Disconnect**: Soft-deletes metadata + removes local OAuth secret. Does **not** revoke the remote GitHub OAuth grant.
+- **Isolation**: Links operates entirely within `~/.pi/agent/links/` and its own REST/SSE routes. It never reads or writes LLM auth storage.
+
+### Storage Layout
+
+```text
+~/.pi/agent/links/
+  registry.json                  — metadata for all connections (connected + disconnected)
+  .locks/
+    registry.lock/               — cross-process mkdir lock for registry mutations
+    <provider>/                  — provider-scoped per-connection mkdir locks
+  github/
+    <opaque-connection-id>.json  — OAuth secret (GitHubOAuthSecretV1, 0600)
+    .quarantine-<random>.json    — quarantined secret during disconnect rollback
+```
+
+- Directories `0700`, files `0600`.
+- Atomic writes: tmp → fsync → rename (same-directory).
+- Provider-keyed process queue + cross-process mkdir lock.
+- Registry is metadata-only — no `device_code`, access token, or raw upstream data.
+- `device_code` never reaches disk.
+- Duplicate detection by provider + `providerUserId` (numeric id) under lock.
+- Disconnect: quarantine secret → update registry → final unlink (restore on failure).
+
+### Authorization State Machine
+
+```text
+starting
+  → awaiting_user
+      ├─ authorization_pending → awaiting_user
+      ├─ slow_down → awaiting_user (interval += GitHub response / min 5s)
+      ├─ access_denied → denied
+      ├─ expired_token / TTL → expired
+      ├─ local cancel → cancelled
+      ├─ network/timeout/bad response → failed
+      └─ access token
+           → validating_identity
+              ├─ invalid token/bad /user → failed
+              └─ valid identity
+                   → persisting
+                      ├─ duplicate → duplicate
+                      ├─ store failure → failed
+                      └─ connected
+```
+
+`globalThis.__piLinkAuthorizations` holds short-lived authorization sessions: opaque authorization id, provider, `userCode`, `deviceCode` (server-memory only), interval, expiry, status, sanitized result/error, AbortController, subscriber set. Constraints:
+
+- Max 20 concurrent authorization sessions; beyond limit returns `429 authorization_capacity_exceeded`.
+- Terminal states retained for 2 min TTL for SSE reconnect, then cleaned.
+- Pending sessions are **never** persisted to disk; server restart loses them.
+- Background polling runs independently of SSE subscribers; browser close / SSE disconnect does not cancel.
+- DELETE cancel terminates polling but cannot guarantee cancellation of an already-approved remote grant.
+
+### GitHub Fixed Network Contract
+
+1. **Device code**: `POST https://github.com/login/device/code` — body: `client_id=<server>&scope=read:user`.
+2. **Token polling**: `POST https://github.com/login/oauth/access_token` — body: `client_id=<server>&device_code=<memory>&grant_type=urn:ietf:params:oauth:grant-type:device_code`. Respects `interval`, `slow_down` (min +5s), `authorization_pending`, `access_denied`, `expired_token`, `device_flow_disabled`.
+3. **Identity validation**: `GET https://api.github.com/user` — Bearer token, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`.
+
+All calls enforce timeout (10s), response size cap (64 KiB), JSON Accept, redirect rejection, and fixed host/path. Raw upstream bodies must not leak into errors. The verification URI is fixed as `https://github.com/login/device`.
+
+### Security Boundaries
+
+- `userCode` is the short-term code GitHub shows users — it **may** appear in the browser/UI but must be cleared on terminal states, view changes, and unmount.
+- `device_code` only exists in server memory (`globalThis.__piLinkAuthorizations`) — never on wire, disk, logs, metadata, or errors.
+- Access token only exists in upstream responses, identity validation calls, and the secret file (`links/github/<id>.json`) — never on wire, DOM, metadata, logs, or task/session JSONL.
+- Client secret is never configured, packaged, or referenced.
+- Stable error codes only — no raw upstream bodies, absolute paths, or stack traces in API responses.
+- All REST responses use `Cache-Control: no-store`; SSE uses `no-cache, no-store`.
+
+### Provider Registry
+
+`lib/links-provider-registry.ts` maintains an allowlist (`github` only in P0). Unknown providers fail closed. The `LinkProviderAdapter` interface encapsulates:
+
+- `startAuthorization()` — initiates the provider OAuth flow (returns `deviceCode` internally only).
+- `pollAuthorization()` — polls token endpoint with interval-aware backoff.
+- `validateCredential()` — calls the provider identity endpoint.
+
+Adapters are registered once at server init via `registerLinkProviderAdapter()`.
+
+### Integration with Settings UI
+
+Settings → Links is a root-level leaf (after Studio, before 模型与用量). Operations are **immediate-save** — they never mark `pi-web.json` dirty. Global Save/Reset is hidden/disabled on the Links view. The Link operations stay local to `~/.pi/agent/links/` and the in-process authorization manager; the Settings modal, `pi-web.json`, and LLM auth stores are never touched.
+
+### Rollback
+
+Hide the `links` Settings leaf and return 503 from authorization start. Retain `~/.pi/agent/links/` data — do not auto-delete or migrate back to `auth.json`. Pending authorizations are memory-only; a server restart naturally clears them. Remote GitHub OAuth grants must be manually revoked by the user at GitHub Settings → Applications → Authorized OAuth Apps.
 
 ## Session File Format
 

@@ -1,0 +1,1354 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings → Links → GitHub Device Authorization · UI Prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-panel: #ffffff;
+      --bg-subtle: #f6f7f9;
+      --bg-hover: #eef2f7;
+      --bg-selected: #eaf1ff;
+      --text: #18202b;
+      --text-muted: #536173;
+      --text-dim: #7b8797;
+      --border: #dce2e9;
+      --accent: #2563eb;
+      --accent-strong: #1d4ed8;
+      --success: #15803d;
+      --success-bg: rgba(21,128,61,.09);
+      --warning: #b45309;
+      --warning-bg: rgba(180,83,9,.09);
+      --danger: #dc2626;
+      --danger-bg: rgba(220,38,38,.09);
+      --shadow: 0 24px 80px rgba(15,23,42,.22);
+      --focus: #2563eb;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #14171c;
+      --bg-panel: #1a1e24;
+      --bg-subtle: #111419;
+      --bg-hover: #242a33;
+      --bg-selected: #17294b;
+      --text: #e8edf4;
+      --text-muted: #a8b2c1;
+      --text-dim: #778395;
+      --border: #303741;
+      --accent: #6ea0ff;
+      --accent-strong: #8bb4ff;
+      --success: #4ade80;
+      --success-bg: rgba(74,222,128,.10);
+      --warning: #fbbf24;
+      --warning-bg: rgba(251,191,36,.10);
+      --danger: #fb7185;
+      --danger-bg: rgba(251,113,133,.10);
+      --shadow: 0 24px 80px rgba(0,0,0,.55);
+      --focus: #8bb4ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 30rem),
+        var(--bg-subtle);
+      color: var(--text);
+    }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    html[data-focus="on"] button,
+    html[data-focus="on"] a,
+    html[data-focus="on"] [tabindex] {
+      outline: 2px dashed color-mix(in srgb, var(--focus) 70%, transparent);
+      outline-offset: 2px;
+    }
+    .prototype-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .prototype-title { margin-right: auto; min-width: 250px; }
+    .prototype-title strong { display: block; font-size: 13px; }
+    .prototype-title span { display: block; margin-top: 2px; color: var(--text-dim); font-size: 10px; }
+    .control-group { display: inline-flex; align-items: center; gap: 6px; }
+    .control-label { color: var(--text-dim); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .prototype-bar select, .prototype-bar button {
+      min-height: 30px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .prototype-bar button[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: var(--bg-selected);
+      color: var(--accent);
+      font-weight: 800;
+    }
+    .stage {
+      min-height: calc(100vh - 52px);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    .settings-overlay {
+      width: 100%;
+      min-height: calc(100vh - 92px);
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: rgba(0,0,0,.33);
+      overflow: hidden;
+      transition: padding 160ms ease;
+    }
+    .settings-shell {
+      width: min(960px, calc(100vw - 68px));
+      height: min(720px, calc(100vh - 112px));
+      min-height: 540px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+      box-shadow: var(--shadow);
+      transition: width 160ms ease, height 160ms ease, border-radius 160ms ease;
+    }
+    html[data-narrow="on"] .settings-shell {
+      width: min(390px, calc(100vw - 24px));
+      height: min(760px, calc(100vh - 84px));
+      border-radius: 10px;
+    }
+    html[data-narrow="on"] .settings-body { flex-direction: column; }
+    html[data-narrow="on"] .tree-panel {
+      width: 100%;
+      flex: none;
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+      max-height: 148px;
+    }
+    html[data-narrow="on"] .settings-footer { flex-direction: column; align-items: stretch; }
+    .settings-header {
+      flex: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-header h1 { margin: 0; font-size: 18px; }
+    .settings-header p { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; }
+    .icon-button {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 23px;
+    }
+    .icon-button:hover { background: var(--bg-hover); color: var(--text); }
+    .settings-body { min-height: 0; flex: 1; display: flex; }
+    .tree-panel {
+      width: 216px;
+      flex: 0 0 216px;
+      min-width: 0;
+      overflow: auto;
+      padding: 10px;
+      border-right: 1px solid var(--border);
+      background: var(--bg-subtle);
+    }
+    .tree-label { padding: 4px 10px 8px; color: var(--text-dim); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .tree { display: flex; flex-direction: column; gap: 3px; }
+    .tree-row {
+      position: relative;
+      width: 100%;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 9px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .tree-row:hover { background: var(--bg-hover); color: var(--text); }
+    .tree-row.active { background: var(--bg-selected); box-shadow: inset 3px 0 0 var(--accent); color: var(--accent); font-weight: 800; }
+    .tree-row.root-leaf { margin: 5px 0; padding-top: 9px; padding-bottom: 9px; border-top-color: var(--border); border-bottom-color: var(--border); border-radius: 0; }
+    .tree-row.root-leaf.active { border-color: transparent; border-radius: 8px; }
+    .tree-row.level-1 { padding-left: 23px; }
+    .tree-icon { width: 16px; flex: 0 0 16px; text-align: center; color: var(--text-dim); }
+    .tree-row.active .tree-icon { color: var(--accent); }
+    .tree-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .settings-content { min-width: 0; flex: 1; overflow: auto; padding: 18px; }
+    .page { min-height: 100%; display: flex; flex-direction: column; gap: 16px; }
+    .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .eyebrow { color: var(--text-dim); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .page-heading h2 { margin: 3px 0 0; font-size: 19px; }
+    .page-heading p { max-width: 620px; margin: 6px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .instant-badge {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .instant-badge::before { content: "✓"; color: var(--success); font-weight: 900; }
+    .provider {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+      box-shadow: 0 5px 18px rgba(0,0,0,.04);
+      overflow: hidden;
+    }
+    .provider-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 15px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-subtle) 72%, var(--bg-panel));
+      flex-wrap: wrap;
+    }
+    .provider-identity { min-width: 0; display: flex; align-items: center; gap: 11px; }
+    .provider-mark {
+      width: 38px;
+      height: 38px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: color-mix(in srgb, var(--text) 10%, var(--bg-subtle));
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-weight: 900;
+      font-size: 12px;
+    }
+    .provider-name { margin: 0; font-size: 15px; }
+    .provider-meta { margin-top: 3px; color: var(--text-muted); font-size: 11px; }
+    .count { color: var(--text); font-weight: 800; }
+    .button {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .button:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
+    .button.primary { border-color: transparent; background: var(--accent); color: #fff; }
+    .button.primary:hover { background: var(--accent-strong); color: #fff; }
+    .button.danger { color: var(--danger); }
+    .button.danger:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+    .button.ghost { background: transparent; }
+    .button:disabled, .button.busy { cursor: not-allowed; opacity: .62; }
+    .provider-body { padding: 14px 15px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .state-view { display: none; }
+    .state-view.active { display: block; }
+    .loading-stack, .empty, .auth-card, .list-stack { display: flex; flex-direction: column; gap: 12px; }
+    .loading-copy, .status-line { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    html[data-reduced-motion="on"] .spinner,
+    html[data-reduced-motion="on"] .progress-bar > span {
+      animation: none !important;
+    }
+    .skeleton {
+      height: 74px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, var(--bg-subtle), color-mix(in srgb, var(--bg-hover) 80%, var(--bg-subtle)), var(--bg-subtle));
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+    .empty {
+      min-height: 220px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--bg-subtle) 70%, transparent);
+      padding: 24px 18px;
+      text-align: center;
+    }
+    .empty-inner { max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .empty-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: grid; place-items: center;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      font-family: var(--mono); font-weight: 900; font-size: 13px;
+    }
+    .empty h3, .auth-card h3, .form-head h3 { margin: 0; font-size: 15px; }
+    .empty p, .auth-card p, .form-head p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .safe-note, .alert, .confirm-warning, .config-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 11px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .safe-note strong, .alert strong, .confirm-warning strong, .config-note strong { color: var(--text); }
+    .alert { gap: 10px; }
+    .alert.error { border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); background: var(--danger-bg); color: var(--danger); }
+    .alert.warning { border-color: color-mix(in srgb, var(--warning) 35%, var(--border)); background: var(--warning-bg); color: var(--warning); }
+    .alert.success { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); background: var(--success-bg); color: var(--success); }
+    .alert.info { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); color: var(--text-muted); }
+    .alert > span:first-child {
+      width: 18px; height: 18px; flex: none;
+      display: grid; place-items: center;
+      border-radius: 999px;
+      background: color-mix(in srgb, currentColor 14%, transparent);
+      font-weight: 900; font-size: 11px;
+    }
+    .auth-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--bg-subtle) 55%, var(--bg-panel));
+      padding: 14px;
+    }
+    .auth-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .code-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+    }
+    .user-code {
+      font-family: var(--mono);
+      font-size: clamp(22px, 4vw, 28px);
+      font-weight: 900;
+      letter-spacing: .18em;
+      color: var(--text);
+      user-select: all;
+      word-break: break-all;
+    }
+    .code-meta { margin-top: 6px; color: var(--text-muted); font-size: 11px; }
+    .code-actions { display: flex; flex-direction: column; gap: 8px; }
+    .progress-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .progress-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: var(--bg-hover);
+      overflow: hidden;
+    }
+    .progress-bar > span {
+      display: block;
+      height: 100%;
+      width: 42%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent), var(--accent));
+      animation: progress-slide 1.8s ease-in-out infinite;
+    }
+    @keyframes progress-slide {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(280%); }
+    }
+    .steps {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .steps li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .step-num {
+      width: 20px; height: 20px; flex: none;
+      display: grid; place-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text-dim);
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .steps li.done .step-num { border-color: color-mix(in srgb, var(--success) 40%, var(--border)); color: var(--success); }
+    .steps li.current .step-num { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
+    .auth-actions, .inline-actions, .card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .connection-list { display: flex; flex-direction: column; gap: 10px; }
+    .connection-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      padding: 12px 13px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px 14px;
+      align-items: start;
+    }
+    .connection-card.busy { opacity: .72; }
+    .connection-card.highlight {
+      border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--warning) 12%, transparent);
+    }
+    .connection-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
+    .connection-title h4 {
+      margin: 0;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+    .login-chip {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 7px;
+    }
+    .connection-detail { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 999px;
+      background: var(--success);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+    }
+    .status-label { color: var(--text); font-weight: 700; }
+    .scope-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .scope-label { color: var(--text-dim); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .scope-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+    .scope-chip.requested { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); color: var(--accent); }
+    .meta-line { color: var(--text-dim); font-size: 11px; word-break: break-word; }
+    .list-footnote { color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+    .settings-footer {
+      flex: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-subtle) 70%, var(--bg-panel));
+    }
+    .footer-note { color: var(--text-dim); font-size: 11px; line-height: 1.45; max-width: 520px; }
+    .footer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .footer-actions .button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .modal-layer {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0,0,0,.48);
+      z-index: 80;
+    }
+    .modal-layer.active { display: grid; }
+    .confirm-dialog {
+      width: min(440px, 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .confirm-dialog h3 { margin: 0; font-size: 16px; }
+    .confirm-dialog p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .confirm-warning {
+      border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 90;
+      display: none;
+      padding: 10px 12px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .toast.active { display: block; }
+    @media (max-width: 640px) {
+      .page-heading { flex-direction: column; }
+      .code-panel { grid-template-columns: 1fr; }
+      .code-actions { flex-direction: row; flex-wrap: wrap; }
+      .connection-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="prototype-bar" aria-label="原型状态控制器">
+    <div class="prototype-title">
+      <strong>Links · GitHub Device Flow 多账号连接</strong>
+      <span>自包含 UI 原型 · 无 PAT 输入 · 不调用真实 GitHub</span>
+    </div>
+    <div class="control-group">
+      <span class="control-label">状态</span>
+      <select id="state-select" aria-label="切换页面状态">
+        <option value="loading">加载</option>
+        <option value="empty" selected>空态 · 连接 GitHub</option>
+        <option value="not-configured">OAuth 未配置</option>
+        <option value="starting">启动授权 busy</option>
+        <option value="device-code">设备码 · 等待授权</option>
+        <option value="popup-blocked">弹窗被拦截</option>
+        <option value="slow-down">slow_down 等待</option>
+        <option value="denied">用户拒绝</option>
+        <option value="expired">设备码过期</option>
+        <option value="cancelled">本机取消</option>
+        <option value="network">网络 / 超时</option>
+        <option value="sse-reconnect">SSE 断线重连</option>
+        <option value="success">授权成功单账号</option>
+        <option value="multi">多账号列表</option>
+        <option value="duplicate">重复 identity 409</option>
+        <option value="load-error">列表加载失败</option>
+        <option value="confirm">断开确认</option>
+        <option value="disconnect-busy">断开 busy</option>
+        <option value="disconnect-fail">断开失败</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <span class="control-label">主题</span>
+      <button id="theme-toggle" type="button" aria-pressed="true">Dark</button>
+    </div>
+    <div class="control-group">
+      <span class="control-label">视口</span>
+      <button id="narrow-toggle" type="button" aria-pressed="false">≤640px</button>
+    </div>
+    <div class="control-group">
+      <button id="focus-toggle" type="button" aria-pressed="false">Keyboard focus</button>
+      <button id="motion-toggle" type="button" aria-pressed="false">Reduced motion</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="settings-overlay" aria-label="设置弹窗背景">
+      <article class="settings-shell" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header class="settings-header">
+          <div>
+            <h1 id="settings-title">设置</h1>
+            <p>配置 yolk pi web 行为。保存后动态生效，无需重启。</p>
+          </div>
+          <button class="icon-button" type="button" aria-label="关闭设置" title="关闭">×</button>
+        </header>
+
+        <div class="settings-body">
+          <aside class="tree-panel">
+            <nav aria-label="设置导航">
+              <div class="tree-label">Settings</div>
+              <div class="tree" role="tree">
+                <button class="tree-row" role="treeitem" aria-expanded="true" type="button"><span class="tree-icon">⌄</span><span class="tree-text">会话与工作区</span></button>
+                <button class="tree-row level-1" role="treeitem" type="button"><span class="tree-icon">π</span><span class="tree-text">蛋黄𝝅</span></button>
+                <button class="tree-row level-1" role="treeitem" type="button"><span class="tree-icon">⑂</span><span class="tree-text">WorkTree</span></button>
+                <button class="tree-row root-leaf" role="treeitem" type="button"><span class="tree-icon">✦</span><span class="tree-text">Studio</span></button>
+                <button class="tree-row root-leaf active" role="treeitem" aria-current="page" aria-selected="true" type="button"><span class="tree-icon">↗</span><span class="tree-text">Links</span></button>
+                <button class="tree-row" role="treeitem" aria-expanded="false" type="button"><span class="tree-icon">›</span><span class="tree-text">模型与用量</span></button>
+                <button class="tree-row" role="treeitem" aria-expanded="false" type="button"><span class="tree-icon">›</span><span class="tree-text">工具</span></button>
+                <button class="tree-row" role="treeitem" aria-expanded="false" type="button"><span class="tree-icon">›</span><span class="tree-text">系统</span></button>
+              </div>
+            </nav>
+          </aside>
+
+          <section class="settings-content">
+            <div class="page">
+              <header class="page-heading">
+                <div>
+                  <div class="eyebrow">External connections</div>
+                  <h2>Links</h2>
+                  <p>通过 GitHub 官方授权连接多个 GitHub 身份。点击连接后在 GitHub 页面批准；服务端自动保存凭据。操作即时生效，不进入 <code>pi-web.json</code>，也不受设置底部全局“保存 / 恢复默认值”控制。</p>
+                </div>
+                <div class="instant-badge">即时保存 · 独立于全局设置</div>
+              </header>
+
+              <section class="provider" aria-labelledby="github-heading">
+                <header class="provider-head">
+                  <div class="provider-identity">
+                    <div class="provider-mark" aria-hidden="true">GH</div>
+                    <div>
+                      <h3 class="provider-name" id="github-heading">GitHub</h3>
+                      <div class="provider-meta"><span class="count" id="connection-count">0</span> 个活动连接 · OAuth Device Flow</div>
+                    </div>
+                  </div>
+                  <button class="button primary connect-trigger" type="button" id="connect-button">连接 GitHub</button>
+                </header>
+
+                <div class="provider-body">
+                  <!-- loading -->
+                  <div class="state-view" data-state="loading">
+                    <div class="loading-stack" aria-busy="true" aria-label="正在加载 GitHub 连接">
+                      <div class="loading-copy"><span class="spinner" aria-hidden="true"></span>正在读取本机 GitHub 连接…</div>
+                      <div class="skeleton"></div>
+                      <div class="skeleton"></div>
+                    </div>
+                  </div>
+
+                  <!-- empty -->
+                  <div class="state-view" data-state="empty">
+                    <div class="empty">
+                      <div class="empty-inner">
+                        <div class="empty-icon" aria-hidden="true">GH</div>
+                        <h3>尚未连接 GitHub</h3>
+                        <p>点击「连接 GitHub」，在 GitHub 官方页面输入设备码并批准授权。本机只保存身份摘要与 OAuth 凭据；浏览器不会显示 access token。</p>
+                        <button class="button primary connect-trigger" type="button">连接 GitHub</button>
+                        <div class="safe-note">
+                          <span aria-hidden="true">🔒</span>
+                          <span><strong>无需创建或粘贴 token。</strong>产品使用自有 GitHub OAuth App 发起 Device Flow；P0 仅请求 <code>read:user</code>，不申请仓库权限。</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- not configured -->
+                  <div class="state-view" data-state="not-configured">
+                    <div class="alert warning" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>GitHub 授权尚未配置</strong>
+                        <div>服务端缺少产品方 OAuth App client id（<code>YPI_LINKS_GITHUB_OAUTH_CLIENT_ID</code>）。部署方需要注入已启用 Device Flow 的 client id 后才能连接。此状态不会退回 token 输入。</div>
+                      </div>
+                    </div>
+                    <div class="config-note">
+                      <span aria-hidden="true">i</span>
+                      <span>终端用户无需创建 OAuth App。源码开发者可在 server 环境覆盖自己的 client id；官方构建由产品注入。详情见部署文档。</span>
+                    </div>
+                    <button class="button primary" type="button" disabled title="GitHub 授权尚未配置">连接 GitHub</button>
+                  </div>
+
+                  <!-- starting -->
+                  <div class="state-view" data-state="starting">
+                    <div class="auth-card" aria-busy="true" aria-live="polite">
+                      <div class="auth-head">
+                        <div>
+                          <h3>正在启动 GitHub 授权…</h3>
+                          <p>向 GitHub 请求设备码。不会要求你输入任何 secret。</p>
+                        </div>
+                        <button class="icon-button cancel-auth" type="button" aria-label="取消授权" title="取消">×</button>
+                      </div>
+                      <div class="loading-copy"><span class="spinner" aria-hidden="true"></span>联系 GitHub Device Flow…</div>
+                    </div>
+                  </div>
+
+                  <!-- device-code / waiting -->
+                  <div class="state-view" data-state="device-code">
+                    <div class="auth-card" aria-live="polite">
+                      <div class="auth-head">
+                        <div>
+                          <h3>在 GitHub 完成授权</h3>
+                          <p>在官方验证页输入下方短期设备码并批准。服务端会自动轮询结果。</p>
+                        </div>
+                        <button class="icon-button cancel-auth" type="button" aria-label="取消授权" title="取消">×</button>
+                      </div>
+
+                      <div class="code-panel">
+                        <div>
+                          <div class="eyebrow">User code</div>
+                          <div class="user-code" id="user-code" tabindex="0" aria-label="GitHub 用户设备码 ABCD-EFGH">ABCD-EFGH</div>
+                          <div class="code-meta">剩余约 <strong id="expiry-text">14:32</strong> · 请勿把此短期码发送给他人</div>
+                        </div>
+                        <div class="code-actions">
+                          <button class="button primary" type="button" id="copy-code">复制设备码</button>
+                          <a class="button" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer" id="open-github">打开 GitHub 验证页</a>
+                        </div>
+                      </div>
+
+                      <ol class="steps">
+                        <li class="done"><span class="step-num">1</span><span>已获取设备码</span></li>
+                        <li class="current"><span class="step-num">2</span><span>在 <strong>github.com/login/device</strong> 输入码并批准</span></li>
+                        <li><span class="step-num">3</span><span>服务端验证身份并保存连接</span></li>
+                      </ol>
+
+                      <div class="progress-wrap">
+                        <div class="status-line"><span class="spinner" aria-hidden="true"></span><span>等待你在 GitHub 批准授权…</span></div>
+                        <div class="progress-bar" aria-hidden="true"><span></span></div>
+                      </div>
+
+                      <div class="safe-note">
+                        <span aria-hidden="true">🔒</span>
+                        <span><strong>安全边界：</strong>浏览器只显示 GitHub 为你生成的短期 user code。服务端持有的 <code>device_code</code> 与最终 access token 永不进入页面、日志或设置文件。</span>
+                      </div>
+                      <div class="auth-actions">
+                        <button class="button ghost cancel-auth" type="button">取消授权</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- popup blocked -->
+                  <div class="state-view" data-state="popup-blocked">
+                    <div class="auth-card" aria-live="polite">
+                      <div class="auth-head">
+                        <div>
+                          <h3>在 GitHub 完成授权</h3>
+                          <p>浏览器拦截了自动打开。请手动打开 GitHub 验证页并输入设备码。</p>
+                        </div>
+                        <button class="icon-button cancel-auth" type="button" aria-label="取消授权" title="取消">×</button>
+                      </div>
+                      <div class="alert warning" role="status">
+                        <span aria-hidden="true">!</span>
+                        <div>
+                          <strong>弹窗被拦截</strong>
+                          <div>请点击下方「打开 GitHub 验证页」。验证地址固定为 GitHub 官方 HTTPS 页面。</div>
+                        </div>
+                      </div>
+                      <div class="code-panel">
+                        <div>
+                          <div class="eyebrow">User code</div>
+                          <div class="user-code" tabindex="0">ABCD-EFGH</div>
+                          <div class="code-meta">剩余约 <strong>12:08</strong></div>
+                        </div>
+                        <div class="code-actions">
+                          <button class="button" type="button" data-copy>复制设备码</button>
+                          <a class="button primary" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer">打开 GitHub 验证页</a>
+                        </div>
+                      </div>
+                      <div class="status-line"><span class="spinner" aria-hidden="true"></span><span>仍在等待 GitHub 授权…</span></div>
+                    </div>
+                  </div>
+
+                  <!-- slow down -->
+                  <div class="state-view" data-state="slow-down">
+                    <div class="auth-card" aria-live="polite">
+                      <div class="auth-head">
+                        <div>
+                          <h3>仍在等待 GitHub 授权</h3>
+                          <p>GitHub 要求放慢轮询。这不是失败，请继续在官方页面完成批准。</p>
+                        </div>
+                        <button class="icon-button cancel-auth" type="button" aria-label="取消授权" title="取消">×</button>
+                      </div>
+                      <div class="code-panel">
+                        <div>
+                          <div class="eyebrow">User code</div>
+                          <div class="user-code" tabindex="0">ABCD-EFGH</div>
+                          <div class="code-meta">剩余约 <strong>09:41</strong> · 轮询间隔已增加</div>
+                        </div>
+                        <div class="code-actions">
+                          <button class="button" type="button" data-copy>复制设备码</button>
+                          <a class="button" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer">打开 GitHub 验证页</a>
+                        </div>
+                      </div>
+                      <div class="alert info" role="status">
+                        <span aria-hidden="true">i</span>
+                        <div>
+                          <strong>GitHub 请求 slow_down</strong>
+                          <div>服务端已按官方 interval 放慢轮询，不会 busy-loop。请保持此页或稍后回来查看结果。</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- denied -->
+                  <div class="state-view" data-state="denied">
+                    <div class="alert error" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>GitHub 授权被拒绝</strong>
+                        <div>你在 GitHub 页面取消或拒绝了授权。本机未保存任何凭据。可重新开始连接。</div>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button primary connect-trigger" type="button">重新连接 GitHub</button>
+                    </div>
+                  </div>
+
+                  <!-- expired -->
+                  <div class="state-view" data-state="expired">
+                    <div class="alert warning" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>设备码已过期</strong>
+                        <div>请重新开始连接以获取新的短期设备码。过期码与对应授权会话已从本机清除。</div>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button primary connect-trigger" type="button">重新连接 GitHub</button>
+                    </div>
+                  </div>
+
+                  <!-- cancelled -->
+                  <div class="state-view" data-state="cancelled">
+                    <div class="alert info" role="status">
+                      <span aria-hidden="true">i</span>
+                      <div>
+                        <strong>已取消本机授权流程</strong>
+                        <div>服务端已停止轮询。如果稍后仍在 GitHub 批准，本机不会静默接收该次授权；需要重新连接。</div>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button primary connect-trigger" type="button">连接 GitHub</button>
+                    </div>
+                  </div>
+
+                  <!-- network -->
+                  <div class="state-view" data-state="network">
+                    <div class="alert error" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>无法完成 GitHub 授权</strong>
+                        <div>网络超时或 GitHub 暂时不可用。本机未保存凭据；页面不会展示上游原始错误。</div>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button primary connect-trigger" type="button">重试连接</button>
+                    </div>
+                  </div>
+
+                  <!-- sse reconnect -->
+                  <div class="state-view" data-state="sse-reconnect">
+                    <div class="auth-card" aria-live="polite">
+                      <div class="auth-head">
+                        <div>
+                          <h3>授权进度连接已恢复</h3>
+                          <p>SSE 短暂断开后已重连。后台授权不会因浏览器断线而自动取消。</p>
+                        </div>
+                        <button class="icon-button cancel-auth" type="button" aria-label="取消授权" title="取消">×</button>
+                      </div>
+                      <div class="alert info" role="status">
+                        <span aria-hidden="true">i</span>
+                        <div>
+                          <strong>已重新订阅授权状态</strong>
+                          <div>当前仍在等待 GitHub 批准。成功持久化不依赖此浏览器标签是否一直在线。</div>
+                        </div>
+                      </div>
+                      <div class="code-panel">
+                        <div>
+                          <div class="eyebrow">User code</div>
+                          <div class="user-code" tabindex="0">ABCD-EFGH</div>
+                          <div class="code-meta">剩余约 <strong>07:15</strong></div>
+                        </div>
+                        <div class="code-actions">
+                          <button class="button" type="button" data-copy>复制设备码</button>
+                          <a class="button" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer">打开 GitHub 验证页</a>
+                        </div>
+                      </div>
+                      <div class="status-line"><span class="spinner" aria-hidden="true"></span><span>polling · 等待批准…</span></div>
+                    </div>
+                  </div>
+
+                  <!-- success single -->
+                  <div class="state-view" data-state="success">
+                    <div class="alert success" role="status">
+                      <span aria-hidden="true">✓</span>
+                      <div>
+                        <strong>已连接 GitHub 账号 @octocat</strong>
+                        <div>身份已验证并保存到本机 Links 存储。浏览器未接收 access token。</div>
+                      </div>
+                    </div>
+                    <div class="connection-list" aria-label="活动 GitHub 连接">
+                      <article class="connection-card" data-connection-id="conn_octocat">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>个人开发</h4>
+                            <span class="login-chip">@octocat</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 19:12</span></div>
+                          <div class="meta-line">GitHub user id · 583231</div>
+                          <div class="scope-row"><span class="scope-label">请求范围</span><span class="scope-chip requested">read:user</span></div>
+                          <div class="scope-row"><span class="scope-label">已授予</span><span class="scope-chip">read:user</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_octocat">断开</button>
+                        </div>
+                      </article>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button connect-trigger" type="button">连接另一个 GitHub 账号</button>
+                    </div>
+                    <div class="list-footnote">“已连接”表示上次验证成功，不代表实时在线。P0 仅请求 <code>read:user</code>，页面不会声称拥有 repo 权限。</div>
+                  </div>
+
+                  <!-- multi -->
+                  <div class="state-view" data-state="multi">
+                    <div class="connection-list" aria-label="活动 GitHub 连接">
+                      <article class="connection-card" data-connection-id="conn_octocat">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>个人开发</h4>
+                            <span class="login-chip">@octocat</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 19:12</span></div>
+                          <div class="meta-line">GitHub user id · 583231</div>
+                          <div class="scope-row"><span class="scope-label">请求范围</span><span class="scope-chip requested">read:user</span></div>
+                          <div class="scope-row"><span class="scope-label">已授予</span><span class="scope-chip">read:user</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_octocat">断开</button>
+                        </div>
+                      </article>
+                      <article class="connection-card" data-connection-id="conn_work">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>工作账号 · very-long-organization-login-name-for-overflow</h4>
+                            <span class="login-chip">@enterprise-dev-bot-long</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 18:04</span></div>
+                          <div class="meta-line">GitHub user id · 99100234</div>
+                          <div class="scope-row"><span class="scope-label">请求范围</span><span class="scope-chip requested">read:user</span></div>
+                          <div class="scope-row"><span class="scope-label">已授予</span><span class="scope-chip">read:user</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_work">断开</button>
+                        </div>
+                      </article>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button connect-trigger" type="button">连接另一个 GitHub 账号</button>
+                    </div>
+                    <div class="list-footnote">不同 GitHub numeric user id 可同时连接。同一 identity 重复授权会返回 409，不会静默替换现有本机凭据。</div>
+                  </div>
+
+                  <!-- duplicate -->
+                  <div class="state-view" data-state="duplicate">
+                    <div class="alert warning" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>该 GitHub 账号已连接</strong>
+                        <div>为避免静默替换本机凭据，重复 identity 被拒绝（409）。请先断开现有连接再重新授权。新 access token 未写入本机；如需清理远端授权，请前往 GitHub → Settings → Applications → Authorized OAuth Apps。</div>
+                      </div>
+                    </div>
+                    <div class="connection-list" aria-label="活动 GitHub 连接">
+                      <article class="connection-card highlight" data-connection-id="conn_octocat" id="duplicate-target">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>个人开发</h4>
+                            <span class="login-chip">@octocat</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 19:12</span></div>
+                          <div class="meta-line">GitHub user id · 583231 · 现有连接保持不变</div>
+                          <div class="scope-row"><span class="scope-label">请求范围</span><span class="scope-chip requested">read:user</span></div>
+                          <div class="scope-row"><span class="scope-label">已授予</span><span class="scope-chip">read:user</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_octocat">断开后重连</button>
+                        </div>
+                      </article>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button connect-trigger" type="button">连接另一个不同账号</button>
+                    </div>
+                  </div>
+
+                  <!-- load error -->
+                  <div class="state-view" data-state="load-error">
+                    <div class="alert error" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>无法读取本机 GitHub 连接</strong>
+                        <div>Links 存储暂时不可用。未向 GitHub 发起网络请求；请重试。错误文案不含绝对路径或凭据。</div>
+                      </div>
+                    </div>
+                    <div class="inline-actions">
+                      <button class="button primary" type="button" id="retry-load">重新加载</button>
+                    </div>
+                  </div>
+
+                  <!-- disconnect busy -->
+                  <div class="state-view" data-state="disconnect-busy">
+                    <div class="connection-list">
+                      <article class="connection-card busy" data-connection-id="conn_octocat" aria-busy="true">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>个人开发</h4>
+                            <span class="login-chip">@octocat</span>
+                          </div>
+                          <div class="status-line"><span class="spinner" aria-hidden="true"></span><span>正在断开本机连接…</span></div>
+                          <div class="meta-line">GitHub user id · 583231</div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger busy" type="button" disabled>断开中…</button>
+                        </div>
+                      </article>
+                      <article class="connection-card" data-connection-id="conn_work">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>工作账号</h4>
+                            <span class="login-chip">@enterprise-dev-bot</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 18:04</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_work">断开</button>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+
+                  <!-- disconnect fail -->
+                  <div class="state-view" data-state="disconnect-fail">
+                    <div class="alert error" role="alert">
+                      <span aria-hidden="true">!</span>
+                      <div>
+                        <strong>断开失败</strong>
+                        <div>本机凭据未能安全删除，连接仍保留在活动列表。不会伪造成功；请重试。</div>
+                      </div>
+                    </div>
+                    <div class="connection-list">
+                      <article class="connection-card" data-connection-id="conn_octocat">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>个人开发</h4>
+                            <span class="login-chip">@octocat</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 19:12</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_octocat">重试断开</button>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+
+                  <!-- confirm uses multi list underneath -->
+                  <div class="state-view" data-state="confirm">
+                    <div class="connection-list">
+                      <article class="connection-card" data-connection-id="conn_octocat">
+                        <div class="connection-detail">
+                          <div class="connection-title">
+                            <h4>个人开发</h4>
+                            <span class="login-chip">@octocat</span>
+                          </div>
+                          <div class="status-line"><span class="status-dot" aria-hidden="true"></span><span class="status-label">已连接</span><span>· 上次验证成功于 2026-07-18 19:12</span></div>
+                          <div class="scope-row"><span class="scope-label">请求范围</span><span class="scope-chip requested">read:user</span></div>
+                          <div class="scope-row"><span class="scope-label">已授予</span><span class="scope-chip">read:user</span></div>
+                        </div>
+                        <div class="card-actions">
+                          <button class="button danger disconnect-trigger" type="button" data-target="conn_octocat">断开</button>
+                        </div>
+                      </article>
+                    </div>
+                  </div>
+
+                  <div class="safe-note" id="footer-safe-note">
+                    <span aria-hidden="true">i</span>
+                    <span><strong>安全边界：</strong>Links 与 LLM 认证完全隔离。列表只显示身份摘要、验证时间与 scopes；access token、device_code 与 client secret 永不进入 DOM、toast、错误或 <code>pi-web.json</code>。</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+
+        <footer class="settings-footer">
+          <div class="footer-note" id="footer-note">
+            Links 页面的连接 / 断开会即时保存。全局“保存 / 恢复默认值”仅作用于 <code>pi-web.json</code> 配置项，在此页禁用以免误解。
+          </div>
+          <div class="footer-actions">
+            <button class="button" type="button" disabled title="Links 使用即时保存">恢复默认值</button>
+            <button class="button primary" type="button" disabled title="Links 使用即时保存">保存</button>
+          </div>
+        </footer>
+      </article>
+    </section>
+  </main>
+
+  <div class="modal-layer" id="confirm-layer" role="presentation">
+    <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description" tabindex="-1">
+      <h3 id="confirm-title">断开 GitHub 连接？</h3>
+      <p id="confirm-description">确认后会删除 yolk pi web 本机保存的这条 GitHub OAuth 凭据，并从活动连接列表移除 <strong>@octocat</strong>。</p>
+      <div class="confirm-warning">
+        <strong>本机断开不会撤销 GitHub 远端授权。</strong>
+        若不再使用，请前往 GitHub Settings → Applications → Authorized OAuth Apps 手工撤销。
+      </div>
+      <div class="auth-actions" style="justify-content:flex-end">
+        <button class="button" type="button" id="confirm-cancel">取消</button>
+        <button class="button danger" type="button" id="confirm-ok">断开本机连接</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="sr-only" id="live-region" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      var select = document.getElementById("state-select");
+      var themeToggle = document.getElementById("theme-toggle");
+      var narrowToggle = document.getElementById("narrow-toggle");
+      var focusToggle = document.getElementById("focus-toggle");
+      var motionToggle = document.getElementById("motion-toggle");
+      var confirmLayer = document.getElementById("confirm-layer");
+      var toast = document.getElementById("toast");
+      var live = document.getElementById("live-region");
+      var connectButton = document.getElementById("connect-button");
+      var countEl = document.getElementById("connection-count");
+      var lastFocus = null;
+
+      var COUNT = {
+        loading: 0,
+        empty: 0,
+        "not-configured": 0,
+        starting: 0,
+        "device-code": 0,
+        "popup-blocked": 0,
+        "slow-down": 0,
+        denied: 0,
+        expired: 0,
+        cancelled: 0,
+        network: 0,
+        "sse-reconnect": 0,
+        success: 1,
+        multi: 2,
+        duplicate: 1,
+        "load-error": 0,
+        confirm: 1,
+        "disconnect-busy": 2,
+        "disconnect-fail": 1
+      };
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("active");
+        window.clearTimeout(showToast._t);
+        showToast._t = window.setTimeout(function () {
+          toast.classList.remove("active");
+        }, 1800);
+      }
+
+      function setState(state) {
+        document.querySelectorAll(".state-view").forEach(function (view) {
+          view.classList.toggle("active", view.getAttribute("data-state") === state);
+        });
+        countEl.textContent = String(COUNT[state] != null ? COUNT[state] : 0);
+
+        var hideConnect = state === "not-configured" || state === "starting" || state === "device-code" || state === "popup-blocked" || state === "slow-down" || state === "sse-reconnect" || state === "loading";
+        connectButton.disabled = state === "not-configured" || state === "starting" || state === "device-code" || state === "popup-blocked" || state === "slow-down" || state === "sse-reconnect";
+        connectButton.style.visibility = hideConnect && state !== "not-configured" ? "hidden" : "visible";
+        if (state === "not-configured") {
+          connectButton.style.visibility = "hidden";
+        }
+
+        if (state === "confirm") {
+          openConfirm();
+        } else {
+          closeConfirm(false);
+        }
+
+        live.textContent = "Links 状态切换为 " + state;
+      }
+
+      function openConfirm() {
+        lastFocus = document.activeElement;
+        confirmLayer.classList.add("active");
+        var dialog = confirmLayer.querySelector(".confirm-dialog");
+        window.setTimeout(function () { dialog.focus(); }, 0);
+      }
+
+      function closeConfirm(restore) {
+        confirmLayer.classList.remove("active");
+        if (restore && lastFocus && typeof lastFocus.focus === "function") {
+          lastFocus.focus();
+        }
+      }
+
+      function copyCode() {
+        var code = "ABCD-EFGH";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code).then(function () {
+            showToast("已复制设备码 ABCD-EFGH");
+          }).catch(function () {
+            showToast("请手动选择并复制设备码");
+          });
+        } else {
+          showToast("请手动选择并复制设备码");
+        }
+      }
+
+      select.addEventListener("change", function () {
+        setState(select.value);
+      });
+
+      themeToggle.addEventListener("click", function () {
+        var dark = document.documentElement.getAttribute("data-theme") !== "light";
+        document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+        themeToggle.setAttribute("aria-pressed", dark ? "false" : "true");
+        themeToggle.textContent = dark ? "Light" : "Dark";
+      });
+
+      narrowToggle.addEventListener("click", function () {
+        var on = document.documentElement.getAttribute("data-narrow") === "on";
+        document.documentElement.setAttribute("data-narrow", on ? "off" : "on");
+        narrowToggle.setAttribute("aria-pressed", on ? "false" : "true");
+      });
+
+      focusToggle.addEventListener("click", function () {
+        var on = document.documentElement.getAttribute("data-focus") === "on";
+        document.documentElement.setAttribute("data-focus", on ? "off" : "on");
+        focusToggle.setAttribute("aria-pressed", on ? "false" : "true");
+      });
+
+      motionToggle.addEventListener("click", function () {
+        var on = document.documentElement.getAttribute("data-reduced-motion") === "on";
+        document.documentElement.setAttribute("data-reduced-motion", on ? "off" : "on");
+        motionToggle.setAttribute("aria-pressed", on ? "false" : "true");
+      });
+
+      document.querySelectorAll(".connect-trigger").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          select.value = "device-code";
+          setState("device-code");
+          showToast("原型：已进入设备码等待状态");
+        });
+      });
+
+      document.querySelectorAll(".cancel-auth").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          select.value = "cancelled";
+          setState("cancelled");
+        });
+      });
+
+      document.querySelectorAll(".disconnect-trigger").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          select.value = "confirm";
+          setState("confirm");
+        });
+      });
+
+      document.getElementById("confirm-cancel").addEventListener("click", function () {
+        select.value = "multi";
+        setState("multi");
+        closeConfirm(true);
+      });
+
+      document.getElementById("confirm-ok").addEventListener("click", function () {
+        select.value = "disconnect-busy";
+        setState("disconnect-busy");
+        showToast("原型：正在断开本机连接（不撤销 GitHub 远端授权）");
+      });
+
+      document.getElementById("copy-code").addEventListener("click", copyCode);
+      document.querySelectorAll("[data-copy]").forEach(function (btn) {
+        btn.addEventListener("click", copyCode);
+      });
+
+      document.getElementById("retry-load").addEventListener("click", function () {
+        select.value = "empty";
+        setState("empty");
+      });
+
+      confirmLayer.addEventListener("click", function (event) {
+        if (event.target === confirmLayer) {
+          select.value = "multi";
+          setState("multi");
+          closeConfirm(true);
+        }
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && confirmLayer.classList.contains("active")) {
+          select.value = "multi";
+          setState("multi");
+          closeConfirm(true);
+        }
+      });
+
+      setState(select.value);
+    })();
+  </script>
+</body>
+</html>

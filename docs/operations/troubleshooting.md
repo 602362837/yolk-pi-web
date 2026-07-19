@@ -382,6 +382,107 @@ The only currently allowed price source is `https://openrouter.ai/api/v1/models`
 
 Run `node scripts/test-model-prices.mjs` for focused validation of price config, merge, revision, JSONC strip, suggest validation, and PATCH batch limits.
 
+## Links / GitHub OAuth Device Flow
+
+### Links shows "GitHub authorization is not configured"
+
+`YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is not set in the server environment. The Links UI is designed to fail closed — it never falls back to PAT input.
+
+1. Confirm that `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is exported in the shell running `ypi` / `npm run dev` / `npm run start`.
+2. This is a **server-only** variable; do not set `NEXT_PUBLIC_*` variants.
+3. The value must be a GitHub OAuth App client id with **Device Flow enabled**.
+4. No client secret is needed or accepted.
+5. For UAT/release, the product owner must provide the official OAuth App client id.
+
+### Device Flow starts but the GitHub page says "device code is incorrect"
+
+The user must enter the exact short-term user code displayed in Settings → Links. The code is a GitHub-generated value like `ABCD-EFGH`.
+
+- The code is case-insensitive but must match exactly.
+- The code expires after ~15 minutes (GitHub default); restart authorization if expired.
+- Clicking "打开 GitHub 验证页" navigates to `https://github.com/login/device` — verify the URL matches exactly.
+- If a popup blocker prevents the new window, manually navigate to `https://github.com/login/device` and enter the displayed code.
+
+### Device Flow times out / "authorization expired"
+
+GitHub Device Flow codes are short-lived (typically 900 seconds). If the user does not complete authorization in time:
+
+1. The UI shows an expired state. Click "重新连接" to start a fresh authorization.
+2. Old `device_code` values are discarded from server memory; only active/completing authorizations matter.
+3. There is no background accumulation of stale authorizations — terminal states are cleaned after 2 minutes.
+
+### "Device Flow disabled" error
+
+The configured GitHub OAuth App must have **Device Flow** explicitly enabled in GitHub's OAuth App settings. Without it, `POST /login/device/code` returns an error.
+
+1. Go to GitHub Settings → Developer settings → OAuth Apps.
+2. Open the app and confirm **Device Flow** is enabled.
+3. If the app was recently created/updated, wait a few minutes for propagation.
+
+### "Access denied" or authorization rejected
+
+The user declined authorization on the GitHub page or the authorization was cancelled.
+
+- No credentials were saved locally (the authorization was still in progress).
+- Click "重新连接" to try again.
+- If the user accidentally denied on GitHub, there is no penalty — just restart.
+
+### Rate limiting / "github_rate_limited"
+
+GitHub may rate-limit Device Flow requests. Common causes:
+
+- Too many rapid device-code requests from the same client id.
+- Token-endpoint polling too aggressively (the adapter respects `interval` and `slow_down`).
+
+Wait and retry. The Links adapter respects GitHub's polling interval recommendations and uses a minimum of 5 seconds between polls.
+
+### Duplicate identity (409) when connecting the same GitHub account
+
+Links rejects duplicate GitHub numeric user ids. If you need to reauthorize the same GitHub identity:
+
+1. **Disconnect** the existing connection in Settings → Links first (this removes the local OAuth secret).
+2. Click **Connect GitHub** again to start a new authorization.
+3. The old GitHub OAuth grant is NOT revoked during disconnect — the user may also want to revoke it at GitHub Settings → Applications → Authorized OAuth Apps.
+
+### "Authorization session expired, please reconnect" after server restart
+
+Pending authorization sessions are memory-only (`globalThis.__piLinkAuthorizations`). A server restart or hot-reload clears them.
+
+- Completed/connected identities are persisted to `~/.pi/agent/links/` and survive restarts.
+- Only in-progress authorizations are lost — click "重新连接" to start over.
+- This is intentional: in-progress state is ephemeral and not persisted to disk.
+
+### Disconnect fails / connection remains
+
+Disconnect uses a quarantine/rollback pattern:
+
+1. Check file permissions on `~/.pi/agent/links/` — directories should be `0700`, files `0600`.
+2. If the disconnect reports failure but the connection still appears, the secret was not removed and the metadata was not updated — it is safe to retry.
+3. If the metadata shows `disconnected` but the secret file still exists, manually delete the secret file under `links/github/<id>.json` (the metadata is soft-deleted and the connection is hidden from the list).
+
+### Multi-process / stale lock
+
+The cross-process lock uses mkdir-based provider locks under `~/.pi/agent/links/.locks/`. A stale lock (e.g., from a crashed process) times out after 30 seconds.
+
+### Access token or device_code accidentally exposed
+
+Links is designed with strong sentinel barriers:
+
+- `device_code` is only stored in `LinkAuthorizationSession.deviceCode` in server memory — never in API responses, SSE frames, metadata, logs, or errors.
+- Access tokens are only in the secret file (`links/github/<id>.json`, 0600) and upstream GitHub responses — never in API, SSE, DOM, metadata, or task/session JSONL.
+- If you suspect leakage, check `~/.pi/agent/links/registry.json` (must never contain tokens), API response bodies, SSE event data, server logs, and Next.js error output.
+
+### Disconnect vs remote GitHub revocation
+
+**Local disconnect** only removes the OAuth secret from `~/.pi/agent/links/github/<id>.json` and soft-deletes the metadata record. The GitHub OAuth grant on GitHub's side is **not affected**.
+
+To fully revoke the GitHub authorization:
+1. Go to GitHub Settings → Applications → Authorized OAuth Apps.
+2. Find the yolk pi web OAuth App.
+3. Click **Revoke**.
+
+This is a GitHub-side operation only; the yolk pi web Links module does not call GitHub's revocation API in P0.
+
 ## Memory Diagnostic Snapshots
 
 When the Yolk Pi Web process memory grows (potentially to multiple GiB after days of uptime), generate a bounded read-only diagnostic snapshot to gather evidence for offline analysis. This is a diagnosis tool only; it does **not** fix or clean up leaks, abort sessions, force GC, or take heap snapshots.

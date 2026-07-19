@@ -19,6 +19,7 @@ export type SettingsSection =
   | "yolk"
   | "worktree"
   | "studio"
+  | "links"
   | "usage"
   | "modelPrices"
   | "terminal"
@@ -100,6 +101,7 @@ export function ancestorGroupsForView(view: SettingsView): SettingsGroupId[] {
     case "worktree":
       return ["sessionWorkspace"];
     case "studio":
+    case "links":
       return [];
     case "usage":
     case "modelPrices":
@@ -192,6 +194,16 @@ export function flattenVisibleTreeNodes(expanded: SettingsExpandedGroups): Focus
     label: "Studio",
     description: "YPI Studio 成员模型",
     icon: "✦",
+  });
+
+  nodes.push({
+    focusId: "view:links",
+    kind: "view",
+    view: "links",
+    level: 0,
+    label: "Links",
+    description: "GitHub 多账号身份连接管理",
+    icon: "↗",
   });
 
   nodes.push({
@@ -672,6 +684,16 @@ export function SettingsTreeNavigation({
           label: "Studio",
           description: "YPI Studio 成员模型",
           icon: "✦",
+        })}
+
+        {renderViewButton({
+          focusId: "view:links",
+          kind: "view",
+          view: "links",
+          level: 0,
+          label: "Links",
+          description: "GitHub 多账号身份连接管理",
+          icon: "↗",
         })}
 
         {renderGroup(

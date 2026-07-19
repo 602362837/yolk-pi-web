@@ -8,6 +8,7 @@ import { TerminalSshCredentialEditor } from "./TerminalSshCredentialEditor";
 import { TerminalSshProfileEditor } from "./TerminalSshProfileEditor";
 import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
 import { ModelPricesConfig } from "./ModelPricesConfig";
+import { LinksConfig } from "./LinksConfig";
 import { SettingsProviderHub } from "./SettingsProviderHub";
 import {
   DEFAULT_SETTINGS_EXPANDED_GROUPS,
@@ -1833,6 +1834,8 @@ export function SettingsConfig({
                       </div>
                     ) : null}
                   </div>
+                ) : view === "links" ? (
+                  <LinksConfig />
                 ) : view === "modelPrices" ? (
                   <ModelPricesConfig cwd={cwd} />
                 ) : view === "providerHub" ? (
@@ -2594,29 +2597,59 @@ export function SettingsConfig({
         </div>
 
         <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 10, flexShrink: 0 }}>
-          <button
-            onClick={resetToDefaults}
-            disabled={!defaults || loading || saving}
-            style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: !defaults || loading || saving ? "not-allowed" : "pointer", fontSize: 12 }}
-          >
-            恢复默认值
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {dirty && <span style={{ fontSize: 12, color: "var(--text-dim)" }}>有未保存更改</span>}
-            <button
-              onClick={onClose}
-              style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
-            >
-              取消
-            </button>
-            <button
-              onClick={() => void handleSave()}
-              disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty}
-              style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
-            >
-              {saving ? "正在保存…" : "保存"}
-            </button>
-          </div>
+          {view === "links" ? (
+            <>
+              <span style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.45, maxWidth: 520 }}>
+                Links 页面的连接 / 断开会即时保存。全局「保存 / 恢复默认值」仅作用于 <code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>pi-web.json</code> 配置项，在此页禁用以免误解。
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  disabled
+                  style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-dim)", cursor: "not-allowed", fontSize: 12, opacity: 0.45 }}
+                >
+                  恢复默认值
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
+                >
+                  关闭
+                </button>
+                <button
+                  disabled
+                  style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: "var(--border)", color: "var(--text-dim)", cursor: "not-allowed", fontSize: 12, fontWeight: 600, opacity: 0.45 }}
+                >
+                  保存
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={resetToDefaults}
+                disabled={!defaults || loading || saving}
+                style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: !defaults || loading || saving ? "not-allowed" : "pointer", fontSize: 12 }}
+              >
+                恢复默认值
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {dirty && <span style={{ fontSize: 12, color: "var(--text-dim)" }}>有未保存更改</span>}
+                <button
+                  onClick={onClose}
+                  style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={!worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty}
+                  style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty ? "var(--border)" : "var(--accent)", color: "white", cursor: !worktree || !trellis || !studio || !usage || !terminal || !chatgpt || !opencodeGo || !grok || !kiro || !antigravity || !editor || loading || saving || !dirty ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600 }}
+                >
+                  {saving ? "正在保存…" : "保存"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
