@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllowedRoots, isPathAllowed } from "@/lib/allowed-roots";
 import { canonicalizeCwd } from "@/lib/cwd";
-import { bestEffortContinueAfterWidgetRequestPlanChanges } from "@/lib/ypi-studio-session-link";
 import {
   approveYpiStudioImprovementPlanFromWidget,
   approveYpiStudioPlanFromWidget,
@@ -28,10 +27,12 @@ import {
   isYpiStudioWidgetApproveImprovementPlanBody,
   isYpiStudioWidgetApprovePlanBody,
   isYpiStudioWidgetRequestPlanChangesBody,
+  isYpiStudioWidgetReturnToUserAcceptanceBody,
   isYpiStudioWidgetStartUserAcceptanceBody,
   recordYpiStudioImprovementApproval,
   requestYpiStudioPlanChangesFromWidget,
   resolveYpiStudioImprovementDisposition,
+  returnYpiStudioToUserAcceptanceFromWidget,
   reviseYpiStudioImprovementPlan,
   startYpiStudioUserAcceptanceFromWidget,
   transitionYpiStudioImprovement,
@@ -173,20 +174,9 @@ export async function PATCH(
     if (isYpiStudioWidgetRequestPlanChangesBody(body)) {
       try {
         const task = requestYpiStudioPlanChangesFromWidget(taskKey, { ...body, cwd: authorizedCwd });
-        // Best-effort wake of the bound session to re-run planning. Never roll back the
-        // already-persisted planning decision if the RPC wrapper is missing/busy.
-        const revisionFrom = body.expectedRevision;
-        const revisionTo = typeof task.meta?.planRevision === "number"
-          ? task.meta.planRevision
-          : revisionFrom + 1;
-        bestEffortContinueAfterWidgetRequestPlanChanges({
-          contextId: body.contextId,
-          taskId: task.id,
-          feedback: typeof body.feedback === "string" ? body.feedback : "",
-          revisionFrom,
-          revisionTo,
-          updatedAt: task.updatedAt,
-        });
+        // Server wake removed: widget decision continuation now travels through the
+        // Chat handleSend path (Hybrid B). Keep bestEffortContinueAfterWidgetRequestPlanChanges
+        // and its helpers in lib/ypi-studio-session-link.ts for tests/emergency rollback.
         return NextResponse.json({ task });
       } catch (error) {
         return widgetDecisionErrorResponse(error);
@@ -205,6 +195,16 @@ export async function PATCH(
     if (isYpiStudioWidgetStartUserAcceptanceBody(body)) {
       try {
         const task = startYpiStudioUserAcceptanceFromWidget(taskKey, { ...body, cwd: authorizedCwd });
+        return NextResponse.json({ task });
+      } catch (error) {
+        return widgetDecisionErrorResponse(error);
+      }
+    }
+    // Explicit return_to_user_acceptance must match before loose transition bodies.
+    // No autocontinue: user_acceptance waits for the main-accept CTA.
+    if (isYpiStudioWidgetReturnToUserAcceptanceBody(body)) {
+      try {
+        const task = returnYpiStudioToUserAcceptanceFromWidget(taskKey, { ...body, cwd: authorizedCwd });
         return NextResponse.json({ task });
       } catch (error) {
         return widgetDecisionErrorResponse(error);

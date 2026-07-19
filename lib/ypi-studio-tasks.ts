@@ -81,6 +81,7 @@ import type {
   YpiStudioWidgetRequestPlanChangesBody,
   YpiStudioWidgetApproveImprovementPlanBody,
   YpiStudioWidgetStartUserAcceptanceBody,
+  YpiStudioWidgetReturnToUserAcceptanceBody,
 } from "./ypi-studio-types";
 import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 
@@ -3310,6 +3311,80 @@ export function startYpiStudioUserAcceptanceFromWidget(
   });
 }
 
+/**
+ * Atomically return a completed task to user_acceptance from the session widget.
+ * Single lock: binding/status=completed/!archived/revision CAS/unresolved==0/transition exists → user_acceptance.
+ * Clears completedAt; does not write plan approvalGrant, archive, or create improvements. No override contract.
+ */
+export function returnYpiStudioToUserAcceptanceFromWidget(
+  taskIdOrKey: string,
+  body: YpiStudioWidgetReturnToUserAcceptanceBody,
+): YpiStudioTaskDetail {
+  if (!body?.contextId || typeof body.contextId !== "string" || !body.contextId.trim()) {
+    throw new Error("return_to_user_acceptance requires a bound session contextId.");
+  }
+  if (!isYpiStudioSessionContextId(body.contextId)) {
+    throw new Error("return_to_user_acceptance requires a session-class contextId (pi_<sessionId>).");
+  }
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot return to user acceptance from the widget");
+    if (record.raw.status !== "completed") {
+      throw new Error(`return_to_user_acceptance requires status completed. Current status: ${record.raw.status}`);
+    }
+    assertTaskBoundToContext(record.raw, body.contextId);
+
+    // Defensive: reject if unresolved improvements still exist (belt + suspenders)
+    const unresolved = record.raw.improvements?.instances?.filter((inst) => isImprovementUnresolved(inst.status)) ?? [];
+    if (unresolved.length > 0) {
+      const ids = unresolved.map((inst) => inst.displayId).join(", ");
+      throw new Error(
+        `return_to_user_acceptance requires zero unresolved improvements. Still unresolved: ${ids}.`,
+      );
+    }
+
+    const revision = record.raw.meta.planRevision ?? 1;
+    assertExpectedRevision(revision, body.expectedRevision, "return_to_user_acceptance");
+
+    const workflow = readYpiStudioWorkflow(ctx.cwd, record.raw.workflowId) ?? getYpiStudioWorkflowOrDefault(ctx.cwd, record.raw.workflowId);
+    const from = record.raw.status;
+    const to = "user_acceptance";
+    const transition = findYpiStudioTransition(workflow, from, to);
+    if (!transition) throw new Error(`Invalid Studio transition: ${from} -> ${to}`);
+    if (!workflow.states[to]) throw new Error(`Unknown workflow state: ${to}`);
+
+    // Clear completedAt (leaving terminal state) and advance into user_acceptance.
+    const updatedAt = nowIso();
+    record.raw.status = to;
+    record.raw.completedAt = null;
+    record.raw.updatedAt = updatedAt;
+    record.raw.currentMember = workflow.states[to]?.owner;
+
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "transition",
+      at: updatedAt,
+      taskId: record.raw.id,
+      from,
+      to,
+      message: "User returned task to user acceptance from widget",
+      data: {
+        source: "user-widget",
+        action: "return_to_user_acceptance",
+        contextId: body.contextId,
+        revision,
+      },
+    });
+    writeRuntimePointer(ctx, body.contextId, record.raw.id);
+
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after widget return to user acceptance");
+    return detail;
+  });
+}
+
 export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTaskTransitionBody): YpiStudioTaskDetail {
   const ctx = createContext(body.cwd);
   return withTaskMutationLock(ctx, taskIdOrKey, () => {
@@ -4028,6 +4103,22 @@ export function isYpiStudioWidgetApproveImprovementPlanBody(value: unknown): val
 export function isYpiStudioWidgetStartUserAcceptanceBody(value: unknown): value is YpiStudioWidgetStartUserAcceptanceBody {
   return isRecord(value)
     && value.action === "start_user_acceptance"
+    && typeof value.cwd === "string"
+    && typeof value.contextId === "string"
+    && isFiniteInteger(value.expectedRevision)
+    && value.override === undefined;
+}
+
+/**
+ * Explicit widget return_to_user_acceptance body.
+ * Rejects override and unknown action shapes.
+ *
+ * Note: studio_archive is a Chat-only action and has no corresponding PATCH body.
+ * The frontend triggers it via onComposeSend("/studio-archive"), never via a widget PATCH.
+ */
+export function isYpiStudioWidgetReturnToUserAcceptanceBody(value: unknown): value is YpiStudioWidgetReturnToUserAcceptanceBody {
+  return isRecord(value)
+    && value.action === "return_to_user_acceptance"
     && typeof value.cwd === "string"
     && typeof value.contextId === "string"
     && isFiniteInteger(value.expectedRevision)

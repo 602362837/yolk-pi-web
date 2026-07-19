@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YPI Studio 浮窗 · Chat Send 续推与工作中禁用 · UI 原型</title>
+  <style>
+    :root {
+      --bg-app: #09090b;
+      --bg-panel: #18181b;
+      --bg-card: rgba(24, 24, 27, 0.82);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #eddcd2;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --accent: #f59e0b;
+      --accent-bg: rgba(245, 158, 11, 0.12);
+      --green: #22c55e;
+      --green-bg: rgba(34, 197, 94, 0.12);
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --blue-bg: rgba(59, 130, 246, 0.12);
+      --widget-w: 360px;
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-app);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px 1fr 380px;
+      gap: 0;
+    }
+    @media (max-width: 1100px) {
+      body { grid-template-columns: 1fr; }
+      .sidebar, .inspector { display: none; }
+    }
+    button { font: inherit; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+    /* ── Control sidebar ── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 16px;
+      overflow: auto;
+    }
+    .sidebar h1 { font-size: 14px; font-weight: 800; margin-bottom: 6px; }
+    .sidebar p { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; }
+    .scene-list { display: flex; flex-direction: column; gap: 6px; }
+    .scene-btn {
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .scene-btn.is-active {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .legend {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+    .legend strong { color: var(--text); }
+
+    /* ── Main stage: fake chat + widget ── */
+    .stage {
+      position: relative;
+      min-height: 100vh;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(245, 158, 11, 0.06), transparent 55%),
+        var(--bg-app);
+      padding: 20px 24px 40px;
+    }
+    .stage-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stage-header h2 { font-size: 15px; font-weight: 800; }
+    .pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .pill.is-run {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+      background: var(--accent-bg);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--widget-w);
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    /* Chat mock */
+    .chat {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(24, 24, 27, 0.55);
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-top {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .chat-body {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .msg {
+      max-width: 92%;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.35);
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .msg .tag {
+      display: block;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    .chat-input {
+      border-top: 1px solid var(--border);
+      padding: 10px 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .chat-input .box {
+      flex: 1;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text-dim);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+    }
+    .chat-input .model {
+      font-size: 10px;
+      color: var(--accent);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Widget card */
+    .widget {
+      width: 100%;
+      max-width: var(--widget-w);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+    .widget-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .widget-head .badge {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .card { padding: 10px 12px 12px; }
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+    .title {
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }
+
+    /* 8-station rail (simplified visual) */
+    .rail {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px 6px;
+      margin-bottom: 10px;
+    }
+    .station {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-dim);
+      padding: 4px 4px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .station.done { color: var(--green); background: var(--green-bg); }
+    .station.active {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      background: var(--accent-bg);
+    }
+
+    .previews {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .preview-btn {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+    }
+
+    .decision {
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+      background: color-mix(in srgb, var(--accent) 8%, transparent);
+      border-radius: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .decision-h {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .decision-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .decision-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .d-btn {
+      flex: 1;
+      min-width: 120px;
+      min-height: 44px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 8px 10px;
+    }
+    .d-btn.primary {
+      background: var(--accent);
+      color: #1c1410;
+      border-color: transparent;
+    }
+    .d-btn.secondary {
+      background: transparent;
+      color: var(--text);
+    }
+    .d-btn.primary:disabled,
+    .d-btn.secondary:disabled {
+      opacity: 0.42;
+    }
+
+    .accept {
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      background: var(--green-bg);
+      border-radius: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .accept .label {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .a-btn {
+      width: 100%;
+      min-height: 40px;
+      border-radius: 9px;
+      border: none;
+      background: #16a34a;
+      color: white;
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .runtime {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 6px; height: 6px; border-radius: 99px; background: currentColor;
+    }
+
+    /* Toast */
+    .toast-host {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 50;
+      max-width: 360px;
+    }
+    .toast {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      font-size: 12px;
+      line-height: 1.45;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      display: none;
+    }
+    .toast.show { display: block; }
+    .toast.success { border-color: rgba(34, 197, 94, 0.45); }
+    .toast.info { border-color: rgba(59, 130, 246, 0.45); }
+    .toast.warn { border-color: rgba(245, 158, 11, 0.55); }
+
+    /* Inspector */
+    .inspector {
+      border-left: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 16px;
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--text-muted);
+      overflow: auto;
+    }
+    .inspector h3 {
+      font-size: 12px;
+      color: var(--text);
+      margin: 0 0 8px;
+    }
+    .inspector code {
+      font-size: 10px;
+      color: var(--accent);
+    }
+    .inspector ul { padding-left: 16px; margin-bottom: 12px; }
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+      margin-top: 8px;
+    }
+    .matrix th, .matrix td {
+      border: 1px solid var(--border);
+      padding: 4px 6px;
+      text-align: left;
+    }
+    .matrix th { color: var(--text); background: rgba(255,255,255,0.03); }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <h1>Chat Send 续推 · UI 原型</h1>
+    <p>任务 <code>20260718-192856</code>。演示 Hybrid B：先 PATCH，再 Chat handleSend；agent 工作中禁用决策/验收。</p>
+    <div class="scene-list" id="scenes"></div>
+    <div class="legend">
+      <div><strong>保全：</strong>8 站 rail、quick preview、结果验收分区仍在。</div>
+      <div style="margin-top:6px"><strong>推荐预览：</strong>busy 时资料按钮仍可点。</div>
+      <div style="margin-top:6px"><strong>禁止：</strong>双发 server inner.prompt 主路径。</div>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="stage-header">
+      <h2 id="sceneTitle">场景</h2>
+      <span class="pill" id="runPill">Chat 空闲</span>
+    </div>
+    <div class="layout">
+      <section class="chat" aria-label="Chat 示意">
+        <div class="chat-top">
+          <span>绑定会话 · transcript</span>
+          <span class="model" id="modelLabel">model: grok-cli/grok-4.5</span>
+        </div>
+        <div class="chat-body" id="chatBody"></div>
+        <div class="chat-input">
+          <div class="box" id="inputHint">输入消息…（续推不经输入框，直接 Send）</div>
+          <span class="model">Send</span>
+        </div>
+      </section>
+
+      <section class="widget" aria-label="YPI Studio 任务浮窗">
+        <div class="widget-head">
+          <span>YPI Studio (1)</span>
+          <span class="badge" id="widgetBadge">需要你的决定</span>
+        </div>
+        <div class="card" id="card"></div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="inspector">
+    <h3>动作矩阵</h3>
+    <table class="matrix">
+      <thead>
+        <tr><th>动作</th><th>PATCH</th><th>Chat Send</th><th>工作中禁用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>approve_plan</td><td>是</td><td>是</td><td>是</td></tr>
+        <tr><td>request_plan_changes</td><td>是</td><td>是</td><td>是</td></tr>
+        <tr><td>approve_improvement_plan</td><td>是</td><td>是</td><td>是</td></tr>
+        <tr><td>start_user_acceptance</td><td>是</td><td>否</td><td>是</td></tr>
+        <tr><td>结果验收</td><td>是</td><td>否</td><td>是</td></tr>
+      </tbody>
+    </table>
+    <h3 style="margin-top:16px">本场景说明</h3>
+    <div id="sceneHelp"></div>
+    <h3>实现接线（示意）</h3>
+    <ul>
+      <li><code>AppShell.chatAgentRunning → widget.agentRunning</code></li>
+      <li><code>ChatWindow.handleSend → widget.onComposeSend</code></li>
+      <li>PATCH 成功后 <code>onComposeSend(fixedPrompt)</code></li>
+      <li>Send 失败不回滚 PATCH</li>
+    </ul>
+  </aside>
+
+  <div class="toast-host">
+    <div class="toast success" id="toastSuccess"></div>
+    <div class="toast warn" id="toastWarn"></div>
+    <div class="toast info" id="toastInfo"></div>
+  </div>
+
+  <script>
+    const STATIONS = ["Brief","Design","Implement","Checks","Review","User Acc.","Completed","Archived"];
+
+    const scenes = [
+      {
+        id: "idle-approve",
+        title: "1 · 空闲 · 主计划决策",
+        running: false,
+        badge: "需要你的决定",
+        help: "<ul><li>主任务 awaiting_approval</li><li>双 CTA：批准 / 需要修改</li><li>空闲时可点；确认后 PATCH + Chat Send</li></ul>",
+        railActive: 1,
+        railDone: [0],
+        decision: {
+          title: "需要你的决定 · 主计划",
+          meta: "demo-task · Revision 2",
+          primary: "批准并开始实现",
+          secondary: "需要修改",
+          disabled: false,
+          titleAttr: "demo-task · Revision 2",
+        },
+        accept: null,
+        chat: [
+          { role: "assistant", text: "规划已完成，请审阅 plan-review 后批准或提出修改。" }
+        ],
+      },
+      {
+        id: "running-disabled",
+        title: "2 · agent 工作中 · 全面禁用写 CTA",
+        running: true,
+        badge: "Chat 工作中",
+        help: "<ul><li>agentRunning=true</li><li>决策与结果验收 disabled</li><li>title：Chat 正在工作，请稍后再试</li><li>quick preview 仍可点（推荐）</li></ul>",
+        railActive: 2,
+        railDone: [0,1],
+        decision: {
+          title: "需要你的决定 · 主计划",
+          meta: "demo-task · Revision 2",
+          primary: "批准并开始实现",
+          secondary: "需要修改",
+          disabled: true,
+          titleAttr: "Chat 正在工作，请稍后再试",
+        },
+        accept: {
+          label: "主任务结果待验收（示例：同卡不会与决策并存，仅演示禁用态）",
+          btn: "确认主任务已验收完成",
+          disabled: true,
+          titleAttr: "Chat 正在工作，请稍后再试",
+        },
+        chat: [
+          { role: "user", text: "（进行中的其他对话…）" },
+          { role: "assistant", text: "正在调用工具处理中…" }
+        ],
+        runtime: "主会话流式输出中",
+      },
+      {
+        id: "after-approve-send-ok",
+        title: "3 · 批准成功 · Chat 已续推",
+        running: true,
+        badge: "编排中",
+        help: "<ul><li>PATCH 已进入 implementing</li><li>transcript 出现固定引导词用户消息</li><li>模型与顶栏一致</li><li>toast：已批准，已在 Chat 继续编排</li></ul>",
+        railActive: 2,
+        railDone: [0,1],
+        decision: null,
+        accept: null,
+        chat: [
+          { role: "assistant", text: "规划已完成，请审阅 plan-review 后批准或提出修改。" },
+          { role: "user", text: "YPI Studio 用户已在会话浮窗批准主任务计划（source=user-widget）。该决定已落库：status 应为 implementing。\n\n- taskId: demo-task\n- action: approve_plan\n- expectedRevision: 2\n- reason: widget approve_plan persisted; continue implementing orchestration\n\n请确认状态并按 implementationPlan 继续 claim/dispatch。" },
+          { role: "assistant", text: "已确认 implementing。正在 implementation_next…" }
+        ],
+        runtime: "等待并行子任务 · 运行 1",
+        toast: { type: "success", text: "计划已批准，已在 Chat 继续编排实现" },
+      },
+      {
+        id: "partial-send-fail",
+        title: "4 · 落库成功 · Send 失败（不回滚）",
+        running: false,
+        badge: "需手动续推",
+        help: "<ul><li>状态已 implementing</li><li>Chat 无新引导词</li><li>toast 明确 partial</li><li>不调用回滚 API</li></ul>",
+        railActive: 2,
+        railDone: [0,1],
+        decision: null,
+        accept: null,
+        chat: [
+          { role: "assistant", text: "规划已完成，请审阅 plan-review 后批准或提出修改。" }
+        ],
+        toast: { type: "warn", text: "计划已批准并落库，但未能在 Chat 续推。请在输入框发送或刷新后重试。" },
+      },
+      {
+        id: "request-changes",
+        title: "5 · 需要修改 · Chat 续推规划",
+        running: true,
+        badge: "重规划中",
+        help: "<ul><li>PATCH → planning + revision+1</li><li>Chat Send 替代 server inner.prompt 主路径</li><li>feedback 已落库，引导词仅摘要</li></ul>",
+        railActive: 1,
+        railDone: [0],
+        decision: null,
+        accept: null,
+        chat: [
+          { role: "user", text: "YPI Studio 用户已在会话浮窗请求修改计划。该决定已落库（status=planning）。\n\n- taskId: demo-task\n- action: request_plan_changes\n- revisionFrom: 2\n- revisionTo: 3\n- feedbackSummary: 请补充 Checks 与回滚方案\n\n请更新规划产物并回到 awaiting_approval。" },
+          { role: "assistant", text: "已回到 planning，正在更新 design/implement/checks…" }
+        ],
+        toast: { type: "success", text: "修改反馈已落库，已在 Chat 续推规划" },
+      },
+      {
+        id: "improve-approve",
+        title: "6 · 改进计划批准",
+        running: false,
+        badge: "改进计划待批",
+        help: "<ul><li>parent=waiting_for_improvements</li><li>仅第一项 waiting_plan_approval</li><li>批准后 Chat Send 含 improvementId</li></ul>",
+        railActive: 4,
+        railDone: [0,1,2,3],
+        decision: {
+          title: "需要你的决定 · 改进计划",
+          meta: "IMP-01 · 修复 toast 文案 · Revision 1",
+          primary: "批准该改进计划",
+          secondary: null,
+          disabled: false,
+          titleAttr: "IMP-01 · Revision 1",
+        },
+        accept: null,
+        chat: [
+          { role: "assistant", text: "改进 IMP-01 计划已就绪，请在浮窗批准。" }
+        ],
+      },
+      {
+        id: "start-ua",
+        title: "7 · 开始用户验收 · 无 Chat Send",
+        running: false,
+        badge: "进入验收",
+        help: "<ul><li>review → user_acceptance</li><li>只 PATCH，不 Send</li><li>随后出现主验收按钮</li></ul>",
+        railActive: 5,
+        railDone: [0,1,2,3,4],
+        decision: null,
+        accept: {
+          label: "主任务结果待验收",
+          btn: "确认主任务已验收完成",
+          disabled: false,
+          titleAttr: "确认主任务已验收完成 · 结果验收",
+        },
+        chat: [
+          { role: "assistant", text: "检查完成，主任务在 review。用户可从浮窗进入验收。" }
+        ],
+        toast: { type: "success", text: "已进入用户验收，请再确认主任务已验收完成" },
+      },
+    ];
+
+    const scenesEl = document.getElementById("scenes");
+    const cardEl = document.getElementById("card");
+    const chatBody = document.getElementById("chatBody");
+    const sceneTitle = document.getElementById("sceneTitle");
+    const sceneHelp = document.getElementById("sceneHelp");
+    const runPill = document.getElementById("runPill");
+    const widgetBadge = document.getElementById("widgetBadge");
+
+    function hideToasts() {
+      ["toastSuccess", "toastWarn", "toastInfo"].forEach((id) => {
+        const el = document.getElementById(id);
+        el.classList.remove("show");
+        el.textContent = "";
+      });
+    }
+
+    function showToast(t) {
+      hideToasts();
+      if (!t) return;
+      const map = { success: "toastSuccess", warn: "toastWarn", info: "toastInfo" };
+      const el = document.getElementById(map[t.type] || "toastInfo");
+      el.textContent = t.text;
+      el.classList.add("show");
+    }
+
+    function renderRail(doneIdx, activeIdx) {
+      return STATIONS.map((name, i) => {
+        let cls = "station";
+        if (doneIdx.includes(i)) cls += " done";
+        if (i === activeIdx) cls += " active";
+        return `<div class="${cls}" title="${name}">${name}</div>`;
+      }).join("");
+    }
+
+    function renderScene(scene) {
+      sceneTitle.textContent = scene.title;
+      sceneHelp.innerHTML = scene.help;
+      widgetBadge.textContent = scene.badge;
+      runPill.textContent = scene.running ? "Chat 工作中 · agentRunning" : "Chat 空闲";
+      runPill.classList.toggle("is-run", scene.running);
+
+      chatBody.innerHTML = scene.chat.map((m) =>
+        `<div class="msg ${m.role}"><span class="tag">${m.role === "user" ? "USER · handleSend" : "ASSISTANT"}</span>${escapeHtml(m.text)}</div>`
+      ).join("");
+
+      const decisionHtml = scene.decision ? `
+        <div class="decision" role="group" aria-label="需要你的决定">
+          <div class="decision-h">
+            <span>${escapeHtml(scene.decision.title)}</span>
+            <span style="color:var(--text-dim);font-weight:700">Rev.</span>
+          </div>
+          <div class="decision-meta" title="${escapeHtml(scene.decision.meta)}">${escapeHtml(scene.decision.meta)}</div>
+          <div class="decision-btns">
+            <button type="button" class="d-btn primary" ${scene.decision.disabled ? "disabled" : ""}
+              title="${escapeHtml(scene.decision.titleAttr)}"
+              aria-label="${escapeHtml(scene.decision.primary)}${scene.decision.disabled ? "（Chat 工作中不可用）" : ""}">
+              ${escapeHtml(scene.decision.primary)}
+            </button>
+            ${scene.decision.secondary ? `
+              <button type="button" class="d-btn secondary" ${scene.decision.disabled ? "disabled" : ""}
+                title="${escapeHtml(scene.decision.titleAttr)}">
+                ${escapeHtml(scene.decision.secondary)}
+              </button>` : ""}
+          </div>
+        </div>` : "";
+
+      const acceptHtml = scene.accept ? `
+        <div class="accept" role="group" aria-label="主任务结果验收">
+          <div class="label">${escapeHtml(scene.accept.label)}</div>
+          <button type="button" class="a-btn" ${scene.accept.disabled ? "disabled" : ""}
+            title="${escapeHtml(scene.accept.titleAttr)}">
+            ${escapeHtml(scene.accept.btn)}
+          </button>
+        </div>` : "";
+
+      const runtimeHtml = scene.runtime ? `
+        <div class="runtime"><span class="dot"></span><span>${escapeHtml(scene.runtime)}</span></div>` : "";
+
+      cardEl.innerHTML = `
+        <div class="meta-row">
+          <span style="width:18px;height:18px;border-radius:6px;display:grid;place-items:center;background:rgba(37,99,235,.13);color:var(--accent);font-size:10px">工</span>
+          <span>Studio · 功能开发</span>
+          <span style="margin-left:auto;color:var(--text)">42%</span>
+          <button type="button" class="preview-btn" title="打开任务详情">详情</button>
+        </div>
+        <div class="title">任务浮窗决策 CTA 改为 Chat Send 续推…</div>
+        <div class="rail is-eight-station" aria-label="完整 8 站流程轨">
+          ${renderRail(scene.railDone || [], scene.railActive ?? 0)}
+        </div>
+        <div class="previews" aria-label="只读资料">
+          <button type="button" class="preview-btn" title="只读 · 不写 grant">计划审批书 ↗</button>
+          <button type="button" class="preview-btn" title="只读">HTML 原型 ↗</button>
+        </div>
+        ${acceptHtml}
+        ${decisionHtml}
+        ${runtimeHtml}
+      `;
+
+      showToast(scene.toast);
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    scenes.forEach((s, idx) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "scene-btn" + (idx === 0 ? " is-active" : "");
+      b.textContent = s.title;
+      b.addEventListener("click", () => {
+        document.querySelectorAll(".scene-btn").forEach((x) => x.classList.remove("is-active"));
+        b.classList.add("is-active");
+        renderScene(s);
+      });
+      scenesEl.appendChild(b);
+    });
+
+    renderScene(scenes[0]);
+  </script>
+</body>
+</html>

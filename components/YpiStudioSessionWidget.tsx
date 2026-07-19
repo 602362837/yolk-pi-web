@@ -18,6 +18,10 @@ import type {
   YpiStudioWidgetQuickPreviewApprovalState,
   YpiStudioWidgetUserAction,
 } from "@/lib/ypi-studio-types";
+import {
+  ypiStudioWidgetActionNeedsChatContinue,
+  buildYpiStudioWidgetChatContinuePrompt,
+} from "@/lib/ypi-studio-widget-continue";
 
 // ── Props ──
 interface Props {
@@ -36,6 +40,14 @@ interface Props {
    * open the right-side main preview via this callback (STUDIO-DOC-2).
    */
   onOpenFile?: (filePath: string, fileName: string) => void;
+  /** Chat agent running (from AppShell chatAgentRunning). Used to disable write CTAs during active work. */
+  agentRunning?: boolean;
+  /**
+   * Current Chat compose send (handleSend). Called after a successful PATCH for
+   * continue-kinds (approve_plan / request_plan_changes / approve_improvement_plan)
+   * to inject a guided user message into the transcript.
+   */
+  onComposeSend?: (message: string) => void | Promise<void>;
 }
 
 interface WidgetPosition { left: number; top: number }
@@ -544,6 +556,8 @@ function userActionsForTask(task: YpiStudioTaskWidgetProjection): YpiStudioWidge
         || action.kind === "request_plan_changes"
         || action.kind === "approve_improvement_plan"
         || action.kind === "start_user_acceptance"
+        || action.kind === "return_to_user_acceptance"
+        || action.kind === "studio_archive"
       );
     })
     .slice(0, 2);
@@ -560,6 +574,9 @@ function decisionRegionTitle(actions: YpiStudioWidgetUserAction[]): string {
   if (kinds.has("start_user_acceptance")) {
     return "👉 需要你的决定: 开始用户验收";
   }
+  if (kinds.has("studio_archive") || kinds.has("return_to_user_acceptance")) {
+    return "👉 需要你的决定: 完成态收尾";
+  }
   return "👉 需要你的决定";
 }
 
@@ -568,6 +585,8 @@ function decisionBusyLabel(kind: YpiStudioWidgetUserAction["kind"]): string {
   if (kind === "approve_improvement_plan") return "批准中…";
   if (kind === "request_plan_changes") return "提交中…";
   if (kind === "start_user_acceptance") return "进入中…";
+  if (kind === "return_to_user_acceptance") return "退回中…";
+  if (kind === "studio_archive") return "发起归档…";
   return "处理中…";
 }
 
@@ -757,6 +776,7 @@ function TaskCard({
   onDecisionAction,
   decidingActionId = null,
   acceptWriteBusy = false,
+  agentRunning = false,
 }: {
   candidate: YpiStudioSessionTaskLinkCandidate;
   runs: YpiStudioTaskWidgetSubagentRun[];
@@ -778,6 +798,8 @@ function TaskCard({
   decidingActionId?: string | null;
   /** True while any widget write (decision or accept) is in flight. */
   acceptWriteBusy?: boolean;
+  /** Chat agent is running — disables write CTAs during active work. */
+  agentRunning?: boolean;
 }) {
   const task = candidate.task;
   const completedCount = task.artifacts.completed.length;
@@ -898,14 +920,14 @@ function TaskCard({
                     <button
                       type="button"
                       className={`ypi-studio-widget-accept-btn${busy ? " is-busy" : ""}`}
-                      disabled={acceptWriteBusy || Boolean(acceptingImprovementId)}
+                      disabled={acceptWriteBusy || Boolean(acceptingImprovementId) || agentRunning}
                       aria-busy={busy || undefined}
-                      aria-label={`确认改进任务 ${inst.displayId}「${inst.title}」已完成（改进结果验收，不是计划审批）`}
-                      title="确认该改进任务已完成 · 这是结果验收，不是计划审批"
+                      aria-label={`确认改进任务 ${inst.displayId}「${inst.title}」已完成（改进结果验收，不是计划审批）${agentRunning ? "（Chat 工作中不可用）" : ""}`}
+                      title={agentRunning ? "Chat 正在工作，请稍后再试" : "确认该改进任务已完成 · 这是结果验收，不是计划审批"}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.stopPropagation();
-                        if (acceptWriteBusy || acceptingImprovementId) return;
+                        if (acceptWriteBusy || acceptingImprovementId || agentRunning) return;
                         onAcceptImprovement?.(inst);
                       }}
                     >
@@ -933,14 +955,14 @@ function TaskCard({
           <button
             type="button"
             className={`ypi-studio-widget-main-accept-btn${acceptingMainTask ? " is-busy" : ""}`}
-            disabled={acceptWriteBusy || !onAcceptMainTask}
+            disabled={acceptWriteBusy || !onAcceptMainTask || agentRunning}
             aria-busy={acceptingMainTask || undefined}
-            aria-label={`确认主任务「${task.title}」已验收完成（主任务结果验收，将进入 completed）`}
-            title="确认主任务已验收完成 · 这是主任务结果验收，不是计划审批或改进验收"
+            aria-label={`确认主任务「${task.title}」已验收完成（主任务结果验收，将进入 completed）${agentRunning ? "（Chat 工作中不可用）" : ""}`}
+            title={agentRunning ? "Chat 正在工作，请稍后再试" : "确认主任务已验收完成 · 这是主任务结果验收，不是计划审批或改进验收"}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              if (acceptWriteBusy || !onAcceptMainTask) return;
+              if (acceptWriteBusy || !onAcceptMainTask || agentRunning) return;
               onAcceptMainTask();
             }}
           >
@@ -1033,20 +1055,24 @@ function TaskCard({
                 : action.targetLabel;
               const ariaLabel = action.kind === "start_user_acceptance"
                 ? `${action.label}，进入 user_acceptance，不是结果验收 · ${ariaObject}`
-                : `${action.label} · ${ariaObject}`;
+                : action.kind === "return_to_user_acceptance"
+                  ? `${action.label}，退回验收（非归档）· ${ariaObject}`
+                  : action.kind === "studio_archive"
+                    ? `${action.label}，Chat 归档（非静默）· ${ariaObject}`
+                    : `${action.label} · ${ariaObject}`;
               return (
                 <button
                   key={action.id}
                   type="button"
                   className={`ypi-decision-btn ${isPrimary ? "is-primary" : "is-secondary"}${busy ? " is-busy" : ""}`}
-                  disabled={acceptWriteBusy || Boolean(decidingActionId)}
+                  disabled={acceptWriteBusy || Boolean(decidingActionId) || agentRunning}
                   aria-busy={busy || undefined}
-                  aria-label={ariaLabel}
-                  title={action.targetLabel}
+                  aria-label={`${ariaLabel}${agentRunning ? "（Chat 工作中不可用）" : ""}`}
+                  title={agentRunning ? "Chat 正在工作，请稍后再试" : action.targetLabel}
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (acceptWriteBusy || decidingActionId) return;
+                    if (acceptWriteBusy || decidingActionId || agentRunning) return;
                     onDecisionAction?.(action);
                   }}
                 >
@@ -1125,6 +1151,8 @@ export function YpiStudioSessionWidget({
   contextId,
   onTaskChanged,
   onOpenFile: _onOpenFile,
+  agentRunning = false,
+  onComposeSend,
 }: Props) {
   void _onOpenFile;
   const isMobile = useMobile();
@@ -1139,6 +1167,9 @@ export function YpiStudioSessionWidget({
   /** Shared in-flight key for decision CTAs and result-acceptance writes. */
   const [acceptingKey, setAcceptingKey] = useState<string | null>(null);
   const acceptingInFlightRef = useRef(false);
+  /** Mirror agentRunning prop so confirm callbacks read the latest value. */
+  const agentRunningRef = useRef(agentRunning);
+  useEffect(() => { agentRunningRef.current = agentRunning; }, [agentRunning]);
 
   /** Markdown/text plans open the shared document page in a new browser tab. */
   const handlePreviewPlan = useCallback((target: YpiStudioPlanReviewTarget) => {
@@ -1239,6 +1270,12 @@ export function YpiStudioSessionWidget({
       intent: "danger",
     });
     if (!confirmed) return;
+
+    // Secondary lock check: agent may have started during confirm modal.
+    if (agentRunningRef.current) {
+      toast({ message: "Chat 正在工作，请稍后再试", tone: "info" });
+      return;
+    }
 
     acceptingInFlightRef.current = true;
     setAcceptingKey(`${taskKey}:${improvement.id}`);
@@ -1368,6 +1405,12 @@ export function YpiStudioSessionWidget({
     });
     if (!choice) return;
 
+    // Secondary lock check: agent may have started during confirm modal.
+    if (agentRunningRef.current) {
+      toast({ message: "Chat 正在工作，请稍后再试", tone: "info" });
+      return;
+    }
+
     const shouldArchive = choice === "secondary";
     acceptingInFlightRef.current = true;
     setAcceptingKey(`${taskKey}:${MAIN_ACCEPT_KEY}`);
@@ -1433,9 +1476,14 @@ export function YpiStudioSessionWidget({
    * Decision CTAs: approve_plan / request_plan_changes / approve_improvement_plan /
    * start_user_acceptance. Confirm or require feedback first; PATCH explicit action bodies;
    * never optimistic transition. Shares acceptingInFlight with result-acceptance writes.
+   *
+   * For continue-kinds (approve_plan / request_plan_changes / approve_improvement_plan),
+   * a Chat Send follow-up is issued after a successful PATCH so the agent continues
+   * working via the current session handleSend (Hybrid B contract).
    */
   const handleDecisionAction = useCallback(async (
     taskKey: string,
+    taskId: string,
     taskTitle: string,
     action: YpiStudioWidgetUserAction,
   ) => {
@@ -1617,14 +1665,114 @@ export function YpiStudioSessionWidget({
         intent: "default",
       });
       if (!confirmed) return;
+    } else if (action.kind === "return_to_user_acceptance") {
+      const confirmed = await confirm({
+        title: "退回用户验收？",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <p style={{ margin: 0 }}>
+              你正在把任务从
+              {" "}
+              <code style={{ fontSize: 12 }}>completed</code>
+              {" "}
+              退回到
+              {" "}
+              <code style={{ fontSize: 12 }}>user_acceptance</code>
+              。
+              <strong>这不是归档</strong>，
+              <strong>不会</strong>
+              清除产物。退回后需再次「确认主任务已验收完成」。
+            </p>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(245,158,11,0.45)",
+                background: "rgba(245,158,11,0.1)",
+                color: "#92400e",
+                fontSize: 12,
+              }}
+            >
+              <div><strong>确认对象：</strong>主任务「{taskTitle}」</div>
+              <div style={{ marginTop: 4 }}><strong>目标：</strong>{action.targetLabel}</div>
+              <div style={{ marginTop: 4 }}><strong>Revision：</strong>{action.expectedRevision}</div>
+            </div>
+          </div>
+        ) as ReactNode,
+        confirmLabel: "退回用户验收",
+        cancelLabel: "取消",
+        intent: "default",
+      });
+      if (!confirmed) return;
+    } else if (action.kind === "studio_archive") {
+      const confirmed = await confirm({
+        title: "归档任务？",
+        message: (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <p style={{ margin: 0 }}>
+              将在
+              <strong>当前 Chat</strong>
+              {" "}
+              发送
+              {" "}
+              <code style={{ fontSize: 12 }}>/studio-archive</code>
+              ，由
+              <strong>当前会话模型</strong>
+              {" "}
+              整理可复用知识后再归档。
+              <strong>不是</strong>
+              {" "}
+              Panel 兜底摘要静默归档。归档后任务只读并移入 archive。
+            </p>
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid rgba(239,68,68,0.35)",
+                background: "rgba(239,68,68,0.08)",
+                color: "var(--text)",
+                fontSize: 12,
+              }}
+            >
+              <div><strong>确认对象：</strong>主任务「{taskTitle}」</div>
+              <div style={{ marginTop: 4 }}><strong>目标：</strong>{action.targetLabel}</div>
+              <div style={{ marginTop: 4 }}><strong>Revision：</strong>{action.expectedRevision}</div>
+            </div>
+          </div>
+        ) as ReactNode,
+        confirmLabel: "在 Chat 归档",
+        cancelLabel: "取消",
+        intent: "danger",
+      });
+      if (!confirmed) return;
     } else {
       // Unknown kind: never invent a write path.
+      return;
+    }
+
+    // Secondary lock check: agent may have started during confirm/prompt modal.
+    if (agentRunningRef.current) {
+      toast({ message: "Chat 正在工作，请稍后再试", tone: "info" });
       return;
     }
 
     acceptingInFlightRef.current = true;
     setAcceptingKey(`${taskKey}:${DECISION_KEY_PREFIX}${action.id}`);
     try {
+      // studio_archive is Chat-only: no PATCH — send slash command via onComposeSend.
+      if (action.kind === "studio_archive") {
+        if (!onComposeSend) {
+          throw new Error("无法发送消息：Chat 未就绪");
+        }
+        await onComposeSend("/studio-archive");
+        toast({
+          message: "已在 Chat 发起 /studio-archive，请等待模型整理知识并归档",
+          tone: "success",
+        });
+        onTaskChanged?.(taskKey);
+        return;
+      }
+
       let body: Record<string, unknown>;
       if (action.kind === "approve_plan") {
         body = {
@@ -1645,6 +1793,13 @@ export function YpiStudioSessionWidget({
         body = {
           cwd,
           action: "start_user_acceptance",
+          contextId,
+          expectedRevision: action.expectedRevision,
+        };
+      } else if (action.kind === "return_to_user_acceptance") {
+        body = {
+          cwd,
+          action: "return_to_user_acceptance",
           contextId,
           expectedRevision: action.expectedRevision,
         };
@@ -1673,29 +1828,111 @@ export function YpiStudioSessionWidget({
         });
       }
 
-      if (action.kind === "approve_plan") {
-        toast({
-          message: "计划已批准，Studio 将继续编排实现",
-          tone: "success",
-        });
-      } else if (action.kind === "approve_improvement_plan") {
-        const displayId = action.displayId?.trim() || action.improvementId || "改进项";
-        toast({
-          message: `已批准 ${displayId} 改进计划，实例 DAG 将继续执行`,
-          tone: "success",
-        });
-      } else if (action.kind === "start_user_acceptance") {
-        toast({
-          message: "已进入用户验收，请再确认主任务已验收完成",
-          tone: "success",
-        });
-      } else {
-        toast({
-          message: "修改反馈已落库，任务已退回 planning",
-          tone: "success",
-        });
-      }
+      // Always refresh widget projection on success.
       onTaskChanged?.(taskKey);
+
+      if (ypiStudioWidgetActionNeedsChatContinue(action.kind)) {
+        // Chat Send path: inject guided user message into the transcript.
+        if (onComposeSend && !agentRunningRef.current) {
+          try {
+            const displayId = action.displayId?.trim() || action.improvementId || undefined;
+            const prompt = buildYpiStudioWidgetChatContinuePrompt({
+              kind: action.kind,
+              taskId,
+              taskKey,
+              expectedRevision: action.expectedRevision,
+              // request_plan_changes bumps planRevision by 1 after a successful PATCH.
+              revisionTo:
+                action.kind === "request_plan_changes"
+                  ? action.expectedRevision + 1
+                  : undefined,
+              improvementId: action.improvementId,
+              displayId,
+              feedback,
+              targetLabel: action.targetLabel,
+            });
+            await onComposeSend(prompt);
+
+            // Full success — Chat has the guided message.
+            if (action.kind === "approve_plan") {
+              toast({
+                message: "计划已批准，已在 Chat 继续编排实现",
+                tone: "success",
+              });
+            } else if (action.kind === "approve_improvement_plan") {
+              const label = action.displayId?.trim() || action.improvementId || "改进项";
+              toast({
+                message: `已批准 ${label} 改进计划，已在 Chat 继续执行`,
+                tone: "success",
+              });
+            } else {
+              // request_plan_changes
+              toast({
+                message: "修改反馈已落库，已在 Chat 续推规划",
+                tone: "success",
+              });
+            }
+          } catch {
+            // PATCH succeeded but Chat Send failed — partial success, no rollback.
+            if (action.kind === "approve_plan") {
+              toast({
+                message: "计划已批准并落库，但未能在 Chat 续推；请在输入框发送或刷新后重试",
+                tone: "info",
+                durationMs: 8000,
+              });
+            } else if (action.kind === "approve_improvement_plan") {
+              const label = action.displayId?.trim() || action.improvementId || "改进项";
+              toast({
+                message: `已批准 ${label} 改进计划并落库，但未能在 Chat 续推；请在输入框发送或刷新后重试`,
+                tone: "info",
+                durationMs: 8000,
+              });
+            } else {
+              toast({
+                message: "修改反馈已落库，但未能在 Chat 续推；请在输入框发送或刷新后重试",
+                tone: "info",
+                durationMs: 8000,
+              });
+            }
+          }
+        } else {
+          // onComposeSend unavailable or agent already started — partial.
+          if (action.kind === "approve_plan") {
+            toast({
+              message: "计划已批准并落库，但未能在 Chat 续推；请在输入框发送或刷新后重试",
+              tone: "info",
+              durationMs: 8000,
+            });
+          } else if (action.kind === "approve_improvement_plan") {
+            const label = action.displayId?.trim() || action.improvementId || "改进项";
+            toast({
+              message: `已批准 ${label} 改进计划并落库，但未能在 Chat 续推；请在输入框发送或刷新后重试`,
+              tone: "info",
+              durationMs: 8000,
+            });
+          } else {
+            toast({
+              message: "修改反馈已落库，但未能在 Chat 续推；请在输入框发送或刷新后重试",
+              tone: "info",
+              durationMs: 8000,
+            });
+          }
+        }
+      } else {
+        // Non-continue kinds: start_user_acceptance, return_to_user_acceptance.
+        if (action.kind === "start_user_acceptance") {
+          toast({
+            message: "已进入用户验收，请再确认主任务已验收完成",
+            tone: "success",
+          });
+        } else if (action.kind === "return_to_user_acceptance") {
+          toast({
+            message: "已退回用户验收，请再次确认主任务",
+            tone: "success",
+          });
+        }
+        // No else — unknown kinds are filtered upstream.
+      }
     } catch (error) {
       const status = typeof error === "object" && error && "status" in error
         ? Number((error as { status?: number }).status)
@@ -1714,7 +1951,7 @@ export function YpiStudioSessionWidget({
       acceptingInFlightRef.current = false;
       setAcceptingKey(null);
     }
-  }, [confirm, contextId, cwd, onTaskChanged, prompt, toast]);
+  }, [confirm, contextId, cwd, onComposeSend, onTaskChanged, prompt, toast]);
 
   const panelRef = useRef<HTMLElement | null>(null);
   const ballRef = useRef<HTMLDivElement | null>(null);
@@ -2050,10 +2287,11 @@ export function YpiStudioSessionWidget({
                       }}
                       acceptingMainTask={acceptingMainTask}
                       onDecisionAction={(action) => {
-                        void handleDecisionAction(c.task.key, c.task.title, action);
+                        void handleDecisionAction(c.task.key, c.task.id, c.task.title, action);
                       }}
                       decidingActionId={decidingActionId}
                       acceptWriteBusy={Boolean(acceptingKey)}
+                      agentRunning={agentRunning}
                     />
                   );
                 })}
@@ -2210,10 +2448,11 @@ export function YpiStudioSessionWidget({
               }}
               acceptingMainTask={acceptingMainTask}
               onDecisionAction={(action) => {
-                void handleDecisionAction(c.task.key, c.task.title, action);
+                void handleDecisionAction(c.task.key, c.task.id, c.task.title, action);
               }}
               decidingActionId={decidingActionId}
               acceptWriteBusy={Boolean(acceptingKey)}
+              agentRunning={agentRunning}
             />
           );
         })}

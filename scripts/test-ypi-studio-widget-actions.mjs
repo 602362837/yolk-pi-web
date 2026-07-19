@@ -12,6 +12,7 @@ import {
   buildWidgetUserActions,
   resolveYpiStudioTaskForSession,
 } from "../lib/ypi-studio-session-link.ts";
+import { readFileSync } from "node:fs";
 import {
   bindYpiStudioTaskToContext,
   createYpiStudioTask,
@@ -21,9 +22,11 @@ import {
   isYpiStudioWidgetApproveImprovementPlanBody,
   isYpiStudioWidgetApprovePlanBody,
   isYpiStudioWidgetRequestPlanChangesBody,
+  isYpiStudioWidgetReturnToUserAcceptanceBody,
   isYpiStudioWidgetStartUserAcceptanceBody,
   recordYpiStudioUserApproval,
   resolveYpiStudioImprovementDisposition,
+  returnYpiStudioToUserAcceptanceFromWidget,
   transitionYpiStudioImprovement,
   transitionYpiStudioTask,
 } from "../lib/ypi-studio-tasks.ts";
@@ -61,6 +64,8 @@ function assertBoundedUserActions(actions) {
       "request_plan_changes",
       "approve_improvement_plan",
       "start_user_acceptance",
+      "return_to_user_acceptance",
+      "studio_archive",
     ].includes(action.kind));
     assert.equal(typeof action.label, "string");
     assert.ok(["primary", "secondary"].includes(action.role));
@@ -238,6 +243,66 @@ function assertBoundedUserActions(actions) {
     "review with unresolved improvements must not project start_user_acceptance",
   );
 
+  // --- Completed status projection (archive + optional return_to_user_acceptance) ---
+
+  // Standard workflow: completed && !archived → 2 CTAs.
+  const completedActions = buildWidgetUserActions({
+    status: "completed",
+    title: "Done task",
+    meta: { planRevision: 5 },
+  });
+  assertBoundedUserActions(completedActions);
+  assert.equal(completedActions.length, 2);
+  assert.equal(completedActions[0].kind, "studio_archive");
+  assert.equal(completedActions[0].role, "primary");
+  assert.equal(completedActions[0].label, "归档");
+  assert.equal(completedActions[0].expectedRevision, 5);
+  assert.equal(completedActions[0].id, "main:studio_archive:r5");
+  assert.ok(completedActions[0].targetLabel.includes("主任务"));
+  assert.ok(completedActions[0].targetLabel.includes("Done task"));
+  assert.equal(completedActions[1].kind, "return_to_user_acceptance");
+  assert.equal(completedActions[1].role, "secondary");
+  assert.equal(completedActions[1].label, "退回用户验收");
+  assert.equal(completedActions[1].expectedRevision, 5);
+  assert.equal(completedActions[1].id, "main:return_to_user_acceptance:r5");
+
+  // Default revision when meta.planRevision absent.
+  const completedDefaultRev = buildWidgetUserActions({
+    status: "completed",
+    title: "No rev completed",
+  });
+  assert.equal(completedDefaultRev[0].expectedRevision, 1);
+  assert.equal(completedDefaultRev[0].id, "main:studio_archive:r1");
+  assert.equal(completedDefaultRev[1].expectedRevision, 1);
+  assert.equal(completedDefaultRev[1].id, "main:return_to_user_acceptance:r1");
+
+  // Archived completed → empty.
+  assert.deepEqual(
+    buildWidgetUserActions({
+      status: "completed",
+      title: "Archived done",
+      archived: true,
+      meta: { planRevision: 1 },
+    }),
+    [],
+    "archived completed projects empty userActions",
+  );
+
+  // supportsReturnToUserAcceptance === false (e.g. review-only workflow) → only archive.
+  const completedNoReturn = buildWidgetUserActions(
+    {
+      status: "completed",
+      title: "Review-only done",
+      meta: { planRevision: 2 },
+    },
+    { supportsReturnToUserAcceptance: false },
+  );
+  assertBoundedUserActions(completedNoReturn);
+  assert.equal(completedNoReturn.length, 1, "review-only completed must project only archive");
+  assert.equal(completedNoReturn[0].kind, "studio_archive");
+  assert.equal(completedNoReturn[0].role, "primary");
+  assert.equal(completedNoReturn[0].id, "main:studio_archive:r2");
+
   // Other phases must not project start_user_acceptance.
   for (const status of ["user_acceptance", "implementing", "checking", "awaiting_approval", "planning"]) {
     const actions = buildWidgetUserActions({
@@ -387,6 +452,114 @@ function assertBoundedUserActions(actions) {
     assert.equal(result.task.userActions[0].label, "开始用户验收");
     assert.notEqual(result.task.canAcceptMain, true, "canAcceptMain must remain false while still in review");
     assert.ok(Array.isArray(result.task.quickPreviews), "quickPreviews conserved on review CTA");
+
+    // completed && !archived live projection: archive + return CTAs; canAcceptMain stays false.
+    transitionYpiStudioTask(task.id, { cwd, to: "user_acceptance", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "completed", override: true, contextId });
+    const completedDetail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(completedDetail.status, "completed");
+    assert.ok(completedDetail.completedAt, "completed must set completedAt");
+    result = bindSessionProjection(cwd, task.id, contextId);
+    assertBoundedUserActions(result.task.userActions);
+    assert.equal(result.task.userActions.length, 2);
+    assert.equal(result.task.userActions[0].kind, "studio_archive");
+    assert.equal(result.task.userActions[0].role, "primary");
+    assert.equal(result.task.userActions[1].kind, "return_to_user_acceptance");
+    assert.equal(result.task.userActions[1].role, "secondary");
+    assert.notEqual(result.task.canAcceptMain, true, "completed must not enable canAcceptMain");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+// --- Domain helper: return_to_user_acceptance from completed ---
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-widget-return-ua-"));
+  try {
+    const contextId = "pi_widget_return_ua";
+    const task = createYpiStudioTask({ cwd, title: "Return UA domain", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    recordYpiStudioUserApproval(cwd, contextId, "确认开始实现");
+    transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "checking", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "review", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "user_acceptance", override: true, contextId });
+    transitionYpiStudioTask(task.id, { cwd, to: "completed", override: true, contextId });
+
+    let detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "completed");
+    assert.ok(detail.completedAt, "seed completedAt before return");
+    const revision = detail.meta.planRevision ?? 1;
+
+    // Wrong context: zero write
+    assert.throws(
+      () => returnYpiStudioToUserAcceptanceFromWidget(task.id, {
+        cwd, action: "return_to_user_acceptance", contextId: "pi_other_session", expectedRevision: revision,
+      }),
+      /not bound to this session context/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "completed");
+    assert.ok(detail.completedAt);
+
+    // Stale revision: zero write
+    assert.throws(
+      () => returnYpiStudioToUserAcceptanceFromWidget(task.id, {
+        cwd, action: "return_to_user_acceptance", contextId, expectedRevision: revision + 99,
+      }),
+      /plan revision changed/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "completed");
+
+    // Wrong status: zero write
+    transitionYpiStudioTask(task.id, { cwd, to: "user_acceptance", override: true, contextId });
+    assert.throws(
+      () => returnYpiStudioToUserAcceptanceFromWidget(task.id, {
+        cwd, action: "return_to_user_acceptance", contextId, expectedRevision: revision,
+      }),
+      /requires status completed/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "user_acceptance");
+
+    // Happy path: completed → user_acceptance, clear completedAt, audit event
+    transitionYpiStudioTask(task.id, { cwd, to: "completed", override: true, contextId });
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "completed");
+    assert.ok(detail.completedAt);
+    const returned = returnYpiStudioToUserAcceptanceFromWidget(task.id, {
+      cwd,
+      action: "return_to_user_acceptance",
+      contextId,
+      expectedRevision: detail.meta.planRevision ?? 1,
+    });
+    assert.equal(returned.status, "user_acceptance");
+    assert.equal(returned.completedAt, null, "must clear completedAt when leaving terminal");
+    assert.ok(!returned.archived, "must not archive");
+    assert.equal(returned.currentMember, "main");
+
+    const eventsPath = join(cwd, ".ypi", "tasks", task.id, "events.jsonl");
+    const events = readFileSync(eventsPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    const returnEvent = events.find((ev) => ev.type === "transition" && ev.data?.action === "return_to_user_acceptance");
+    assert.ok(returnEvent, "auditable return_to_user_acceptance transition event");
+    assert.equal(returnEvent.from, "completed");
+    assert.equal(returnEvent.to, "user_acceptance");
+    assert.equal(returnEvent.data.source, "user-widget");
+    assert.equal(returnEvent.data.contextId, contextId);
+
+    // Re-entry after success: zero partial write
+    assert.throws(
+      () => returnYpiStudioToUserAcceptanceFromWidget(task.id, {
+        cwd, action: "return_to_user_acceptance", contextId, expectedRevision: returned.meta.planRevision ?? 1,
+      }),
+      /requires status completed/,
+    );
+    detail = getYpiStudioTaskDetail(cwd, task.id);
+    assert.equal(detail.status, "user_acceptance");
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -443,6 +616,20 @@ function assertBoundedUserActions(actions) {
   assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...startUa, expectedRevision: 1.5 }), false);
   assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...startUa, expectedRevision: "1" }), false);
   assert.equal(isYpiStudioWidgetStartUserAcceptanceBody({ ...startUa, reason: "x" }), true, "extra reason field does not break shape; helper ignores it");
+
+  const returnUa = {
+    cwd: "/tmp",
+    action: "return_to_user_acceptance",
+    contextId: "pi_session",
+    expectedRevision: 1,
+  };
+  assert.equal(isYpiStudioWidgetReturnToUserAcceptanceBody(returnUa), true);
+  assert.equal(isYpiStudioTaskTransitionBody(returnUa), false, "return_to_user_acceptance must not match transition body");
+  assert.equal(isYpiStudioWidgetReturnToUserAcceptanceBody({ ...returnUa, override: true }), false, "override rejected");
+  assert.equal(isYpiStudioWidgetReturnToUserAcceptanceBody({ ...returnUa, expectedRevision: 1.5 }), false);
+  assert.equal(isYpiStudioWidgetReturnToUserAcceptanceBody({ ...returnUa, expectedRevision: "1" }), false);
+  assert.equal(isYpiStudioWidgetReturnToUserAcceptanceBody({ ...returnUa, action: "start_user_acceptance" }), false, "wrong action rejected");
+  assert.equal(isYpiStudioWidgetReturnToUserAcceptanceBody({ ...returnUa, reason: "x" }), true, "extra reason field does not break shape");
 
   // Loose parent transition still works for legitimate transition bodies.
   assert.equal(isYpiStudioTaskTransitionBody({ cwd: "/tmp", to: "implementing" }), true);

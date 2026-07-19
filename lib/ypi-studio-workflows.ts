@@ -144,6 +144,7 @@ const BASE_TRANSITIONS: YpiStudioWorkflowTransition[] = [
   { from: "planning", to: "cancelled", overrideAllowed: true },
   { from: "awaiting_approval", to: "cancelled", overrideAllowed: true },
   { from: "waiting_for_improvements", to: "cancelled", overrideAllowed: true },
+  { from: "completed", to: "user_acceptance" },
   { from: "completed", to: "archived" },
 ];
 
