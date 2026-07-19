@@ -19,6 +19,22 @@ import type {
   ToolCallContent,
   ThinkingContent,
 } from "@/lib/types";
+import {
+  formatYpiStudioInjectionPreview,
+  formatYpiStudioMessageTag,
+  parseYpiStudioUserMessage,
+  type YpiStudioUserDisplayContent,
+} from "@/lib/ypi-studio-message-display";
+
+/** Broadcast so only one Studio injection preview is open at a time. */
+const YPI_STUDIO_INJECTION_PREVIEW_OPEN_EVENT = "ypi-studio-injection-preview:open";
+
+let ypiStudioInjectionPreviewSeq = 0;
+
+function nextYpiStudioInjectionPreviewId(): string {
+  ypiStudioInjectionPreviewSeq += 1;
+  return `ypi-studio-inj-${ypiStudioInjectionPreviewSeq}`;
+}
 
 interface Props {
   message: AgentMessage;
@@ -97,14 +113,125 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
 }) {
   const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [injectionCopied, setInjectionCopied] = useState(false);
+  const [rawCopied, setRawCopied] = useState(false);
+  const tagButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previewWrapRef = useRef<HTMLDivElement | null>(null);
+  // Stable per-mount id for aria-controls + mutual-exclusion events (lazy init, not Math.random).
+  const previewInstanceIdRef = useRef<string | null>(null);
+  if (previewInstanceIdRef.current == null) {
+    previewInstanceIdRef.current = entryId
+      ? `ypi-studio-inj-${entryId}`
+      : nextYpiStudioInjectionPreviewId();
+  }
+  const previewInstanceId = previewInstanceIdRef.current;
 
-  const content =
+  // Raw joined text from JSONL / optimistic message (may contain historical Studio injections).
+  const rawContent =
     typeof message.content === "string"
       ? message.content
       : message.content
           .filter((b): b is TextContent => b.type === "text")
           .map((b) => b.text)
           .join("\n");
+
+  // SCI L0: strip known Studio injection blocks for bubble / Copy / Edit; fail open to raw.
+  const parsed = useMemo((): YpiStudioUserDisplayContent => {
+    try {
+      return parseYpiStudioUserMessage(rawContent);
+    } catch {
+      return {
+        displayText: rawContent,
+        rawText: rawContent,
+        hadInjection: false,
+        studioStatus: null,
+        stripConfidence: "none",
+        injectionBlocks: [],
+        injectionText: "",
+      };
+    }
+  }, [rawContent]);
+
+  const displayText = parsed.displayText;
+  const studioTagLabel = formatYpiStudioMessageTag(parsed.studioStatus);
+  // SCI gate unchanged: only full strip + known status show a success interactive tag.
+  const showStudioTag =
+    parsed.hadInjection &&
+    parsed.stripConfidence === "full" &&
+    parsed.studioStatus != null &&
+    studioTagLabel.length > 0;
+
+  const injectionPreview = useMemo(
+    () => formatYpiStudioInjectionPreview(parsed.injectionText),
+    [parsed.injectionText],
+  );
+  const panelId = `${previewInstanceId}-panel`;
+  const titleId = `${previewInstanceId}-title`;
+
+  const closePreview = (opts?: { restoreFocus?: boolean }) => {
+    setPreviewOpen(false);
+    if (opts?.restoreFocus) {
+      // Defer so button is interactive again after unmount effects.
+      requestAnimationFrame(() => tagButtonRef.current?.focus());
+    }
+  };
+
+  const openPreview = () => {
+    // Mutual exclusion: close other message previews first.
+    if (typeof document !== "undefined") {
+      document.dispatchEvent(
+        new CustomEvent(YPI_STUDIO_INJECTION_PREVIEW_OPEN_EVENT, {
+          detail: { id: previewInstanceId },
+        }),
+      );
+    }
+    setPreviewOpen(true);
+  };
+
+  const togglePreview = () => {
+    if (previewOpen) closePreview();
+    else openPreview();
+  };
+
+  useEffect(() => {
+    if (!previewOpen) return;
+
+    const onPeerOpen = (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: string }>).detail;
+      if (detail?.id && detail.id !== previewInstanceId) {
+        setPreviewOpen(false);
+      }
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (previewWrapRef.current?.contains(target)) return;
+      setPreviewOpen(false);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closePreview({ restoreFocus: true });
+      }
+    };
+
+    document.addEventListener(YPI_STUDIO_INJECTION_PREVIEW_OPEN_EVENT, onPeerOpen);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener(YPI_STUDIO_INJECTION_PREVIEW_OPEN_EVENT, onPeerOpen);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [previewOpen, previewInstanceId]);
+
+  // If parse result no longer qualifies for a tag, force-close any open preview.
+  useEffect(() => {
+    if (!showStudioTag && previewOpen) setPreviewOpen(false);
+  }, [showStudioTag, previewOpen]);
 
   const imageBlocks: ImageContent[] =
     typeof message.content === "string"
@@ -116,9 +243,27 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
   const canNavigate = !!prevAssistantEntryId && !!onNavigate;
 
   const copyContent = () => {
-    copyText(content).then(() => {
+    copyText(displayText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  const copyInjection = () => {
+    copyText(parsed.injectionText).then(() => {
+      setInjectionCopied(true);
+      setTimeout(() => setInjectionCopied(false), 1500);
+    }).catch(() => {
+      /* clipboard may fail in restricted contexts */
+    });
+  };
+
+  const copyFullRaw = () => {
+    copyText(parsed.rawText).then(() => {
+      setRawCopied(true);
+      setTimeout(() => setRawCopied(false), 1500);
+    }).catch(() => {
+      /* clipboard may fail in restricted contexts */
     });
   };
 
@@ -129,6 +274,90 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {showStudioTag && (
+        <div className="message-user-meta-row">
+          <div className="message-studio-tag-wrap" ref={previewWrapRef}>
+            <button
+              ref={tagButtonRef}
+              type="button"
+              className="message-studio-tag"
+              data-status={parsed.studioStatus ?? undefined}
+              data-interactive="true"
+              aria-expanded={previewOpen}
+              aria-controls={panelId}
+              aria-haspopup="dialog"
+              title={
+                previewOpen
+                  ? `${studioTagLabel} — view stripped injection`
+                  : `${studioTagLabel} — context was attached; display stripped`
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                togglePreview();
+              }}
+            >
+              {studioTagLabel}
+              <span className="message-studio-tag-chev" aria-hidden="true">▾</span>
+            </button>
+            {previewOpen && parsed.injectionText.length > 0 && (
+              <div
+                id={panelId}
+                className="message-studio-injection-popover"
+                role="dialog"
+                aria-modal="false"
+                aria-labelledby={titleId}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="message-studio-injection-popover-head">
+                  <p className="message-studio-injection-popover-title" id={titleId}>
+                    {studioTagLabel}
+                  </p>
+                  <button
+                    type="button"
+                    className="message-studio-injection-popover-close"
+                    aria-label="Close injection preview"
+                    onClick={() => closePreview({ restoreFocus: true })}
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="message-studio-injection-popover-note">
+                  来自此条用户消息的历史注入（已从气泡剥离）。不是当前 system 通道的实时注入。
+                </p>
+                <pre className="message-studio-injection-popover-pre">{injectionPreview.text}</pre>
+                {injectionPreview.truncated && (
+                  <p className="message-studio-injection-popover-trunc">
+                    Preview truncated for display. Copy still uses full injection text.
+                  </p>
+                )}
+                <div className="message-studio-injection-popover-actions">
+                  <button
+                    type="button"
+                    className="message-studio-injection-popover-btn primary"
+                    onClick={copyInjection}
+                  >
+                    {injectionCopied ? "Copied" : "Copy injection"}
+                  </button>
+                  <button
+                    type="button"
+                    className="message-studio-injection-popover-btn"
+                    onClick={copyFullRaw}
+                  >
+                    {rawCopied ? "Copied" : "Copy full raw"}
+                  </button>
+                  <button
+                    type="button"
+                    className="message-studio-injection-popover-btn"
+                    onClick={() => closePreview({ restoreFocus: true })}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="message-bubble-row message-bubble-row-user" style={{ display: "flex", alignItems: "flex-end", gap: 6, maxWidth: "85%" }}>
         <div
           style={{
@@ -145,7 +374,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
           }}
         >
           {imageBlocks.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: displayText ? 8 : 0 }}>
               {imageBlocks.map((img, i) => {
                 // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
                 // pi-ai on-disk format uses flat {data, mimeType} — handle both
@@ -169,7 +398,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
               })}
             </div>
           )}
-          {content && <MarkdownBody className="markdown-user-message">{content}</MarkdownBody>}
+          {displayText && <MarkdownBody className="markdown-user-message">{displayText}</MarkdownBody>}
         </div>
 
       </div>
@@ -188,7 +417,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
           }}>
             <button
               onClick={copyContent}
-              title="Copy message"
+              title={showStudioTag ? "Copy clean text" : "Copy message"}
               {...iconFlowAttrs("interactive")}
               style={{
                 display: "flex", alignItems: "center", gap: 4,
@@ -226,7 +455,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
             }}>
               {canNavigate && (
                 <button
-                  onClick={() => { onNavigate!(prevAssistantEntryId!); onEditContent?.(content); }}
+                  onClick={() => { onNavigate!(prevAssistantEntryId!); onEditContent?.(displayText); }}
                   title="Edit from here — branches within this session"
                   {...iconFlowAttrs("interactive")}
                   style={{
