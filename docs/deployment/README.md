@@ -158,6 +158,7 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent-data ypi
 | `pi-web.json` | Web UI settings, including Yolk Pi chat defaults, WorkTree defaults, YPI Studio member policies and subagent runner rollout (`studio.subagents.runner`), Usage scope, Web Terminal settings, ChatGPT panel/auto-refresh settings, default-off OpenCode Go auto-failover settings (`opencodeGo.autoFailover`), and Trellis settings. |
 | `chatgpt-usage-refresh.lock` | Backend ChatGPT usage auto-refresh lock file; stale locks can be repaired from the ChatGPT panel fault handler. |
 | `auth-api-key-accounts/` | Managed API-key account storage for multi-account providers (`opencode-go/`, `xai/`). Contains per-provider `accounts.json` (metadata with active account, disabled state, masked previews) and per-account `<accountId>.json` secret files (mode 0600). Old metadata without `disabled` fields is treated as enabled — no migration required. Automatic failover remains OpenCode Go–only; xAI uses manual key activation only. |
+| `links/` | Links GitHub OAuth connection storage. Contains `registry.json` (metadata only — connected + disconnected), `.locks/` (cross-process mkdir locks), and `github/<id>.json` (OAuth secret, mode 0600). `device_code` never reaches disk; access tokens only in secret files. Fully isolated from LLM auth (`auth.json`, `auth-accounts/`, `auth-api-key-accounts/`). |
 
 Session path format:
 
@@ -248,6 +249,37 @@ pm2 start ecosystem.config.cjs
 - The proxy scripts default to the production command `npm run start`; use `PI_WEB_CMD="npm run dev"` for development.
 
 Default proxy is `http://127.0.0.1:7897`; override with `PROXY_URL` or `SOCKS_PROXY_URL` where supported.
+
+## Links / GitHub OAuth Device Flow Configuration
+
+The Links module enables GitHub identity connections through GitHub OAuth Device Flow using a **product-owned OAuth App**.
+
+### Prerequisites
+
+- A GitHub OAuth App with **Device Flow enabled** (no callback URL needed).
+- The OAuth App client id must be provided via server-only env var `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`.
+- **No client secret** is required or configured.
+
+### Official build / deployment
+
+```bash
+export YPI_LINKS_GITHUB_OAUTH_CLIENT_ID=<product-client-id>
+ypi
+```
+
+This value is server-only and never exposed to the browser or `NEXT_PUBLIC_*`.
+
+### Source developers
+
+Developers can obtain their own GitHub OAuth App client id (Device Flow enabled) for local testing:
+
+```bash
+YPI_LINKS_GITHUB_OAUTH_CLIENT_ID=your-dev-client-id npm run dev
+```
+
+### Missing configuration
+
+When `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is not set, the Links UI shows a safe "GitHub authorization is not configured" state. The authorization start API returns `503 github_authorization_not_configured`. There is **no PAT fallback** — the configuration must be provided to enable Links.
 
 ## Repository Remotes
 

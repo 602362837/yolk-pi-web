@@ -208,6 +208,78 @@ Web modules:
 4. Preserve `auth-accounts/google-antigravity/` and `.quota-cache.json`; do not bulk-delete user credentials.
 5. No Session JSONL / usage-ledger / cacheWrite migration exists for Antigravity, so no data rewrite rollback.
 
+## Links / GitHub OAuth Device Flow Connections
+
+The **Links** domain is an isolated subsystem that lets users connect multiple GitHub identities without touching LLM auth. It uses **GitHub OAuth Device Flow** with a **product-owned OAuth App**.
+
+### Design
+
+- **App identity**: Product-owned GitHub OAuth App with Device Flow enabled. Client id from server-only `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`. **No client secret** required or configured.
+- **Terminal user**: Does not create an OAuth App, does not paste PAT.
+- **Scope**: Fixed `read:user` only.
+- **Multi-account**: Multiple GitHub numeric user ids can be connected simultaneously.
+- **Duplicate identity**: Returns `409 duplicate_identity`; existing credentials are not replaced.
+- **Disconnect**: Removes local OAuth secret only; does not revoke the remote GitHub grant.
+- **Isolation**: Never imports `auth.json`, `auth-accounts/`, `CredentialStore`, `ModelRuntime`, or RPC auth reload.
+
+### Configuration
+
+| Env var | Purpose | Required |
+| --- | --- | --- |
+| `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` | Server-only client id for the product-owned GitHub OAuth App (Device Flow enabled) | Yes — missing means `github_authorization_not_configured` and the UI shows a safe unavailable state |
+
+No client secret is needed. No browser/client-side config. Source developers can set their own OAuth App client id for local testing.
+
+### Network Contract
+
+All GitHub calls use fixed allowlisted hosts and paths:
+
+1. **Device code**: `POST https://github.com/login/device/code` — `client_id=<server>&scope=read:user`
+2. **Token polling**: `POST https://github.com/login/oauth/access_token` — respects `interval`, `slow_down`, `authorization_pending`, `access_denied`, `expired_token`
+3. **Identity validation**: `GET https://api.github.com/user` — Bearer token, `Accept: application/vnd.github+json`
+
+Enforced: 10s timeout, 64 KiB response cap, reject redirects, JSON Accept. Raw upstream bodies never leak into errors.
+
+### Key Modules
+
+| Module | Role |
+| --- | --- |
+| `lib/links-types.ts` | Wire contracts, stable error codes, allowlisted provider ids, fixed GitHub URLs |
+| `lib/links-provider-registry.ts` | Provider adapter registry (`github` only in P0); unknown providers fail closed |
+| `lib/github-link-oauth.ts` | GitHub Device Flow adapter: device code, token polling, `/user` identity validation |
+| `lib/links-authorization-manager.ts` | In-process authorization state machine (`globalThis.__piLinkAuthorizations`) |
+| `lib/links-store.ts` | Metadata/secret persistence under `~/.pi/agent/links/` with locking and atomic writes |
+| `lib/links-api-helpers.ts` | Shared route helpers: validation, error mapping, adapter registration bridge |
+| `components/LinksConfig.tsx` | Settings → Links Device Flow UI and connection management |
+
+### API Routes
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/links` | Provider catalog with config status and connection counts |
+| `GET /api/links/github/connections` | List connected GitHub identities (metadata only) |
+| `POST /api/links/github/authorizations` | Start Device Flow (returns `userCode`, verification URI, expiry) |
+| `GET /api/links/github/authorizations/[id]/events` | SSE stream for authorization progress |
+| `DELETE /api/links/github/authorizations/[id]` | Cancel pending authorization |
+| `DELETE /api/links/github/connections/[id]` | Disconnect (local secret removal only) |
+
+All responses: `Cache-Control: no-store` (SSE: `no-cache, no-store`). Never return `device_code`, access token, or `client_secret`.
+
+### Security
+
+- `device_code`: server memory only — never on wire, disk, logs, or metadata.
+- Access token: only in upstream responses, validation calls, and the `0600` secret file — never on wire, DOM, metadata, logs, or task/session JSONL.
+- `userCode`: the short-term code GitHub shows users — may appear in browser UI but must be cleared on terminal states, view changes, and unmount.
+- Client secret: never configured, packaged, or referenced.
+- Stable error codes only — no raw upstream bodies, absolute paths, or stack traces.
+
+### Rollback
+
+1. Hide the `links` Settings leaf and return 503 from authorization start.
+2. Retain `~/.pi/agent/links/` data; do not auto-delete or migrate.
+3. Pending authorizations are memory-only; restart clears them.
+4. Remote GitHub grants must be manually revoked at GitHub Settings → Applications → Authorized OAuth Apps.
+
 ## Skills and Commands
 
 Skill search/install/list routes live under `app/api/skills/`; slash-command discovery lives under `app/api/commands/`. Use `lib/npx.ts` for cross-platform `npx` execution.
