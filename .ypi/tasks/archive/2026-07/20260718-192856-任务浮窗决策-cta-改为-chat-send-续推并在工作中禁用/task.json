@@ -1,0 +1,1443 @@
+{
+  "schemaVersion": 1,
+  "id": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+  "title": "任务浮窗决策 CTA 改为 Chat Send 续推并在工作中禁用",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643",
+  "createdAt": "2026-07-18T11:28:56.898Z",
+  "updatedAt": "2026-07-19T09:51:06.751Z",
+  "completedAt": "2026-07-18T20:33:14.658Z",
+  "contextIds": [
+    "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-1fc1fc8fda4f83f9685f0d5c",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T11:29:36.339Z",
+      "finishedAt": "2026-07-18T11:37:04.296Z",
+      "runner": "sdk",
+      "childSessionId": "019f74fd-2a87-74d8-8559-b027d49f536f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T11-29-36-391Z_019f74fd-2a87-74d8-8559-b027d49f536f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f74fd-2a87-74d8-8559-b027d49f536f",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Handoff（architect）\n\n**任务** `20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用`  \n**状态**：已写入规划产物并 **transition → `awaiting_approval`**（等待用户批准）。  \n**未改生产代码；未 commit/push/merge；未进入 implementing。**\n\n### 产物\n\n| 文件 | 作用 |\n| --- | --- |\n| `brief.md` / `prd.md` / `design.md` / `ui.md` | 目标、矩阵、Hybrid B 设计 |\n| `studio-widget-chat-send-continue-prototype.html` | **HTML 原型**（7 场景，UI 门禁） |\n| `implement.md` | schemaVersion **2** DAG，5 子任务，`maxConcurrency=2`（已写入 task state） |\n| `checks.md` | 覆盖 / 自动 / 手工 / 保全 A–F |\n| `plan-review.md` | **用户审批入口**（相对链接齐全） |\n| `handoff.md` | 交接说明 |\n\n### 设计收敛（用户已确认边界）\n\n| 动作 | PATCH | Chat Send | 工作中禁用 |\n| --- | --- | --- | --- |\n| approve_plan / request_plan_changes / approve_improvement_plan | 是 | **是** | 是 |\n| start_user_acceptance / 结果验收 | 是 | **否** | 是 |\n\n- 接线：`ChatWindow.handleSend` → AppShell → `widget.onComposeSend` + `agentRunning`\n- server：`request_plan_changes` **推荐去掉 route 主路径 `inner.prompt` 双发**\n- Send 失败：**不回滚** PATCH；partial toast\n\n### 验证\n\n- 源码交叉阅读完成；规划阶段无 lint/tsc 业务改动  \n- 已 `updateYpiStudioImplementationPlan` + `transition → awaiting_approval`（`missingArtifacts: []`，`approvalGate: true`）\n\n### 主会话 / 用户决策\n\n请审阅 [plan-review.md](.ypi/tasks/20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用/plan-review.md) 与 HTML 原型，确认：\n\n1. Hybrid B 与动作矩阵  \n2. server 去双发（选项 A）  \n3. busy = `agentRunning || 写锁`  \n4. 5 项 DAG  \n\n批准后再进入 implementing 并派 implementer。\n\n### 残留风险\n\n- 本环境无 `ypi_studio_subagent`，HTML 由架构师按现网/前序原型交付（非独立 ui-designer 进程）；若需署名可补派一轮。  \n- 若要坚持 server fallback，需在批准意见里改选项，并补双发防护后再实现。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T11:29:36.339Z",
+        "updatedAt": "2026-07-18T11:37:04.296Z",
+        "eventCount": 1905,
+        "lastTextPreview": "## Handoff（architect）\n\n**任务** `20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用`  \n**状态**：已写入规划产物并 **transition → `awaiting_approval`**（等待用户批准）。  \n**未改生产代码；未 commit/push/merge；未进入 implementing。**\n\n### 产物\n\n| 文件 | 作用 |\n| --- | --- |\n| `brief.md` / `prd.md` / `design.md` / `ui.md` | 目标、矩阵、Hybrid B 设计 |\n| `studio-widget-chat-send-continue-prototype.html` | **HTML 原型**（7 场景，UI 门禁） |\n| `implement.md` | schemaVersion **2** DAG，5 子任务，`maxConcurrency=2`（已写入 task state） |\n| `checks.md` | 覆盖 / 自动 / 手工 / 保全 A–F |\n| `plan-review.md` | **用户审批入口**（相对链接齐全） |\n| `handoff.md` | 交接说明 |\n\n### 设计收敛（用户已确认边界）\n\n| 动作 | PATCH | Chat Send | 工作中禁用 |\n| --- | --- | --- | --- |\n| approve_plan / request_plan_changes / approve_improvement_plan | 是 | **是** | 是 |\n| start_user_acceptance / 结果验收 | 是 | **否** | 是 |\n\n- 接线：`ChatWindow.handleSend` → AppShell → `widget.onComposeSend` + `agentRunning`\n- server：`request_plan_changes` **推荐去掉 route 主路径 `inner.prompt` 双发**\n- Send 失败：**不回滚** PATCH；partial toast\n\n### 验证\n\n- 源码交叉阅读完成；规划阶段无 lint/tsc 业务改动  \n- 已 `updateYpiStudioImplementationPlan` + `transition → awaiting_approval`（`missingArtifacts: []`，`approvalGate: true`）\n\n### 主会话 / 用户决策\n\n请审阅 [plan-review.md](.ypi/tasks/20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用/plan-review.md) 与 HTML 原型，确认：\n\n1. Hybrid B 与动作矩阵  \n2. server 去双发（选项 A）  \n3. busy = `agentRunning || 写锁`  \n4. 5 项 DAG  \n\n批准后再进入 implementing 并派 implementer。\n\n### 残留风险\n\n- 本环境无 `ypi_studio_subagent`，HTML 由架构师按现网/前序原型交付（非独立 ui-designer 进程）；若需署名可补派一轮。  \n- 若要坚持 server fallback，需在批准意见里改选项，并补双发防护后再实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T11:36:45.200Z",
+            "toolCallId": "call-2d5ee1b4-3986-4f3a-aa75-4a246d1bedc4-44|fc_8c00acaf-7797-96e0-a0c5-5918edb6a6ac_0",
+            "toolName": "bash",
+            "text": "(node:53712) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nplan saved, status planning hasPlan true\ntransitioned to awaiting_approval missing []",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T11:36:48.914Z",
+            "toolCallId": "call-23b0f1bd-c259-4f42-948f-dfe8b1e84dac-45|fc_2538aa09-4240-92a3-8ef9-ac503a510c2f_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON -e '\\nimport { getYpiStudioTaskDetail } from \\\"./lib/ypi-studio-tasks.ts\\\";\\nconst cwd = process.cwd();\\nconst taskId = \\\"20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用\\\";\\nconst d = getYpiStudioTaskDetail(cwd, taskId);\\nconsole.log(JSON.stringify({\\n  status: d.status,\\n  progress: d.progress,\\n  currentMember: d.currentMember,\\n  hasImplementationPlan: !!d.implementationPlan,\\n  subtaskCount: d.implementationPlan?.subtasks?.length,\\n  maxConcurrency: d.implementationPlan?.maxConcurrency,\\n  planRevision: d.meta?.planRevision,\\n  approvalGate: !!d.meta?.approvalGate,\\n}, null, 2));\\n'\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T11:36:49.789Z",
+            "toolCallId": "call-23b0f1bd-c259-4f42-948f-dfe8b1e84dac-45|fc_2538aa09-4240-92a3-8ef9-ac503a510c2f_0",
+            "toolName": "bash",
+            "text": "(node:53769) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n{\n  \"status\": \"awaiting_approval\",\n  \"progress\": {\n    \"status\": \"awaiting_approval\",\n    \"label\": \"等待确认\",\n    \"percent\": 45,\n    \"owner\": \"main\",\n    \"requiredArtifacts\": [\n      \"plan-review.md\",\n      \"prd.md\",\n      \"design.md\",\n      \"implement.md\",\n      \"checks.md\"\n    ],\n    \"optionalArtifacts\": [\n      \"ui.md\"\n    ],\n    \"completedArtifacts\": [\n      \"plan-review.md\",\n      \"prd.md\",\n      \"design.md\",\n      \"implement.md\",\n      \"checks.md\",\n      \"ui.md\"\n    ],\n    \"missingArtifacts\": []\n  },\n  \"currentMember\": \"main\",\n  \"hasImplementationPlan\": true,\n  \"subtaskCount\": 5,\n  \"maxConcurrency\": 2,\n  \"approvalGate\": true\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T11:37:04.272Z",
+            "text": "## Handoff（architect）\n\n**任务** `20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用`  \n**状态**：已写入规划产物并 **transition → `awaiting_approval`**（等待用户批准）。  \n**未改生产代码；未 commit/push/merge；未进入 implementing。**\n\n### 产物\n\n| 文件 | 作用 |\n| --- | --- |\n| `brief.md` / `prd.md` / `design.md` / `ui.md` | 目标、矩阵、Hybrid B 设计 |\n| `studio-widget-chat-send-continue-prototype.html` | **HTML 原型**（7 场景，UI 门禁） |\n| `implement.md` | schemaVersion **2** DAG，5 子任务，`maxConcurrency=2`（已写入 task state） |\n| `checks.md` | 覆盖 / 自动 / 手工 / 保全 A–F |\n| `plan-review.md` | **用户审批入口**（相对链接齐全） |\n| `handoff.md` | 交接说明 |\n\n### 设计收敛（用户已确认边界）\n\n| 动作 | PATCH | Chat Send | 工作中禁用 |\n| --- | --- | --- | --- |\n| approve_plan / request_plan_changes / approve_improvement_plan | 是 | **是** | 是 |\n| start_user_acceptance / 结果验收 | 是 | **否** | 是 |\n\n- 接线：`ChatWindow.handleSend` → AppShell → `widget.onComposeSend` + `agentRunning`\n- server：`request_plan_changes` **推荐去掉 route 主路径 `inner.prompt` 双发**\n- Send 失败：**不回滚** PATCH；partial toast\n\n### 验证\n\n- 源码交叉阅读完成；规划阶段无 lint/tsc 业务改动  \n- 已 `updateYpiStudioImplementationPlan` + `transition → awaiting_approval`（`missingArtifacts: []`，`approvalGate: true`）\n\n### 主会话 / 用户决策\n\n请审阅 [plan-review.md](.ypi/tasks/20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用/plan-review.md) 与 HTML 原型，确认：\n\n1. Hybrid B 与动作矩阵  \n2. server 去双发（选项 A）  \n3. busy = `agentRunning || 写锁`  \n4. 5 项 DAG  \n\n批准后再进入 implementing 并派 implementer。\n\n### 残留风险\n\n- 本环境无 `ypi_studio_subagent`，HTML 由架构师按现网/前序原型交付（非独立 ui-designer 进程）；若需署名可补派一轮。  \n- 若要坚持 server fallback，需在批准意见里改选项，并补双发防护后再实现。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T11:37:04.276Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1840,
+        "tokens": 667,
+        "tokenSource": "usage",
+        "tps": 1.5,
+        "firstTokenAt": "2026-07-18T11:29:39.116Z",
+        "lastTokenAt": "2026-07-18T11:37:04.267Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-1fc1fc8fda4f83f9685f0d5c",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/architect-1fc1fc8fda4f83f9685f0d5c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T11:29:36.339Z",
+        "finishedAt": "2026-07-18T11:37:04.279Z",
+        "updatedAt": "2026-07-18T11:37:04.279Z",
+        "itemCount": 103,
+        "messageCount": 7,
+        "toolCallCount": 46,
+        "stderrBytes": 0,
+        "bytes": 310415,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f74fd-2a87-74d8-8559-b027d49f536f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T11-29-36-391Z_019f74fd-2a87-74d8-8559-b027d49f536f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-230cc8ffff90ace7ae2ea0b7",
+      "subtaskId": "CONT-HELPER-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T11:54:04.536Z",
+      "finishedAt": "2026-07-18T12:04:35.361Z",
+      "runner": "sdk",
+      "childSessionId": "019f7513-91d1-705e-9b74-3bfff661b2e0",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T11-54-04-625Z_019f7513-91d1-705e-9b74-3bfff661b2e0.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f7513-91d1-705e-9b74-3bfff661b2e0",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Implementation Complete — CONT-HELPER-01\n\n### Files Changed\n\n- **`lib/ypi-studio-widget-continue.ts`** (new) — Pure helper module with:\n  - `YpiStudioWidgetContinueKind` — union of `\"approve_plan\" | \"request_plan_changes\" | \"approve_improvement_plan\"`\n  - `ypiStudioWidgetActionNeedsChatContinue(kind)` — type guard returning `true` for the three continue kinds, `false` for `start_user_acceptance` and unknown\n  - `buildYpiStudioWidgetChatContinuePrompt(input)` — builds fixed, audit-safe Chat user messages per PRD §3.2 with per-kind templates, ≤200-char feedback truncation, no HTML/URLs, and optional `taskKey`/`targetLabel`/`improvementId`/`displayId`/`revisionTo`\n\n- **`scripts/test-ypi-studio-widget-continue.mjs`** (new) — Comprehensive test covering:\n  - needsChatContinue matrix (true for 3 kinds, false for `start_user_acceptance`)\n  - Prompt invariants (no HTML, no URLs, ≤4000 chars)\n  - All three prompt kinds with required substrings\n  - Feedback truncation at exactly 200, over 200, whitespace-only\n  - `taskKey` propagation, `revisionTo`/`revisionFrom` logic, `displayId` fallback\n\n- **`package.json`** — Added `\"test:studio-widget-continue\"` script\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run test:studio-widget-continue` | ✅ PASSED |\n| `npm run test:studio-widget-actions` | ✅ PASSED (no regression) |\n| `npm run test:studio-dag` | ✅ PASSED (no regression) |\n| `tsc --noEmit` (new file only) | ✅ Zero errors |\n\n### Notes / Risks\n\n- No React imports, no rpc-manager imports (circular-dep safe)\n- Pure functions with no side effects — safe for both client and server contexts\n- Prompt semantics lock to PRD §3.2; future wording tweaks can be made without changing the function signature\n- ESLint not available in this worktree; code follows existing project patterns (`.filter(Boolean).join(\"\\n\")`, JSDoc, `ReadonlySet`)\n- Next subtask dependencies: CONT-WIRE-02 (ChatWindow wiring) and CONT-WIDGET-03 (widget integration) can now consume this helper",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T11:54:04.536Z",
+        "updatedAt": "2026-07-18T12:04:35.360Z",
+        "eventCount": 13868,
+        "lastTextPreview": "## Implementation Complete — CONT-HELPER-01\n\n### Files Changed\n\n- **`lib/ypi-studio-widget-continue.ts`** (new) — Pure helper module with:\n  - `YpiStudioWidgetContinueKind` — union of `\"approve_plan\" | \"request_plan_changes\" | \"approve_improvement_plan\"`\n  - `ypiStudioWidgetActionNeedsChatContinue(kind)` — type guard returning `true` for the three continue kinds, `false` for `start_user_acceptance` and unknown\n  - `buildYpiStudioWidgetChatContinuePrompt(input)` — builds fixed, audit-safe Chat user messages per PRD §3.2 with per-kind templates, ≤200-char feedback truncation, no HTML/URLs, and optional `taskKey`/`targetLabel`/`improvementId`/`displayId`/`revisionTo`\n\n- **`scripts/test-ypi-studio-widget-continue.mjs`** (new) — Comprehensive test covering:\n  - needsChatContinue matrix (true for 3 kinds, false for `start_user_acceptance`)\n  - Prompt invariants (no HTML, no URLs, ≤4000 chars)\n  - All three prompt kinds with required substrings\n  - Feedback truncation at exactly 200, over 200, whitespace-only\n  - `taskKey` propagation, `revisionTo`/`revisionFrom` logic, `displayId` fallback\n\n- **`package.json`** — Added `\"test:studio-widget-continue\"` script\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run test:studio-widget-continue` | ✅ PASSED |\n| `npm run test:studio-widget-actions` | ✅ PASSED (no regression) |\n| `npm run test:studio-dag` | ✅ PASSED (no regression) |\n| `tsc --noEmit` (new file only) | ✅ Zero errors |\n\n### Notes / Risks\n\n- No React imports, no rpc-manager imports (circular-dep safe)\n- Pure functions with no side effects — safe for both client and server contexts\n- Prompt semantics lock to PRD §3.2; future wording tweaks can be made without changing the function signature\n- ESLint not available in this worktree; code follows existing project patterns (`.filter(Boolean).join(\"\\n\")`, JSDoc, `ReadonlySet`)\n- Next subtask dependencies: CONT-WIRE-02 (ChatWindow wiring) and CONT-WIDGET-03 (widget integration) can now consume this helper",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:04:10.407Z",
+            "text": "Let me verify the created files look correct:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T12:04:10.409Z",
+            "toolCallId": "call_00_ENM4V6A1YVk7Gbfx4DJB0009",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643/lib/ypi-studio-widget-continue.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:04:10.792Z",
+            "toolCallId": "call_00_ENM4V6A1YVk7Gbfx4DJB0009",
+            "toolName": "read",
+            "text": "/**\n * Pure helpers for widget-decision → Chat Send continuation.\n *\n * Separated from session-link and rpc-manager to avoid circular dependencies.\n * All exports are side-effect-free functions suitable for React components,\n * test scripts, and server helpers alike.\n */\n\nimport type { YpiStudioWidgetUserActionKind } from \"./ypi-studio-types\";\n\n// ── Kinds that need Chat Send after a successful PATCH ──\n\n/** Union of widget decision kinds that must trigger a Chat Send continuation. */\nexport type YpiStudioWidgetContinueKind = Extract<\n  YpiStudioWidgetUserActionKind,\n  \"approve_plan\" | \"request_plan_changes\" | \"approve_improvement_plan\"\n>;\n\nconst CONTINUE_KINDS: ReadonlySet<YpiStudioWidgetUserActionKind> = new Set([\n  \"approve_plan\",\n  \"request_plan_changes\",\n  \"approve_improvement_plan\",\n]);\n\n/**\n * Type-guard: returns true when the given widget user-action kind requires\n * a Chat Send continuation after the PATCH succeeds.\n */\nexport function ypiStudioWidgetActionNeedsChatContinue(\n  kind: YpiStudioWidgetUserActionKind,\n): kind is YpiStudioWidgetContinueKind {\n  return CONTINUE_KINDS.has(kind);\n}\n\n// ── Prompt builder ──\n\nexport interface YpiStudioWidgetChatContinuePromptInput {\n  kind: YpiStudioWidgetContinueKind;\n  taskId: string;\n  taskKey?: string;\n  expectedRevision: number;\n  /** Only for request_plan_changes: revision after the bump. */\n  revisionTo?: number;\n  /** Only for approve_improvement_plan. */\n  improvementId?: string;\n  displayId?: string;\n  /**\n   * Already-persisted feedback (request_plan_changes). Truncated to ≤200\n   * characters in the prompt to keep the Chat message bounded.\n   */\n  feedback?: string;\n  /** Optional display label for the target (e.g. task title, improvement title). */\n  targetLabel?: string;\n}\n\n/**\n * Maximum characters of persisted feedback carried into the Chat prompt.\n * The full feedback is already on disk; this is only a human-visible summary.\n */\nconst FEEDBACK_TRUNCATE_LEN = 200;\n\n/**\n * Build a fixed, machine-auditable Chat user-message for widget decision\n * continuation. The prompt is pure text; it never contains HTML, URLs, file\n * paths, or secret material.\n *\n * Semantics are locked to the Hybrid B contract (PRD §3.2). Callers MUST\n * have already persisted the decision via PATCH before calling this function;\n * this builder only produces text — it does NOT perform any side effect.\n */\nexport function buildYpiStudioWidgetChatContinuePrompt(\n  input: YpiStudioWidgetChatContinuePromptInput,\n): string {\n  const feedbackSummary = input.feedback\n    ? input.feedback.trim().slice(0, FEEDBACK_TRUNCATE_LEN)\n    : undefined;\n\n  switch (input.kind) {\n    case \"approve_plan\":\n      return buildApprovePlanPrompt(input);\n    case \"request_plan_changes\":\n      return buildRequestPlanChangesPrompt(input, feedbackSummary);\n    case \"approve_improvement_plan\":\n      return buildApproveImprovementPlanPrompt(input);\n    default: {\n      // Exhaustive check: CONTINUE_KINDS covers all three; this branch is\n      // unreachable at runtime.  Included for type-narrowing robustness.\n      const _exhaustive: never = input.kind;\n      throw new Error(`Unsupported continue kind: ${_exhaustive}`);\n    }\n  }\n}\n\n// ── Per-kind builders ──\n\nfunction buildApprovePlanPrompt(\n  input: YpiStudioWidgetChatContinuePromptInput,\n): string {\n  return [\n    \"YPI Studio 用户已在会话浮窗批准主任务计划（source=user-widget）。该决定已落库：status 应为 implementing，approvalGrant 已写入。\",\n    \"请继续自动编排，不要等待用户再次输入批准文案。\",\n    \"\",\n    `- taskId: ${input.taskId}`,\n    `- action: approve_plan`,\n    `- expectedRevision: ${input.expectedRevision}`,\n    input.targetLabel ? `- target: ${truncateTarget(input.targetLabel)}` : undefined,\n    \"- reason: widget approve_plan persisted; continue implementing orchestration\",\n    input.taskKey ? `- taskKey: ${input.taskKey}` : undefined,\n    \"\",\n    \"请：ypi_studio_task(current/get) 确认状态 → 按 implementationPlan 执行 implementation_next/claim 并派发 implementer（遵守 maxConcurrency）→ 不要伪造额外批准。\",\n  ].filter(Boolean).join(\"\\n\");\n}\n\nfunction buildRequestPlanChangesPrompt(\n  input: YpiStudioWidgetChatContinuePromptInput,\n  feedbackSummary?: string,\n): string {\n  const revFrom =\n    typeof input.revisionTo === \"number\" && input.revisionTo > input.expectedRevision\n      ? input.revisionTo - 1\n      : input.expectedRevision;\n  const revTo = input.revisionTo ?? input.expectedRevision;\n\n  return [\n    \"YPI Studio 用户已在会话浮窗请求修改计划。该决定已落库（status=planning，旧 grant 已清除，planRevision 已提升）。请继续自动重跑架构规划。\",\n    \"\",\n    `- taskId: ${input.taskId}`,\n    `- action: request_plan_changes`,\n    `- revisionFrom: ${revFrom}`,\n    `- revisionTo: ${revTo}`,\n    feedbackSummary ? `- feedbackSummary: ${feedbackSummary}` : undefined,\n    \"- reason: widget request_plan_changes persisted; wake architect planning\",\n    input.taskKey ? `- taskKey: ${input.taskKey}` : undefined,\n    \"\",\n    feedbackSummary\n      ? `以任务事件/产物中的完整 feedback 为准，勿要求用户再次粘贴。请更新规划产物与 plan-review，保存 implementationPlan，transition 到 awaiting_approval 后停止；不要本轮进入 implementing。`\n      : \"请更新规划产物与 plan-review，保存 implementationPlan，transition 到 awaiting_approval 后停止；不要本轮进入 implementing。\",\n  ].filter(Boolean).join(\"\\n\");\n}\n\nfunction buildApproveImprovementPlanPrompt(\n  input: YpiStudioWidgetChatContinuePromptInput,\n): string {\n  const display = input.displayId ?? input.improvementId ?? \"(unknown)\";\n\n  return [\n    \"YPI Studio 用户已在会话浮窗批准改进计划（source=user-widget）。该改进实例应已进入 implementing；主任务保持 waiting_for_improvements。\",\n    \"\",\n    `- taskId: ${input.taskId}`,\n    `- action: approve_improvement_plan`,\n    `- improvementId: ${input.improvementId ?? \"(missing)\"}`,\n    `- displayId: ${display}`,\n    `- expectedRevision: ${input.expectedRevision}`,\n    input.targetLabel ? `- target: ${truncateTarget(input.targetLabel)}` : undefined,\n    \"- reason: widget approve_improvement_plan persisted; continue instance DAG\",\n    input.taskKey ? `- taskKey: ${input.taskKey}` : undefined,\n    \"\",\n    \"请仅推进该 improvement 的 instance plan（claim/dispatch），不要误批主任务计划，不要完成/归档主任务。\",\n  ].filter(Boolean).join(\"\\n\");\n}\n\n// ── Internal helpers ──\n\nfunction truncateTarget(label: string, max = 120): string {\n  return label.length <= max ? label : label.slice(0, max - 1) + \"…\";\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:04:35.339Z",
+            "text": "## Implementation Complete — CONT-HELPER-01\n\n### Files Changed\n\n- **`lib/ypi-studio-widget-continue.ts`** (new) — Pure helper module with:\n  - `YpiStudioWidgetContinueKind` — union of `\"approve_plan\" | \"request_plan_changes\" | \"approve_improvement_plan\"`\n  - `ypiStudioWidgetActionNeedsChatContinue(kind)` — type guard returning `true` for the three continue kinds, `false` for `start_user_acceptance` and unknown\n  - `buildYpiStudioWidgetChatContinuePrompt(input)` — builds fixed, audit-safe Chat user messages per PRD §3.2 with per-kind templates, ≤200-char feedback truncation, no HTML/URLs, and optional `taskKey`/`targetLabel`/`improvementId`/`displayId`/`revisionTo`\n\n- **`scripts/test-ypi-studio-widget-continue.mjs`** (new) — Comprehensive test covering:\n  - needsChatContinue matrix (true for 3 kinds, false for `start_user_acceptance`)\n  - Prompt invariants (no HTML, no URLs, ≤4000 chars)\n  - All three prompt kinds with required substrings\n  - Feedback truncation at exactly 200, over 200, whitespace-only\n  - `taskKey` propagation, `revisionTo`/`revisionFrom` logic, `displayId` fallback\n\n- **`package.json`** — Added `\"test:studio-widget-continue\"` script\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run test:studio-widget-continue` | ✅ PASSED |\n| `npm run test:studio-widget-actions` | ✅ PASSED (no regression) |\n| `npm run test:studio-dag` | ✅ PASSED (no regression) |\n| `tsc --noEmit` (new file only) | ✅ Zero errors |\n\n### Notes / Risks\n\n- No React imports, no rpc-manager imports (circular-dep safe)\n- Pure functions with no side effects — safe for both client and server contexts\n- Prompt semantics lock to PRD §3.2; future wording tweaks can be made without changing the function signature\n- ESLint not available in this worktree; code follows existing project patterns (`.filter(Boolean).join(\"\\n\")`, JSDoc, `ReadonlySet`)\n- Next subtask dependencies: CONT-WIRE-02 (ChatWindow wiring) and CONT-WIDGET-03 (widget integration) can now consume this helper",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T12:04:35.343Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2850,
+        "tokens": 949,
+        "tokenSource": "usage",
+        "tps": 1.52,
+        "firstTokenAt": "2026-07-18T11:54:10.008Z",
+        "lastTokenAt": "2026-07-18T12:04:35.337Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-230cc8ffff90ace7ae2ea0b7",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/implementer-230cc8ffff90ace7ae2ea0b7.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T11:54:04.536Z",
+        "finishedAt": "2026-07-18T12:04:35.346Z",
+        "updatedAt": "2026-07-18T12:04:35.346Z",
+        "itemCount": 117,
+        "messageCount": 13,
+        "toolCallCount": 50,
+        "stderrBytes": 0,
+        "bytes": 130571,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7513-91d1-705e-9b74-3bfff661b2e0",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T11-54-04-625Z_019f7513-91d1-705e-9b74-3bfff661b2e0.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3590cac66c1872fe737fde77",
+      "subtaskId": "CONT-WIRE-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T11:54:04.586Z",
+      "finishedAt": "2026-07-18T12:18:00.616Z",
+      "runner": "sdk",
+      "childSessionId": "019f7513-91e3-73a3-9851-60cc66600689",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T11-54-04-643Z_019f7513-91e3-73a3-9851-60cc66600689.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f7513-91e3-73a3-9851-60cc66600689",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "All changes are clean. Let me provide the summary.\n\n---\n\n## Implementation Complete — CONT-WIRE-02\n\n### Files Changed\n\n- **`components/ChatWindow.tsx`** — Added `onComposeSendReady` prop. Registers `handleSend` via `onComposeSendReady(handleSend)` on mount/change with cleanup `onComposeSendReady(null)`. Dependencies: `[handleSend, onComposeSendReady]`.\n\n- **`components/AppShell.tsx`** — Added `composeSendRef` (useRef) and stable `handleComposeSendReady` callback. Passes `onComposeSendReady` to `ChatWindow` and `agentRunning={chatAgentRunning}` + `onComposeSend` to `YpiStudioSessionWidget`. The `onComposeSend` callback reads the latest ref (`composeSendRef.current?.(message)`), staying stable across renders.\n\n- **`components/YpiStudioSessionWidget.tsx`** — Added `agentRunning?: boolean` and `onComposeSend?: (message: string) => void | Promise<void>` to the Props interface. Destructured and voided (logic reserved for CONT-WIDGET-03).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `eslint` (3 changed files) | 0 errors, 0 warnings |\n| `tsc --noEmit` | 0 errors |\n\n### Wiring Summary\n\n```\nChatWindow.handleSend\n  → useEffect → onComposeSendReady(handleSend)\n    → AppShell.composeSendRef.current = handleSend\n      → YpiStudioSessionWidget.onComposeSend(msg)\n        → composeSendRef.current?.(msg) → ChatWindow.handleSend(msg)\n```\n\nSession-switch safety: `ChatWindow` remounts on `key={sessionKey}`, so cleanup nulls the old `handleSend` before the new one registers. Widget `onComposeSend` is a stable arrow reading the ref, so it always calls the current session's `handleSend` or no-ops when null.\n\n### Notes / Risks\n\n- The `package.json` diff includes an additional `test:studio-widget-continue` script line from CONT-HELPER-01 — this is pre-existing in the worktree and unrelated to CONT-WIRE-02.\n- `npm-shrinkwrap.json` was temporarily removed to allow devDependency install (NODE_ENV=production skips devDeps); restored after validation. A fresh `package-lock.json` was generated — not committed.\n- Widget props `agentRunning` / `onComposeSend` are received but unused (voided) — CONT-WIDGET-03 will wire them to busy/continue logic.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T11:54:04.586Z",
+        "updatedAt": "2026-07-18T12:18:00.616Z",
+        "eventCount": 14462,
+        "lastTextPreview": "All changes are clean. Let me provide the summary.\n\n---\n\n## Implementation Complete — CONT-WIRE-02\n\n### Files Changed\n\n- **`components/ChatWindow.tsx`** — Added `onComposeSendReady` prop. Registers `handleSend` via `onComposeSendReady(handleSend)` on mount/change with cleanup `onComposeSendReady(null)`. Dependencies: `[handleSend, onComposeSendReady]`.\n\n- **`components/AppShell.tsx`** — Added `composeSendRef` (useRef) and stable `handleComposeSendReady` callback. Passes `onComposeSendReady` to `ChatWindow` and `agentRunning={chatAgentRunning}` + `onComposeSend` to `YpiStudioSessionWidget`. The `onComposeSend` callback reads the latest ref (`composeSendRef.current?.(message)`), staying stable across renders.\n\n- **`components/YpiStudioSessionWidget.tsx`** — Added `agentRunning?: boolean` and `onComposeSend?: (message: string) => void | Promise<void>` to the Props interface. Destructured and voided (logic reserved for CONT-WIDGET-03).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `eslint` (3 changed files) | 0 errors, 0 warnings |\n| `tsc --noEmit` | 0 errors |\n\n### Wiring Summary\n\n```\nChatWindow.handleSend\n  → useEffect → onComposeSendReady(handleSend)\n    → AppShell.composeSendRef.current = handleSend\n      → YpiStudioSessionWidget.onComposeSend(msg)\n        → composeSendRef.current?.(msg) → ChatWindow.handleSend(msg)\n```\n\nSession-switch safety: `ChatWindow` remounts on `key={sessionKey}`, so cleanup nulls the old `handleSend` before the new one registers. Widget `onComposeSend` is a stable arrow reading the ref, so it always calls the current session's `handleSend` or no-ops when null.\n\n### Notes / Risks\n\n- The `package.json` diff includes an additional `test:studio-widget-continue` script line from CONT-HELPER-01 — this is pre-existing in the worktree and unrelated to CONT-WIRE-02.\n- `npm-shrinkwrap.json` was temporarily removed to allow devDependency install (NODE_ENV=production skips devDeps); restored after validation. A fresh `package-lock.json` was generated — not committed.\n- Widget props `agentRunning` / `onComposeSend` are received but unused (voided) — CONT-WIDGET-03 will wire them to busy/continue logic.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:17:29.496Z",
+            "toolCallId": "call_00_G23FLVN4dWW9sfsjeFGR2767",
+            "toolName": "bash",
+            "text": "+        \"type\": \"github\",\n+        \"url\": \"https://github.com/sponsors/wooorm\"\n+      }\n+    },\n     \"node_modules/imurmurhash\": {\n       \"version\": \"0.1.4\",\n       \"resolved\": \"https://registry.npmjs.org/imurmurhash/-/imurmurhash-0.1.4.tgz\",\n@@ -11668,6 +11399,8 @@\n     },\n     \"node_modules/inline-style-parser\": {\n       \"version\": \"0.2.7\",\n+      \"resolved\": \"https://registry.npmjs.org/inline-style-parser/-/inline-style-parser-0.2.7.tgz\",\n+      \"integrity\": \"sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA==\",\n       \"license\": \"MIT\"\n     },\n     \"node_modules/internal-slot\": {\n@@ -11704,6 +11437,8 @@\n     },\n     \"node_modules/is-alphabetical\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/is-alphabetical/-/is-alphabetical-2.0.1.tgz\",\n+      \"integrity\": \"sha512-FWyyY60MeTNyeSRpkM2Iry0G9hpr7/9kD40mD/cGQEuilcZYS4okz8SN2Q6rLCJ8gbCt6fN+rC+6tMGS99LaxQ==\",\n       \"license\": \"MIT\",\n       \"funding\": {\n         \"type\": \"github\",\n@@ -11712,6 +11447,8 @@\n     },\n     \"node_modules/is-alphanumerical\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/is-alphanumerical/-/is-alphanumerical-2.0.1.tgz\",\n+      \"integrity\": \"sha512-hmbYhX/9MUMF5uh7tOXyK/n0ZvWpad5caBA17GsC6vyuCqaWliRG5K1qS9inmUhEMaOBIW7/whAnSwveW/LtZw==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"is-alphabetical\": \"^2.0.0\",\n@@ -11887,6 +11624,8 @@\n     },\n     \"node_modules/is-decimal\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/is-decimal/-/is-decimal-2.0.1.tgz\",\n+      \"integrity\": \"sha512-AAB9hiomQs5DXWcRB1rqsxGUstbRroFOPPVAomNk/3XHR5JyEZChOyTWe2oayKnsSsr/kcGqF+z6yuH6HHpN0A==\",\n       \"license\": \"MIT\",\n       \"funding\": {\n         \"type\": \"github\",\n@@ -11983,6 +11722,8 @@\n     },\n     \"node_modules/is-hexadecimal\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/is-hexadecimal/-/is-hexadecimal-2.0.1.tgz\",\n+      \"integrity\": \"sha512-DgZQp241c8oO6cA1SbTEWiXeoxV42vlcJxgH+B3hi1AiqqKruZR3ZGF8In3fj4+/y/7rHvlOZLZtgJ/4ttYGZg==\",\n       \"license\": \"MIT\",\n       \"funding\": {\n         \"type\": \"github\",\n@@ -12050,6 +11791,8 @@\n     },\n     \"node_modules/is-plain-obj\": {\n       \"version\": \"4.1.0\",\n+      \"resolved\": \"https://registry.npmjs.org/is-plain-obj/-/is-plain-obj-4.1.0.tgz\",\n+      \"integrity\": \"sha512-+Pgi+vMuUNkJyExiMBt5IlFoMyKnr5zhJ4Uspz58WOhBF5QoIZkFyNHIbBAtHwzVAgk5RtndVNsDRN61/mmDqg==\",\n       \"license\": \"MIT\",\n       \"engines\": {\n         \"node\": \">=12\"\n@@ -12217,10 +11960,9 @@\n       }\n     },\n     \"node_modules/isarray\": {\n-      \"version\": \"2.0.5\",\n-      \"resolved\": \"https://registry.npmjs.org/isarray/-/isarray-2.0.5.tgz\",\n-      \"integrity\": \"sha512-xHjhDr3cNBK0BzdUJSPXZntQUx/mwMS5Rw4A7lPJ90XGAO6ISP/ePDNuo0vhqOZU+UD5JoodwCAAoZQd3FeAKw==\",\n-      \"dev\": true,\n+      \"version\": \"1.0.0\",\n+      \"resolved\": \"https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz\",\n+      \"integrity\": \"sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==\",\n       \"license\": \"MIT\"\n     },\n     \"node_modules/isexe\": {\n@@ -12897,6 +12639,8 @@\n     },\n     \"node_modules/longest-streak\": {\n       \"version\": \"3.1.0\",\n+      \"resolved\": \"https://registry.npmjs.org/longest-streak/-/longest-streak-3.1.0.tgz\",\n+      \"integrity\": \"sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==\",\n       \"license\": \"MIT\",\n       \"funding\": {\n         \"type\": \"github\",\n@@ -13034,15 +12778,16 @@\n       }\n     },\n     \"node_modules/marked\": {\n-      \"version\": \"14.0.0\",\n-      \"resolved\": \"https://registry.npmjs.org/marked/-/marked-14.0.0.tgz\",\n-      \"integrity\": \"sha512-uIj4+faQ+MgHgwUW1l2PsPglZLOLOT1uErt06dAPtx2kjteLAkbsd/0FiYg/MGS+i7ZKLb7w2WClxHkzOOuryQ==\",\n+      \"version\": \"18.0.5\",\n+      \"resolved\": \"https://registry.npmjs.org/marked/-/marked-18.0.5.tgz\",\n+      \"integrity\": \"sha512-S6GcvALHg6K4ohtu4E7x0a1AqhAjp6cV8KhLSyN9qVapnzJkusVBxZRcIU9AeYsbe6P1hKDusSbEOzGyyuce6w==\",\n       \"license\": \"MIT\",\n+      \"peer\": true,\n       \"bin\": {\n         \"marked\": \"bin/marked.js\"\n       },\n       \"engines\": {\n-        \"node\": \">= 18\"\n+        \"node\": \">= 20\"\n       }\n     },\n     \"node_modules/math-intrinsics\": {\n@@ -13085,6 +12830,8 @@\n     },\n     \"node_modules/mdast-util-from-markdown\": {\n       \"version\": \"2.0.3\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-from-markdown/-/mdast-util-from-markdown-2.0.3.tgz\",\n+      \"integrity\": \"sha512-W4mAWTvSlKvf8L6J+VN9yLSqQ9AOAAvHuoDAmPkz4dHf553m5gVj2ejadHJhoJmcmxEnOv6Pa8XJhpxE93kb8Q==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/mdast\": \"^4.0.0\",\n@@ -13245,6 +12992,8 @@\n     },\n     \"node_modules/mdast-util-mdx-expression\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-mdx-expression/-/mdast-util-mdx-expression-2.0.1.tgz\",\n+      \"integrity\": \"sha512-J6f+9hUp+ldTZqKRSg7Vw5V6MqjATc+3E4gf3CFNcuZNWD8XdyI6zQ8GqH7f8169MM6P7hMBRDVGnn7oHB9kXQ==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/estree-jsx\": \"^1.0.0\",\n@@ -13261,6 +13010,8 @@\n     },\n     \"node_modules/mdast-util-mdx-jsx\": {\n       \"version\": \"3.2.0\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-mdx-jsx/-/mdast-util-mdx-jsx-3.2.0.tgz\",\n+      \"integrity\": \"sha512-lj/z8v0r6ZtsN/cGNNtemmmfoLAFZnjMbNyLzBafjzikOM+glrjNHPlf6lQDOTccj9n5b0PPihEBbhneMyGs1Q==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/estree-jsx\": \"^1.0.0\",\n@@ -13283,6 +13034,8 @@\n     },\n     \"node_modules/mdast-util-mdxjs-esm\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-mdxjs-esm/-/mdast-util-mdxjs-esm-2.0.1.tgz\",\n+      \"integrity\": \"sha512-EcmOpxsZ96CvlP03NghtH1EsLtr0n9Tm4lPUJUBccV9RwUOneqSycg19n5HGzCf+10LozMRSObtVr3ee1WoHtg==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/estree-jsx\": \"^1.0.0\",\n@@ -13314,6 +13067,8 @@\n     },\n     \"node_modules/mdast-util-phrasing\": {\n       \"version\": \"4.1.0\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-phrasing/-/mdast-util-phrasing-4.1.0.tgz\",\n+      \"integrity\": \"sha512-TqICwyvJJpBwvGAMZjj4J2n0X8QWp21b9l0o7eXyVJ25YNWYbJDVIyD1bZXE6WtV6RmKJVYmQAKWa0zWOABz2w==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/mdast\": \"^4.0.0\",\n@@ -13326,6 +13081,8 @@\n     },\n     \"node_modules/mdast-util-to-hast\": {\n       \"version\": \"13.2.1\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-to-hast/-/mdast-util-to-hast-13.2.1.tgz\",\n+      \"integrity\": \"sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/hast\": \"^3.0.0\",\n@@ -13345,6 +13102,8 @@\n     },\n     \"node_modules/mdast-util-to-markdown\": {\n       \"version\": \"2.1.2\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-to-markdown/-/mdast-util-to-markdown-2.1.2.tgz\",\n+      \"integrity\": \"sha512-xj68wMTvGXVOKonmog6LwyJKrYXZPvlwabaryTjLh9LuvovB/KAH+kvi8Gjj+7rJjsFi23nkUxRQv1KqSroMqA==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/mdast\": \"^4.0.0\",\n@@ -13387,6 +13146,8 @@\n     },\n     \"node_modules/mdast-util-to-string\": {\n       \"version\": \"4.0.0\",\n+      \"resolved\": \"https://registry.npmjs.org/mdast-util-to-string/-/mdast-util-to-string-4.0.0.tgz\",\n+      \"integrity\": \"sha512-0H44vDimn51F0YwvxSJSm0eCDOJTRlmN0R1yBh4HLj9wiV1Dn0QoXGbvFAWj2hSItVTlCmBF1hqKlIyUBVFLPg==\",\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"@types/mdast\": \"^4.0.0\"\n@@ -13465,6 +13226,8 @@\n     },\n     \"node_modules/micromark\": {\n       \"version\": \"4.0.2\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark/-/micromark-4.0.2.tgz\",\n+      \"integrity\": \"sha512-zpe98Q6kvavpCr1NPVSCMebCKfD7CA2NqZ+rykeNhONIJBpc1tFKt9hucLGwha3jNTNI8lHpctWJWoimVF4PfA==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13498,6 +13261,8 @@\n     },\n     \"node_modules/micromark-core-commonmark\": {\n       \"version\": \"2.0.3\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-core-commonmark/-/micromark-core-commonmark-2.0.3.tgz\",\n+      \"integrity\": \"sha512-RDBrHEMSxVFLg6xvnXmb1Ayr2WzLAWjeSATAoxwKYJV94TeNavgoIdA0a9ytzDSVzBy2YKFK+emCPOEibLeCrg==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13823,6 +13588,8 @@\n     },\n     \"node_modules/micromark-factory-destination\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-factory-destination/-/micromark-factory-destination-2.0.1.tgz\",\n+      \"integrity\": \"sha512-Xe6rDdJlkmbFRExpTOmRj9N3MaWmbAgdpSrBQvCFqhezUn4AHqJHbaEnfbVYYiexVSs//tqOdY/DxhjdCiJnIA==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13842,6 +13609,8 @@\n     },\n     \"node_modules/micromark-factory-label\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-factory-label/-/micromark-factory-label-2.0.1.tgz\",\n+      \"integrity\": \"sha512-VFMekyQExqIW7xIChcXn4ok29YE3rnuyveW3wZQWWqF4Nv9Wk5rgJ99KzPvHjkmPXF93FXIbBp6YdW3t71/7Vg==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13890,6 +13659,8 @@\n     },\n     \"node_modules/micromark-factory-space\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-factory-space/-/micromark-factory-space-2.0.1.tgz\",\n+      \"integrity\": \"sha512-zRkxjtBxxLd2Sc0d+fbnEunsTj46SWXgXciZmHq0kDYGnck/ZSGj9/wULTV95uoeYiK5hRXP2mJ98Uo4cq/LQg==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13908,6 +13679,8 @@\n     },\n     \"node_modules/micromark-factory-title\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-factory-title/-/micromark-factory-title-2.0.1.tgz\",\n+      \"integrity\": \"sha512-5bZ+3CjhAd9eChYTHsjy6TGxpOFSKgKKJPJxr293jTbfry2KDoWkhBb6TcPVB4NmzaPhMs1Frm9AZH7OD4Cjzw==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13928,6 +13701,8 @@\n     },\n     \"node_modules/micromark-factory-whitespace\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-factory-whitespace/-/micromark-factory-whitespace-2.0.1.tgz\",\n+      \"integrity\": \"sha512-Ob0nuZ3PKt/n0hORHyvoD9uZhr+Za8sFoP+OnMcnWK5lngSzALgQYKMr9RJVOWLqQYuyn6ulqGWSXdwf6F80lQ==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13948,6 +13723,8 @@\n     },\n     \"node_modules/micromark-util-character\": {\n       \"version\": \"2.1.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-character/-/micromark-util-character-2.1.1.tgz\",\n+      \"integrity\": \"sha512-wv8tdUTJ3thSFFFJKtpYKOYiGP2+v96Hvk4Tu8KpCAsTMs6yi+nVmGh1syvSCsaxz45J6Jbw+9DD6g97+NV67Q==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13966,6 +13743,8 @@\n     },\n     \"node_modules/micromark-util-chunked\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-chunked/-/micromark-util-chunked-2.0.1.tgz\",\n+      \"integrity\": \"sha512-QUNFEOPELfmvv+4xiNg2sRYeS/P84pTW0TCgP5zc9FpXetHY0ab7SxKyAQCNCc1eK0459uoLI1y5oO5Vc1dbhA==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -13983,6 +13762,8 @@\n     },\n     \"node_modules/micromark-util-classify-character\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-classify-character/-/micromark-util-classify-character-2.0.1.tgz\",\n+      \"integrity\": \"sha512-K0kHzM6afW/MbeWYWLjoHQv1sgg2Q9EccHEDzSkxiP/EaagNzCm7T/WMKZ3rjMbvIpvBiZgwR3dKMygtA4mG1Q==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14002,6 +13783,8 @@\n     },\n     \"node_modules/micromark-util-combine-extensions\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-combine-extensions/-/micromark-util-combine-extensions-2.0.1.tgz\",\n+      \"integrity\": \"sha512-OnAnH8Ujmy59JcyZw8JSbK9cGpdVY44NKgSM7E9Eh7DiLS2E9RNQf0dONaGDzEG9yjEl5hcqeIsj4hfRkLH/Bg==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14020,6 +13803,8 @@\n     },\n     \"node_modules/micromark-util-decode-numeric-character-reference\": {\n       \"version\": \"2.0.2\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-decode-numeric-character-reference/-/micromark-util-decode-numeric-character-reference-2.0.2.tgz\",\n+      \"integrity\": \"sha512-ccUbYk6CwVdkmCQMyr64dXz42EfHGkPQlBj5p7YVGzq8I7CtjXZJrubAYezf7Rp+bjPseiROqe7G6foFd+lEuw==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14037,6 +13822,8 @@\n     },\n     \"node_modules/micromark-util-decode-string\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-decode-string/-/micromark-util-decode-string-2.0.1.tgz\",\n+      \"integrity\": \"sha512-nDV/77Fj6eH1ynwscYTOsbK7rR//Uj0bZXBwJZRfaLEJ1iGBR6kIfNmlNqaqJf649EP0F3NWNdeJi03elllNUQ==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14057,6 +13844,8 @@\n     },\n     \"node_modules/micromark-util-encode\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-encode/-/micromark-util-encode-2.0.1.tgz\",\n+      \"integrity\": \"sha512-c3cVx2y4KqUnwopcO9b/SCdo2O67LwJJ/UyqGfbigahfegL9myoEFoDYZgkT7f36T0bLrM9hZTAaAyH+PCAXjw==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14097,6 +13886,8 @@\n     },\n     \"node_modules/micromark-util-html-tag-name\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-html-tag-name/-/micromark-util-html-tag-name-2.0.1.tgz\",\n+      \"integrity\": \"sha512-2cNEiYDhCWKI+Gs9T0Tiysk136SnR13hhO8yW6BGNyhOC4qYFnwF1nKfD3HFAIXA5c45RrIG1ub11GiXeYd1xA==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14111,6 +13902,8 @@\n     },\n     \"node_modules/micromark-util-normalize-identifier\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-normalize-identifier/-/micromark-util-normalize-identifier-2.0.1.tgz\",\n+      \"integrity\": \"sha512-sxPqmo70LyARJs0w2UclACPUUEqltCkJ6PhKdMIDuJ3gSf/Q+/GIe3WKl0Ijb/GyH9lOpUkRAO2wp0GVkLvS9Q==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14128,6 +13921,8 @@\n     },\n     \"node_modules/micromark-util-resolve-all\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-resolve-all/-/micromark-util-resolve-all-2.0.1.tgz\",\n+      \"integrity\": \"sha512-VdQyxFWFT2/FGJgwQnJYbe1jjQoNTS4RjglmSjTUlpUMa95Htx9NHeYW4rGDJzbjvCsl9eLjMQwGeElsqmzcHg==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14145,6 +13940,8 @@\n     },\n     \"node_modules/micromark-util-sanitize-uri\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-sanitize-uri/-/micromark-util-sanitize-uri-2.0.1.tgz\",\n+      \"integrity\": \"sha512-9N9IomZ/YuGGZZmQec1MbgxtlgougxTodVwDzzEouPKo3qFWvymFHWcnDi2vzV1ff6kas9ucW+o3yzJK9YB1AQ==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14164,6 +13961,8 @@\n     },\n     \"node_modules/micromark-util-subtokenize\": {\n       \"version\": \"2.1.0\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-subtokenize/-/micromark-util-subtokenize-2.1.0.tgz\",\n+      \"integrity\": \"sha512-XQLu552iSctvnEcgXw6+Sx75GflAPNED1qx7eBJ+wydBb2KCbRZe+NwvIEEMM83uml1+2WSXpBAcp9IUCgCYWA==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14184,6 +13983,8 @@\n     },\n     \"node_modules/micromark-util-symbol\": {\n       \"version\": \"2.0.1\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-symbol/-/micromark-util-symbol-2.0.1.tgz\",\n+      \"integrity\": \"sha512-vs5t8Apaud9N28kgCrRUdEed4UJ+wWNvicHLPxCa9ENlYuAY31M0ETy5y1vA33YoNPDFTghEbnh6efaE8h4x0Q==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14198,6 +13999,8 @@\n     },\n     \"node_modules/micromark-util-types\": {\n       \"version\": \"2.0.2\",\n+      \"resolved\": \"https://registry.npmjs.org/micromark-util-types/-/micromark-util-types-2.0.2.tgz\",\n+      \"integrity\": \"sha512-Yw0ECSpJoViF1qTU4DC6NwtC4aWGt1EkzaQB8KPPyCRR8z9TWeV0HbEFGTO+ZY1wB22zmxnJqhPyTpOVCpeHTA==\",\n       \"funding\": [\n         {\n           \"type\": \"GitHub Sponsors\",\n@@ -14225,18 +14028,16 @@\n       }\n     },\n     \"node_modules/minimatch\": {\n-      \"version\": \"10.2.5\",\n-      \"resolved\": \"http…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T12:17:43.076Z",
+            "toolCallId": "call_00_14m6Kx7pq0vw2rvqJblm1543",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643 && git diff -- components/ChatWindow.tsx components/AppShell.tsx components/YpiStudioSessionWidget.tsx 2>&1\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:17:43.267Z",
+            "toolCallId": "call_00_14m6Kx7pq0vw2rvqJblm1543",
+            "toolName": "bash",
+            "text": "diff --git a/components/AppShell.tsx b/components/AppShell.tsx\nindex 83dee85..d96fbd1 100644\n--- a/components/AppShell.tsx\n+++ b/components/AppShell.tsx\n@@ -365,6 +365,11 @@ function AppShellContent() {\n   );\n   const [sidebarResizing, setSidebarResizing] = useState(false);\n   const chatInputRef = useRef<ChatInputHandle | null>(null);\n+  /** Latest Chat compose-send handle, registered by ChatWindow via onComposeSendReady. */\n+  const composeSendRef = useRef<((message: string) => void | Promise<void>) | null>(null);\n+  const handleComposeSendReady = useCallback((send: ((message: string) => void | Promise<void>) | null) => {\n+    composeSendRef.current = send;\n+  }, []);\n   const topBarRef = useRef<HTMLDivElement>(null);\n \n   const loadWebConfig = useCallback(async (signal?: AbortSignal) => {\n@@ -1839,6 +1844,7 @@ function AppShellContent() {\n               onContextUsageChange={handleContextUsageChange}\n               onStudioToolProgressChange={handleStudioToolProgressChange}\n               onSessionListRefreshNeeded={handleStudioSessionListRefreshNeeded}\n+              onComposeSendReady={handleComposeSendReady}\n               defaultToolPreset={webConfig?.yolk.defaultToolPreset}\n               defaultThinkingLevel={\n                 webConfig?.yolk.defaultModel.mode === \"specific\"\n@@ -1884,6 +1890,8 @@ function AppShellContent() {\n               contextId={studioContextIdForSession(selectedSession?.id) ?? undefined}\n               onTaskChanged={() => setStudioSessionTaskRefreshKey((key) => key + 1)}\n               onOpenFile={handleOpenFile}\n+              agentRunning={chatAgentRunning}\n+              onComposeSend={(message) => composeSendRef.current?.(message)}\n             />\n           )}\n           </div>\ndiff --git a/components/ChatWindow.tsx b/components/ChatWindow.tsx\nindex 7f82571..98231a0 100644\n--- a/components/ChatWindow.tsx\n+++ b/components/ChatWindow.tsx\n@@ -33,6 +33,12 @@ interface Props {\n   defaultThinkingLevel?: PiWebThinkingLevel;\n   /** New-session model seed from yolk.defaultModel (specific mode only). */\n   defaultModel?: { provider: string; modelId: string } | null;\n+  /**\n+   * Registers the current Chat compose-send handle so parent (AppShell) can forward\n+   * messages from external UI (e.g. Studio widget continue prompts).\n+   * Called with the stable handleSend on mount/change; cleanup calls with null.\n+   */\n+  onComposeSendReady?: (send: ((message: string) => void | Promise<void>) | null) => void;\n }\n \n function isRecord(value: unknown): value is Record<string, unknown> {\n@@ -166,7 +172,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {\n   );\n }\n \n-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {\n+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel, onComposeSendReady }: Props) {\n   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();\n   const {\n     loading, error, messages, entryIds, streamState,\n@@ -192,6 +198,15 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o\n   const soundEnabledRef = useRef(soundEnabled);\n   soundEnabledRef.current = soundEnabled;\n \n+  // Register the current compose-send handle with the parent so external UI\n+  // (e.g. Studio widget) can inject Chat messages via the same handleSend path.\n+  // Cleanup on unmount / handleSend change to avoid stale-closure references.\n+  useEffect(() => {\n+    if (!onComposeSendReady) return;\n+    onComposeSendReady(handleSend);\n+    return () => { onComposeSendReady(null); };\n+  }, [handleSend, onComposeSendReady]);\n+\n   // Wrap agent event handler to play sound on agent_end\n   const origHandler = handleAgentEventRef.current;\n   useEffect(() => {\ndiff --git a/components/YpiStudioSessionWidget.tsx b/components/YpiStudioSessionWidget.tsx\nindex 7917bdd..a0cf1f5 100644\n--- a/components/YpiStudioSessionWidget.tsx\n+++ b/components/YpiStudioSessionWidget.tsx\n@@ -36,6 +36,14 @@ interface Props {\n    * open the right-side main preview via this callback (STUDIO-DOC-2).\n    */\n   onOpenFile?: (filePath: string, fileName: string) => void;\n+  /** Chat agent running (from AppShell chatAgentRunning). Used to disable write CTAs during active work. */\n+  agentRunning?: boolean;\n+  /**\n+   * Current Chat compose send (handleSend). Called after a successful PATCH for\n+   * continue-kinds (approve_plan / request_plan_changes / approve_improvement_plan)\n+   * to inject a guided user message into the transcript.\n+   */\n+  onComposeSend?: (message: string) => void | Promise<void>;\n }\n \n interface WidgetPosition { left: number; top: number }\n@@ -1125,8 +1133,12 @@ export function YpiStudioSessionWidget({\n   contextId,\n   onTaskChanged,\n   onOpenFile: _onOpenFile,\n+  agentRunning: _agentRunning,\n+  onComposeSend: _onComposeSend,\n }: Props) {\n   void _onOpenFile;\n+  void _agentRunning;\n+  void _onComposeSend;\n   const isMobile = useMobile();\n   const { confirm, confirmChoice, prompt, toast } = usePrompt();\n   const [expanded, setExpanded] = useState(() => readExpandedState());",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:18:00.593Z",
+            "text": "All changes are clean. Let me provide the summary.\n\n---\n\n## Implementation Complete — CONT-WIRE-02\n\n### Files Changed\n\n- **`components/ChatWindow.tsx`** — Added `onComposeSendReady` prop. Registers `handleSend` via `onComposeSendReady(handleSend)` on mount/change with cleanup `onComposeSendReady(null)`. Dependencies: `[handleSend, onComposeSendReady]`.\n\n- **`components/AppShell.tsx`** — Added `composeSendRef` (useRef) and stable `handleComposeSendReady` callback. Passes `onComposeSendReady` to `ChatWindow` and `agentRunning={chatAgentRunning}` + `onComposeSend` to `YpiStudioSessionWidget`. The `onComposeSend` callback reads the latest ref (`composeSendRef.current?.(message)`), staying stable across renders.\n\n- **`components/YpiStudioSessionWidget.tsx`** — Added `agentRunning?: boolean` and `onComposeSend?: (message: string) => void | Promise<void>` to the Props interface. Destructured and voided (logic reserved for CONT-WIDGET-03).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `eslint` (3 changed files) | 0 errors, 0 warnings |\n| `tsc --noEmit` | 0 errors |\n\n### Wiring Summary\n\n```\nChatWindow.handleSend\n  → useEffect → onComposeSendReady(handleSend)\n    → AppShell.composeSendRef.current = handleSend\n      → YpiStudioSessionWidget.onComposeSend(msg)\n        → composeSendRef.current?.(msg) → ChatWindow.handleSend(msg)\n```\n\nSession-switch safety: `ChatWindow` remounts on `key={sessionKey}`, so cleanup nulls the old `handleSend` before the new one registers. Widget `onComposeSend` is a stable arrow reading the ref, so it always calls the current session's `handleSend` or no-ops when null.\n\n### Notes / Risks\n\n- The `package.json` diff includes an additional `test:studio-widget-continue` script line from CONT-HELPER-01 — this is pre-existing in the worktree and unrelated to CONT-WIRE-02.\n- `npm-shrinkwrap.json` was temporarily removed to allow devDependency install (NODE_ENV=production skips devDeps); restored after validation. A fresh `package-lock.json` was generated — not committed.\n- Widget props `agentRunning` / `onComposeSend` are received but unused (voided) — CONT-WIDGET-03 will wire them to busy/continue logic.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T12:18:00.595Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3013,
+        "tokens": 921,
+        "tokenSource": "usage",
+        "tps": 0.65,
+        "firstTokenAt": "2026-07-18T11:54:24.401Z",
+        "lastTokenAt": "2026-07-18T12:18:00.474Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3590cac66c1872fe737fde77",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/implementer-3590cac66c1872fe737fde77.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T11:54:04.586Z",
+        "finishedAt": "2026-07-18T12:18:00.597Z",
+        "updatedAt": "2026-07-18T12:18:00.597Z",
+        "itemCount": 142,
+        "messageCount": 12,
+        "toolCallCount": 63,
+        "stderrBytes": 0,
+        "bytes": 184289,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7513-91e3-73a3-9851-60cc66600689",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T11-54-04-643Z_019f7513-91e3-73a3-9851-60cc66600689.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-b92c02c81afa06913728a096",
+      "subtaskId": "CONT-SERVER-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T12:18:25.183Z",
+      "finishedAt": "2026-07-18T12:23:33.029Z",
+      "runner": "sdk",
+      "childSessionId": "019f7529-db58-76c1-8b03-9c4d663ef0a9",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-18-25-240Z_019f7529-db58-76c1-8b03-9c4d663ef0a9.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f7529-db58-76c1-8b03-9c4d663ef0a9",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Implementation Complete — CONT-SERVER-04\n\n### Files Changed\n\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — Removed `bestEffortContinueAfterWidgetRequestPlanChanges` import and its call site in the `request_plan_changes` success branch. The PATCH still writes correctly (status → `planning`, `planRevision+1`, grant cleared); just no longer fires the server-side `studio_user_action` wake. Added a comment referencing the deprecated helper for emergency rollback.\n\n- **`lib/ypi-studio-session-link.ts`** — Added `@deprecated` JSDoc annotations on all three continuation helpers (`buildYpiStudioRequestPlanChangesContinuationCommand`, `resolveYpiStudioRequestPlanChangesContinuation`, `bestEffortContinueAfterWidgetRequestPlanChanges`). Functions are preserved intact for tests and emergency rollback.\n\n### Not Changed (as required)\n\n- `lib/rpc-manager.ts` — `studio_user_action` command handling, `scheduleStudioUserActionContinuation`, `bestEffortSendStudioCommand` untouched\n- `studio_autocontinue` sub-task continuation untouched\n- `approve_plan` / `approve_improvement` write helpers untouched\n- No test script line modified (dag test tests helpers directly, still passes)\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `node_modules/.bin/tsc --noEmit` | ✅ 0 errors |\n| `npx eslint app/api/studio/tasks/[taskKey]/route.ts lib/ypi-studio-session-link.ts` | ✅ 0 errors |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-dag` | ✅ passed |\n| `npm run test:studio-widget-continue` | ✅ passed |\n\n### Notes / Risks\n\n- **Rollback path**: restore the removed `bestEffortContinueAfterWidgetRequestPlanChanges(...)` call block and re-add the import — one-line change. The helper and its unit coverage (dag test) are intact.\n- **No external callers**: grep confirms no other module imports/calls `bestEffortContinueAfterWidgetRequestPlanChanges` — only the route.ts (now removed) and the definition in session-link.ts.\n- **Risk**: `request_plan_changes` path now depends on CONT-WIDGET-03 completing Chat Send wiring for post-PATCH continuation. If that subtask fails, `request_plan_changes` will PATCH correctly but have no wake at all. Mitigation: rollback is trivial.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T12:18:25.183Z",
+        "updatedAt": "2026-07-18T12:23:33.029Z",
+        "eventCount": 5441,
+        "lastTextPreview": "## Implementation Complete — CONT-SERVER-04\n\n### Files Changed\n\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — Removed `bestEffortContinueAfterWidgetRequestPlanChanges` import and its call site in the `request_plan_changes` success branch. The PATCH still writes correctly (status → `planning`, `planRevision+1`, grant cleared); just no longer fires the server-side `studio_user_action` wake. Added a comment referencing the deprecated helper for emergency rollback.\n\n- **`lib/ypi-studio-session-link.ts`** — Added `@deprecated` JSDoc annotations on all three continuation helpers (`buildYpiStudioRequestPlanChangesContinuationCommand`, `resolveYpiStudioRequestPlanChangesContinuation`, `bestEffortContinueAfterWidgetRequestPlanChanges`). Functions are preserved intact for tests and emergency rollback.\n\n### Not Changed (as required)\n\n- `lib/rpc-manager.ts` — `studio_user_action` command handling, `scheduleStudioUserActionContinuation`, `bestEffortSendStudioCommand` untouched\n- `studio_autocontinue` sub-task continuation untouched\n- `approve_plan` / `approve_improvement` write helpers untouched\n- No test script line modified (dag test tests helpers directly, still passes)\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `node_modules/.bin/tsc --noEmit` | ✅ 0 errors |\n| `npx eslint app/api/studio/tasks/[taskKey]/route.ts lib/ypi-studio-session-link.ts` | ✅ 0 errors |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-dag` | ✅ passed |\n| `npm run test:studio-widget-continue` | ✅ passed |\n\n### Notes / Risks\n\n- **Rollback path**: restore the removed `bestEffortContinueAfterWidgetRequestPlanChanges(...)` call block and re-add the import — one-line change. The helper and its unit coverage (dag test) are intact.\n- **No external callers**: grep confirms no other module imports/calls `bestEffortContinueAfterWidgetRequestPlanChanges` — only the route.ts (now removed) and the definition in session-link.ts.\n- **Risk**: `request_plan_changes` path now depends on CONT-WIDGET-03 completing Chat Send wiring for post-PATCH continuation. If that subtask fails, `request_plan_changes` will PATCH correctly but have no wake at all. Mitigation: rollback is trivial.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:23:15.264Z",
+            "text": "Everything is clean. Let me do a final verification that no other importers exist:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T12:23:15.266Z",
+            "toolCallId": "call_00_32eTnk3Dzafa7ptWkeg59509",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg \\\"bestEffortContinueAfterWidgetRequestPlanChanges\\\" --no-heading -n --no-filename app/ lib/ components/ hooks/ 2>/dev/null | grep -v \\\"node_modules\\\"\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:23:15.457Z",
+            "toolCallId": "call_00_32eTnk3Dzafa7ptWkeg59509",
+            "toolName": "bash",
+            "text": "945:export function bestEffortContinueAfterWidgetRequestPlanChanges(options: {\n176:        // Chat handleSend path (Hybrid B). Keep bestEffortContinueAfterWidgetRequestPlanChanges",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:23:33.016Z",
+            "text": "## Implementation Complete — CONT-SERVER-04\n\n### Files Changed\n\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — Removed `bestEffortContinueAfterWidgetRequestPlanChanges` import and its call site in the `request_plan_changes` success branch. The PATCH still writes correctly (status → `planning`, `planRevision+1`, grant cleared); just no longer fires the server-side `studio_user_action` wake. Added a comment referencing the deprecated helper for emergency rollback.\n\n- **`lib/ypi-studio-session-link.ts`** — Added `@deprecated` JSDoc annotations on all three continuation helpers (`buildYpiStudioRequestPlanChangesContinuationCommand`, `resolveYpiStudioRequestPlanChangesContinuation`, `bestEffortContinueAfterWidgetRequestPlanChanges`). Functions are preserved intact for tests and emergency rollback.\n\n### Not Changed (as required)\n\n- `lib/rpc-manager.ts` — `studio_user_action` command handling, `scheduleStudioUserActionContinuation`, `bestEffortSendStudioCommand` untouched\n- `studio_autocontinue` sub-task continuation untouched\n- `approve_plan` / `approve_improvement` write helpers untouched\n- No test script line modified (dag test tests helpers directly, still passes)\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `node_modules/.bin/tsc --noEmit` | ✅ 0 errors |\n| `npx eslint app/api/studio/tasks/[taskKey]/route.ts lib/ypi-studio-session-link.ts` | ✅ 0 errors |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-dag` | ✅ passed |\n| `npm run test:studio-widget-continue` | ✅ passed |\n\n### Notes / Risks\n\n- **Rollback path**: restore the removed `bestEffortContinueAfterWidgetRequestPlanChanges(...)` call block and re-add the import — one-line change. The helper and its unit coverage (dag test) are intact.\n- **No external callers**: grep confirms no other module imports/calls `bestEffortContinueAfterWidgetRequestPlanChanges` — only the route.ts (now removed) and the definition in session-link.ts.\n- **Risk**: `request_plan_changes` path now depends on CONT-WIDGET-03 completing Chat Send wiring for post-PATCH continuation. If that subtask fails, `request_plan_changes` will PATCH correctly but have no wake at all. Mitigation: rollback is trivial.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T12:23:33.020Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3203,
+        "tokens": 923,
+        "tokenSource": "usage",
+        "tps": 3.6,
+        "firstTokenAt": "2026-07-18T12:19:16.238Z",
+        "lastTokenAt": "2026-07-18T12:23:32.728Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-b92c02c81afa06913728a096",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/implementer-b92c02c81afa06913728a096.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T12:18:25.183Z",
+        "finishedAt": "2026-07-18T12:23:33.021Z",
+        "updatedAt": "2026-07-18T12:23:33.021Z",
+        "itemCount": 60,
+        "messageCount": 10,
+        "toolCallCount": 23,
+        "stderrBytes": 0,
+        "bytes": 72102,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7529-db58-76c1-8b03-9c4d663ef0a9",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-18-25-240Z_019f7529-db58-76c1-8b03-9c4d663ef0a9.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-3c3fbd6fe44321d5838fa7f9",
+      "subtaskId": "CONT-WIDGET-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T12:18:25.134Z",
+      "finishedAt": "2026-07-18T12:28:11.103Z",
+      "runner": "sdk",
+      "childSessionId": "019f7529-db49-7283-9d56-3d97c2c70eea",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-18-25-225Z_019f7529-db49-7283-9d56-3d97c2c70eea.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f7529-db49-7283-9d56-3d97c2c70eea",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "All changes are in place and verified. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-WIDGET-03\n\n### Files Changed\n\n- **`components/YpiStudioSessionWidget.tsx`** — Widget busy 禁用 + PATCH 后 Chat 续推 + toast\n\n### Changes Made\n\n1. **Import** — Added `ypiStudioWidgetActionNeedsChatContinue` and `buildYpiStudioWidgetChatContinuePrompt` from `lib/ypi-studio-widget-continue`\n\n2. **Props wiring** — Removed `void` lines for `agentRunning` / `onComposeSend`; added `agentRunningRef` mirroring prop via `useRef` + `useEffect` for stale-closure safety in confirm callbacks\n\n3. **TaskCard** — Added `agentRunning?: boolean` prop; merged into disabled conditions:\n   - Decision CTA buttons: `acceptWriteBusy || Boolean(decidingActionId) || agentRunning`\n   - Improvement accept: `acceptWriteBusy || Boolean(acceptingImprovementId) || agentRunning`\n   - Main accept: `acceptWriteBusy || !onAcceptMainTask || agentRunning`\n   - Quick preview: **unchanged** (only `acceptWriteBusy`, not disabled by agentRunning)\n   - Added `title=\"Chat 正在工作，请稍后再试\"` and `aria-label` suffix `（Chat 工作中不可用）` when `agentRunning`\n\n4. **handleDecisionAction** — \n   - Added `taskId` parameter (sourced from `candidate.task.id`)\n   - Secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`\n   - After PATCH success + `onTaskChanged`: type-guard `ypiStudioWidgetActionNeedsChatContinue`\n   - If continue kind + `onComposeSend` + not running → build prompt, `await onComposeSend(prompt)` → full success toast\n   - If `onComposeSend` fails → partial toast (info, 8s), no rollback\n   - If `onComposeSend` missing or agent started → partial toast\n   - Non-continue kinds (`start_user_acceptance`) → existing toast, no Send\n   - Added `onComposeSend` to deps array\n\n5. **handleAcceptImprovement / handleAcceptMainTask** — Added secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`, before PATCH\n\n6. **Render sections** (mobile + desktop) — Updated `onDecisionAction` callbacks to pass `c.task.id`; added `agentRunning={agentRunning}` prop to `TaskCard`\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — ✅ 0 errors\n- `npx eslint components/YpiStudioSessionWidget.tsx` — ✅ 0 errors\n- `node --loader ... scripts/test-ypi-studio-widget-continue.mjs` — ✅ passed\n\n### Notes / Risks\n\n- **toast API**: uses `tone: \"info\"` for partial failures (no `warning` tone in the prompt API). This is per the design doc recommendation.\n- **`handleSend` early return**: when `agentRunning` is true, `handleSend` returns early. The secondary lock check in `handleDecisionAction` catches this before we try, and falls into the \"partial\" branch that warns the user. This is correct per the spec.\n- **No visual changes**: Only `disabled`/`title`/`aria` attributes and toast text were modified; no CSS/DOM layout changes.\n- **`onComposeSend` can be `undefined`**: If `ChatWindow` hasn't registered yet, the partial toast correctly informs the user.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T12:18:25.134Z",
+        "updatedAt": "2026-07-18T12:28:11.103Z",
+        "eventCount": 21784,
+        "lastTextPreview": "All changes are in place and verified. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-WIDGET-03\n\n### Files Changed\n\n- **`components/YpiStudioSessionWidget.tsx`** — Widget busy 禁用 + PATCH 后 Chat 续推 + toast\n\n### Changes Made\n\n1. **Import** — Added `ypiStudioWidgetActionNeedsChatContinue` and `buildYpiStudioWidgetChatContinuePrompt` from `lib/ypi-studio-widget-continue`\n\n2. **Props wiring** — Removed `void` lines for `agentRunning` / `onComposeSend`; added `agentRunningRef` mirroring prop via `useRef` + `useEffect` for stale-closure safety in confirm callbacks\n\n3. **TaskCard** — Added `agentRunning?: boolean` prop; merged into disabled conditions:\n   - Decision CTA buttons: `acceptWriteBusy || Boolean(decidingActionId) || agentRunning`\n   - Improvement accept: `acceptWriteBusy || Boolean(acceptingImprovementId) || agentRunning`\n   - Main accept: `acceptWriteBusy || !onAcceptMainTask || agentRunning`\n   - Quick preview: **unchanged** (only `acceptWriteBusy`, not disabled by agentRunning)\n   - Added `title=\"Chat 正在工作，请稍后再试\"` and `aria-label` suffix `（Chat 工作中不可用）` when `agentRunning`\n\n4. **handleDecisionAction** — \n   - Added `taskId` parameter (sourced from `candidate.task.id`)\n   - Secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`\n   - After PATCH success + `onTaskChanged`: type-guard `ypiStudioWidgetActionNeedsChatContinue`\n   - If continue kind + `onComposeSend` + not running → build prompt, `await onComposeSend(prompt)` → full success toast\n   - If `onComposeSend` fails → partial toast (info, 8s), no rollback\n   - If `onComposeSend` missing or agent started → partial toast\n   - Non-continue kinds (`start_user_acceptance`) → existing toast, no Send\n   - Added `onComposeSend` to deps array\n\n5. **handleAcceptImprovement / handleAcceptMainTask** — Added secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`, before PATCH\n\n6. **Render sections** (mobile + desktop) — Updated `onDecisionAction` callbacks to pass `c.task.id`; added `agentRunning={agentRunning}` prop to `TaskCard`\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — ✅ 0 errors\n- `npx eslint components/YpiStudioSessionWidget.tsx` — ✅ 0 errors\n- `node --loader ... scripts/test-ypi-studio-widget-continue.mjs` — ✅ passed\n\n### Notes / Risks\n\n- **toast API**: uses `tone: \"info\"` for partial failures (no `warning` tone in the prompt API). This is per the design doc recommendation.\n- **`handleSend` early return**: when `agentRunning` is true, `handleSend` returns early. The secondary lock check in `handleDecisionAction` catches this before we try, and falls into the \"partial\" branch that warns the user. This is correct per the spec.\n- **No visual changes**: Only `disabled`/`title`/`aria` attributes and toast text were modified; no CSS/DOM layout changes.\n- **`onComposeSend` can be `undefined`**: If `ChatWindow` hasn't registered yet, the partial toast correctly informs the user.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:27:54.053Z",
+            "text": "Let me verify the dependency array of `handleDecisionAction` is correct:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T12:27:54.055Z",
+            "toolCallId": "call_00_1o65sQUHkaqZPnZPcpwF5375",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"grep -n \\\"}, \\\\[confirm, contextId, cwd, onComposeSend, onTaskChanged, prompt, toast\\\\]);\\\" /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643/components/YpiStudioSessionWidget.tsx\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:27:54.140Z",
+            "toolCallId": "call_00_1o65sQUHkaqZPnZPcpwF5375",
+            "toolName": "bash",
+            "text": "1832:  }, [confirm, contextId, cwd, onComposeSend, onTaskChanged, prompt, toast]);",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:28:11.089Z",
+            "text": "All changes are in place and verified. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-WIDGET-03\n\n### Files Changed\n\n- **`components/YpiStudioSessionWidget.tsx`** — Widget busy 禁用 + PATCH 后 Chat 续推 + toast\n\n### Changes Made\n\n1. **Import** — Added `ypiStudioWidgetActionNeedsChatContinue` and `buildYpiStudioWidgetChatContinuePrompt` from `lib/ypi-studio-widget-continue`\n\n2. **Props wiring** — Removed `void` lines for `agentRunning` / `onComposeSend`; added `agentRunningRef` mirroring prop via `useRef` + `useEffect` for stale-closure safety in confirm callbacks\n\n3. **TaskCard** — Added `agentRunning?: boolean` prop; merged into disabled conditions:\n   - Decision CTA buttons: `acceptWriteBusy || Boolean(decidingActionId) || agentRunning`\n   - Improvement accept: `acceptWriteBusy || Boolean(acceptingImprovementId) || agentRunning`\n   - Main accept: `acceptWriteBusy || !onAcceptMainTask || agentRunning`\n   - Quick preview: **unchanged** (only `acceptWriteBusy`, not disabled by agentRunning)\n   - Added `title=\"Chat 正在工作，请稍后再试\"` and `aria-label` suffix `（Chat 工作中不可用）` when `agentRunning`\n\n4. **handleDecisionAction** — \n   - Added `taskId` parameter (sourced from `candidate.task.id`)\n   - Secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`\n   - After PATCH success + `onTaskChanged`: type-guard `ypiStudioWidgetActionNeedsChatContinue`\n   - If continue kind + `onComposeSend` + not running → build prompt, `await onComposeSend(prompt)` → full success toast\n   - If `onComposeSend` fails → partial toast (info, 8s), no rollback\n   - If `onComposeSend` missing or agent started → partial toast\n   - Non-continue kinds (`start_user_acceptance`) → existing toast, no Send\n   - Added `onComposeSend` to deps array\n\n5. **handleAcceptImprovement / handleAcceptMainTask** — Added secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`, before PATCH\n\n6. **Render sections** (mobile + desktop) — Updated `onDecisionAction` callbacks to pass `c.task.id`; added `agentRunning={agentRunning}` prop to `TaskCard`\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — ✅ 0 errors\n- `npx eslint components/YpiStudioSessionWidget.tsx` — ✅ 0 errors\n- `node --loader ... scripts/test-ypi-studio-widget-continue.mjs` — ✅ passed\n\n### Notes / Risks\n\n- **toast API**: uses `tone: \"info\"` for partial failures (no `warning` tone in the prompt API). This is per the design doc recommendation.\n- **`handleSend` early return**: when `agentRunning` is true, `handleSend` returns early. The secondary lock check in `handleDecisionAction` catches this before we try, and falls into the \"partial\" branch that warns the user. This is correct per the spec.\n- **No visual changes**: Only `disabled`/`title`/`aria` attributes and toast text were modified; no CSS/DOM layout changes.\n- **`onComposeSend` can be `undefined`**: If `ChatWindow` hasn't registered yet, the partial toast correctly informs the user.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T12:28:11.092Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 5082,
+        "tokens": 926,
+        "tokenSource": "usage",
+        "tps": 1.61,
+        "firstTokenAt": "2026-07-18T12:18:35.511Z",
+        "lastTokenAt": "2026-07-18T12:28:11.077Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-3c3fbd6fe44321d5838fa7f9",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/implementer-3c3fbd6fe44321d5838fa7f9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T12:18:25.134Z",
+        "finishedAt": "2026-07-18T12:28:11.093Z",
+        "updatedAt": "2026-07-18T12:28:11.093Z",
+        "itemCount": 145,
+        "messageCount": 29,
+        "toolCallCount": 56,
+        "stderrBytes": 0,
+        "bytes": 199645,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7529-db49-7283-9d56-3d97c2c70eea",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-18-25-225Z_019f7529-db49-7283-9d56-3d97c2c70eea.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-97603179df91c1d2cffdee49",
+      "subtaskId": "CONT-DOCS-TEST-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T12:28:22.264Z",
+      "finishedAt": "2026-07-18T12:34:43.684Z",
+      "runner": "sdk",
+      "childSessionId": "019f7532-f79f-766f-ad17-cf78bc43d986",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-28-22-304Z_019f7532-f79f-766f-ad17-cf78bc43d986.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f7532-f79f-766f-ad17-cf78bc43d986",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "All validation passed and docs are updated. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-DOCS-TEST-05\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `ChatWindow` (added `onComposeSendReady` prop), `AppShell` (added `composeSendRef` / `handleComposeSendReady` wiring + `chatAgentRunning`/`onComposeSend` pass-through to widget), and `YpiStudioSessionWidget` (added `agentRunning`/`onComposeSend` props, Hybrid B continuation: busy disable + PATCH + Chat Send + partial toast + TOCTOU guard). Conservation invariant paragraph updated with full Hybrid B behavior description.\n\n- `docs/modules/api.md` — Updated `request_plan_changes` server-wake paragraph: route no longer calls `bestEffortContinueAfterWidgetRequestPlanChanges` / `studio_user_action` as main path; helper retained for tests/rollback.\n\n- `docs/modules/library.md` — Added new entry for `lib/ypi-studio-widget-continue.ts` (pure helpers: `ypiStudioWidgetActionNeedsChatContinue`, `buildYpiStudioWidgetChatContinuePrompt`). Updated `lib/ypi-studio-session-link.ts` entry: best-effort continuation helpers now deprecated as primary widget decision path; Hybrid B Chat Send is the main path.\n\n- `docs/architecture/overview.md` — Replaced the `studio_user_action` request-changes wake sentence with Hybrid B description (Chat `handleSend` path + guided prompt from `lib/ypi-studio-widget-continue.ts`; `start_user_acceptance`/result-acceptance never Send; partial toast on failure).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-widget-continue` | ✅ passed |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-main-accept` | ✅ passed (13 cases) |\n| `npm run test:studio-dag` | ✅ passed |\n| `node_modules/.bin/tsc --noEmit` | ✅ clean |\n| `npx eslint lib/ypi-studio-widget-continue.ts components/YpiStudioSessionWidget.tsx components/AppShell.tsx components/ChatWindow.tsx app/api/studio/tasks/[taskKey]/route.ts` | ✅ clean |\n| Visual constraint check (no CSS changed, no HTML prototype references) | ✅ preserved |\n| A–F preservation (rail/preview/accept structure unchanged) | ✅ diff confirms no regression |\n\n### Notes / Risks\n\n- **No remaining risks** for CONT-DOCS-TEST-05 specifically — docs match the implementation produced by the prior 4 subtasks.\n- The `npm run lint` full command timed out at 60s but focused lint on the 5 changed source files passed clean. The full-project lint timeout is an existing CI concern unrelated to this task.\n- All prior subtask work (CONT-HELPER-01 through CONT-SERVER-04) is correctly reflected in docs. The implementation plan is now 5/5 done.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T12:28:22.264Z",
+        "updatedAt": "2026-07-18T12:34:43.684Z",
+        "eventCount": 17248,
+        "lastTextPreview": "All validation passed and docs are updated. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-DOCS-TEST-05\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `ChatWindow` (added `onComposeSendReady` prop), `AppShell` (added `composeSendRef` / `handleComposeSendReady` wiring + `chatAgentRunning`/`onComposeSend` pass-through to widget), and `YpiStudioSessionWidget` (added `agentRunning`/`onComposeSend` props, Hybrid B continuation: busy disable + PATCH + Chat Send + partial toast + TOCTOU guard). Conservation invariant paragraph updated with full Hybrid B behavior description.\n\n- `docs/modules/api.md` — Updated `request_plan_changes` server-wake paragraph: route no longer calls `bestEffortContinueAfterWidgetRequestPlanChanges` / `studio_user_action` as main path; helper retained for tests/rollback.\n\n- `docs/modules/library.md` — Added new entry for `lib/ypi-studio-widget-continue.ts` (pure helpers: `ypiStudioWidgetActionNeedsChatContinue`, `buildYpiStudioWidgetChatContinuePrompt`). Updated `lib/ypi-studio-session-link.ts` entry: best-effort continuation helpers now deprecated as primary widget decision path; Hybrid B Chat Send is the main path.\n\n- `docs/architecture/overview.md` — Replaced the `studio_user_action` request-changes wake sentence with Hybrid B description (Chat `handleSend` path + guided prompt from `lib/ypi-studio-widget-continue.ts`; `start_user_acceptance`/result-acceptance never Send; partial toast on failure).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-widget-continue` | ✅ passed |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-main-accept` | ✅ passed (13 cases) |\n| `npm run test:studio-dag` | ✅ passed |\n| `node_modules/.bin/tsc --noEmit` | ✅ clean |\n| `npx eslint lib/ypi-studio-widget-continue.ts components/YpiStudioSessionWidget.tsx components/AppShell.tsx components/ChatWindow.tsx app/api/studio/tasks/[taskKey]/route.ts` | ✅ clean |\n| Visual constraint check (no CSS changed, no HTML prototype references) | ✅ preserved |\n| A–F preservation (rail/preview/accept structure unchanged) | ✅ diff confirms no regression |\n\n### Notes / Risks\n\n- **No remaining risks** for CONT-DOCS-TEST-05 specifically — docs match the implementation produced by the prior 4 subtasks.\n- The `npm run lint` full command timed out at 60s but focused lint on the 5 changed source files passed clean. The full-project lint timeout is an existing CI concern unrelated to this task.\n- All prior subtask work (CONT-HELPER-01 through CONT-SERVER-04) is correctly reflected in docs. The implementation plan is now 5/5 done.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T12:34:28.263Z",
+            "toolCallId": "call_01_9siH8T94bkyvVFVXXu2S4077",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643 && grep -c \\\"studio-widget-chat-send-continue-prototype\\\" components/YpiStudioSessionWidget.tsx components/AppShell.tsx components/ChatWindow.tsx lib/ypi-studio-widget-continue.ts 2>/dev/null\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:34:28.359Z",
+            "toolCallId": "call_01_9siH8T94bkyvVFVXXu2S4077",
+            "toolName": "bash",
+            "text": "components/YpiStudioSessionWidget.tsx:0\ncomponents/AppShell.tsx:0\ncomponents/ChatWindow.tsx:0\nlib/ypi-studio-widget-continue.ts:0\n\n\nCommand exited with code 1",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:34:28.400Z",
+            "toolCallId": "call_00_QoPOjXTffZ3xYLJxAOpf0295",
+            "toolName": "bash",
+            "text": "---\nCSS files changed: 0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:34:43.652Z",
+            "text": "All validation passed and docs are updated. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-DOCS-TEST-05\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `ChatWindow` (added `onComposeSendReady` prop), `AppShell` (added `composeSendRef` / `handleComposeSendReady` wiring + `chatAgentRunning`/`onComposeSend` pass-through to widget), and `YpiStudioSessionWidget` (added `agentRunning`/`onComposeSend` props, Hybrid B continuation: busy disable + PATCH + Chat Send + partial toast + TOCTOU guard). Conservation invariant paragraph updated with full Hybrid B behavior description.\n\n- `docs/modules/api.md` — Updated `request_plan_changes` server-wake paragraph: route no longer calls `bestEffortContinueAfterWidgetRequestPlanChanges` / `studio_user_action` as main path; helper retained for tests/rollback.\n\n- `docs/modules/library.md` — Added new entry for `lib/ypi-studio-widget-continue.ts` (pure helpers: `ypiStudioWidgetActionNeedsChatContinue`, `buildYpiStudioWidgetChatContinuePrompt`). Updated `lib/ypi-studio-session-link.ts` entry: best-effort continuation helpers now deprecated as primary widget decision path; Hybrid B Chat Send is the main path.\n\n- `docs/architecture/overview.md` — Replaced the `studio_user_action` request-changes wake sentence with Hybrid B description (Chat `handleSend` path + guided prompt from `lib/ypi-studio-widget-continue.ts`; `start_user_acceptance`/result-acceptance never Send; partial toast on failure).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-widget-continue` | ✅ passed |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-main-accept` | ✅ passed (13 cases) |\n| `npm run test:studio-dag` | ✅ passed |\n| `node_modules/.bin/tsc --noEmit` | ✅ clean |\n| `npx eslint lib/ypi-studio-widget-continue.ts components/YpiStudioSessionWidget.tsx components/AppShell.tsx components/ChatWindow.tsx app/api/studio/tasks/[taskKey]/route.ts` | ✅ clean |\n| Visual constraint check (no CSS changed, no HTML prototype references) | ✅ preserved |\n| A–F preservation (rail/preview/accept structure unchanged) | ✅ diff confirms no regression |\n\n### Notes / Risks\n\n- **No remaining risks** for CONT-DOCS-TEST-05 specifically — docs match the implementation produced by the prior 4 subtasks.\n- The `npm run lint` full command timed out at 60s but focused lint on the 5 changed source files passed clean. The full-project lint timeout is an existing CI concern unrelated to this task.\n- All prior subtask work (CONT-HELPER-01 through CONT-SERVER-04) is correctly reflected in docs. The implementation plan is now 5/5 done.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T12:34:43.654Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3888,
+        "tokens": 888,
+        "tokenSource": "usage",
+        "tps": 2.37,
+        "firstTokenAt": "2026-07-18T12:28:28.751Z",
+        "lastTokenAt": "2026-07-18T12:34:43.542Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-97603179df91c1d2cffdee49",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/implementer-97603179df91c1d2cffdee49.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T12:28:22.264Z",
+        "finishedAt": "2026-07-18T12:34:43.655Z",
+        "updatedAt": "2026-07-18T12:34:43.655Z",
+        "itemCount": 87,
+        "messageCount": 15,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 251768,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7532-f79f-766f-ad17-cf78bc43d986",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-28-22-304Z_019f7532-f79f-766f-ad17-cf78bc43d986.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-de173f10a10bb13bf2ca6009",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-18T12:34:55.054Z",
+      "finishedAt": "2026-07-18T12:42:15.378Z",
+      "runner": "sdk",
+      "childSessionId": "019f7538-f601-7856-96e6-c04a0863b6bf",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-34-55-105Z_019f7538-f601-7856-96e6-c04a0863b6bf.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "childSessionId": "019f7538-f601-7856-96e6-c04a0863b6bf",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n1. **AppShell `onComposeSend` 假成功** — `composeSendRef` 为空时原先静默 no-op 却 toast「已在 Chat 续推」；现改为 throw → partial toast。\n2. **`request_plan_changes` 缺 `revisionTo`** — 现传入 `expectedRevision + 1`。\n\n#### Remaining Findings\n- **Blocking:** None\n- **Non-blocking:**\n  1. `handleSend` 在 `agentRunning` 时静默 return（不 throw），极端 TOCTOU 下可能假成功 toast。\n  2. `package-lock.json` 大范围无关 churn，建议主会话评估回滚。\n  3. 仓库 lint 既有 4 error（Trellis 等，非本 diff）。\n  4. 未做 dev 手工点按（建议验收补一轮）。\n\n#### Verification\n| 命令 | 结果 |\n| --- | --- |\n| `tsc --noEmit` | Pass |\n| `test:studio-widget-continue` | Pass |\n| `test:studio-widget-actions` | Pass |\n| `test:studio-main-accept` | Pass |\n| `test:studio-dag` | Pass |\n| lint（本任务文件） | 0 hit |\n\n#### Verdict\n**Pass** — Hybrid B、矩阵 6 行、busy/二次 lock、server 去双发、`studio_autocontinue` 保留、视觉硬约束、A–F、文档与测试均达标。\n\n---\n\n### Handoff（主会话）\n\n**Artifact produced:**  \n`.ypi/tasks/20260718-192856-…/review.md`\n\n**Code touched by checker (small fixes only):**\n- `components/AppShell.tsx` — compose send 可用性检查\n- `components/YpiStudioSessionWidget.tsx` — `revisionTo`\n\n**Implementation files (pre-existing, reviewed):**\n- `lib/ypi-studio-widget-continue.ts` (new)\n- `scripts/test-ypi-studio-widget-continue.mjs` (new)\n- `components/ChatWindow.tsx`, `YpiStudioSessionWidget.tsx`, `AppShell.tsx`\n- `app/api/studio/tasks/[taskKey]/route.ts`\n- `lib/ypi-studio-session-link.ts`\n- docs: frontend / api / library / overview\n- `package.json` (+ lock churn)\n\n**Decisions needed from main session:**\n1. Transition checking → review / user_acceptance（检查员未 transition）。\n2. 是否回滚 `package-lock.json` 无关依赖 churn。\n3. 可选手工冒烟 checks.md §7。\n4. 不 commit/push（本角色未执行）。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-18T12:34:55.054Z",
+        "updatedAt": "2026-07-18T12:42:15.378Z",
+        "eventCount": 1424,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n1. **AppShell `onComposeSend` 假成功** — `composeSendRef` 为空时原先静默 no-op 却 toast「已在 Chat 续推」；现改为 throw → partial toast。\n2. **`request_plan_changes` 缺 `revisionTo`** — 现传入 `expectedRevision + 1`。\n\n#### Remaining Findings\n- **Blocking:** None\n- **Non-blocking:**\n  1. `handleSend` 在 `agentRunning` 时静默 return（不 throw），极端 TOCTOU 下可能假成功 toast。\n  2. `package-lock.json` 大范围无关 churn，建议主会话评估回滚。\n  3. 仓库 lint 既有 4 error（Trellis 等，非本 diff）。\n  4. 未做 dev 手工点按（建议验收补一轮）。\n\n#### Verification\n| 命令 | 结果 |\n| --- | --- |\n| `tsc --noEmit` | Pass |\n| `test:studio-widget-continue` | Pass |\n| `test:studio-widget-actions` | Pass |\n| `test:studio-main-accept` | Pass |\n| `test:studio-dag` | Pass |\n| lint（本任务文件） | 0 hit |\n\n#### Verdict\n**Pass** — Hybrid B、矩阵 6 行、busy/二次 lock、server 去双发、`studio_autocontinue` 保留、视觉硬约束、A–F、文档与测试均达标。\n\n---\n\n### Handoff（主会话）\n\n**Artifact produced:**  \n`.ypi/tasks/20260718-192856-…/review.md`\n\n**Code touched by checker (small fixes only):**\n- `components/AppShell.tsx` — compose send 可用性检查\n- `components/YpiStudioSessionWidget.tsx` — `revisionTo`\n\n**Implementation files (pre-existing, reviewed):**\n- `lib/ypi-studio-widget-continue.ts` (new)\n- `scripts/test-ypi-studio-widget-continue.mjs` (new)\n- `components/ChatWindow.tsx`, `YpiStudioSessionWidget.tsx`, `AppShell.tsx`\n- `app/api/studio/tasks/[taskKey]/route.ts`\n- `lib/ypi-studio-session-link.ts`\n- docs: frontend / api / library / overview\n- `package.json` (+ lock churn)\n\n**Decisions needed from main session:**\n1. Transition checking → review / user_acceptance（检查员未 transition）。\n2. 是否回滚 `package-lock.json` 无关依赖 churn。\n3. 可选手工冒烟 checks.md §7。\n4. 不 commit/push（本角色未执行）。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:41:58.251Z",
+            "text": "Writing `review.md` with the check verdict.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-18T12:41:58.253Z",
+            "toolCallId": "call-7385eaa8-a981-422a-9024-3c911476afde-27|fc_d83503ee-338c-9564-be48-f466eb7bad72_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643/.ypi/tasks/20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用/review.md\",\n  \"content\": \"# Review：任务浮窗决策 CTA → Chat Send 续推并在工作中禁用\\n\\n**Task:** `20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用`  \\n**Role:** checker  \\n**Date:** 2026-07-18  \\n**Verdict:** **Pass**（含检查员范围内小修复；无阻塞返工）\\n\\n---\\n\\n## 1. 范围对照\\n\\n| 子任务 | 状态 | 证据 |\\n| --- | --- | --- |\\n| CONT-HELPER-01 | Done | `lib/ypi-studio-widget-continue.ts` + `scripts/test-ypi-studio-widget-continue.mjs` + `package.json` script |\\n| CONT-WIRE-02 | Done | `ChatWindow.onComposeSendReady` → `AppShell.composeSendRef` → widget `onComposeSend` / `agentRunning` |\\n| CONT-WIDGET-03 | Done | busy 禁用、二次 lock、PATCH 后 Send、partial toast、矩阵 6 行 |\\n| CONT-SERVER-04 | Done | route 删除 `bestEffortContinue*` 主路径调用；helper `@deprecated` 保留；`studio_autocontinue` 未动 |\\n| CONT-DOCS-TEST-05 | Done | frontend/api/library/overview 已描述 Hybrid B |\\n\\n---\\n\\n## 2. 需求 / 动作矩阵\\n\\n| 动作 | PATCH | Chat Send | 工作中禁用 | 结论 |\\n| --- | --- | --- | --- | --- |\\n| `approve_plan` | 是 | 是（PATCH 后） | 是 | Pass |\\n| `request_plan_changes` | 是 | 是（替代 server wake） | 是 | Pass |\\n| `approve_improvement_plan` | 是 | 是 | 是 | Pass |\\n| `start_user_acceptance` | 是 | **否** | 是 | Pass |\\n| 改进结果验收 | 是 | **否** | 是 | Pass |\\n| 主验收/归档 | 是 | **否** | 是 | Pass |\\n\\n**Hybrid B 硬约束：** 无「只 Send 不 PATCH」路径；决策仍走显式 action body + revision/context。\\n\\n---\\n\\n## 3. 设计 / 边界\\n\\n- **接线：** `ChatWindow` 注册 `handleSend`；unmount cleanup `null`；AppShell ref 转发。符合 Design 最小侵入方案。\\n- **Server 选项 A：** `app/api/studio/tasks/[taskKey]/route.ts` 成功分支不再调用 `bestEffortContinueAfterWidgetRequestPlanChanges`；`lib/ypi-studio-session-link.ts` helper 标注 deprecated-as-primary。\\n- **`studio_autocontinue` / child continuation：** `lib/rpc-manager.ts` 中 `studio_autocontinue`、`scheduleStudioFollowUp`、子任务续推保留。\\n- **Send 失败不回滚：** catch 仅 partial toast + 已调用 `onTaskChanged`；无回滚 API。\\n- **二次 lock：** confirm/prompt 后读 `agentRunningRef`；改进/主验收同理。\\n- **预览：** quick preview 未因 `agentRunning` 禁用（符合 UI 推荐）。\\n\\n---\\n\\n## 4. 视觉硬约束（ui.md §0）\\n\\n| 检查 | 结果 |\\n| --- | --- |\\n| `app/globals.css` 是否因本任务改写决策区/rail/验收区 | **否**（diff 无 globals.css） |\\n| 是否按 HTML 原型重画 DOM/class/色板 | **否** |\\n| 允许变化：`disabled` / `title` / `aria-*` / toast / Chat 用户消息 / 行为接线 | **是** |\\n\\nHTML `studio-widget-chat-send-continue-prototype.html` 仅作交互场景旁证；生产组件为唯一 UI 权威。本任务交互/反馈变更，**不要求**新视觉稿。\\n\\n---\\n\\n## 5. 保全 A–F\\n\\n| ID | 项 | 结论 |\\n| --- | --- | --- |\\n| A | 8 站 `WorkflowRail` / Detail | Pass（未改 rail 结构） |\\n| B | quickPreviews 只读 | Pass（busy 时仍可预览） |\\n| C | 改进摘要 + 结果验收 | Pass（仅 disabled + 二次 lock） |\\n| D | 主验收 + 归档 | Pass（PATCH body 不变） |\\n| E | runtime / overlays / 写锁 | Pass（写锁覆盖决策+验收） |\\n| F | 聊天 `user-input` 批准 | Pass（未删除 record 路径） |\\n\\n---\\n\\n## 6. Findings Fixed（检查员小修）\\n\\n1. **AppShell `onComposeSend` 假成功**（原实现：`(message) => composeSendRef.current?.(message)` 在 ref 为 null 时静默 no-op，widget 仍 toast「已在 Chat 续推」）。  \\n   **修复：** 无 send 时 `throw`，走 partial toast 分支。\\n2. **`request_plan_changes` 引导词缺 `revisionTo`**（builder 无 `revisionTo` 时 `revisionFrom/To` 同为 expected）。  \\n   **修复：** widget 传入 `expectedRevision + 1`（与落库 +1 语义一致）。\\n\\n---\\n\\n## 7. Remaining Findings\\n\\n### Blocking\\n\\nNone。\\n\\n### Non-blocking\\n\\n1. **`handleSend` 在 `agentRunning` 时静默 return 不 throw**（`useAgentSession`）：若 PATCH 与 Send 之间 agent 刚变忙，可能仍 toast 全成功而 transcript 无消息。主路径有 disabled + 二次 lock 大幅降低概率；完整修需 `handleSend` 返回成功态（范围外，建议后续小改）。\\n2. **`package-lock.json` 大 diff**（~1.7k 行 AWS/SDK 等无关 churn）与本任务仅加 `test:studio-widget-continue` 脚本不匹配。建议主会话评估是否回滚 lock 无关变更，仅保留 script 相关项。\\n3. **仓库级 `npm run lint`** 仍有既有 4 error（`TrellisWorkflowVisualizer` React Compiler memoization 等），**与本 diff 无关**；改动文件无 lint 命中。\\n4. **手工 dev 场景**（批准→流式、改计划无双消息、工作中 disabled、mock Send fail）未在本环境实点；自动验证与静态审已覆盖契约，人工点按建议主会话/验收阶段补一轮。\\n\\n---\\n\\n## 8. Verification\\n\\n| 命令 | 结果 |\\n| --- | --- |\\n| `node_modules/.bin/tsc --noEmit` | Pass（0 error） |\\n| `npm run test:studio-widget-continue` | Pass |\\n| `npm run test:studio-widget-actions` | Pass |\\n| `npm run test:studio-main-accept` | Pass |\\n| `npm run test:studio-dag` | Pass |\\n| `npm run lint` | 既有 4 error（非本任务文件）；本任务改动文件 0 hit |\\n\\n---\\n\\n## 9. Checks 勾选摘要\\n\\n- R-01…R-13：代码审 + 单测覆盖；R-13 视觉硬约束 Pass  \\n- 动作矩阵 6 行：Pass  \\n- 文档门禁 frontend/api/library/overview：Pass  \\n- A–F：Pass  \\n\\n---\\n\\n## 10. Verdict\\n\\n**Pass**\\n\\n实现满足 Hybrid B、动作矩阵、busy 禁用、server 去双发、pure helper/测试与文档，且未重画浮窗视觉。检查员已修 2 处低风险 partial/引导词问题。主会话可进入后续 review / user_acceptance 流转（**检查员不自行 transition**）。\\n\\n### 主会话建议\\n\\n1. 决定 `package-lock.json` 无关 churn 是否回滚。  \\n2. 可选手工冒烟 checks.md §7。  \\n3. 合法 transition（checking → review / user_acceptance）由主会话执行。  \\n4. 不 commit/push（本检查员未执行）。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-18T12:41:58.695Z",
+            "toolCallId": "call-7385eaa8-a981-422a-9024-3c911476afde-27|fc_d83503ee-338c-9564-be48-f466eb7bad72_0",
+            "toolName": "write",
+            "text": "Successfully wrote 4399 bytes to /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260718-191643/.ypi/tasks/20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-18T12:42:15.361Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n1. **AppShell `onComposeSend` 假成功** — `composeSendRef` 为空时原先静默 no-op 却 toast「已在 Chat 续推」；现改为 throw → partial toast。\n2. **`request_plan_changes` 缺 `revisionTo`** — 现传入 `expectedRevision + 1`。\n\n#### Remaining Findings\n- **Blocking:** None\n- **Non-blocking:**\n  1. `handleSend` 在 `agentRunning` 时静默 return（不 throw），极端 TOCTOU 下可能假成功 toast。\n  2. `package-lock.json` 大范围无关 churn，建议主会话评估回滚。\n  3. 仓库 lint 既有 4 error（Trellis 等，非本 diff）。\n  4. 未做 dev 手工点按（建议验收补一轮）。\n\n#### Verification\n| 命令 | 结果 |\n| --- | --- |\n| `tsc --noEmit` | Pass |\n| `test:studio-widget-continue` | Pass |\n| `test:studio-widget-actions` | Pass |\n| `test:studio-main-accept` | Pass |\n| `test:studio-dag` | Pass |\n| lint（本任务文件） | 0 hit |\n\n#### Verdict\n**Pass** — Hybrid B、矩阵 6 行、busy/二次 lock、server 去双发、`studio_autocontinue` 保留、视觉硬约束、A–F、文档与测试均达标。\n\n---\n\n### Handoff（主会话）\n\n**Artifact produced:**  \n`.ypi/tasks/20260718-192856-…/review.md`\n\n**Code touched by checker (small fixes only):**\n- `components/AppShell.tsx` — compose send 可用性检查\n- `components/YpiStudioSessionWidget.tsx` — `revisionTo`\n\n**Implementation files (pre-existing, reviewed):**\n- `lib/ypi-studio-widget-continue.ts` (new)\n- `scripts/test-ypi-studio-widget-continue.mjs` (new)\n- `components/ChatWindow.tsx`, `YpiStudioSessionWidget.tsx`, `AppShell.tsx`\n- `app/api/studio/tasks/[taskKey]/route.ts`\n- `lib/ypi-studio-session-link.ts`\n- docs: frontend / api / library / overview\n- `package.json` (+ lock churn)\n\n**Decisions needed from main session:**\n1. Transition checking → review / user_acceptance（检查员未 transition）。\n2. 是否回滚 `package-lock.json` 无关依赖 churn。\n3. 可选手工冒烟 checks.md §7。\n4. 不 commit/push（本角色未执行）。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-18T12:42:15.365Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2130,
+        "tokens": 628,
+        "tokenSource": "usage",
+        "tps": 1.44,
+        "firstTokenAt": "2026-07-18T12:34:59.331Z",
+        "lastTokenAt": "2026-07-18T12:42:15.359Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-de173f10a10bb13bf2ca6009",
+        "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260718-192856-_-cta-_-chat-send-/checker-de173f10a10bb13bf2ca6009.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-18T12:34:55.054Z",
+        "finishedAt": "2026-07-18T12:42:15.366Z",
+        "updatedAt": "2026-07-18T12:42:15.366Z",
+        "itemCount": 65,
+        "messageCount": 5,
+        "toolCallCount": 28,
+        "stderrBytes": 0,
+        "bytes": 147012,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7538-f601-7856-96e6-c04a0863b6bf",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260718-191643--/2026-07-18T12-34-55-105Z_019f7538-f601-7856-96e6-c04a0863b6bf.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-18T11:36:45.079Z",
+      "contextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-18T11:53:25.349Z",
+      "contextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+      "inputHash": "0ebac5180108d3b8605d1539",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-19T09:51:06.751Z",
+    "archiveReason": "用户请求归档",
+    "knowledgeEntryId": "20260719-175106-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+    "knowledgePath": ".ypi/knowledge/20260719-175106-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-18T11:36:45.037Z",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "foundation",
+          "title": "Pure helper",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "CONT-HELPER-01"
+          ]
+        },
+        {
+          "id": "wiring-ui",
+          "title": "Chat wiring + widget behavior",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "CONT-WIRE-02",
+            "CONT-WIDGET-03"
+          ]
+        },
+        {
+          "id": "server-docs",
+          "title": "Server path + docs/tests",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "CONT-SERVER-04",
+            "CONT-DOCS-TEST-05"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "CONT-HELPER-01",
+        "title": "新增 ypi-studio-widget-continue pure helper",
+        "phase": "foundation",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "lib/ypi-studio-widget-continue.ts",
+          "scripts/test-ypi-studio-widget-continue.mjs",
+          "package.json"
+        ],
+        "instructions": [
+          "新建 lib/ypi-studio-widget-continue.ts：导出 ypiStudioWidgetActionNeedsChatContinue(kind) 与 buildYpiStudioWidgetChatContinuePrompt(input)。",
+          "needsChatContinue 仅对 approve_plan / request_plan_changes / approve_improvement_plan 为 true；start_user_acceptance 与未知 kind 为 false。",
+          "引导词语义锁定 PRD §3.2：中文说明 + bullet（taskId/action/revision/improvementId/feedbackSummary/reason）；feedback 截断 ≤200；总长建议 ≤4000。",
+          "禁止输出 HTML 标签、http(s) endpoint、任意用户路径。",
+          "新增 scripts/test-ypi-studio-widget-continue.mjs（或并入 test-ypi-studio-widget-actions.mjs）：assert 三种 prompt 子串与 needs* 矩阵。",
+          "package.json 增加 npm script test:studio-widget-continue（若独立文件）。",
+          "不修改 React 组件。"
+        ],
+        "acceptance": [
+          "纯函数无副作用；tsc 可解析。",
+          "单测覆盖 true/false kind 与 prompt 必含字段。",
+          "prompt 不含 <html 与 http://"
+        ],
+        "validation": [
+          "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-widget-continue.mjs",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "与 rpc-manager 内 server continuation 文案重复但路径不同——保持语义对齐即可，勿 import rpc-manager（环依赖）。"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "CONT-WIRE-02",
+        "title": "ChatWindow/AppShell 暴露 compose send 与 agentRunning",
+        "phase": "wiring",
+        "order": 2,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "components/ChatWindow.tsx",
+          "components/AppShell.tsx",
+          "components/YpiStudioSessionWidget.tsx"
+        ],
+        "instructions": [
+          "ChatWindow Props 增加 onComposeSendReady?: (send: ((message: string) => void | Promise<void>) | null) => void。",
+          "在 handleSend 稳定后 useEffect 注册 onComposeSendReady(handleSend)；cleanup 传 null。",
+          "AppShell 用 useRef 或 useState 保存 composeSend；ChatWindow 回调写入。",
+          "YpiStudioSessionWidget 已有挂载点传入 agentRunning={chatAgentRunning} 与 onComposeSend={composeSend}。",
+          "不要把业务引导词写进 AppShell；不要扩展 ChatInputHandle 作为主方案。",
+          "注意：ChatWindow 随 selectedSession 重挂载时必须更新/清空句柄，避免指向已卸载 session 的 handleSend。"
+        ],
+        "acceptance": [
+          "类型完整；无 any 泄漏。",
+          "会话切换后 onComposeSend 指向当前会话。",
+          "widget 在无 Chat 时 onComposeSend 可为 undefined。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "risks": [
+          "stale closure：必须依赖 handleSend 更新 effect。",
+          "新会话 isNew 时 handleSend 仍可用——续推一般发生在已绑定 session，保持与手动发送一致即可。"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "CONT-WIDGET-03",
+        "title": "Widget：busy 禁用 + PATCH 后 Chat 续推 + toast",
+        "phase": "ui-logic",
+        "order": 3,
+        "dependsOn": [
+          "CONT-HELPER-01",
+          "CONT-WIRE-02"
+        ],
+        "dependencies": [
+          "CONT-HELPER-01",
+          "CONT-WIRE-02"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/YpiStudioSessionWidget.tsx",
+          "app/globals.css"
+        ],
+        "instructions": [
+          "Props 增加 agentRunning?: boolean；onComposeSend?: (message: string) => void | Promise<void>。",
+          "agentRunningRef 镜像 prop，供 confirm 返回后二次检查。",
+          "interactionLocked = agentRunning || Boolean(acceptingKey)（及既有 acceptingInFlightRef）。",
+          "TaskCard：决策按钮、改进验收、主验收 disabled 条件并入 interactionLocked；agentRunning 时 title/aria 说明「Chat 正在工作，请稍后再试」。",
+          "handleDecisionAction：confirm 后若 locked → info toast return；PATCH 成功后 onTaskChanged；若 needsChatContinue(kind) 则 build prompt 并 await onComposeSend；catch → partial toast，不回滚。",
+          "handleAcceptImprovement / handleAcceptMainTask：PATCH 前同样 lock 检查；disabled 同步；不调用 onComposeSend。",
+          "修正 approve_* 成功 toast：区分 Send ok / fail（PRD/UI 文案）。",
+          "start_user_acceptance 保持无 Send。",
+          "quick preview 默认不因 agentRunning 禁用（与 UI 推荐一致）。",
+          "CSS：若需 .is-agent-locked 可加，优先复用 :disabled。",
+          "taskId：从 candidate.task.id 取；prompt 用 id 而非仅 key。"
+        ],
+        "acceptance": [
+          "动作矩阵 6 行行为正确。",
+          "agentRunning 时无法触发 PATCH（disabled + 二次检查）。",
+          "续推类成功后 Chat 路径被调用一次。",
+          "Send 失败不 fetch 回滚。",
+          "保全 A–F：rail/preview/accept 结构仍在。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "手工：dev 下点批准/改计划/改进批准/进入验收/主验收 + 工作中禁用"
+        ],
+        "risks": [
+          "handleSend 在 agentRunning 时直接 return：续推前必须再读 ref。",
+          "toast API 无 warning tone 时用 info + 明确 partial 文案。"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "CONT-SERVER-04",
+        "title": "降级 request_plan_changes 的 server best-effort 主路径",
+        "phase": "server",
+        "order": 4,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "files": [
+          "app/api/studio/tasks/[taskKey]/route.ts",
+          "lib/ypi-studio-session-link.ts",
+          "lib/rpc-manager.ts"
+        ],
+        "instructions": [
+          "推荐选项 A：删除 route 成功分支对 bestEffortContinueAfterWidgetRequestPlanChanges 的调用；保留 import 删除后的干净依赖。",
+          "在 session-link 的 bestEffortContinue* / build*Continuation 注释标注：非 widget 主路径；保留供测试或紧急回滚。",
+          "不要删除 studio_user_action 命令处理或 scheduleStudioUserActionContinuation（可能仍被其他调用）。",
+          "不要改 approve_plan / approve_improvement 写库 helper。",
+          "不要改 studio_autocontinue 子任务续推。",
+          "若测试脚本断言 route 调用 best-effort，更新断言为「不调用」或改为单测 helper 本身。"
+        ],
+        "acceptance": [
+          "request_plan_changes PATCH 仍 200 且状态 planning/revision+1。",
+          "route 成功路径无 getRpcSession/send studio_user_action。",
+          "helper 单测若存在仍可通过。"
+        ],
+        "validation": [
+          "npm run test:studio-widget-actions",
+          "npm run test:studio-dag"
+        ],
+        "risks": [
+          "若有外部依赖 server wake：产品已确认 Chat 为主路径；回滚可恢复一行调用。"
+        ],
+        "parallelizable": true
+      },
+      {
+        "id": "CONT-DOCS-TEST-05",
+        "title": "文档、回归测试与质量门禁",
+        "phase": "verify",
+        "order": 5,
+        "dependsOn": [
+          "CONT-HELPER-01",
+          "CONT-WIRE-02",
+          "CONT-WIDGET-03",
+          "CONT-SERVER-04"
+        ],
+        "dependencies": [
+          "CONT-HELPER-01",
+          "CONT-WIRE-02",
+          "CONT-WIDGET-03",
+          "CONT-SERVER-04"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/api.md",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md",
+          "scripts/test-ypi-studio-widget-actions.mjs",
+          "scripts/test-ypi-studio-widget-continue.mjs",
+          "package.json"
+        ],
+        "instructions": [
+          "更新 frontend.md：Widget props agentRunning/onComposeSend；busy；PATCH+Send；toast partial。",
+          "更新 api.md：request_plan_changes 不再 best-effort server wake 为主路径。",
+          "更新 library.md：新 helper；session-link continuation 标注。",
+          "更新 overview.md 中 widget decision 续推一句。",
+          "扩展 widget-actions 测试：needsChatContinue 矩阵（若未在 continue 测试覆盖）。",
+          "跑 lint、tsc、test:studio-widget-actions、test:studio-main-accept、新 continue 测试、相关 dag 冒烟。",
+          "对照 checks.md 勾选；不 commit。"
+        ],
+        "acceptance": [
+          "文档与实现一致。",
+          "自动验证全绿。",
+          "保全 A–F 无回归描述漏洞。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:studio-widget-actions",
+          "npm run test:studio-main-accept",
+          "npm run test:studio-widget-continue"
+        ],
+        "risks": [
+          "文档漏更导致后续 agent 仍按 server wake 实现。"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-19T09:51:06.751Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 5,
+      "skipped": 0
+    },
+    "subtasks": {
+      "CONT-HELPER-01": {
+        "id": "CONT-HELPER-01",
+        "status": "done",
+        "updatedAt": "2026-07-18T12:04:35.365Z",
+        "startedAt": "2026-07-18T11:53:52.101Z",
+        "finishedAt": "2026-07-18T12:04:35.361Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-230cc8ffff90ace7ae2ea0b7"
+        ],
+        "lastRunId": "implementer-230cc8ffff90ace7ae2ea0b7",
+        "claimedAt": "2026-07-18T11:53:52.101Z",
+        "claimedByContextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "summary": "## Implementation Complete — CONT-HELPER-01\n\n### Files Changed\n\n- **`lib/ypi-studio-widget-continue.ts`** (new) — Pure helper module with:\n  - `YpiStudioWidgetContinueKind` — union of `\"approve_plan\" | \"request_plan_changes\" | \"approve_improvement_plan\"`\n  - `ypiStudioWidgetActionNeedsChatContinue(kind)` — type guard returning `true` for the three continue kinds, `false` for `start_user_acceptance` and unknown\n  - `buildYpiStudioWidgetChatContinuePrompt(input)` — builds fixed, audit-safe Chat user messages per PRD §3.2 with per-kind templates, ≤200-char feedback truncation, no HTML/URLs, and optional `taskKey`/`targetLabel`/`improvementId`/`displayId`/`revisionTo`\n\n- **`scripts/test-ypi-studio-widget-continue.mjs`** (new) — Comprehensive test covering:\n  - needsChatContinue matrix (true for 3 kinds, false for `start_user_acceptance`)\n  - Prompt invariants (no HTML, no URLs, ≤4000 chars)\n  - All three prompt kinds with required substrings\n  - Feedback truncation at exactly 200, over 200, whitespace-only\n  - `taskKey` propagation, `revisionTo`/`revisionFrom` logic, `displayId` fallback\n\n- **`package.json`** — Added `\"test:studio-widget-continue\"` script\n\n### Verification\n\n| Command | Result |\n|---|---|\n| `npm run test:studio-widget-continue` | ✅ PASSED |\n| `npm run test:studio-widget-actions` | ✅ PASSED (no regression) |\n| `npm run test:studio-dag` | ✅ PASSED (no regression) |\n| `tsc --noEmit` (new file only) | ✅ Zero errors |\n\n### Notes / Risks\n\n- No React imports, no rpc-manager imports (circular-dep safe)\n- Pure functions with no side effects — safe for both client and server contexts\n- Prompt semantics lock to PRD §3.2; future wording tweaks can be made without changing the function signature\n- ESLint not available in this worktree; code follows existing project patterns (`.filter(Boolean).join(\"\\n\")`, JSDoc, `ReadonlySet`)\n- Next subtask dependencies: CONT-WIRE-02 (ChatWindow wiring) and CONT-WIDGET-03 (widget integration) can now consume this helper"
+      },
+      "CONT-WIRE-02": {
+        "id": "CONT-WIRE-02",
+        "status": "done",
+        "updatedAt": "2026-07-18T12:18:00.620Z",
+        "startedAt": "2026-07-18T11:53:52.101Z",
+        "finishedAt": "2026-07-18T12:18:00.616Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-3590cac66c1872fe737fde77"
+        ],
+        "lastRunId": "implementer-3590cac66c1872fe737fde77",
+        "claimedAt": "2026-07-18T11:53:52.101Z",
+        "claimedByContextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "summary": "All changes are clean. Let me provide the summary.\n\n---\n\n## Implementation Complete — CONT-WIRE-02\n\n### Files Changed\n\n- **`components/ChatWindow.tsx`** — Added `onComposeSendReady` prop. Registers `handleSend` via `onComposeSendReady(handleSend)` on mount/change with cleanup `onComposeSendReady(null)`. Dependencies: `[handleSend, onComposeSendReady]`.\n\n- **`components/AppShell.tsx`** — Added `composeSendRef` (useRef) and stable `handleComposeSendReady` callback. Passes `onComposeSendReady` to `ChatWindow` and `agentRunning={chatAgentRunning}` + `onComposeSend` to `YpiStudioSessionWidget`. The `onComposeSend` callback reads the latest ref (`composeSendRef.current?.(message)`), staying stable across renders.\n\n- **`components/YpiStudioSessionWidget.tsx`** — Added `agentRunning?: boolean` and `onComposeSend?: (message: string) => void | Promise<void>` to the Props interface. Destructured and voided (logic reserved for CONT-WIDGET-03).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `eslint` (3 changed files) | 0 errors, 0 warnings |\n| `tsc --noEmit` | 0 errors |\n\n### Wiring Summary\n\n```\nChatWindow.handleSend\n  → useEffect → onComposeSendReady(handleSend)\n    → AppShell.composeSendRef.current = handleSend\n      → YpiStudioSessionWidget.onComposeSend(msg)\n        → composeSendRef.current?.(msg) → ChatWindow.handleSend(msg)\n```\n\nSession-switch safety: `ChatWindow` remounts on `key={sessionKey}`, so cleanup nulls the old `handleSend` before the new one registers. Widget `onComposeSend` is a stable arrow reading the ref, so it always calls the current session's `handleSend` or no-ops when null.\n\n### Notes / Risks\n\n- The `package.json` diff includes an additional `test:studio-widget-continue` script line from CONT-HELPER-01 — this is pre-existing in the worktree and unrelated to CONT-WIRE-02.\n- `npm-shrinkwrap.json` was temporarily removed to allow devDependency install (NODE_ENV=production skips devDeps); restored after validation. A fresh `package-lock.json` was generated — not committed.\n- Widget props `agentRunning` / `onComposeSend` are received but unused (voided) — CONT-WIDGET-03 will wire them to busy/continue logic."
+      },
+      "CONT-WIDGET-03": {
+        "id": "CONT-WIDGET-03",
+        "status": "done",
+        "updatedAt": "2026-07-18T12:28:11.106Z",
+        "startedAt": "2026-07-18T12:18:15.761Z",
+        "finishedAt": "2026-07-18T12:28:11.103Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-3c3fbd6fe44321d5838fa7f9"
+        ],
+        "lastRunId": "implementer-3c3fbd6fe44321d5838fa7f9",
+        "claimedAt": "2026-07-18T12:18:15.761Z",
+        "claimedByContextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "summary": "All changes are in place and verified. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-WIDGET-03\n\n### Files Changed\n\n- **`components/YpiStudioSessionWidget.tsx`** — Widget busy 禁用 + PATCH 后 Chat 续推 + toast\n\n### Changes Made\n\n1. **Import** — Added `ypiStudioWidgetActionNeedsChatContinue` and `buildYpiStudioWidgetChatContinuePrompt` from `lib/ypi-studio-widget-continue`\n\n2. **Props wiring** — Removed `void` lines for `agentRunning` / `onComposeSend`; added `agentRunningRef` mirroring prop via `useRef` + `useEffect` for stale-closure safety in confirm callbacks\n\n3. **TaskCard** — Added `agentRunning?: boolean` prop; merged into disabled conditions:\n   - Decision CTA buttons: `acceptWriteBusy || Boolean(decidingActionId) || agentRunning`\n   - Improvement accept: `acceptWriteBusy || Boolean(acceptingImprovementId) || agentRunning`\n   - Main accept: `acceptWriteBusy || !onAcceptMainTask || agentRunning`\n   - Quick preview: **unchanged** (only `acceptWriteBusy`, not disabled by agentRunning)\n   - Added `title=\"Chat 正在工作，请稍后再试\"` and `aria-label` suffix `（Chat 工作中不可用）` when `agentRunning`\n\n4. **handleDecisionAction** — \n   - Added `taskId` parameter (sourced from `candidate.task.id`)\n   - Secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`\n   - After PATCH success + `onTaskChanged`: type-guard `ypiStudioWidgetActionNeedsChatContinue`\n   - If continue kind + `onComposeSend` + not running → build prompt, `await onComposeSend(prompt)` → full success toast\n   - If `onComposeSend` fails → partial toast (info, 8s), no rollback\n   - If `onComposeSend` missing or agent started → partial toast\n   - Non-continue kinds (`start_user_acceptance`) → existing toast, no Send\n   - Added `onComposeSend` to deps array\n\n5. **handleAcceptImprovement / handleAcceptMainTask** — Added secondary lock check after confirm: `if (agentRunningRef.current) → toast info → return`, before PATCH\n\n6. **Render sections** (mobile + desktop) — Updated `onDecisionAction` callbacks to pass `c.task.id`; added `agentRunning={agentRunning}` prop to `TaskCard`\n\n### Verification\n\n- `node_modules/.bin/tsc --noEmit` — ✅ 0 errors\n- `npx eslint components/YpiStudioSessionWidget.tsx` — ✅ 0 errors\n- `node --loader ... scripts/test-ypi-studio-widget-continue.mjs` — ✅ passed\n\n### Notes / Risks\n\n- **toast API**: uses `tone: \"info\"` for partial failures (no `warning` tone in the prompt API). This is per the design doc recommendation.\n- **`handleSend` early return**: when `agentRunning` is true, `handleSend` returns early. The secondary lock check in `handleDecisionAction` catches this before we try, and falls into the \"partial\" branch that warns the user. This is correct per the spec.\n- **No visual changes**: Only `disabled`/`title`/`aria` attributes and toast text were modified; no CSS/DOM layout changes.\n- **`onComposeSend` can be `undefined`**: If `ChatWindow` hasn't registered yet, the partial toast correctly informs the user."
+      },
+      "CONT-SERVER-04": {
+        "id": "CONT-SERVER-04",
+        "status": "done",
+        "updatedAt": "2026-07-18T12:23:33.031Z",
+        "startedAt": "2026-07-18T12:18:15.761Z",
+        "finishedAt": "2026-07-18T12:23:33.029Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-b92c02c81afa06913728a096"
+        ],
+        "lastRunId": "implementer-b92c02c81afa06913728a096",
+        "claimedAt": "2026-07-18T12:18:15.761Z",
+        "claimedByContextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "summary": "## Implementation Complete — CONT-SERVER-04\n\n### Files Changed\n\n- **`app/api/studio/tasks/[taskKey]/route.ts`** — Removed `bestEffortContinueAfterWidgetRequestPlanChanges` import and its call site in the `request_plan_changes` success branch. The PATCH still writes correctly (status → `planning`, `planRevision+1`, grant cleared); just no longer fires the server-side `studio_user_action` wake. Added a comment referencing the deprecated helper for emergency rollback.\n\n- **`lib/ypi-studio-session-link.ts`** — Added `@deprecated` JSDoc annotations on all three continuation helpers (`buildYpiStudioRequestPlanChangesContinuationCommand`, `resolveYpiStudioRequestPlanChangesContinuation`, `bestEffortContinueAfterWidgetRequestPlanChanges`). Functions are preserved intact for tests and emergency rollback.\n\n### Not Changed (as required)\n\n- `lib/rpc-manager.ts` — `studio_user_action` command handling, `scheduleStudioUserActionContinuation`, `bestEffortSendStudioCommand` untouched\n- `studio_autocontinue` sub-task continuation untouched\n- `approve_plan` / `approve_improvement` write helpers untouched\n- No test script line modified (dag test tests helpers directly, still passes)\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `node_modules/.bin/tsc --noEmit` | ✅ 0 errors |\n| `npx eslint app/api/studio/tasks/[taskKey]/route.ts lib/ypi-studio-session-link.ts` | ✅ 0 errors |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-dag` | ✅ passed |\n| `npm run test:studio-widget-continue` | ✅ passed |\n\n### Notes / Risks\n\n- **Rollback path**: restore the removed `bestEffortContinueAfterWidgetRequestPlanChanges(...)` call block and re-add the import — one-line change. The helper and its unit coverage (dag test) are intact.\n- **No external callers**: grep confirms no other module imports/calls `bestEffortContinueAfterWidgetRequestPlanChanges` — only the route.ts (now removed) and the definition in session-link.ts.\n- **Risk**: `request_plan_changes` path now depends on CONT-WIDGET-03 completing Chat Send wiring for post-PATCH continuation. If that subtask fails, `request_plan_changes` will PATCH correctly but have no wake at all. Mitigation: rollback is trivial."
+      },
+      "CONT-DOCS-TEST-05": {
+        "id": "CONT-DOCS-TEST-05",
+        "status": "done",
+        "updatedAt": "2026-07-18T12:34:43.687Z",
+        "startedAt": "2026-07-18T12:28:16.651Z",
+        "finishedAt": "2026-07-18T12:34:43.684Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-97603179df91c1d2cffdee49"
+        ],
+        "lastRunId": "implementer-97603179df91c1d2cffdee49",
+        "claimedAt": "2026-07-18T12:28:16.651Z",
+        "claimedByContextId": "pi_019f74f3-16ef-77f6-8378-bccecdeafbb1",
+        "summary": "All validation passed and docs are updated. Here's the summary:\n\n---\n\n## Implementation Complete — CONT-DOCS-TEST-05\n\n### Files Changed\n\n- `docs/modules/frontend.md` — Updated `ChatWindow` (added `onComposeSendReady` prop), `AppShell` (added `composeSendRef` / `handleComposeSendReady` wiring + `chatAgentRunning`/`onComposeSend` pass-through to widget), and `YpiStudioSessionWidget` (added `agentRunning`/`onComposeSend` props, Hybrid B continuation: busy disable + PATCH + Chat Send + partial toast + TOCTOU guard). Conservation invariant paragraph updated with full Hybrid B behavior description.\n\n- `docs/modules/api.md` — Updated `request_plan_changes` server-wake paragraph: route no longer calls `bestEffortContinueAfterWidgetRequestPlanChanges` / `studio_user_action` as main path; helper retained for tests/rollback.\n\n- `docs/modules/library.md` — Added new entry for `lib/ypi-studio-widget-continue.ts` (pure helpers: `ypiStudioWidgetActionNeedsChatContinue`, `buildYpiStudioWidgetChatContinuePrompt`). Updated `lib/ypi-studio-session-link.ts` entry: best-effort continuation helpers now deprecated as primary widget decision path; Hybrid B Chat Send is the main path.\n\n- `docs/architecture/overview.md` — Replaced the `studio_user_action` request-changes wake sentence with Hybrid B description (Chat `handleSend` path + guided prompt from `lib/ypi-studio-widget-continue.ts`; `start_user_acceptance`/result-acceptance never Send; partial toast on failure).\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:studio-widget-continue` | ✅ passed |\n| `npm run test:studio-widget-actions` | ✅ passed |\n| `npm run test:studio-main-accept` | ✅ passed (13 cases) |\n| `npm run test:studio-dag` | ✅ passed |\n| `node_modules/.bin/tsc --noEmit` | ✅ clean |\n| `npx eslint lib/ypi-studio-widget-continue.ts components/YpiStudioSessionWidget.tsx components/AppShell.tsx components/ChatWindow.tsx app/api/studio/tasks/[taskKey]/route.ts` | ✅ clean |\n| Visual constraint check (no CSS changed, no HTML prototype references) | ✅ preserved |\n| A–F preservation (rail/preview/accept structure unchanged) | ✅ diff confirms no regression |\n\n### Notes / Risks\n\n- **No remaining risks** for CONT-DOCS-TEST-05 specifically — docs match the implementation produced by the prior 4 subtasks.\n- The `npm run lint` full command timed out at 60s but focused lint on the 5 changed source files passed clean. The full-project lint timeout is an existing CI concern unrelated to this task.\n- All prior subtask work (CONT-HELPER-01 through CONT-SERVER-04) is correctly reflected in docs. The implementation plan is now 5/5 done."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-18T11:53:52.101Z",
+        "subtaskId": "CONT-HELPER-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-18T11:53:52.101Z",
+        "subtaskId": "CONT-WIRE-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-18T12:18:15.761Z",
+        "subtaskId": "CONT-WIDGET-03",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-18T12:18:15.761Z",
+        "subtaskId": "CONT-SERVER-04",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-18T12:28:16.651Z",
+        "subtaskId": "CONT-DOCS-TEST-05",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

@@ -57,6 +57,66 @@
       ]
     },
     {
+      "id": "20260719-175106-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+      "title": "任务浮窗决策 CTA 改为 Chat Send 续推并在工作中禁用",
+      "taskId": "20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+      "taskKey": "archived:2026-07:20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+      "workflowId": "feature-dev",
+      "summary": "已完成 Hybrid B：浮窗决策需主会话干活时，先原子 PATCH（grant/revision/context），成功后用当前 Chat handleSend 发固定引导词；agentRunning/写锁时禁用决策与结果验收 CTA；Send 失败不回滚。approve_plan/request_plan_changes/approve_improvement_plan 续推走 Chat；start_user_acceptance 与结果验收仅 PATCH。去掉 request_plan_changes 的 server inner.prompt 主路径防双发。可复用：onComposeSend 接线、pure continue helper、假成功要 throw 走 partial toast、不按示意 HTML 改视觉。",
+      "tags": [
+        "studio",
+        "widget",
+        "chat",
+        "cta",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260718-192856-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用",
+      "knowledgePath": ".ypi/knowledge/20260719-175106-任务浮窗决策-cta-改为-chat-send-续推并在工作中禁用.md",
+      "createdAt": "2026-07-19T09:51:06.751Z",
+      "archivedAt": "2026-07-19T09:51:06.751Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
+    {
+      "id": "20260719-174542-任务浮窗-completed-态支持退回用户验收与-studio-archive-归档",
+      "title": "任务浮窗 completed 态支持退回用户验收与 /studio-archive 归档",
+      "taskId": "20260719-043757-任务浮窗-completed-态支持退回用户验收与-studio-archive-归档",
+      "taskKey": "archived:2026-07:20260719-043757-任务浮窗-completed-态支持退回用户验收与-studio-archive-归档",
+      "workflowId": "feature-dev",
+      "summary": "已完成：任务浮窗 completed 态补双 CTA——退回用户验收（原子 PATCH completed→user_acceptance，清 completedAt）与归档（Chat 发送 /studio-archive，当前模型写 knowledge；禁止浮窗 silent allowFallbackKnowledge 主路径）。可复用：workflow 需显式 completed→user_acceptance 边；userActions 投影 max2、advisory；写路径 binding/revision/单锁；studio_archive 不进 needsChatContinue；复用 decision 样式不改视觉；他仓 workflow 缺边应明确失败。",
+      "tags": [
+        "studio",
+        "widget",
+        "completed",
+        "archive",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260719-043757-任务浮窗-completed-态支持退回用户验收与-studio-archive-归档",
+      "knowledgePath": ".ypi/knowledge/20260719-174542-任务浮窗-completed-态支持退回用户验收与-studio-archive-归档.md",
+      "createdAt": "2026-07-19T09:45:42.223Z",
+      "archivedAt": "2026-07-19T09:45:42.223Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
+    {
       "id": "20260718-201930-自定义-openai-兼容提供商支持从-models-端点同步模型列表",
       "title": "自定义 OpenAI 兼容提供商支持从 /models 端点同步模型列表",
       "taskId": "20260718-180415-自定义-openai-兼容提供商支持从-models-端点同步模型列表",

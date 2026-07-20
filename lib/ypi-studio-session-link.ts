@@ -11,7 +11,7 @@ import {
 import { readYpiStudioSubagentTranscriptPreview } from "./ypi-studio-transcripts";
 import { getYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import { orderYpiStudioWorkflowStates } from "./ypi-studio-workflow-flow";
-import { readYpiStudioWorkflow } from "./ypi-studio-workflows";
+import { findYpiStudioTransition, readYpiStudioWorkflow } from "./ypi-studio-workflows";
 import type {
   YpiStudioSessionTaskLinkCandidate,
   YpiStudioSessionTaskLinkSource,
@@ -447,7 +447,7 @@ export function buildWidgetUserActions(detail: {
       approval?: { revision?: number } | null;
     }>;
   } | null;
-}): YpiStudioWidgetUserAction[] {
+}, opts?: { supportsReturnToUserAcceptance?: boolean }): YpiStudioWidgetUserAction[] {
   if (detail.archived) return [];
 
   if (detail.status === "awaiting_approval") {
@@ -523,6 +523,37 @@ export function buildWidgetUserActions(detail: {
       expectedRevision: revision,
       targetLabel: boundWidgetTargetLabel(`主任务 · ${detail.title}`),
     }];
+  }
+
+  // completed && !archived: archive (primary) + optional return to user_acceptance (secondary).
+  if (detail.status === "completed") {
+    const revision = typeof detail.meta?.planRevision === "number" && Number.isFinite(detail.meta.planRevision)
+      ? detail.meta.planRevision
+      : 1;
+    const targetLabel = boundWidgetTargetLabel(`主任务 · ${detail.title}`);
+    const actions: YpiStudioWidgetUserAction[] = [
+      {
+        id: `main:studio_archive:r${revision}`,
+        kind: "studio_archive",
+        label: "归档",
+        role: "primary",
+        requiresConfirmation: true,
+        expectedRevision: revision,
+        targetLabel,
+      },
+    ];
+    if (opts?.supportsReturnToUserAcceptance !== false) {
+      actions.push({
+        id: `main:return_to_user_acceptance:r${revision}`,
+        kind: "return_to_user_acceptance",
+        label: "退回用户验收",
+        role: "secondary",
+        requiresConfirmation: true,
+        expectedRevision: revision,
+        targetLabel,
+      });
+    }
+    return actions.slice(0, WIDGET_USER_ACTIONS_MAX);
   }
 
   return [];
@@ -601,7 +632,8 @@ function buildProjection(cwd: string, summary: YpiStudioTaskSummary): YpiStudioT
   })() : undefined;
 
   const quickPreviews = buildWidgetQuickPreviews(cwd, detail);
-  const userActions = buildWidgetUserActions(detail);
+  const supportsReturnToUserAcceptance = workflow ? !!findYpiStudioTransition(workflow, "completed", "user_acceptance") : false;
+  const userActions = buildWidgetUserActions(detail, { supportsReturnToUserAcceptance });
   const unresolvedImprovementCount = improvementSummary?.unresolved ?? 0;
   // Omit false so older clients and sparse JSON stay quiet; UI checks === true.
   const canAcceptMain = canAcceptMainTask({
@@ -876,10 +908,12 @@ export function parseYpiStudioSessionIdFromContextId(contextId: string): string 
 }
 
 /**
- * Best-effort studio_user_action command after request_plan_changes.
- * Feedback must already be persisted; this only wakes the bound session.
- * Callers (task PATCH route) should send via getRpcSession(sessionId)?.send(command).catch(() => {})
- * and never roll back the persisted planning decision if the wrapper is missing/busy.
+ * Build a studio_user_action continuation command after request_plan_changes.
+ * Feedback must already be persisted; this only builds the command payload.
+ *
+ * @deprecated Not the widget primary path as of 2026-07-18 Hybrid B.
+ * Widget decision continuation now travels through Chat handleSend.
+ * Kept for tests and emergency rollback only.
  */
 export function buildYpiStudioRequestPlanChangesContinuationCommand(options: {
   taskId: string;
@@ -904,6 +938,10 @@ export function buildYpiStudioRequestPlanChangesContinuationCommand(options: {
 /**
  * Resolve sessionId + studio_user_action command after a successful request_plan_changes mutation.
  * Returns null only when contextId is not a live session-class id.
+ *
+ * @deprecated Not the widget primary path as of 2026-07-18 Hybrid B.
+ * Widget decision continuation now travels through Chat handleSend.
+ * Kept for tests and emergency rollback only.
  */
 export function resolveYpiStudioRequestPlanChangesContinuation(options: {
   contextId: string;
@@ -931,6 +969,10 @@ export function resolveYpiStudioRequestPlanChangesContinuation(options: {
  * One-shot helper for task PATCH after a successful request_plan_changes mutation.
  * Lazy-imports getRpcSession to keep session-link free of circular startup deps with rpc-manager.
  * Never throws; never rolls back the already-persisted planning decision.
+ *
+ * @deprecated Not the widget primary path as of 2026-07-18 Hybrid B.
+ * Widget decision continuation now travels through Chat handleSend.
+ * The task PATCH route no longer calls this; kept for tests and emergency rollback only.
  */
 export function bestEffortContinueAfterWidgetRequestPlanChanges(options: {
   contextId: string;

@@ -365,6 +365,11 @@ function AppShellContent() {
   );
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
+  /** Latest Chat compose-send handle, registered by ChatWindow via onComposeSendReady. */
+  const composeSendRef = useRef<((message: string) => void | Promise<void>) | null>(null);
+  const handleComposeSendReady = useCallback((send: ((message: string) => void | Promise<void>) | null) => {
+    composeSendRef.current = send;
+  }, []);
   const topBarRef = useRef<HTMLDivElement>(null);
 
   const loadWebConfig = useCallback(async (signal?: AbortSignal) => {
@@ -1839,6 +1844,7 @@ function AppShellContent() {
               onContextUsageChange={handleContextUsageChange}
               onStudioToolProgressChange={handleStudioToolProgressChange}
               onSessionListRefreshNeeded={handleStudioSessionListRefreshNeeded}
+              onComposeSendReady={handleComposeSendReady}
               defaultToolPreset={webConfig?.yolk.defaultToolPreset}
               defaultThinkingLevel={
                 webConfig?.yolk.defaultModel.mode === "specific"
@@ -1884,6 +1890,15 @@ function AppShellContent() {
               contextId={studioContextIdForSession(selectedSession?.id) ?? undefined}
               onTaskChanged={() => setStudioSessionTaskRefreshKey((key) => key + 1)}
               onOpenFile={handleOpenFile}
+              agentRunning={chatAgentRunning}
+              onComposeSend={async (message) => {
+                const send = composeSendRef.current;
+                if (!send) {
+                  // Surface as partial-success in the widget: PATCH already succeeded.
+                  throw new Error("Chat compose send unavailable");
+                }
+                await send(message);
+              }}
             />
           )}
           </div>

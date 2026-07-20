@@ -852,7 +852,10 @@ export type YpiStudioWidgetUserActionKind =
   | "approve_plan"
   | "request_plan_changes"
   | "approve_improvement_plan"
-  | "start_user_acceptance";
+  | "start_user_acceptance"
+  | "return_to_user_acceptance"
+  /** studio_archive is a Chat-only action (no PATCH body). The frontend calls onComposeSend("/studio-archive"). */
+  | "studio_archive";
 
 export type YpiStudioWidgetUserActionRole = "primary" | "secondary";
 
@@ -1219,6 +1222,14 @@ export interface YpiStudioWidgetApproveImprovementPlanBody {
 export interface YpiStudioWidgetStartUserAcceptanceBody {
   cwd: string;
   action: "start_user_acceptance";
+  contextId: string;
+  expectedRevision: number;
+}
+
+/** Explicit widget decision body: return completed task back to user_acceptance. No override field. */
+export interface YpiStudioWidgetReturnToUserAcceptanceBody {
+  cwd: string;
+  action: "return_to_user_acceptance";
   contextId: string;
   expectedRevision: number;
 }

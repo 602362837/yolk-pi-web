@@ -33,6 +33,12 @@ interface Props {
   defaultThinkingLevel?: PiWebThinkingLevel;
   /** New-session model seed from yolk.defaultModel (specific mode only). */
   defaultModel?: { provider: string; modelId: string } | null;
+  /**
+   * Registers the current Chat compose-send handle so parent (AppShell) can forward
+   * messages from external UI (e.g. Studio widget continue prompts).
+   * Called with the stable handleSend on mount/change; cleanup calls with null.
+   */
+  onComposeSendReady?: (send: ((message: string) => void | Promise<void>) | null) => void;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -166,7 +172,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel }: Props) {
+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel, onComposeSendReady }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -191,6 +197,15 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
   playDoneSoundRef.current = playDoneSound;
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
+
+  // Register the current compose-send handle with the parent so external UI
+  // (e.g. Studio widget) can inject Chat messages via the same handleSend path.
+  // Cleanup on unmount / handleSend change to avoid stale-closure references.
+  useEffect(() => {
+    if (!onComposeSendReady) return;
+    onComposeSendReady(handleSend);
+    return () => { onComposeSendReady(null); };
+  }, [handleSend, onComposeSendReady]);
 
   // Wrap agent event handler to play sound on agent_end
   const origHandler = handleAgentEventRef.current;

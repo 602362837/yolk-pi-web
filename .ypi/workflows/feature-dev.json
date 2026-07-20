@@ -303,6 +303,10 @@
     },
     {
       "from": "completed",
+      "to": "user_acceptance"
+    },
+    {
+      "from": "completed",
       "to": "archived"
     }
   ]
