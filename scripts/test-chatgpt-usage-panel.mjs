@@ -89,10 +89,10 @@ await test("knownQuotaTiers filters only five_hour/seven_day", () => {
   assert.deepEqual(tiers.map((tier) => tier.name), ["five_hour", "seven_day"]);
 });
 
-await test("formatQuotaQueriedAt remains English for Models consumers", () => {
-  assert.equal(formatQuotaQueriedAt(null), "never");
-  assert.equal(formatQuotaQueriedAt(Date.now() - 1_000), "just now");
-  assert.match(formatQuotaQueriedAt(Date.now() - 120_000), /m ago$/);
+await test("formatQuotaQueriedAt returns Chinese ages for Models consumers", () => {
+  assert.equal(formatQuotaQueriedAt(null), "从未");
+  assert.equal(formatQuotaQueriedAt(Date.now() - 1_000), "刚刚");
+  assert.match(formatQuotaQueriedAt(Date.now() - 120_000), /分钟前$/);
 });
 
 await test("formatGptQuotaRelativeAge returns Chinese ages", () => {

@@ -41,24 +41,24 @@ function normalizeDailyTime(value: string): string | null {
 
 function accountQuotaText(account: OAuthAccountSummary): string {
   const quotaCache = account.quotaCache;
-  if (!quotaCache) return "Quota not refreshed yet";
+  if (!quotaCache) return "配额尚未刷新";
   if (quotaCache.error) return quotaCache.error;
   const knownTiers = knownQuotaTiers(quotaCache.tiers);
-  if (knownTiers.length === 0) return "Reset time unknown";
+  if (knownTiers.length === 0) return "重置时间未知";
   const resetParts = knownTiers.map((tier) => {
     const label = QUOTA_TIER_LABELS[tier.name] ?? tier.name;
     const countdown = formatResetCountdown(tier.resetsAt);
-    return `${label}: ${countdown ? `resets in ${countdown}` : "reset unknown"}`;
+    return `${label}：${countdown ? `${countdown} 后重置` : "重置时间未知"}`;
   });
   const queriedAt = quotaCache.queriedAt ? ` · ${formatQuotaQueriedAt(quotaCache.queriedAt)}` : "";
   return `${resetParts.join(" · ")}${queriedAt}`;
 }
 
 function resultText(result: OpenAICodexWarmupResult | undefined): { text: string; color: string } {
-  if (!result) return { text: "Ready", color: "var(--text-dim)" };
-  if (!result.success) return { text: result.error ?? "Warmup failed", color: "#f87171" };
-  if (!result.quotaRefreshSuccess) return { text: result.quotaError ? `Warmed · quota refresh failed: ${result.quotaError}` : "Warmed · quota refresh unavailable", color: "#fb923c" };
-  return { text: `Warmed${result.latencyMs !== null ? ` · ${result.latencyMs}ms` : ""} · quota refreshed`, color: "#34d399" };
+  if (!result) return { text: "就绪", color: "var(--text-dim)" };
+  if (!result.success) return { text: result.error ?? "预热失败", color: "#f87171" };
+  if (!result.quotaRefreshSuccess) return { text: result.quotaError ? `已预热 · 配额刷新失败：${result.quotaError}` : "已预热 · 配额刷新不可用", color: "#fb923c" };
+  return { text: `已预热${result.latencyMs !== null ? ` · ${result.latencyMs}ms` : ""} · 配额已刷新`, color: "#34d399" };
 }
 
 function schedulesEqual(a: PiWebChatGptWarmupConfig, b: PiWebChatGptWarmupConfig): boolean {
@@ -69,7 +69,7 @@ function schedulesEqual(a: PiWebChatGptWarmupConfig, b: PiWebChatGptWarmupConfig
 
 function runSummary(run: OpenAICodexWarmupHistoryRun): string {
   const successCount = run.results.filter((result) => result.success).length;
-  return `${successCount}/${run.results.length} warmed`;
+  return `${successCount}/${run.results.length} 已预热`;
 }
 
 function formatRunTime(value: string): string {
@@ -109,7 +109,7 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
       setHistory(data);
     } catch (loadError) {
       if ((loadError as { name?: string }).name === "AbortError") return;
-      setHistoryError(loadError instanceof Error ? loadError.message : "Failed to load warmup history");
+      setHistoryError(loadError instanceof Error ? loadError.message : "加载预热历史失败");
     }
   }, []);
 
@@ -125,7 +125,7 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
       setSavedSchedule(data.config.chatgpt.warmup);
     } catch (loadError) {
       if ((loadError as { name?: string }).name === "AbortError") return;
-      setConfigError(loadError instanceof Error ? loadError.message : "Failed to load warmup schedule");
+      setConfigError(loadError instanceof Error ? loadError.message : "加载预热计划失败");
     } finally {
       setConfigLoading(false);
     }
@@ -196,7 +196,7 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
       setSavedSchedule(data.config.chatgpt.warmup);
       await loadHistory();
     } catch (saveError) {
-      setConfigError(saveError instanceof Error ? saveError.message : "Failed to save warmup schedule");
+      setConfigError(saveError instanceof Error ? saveError.message : "保存预热计划失败");
     } finally {
       setScheduleSaving(false);
     }
@@ -219,7 +219,7 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
       await onComplete?.();
       await loadHistory();
     } catch (runError) {
-      setError(runError instanceof Error ? runError.message : "Warmup failed");
+      setError(runError instanceof Error ? runError.message : "预热失败");
     } finally {
       setRunning(false);
     }
@@ -234,8 +234,8 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
       <div className="pi-modal-panel" style={{ width: 760, maxWidth: "calc(100vw - 32px)", maxHeight: "min(88vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>ChatGPT account warmup</div>
-            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 3 }}>Manual warmup now, or save a local daily schedule for selected accounts.</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)" }}>ChatGPT 账号预热</div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 3 }}>可立即手动预热，或为所选账号保存本地每日计划。</div>
           </div>
           <button type="button" disabled={running || scheduleSaving} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: running || scheduleSaving ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
         </div>
@@ -243,23 +243,23 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
         <div className="mobile-stack-grid" style={{ padding: 14, overflow: "auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 0.85fr)", gap: 14 }}>
           <section style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
             <div style={{ padding: 10, borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
-              Warmup sends a tiny real Codex request using a fixed low-cost model. Tokens stay server-side; this dialog only receives per-account results.
+              预热会使用固定的低成本模型发送一次极小的真实 Codex 请求。Token 仅保留在服务端；此对话框只接收各账号结果。
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 700 }}>Manual warmup</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 700 }}>手动预热</div>
               <div style={{ display: "flex", gap: 6 }}>
-                <button type="button" disabled={running || accounts.length === 0} onClick={selectAll} style={{ padding: "5px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: running || accounts.length === 0 ? "var(--text-dim)" : "var(--text-muted)", cursor: running || accounts.length === 0 ? "not-allowed" : "pointer", fontSize: 12 }}>Select all</button>
-                <button type="button" disabled={running || selectedCount === 0} onClick={clearSelection} style={{ padding: "5px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: running || selectedCount === 0 ? "var(--text-dim)" : "var(--text-muted)", cursor: running || selectedCount === 0 ? "not-allowed" : "pointer", fontSize: 12 }}>Clear</button>
+                <button type="button" disabled={running || accounts.length === 0} onClick={selectAll} style={{ padding: "5px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: running || accounts.length === 0 ? "var(--text-dim)" : "var(--text-muted)", cursor: running || accounts.length === 0 ? "not-allowed" : "pointer", fontSize: 12 }}>全选</button>
+                <button type="button" disabled={running || selectedCount === 0} onClick={clearSelection} style={{ padding: "5px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: running || selectedCount === 0 ? "var(--text-dim)" : "var(--text-muted)", cursor: running || selectedCount === 0 ? "not-allowed" : "pointer", fontSize: 12 }}>清空</button>
               </div>
             </div>
 
             <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              {accounts.length} saved · {selectedCount} selected{resultList.length > 0 ? ` · ${successCount}/${resultList.length} warmed` : ""}
+              {accounts.length} 个已保存 · 已选 {selectedCount} 个{resultList.length > 0 ? ` · ${successCount}/${resultList.length} 已预热` : ""}
             </div>
 
             {accounts.length === 0 ? (
-              <div style={{ color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>No saved ChatGPT/Codex accounts yet.</div>
+              <div style={{ color: "var(--text-dim)", fontSize: 12, lineHeight: 1.5 }}>暂无已保存的 ChatGPT/Codex 账号。</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 {accounts.map((account) => {
@@ -272,12 +272,12 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
                       <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                           <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
-                          {account.active && <span style={{ color: "#4ade80", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>active</span>}
+                          {account.active && <span style={{ color: "#4ade80", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>当前</span>}
                         </span>
                         <code style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>{account.maskedAccountId}</code>
                         {account.extraInfo && <span style={{ color: "var(--text-muted)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
                         <span style={{ color: account.quotaCache?.error ? "#fb923c" : "var(--text-dim)", fontSize: 11, lineHeight: 1.4 }}>{accountQuotaText(account)}</span>
-                        <span style={{ color: status.color, fontSize: 11, lineHeight: 1.4 }}>{running && checked && !result ? "Warming sequentially…" : status.text}</span>
+                        <span style={{ color: status.color, fontSize: 11, lineHeight: 1.4 }}>{running && checked && !result ? "正在依次预热…" : status.text}</span>
                       </span>
                     </label>
                   );
@@ -291,12 +291,12 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
           <section style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
             <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
-                <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 800 }}>Scheduled warmup</div>
-                <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.45 }}>Uses local server time and only runs while yolk pi web is running.</div>
+                <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 800 }}>定时预热</div>
+                <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.45 }}>使用本地服务器时间，且仅在 yolk pi web 运行期间执行。</div>
               </div>
 
               {configLoading ? (
-                <div style={{ color: "var(--text-muted)", fontSize: 12 }}>Loading schedule…</div>
+                <div style={{ color: "var(--text-muted)", fontSize: 12 }}>正在加载计划…</div>
               ) : (
                 <>
                   <button
@@ -306,8 +306,8 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
                     style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-subtle)", color: "var(--text)", cursor: scheduleSaving ? "not-allowed" : "pointer", textAlign: "left" }}
                   >
                     <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700 }}>Enable daily scheduled warmup</span>
-                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{schedule.enabled ? "Enabled" : "Disabled"}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>启用每日定时预热</span>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{schedule.enabled ? "已启用" : "已关闭"}</span>
                     </span>
                     <span style={{ width: 38, height: 21, borderRadius: 999, background: schedule.enabled ? "var(--accent)" : "var(--border)", position: "relative", flexShrink: 0 }}>
                       <span style={{ position: "absolute", top: 3, left: schedule.enabled ? 20 : 3, width: 15, height: 15, borderRadius: "50%", background: "white", transition: "left 0.12s" }} />
@@ -315,9 +315,9 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
                   </button>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 700 }}>Schedule accounts</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 700 }}>计划账号</div>
                     {accounts.length === 0 ? (
-                      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>No accounts available.</div>
+                      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>暂无可用账号。</div>
                     ) : accounts.map((account) => (
                       <label key={account.accountId} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 7px", border: "1px solid var(--border)", borderRadius: 6, background: scheduleAccountSet.has(account.accountId) ? "rgba(59,130,246,0.10)" : "var(--bg)", cursor: scheduleSaving ? "default" : "pointer" }}>
                         <input type="checkbox" checked={scheduleAccountSet.has(account.accountId)} disabled={scheduleSaving} onChange={() => toggleScheduleAccount(account.accountId)} />
@@ -327,11 +327,11 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
                         </span>
                       </label>
                     ))}
-                    <button type="button" disabled={scheduleSaving || selectedIds.length === 0} onClick={() => setSchedule((prev) => ({ ...prev, accountIds: selectedIds }))} style={{ alignSelf: "flex-start", padding: "5px 8px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: scheduleSaving || selectedIds.length === 0 ? "var(--text-dim)" : "var(--accent)", cursor: scheduleSaving || selectedIds.length === 0 ? "not-allowed" : "pointer", fontSize: 11 }}>Use manual selection</button>
+                    <button type="button" disabled={scheduleSaving || selectedIds.length === 0} onClick={() => setSchedule((prev) => ({ ...prev, accountIds: selectedIds }))} style={{ alignSelf: "flex-start", padding: "5px 8px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: scheduleSaving || selectedIds.length === 0 ? "var(--text-dim)" : "var(--accent)", cursor: scheduleSaving || selectedIds.length === 0 ? "not-allowed" : "pointer", fontSize: 11 }}>使用手动选择</button>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 700 }}>Daily local times</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 700 }}>每日本地时间</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {schedule.times.map((time) => (
                         <span key={time} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 7px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
@@ -342,37 +342,37 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={newTime} onChange={(event) => setNewTime(event.currentTarget.value)} placeholder="07:00" style={{ minWidth: 0, flex: 1, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", fontSize: 12, fontFamily: "var(--font-mono)", outline: "none" }} />
-                      <button type="button" disabled={scheduleSaving} onClick={addScheduleTime} style={{ padding: "6px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: scheduleSaving ? "var(--text-dim)" : "var(--accent)", cursor: scheduleSaving ? "not-allowed" : "pointer", fontSize: 12 }}>Add</button>
+                      <button type="button" disabled={scheduleSaving} onClick={addScheduleTime} style={{ padding: "6px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: scheduleSaving ? "var(--text-dim)" : "var(--accent)", cursor: scheduleSaving ? "not-allowed" : "pointer", fontSize: 12 }}>添加</button>
                     </div>
                   </div>
 
                   {configError && <div style={{ color: "#f87171", fontSize: 12, lineHeight: 1.45 }}>{configError}</div>}
 
-                  <button type="button" disabled={scheduleSaving || !scheduleDirty} onClick={saveSchedule} style={{ padding: "7px 12px", background: !scheduleSaving && scheduleDirty ? "var(--accent)" : "var(--bg-subtle)", border: "none", borderRadius: 7, color: !scheduleSaving && scheduleDirty ? "#fff" : "var(--text-dim)", cursor: !scheduleSaving && scheduleDirty ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 800 }}>{scheduleSaving ? "Saving…" : scheduleDirty ? "Save schedule" : "Schedule saved"}</button>
+                  <button type="button" disabled={scheduleSaving || !scheduleDirty} onClick={saveSchedule} style={{ padding: "7px 12px", background: !scheduleSaving && scheduleDirty ? "var(--accent)" : "var(--bg-subtle)", border: "none", borderRadius: 7, color: !scheduleSaving && scheduleDirty ? "#fff" : "var(--text-dim)", cursor: !scheduleSaving && scheduleDirty ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 800 }}>{scheduleSaving ? "保存中…" : scheduleDirty ? "保存计划" : "计划已保存"}</button>
                 </>
               )}
             </div>
 
             <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 800 }}>Recent runs</div>
-                <button type="button" onClick={() => void loadHistory()} style={{ padding: "4px 7px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>Refresh</button>
+                <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 800 }}>最近运行</div>
+                <button type="button" onClick={() => void loadHistory()} style={{ padding: "4px 7px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>刷新</button>
               </div>
               {historyError ? (
                 <div style={{ color: "#f87171", fontSize: 12 }}>{historyError}</div>
               ) : !history ? (
-                <div style={{ color: "var(--text-muted)", fontSize: 12 }}>Loading history…</div>
+                <div style={{ color: "var(--text-muted)", fontSize: 12 }}>正在加载历史…</div>
               ) : history.runs.length === 0 ? (
-                <div style={{ color: "var(--text-dim)", fontSize: 12 }}>No warmup runs recorded yet.</div>
+                <div style={{ color: "var(--text-dim)", fontSize: 12 }}>尚无预热运行记录。</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {history.runs.slice(0, 6).map((run) => (
                     <div key={run.id} style={{ padding: 8, border: "1px solid var(--border)", borderRadius: 7, background: "var(--bg)", display: "flex", flexDirection: "column", gap: 3 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ color: "var(--text)", fontSize: 11, fontWeight: 700 }}>{run.source === "scheduled" ? "Scheduled" : "Manual"}</span>
+                        <span style={{ color: "var(--text)", fontSize: 11, fontWeight: 700 }}>{run.source === "scheduled" ? "定时" : "手动"}</span>
                         <span style={{ color: run.results.every((result) => result.success) ? "#34d399" : "#fb923c", fontSize: 11, fontWeight: 700 }}>{runSummary(run)}</span>
                       </div>
-                      <span style={{ color: "var(--text-dim)", fontSize: 10 }}>{formatRunTime(run.completedAt)} · {run.accountIds.length} account{run.accountIds.length === 1 ? "" : "s"}</span>
+                      <span style={{ color: "var(--text-dim)", fontSize: 10 }}>{formatRunTime(run.completedAt)} · {run.accountIds.length} 个账号</span>
                       {run.scheduledRunKey && <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{run.scheduledRunKey}</span>}
                     </div>
                   ))}
@@ -383,8 +383,8 @@ export function ChatGptWarmupDialog({ accounts, onClose, onComplete }: Props) {
         </div>
 
         <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button type="button" disabled={running || scheduleSaving} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: running || scheduleSaving ? "var(--text-dim)" : "var(--text-muted)", cursor: running || scheduleSaving ? "not-allowed" : "pointer", fontSize: 12 }}>Close</button>
-          <button type="button" disabled={running || selectedCount === 0} onClick={runWarmup} style={{ padding: "6px 14px", background: !running && selectedCount > 0 ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 6, color: !running && selectedCount > 0 ? "#fff" : "var(--text-dim)", cursor: !running && selectedCount > 0 ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 800 }}>{running ? "Warming…" : "Warm selected now"}</button>
+          <button type="button" disabled={running || scheduleSaving} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: running || scheduleSaving ? "var(--text-dim)" : "var(--text-muted)", cursor: running || scheduleSaving ? "not-allowed" : "pointer", fontSize: 12 }}>关闭</button>
+          <button type="button" disabled={running || selectedCount === 0} onClick={runWarmup} style={{ padding: "6px 14px", background: !running && selectedCount > 0 ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 6, color: !running && selectedCount > 0 ? "#fff" : "var(--text-dim)", cursor: !running && selectedCount > 0 ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 800 }}>{running ? "预热中…" : "立即预热所选账号"}</button>
         </div>
       </div>
     </div>

@@ -21,11 +21,13 @@ import {
 import {
   getOAuthAccountAdapter,
   ANTIGRAVITY_PROVIDER_ID,
+  GROK_CLI_PROVIDER_ID,
   KIRO_PROVIDER_ID,
   maskAccountId,
   type OAuthAccountProviderAdapter,
 } from "./oauth-account-providers";
 import { withAntigravityProviderLock } from "./antigravity-account-lock";
+import { withGrokProviderLock } from "./grok-account-lock";
 import { withKiroProviderLock } from "./kiro-account-lock";
 
 // Re-export for backward compatibility
@@ -769,21 +771,30 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P
   const normalizedAccountId = accountId.trim();
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
 
-  await syncActiveOAuthAccountCredential(provider);
-  const metadata = await readMetadata(provider);
-  if (metadata.activeAccountId === normalizedAccountId) {
-    throw new OAuthAccountStoreError("Active OAuth account cannot be deleted", 409);
+  const run = async (): Promise<OAuthAccountsList> => {
+    await syncActiveOAuthAccountCredential(provider);
+    const metadata = await readMetadata(provider);
+    if (metadata.activeAccountId === normalizedAccountId) {
+      throw new OAuthAccountStoreError("Active OAuth account cannot be deleted", 409);
+    }
+
+    const sourcePath = credentialPath(provider, normalizedAccountId);
+    if (!(await pathExists(sourcePath))) throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
+
+    await ensureDeletedAccountStoreDir(provider);
+    await rename(sourcePath, deletedCredentialPath(provider, normalizedAccountId));
+
+    const accounts = metadata.accounts.filter((entry) => entry.accountId !== normalizedAccountId);
+    await writeMetadata(provider, { ...metadata, accounts });
+    return listOAuthAccounts(provider);
+  };
+
+  // Grok delete must coordinate with reauth so a concurrent reauth cannot
+  // recreate the deleted slot after the target existence check.
+  if (provider === GROK_CLI_PROVIDER_ID) {
+    return withGrokProviderLock(run);
   }
-
-  const sourcePath = credentialPath(provider, normalizedAccountId);
-  if (!(await pathExists(sourcePath))) throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
-
-  await ensureDeletedAccountStoreDir(provider);
-  await rename(sourcePath, deletedCredentialPath(provider, normalizedAccountId));
-
-  const accounts = metadata.accounts.filter((entry) => entry.accountId !== normalizedAccountId);
-  await writeMetadata(provider, { ...metadata, accounts });
-  return listOAuthAccounts(provider);
+  return run();
 }
 
 /**
@@ -824,6 +835,9 @@ export async function activateOAuthAccount(provider: string, accountId: string):
     return listOAuthAccounts(provider);
   };
 
+  if (provider === GROK_CLI_PROVIDER_ID) {
+    return withGrokProviderLock(run);
+  }
   if (provider === KIRO_PROVIDER_ID) {
     return withKiroProviderLock(run);
   }
@@ -831,4 +845,164 @@ export async function activateOAuthAccount(provider: string, accountId: string):
     return withAntigravityProviderLock(run);
   }
   return run();
+}
+
+/**
+ * Replace the OAuth credential of an existing saved account in-place.
+ *
+ * P0 only for grok-cli.  The opaque storage id, label, extraInfo, createdAt,
+ * lastActivatedAt, and Active pointer are preserved.  The secret credential and
+ * provider-native diagnostic id are updated.  On failure or cancellation the
+ * original credential and Active state are unchanged.
+ *
+ * Callers outside this module must coordinate token-flight and quota-cache
+ * invalidation after a successful reauthentication (see grok-account-token and
+ * grok-subscription-quota).
+ */
+export async function reauthenticateOAuthAccount(
+  provider: string,
+  storageId: string,
+  credential: unknown,
+): Promise<{
+  account: OAuthAccountSummary;
+  accounts: OAuthAccountsList;
+  active: boolean;
+}> {
+  // P0 guard: only grok-cli supports reauthentication.
+  if (provider !== GROK_CLI_PROVIDER_ID) {
+    throw new OAuthAccountStoreError("Reauthentication is currently only supported for grok-cli", 400);
+  }
+
+  const adapter = getAdapter(provider);
+  if (!adapter.isCredential(credential)) {
+    throw new OAuthAccountStoreError("Expected an OAuth credential for reauthentication", 400);
+  }
+
+  const normalizedAccountId = storageId.trim();
+  if (!normalizedAccountId) {
+    throw new OAuthAccountStoreError("accountId is required", 400);
+  }
+
+  return withGrokProviderLock(async () => {
+    // Lock-time: verify target credential file still exists.
+    const credPath = credentialPath(provider, normalizedAccountId);
+    if (!(await pathExists(credPath))) {
+      throw new OAuthAccountStoreError("Saved OAuth account not found", 404);
+    }
+
+    // Read old credential for rollback.
+    let oldCredentialRaw: string | null = null;
+    try {
+      oldCredentialRaw = await readFile(credPath, "utf8");
+    } catch {
+      // Proceed without rollback safety net if old file is unreadable.
+    }
+
+    // Read current metadata and capture the pre-reauth state.
+    const oldMetadata = await readMetadata(provider);
+    const existingEntry = oldMetadata.accounts.find((e) => e.accountId === normalizedAccountId);
+    if (!existingEntry) {
+      throw new OAuthAccountStoreError("Saved OAuth account metadata not found", 404);
+    }
+
+    const wasActive = oldMetadata.activeAccountId === normalizedAccountId;
+    const cred = credential as Record<string, unknown>;
+    const realAccountId = adapter.deriveRealAccountId(cred);
+
+    // Phase 1 — atomic credential write (tmp + rename).
+    try {
+      await ensureAccountStoreDir(provider);
+      const tmpCredPath = `${credPath}.tmp.${process.pid}.${Date.now()}`;
+      await writeFile(tmpCredPath, `${JSON.stringify(cred, null, 2)}\n`, { encoding: "utf8", mode: JSON_FILE_MODE });
+      await rename(tmpCredPath, credPath);
+      await chmod(credPath, JSON_FILE_MODE).catch(() => {});
+    } catch {
+      if (oldCredentialRaw) {
+        try { await writeFile(credPath, oldCredentialRaw, { encoding: "utf8", mode: JSON_FILE_MODE }); } catch { /* best-effort */ }
+      }
+      throw new OAuthAccountStoreError("Failed to update OAuth credential", 500);
+    }
+
+    // Phase 2 — metadata update (atomic tmp + rename).
+    const now = new Date().toISOString();
+    const updatedEntry: OAuthAccountMetadataEntry = {
+      ...existingEntry,
+      chatgptAccountId: realAccountId,
+      updatedAt: now,
+    };
+
+    const updatedAccounts = oldMetadata.accounts.map((e) =>
+      e.accountId === normalizedAccountId ? updatedEntry : e,
+    );
+    const updatedMetadata: OAuthAccountStoreMetadata = {
+      ...oldMetadata,
+      accounts: updatedAccounts,
+    };
+
+    const metaPath = metadataPath(provider);
+    try {
+      await ensureAccountStoreDir(provider);
+      const tmpMetaPath = `${metaPath}.tmp.${process.pid}.${Date.now()}`;
+      await writeFile(tmpMetaPath, `${JSON.stringify(updatedMetadata, null, 2)}\n`, { encoding: "utf8", mode: JSON_FILE_MODE });
+      await rename(tmpMetaPath, metaPath);
+      await chmod(metaPath, JSON_FILE_MODE).catch(() => {});
+    } catch {
+      // Best-effort rollback of credential + metadata.
+      if (oldCredentialRaw) {
+        try { await writeFile(credPath, oldCredentialRaw, { encoding: "utf8", mode: JSON_FILE_MODE }); } catch { /* best-effort */ }
+      }
+      try { await writeMetadata(provider, oldMetadata); } catch { /* best-effort */ }
+      throw new OAuthAccountStoreError("Failed to update account metadata", 500);
+    }
+
+    // Phase 3 — if the target was Active, mirror to auth.json.
+    if (wasActive) {
+      try {
+        const store = await getWebCredentialStore();
+        const authCredential = (cred as Record<string, unknown>).type
+          ? cred
+          : { ...cred, type: "oauth" as const };
+        await store.modify(provider, async () => authCredential as unknown as Credential);
+      } catch {
+        // Best-effort rollback: credential + metadata.
+        if (oldCredentialRaw) {
+          try { await writeFile(credPath, oldCredentialRaw, { encoding: "utf8", mode: JSON_FILE_MODE }); } catch { /* best-effort */ }
+        }
+        try { await writeMetadata(provider, oldMetadata); } catch { /* best-effort */ }
+        throw new OAuthAccountStoreError("Failed to update active OAuth credential", 500);
+      }
+    }
+
+    // Phase 4 — invalidate token flight and quota cache for this account.
+    // Dynamic imports avoid a circular dependency with grok-account-token and
+    // grok-subscription-quota.
+    try {
+      const { invalidateGrokTokenFlight } = await import("./grok-account-token");
+      invalidateGrokTokenFlight(normalizedAccountId);
+    } catch { /* best-effort */ }
+
+    try {
+      const { bumpGrokQuotaGeneration, deleteGrokQuotaPersistedCacheEntry } = await import("./grok-subscription-quota");
+      bumpGrokQuotaGeneration(normalizedAccountId);
+      await deleteGrokQuotaPersistedCacheEntry(normalizedAccountId);
+    } catch { /* best-effort */ }
+
+    // Phase 5 — return the updated account summary and full list.
+    const finalMetadata = await readMetadata(provider);
+    const finalEntry = finalMetadata.accounts.find((e) => e.accountId === normalizedAccountId);
+    if (!finalEntry) {
+      throw new OAuthAccountStoreError("Account metadata inconsistent after reauthentication", 500);
+    }
+
+    const account = accountSummary(finalMetadata, finalEntry);
+    const accounts: OAuthAccountsList = {
+      provider,
+      activeAccountId: finalMetadata.activeAccountId ?? null,
+      accounts: sortAccountSummaries(
+        finalMetadata.accounts.map((e) => accountSummary(finalMetadata, e)),
+      ),
+    };
+
+    return { account, accounts, active: wasActive };
+  });
 }

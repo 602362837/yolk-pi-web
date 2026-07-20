@@ -90,11 +90,14 @@ export function GrokQuotaView({
   loading,
   account,
   onRefresh,
+  onReauthenticate,
 }: {
   quota: GrokQuotaResultV1 | null;
   loading: boolean;
   account: GrokQuotaAccountBadge | null;
   onRefresh: () => void;
+  /** When set, renders a CTA button inside the reauthRequired banner. */
+  onReauthenticate?: () => void;
 }) {
   if (!quota && !loading && !account) return null;
 
@@ -144,8 +147,27 @@ export function GrokQuotaView({
       )}
 
       {quota?.reauthRequired && (
-        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5, padding: "8px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 5 }}>
-          需要重新登录。{grokQuotaErrorMessage("unauthorized")}
+        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5, padding: "8px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 5, display: "flex", flexDirection: "column", gap: 8 }}>
+          <span>需要重新登录。{grokQuotaErrorMessage("unauthorized")}</span>
+          {onReauthenticate && (
+            <button
+              type="button"
+              onClick={onReauthenticate}
+              style={{
+                alignSelf: "flex-start",
+                padding: "4px 12px",
+                background: "#ef4444",
+                border: "none",
+                borderRadius: 5,
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              重新登录此账号
+            </button>
+          )}
         </div>
       )}
 

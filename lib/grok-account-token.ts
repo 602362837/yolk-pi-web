@@ -24,6 +24,7 @@ import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
 import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
 import { listOAuthAccounts } from "./oauth-accounts";
 import { getWebCredentialStore } from "./web-credential-store";
+import { withGrokProviderLock } from "./grok-account-lock";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -215,31 +216,37 @@ export async function getGrokAccessToken(
 
   const promise = (async (): Promise<GrokAccessToken> => {
     try {
-      // Read saved credential
-      const credPath = credentialFilePath(storageId);
-      if (!(await pathExists(credPath))) {
-        throw new Error(`Grok saved account not found: ${storageId}`);
-      }
-
-      const raw = JSON.parse(await readFile(credPath, "utf8")) as unknown;
-      if (!isRecord(raw)) {
-        throw new Error(`Grok saved account credential is invalid: ${storageId}`);
-      }
-
-      const access = typeof raw.access === "string" ? raw.access.trim() : "";
-      const expires = typeof raw.expires === "number" ? raw.expires : 0;
-      // forceRefresh must refresh even when the token is still far from expiry.
-      // Do not fake this with minValidityMs:0 alone — that only refreshes expired tokens.
-      const needsRefresh = forceRefresh || !access || epochNow() >= expires - minValidityMs;
-
-      if (!needsRefresh) {
-        return { accessToken: access, refreshed: false, expiresAt: expires };
-      }
-
-      // Check abort signal before blocking refresh
+      // Check abort signal before entering the lock.
       signal?.throwIfAborted();
 
-      return await refreshGrokCredential(storageId, raw);
+      return await withGrokProviderLock(async () => {
+        // Re-read the credential file under the lock so a concurrent reauth
+        // or Activate that completed before us is visible.
+        const credPath = credentialFilePath(storageId);
+        if (!(await pathExists(credPath))) {
+          throw new Error(`Grok saved account not found: ${storageId}`);
+        }
+
+        const raw = JSON.parse(await readFile(credPath, "utf8")) as unknown;
+        if (!isRecord(raw)) {
+          throw new Error(`Grok saved account credential is invalid: ${storageId}`);
+        }
+
+        const access = typeof raw.access === "string" ? raw.access.trim() : "";
+        const expires = typeof raw.expires === "number" ? raw.expires : 0;
+        // forceRefresh must refresh even when the token is still far from expiry.
+        // Do not fake this with minValidityMs:0 alone — that only refreshes expired tokens.
+        const needsRefresh = forceRefresh || !access || epochNow() >= expires - minValidityMs;
+
+        if (!needsRefresh) {
+          return { accessToken: access, refreshed: false, expiresAt: expires };
+        }
+
+        // Re-check abort signal inside the lock before the blocking refresh.
+        signal?.throwIfAborted();
+
+        return await refreshGrokCredential(storageId, raw);
+      });
     } finally {
       inflightRefreshes.delete(key);
     }

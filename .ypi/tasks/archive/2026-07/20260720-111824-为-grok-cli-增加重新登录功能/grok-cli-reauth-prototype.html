@@ -1,0 +1,1422 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yolk Pi Web · Grok CLI 重新登录交互原型</title>
+  <style>
+    :root {
+      --bg: #131313;
+      --bg-panel: #1e1e1e;
+      --bg-hover: #2d2d2d;
+      --bg-selected: rgba(96, 165, 250, 0.15);
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+      --border: #2e2e2e;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.1);
+      --success-border: rgba(16, 185, 129, 0.2);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.08);
+      --warning-border: rgba(245, 158, 11, 0.2);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.1);
+      --danger-border: rgba(239, 68, 68, 0.2);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+
+    html.light {
+      --bg: #f8fafc;
+      --bg-panel: #ffffff;
+      --bg-hover: #f1f5f9;
+      --bg-selected: rgba(59, 130, 246, 0.1);
+      --bg-subtle: #f8fafc;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #059669;
+      --success-bg: rgba(5, 150, 105, 0.08);
+      --success-border: rgba(5, 150, 105, 0.2);
+      --warning: #d97706;
+      --warning-bg: rgba(217, 119, 6, 0.08);
+      --warning-border: rgba(217, 119, 6, 0.2);
+      --danger: #dc2626;
+      --danger-bg: rgba(220, 38, 38, 0.08);
+      --danger-border: rgba(220, 38, 38, 0.2);
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--bg); color: var(--text); font-size: 13px; transition: background-color 0.2s, color 0.2s; }
+    
+    button { font: inherit; }
+    button:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Header styling */
+    .proto-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .proto-title strong { display: block; font-size: 15px; font-weight: 800; }
+    .proto-title span { color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px; }
+    .proto-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-ctrl {
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-panel);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .btn-ctrl:hover { background: var(--bg-hover); color: var(--text); }
+    .btn-ctrl.active { background: var(--accent); color: white; border-color: var(--accent); }
+    
+    /* Layout styling */
+    .proto-container { max-width: 1280px; margin: 24px auto; padding: 0 16px; }
+    .proto-desc {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .proto-desc h2 { margin: 0 0 8px; font-size: 14px; font-weight: 800; color: var(--accent); }
+    .proto-desc ul { margin: 8px 0 0; padding-left: 20px; color: var(--text-muted); }
+
+    /* Mock Interface Frame */
+    .interface-frame {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 700px;
+      position: relative;
+      transition: width 0.3s ease;
+    }
+    .interface-frame.narrow { width: 375px; margin: 0 auto; }
+
+    /* Mock Top-bar */
+    .mock-topbar {
+      height: 42px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 12px;
+    }
+    .mock-topbar-left { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+    .mock-topbar-right { display: flex; align-items: center; gap: 12px; }
+    
+    /* Topbar quota widget */
+    .mock-topbar-grok-widget {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--bg);
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .mock-topbar-grok-widget:hover { border-color: var(--accent); background: var(--bg-hover); color: var(--text); }
+    .mock-topbar-grok-widget.reauth-active {
+      border-color: var(--danger);
+      background: var(--danger-bg);
+      color: var(--danger);
+      animation: pulse-border 2s infinite;
+    }
+    @keyframes pulse-border {
+      0% { border-color: rgba(239, 68, 68, 0.4); }
+      50% { border-color: rgba(239, 68, 68, 1); }
+      100% { border-color: rgba(239, 68, 68, 0.4); }
+    }
+
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .status-dot.success { background-color: var(--success); }
+    .status-dot.warning { background-color: var(--warning); }
+    .status-dot.danger { background-color: var(--danger); }
+    .status-dot.muted { background-color: var(--text-dim); }
+
+    /* Mock Models Modal (2-column layout) */
+    .models-modal {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      background: var(--bg-panel);
+      min-height: 0;
+    }
+    .interface-frame.narrow .models-modal { grid-template-columns: 1fr; }
+
+    /* Sidebar List */
+    .models-sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .interface-frame.narrow .models-sidebar { display: none; }
+    .sidebar-title { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; padding: 4px 8px; letter-spacing: 0.05em; }
+    .sidebar-item {
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+    .sidebar-item.active { background: var(--bg-selected); color: var(--accent); font-weight: 700; }
+    .sidebar-badge { font-size: 9px; padding: 1px 4px; border-radius: 9px; font-weight: bold; }
+    .sidebar-badge.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+
+    /* Content Area */
+    .models-content {
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .interface-frame.narrow .models-content { padding: 16px; }
+
+    .content-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .content-header h1 { font-size: 16px; margin: 0; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .header-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Banner Alerts */
+    .alert-banner {
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      line-height: 1.5;
+    }
+    .alert-banner.danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--text); }
+    .alert-banner.warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--text); }
+    .alert-banner-icon { font-size: 16px; flex-shrink: 0; }
+    .alert-banner-body { flex: 1; }
+    .alert-banner-title { font-weight: 700; margin-bottom: 2px; }
+    .alert-banner-desc { font-size: 11px; color: var(--text-muted); }
+    .alert-banner-cta {
+      margin-top: 8px;
+      padding: 4px 8px;
+      background: var(--danger);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .alert-banner-cta:hover { background: var(--accent-hover); }
+
+    /* Accounts List section */
+    .accounts-section { display: flex; flex-direction: column; gap: 8px; }
+    .section-title { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    .account-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: border-color 0.2s;
+    }
+    .account-card.active { border-color: var(--success); background: var(--success-bg); }
+    .account-info { min-width: 0; flex: 1; }
+    .account-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .account-name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .account-tag { font-size: 10px; padding: 1px 6px; border-radius: 9px; background: var(--bg-hover); color: var(--text-muted); font-weight: bold; }
+    .account-email { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    
+    .account-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+    .btn-act {
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-panel);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .btn-act:hover { background: var(--bg-hover); }
+    .btn-act.btn-reauth { color: var(--warning); border-color: var(--warning-border); }
+    .btn-act.btn-reauth.reauth-needed { color: var(--danger); border-color: var(--danger-border); animation: pulse-border 2s infinite; }
+    .btn-act.btn-reauth:hover { background: var(--warning-bg); }
+    .btn-act.btn-active { color: var(--success); border-color: var(--success-border); }
+    
+    /* Mock Quota Section */
+    .quota-section { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; background: var(--bg-panel); }
+    .quota-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .quota-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .interface-frame.narrow .quota-grid { grid-template-columns: 1fr; }
+    
+    .quota-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .quota-card-label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); font-weight: 700; margin-bottom: 6px; }
+    .quota-card-value { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .quota-card-value small { font-size: 11px; color: var(--text-dim); font-weight: normal; }
+    .quota-bar-outer { height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; margin: 8px 0; }
+    .quota-bar-inner { height: 100%; border-radius: 3px; width: 0; transition: width 0.3s ease; }
+    .quota-card-desc { font-size: 10px; color: var(--text-dim); }
+
+    /* Interactive Overlay Modal Dialogs */
+    .overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+    .proto-dialog {
+      width: 480px;
+      max-width: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .proto-dialog-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .proto-dialog-title { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .proto-dialog-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; line-height: 1; }
+    
+    .proto-dialog-body { padding: 20px 16px; font-size: 12px; line-height: 1.5; overflow-y: auto; max-height: 380px; }
+    
+    .proto-dialog-foot { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--bg-subtle); }
+    
+    /* Dialog button variants */
+    .btn-dlg {
+      min-height: 30px;
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .btn-dlg-cancel { background: var(--bg-panel); color: var(--text-muted); }
+    .btn-dlg-cancel:hover { background: var(--bg-hover); color: var(--text); }
+    .btn-dlg-primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .btn-dlg-primary:hover { background: var(--accent-hover); }
+    .btn-dlg-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-dlg-danger { background: var(--danger); color: white; border-color: var(--danger); }
+    .btn-dlg-danger:hover { background: #b91c1c; }
+
+    /* Account detail container in dialog */
+    .dialog-account-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    
+    /* Alert notice boxes inside dialogs */
+    .dialog-notice {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .dialog-notice-icon { font-size: 14px; flex-shrink: 0; }
+    .dialog-notice.warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--text); }
+    .dialog-notice.danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--text); }
+    .dialog-notice.info { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); color: var(--text); }
+
+    /* Methods grid */
+    .methods-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .method-option {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: var(--bg);
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.15s;
+      width: 100%;
+    }
+    .method-option:hover { border-color: var(--accent); background: var(--bg-hover); }
+    .method-option-title { font-weight: 700; font-size: 12px; color: var(--text); }
+    .method-option-desc { font-size: 11px; color: var(--text-muted); }
+
+    /* Form control */
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .form-label { font-size: 11px; font-weight: 700; color: var(--text-dim); }
+    .form-input {
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      width: 100%;
+      outline: none;
+    }
+    .form-input:focus { border-color: var(--accent); }
+
+    /* Device code box */
+    .device-code-box {
+      font-size: 24px;
+      font-weight: 800;
+      text-align: center;
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      letter-spacing: 0.1em;
+      margin: 12px 0;
+      color: var(--accent-hover);
+    }
+    .device-link { text-align: center; color: var(--accent); text-decoration: none; display: block; font-weight: 600; margin-top: 8px; }
+    .device-link:hover { text-decoration: underline; }
+
+    /* Loading indicators */
+    .spinner-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 0; gap: 12px; }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(148, 163, 184, 0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast Notification */
+    .toast {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast-success { border-color: var(--success); }
+    .toast-success-icon { color: var(--success); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <header class="proto-header">
+    <div class="proto-title">
+      <strong>Grok CLI 指定账号原位重新登录 · UI 原型</strong>
+      <span>覆盖 Active/非 Active 确认、无法强校验身份风险警示、登录方式预选与冲突处理</span>
+    </div>
+    <div class="proto-controls" aria-label="原型控制区">
+      <button class="btn-ctrl active" onclick="setTheme('dark')">深色模式</button>
+      <button class="btn-ctrl" onclick="setTheme('light')">浅色模式</button>
+      <button class="btn-ctrl" id="btn-toggle-responsive" onclick="toggleResponsive()">切到 375px 窄屏</button>
+      <button class="btn-ctrl" onclick="resetPrototype()">重置原型</button>
+    </div>
+  </header>
+
+  <main class="proto-container">
+    <section class="proto-desc">
+      <h2>💡 设计概要与交互门禁验证点</h2>
+      <p>为了解决 Grok 托管账号凭据失效后只能通过“添加账号”导致重复槽位的问题，我们设计了<strong>原位重新登录 (reauth) 机制</strong>。请在此原型中重点验证：</p>
+      <ul>
+        <li><strong>原位覆盖：</strong>重新登录将直接替换选定 storage slot 的 secret 凭据，保留备注、补充信息及 Active 指针。</li>
+        <li><strong>安全警示：</strong>由于 xAI OAuth 无法强校验同一远端身份，授权前对话框必须显式警告“请在浏览器确认使用正确账号”。</li>
+        <li><strong>Active 确认差异：</strong>Active 账号重新登录将提醒会影响所有后续会话；非 Active 重新登录则明确说明不会改变全局 Active。</li>
+        <li><strong>登录方式映射：</strong>UI 方法映射至上游真实 id <code>browser | device | existing</code>，并提供相应的交互表单。</li>
+        <li><strong>深链聚焦：</strong>点击顶部失效提示或用量面板，深链至 Models 页面，且直接聚焦到对应的 Grok 提供商。</li>
+      </ul>
+    </section>
+
+    <!-- Simulated Web UI Frame -->
+    <section class="interface-frame" id="interfaceFrame" aria-label="模拟 Yolk Pi Web 界面">
+      
+      <!-- Top-bar -->
+      <div class="mock-topbar">
+        <div class="mock-topbar-left">
+          <span>🍳 yolk pi web</span>
+          <span style="font-weight: normal; color: var(--text-dim);">|</span>
+          <span style="color: var(--text-muted); font-size: 11px;">workspace: default_project</span>
+        </div>
+        <div class="mock-topbar-right">
+          <!-- Standalone topbar item -->
+          <div class="mock-topbar-grok-widget reauth-active" id="topbarGrokWidget" onclick="focusGrokProvider(true)" title="Grok 凭据已失效，需要重新登录。点击进入 Models 管理">
+            <span class="status-dot danger"></span>
+            <span style="font-weight: 800; font-size: 10px; color: var(--text);">Grok</span>
+            <span style="font-size: 10px;">重新登录</span>
+          </div>
+          <span style="color: var(--text-dim);">|</span>
+          <span style="font-family: var(--font-mono); color: var(--text-muted);">v0.80.10</span>
+        </div>
+      </div>
+
+      <!-- Models Modal Area -->
+      <div class="models-modal">
+        <!-- Sidebar -->
+        <aside class="models-sidebar">
+          <div class="sidebar-title">Providers</div>
+          <a class="sidebar-item" onclick="selectProvider('openai')">
+            <span>OpenAI</span>
+            <span class="status-dot success"></span>
+          </a>
+          <a class="sidebar-item" onclick="selectProvider('kiro')">
+            <span>AWS Kiro</span>
+            <span class="status-dot success"></span>
+          </a>
+          <a class="sidebar-item active" id="sidebar-grok-item" onclick="selectProvider('grok')">
+            <span>Grok (CLI)</span>
+            <span class="sidebar-badge danger" id="grok-sidebar-badge">需重登</span>
+          </a>
+          <a class="sidebar-item" onclick="selectProvider('google')">
+            <span>Google Vertex</span>
+            <span class="status-dot muted"></span>
+          </a>
+        </aside>
+
+        <!-- Main Content (Grok CLI Accounts Page) -->
+        <div class="models-content">
+          <div class="content-header">
+            <div>
+              <h1>Grok (CLI) 订阅账号管理</h1>
+              <div class="header-sub" id="providerHeaderSub">已保存 3 个账号，当前凭据需恢复 / 未连接</div>
+            </div>
+            <button class="btn-ctrl" style="background: var(--accent); color: white; border-color: var(--accent); font-weight: 700;" onclick="showAddFlow()">
+              ＋ 添加新账号
+            </button>
+          </div>
+
+          <!-- Reauth Required Alert Banner (R2) -->
+          <div class="alert-banner danger" id="grokReauthBanner">
+            <span class="alert-banner-icon">⚠️</span>
+            <div class="alert-banner-body">
+              <div class="alert-banner-title">Active 账号 Grok 登录已失效</div>
+              <div class="alert-banner-desc">系统检测到当前全局活动账号 <strong>主力账号 (per•••@example.com)</strong> 凭据已被撤销或过期。Grok 相关的模型调用和额度查询将受到限制。</div>
+              <button class="alert-banner-cta" onclick="startReauth('acc_primary')">重新登录此账号</button>
+            </div>
+          </div>
+
+          <!-- Accounts List (R3) -->
+          <div class="accounts-section">
+            <div class="section-title">已保存的托管账号</div>
+            
+            <!-- Account 1 (Active, Expired) -->
+            <div class="account-card active" id="card-acc_primary">
+              <div class="account-info">
+                <div class="account-meta">
+                  <span class="account-name" id="name-acc_primary">个人 SuperGrok</span>
+                  <span class="account-tag">主力账号</span>
+                  <span class="status-dot danger" id="dot-acc_primary" title="凭据失效，需要重新登录"></span>
+                </div>
+                <div class="account-email" id="email-acc_primary">per•••@example.com</div>
+                <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;" id="meta-acc_primary">创建时间: 2026-07-15 | 备注: 包含主力额度</div>
+              </div>
+              <div class="account-actions">
+                <span class="account-tag" style="background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border)">Active</span>
+                <button class="btn-act btn-reauth reauth-needed" id="btn-reauth-acc_primary" onclick="startReauth('acc_primary')">重新登录</button>
+                <button class="btn-act" onclick="showDetail('acc_primary')">详情</button>
+              </div>
+            </div>
+
+            <!-- Account 2 (Non-Active, Valid) -->
+            <div class="account-card" id="card-acc_backup">
+              <div class="account-info">
+                <div class="account-meta">
+                  <span class="account-name" id="name-acc_backup">工作区 Grok</span>
+                  <span class="account-tag">备用账号</span>
+                  <span class="status-dot success" id="dot-acc_backup" title="凭据有效"></span>
+                </div>
+                <div class="account-email" id="email-acc_backup">wor•••@example.com</div>
+                <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;" id="meta-acc_backup">创建时间: 2026-07-16 | 备注: 团队备用</div>
+              </div>
+              <div class="account-actions">
+                <button class="btn-act btn-active" id="btn-active-acc_backup" onclick="setActiveAccount('acc_backup')">设为 Active</button>
+                <button class="btn-act btn-reauth" id="btn-reauth-acc_backup" onclick="startReauth('acc_backup')">重新登录</button>
+                <button class="btn-act" onclick="showDetail('acc_backup')">详情</button>
+                <button class="btn-act" style="color: var(--danger);" onclick="deleteAccount('acc_backup')">删除</button>
+              </div>
+            </div>
+
+            <!-- Account 3 (Non-Active, Expired) -->
+            <div class="account-card" id="card-acc_long">
+              <div class="account-info">
+                <div class="account-meta">
+                  <span class="account-name" id="name-acc_long" style="max-width: 160px;">验证省略显示的超长账号名称</span>
+                  <span class="account-tag">长内容测试</span>
+                  <span class="status-dot danger" id="dot-acc_long" title="凭据失效，需要重新登录"></span>
+                </div>
+                <div class="account-email" id="email-acc_long">ver••••••••@long-domain.example</div>
+                <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;" id="meta-acc_long">创建时间: 2026-07-17 | 备注: 边界验证</div>
+              </div>
+              <div class="account-actions">
+                <button class="btn-act btn-active" id="btn-active-acc_long" onclick="setActiveAccount('acc_long')">设为 Active</button>
+                <button class="btn-act btn-reauth reauth-needed" id="btn-reauth-acc_long" onclick="startReauth('acc_long')">重新登录</button>
+                <button class="btn-act" onclick="showDetail('acc_long')">详情</button>
+                <button class="btn-act" style="color: var(--danger);" onclick="deleteAccount('acc_long')">删除</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Quota View Section (R2) -->
+          <div class="quota-section" id="grokQuotaSection">
+            <div class="quota-header">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span class="section-title">用量额度卡片</span>
+                <span style="font-size: 11px; color: var(--text-dim);" id="quotaUpdateTime">更新于 5 小时前 (展示缓存数据)</span>
+              </div>
+              <button class="btn-act" onclick="refreshQuota()" id="btn-refresh-quota" style="height: 24px; padding: 0 8px;">
+                ↻ 刷新额度
+              </button>
+            </div>
+            
+            <div class="quota-grid">
+              <div class="quota-card">
+                <div class="quota-card-label">月度额度</div>
+                <div class="quota-card-value" id="monthlyQuotaVal">604 <small>/ 1,000 次</small></div>
+                <div class="quota-bar-outer">
+                  <div class="quota-bar-inner" id="monthlyQuotaBar" style="width: 60.4%; background: var(--warning);"></div>
+                </div>
+                <div class="quota-card-desc" id="monthlyQuotaDesc">剩余 396 次 · 重置于 2026-08-01 08:00</div>
+              </div>
+
+              <div class="quota-card">
+                <div class="quota-card-label">周额度</div>
+                <div class="quota-card-value" id="weeklyQuotaVal">80% <small>已使用</small></div>
+                <div class="quota-bar-outer">
+                  <div class="quota-bar-inner" id="weeklyQuotaBar" style="width: 80%; background: var(--warning);"></div>
+                </div>
+                <div class="quota-card-desc" id="weeklyQuotaDesc">重置于 2026-07-20 00:00</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modals and Overlays container -->
+      <div id="dialogContainer" class="hidden">
+        
+        <!-- Overlay 1: Confirmation Dialog (R4) -->
+        <div class="overlay-backdrop" id="dialog-confirm" class="hidden">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="confirm-title">⚠️ 重新登录账号槽位确认</div>
+              <button class="proto-dialog-close" onclick="closeDialog()">×</button>
+            </div>
+            <div class="proto-dialog-body">
+              <div class="dialog-account-box">
+                <div style="font-weight: 700; font-size: 13px;" id="dlg-account-name">个人 SuperGrok</div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-top: 4px;" id="dlg-account-email">per•••@example.com</div>
+              </div>
+
+              <!-- Notice depending on whether target is active -->
+              <div class="dialog-notice danger" id="dlg-notice-active">
+                <span class="dialog-notice-icon">⚠️</span>
+                <div>
+                  <strong>此账号当前为活动账号 (Active)</strong>
+                  <div style="margin-top: 4px;">重新授权成功后，该账号仍将保持全局 Active，并影响当前和所有新会话的后续 Grok 调用凭据。</div>
+                </div>
+              </div>
+              <div class="dialog-notice info hidden" id="dlg-notice-inactive">
+                <span class="dialog-notice-icon">ℹ️</span>
+                <div>
+                  <strong>此账号为非活动账号 (Inactive)</strong>
+                  <div style="margin-top: 4px;">重新授权仅更新该账号槽位的凭证，不会改变全局当前 Active 账号（当前 Active 账号不受影响）。</div>
+                </div>
+              </div>
+
+              <!-- Identity Warning (R4) -->
+              <div class="dialog-notice warning">
+                <span class="dialog-notice-icon">💡</span>
+                <div>
+                  <strong>无法强校验远端身份</strong>
+                  <div style="margin-top: 4px;">xAI 凭据未提供稳定公开的账号 ID，系统无法可靠验证浏览器里登录的账号是否为原账号。请在浏览器授权时确认使用正确账号。</div>
+                </div>
+              </div>
+
+              <p style="margin: 0; color: var(--text-muted);">继续后，我们将发起安全 OAuth 会话以重新授权此账号。原有的备注和补充信息将保留，失败或取消时原凭据不作修改。</p>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" onclick="closeDialog()">取消</button>
+              <button class="btn-dlg btn-dlg-primary" onclick="proceedToMethods()">确认并继续</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 2: Method Selector (R5) -->
+        <div class="overlay-backdrop hidden" id="dialog-methods">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="methods-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="methods-title">选择重新登录授权方式</div>
+              <button class="proto-dialog-close" onclick="closeDialog()">×</button>
+            </div>
+            <div class="proto-dialog-body">
+              <p style="margin: 0 0 12px; color: var(--text-muted);">重新登录 <strong id="dlg-method-account-name">个人 SuperGrok</strong>。请选择匹配的登录授权类型：</p>
+              
+              <div class="methods-list">
+                <button class="method-option" onclick="startOAuthFlow('browser')">
+                  <span class="method-option-title">🌐 浏览器登录 (推荐)</span>
+                  <span class="method-option-desc">通过 PKCE 在外部浏览器跳转授权，安全回填 callback URL</span>
+                </button>
+                
+                <button class="method-option" onclick="startOAuthFlow('device')">
+                  <span class="method-option-title">📺 设备验证码登录</span>
+                  <span class="method-option-desc">适用于远程 headless、跳板机或没有本地浏览器的环境</span>
+                </button>
+                
+                <button class="method-option" onclick="startOAuthFlow('existing')">
+                  <span class="method-option-title">📂 复用本地 Grok Build</span>
+                  <span class="method-option-desc">自动读取本地官方客户端的 <code>~/.grok/auth.json</code> 文件配置</span>
+                </button>
+              </div>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" onclick="backToConfirm()">返回</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 3: Connecting State -->
+        <div class="overlay-backdrop hidden" id="dialog-connecting">
+          <div class="proto-dialog">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title">正在建立授权连接…</div>
+            </div>
+            <div class="proto-dialog-body">
+              <div class="spinner-box">
+                <div class="spinner"></div>
+                <p style="margin: 0; color: var(--text-muted);">正在初始化 isolated OAuth 内存状态，并在安全锁中准备写入…</p>
+              </div>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" onclick="cancelFlow()">取消</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 4: Browser PKCE Input Form (R5) -->
+        <div class="overlay-backdrop hidden" id="dialog-form-browser">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="browser-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="browser-title">浏览器跳转授权</div>
+              <button class="proto-dialog-close" onclick="cancelFlow()">×</button>
+            </div>
+            <div class="proto-dialog-body">
+              <p style="margin: 0 0 12px; line-height: 1.6;">已在您的默认浏览器中打开 Grok 登录授权页。如果在授权通过后浏览器显示“无法访问此页面”或无法建立连接，请复制地址栏中的<strong>完整跳转 URL</strong> 并粘贴到下方：</p>
+              
+              <div style="background: var(--bg); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 12px; font-size: 11px;">
+                <span style="font-weight: 700; display: block; margin-bottom: 2px;">外部页面未弹出？</span>
+                <a href="https://auth.x.ai/oauth/authorize?response_type=code&client_id=grok-cli..." target="_blank" style="color: var(--accent); text-decoration: none; word-break: break-all;">点击这里手动打开 xAI 授权页</a>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="callbackUrl">粘贴 Callback URL</label>
+                <input class="form-input" id="callbackUrl" placeholder="http://localhost:1455/auth/callback?code=..." oninput="validateInput()" />
+              </div>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" onclick="cancelFlow()">取消</button>
+              <button class="btn-dlg btn-dlg-primary" id="btn-submit-browser" disabled onclick="submitAuth('browser')">提交授权</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 5: Device Code Display (R5) -->
+        <div class="overlay-backdrop hidden" id="dialog-form-device">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="device-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="device-title">设备验证码登录</div>
+              <button class="proto-dialog-close" onclick="cancelFlow()">×</button>
+            </div>
+            <div class="proto-dialog-body" style="text-align: center;">
+              <p style="margin: 0 0 12px; text-align: left;">请在您的手机或另一台电脑上打开以下验证链接，并输入下方的设备验证码：</p>
+              
+              <a href="https://auth.x.ai/activate" target="_blank" class="device-link">https://auth.x.ai/activate</a>
+
+              <div class="device-code-box">XAI-8F9B-20A4</div>
+
+              <p style="margin: 12px 0 0; font-size: 11px; color: var(--text-dim);">系统正在自动轮询验证状态。该码将在 <span id="countdown">180</span> 秒内有效。</p>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" style="width: 100%;" onclick="cancelFlow()">取消授权</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 6: Progress Status -->
+        <div class="overlay-backdrop hidden" id="dialog-progress">
+          <div class="proto-dialog">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="progress-title">正在验证凭证并保存…</div>
+            </div>
+            <div class="proto-dialog-body">
+              <div class="spinner-box">
+                <div class="spinner"></div>
+                <p style="margin: 0; color: var(--text-muted);" id="progress-message">正在连接 xAI 并验证令牌的可用性…</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 7: Conflict / Account Deleted Dialog (R10) -->
+        <div class="overlay-backdrop hidden" id="dialog-conflict">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="conflict-title" style="color: var(--danger)">⚠️ 授权冲突 / 目标已发生变化</div>
+              <button class="proto-dialog-close" onclick="closeDialog()">×</button>
+            </div>
+            <div class="proto-dialog-body">
+              <div class="dialog-notice danger">
+                <span class="dialog-notice-icon">✕</span>
+                <div>
+                  <strong>账号在此期间被删除或状态已变化</strong>
+                  <div style="margin-top: 4px;">由于重新登录的锁时间校验，目标账号在您完成浏览器授权前已被另一窗口删除或重新修改，本次授权无法提交。</div>
+                </div>
+              </div>
+              <p style="margin: 0; color: var(--text-muted);">系统已回滚本次零写入，以防止创建重复且无所有权的废弃槽位。请重新加载列表后再试。</p>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" style="width: 100%" onclick="closeDialog()">返回</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 8: Success Dialog (R10) -->
+        <div class="overlay-backdrop hidden" id="dialog-success">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="success-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="success-title" style="color: var(--success)">✓ 重新登录成功</div>
+            </div>
+            <div class="proto-dialog-body">
+              <div class="dialog-notice success" id="dlg-success-active-notice">
+                <span class="dialog-notice-icon">✓</span>
+                <div>
+                  <strong>已更新全局 Active 凭证</strong>
+                  <div style="margin-top: 4px;">账号槽位凭据已在原 storage ID 下成功替换，并在全局 Active mirror 中自动重载。当前与新会话后续请求将无缝使用新凭证。</div>
+                </div>
+              </div>
+              <div class="dialog-notice success hidden" id="dlg-success-inactive-notice">
+                <span class="dialog-notice-icon">✓</span>
+                <div>
+                  <strong>账号凭据已更新，未改变全局 Active</strong>
+                  <div style="margin-top: 4px;">账号槽位凭据已在原 storage ID 下成功替换。由于其当前不是活动账号，系统未改动全局 Active 指针与 auth.json。</div>
+                </div>
+              </div>
+
+              <div class="dialog-account-box">
+                <div style="font-weight: 700; font-size: 13px;" id="dlg-success-account-name">个人 SuperGrok</div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-top: 4px;" id="dlg-success-account-email">per•••@example.com</div>
+              </div>
+              <p style="margin: 0; color: var(--text-muted);">已安全清除旧的限额缓存。正在触发 quota 重新查询以获得最新额度数据。</p>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-primary" style="width: 100%;" onclick="finishSuccessFlow()">完成</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay 9: Details / Remarks Dialog -->
+        <div class="overlay-backdrop hidden" id="dialog-detail">
+          <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+            <div class="proto-dialog-head">
+              <div class="proto-dialog-title" id="detail-title">账号详情与补充信息</div>
+              <button class="proto-dialog-close" onclick="closeDialog()">×</button>
+            </div>
+            <div class="proto-dialog-body">
+              <div class="form-group">
+                <label class="form-label">账号名</label>
+                <div style="padding: 6px 0; font-weight: bold;" id="dlg-detail-name">个人 SuperGrok</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Masked Account ID (Opaque Display)</label>
+                <div style="font-family: var(--font-mono); padding: 6px 0;" id="dlg-detail-email">per•••@example.com</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">补充说明 (备注)</label>
+                <textarea class="form-input" style="min-height: 80px; font-family: inherit;" id="dlg-detail-textarea">主力账号，包含主力额度</textarea>
+              </div>
+            </div>
+            <div class="proto-dialog-foot">
+              <button class="btn-dlg btn-dlg-cancel" onclick="closeDialog()">关闭</button>
+              <button class="btn-dlg btn-dlg-primary" onclick="saveDetail()">保存备注</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Toast Container -->
+      <div class="toast" id="toastNotification" role="status" aria-live="polite">
+        <span class="toast-success-icon">✓</span>
+        <span id="toastMessage">操作成功</span>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    // Prototype state management
+    let activeAccount = "acc_primary";
+    let selectedTargetAccount = null;
+    let responsiveMode = false;
+    let countdownInterval = null;
+
+    // Simulated local database
+    const accountsData = {
+      acc_primary: {
+        id: "acc_primary",
+        name: "个人 SuperGrok",
+        email: "per•••@example.com",
+        label: "主力账号",
+        meta: "创建时间: 2026-07-15 | 备注: 包含主力额度",
+        status: "danger", // danger means expired, success means valid
+        active: true
+      },
+      acc_backup: {
+        id: "acc_backup",
+        name: "工作区 Grok",
+        email: "wor•••@example.com",
+        label: "备用账号",
+        meta: "创建时间: 2026-07-16 | 备注: 团队备用",
+        status: "success",
+        active: false
+      },
+      acc_long: {
+        id: "acc_long",
+        name: "验证省略显示的超长账号名称",
+        email: "ver••••••••@long-domain.example",
+        label: "长内容测试",
+        meta: "创建时间: 2026-07-17 | 备注: 边界验证",
+        status: "danger",
+        active: false
+      }
+    };
+
+    function setTheme(theme) {
+      const html = document.documentElement;
+      if (theme === 'light') {
+        html.classList.remove('dark');
+        html.classList.add('light');
+      } else {
+        html.classList.remove('light');
+        html.classList.add('dark');
+      }
+      document.querySelectorAll('.proto-controls button').forEach(btn => {
+        if (btn.textContent.includes(theme === 'light' ? '浅色' : '深色')) {
+          btn.classList.add('active');
+        } else if (btn.textContent.includes('浅色') || btn.textContent.includes('深色')) {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    function toggleResponsive() {
+      responsiveMode = !responsiveMode;
+      const frame = document.getElementById('interfaceFrame');
+      const toggleBtn = document.getElementById('btn-toggle-responsive');
+      
+      if (responsiveMode) {
+        frame.classList.add('narrow');
+        toggleBtn.textContent = "切到 100% 宽";
+        toggleBtn.classList.add('active');
+      } else {
+        frame.classList.remove('narrow');
+        toggleBtn.textContent = "切到 375px 窄屏";
+        toggleBtn.classList.remove('active');
+      }
+    }
+
+    function selectProvider(provider) {
+      if (provider !== 'grok') {
+        alert("原型中其他提供商未实现，请专注于 Grok CLI 的重新登录流程验证！");
+        return;
+      }
+    }
+
+    // R11 Top bar link focusing Grok provider page
+    function focusGrokProvider(fromWidget = false) {
+      if (fromWidget) {
+        showToast("深链唤醒：从顶部用量面板深链进入 Models → Grok，聚焦失效账号。");
+      }
+      // Re-initialize lists/views as needed to showcase Grok in the foreground.
+    }
+
+    // Dialog state controllers
+    function openOverlay(id) {
+      document.getElementById('dialogContainer').classList.remove('hidden');
+      // Hide all panels
+      document.getElementById('dialog-confirm').classList.add('hidden');
+      document.getElementById('dialog-methods').classList.add('hidden');
+      document.getElementById('dialog-connecting').classList.add('hidden');
+      document.getElementById('dialog-form-browser').classList.add('hidden');
+      document.getElementById('dialog-form-device').classList.add('hidden');
+      document.getElementById('dialog-progress').classList.add('hidden');
+      document.getElementById('dialog-conflict').classList.add('hidden');
+      document.getElementById('dialog-success').classList.add('hidden');
+      document.getElementById('dialog-detail').classList.add('hidden');
+
+      // Show requested one
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeDialog() {
+      document.getElementById('dialogContainer').classList.add('hidden');
+      selectedTargetAccount = null;
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+    }
+
+    // Start Reauth (R3 & R4)
+    function startReauth(accountId) {
+      selectedTargetAccount = accountsData[accountId];
+      if (!selectedTargetAccount) return;
+
+      // Populate confirmation dialog
+      document.getElementById('dlg-account-name').textContent = selectedTargetAccount.name;
+      document.getElementById('dlg-account-email').textContent = selectedTargetAccount.email;
+
+      // Conditional notification (R4)
+      if (selectedTargetAccount.active) {
+        document.getElementById('dlg-notice-active').classList.remove('hidden');
+        document.getElementById('dlg-notice-inactive').classList.add('hidden');
+      } else {
+        document.getElementById('dlg-notice-active').classList.add('hidden');
+        document.getElementById('dlg-notice-inactive').classList.remove('hidden');
+      }
+
+      openOverlay('dialog-confirm');
+    }
+
+    function proceedToMethods() {
+      document.getElementById('dlg-method-account-name').textContent = selectedTargetAccount.name;
+      openOverlay('dialog-methods');
+    }
+
+    function backToConfirm() {
+      openOverlay('dialog-confirm');
+    }
+
+    // SSE flow simulation (R5)
+    function startOAuthFlow(method) {
+      openOverlay('dialog-connecting');
+
+      // Simulate a small network latency
+      setTimeout(() => {
+        if (method === 'browser') {
+          document.getElementById('callbackUrl').value = "";
+          document.getElementById('btn-submit-browser').disabled = true;
+          openOverlay('dialog-form-browser');
+        } else if (method === 'device') {
+          startDeviceCountdown();
+          openOverlay('dialog-form-device');
+        } else if (method === 'existing') {
+          simulateExistingFlow();
+        }
+      }, 1000);
+    }
+
+    function cancelFlow() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+      showToast("授权已取消");
+      closeDialog();
+    }
+
+    function validateInput() {
+      const val = document.getElementById('callbackUrl').value.trim();
+      // Simple validation for URL presence
+      document.getElementById('btn-submit-browser').disabled = (val.length < 15);
+    }
+
+    // Device countdown
+    function startDeviceCountdown() {
+      let seconds = 180;
+      const display = document.getElementById('countdown');
+      display.textContent = seconds;
+      
+      if (countdownInterval) clearInterval(countdownInterval);
+      
+      countdownInterval = setInterval(() => {
+        seconds--;
+        display.textContent = seconds;
+        if (seconds <= 0) {
+          clearInterval(countdownInterval);
+          // Simulate timeout/failure
+          setLoginError("设备验证码已过期，请重试。");
+        }
+        // Simulate background polling success at 165 seconds
+        if (seconds === 165) {
+          clearInterval(countdownInterval);
+          simulateSubmission();
+        }
+      }, 1000);
+    }
+
+    function simulateExistingFlow() {
+      document.getElementById('progress-title').textContent = "正在读取本地 Grok Build 凭证…";
+      document.getElementById('progress-message').textContent = "正在加载并读取 ~/.grok/auth.json 文件中保存的 OAuth token…";
+      openOverlay('dialog-progress');
+      setTimeout(() => {
+        simulateSubmission();
+      }, 1200);
+    }
+
+    function submitAuth(method) {
+      simulateSubmission();
+    }
+
+    function simulateSubmission() {
+      document.getElementById('progress-title').textContent = "正在验证凭证并保存…";
+      document.getElementById('progress-message').textContent = "正在连接 xAI 并验证令牌的可用性与额度信息…";
+      openOverlay('dialog-progress');
+
+      setTimeout(() => {
+        // Special condition: simulation controls conflict/success
+        // If "Validation Error" triggers conflict simulation
+        if (selectedTargetAccount.id === 'acc_long') {
+          // Lets simulate a conflict to show the conflict overlay
+          openOverlay('dialog-conflict');
+        } else {
+          // Success
+          showSuccessDialog();
+        }
+      }, 1500);
+    }
+
+    function showSuccessDialog() {
+      document.getElementById('dlg-success-account-name').textContent = selectedTargetAccount.name;
+      document.getElementById('dlg-success-account-email').textContent = selectedTargetAccount.email;
+
+      if (selectedTargetAccount.active) {
+        document.getElementById('dlg-success-active-notice').classList.remove('hidden');
+        document.getElementById('dlg-success-inactive-notice').classList.add('hidden');
+      } else {
+        document.getElementById('dlg-success-active-notice').classList.add('hidden');
+        document.getElementById('dlg-success-inactive-notice').classList.remove('hidden');
+      }
+
+      openOverlay('dialog-success');
+    }
+
+    function setLoginError(msg) {
+      // Show simulated failure state
+      openOverlay('dialog-methods'); // go back to methods with toast warning
+      showToast("登录授权失败：" + msg);
+    }
+
+    // Finish Success Flow (R10: Force reload and query new quota)
+    function finishSuccessFlow() {
+      const accId = selectedTargetAccount.id;
+      
+      // Update local storage representation
+      accountsData[accId].status = "success"; // mark as valid
+      
+      // Update visual DOM immediately
+      document.getElementById('dot-' + accId).className = "status-dot success";
+      document.getElementById('dot-' + accId).title = "凭据有效";
+      
+      const reauthBtn = document.getElementById('btn-reauth-' + accId);
+      reauthBtn.className = "btn-act btn-reauth"; // remove reauth-needed animations
+      
+      // Force refresh quota cards visually to represent new live data (R9 & R10)
+      if (accountsData[accId].active) {
+        document.getElementById('grokReauthBanner').classList.add('hidden');
+        document.getElementById('topbarGrokWidget').classList.remove('reauth-active');
+        document.getElementById('topbarGrokWidget').title = "Grok 凭据有效，用量正常";
+        document.querySelector('#topbarGrokWidget span:first-child').className = "status-dot success";
+        document.querySelector('#topbarGrokWidget span:last-child').textContent = "用量正常";
+        document.getElementById('grok-sidebar-badge').classList.add('hidden');
+        document.getElementById('providerHeaderSub').textContent = "已保存 3 个账号，当前凭据有效 / 已连接";
+
+        // New quota numbers (simulated fresh numbers)
+        document.getElementById('monthlyQuotaVal').innerHTML = "342 <small>/ 1,000 次</small>";
+        document.getElementById('monthlyQuotaBar').style.width = "34.2%";
+        document.getElementById('monthlyQuotaBar').style.background = "var(--success)";
+        document.getElementById('monthlyQuotaDesc').textContent = "剩余 658 次 · 重置于 2026-08-01 08:00";
+        document.getElementById('weeklyQuotaVal').innerHTML = "12% <small>已使用</small>";
+        document.getElementById('weeklyQuotaBar').style.width = "12%";
+        document.getElementById('weeklyQuotaBar').style.background = "var(--success)";
+        document.getElementById('weeklyQuotaDesc').textContent = "重置于 2026-07-20 00:00";
+        document.getElementById('quotaUpdateTime').textContent = "更新于 刚刚 (展示实时数据)";
+      }
+
+      closeDialog();
+      showToast("账号「" + accountsData[accId].name + "」已原位成功重新授权！");
+    }
+
+    // Set Active Account flow
+    function setActiveAccount(accountId) {
+      // Demote current active
+      for (const id in accountsData) {
+        if (accountsData[id].active) {
+          accountsData[id].active = false;
+          // visually update
+          const card = document.getElementById('card-' + id);
+          if (card) {
+            card.classList.remove('active');
+            // add back activate button
+            const actContainer = card.querySelector('.account-actions');
+            actContainer.innerHTML = `
+              <button class="btn-act btn-active" id="btn-active-${id}" onclick="setActiveAccount('${id}')">设为 Active</button>
+              <button class="btn-act btn-reauth ${accountsData[id].status === 'danger' ? 'reauth-needed' : ''}" id="btn-reauth-${id}" onclick="startReauth('${id}')">重新登录</button>
+              <button class="btn-act" onclick="showDetail('${id}')">详情</button>
+              <button class="btn-act" style="color: var(--danger);" onclick="deleteAccount('${id}')">删除</button>
+            `;
+          }
+        }
+      }
+
+      // Activate selected
+      accountsData[accountId].active = true;
+      const newCard = document.getElementById('card-' + accountId);
+      newCard.classList.add('active');
+      const actContainer = newCard.querySelector('.account-actions');
+      actContainer.innerHTML = `
+        <span class="account-tag" style="background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border)">Active</span>
+        <button class="btn-act btn-reauth ${accountsData[accountId].status === 'danger' ? 'reauth-needed' : ''}" id="btn-reauth-${accountId}" onclick="startReauth('${accountId}')">重新登录</button>
+        <button class="btn-act" onclick="showDetail('${accountId}')">详情</button>
+      `;
+
+      // Update banner & widgets
+      if (accountsData[accountId].status === 'danger') {
+        document.getElementById('grokReauthBanner').classList.remove('hidden');
+        document.getElementById('topbarGrokWidget').classList.add('reauth-active');
+        document.getElementById('topbarGrokWidget').title = "Grok 凭据已失效，需要重新登录";
+        document.querySelector('#topbarGrokWidget span:first-child').className = "status-dot danger";
+        document.querySelector('#topbarGrokWidget span:last-child').textContent = "重新登录";
+        document.getElementById('grok-sidebar-badge').classList.remove('hidden');
+        document.getElementById('providerHeaderSub').textContent = "已保存 3 个账号，当前凭据需恢复 / 未连接";
+        
+        // Stale expired numbers
+        document.getElementById('monthlyQuotaVal').innerHTML = "604 <small>/ 1,000 次</small>";
+        document.getElementById('monthlyQuotaBar').style.width = "60.4%";
+        document.getElementById('monthlyQuotaBar').style.background = "var(--warning)";
+        document.getElementById('monthlyQuotaDesc').textContent = "剩余 396 次 · 重置于 2026-08-01 08:00 (重新登录以更新)";
+        document.getElementById('weeklyQuotaVal').innerHTML = "未知";
+        document.getElementById('weeklyQuotaBar').style.width = "0%";
+        document.getElementById('weeklyQuotaDesc').textContent = "请重新登录重新启用周额度监控";
+      } else {
+        document.getElementById('grokReauthBanner').classList.add('hidden');
+        document.getElementById('topbarGrokWidget').classList.remove('reauth-active');
+        document.getElementById('topbarGrokWidget').title = "Grok 凭据有效，用量正常";
+        document.querySelector('#topbarGrokWidget span:first-child').className = "status-dot success";
+        document.querySelector('#topbarGrokWidget span:last-child').textContent = "用量正常";
+        document.getElementById('grok-sidebar-badge').classList.add('hidden');
+        document.getElementById('providerHeaderSub').textContent = "已保存 3 个账号，当前凭据有效 / 已连接";
+
+        // Valid backup numbers
+        document.getElementById('monthlyQuotaVal').innerHTML = "718 <small>/ 1,000 次</small>";
+        document.getElementById('monthlyQuotaBar').style.width = "71.8%";
+        document.getElementById('monthlyQuotaBar').style.background = "var(--warning)";
+        document.getElementById('monthlyQuotaDesc').textContent = "剩余 282 次 · 重置于 2026-08-01 08:00";
+        document.getElementById('weeklyQuotaVal').innerHTML = "86% <small>已使用</small>";
+        document.getElementById('weeklyQuotaBar').style.width = "86%";
+        document.getElementById('weeklyQuotaBar').style.background = "var(--warning)";
+        document.getElementById('weeklyQuotaDesc').textContent = "重置于 2026-07-20 00:00";
+        document.getElementById('quotaUpdateTime').textContent = "更新于 刚刚 (展示实时数据)";
+      }
+
+      showToast("已启用「" + accountsData[accountId].name + "」为全局 Active 账号");
+    }
+
+    // Refresh Quota
+    function refreshQuota() {
+      const btn = document.getElementById('btn-refresh-quota');
+      btn.textContent = "正在刷新…";
+      btn.disabled = true;
+      
+      setTimeout(() => {
+        btn.textContent = "↻ 刷新额度";
+        btn.disabled = false;
+        showToast("已成功刷新额度缓存！");
+      }, 1000);
+    }
+
+    // Detail remarks helper
+    function showDetail(id) {
+      selectedTargetAccount = accountsData[id];
+      document.getElementById('dlg-detail-name').textContent = selectedTargetAccount.name;
+      document.getElementById('dlg-detail-email').textContent = selectedTargetAccount.email;
+      document.getElementById('dlg-detail-textarea').value = selectedTargetAccount.label + "，" + selectedTargetAccount.meta.split('|')[1]?.trim();
+      openOverlay('dialog-detail');
+    }
+
+    function saveDetail() {
+      const remark = document.getElementById('dlg-detail-textarea').value.trim();
+      selectedTargetAccount.label = remark.split('，')[0] || "备注";
+      // Update visuals
+      const card = document.getElementById('card-' + selectedTargetAccount.id);
+      if (card) {
+        card.querySelector('.account-tag').textContent = selectedTargetAccount.label;
+      }
+      closeDialog();
+      showToast("保存备注成功");
+    }
+
+    // Delete flow mock
+    function deleteAccount(id) {
+      if (accountsData[id].active) {
+        alert("不能直接删除 Active 账号。请先设另一账号为 Active，或者联系系统进行重置。");
+        return;
+      }
+      if (confirm("确定要永久删除账号「" + accountsData[id].name + "」吗？此操作将清除对应凭证槽位。")) {
+        document.getElementById('card-' + id).style.display = "none";
+        showToast("已成功删除账号「" + accountsData[id].name + "」");
+      }
+    }
+
+    // Reset prototype state
+    function resetPrototype() {
+      for (const id in accountsData) {
+        if (id === 'acc_primary') {
+          accountsData[id].status = "danger";
+          accountsData[id].active = true;
+          document.getElementById('dot-' + id).className = "status-dot danger";
+          document.getElementById('dot-' + id).title = "凭据失效，需要重新登录";
+          document.getElementById('btn-reauth-' + id).className = "btn-act btn-reauth reauth-needed";
+        } else {
+          accountsData[id].active = false;
+          if (id === 'acc_long') {
+            accountsData[id].status = "danger";
+            document.getElementById('dot-' + id).className = "status-dot danger";
+            document.getElementById('btn-reauth-' + id).className = "btn-act btn-reauth reauth-needed";
+          } else {
+            accountsData[id].status = "success";
+            document.getElementById('dot-' + id).className = "status-dot success";
+            document.getElementById('btn-reauth-' + id).className = "btn-act btn-reauth";
+          }
+        }
+        document.getElementById('card-' + id).style.display = "flex";
+      }
+
+      // Re-init Active layout
+      const pCard = document.getElementById('card-acc_primary');
+      pCard.classList.add('active');
+      pCard.querySelector('.account-actions').innerHTML = `
+        <span class="account-tag" style="background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border)">Active</span>
+        <button class="btn-act btn-reauth reauth-needed" id="btn-reauth-acc_primary" onclick="startReauth('acc_primary')">重新登录</button>
+        <button class="btn-act" onclick="showDetail('acc_primary')">详情</button>
+      `;
+
+      const bCard = document.getElementById('card-acc_backup');
+      bCard.classList.remove('active');
+      bCard.querySelector('.account-actions').innerHTML = `
+        <button class="btn-act btn-active" id="btn-active-acc_backup" onclick="setActiveAccount('acc_backup')">设为 Active</button>
+        <button class="btn-act btn-reauth" id="btn-reauth-acc_backup" onclick="startReauth('acc_backup')">重新登录</button>
+        <button class="btn-act" onclick="showDetail('acc_backup')">详情</button>
+        <button class="btn-act" style="color: var(--danger);" onclick="deleteAccount('acc_backup')">删除</button>
+      `;
+
+      const lCard = document.getElementById('card-acc_long');
+      lCard.classList.remove('active');
+      lCard.querySelector('.account-actions').innerHTML = `
+        <button class="btn-act btn-active" id="btn-active-acc_long" onclick="setActiveAccount('acc_long')">设为 Active</button>
+        <button class="btn-act btn-reauth reauth-needed" id="btn-reauth-acc_long" onclick="startReauth('acc_long')">重新登录</button>
+        <button class="btn-act" onclick="showDetail('acc_long')">详情</button>
+        <button class="btn-act" style="color: var(--danger);" onclick="deleteAccount('acc_long')">删除</button>
+      `;
+
+      document.getElementById('grokReauthBanner').classList.remove('hidden');
+      document.getElementById('topbarGrokWidget').classList.add('reauth-active');
+      document.querySelector('#topbarGrokWidget span:first-child').className = "status-dot danger";
+      document.querySelector('#topbarGrokWidget span:last-child').textContent = "重新登录";
+      document.getElementById('grok-sidebar-badge').classList.remove('hidden');
+      document.getElementById('providerHeaderSub').textContent = "已保存 3 个账号，当前凭据需恢复 / 未连接";
+
+      // Reset quota numbers
+      document.getElementById('monthlyQuotaVal').innerHTML = "604 <small>/ 1,000 次</small>";
+      document.getElementById('monthlyQuotaBar').style.width = "60.4%";
+      document.getElementById('monthlyQuotaBar').style.background = "var(--warning)";
+      document.getElementById('monthlyQuotaDesc').textContent = "剩余 396 次 · 重置于 2026-08-01 08:00 (重新登录以更新)";
+      document.getElementById('weeklyQuotaVal').innerHTML = "未知";
+      document.getElementById('weeklyQuotaBar').style.width = "0%";
+      document.getElementById('weeklyQuotaDesc').textContent = "请重新登录重新启用周额度监控";
+      document.getElementById('quotaUpdateTime').textContent = "更新于 5 小时前 (展示缓存数据)";
+
+      showToast("原型状态已重置");
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toastNotification');
+      const msg = document.getElementById('toastMessage');
+      msg.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    function showAddFlow() {
+      showToast("已在此槽位添加功能：请选择“重新登录”来验证指定的重新授权！");
+    }
+  </script>
+</body>
+</html>

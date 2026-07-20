@@ -95,7 +95,7 @@ test("reloadRpcAuthState refreshes same-identity model descriptor without setMod
 });
 
 test("Models UI describes global Active, not session pin", () => {
-  assertIncludes(models, "全局当前 Active", "global Active copy");
+  assertIncludes(models, "全局当前账号", "global Active copy");
   assertIncludes(models, "不是锁定账号", "not lock");
   assertNotIncludes(models, "Session Pinning", "old pin copy removed");
   assertNotIncludes(models, "新建会话的默认账号", "old default-session-only copy removed");
