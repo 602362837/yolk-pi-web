@@ -5,8 +5,10 @@ description: >
   for this repo using gh. Use whenever the user provides a PR URL, PR number/id,
   or asks to 认领/审核/审查/处理/合并 PR, review a pull request, approve merge,
   request changes, or add labels on a PR — even if they only paste a link like
-  https://github.com/org/repo/pull/123 or say "处理一下 #42". Prefer this skill
-  over ad-hoc gh commands for the full claim→label→review→merge/reject flow.
+  https://github.com/org/repo/pull/123 or say "处理一下 #42". If the user does
+  not identify a specific PR, first list the repository's open PRs and ask them
+  to choose one. Prefer this skill over ad-hoc gh commands for the full
+  claim→label→review→merge/reject flow.
 ---
 
 # PR Review Handle (project)
@@ -31,6 +33,30 @@ Handle an inbound GitHub PR end-to-end for **yolk-pi-web / pi-agnet-web**: claim
 4. Do not invent review findings. Base comments on actual diff / CI / project invariants (`AGENTS.md`, `docs/`).
 
 ## Resolve the PR
+
+### If the user did not specify a PR
+
+Before asking which PR to handle, proactively query the current repository's open PR list. Do not claim, label, review, comment on, or merge anything until the user selects a PR. Resolve the repository from the primary remote (prefer `upstream`, otherwise `origin`) and run:
+
+```bash
+REMOTE_URL="$(git remote get-url upstream 2>/dev/null || git remote get-url origin)"
+REPO="$(printf '%s' "$REMOTE_URL" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\\.git$##')"
+gh pr list --repo "$REPO" --state open --limit 100 \
+  --json number,title,headRefName,baseRefName,url \
+  --jq '(["| id | 标题 | source merge to target | pr链接 |","|---:|---|---|---|"] + [.[] | "| \(.number) | \(.title | gsub("\\|"; "\\\\|")) | \(.headRefName) merge to \(.baseRefName) | \(.url) |"] | .[])'
+```
+
+Present the result as this Markdown table, preserving these columns:
+
+```markdown
+| id | 标题 | source merge to target | pr链接 |
+|---:|---|---|---|
+| 123 | 示例标题 | feature/example merge to main | https://github.com/OWNER/REPO/pull/123 |
+```
+
+Then ask the user to provide the PR `id` (or URL) to handle. If no open PRs are found, say so explicitly and ask whether they want to provide a closed PR or another repository. If listing fails because `gh` is unauthenticated or the remote cannot be resolved, report that blocker instead of guessing.
+
+### If the user specified a PR
 
 Accept any of:
 
