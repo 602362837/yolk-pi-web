@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-19T12:21:19.354Z",
+  "updatedAt": "2026-07-20T05:46:45.560Z",
   "entries": [
+    {
+      "id": "20260720-134645-为-grok-cli-增加重新登录功能",
+      "title": "为 Grok CLI 增加重新登录功能",
+      "taskId": "20260720-111824-为-grok-cli-增加重新登录功能",
+      "taskKey": "archived:2026-07:20260720-111824-为-grok-cli-增加重新登录功能",
+      "workflowId": "feature-dev",
+      "summary": "## 已完成子任务 **GROK-REAUTH-01: 建立 Grok 原位重新授权持久化、并发锁和旧 quota 隔离** ✅ (prior) **GROK-REAUTH-02: 扩展 OAuth SSE login route 的 Grok-only reauth mode** ✅ (prior) **GROK-REAUTH-03: Models Grok 恢复态、账号级重新登录 UI 与 Top-bar 深链** ✅ (prior) **GROK-REAUTH-04: 行为测试、回归、浏览器验收与文档** ✅ (prior) **GROK-REAUTH-05: 修复 checker 六项阻塞问题并补充并发/UI 验证** ✅ (prior) **GROK-REAUTH-06: 修复 R2/R9/R11 并补可执行 race 测试** ✅ (this) ## GROK-REAUTH-06 活动 修复了 review.md 中列出的三项阻塞问题： ### 1. R2 — invalid saved account 仍加载 quota/recovery banner **文件**: `components/ModelsConfig.tsx` - `loadGrokQuota` guard 从 `(!provider.loggedIn && !force)` 改为 `(!provider.loggedIn && !force && accounts.length === 0)`，与 Kiro/Antigravity 对齐。 - 依赖数组新增 `accounts.length`。 - `loggedIn=false` 但有 saved accounts 时，quota 加载正常触发，可解析 HTTP 401 安全 body 并显示 reauthRequired banner。 ### 2. R11 — Top-bar account focus 在 OAuthDetail mount 前不丢失并真实选中目标 **文件**: `components/ModelsConfig…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260720-111824-为-grok-cli-增加重新登录功能",
+      "knowledgePath": ".ypi/knowledge/20260720-134645-为-grok-cli-增加重新登录功能.md",
+      "createdAt": "2026-07-20T05:46:45.560Z",
+      "archivedAt": "2026-07-20T05:46:45.560Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
       "title": "修复 Chat 首轮发送未遵从会话选中模型（冷启动误用虚空默认模型）",

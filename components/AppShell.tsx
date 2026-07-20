@@ -341,6 +341,9 @@ function AppShellContent() {
 
   const [modelsConfigOpen, setModelsConfigOpen] = useState(false);
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
+  // Models focus context from top-bar deep-link (provider → account). Consumed once by ModelsConfig.
+  const [modelsInitialProviderId, setModelsInitialProviderId] = useState<string | null>(null);
+  const [modelsInitialAccountId, setModelsInitialAccountId] = useState<string | null>(null);
   // Aggregate shell close token (Models open / hot-switch) without remounting owners.
   const [providerUsageAggregateCloseGeneration, setProviderUsageAggregateCloseGeneration] = useState(0);
   const [gptAggregateProjection, setGptAggregateProjection] = useState<ProviderUsageAggregateProjection | null>(null);
@@ -935,9 +938,13 @@ function AppShellContent() {
     }
   }, [providerUsageAggregated]);
 
-  const openModelsFromProviderUsage = useCallback(() => {
+  const openModelsFromProviderUsage = useCallback((providerId?: string, accountId?: string | null) => {
     if (providerUsageAggregated) {
       setProviderUsageAggregateCloseGeneration((value) => value + 1);
+    }
+    if (providerId) {
+      setModelsInitialProviderId(providerId);
+      setModelsInitialAccountId(accountId ?? null);
     }
     setModelsConfigOpen(true);
   }, [providerUsageAggregated]);
@@ -958,7 +965,7 @@ function AppShellContent() {
     () => (
       <GrokUsagePanel
         presentationMode="aggregate"
-        onOpenModels={openModelsFromProviderUsage}
+        onOpenModels={(options) => openModelsFromProviderUsage("grok-cli", options?.accountId)}
         onProjectionChange={setGrokAggregateProjection}
       />
     ),
@@ -1719,7 +1726,7 @@ function AppShellContent() {
                 <ProviderUsageAggregatePanel
                   columns={providerUsageAggregateColumns}
                   closeGeneration={providerUsageAggregateCloseGeneration}
-                  onOpenModels={() => openModelsFromProviderUsage()}
+                  onOpenModels={(key) => openModelsFromProviderUsage(key)}
                 />
               ) : (
                 <>
@@ -1731,7 +1738,7 @@ function AppShellContent() {
                   )}
                   {showGrokUsage && (
                     <GrokUsagePanel
-                      onOpenModels={openModelsFromProviderUsage}
+                      onOpenModels={(options) => openModelsFromProviderUsage("grok-cli", options?.accountId)}
                       displayMode={providerUsageDisplayMode}
                     />
                   )}
@@ -2181,7 +2188,17 @@ function AppShellContent() {
         </button>
       )}
     </div>
-    {modelsConfigOpen && <ModelsConfig onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }} />}
+    {modelsConfigOpen && (
+      <ModelsConfig
+        onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }}
+        initialProviderId={modelsInitialProviderId}
+        initialAccountId={modelsInitialAccountId}
+        onConsumedFocus={() => {
+          setModelsInitialProviderId(null);
+          setModelsInitialAccountId(null);
+        }}
+      />
+    )}
     {skillsConfigOpen && (activeCwd ?? selectedSession?.cwd ?? newSessionCwd) && (
       <SkillsConfig cwd={(activeCwd ?? selectedSession?.cwd ?? newSessionCwd)!} onClose={() => setSkillsConfigOpen(false)} />
     )}

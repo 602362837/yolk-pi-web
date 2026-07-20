@@ -80,10 +80,10 @@ test("Antigravity risk disclosure covers non-official channel and wide cloud-pla
 });
 
 test("Antigravity Active semantics and protected delete copy are present", () => {
-  assert.match(models, /Activate 只设置 Antigravity 的/);
-  assert.match(models, /全局当前 Active/);
-  assert.match(models, /in-flight 请求不会中途更换 token/);
-  assert.match(models, /fail-closed/);
+  assert.match(models, /「启用」只设置 Antigravity 的/);
+  assert.match(models, /全局当前账号/);
+  assert.match(models, /已经发出的请求不会中途更换 token/);
+  assert.match(models, /失败关闭/);
   assert.match(models, /已连接 \$\{accounts\.length\} 个 Antigravity 账号/);
 });
 

@@ -307,8 +307,8 @@ function SecretTextInput({
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? "Hide API key" : "Show API key"}
-        title={visible ? "Hide API key" : "Show API key"}
+        aria-label={visible ? "隐藏 API Key" : "显示 API Key"}
+        title={visible ? "隐藏 API Key" : "显示 API Key"}
         style={{
           position: "absolute",
           right: 5,
@@ -357,7 +357,7 @@ function Select({ value, onChange, options, required }: { value: string; onChang
         ...options.map((option) => ({ value: option, label: option })),
       ]}
       onChange={onChange}
-      ariaLabel="Select API type"
+      ariaLabel="选择 API 类型"
     />
   );
 }
@@ -790,19 +790,19 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, dirty, i
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>Provider</SectionTitle>
+        <SectionTitle>提供商</SectionTitle>
         <button onClick={onDelete}
           style={{ padding: "3px 8px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: "#ef4444", cursor: "pointer", fontSize: 11 }}>
-          Delete
+          删除
         </button>
       </div>
 
-      <Field label="Provider name">
+      <Field label="提供商名称">
         <TextInput value={editingName} onChange={setEditingName} placeholder="provider-name" mono />
         {editingName !== name && editingName.trim() && (
           <button onClick={() => onRename(editingName.trim())}
             style={{ marginTop: 4, padding: "3px 10px", background: "var(--accent)", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: 11, alignSelf: "flex-start" }}>
-            Rename
+            重命名
           </button>
         )}
       </Field>
@@ -814,9 +814,9 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, dirty, i
 
       <Field label="API Key">
         <SecretTextInput value={provider.apiKey ?? ""} onChange={(v) => set("apiKey", v || undefined)}
-          placeholder="ENV_VAR_NAME, !shell-command, or literal key" mono />
+          placeholder="环境变量名、!shell 命令或明文密钥" mono />
         <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
-          Prefix with <code style={{ fontFamily: "var(--font-mono)" }}>!</code> to run a shell command, or use an env var name
+          以 <code style={{ fontFamily: "var(--font-mono)" }}>!</code> 开头可执行 shell 命令，也可直接填写环境变量名
         </span>
       </Field>
 
@@ -1006,13 +1006,13 @@ function ThinkingLevelMapEditor({
                 onClick={() => setLevel(level, "omit")}
                 style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
               >
-                Default
+                默认
               </button>
               <button
                 onClick={() => setLevel(level, null)}
                 style={{ ...btnBase, borderLeft: "1px solid var(--border)", ...(state === "null" ? btnActiveDisabled : {}) }}
               >
-                Disabled
+                禁用
               </button>
             </div>
 
@@ -1022,7 +1022,7 @@ function ThinkingLevelMapEditor({
                 onClick={() => setLevel(level, strVal || level)}
                 style={{ ...btnBase, ...(state === "string" ? btnActive : {}), borderRight: "1px solid var(--border)", flexShrink: 0 }}
               >
-                Custom
+                自定义
               </button>
               <input
                 value={strVal}
@@ -1094,15 +1094,15 @@ function ModelDetail({
   };
   const testSummary = (() => {
     if (testState.phase === "idle") return null;
-    if (testState.phase === "testing") return "Testing model connection...";
+    if (testState.phase === "testing") return "正在测试模型连接…";
     const meta = [
       testState.latencyMs !== undefined ? `${testState.latencyMs}ms` : null,
       testState.status !== undefined ? `HTTP ${testState.status}` : null,
     ].filter(Boolean);
     if (testState.phase === "success") {
-      return ["Connected", ...meta, testState.responseText || null].filter(Boolean).join(" · ");
+      return ["连接成功", ...meta, testState.responseText || null].filter(Boolean).join(" · ");
     }
-    return ["Failed", ...meta, testState.message].filter(Boolean).join(" · ");
+    return ["连接失败", ...meta, testState.message].filter(Boolean).join(" · ");
   })();
 
   useEffect(() => {
@@ -1148,7 +1148,7 @@ function ModelDetail({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>Model</SectionTitle>
+        <SectionTitle>模型</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {testSummary && (
             <span
@@ -1176,7 +1176,7 @@ function ModelDetail({
           <button
             onClick={handleTest}
             disabled={!model.id.trim() || testState.phase === "testing"}
-            title="Test model connection"
+            title="测试模型连接"
             style={{
               height: 24,
               padding: "0 8px",
@@ -1198,46 +1198,46 @@ function ModelDetail({
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             )}
-            {testState.phase === "testing" ? "Testing…" : testState.phase === "success" ? "OK" : "Test"}
+            {testState.phase === "testing" ? "测试中…" : testState.phase === "success" ? "通过" : "测试"}
           </button>
           <button onClick={onDelete}
             style={{ height: 24, padding: "0 8px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: "#ef4444", cursor: "pointer", fontSize: 11, boxSizing: "border-box" }}>
-            Remove
+            移除
           </button>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <Field label="ID *"><TextInput value={model.id} onChange={(v) => set("id", v)} placeholder="model-id" mono /></Field>
-        <Field label="Name"><TextInput value={model.name ?? ""} onChange={(v) => set("name", v || undefined)} placeholder="Display name" /></Field>
+        <Field label="名称"><TextInput value={model.name ?? ""} onChange={(v) => set("name", v || undefined)} placeholder="显示名称" /></Field>
       </div>
 
-      <Field label="API override">
+      <Field label="API 覆盖">
         <Select value={model.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
       </Field>
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-        <Check label="Reasoning / thinking" checked={model.reasoning ?? false} onChange={(v) => set("reasoning", v || undefined)} />
-        <Check label="Image input" checked={model.input?.includes("image") ?? false}
+        <Check label="推理 / Thinking" checked={model.reasoning ?? false} onChange={(v) => set("reasoning", v || undefined)} />
+        <Check label="支持图片输入" checked={model.input?.includes("image") ?? false}
           onChange={(v) => set("input", v ? ["text", "image"] : undefined)} />
       </div>
 
       {model.reasoning && (
         <>
           <Check
-            label="DeepSeek thinking compat"
+            label="DeepSeek Thinking 兼容"
             checked={hasDeepseekCompat(model)}
             onChange={(v) => onChange(setDeepseekCompat(model, v))}
           />
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <SectionTitle>Thinking level map</SectionTitle>
+              <SectionTitle>Thinking 级别映射</SectionTitle>
               {model.thinkingLevelMap && (
                 <button
                   onClick={() => set("thinkingLevelMap", undefined)}
                   style={{ fontSize: 10, padding: "2px 7px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-dim)", cursor: "pointer" }}
                 >
-                  clear all
+                  全部清除
                 </button>
               )}
             </div>
@@ -1250,21 +1250,26 @@ function ModelDetail({
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Field label="Context window (tokens)">
+        <Field label="上下文窗口（tokens）">
           <NumInput value={model.contextWindow !== undefined ? String(model.contextWindow) : ""}
             onChange={(v) => set("contextWindow", v ? parseInt(v) : undefined)} placeholder="128000" />
         </Field>
-        <Field label="Max output tokens">
+        <Field label="最大输出 tokens">
           <NumInput value={model.maxTokens !== undefined ? String(model.maxTokens) : ""}
             onChange={(v) => set("maxTokens", v ? parseInt(v) : undefined)} placeholder="16384" />
         </Field>
       </div>
 
       <div>
-        <SectionTitle>Cost (per million tokens)</SectionTitle>
+        <SectionTitle>费用（每百万 tokens）</SectionTitle>
         <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-          {(["input", "output", "cacheRead", "cacheWrite"] as const).map((k) => (
-            <Field key={k} label={k}>
+          {([
+            ["input", "输入"],
+            ["output", "输出"],
+            ["cacheRead", "缓存读取"],
+            ["cacheWrite", "缓存写入"],
+          ] as const).map(([k, label]) => (
+            <Field key={k} label={label}>
               <NumInput value={costVal(k)} onChange={(v) => setCost(k, v)} placeholder="0" />
             </Field>
           ))}
@@ -1314,17 +1319,17 @@ function OAuthQuotaView({
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Usage</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>用量</span>
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            {loading ? "Refreshing…" : `Updated ${formatQuotaQueriedAt(displayedQuota?.queriedAt ?? null)}`}
+            {loading ? "刷新中…" : `更新于 ${formatQuotaQueriedAt(displayedQuota?.queriedAt ?? null)}`}
           </span>
         </div>
         <button
           onClick={() => onRefresh()}
           disabled={loading || resetting}
           {...iconFlowAttrs(loading || resetting ? "off" : "interactive")}
-          title="Refresh usage"
-          aria-label="Refresh usage"
+          title="刷新用量"
+          aria-label="刷新用量"
           style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading || resetting ? "var(--text-dim)" : "var(--text-muted)", cursor: loading || resetting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
         >
           <ActionFlowIcon width={14} height={14} strokeWidth={2}>
@@ -1345,7 +1350,7 @@ function OAuthQuotaView({
             {account.extraInfo && <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
           </div>
           <span style={{ fontSize: 11, color: account.active ? "#4ade80" : "var(--text-dim)", fontWeight: 600, flexShrink: 0 }}>
-            {account.active ? "active account" : "temporary view"}
+            {account.active ? "当前账号" : "临时查看"}
           </span>
         </div>
       )}
@@ -1353,9 +1358,9 @@ function OAuthQuotaView({
       {resetCreditsAvailableCount !== null && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-            <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 700 }}>Reset credits: {resetCreditsAvailableCount}</span>
+            <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 700 }}>重置额度：{resetCreditsAvailableCount}</span>
             <span style={{ fontSize: 10, color: resetCreditsError ? "#fb923c" : "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {resetCreditsError ? resetCreditsError : resetExpiresCountdown ? `Earliest expires in ${resetExpiresCountdown}` : resetExpiresAt ? `Earliest expires ${new Date(resetExpiresAt).toLocaleDateString()}` : "No credit expiration details"}
+              {resetCreditsError ? resetCreditsError : resetExpiresCountdown ? `最早将于 ${resetExpiresCountdown} 后过期` : resetExpiresAt ? `最早过期：${new Date(resetExpiresAt).toLocaleDateString()}` : "暂无额度过期信息"}
             </span>
           </div>
           {canReset && (
@@ -1363,33 +1368,33 @@ function OAuthQuotaView({
               type="button"
               onClick={() => onReset()}
               disabled={loading || resetting}
-              title={resetExpiresCountdown ? `Consumes one reset credit. Earliest expires in ${resetExpiresCountdown}` : "Consumes one Codex reset credit"}
+              title={resetExpiresCountdown ? `将消耗 1 次重置额度。最早将于 ${resetExpiresCountdown} 后过期` : "将消耗 1 次 Codex 重置额度"}
               style={{ padding: "5px 10px", border: "1px solid rgba(34,197,94,0.45)", borderRadius: 5, background: "transparent", color: loading || resetting ? "var(--text-dim)" : "#22c55e", cursor: loading || resetting ? "default" : "pointer", fontSize: 11, fontWeight: 700, flexShrink: 0 }}
             >
-              {resetting ? "Resetting…" : "Reset limit"}
+              {resetting ? "重置中…" : "重置限额"}
             </button>
           )}
         </div>
       )}
 
       {quota && quota.credentialStatus === "expired" && !quota.success && (
-        <div style={{ fontSize: 12, color: "#fb923c", lineHeight: 1.5 }}>{quota.error ?? "Token expired. Please re-login."}</div>
+        <div style={{ fontSize: 12, color: "#fb923c", lineHeight: 1.5 }}>{quota.error ?? "Token 已过期，请重新登录。"}</div>
       )}
 
       {quota && quota.credentialStatus === "parse_error" && (
-        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{quota.error ?? "Failed to read OAuth credentials."}</div>
+        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{quota.error ?? "读取 OAuth 凭证失败。"}</div>
       )}
 
       {quota && quota.credentialStatus === "not_found" && (
-        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>No OAuth credential found.</div>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>未找到 OAuth 凭证。</div>
       )}
 
       {quota && quota.credentialStatus === "valid" && !quota.success && (
-        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{quota.error ?? "Usage query failed."}</div>
+        <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{quota.error ?? "用量查询失败。"}</div>
       )}
 
       {quota?.success && knownTiers.length === 0 && (
-        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>No quota windows returned.</div>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>未返回任何配额窗口。</div>
       )}
 
       {knownTiers.length > 0 && (
@@ -1418,12 +1423,12 @@ function OAuthQuotaView({
 
 function accountQuotaResetText(account: OAuthAccountSummary): string {
   const resetCreditsAvailableCount = account.quotaCache?.resetCreditsAvailableCount;
-  const resetCreditsText = typeof resetCreditsAvailableCount === "number" ? `Credits ${resetCreditsAvailableCount}` : null;
+  const resetCreditsText = typeof resetCreditsAvailableCount === "number" ? `重置额度 ${resetCreditsAvailableCount}` : null;
   const tiers = knownQuotaTiers(account.quotaCache?.tiers ?? []).filter((tier) => tier.resetsAt);
-  if (tiers.length === 0) return resetCreditsText ?? (account.quotaCache?.queriedAt ? "No reset time" : "No quota cache");
+  if (tiers.length === 0) return resetCreditsText ?? (account.quotaCache?.queriedAt ? "无重置时间" : "无配额缓存");
   const windowsText = tiers.map((tier) => {
     const countdown = formatResetCountdown(tier.resetsAt);
-    return `${QUOTA_TIER_LABELS[tier.name]} ${countdown ?? "due"}`;
+    return `${QUOTA_TIER_LABELS[tier.name]} ${countdown ?? "已到期"}`;
   }).join(" · ");
   return resetCreditsText ? `${windowsText} · ${resetCreditsText}` : windowsText;
 }
@@ -1439,7 +1444,7 @@ function AccountQuotaMiniCharts({ account }: { account: OAuthAccountSummary }) {
         const color = quotaColor(utilization);
         const label = QUOTA_TIER_LABELS[tier.name];
         return (
-          <span key={tier.name} title={`${label} quota ${Math.round(utilization)}% used`} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+          <span key={tier.name} title={`${label} 已使用 ${Math.round(utilization)}%`} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
             <span style={{ width: 16, height: 16, borderRadius: "50%", background: `conic-gradient(${color} ${utilization * 3.6}deg, var(--bg-panel) 0deg)`, border: "1px solid var(--border)", display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--bg)" }} />
             </span>
@@ -1471,6 +1476,8 @@ function OAuthAccountsView({
   onRefreshQuota,
   onDelete,
   onWarmup,
+  onReauthenticate,
+  actionsDisabled,
 }: {
   accounts: OAuthAccountSummary[];
   loading: boolean;
@@ -1492,13 +1499,17 @@ function OAuthAccountsView({
   onRefreshQuota: (account: OAuthAccountSummary) => void;
   onDelete: (account: OAuthAccountSummary) => void;
   onWarmup?: () => void;
+  /** Grok-only: opens reauth confirm dialog for the given account. */
+  onReauthenticate?: (account: OAuthAccountSummary) => void;
+  /** When true, all action buttons (Activate, Delete, edit, quota refresh) are disabled. */
+  actionsDisabled?: boolean;
 }) {
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Accounts</span>
-          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{loading ? "Loading…" : `${accounts.length} saved`}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>账号</span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{loading ? "加载中…" : `已保存 ${accounts.length} 个`}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {onWarmup && (
@@ -1507,15 +1518,15 @@ function OAuthAccountsView({
               disabled={loading || accounts.length === 0}
               style={{ padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading || accounts.length === 0 ? "var(--text-dim)" : "var(--accent)", cursor: loading || accounts.length === 0 ? "not-allowed" : "pointer", fontSize: 11, fontWeight: 700 }}
             >
-              Warm up
+              预热
             </button>
           )}
           <button
             onClick={onRefresh}
             disabled={loading}
             {...iconFlowAttrs(loading ? "off" : "interactive")}
-            title="Refresh accounts"
-            aria-label="Refresh accounts"
+            title="刷新账号"
+            aria-label="刷新账号"
             style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
           >
             <ActionFlowIcon width={14} height={14} strokeWidth={2}>
@@ -1530,7 +1541,7 @@ function OAuthAccountsView({
 
       {error && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{error}</div>}
       {!loading && !error && accounts.length === 0 && (
-        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>No saved accounts yet.</div>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>暂无已保存账号。</div>
       )}
 
       {accounts.length > 0 && (
@@ -1539,16 +1550,16 @@ function OAuthAccountsView({
             const quotaRefreshing = refreshingQuotaAccountId === account.accountId;
             const selected = selectedAccountId === account.accountId;
             return (
-              <div key={account.accountId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 9px", background: selected ? "var(--bg-selected)" : "var(--bg)", border: selected ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 5 }}>
+              <div key={account.accountId} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, padding: "8px 9px", background: selected ? "var(--bg-selected)" : "var(--bg)", border: selected ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 5, rowGap: 6 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: account.active ? "#4ade80" : "var(--border)", flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
-                  <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
-                  {account.extraInfo && <span style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
+                  <span title={account.displayName} style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</span>
+                  <span title={account.maskedAccountId} style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.maskedAccountId}</span>
+                  {account.extraInfo && <span title={account.extraInfo} style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.extraInfo}</span>}
                   {!hideCodexQuotaSummary && (
                     <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, fontSize: 10, color: account.quotaCache?.error ? "#fb923c" : "var(--text-dim)" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                        Reset: {accountQuotaResetText(account)}{account.quotaCache?.queriedAt ? ` · ${formatQuotaQueriedAt(account.quotaCache.queriedAt)}` : ""}
+                        重置：{accountQuotaResetText(account)}{account.quotaCache?.queriedAt ? ` · ${formatQuotaQueriedAt(account.quotaCache.queriedAt)}` : ""}
                       </span>
                       <AccountQuotaMiniCharts account={account} />
                     </div>
@@ -1556,51 +1567,62 @@ function OAuthAccountsView({
                 </div>
                 <button
                   onClick={() => onSelect(account)}
-                  disabled={selected || Boolean(refreshingQuotaAccountId) || quotaResetting}
-                  style={{ padding: "4px 9px", background: selected ? "var(--accent)" : "none", border: selected ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 4, color: selected ? "#fff" : quotaResetting ? "var(--text-dim)" : "var(--accent)", cursor: selected || refreshingQuotaAccountId || quotaResetting ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                  disabled={selected || Boolean(refreshingQuotaAccountId) || quotaResetting || actionsDisabled}
+                  style={{ padding: "4px 9px", background: selected ? "var(--accent)" : "none", border: selected ? "1px solid var(--accent)" : "1px solid var(--border)", borderRadius: 4, color: selected ? "#fff" : (quotaResetting || actionsDisabled) ? "var(--text-dim)" : "var(--accent)", cursor: selected || refreshingQuotaAccountId || quotaResetting || actionsDisabled ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
                 >
-                  {selected ? "Viewing" : "View"}
+                  {selected ? "查看中" : "查看"}
                 </button>
                 <button
                   onClick={() => onEditLabel(account)}
-                  disabled={savingLabelAccountId === account.accountId}
-                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingLabelAccountId === account.accountId ? "var(--text-dim)" : "var(--text-muted)", cursor: savingLabelAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                  disabled={savingLabelAccountId === account.accountId || actionsDisabled}
+                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingLabelAccountId === account.accountId || actionsDisabled ? "var(--text-dim)" : "var(--text-muted)", cursor: savingLabelAccountId === account.accountId || actionsDisabled ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
                 >
-                  {savingLabelAccountId === account.accountId ? "Saving…" : "Remark"}
+                  {savingLabelAccountId === account.accountId ? "保存中…" : "备注"}
                 </button>
                 <button
                   onClick={() => onEditExtraInfo(account)}
-                  disabled={savingExtraInfoAccountId === account.accountId}
-                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingExtraInfoAccountId === account.accountId ? "var(--text-dim)" : "var(--text-muted)", cursor: savingExtraInfoAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                  disabled={savingExtraInfoAccountId === account.accountId || actionsDisabled}
+                  style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: savingExtraInfoAccountId === account.accountId || actionsDisabled ? "var(--text-dim)" : "var(--text-muted)", cursor: savingExtraInfoAccountId === account.accountId || actionsDisabled ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
                 >
-                  {savingExtraInfoAccountId === account.accountId ? "Saving…" : "Details"}
+                  {savingExtraInfoAccountId === account.accountId ? "保存中…" : "详情"}
                 </button>
                 {account.active ? (
-                  <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>active</span>
+                  <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>当前</span>
                 ) : (
                   <>
                     <button
                       onClick={() => onActivate(account.accountId)}
-                      disabled={Boolean(activatingAccountId) || deletingAccountId === account.accountId}
-                      style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: activatingAccountId === account.accountId ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId || deletingAccountId === account.accountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                      disabled={Boolean(activatingAccountId) || deletingAccountId === account.accountId || actionsDisabled}
+                      style={{ padding: "4px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: activatingAccountId === account.accountId || actionsDisabled ? "var(--text-dim)" : "var(--accent)", cursor: activatingAccountId || deletingAccountId === account.accountId || actionsDisabled ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
                     >
-                      {activatingAccountId === account.accountId ? "Activating…" : "Activate"}
+                      {activatingAccountId === account.accountId ? "启用中…" : "启用"}
                     </button>
                     <button
                       onClick={() => onDelete(account)}
-                      disabled={Boolean(deletingAccountId) || Boolean(activatingAccountId)}
-                      style={{ padding: "4px 9px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: deletingAccountId === account.accountId ? "var(--text-dim)" : "#ef4444", cursor: deletingAccountId || activatingAccountId ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                      disabled={Boolean(deletingAccountId) || Boolean(activatingAccountId) || actionsDisabled}
+                      style={{ padding: "4px 9px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: deletingAccountId === account.accountId || actionsDisabled ? "var(--text-dim)" : "#ef4444", cursor: deletingAccountId || activatingAccountId || actionsDisabled ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
                     >
-                      {deletingAccountId === account.accountId ? "Deleting…" : "Delete"}
+                      {deletingAccountId === account.accountId ? "删除中…" : "删除"}
                     </button>
                   </>
                 )}
+                {onReauthenticate && (
+                  <button
+                    onClick={() => onReauthenticate(account)}
+                    disabled={Boolean(refreshingQuotaAccountId) || quotaResetting || Boolean(activatingAccountId) || Boolean(deletingAccountId) || actionsDisabled}
+                    title="重新登录此账号"
+                    aria-label={`重新登录 ${account.displayName}`}
+                    style={{ padding: "4px 9px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, color: refreshingQuotaAccountId || quotaResetting || activatingAccountId || deletingAccountId || actionsDisabled ? "var(--text-dim)" : "#ef4444", cursor: refreshingQuotaAccountId || quotaResetting || activatingAccountId || deletingAccountId || actionsDisabled ? "default" : "pointer", fontSize: 11, fontWeight: 600 }}
+                  >
+                    重新登录
+                  </button>
+                )}
                 <button
                   onClick={() => onRefreshQuota(account)}
-                  disabled={Boolean(refreshingQuotaAccountId) || quotaResetting}
-                  title="Refresh this account quota reset time"
-                  aria-label="Refresh this account quota reset time"
-                  style={{ width: 28, height: 28, padding: 0, background: "none", border: "1px solid var(--border)", borderRadius: 4, color: quotaRefreshing || quotaResetting ? "var(--text-dim)" : "var(--accent)", cursor: refreshingQuotaAccountId || quotaResetting ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  disabled={Boolean(refreshingQuotaAccountId) || quotaResetting || actionsDisabled}
+                  title="刷新该账号配额重置时间"
+                  aria-label="刷新该账号配额重置时间"
+                  style={{ width: 28, height: 28, padding: 0, background: "none", border: "1px solid var(--border)", borderRadius: 4, color: quotaRefreshing || quotaResetting || actionsDisabled ? "var(--text-dim)" : "var(--accent)", cursor: refreshingQuotaAccountId || quotaResetting || actionsDisabled ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6.36-2.64" />
@@ -1646,26 +1668,26 @@ function ExtraInfoDialog({
       <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 520, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
         <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Account details</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>账号详情</div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{account.displayName}</div>
           </div>
           <button type="button" disabled={saving} onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
         </div>
         <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>Extra information</label>
+          <label style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>补充信息</label>
           <textarea
             ref={textareaRef}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={saving}
-            placeholder="Add notes such as subscription owner, renewal notes, usage hints…"
+            placeholder="可填写订阅归属、续费说明、使用提示等…"
             style={{ minHeight: 120, resize: "vertical", padding: "9px 10px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 12, outline: "none", boxSizing: "border-box", lineHeight: 1.5 }}
           />
-          <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>Leave empty to clear this account&apos;s extra information.</div>
+          <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>留空将清除该账号的补充信息。</div>
         </div>
         <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button type="button" disabled={saving} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer", fontSize: 12 }}>Cancel</button>
-          <button type="button" disabled={saving} onClick={() => onSave(account, value)} style={{ padding: "6px 14px", background: saving ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: saving ? "var(--text-dim)" : "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "Saving…" : "Save"}</button>
+          <button type="button" disabled={saving} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+          <button type="button" disabled={saving} onClick={() => onSave(account, value)} style={{ padding: "6px 14px", background: saving ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: saving ? "var(--text-dim)" : "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{saving ? "保存中…" : "保存"}</button>
         </div>
       </div>
     </div>
@@ -1947,7 +1969,7 @@ function ManagedOAuthDeleteConfirmDialog({
   let footer: React.ReactNode;
 
   if (isActive) {
-    title = "⚠️ 无法直接删除 Active 账号";
+    title = "⚠️ 无法直接删除当前账号";
     body = (
       <>
         <p style={{ marginBottom: 12, color: "var(--danger)", fontWeight: 600 }}>
@@ -2019,7 +2041,139 @@ function ManagedOAuthDeleteConfirmDialog({
   );
 }
 
-function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
+// ── Grok Reauth Confirm Dialog ───────────────────────────────────────────
+
+function GrokReauthConfirmDialog({
+  account,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  account: OAuthAccountSummary;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const isActive = account.active;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const headingId = `grok-reauth-dialog-heading-${account.accountId}`;
+
+  // Focus trap: save previous focus, focus confirm button on mount, restore on unmount.
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const timer = setTimeout(() => confirmBtnRef.current?.focus(), 50);
+    return () => {
+      clearTimeout(timer);
+      previousFocusRef.current?.focus();
+    };
+  }, []);
+
+  // Escape to close (only when not busy).
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [busy, onClose]);
+
+  // Focus trap — keep Tab focus within the dialog.
+  useEffect(() => {
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const el = dialogRef.current;
+      if (!el) return;
+      const focusable = el.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleTab);
+    return () => document.removeEventListener("keydown", handleTab);
+  }, []);
+
+  return (
+    <div
+      className="pi-modal-overlay"
+      role="presentation"
+      style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        className="pi-modal-panel pi-modal-panel-compact"
+        style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}
+      >
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div id={headingId} style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>⚠️ 重新登录账号槽位确认</div>
+          <button type="button" disabled={busy} onClick={onClose} aria-label="关闭" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: busy ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
+        </div>
+        <div style={{ padding: 14, fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Target account info */}
+          <div style={{ background: "var(--bg-panel)", padding: "10px 12px", borderRadius: 6, border: "1px solid var(--border)" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{account.label || account.displayName}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>{account.maskedAccountId}</div>
+          </div>
+
+          {/* Active / non-Active notice */}
+          {isActive ? (
+            <div style={{ padding: "10px 12px", borderRadius: 6, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", display: "flex", gap: 8 }}>
+              <span style={{ flexShrink: 0 }}>⚠️</span>
+              <div>
+                <strong>此账号当前为活动账号 (Active)</strong>
+                <div style={{ marginTop: 4 }}>重新授权成功后，该账号仍将保持全局 Active，并影响当前和所有新会话的后续 Grok 调用凭据。</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: "10px 12px", borderRadius: 6, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", display: "flex", gap: 8 }}>
+              <span style={{ flexShrink: 0 }}>ℹ️</span>
+              <div>
+                <strong>此账号为非活动账号 (Inactive)</strong>
+                <div style={{ marginTop: 4 }}>重新授权仅更新该账号槽位的凭据，不会改变全局当前 Active 账号（当前 Active 账号不受影响）。</div>
+              </div>
+            </div>
+          )}
+
+          {/* Identity verification warning */}
+          <div style={{ padding: "10px 12px", borderRadius: 6, background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.2)", display: "flex", gap: 8 }}>
+            <span style={{ flexShrink: 0 }}>💡</span>
+            <div>
+              <strong>无法强校验远端身份</strong>
+              <div style={{ marginTop: 4 }}>xAI 凭据未提供稳定公开的账号 ID，系统无法可靠验证浏览器里登录的账号是否为原账号。请在浏览器授权时确认使用正确账号。</div>
+            </div>
+          </div>
+
+          <p style={{ margin: 0, color: "var(--text-dim)" }}>继续后，我们将发起安全 OAuth 会话以重新授权此账号。原有的备注和补充信息将保留，失败或取消时原凭据不作修改。</p>
+        </div>
+        <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button type="button" disabled={busy} onClick={onClose} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: busy ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+          <button type="button" ref={confirmBtnRef} disabled={busy} onClick={onConfirm} style={{ padding: "6px 14px", background: busy ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: busy ? "var(--text-dim)" : "#fff", cursor: busy ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>
+            {busy ? "处理中…" : "确认并继续"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountConsumed }: { provider: OAuthProvider; onRefresh: () => void; initialAccountId?: string | null; onInitialAccountConsumed?: () => void }) {
   const { confirm, prompt } = usePrompt();
   const isManagedAccounts = provider.authMode === "managed_accounts";
   const isGrok = provider.id === "grok-cli";
@@ -2057,9 +2211,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   const [showLoginMethods, setShowLoginMethods] = useState(false);
   // Preferred Kiro method id to auto-answer the provider's onSelect prompt
   const preferredKiroMethodRef = useRef<"builder-id" | "google" | "github" | null>(null);
+  // Preferred Grok method id to auto-answer the provider's onSelect prompt.
+  // UI-local methods map to upstream ids: browser→browser, device→device, grok_build→existing.
+  const preferredGrokMethodRef = useRef<"browser" | "device" | "existing" | null>(null);
   // Protected delete dialog states (Grok / Kiro / Antigravity Active protection)
   const [protectedDeleteAccount, setProtectedDeleteAccount] = useState<OAuthAccountSummary | null>(null);
   const [protectedDeleteDeleting, setProtectedDeleteDeleting] = useState(false);
+  // Reauth target account (Grok only); set before confirm dialog, consumed by reauth flow.
+  const [reauthTarget, setReauthTarget] = useState<OAuthAccountSummary | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Antigravity quota race guards — clear old data and reject stale responses on account switch.
@@ -2096,8 +2255,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     setWarmupDialogOpen(false);
     setShowLoginMethods(false);
     preferredKiroMethodRef.current = null;
+    preferredGrokMethodRef.current = null;
     setProtectedDeleteAccount(null);
     setProtectedDeleteDeleting(false);
+    setReauthTarget(null);
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
     antigravityQuotaAbortRef.current?.abort();
@@ -2122,7 +2283,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
     } catch (error) {
-      setAccountsError(error instanceof Error ? error.message : "Failed to load accounts");
+      setAccountsError(error instanceof Error ? error.message : "加载账号失败");
     } finally {
       setAccountsLoading(false);
     }
@@ -2143,6 +2304,18 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     });
   }, [accounts, provider.id, isManagedAccounts]);
 
+  // Consume initialAccountId from top-bar deep-link focus. Auto-select the
+  // target account once and then clear, so subsequent provider switches don't re-apply.
+  const initialAccountConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!initialAccountId || accounts.length === 0 || initialAccountConsumedRef.current) return;
+    if (accounts.some((a) => a.accountId === initialAccountId)) {
+      setSelectedQuotaAccountId(initialAccountId);
+      initialAccountConsumedRef.current = true;
+      onInitialAccountConsumed?.();
+    }
+  }, [initialAccountId, accounts, onInitialAccountConsumed]);
+
   // Codex quota loader
   const loadQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
     if (provider.id !== "openai-codex" || (!provider.loggedIn && !force)) return;
@@ -2161,7 +2334,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         credentialMessage: error instanceof Error ? error.message : String(error),
         success: false,
         tiers: [],
-        error: error instanceof Error ? error.message : "Usage query failed",
+        error: error instanceof Error ? error.message : "用量查询失败",
         queriedAt: Date.now(),
         resetCreditsAvailableCount: null,
         resetCredits: [],
@@ -2174,7 +2347,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   // Grok quota loader
   const loadGrokQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
-    if (!isGrok || (!provider.loggedIn && !force)) return;
+    if (!isGrok || (!provider.loggedIn && !force && accounts.length === 0)) return;
     const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
     setQuotaLoading(true);
     try {
@@ -2186,11 +2359,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       void loadAccounts();
     } catch (error) {
       setGrokQuota(null);
-      setAccountsError(error instanceof Error ? error.message : "Failed to load Grok quota");
+      setAccountsError(error instanceof Error ? error.message : "加载 Grok 配额失败");
     } finally {
       setQuotaLoading(false);
     }
-  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isGrok]);
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, accounts.length, loadAccounts, isGrok]);
 
   // Kiro quota loader — GetUsageLimits wire projection only (no secrets/raw body)
   const loadKiroQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
@@ -2206,7 +2379,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       void loadAccounts();
     } catch (error) {
       setKiroQuota(null);
-      setAccountsError(error instanceof Error ? error.message : "Failed to load Kiro quota");
+      setAccountsError(error instanceof Error ? error.message : "加载 Kiro 配额失败");
     } finally {
       setQuotaLoading(false);
     }
@@ -2241,7 +2414,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } catch (error) {
       if (controller.signal.aborted || generation !== antigravityQuotaGenerationRef.current) return;
       setAntigravityQuota(null);
-      setAccountsError(error instanceof Error ? error.message : "Failed to load Antigravity quota");
+      setAccountsError(error instanceof Error ? error.message : "加载 Antigravity 配额失败");
     } finally {
       if (generation === antigravityQuotaGenerationRef.current) {
         setQuotaLoading(false);
@@ -2256,10 +2429,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
   }, [provider.id, provider.loggedIn, loadQuota]);
 
   useEffect(() => {
-    if (isGrok && provider.loggedIn) {
+    if (isGrok && (provider.loggedIn || accounts.length > 0)) {
       void loadGrokQuota();
     }
-  }, [provider.id, provider.loggedIn, isGrok, loadGrokQuota]);
+  }, [provider.id, provider.loggedIn, isGrok, loadGrokQuota, accounts.length]);
 
   useEffect(() => {
     if (isKiro && (provider.loggedIn || accounts.length > 0)) {
@@ -2273,12 +2446,21 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     }
   }, [provider.id, provider.loggedIn, isAntigravity, loadAntigravityQuota, accounts.length]);
 
-  const handleLogin = useCallback((accountMode: "login" | "add" = "login") => {
+  const handleLogin = useCallback((options?: { mode?: "login" | "add" | "reauth"; accountId?: string }) => {
+    const mode = options?.mode ?? "login";
+    const accountId = options?.accountId;
     eventSourceRef.current?.close();
     setLoginState({ phase: "connecting" });
     setInputValue("");
 
-    const loginUrl = `/api/auth/login/${encodeURIComponent(provider.id)}${accountMode === "add" ? "?accountMode=add" : ""}`;
+    const params = new URLSearchParams();
+    if (mode === "add") params.set("accountMode", "add");
+    else if (mode === "reauth") {
+      params.set("accountMode", "reauth");
+      if (accountId) params.set("accountId", accountId);
+    }
+    const query = params.toString();
+    const loginUrl = `/api/auth/login/${encodeURIComponent(provider.id)}${query ? `?${query}` : ""}`;
     const es = new EventSource(loginUrl);
     eventSourceRef.current = es;
 
@@ -2305,32 +2487,64 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       } else if (data.type === "prompt_request") {
         setLoginState({ phase: "prompt", message: data.message!, placeholder: data.placeholder ?? null, token: data.token! });
       } else if (data.type === "select_request") {
-        const preferred = preferredKiroMethodRef.current;
         const options = data.options ?? [];
-        if (preferred && options.some((option) => option.id === preferred)) {
-          preferredKiroMethodRef.current = null;
-          setLoginState({ phase: "progress", message: "Continuing…" });
+        // Check Grok preferred method first (grok-cli uses upstream ids: browser|device|existing).
+        const preferredGrok = preferredGrokMethodRef.current;
+        if (isGrok && preferredGrok && options.some((option) => option.id === preferredGrok)) {
+          preferredGrokMethodRef.current = null;
+          setLoginState({ phase: "progress", message: "继续中…" });
           void fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: data.token!, code: preferred }),
+            body: JSON.stringify({ token: data.token!, code: preferredGrok }),
           }).then(async (res) => {
             if (!res.ok) {
               const d = await res.json().catch(() => ({})) as { error?: string };
-              setLoginState({ phase: "error", message: d.error ?? `Server error ${res.status}` });
+              setLoginState({ phase: "error", message: d.error ?? `服务器错误 ${res.status}` });
             }
           }).catch((e) => {
-            setLoginState({ phase: "error", message: e instanceof Error ? e.message : "Network error" });
+            setLoginState({ phase: "error", message: e instanceof Error ? e.message : "网络错误" });
+          });
+          return;
+        }
+        // Then check Kiro preferred method.
+        const preferredKiro = preferredKiroMethodRef.current;
+        if (preferredKiro && options.some((option) => option.id === preferredKiro)) {
+          preferredKiroMethodRef.current = null;
+          setLoginState({ phase: "progress", message: "继续中…" });
+          void fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: data.token!, code: preferredKiro }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const d = await res.json().catch(() => ({})) as { error?: string };
+              setLoginState({ phase: "error", message: d.error ?? `服务器错误 ${res.status}` });
+            }
+          }).catch((e) => {
+            setLoginState({ phase: "error", message: e instanceof Error ? e.message : "网络错误" });
           });
         } else {
           preferredKiroMethodRef.current = null;
+          preferredGrokMethodRef.current = null;
           setLoginState({ phase: "select", message: data.message!, options, token: data.token! });
         }
       } else if (data.type === "progress") {
         setLoginState({ phase: "progress", message: data.message! });
       } else if (data.type === "success") {
         es.close();
-        setLoginState({ phase: "success", message: data.message ?? (accountMode === "add" ? "Account saved successfully." : "Connected successfully.") });
+        const reauthenticated = (data as { reauthenticated?: boolean }).reauthenticated === true;
+        const targetActive = (data as { active?: boolean }).active === true;
+        let successMessage: string;
+        if (reauthenticated) {
+          successMessage = targetActive
+            ? "已更新全局 Active 凭据。当前与新会话的后续请求将使用新凭据。"
+            : "账号凭据已更新，未改变全局 Active。";
+        } else {
+          successMessage = data.message ?? (mode === "add" ? "账号保存成功。" : "连接成功。");
+        }
+        setLoginState({ phase: "success", message: successMessage });
+        setReauthTarget(null);
         onRefresh();
         void loadAccounts();
         if (isGrok) void loadGrokQuota(true);
@@ -2347,7 +2561,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     };
     es.onerror = () => {
       es.close();
-      setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "Connection lost" });
+      setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "连接已断开" });
     };
   }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
 
@@ -2367,7 +2581,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
-    setLoginState({ phase: "progress", message: "Verifying…" });
+    setLoginState({ phase: "progress", message: "验证中…" });
     try {
       const res = await fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
         method: "POST",
@@ -2376,18 +2590,18 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
-        setLoginState({ phase: "error", message: d.error ?? `Server error ${res.status}` });
+        setLoginState({ phase: "error", message: d.error ?? `服务器错误 ${res.status}` });
         return;
       }
       setInputValue("");
       // Success path: SSE stream will emit "success" and update state
     } catch (e) {
-      setLoginState({ phase: "error", message: e instanceof Error ? e.message : "Network error" });
+      setLoginState({ phase: "error", message: e instanceof Error ? e.message : "网络错误" });
     }
   }, [provider.id]);
 
   const submitSelection = useCallback(async (token: string, value: string) => {
-    setLoginState({ phase: "progress", message: "Continuing…" });
+    setLoginState({ phase: "progress", message: "继续中…" });
     try {
       const res = await fetch(`/api/auth/login/${encodeURIComponent(provider.id)}`, {
         method: "POST",
@@ -2396,10 +2610,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
-        setLoginState({ phase: "error", message: d.error ?? `Server error ${res.status}` });
+        setLoginState({ phase: "error", message: d.error ?? `服务器错误 ${res.status}` });
       }
     } catch (e) {
-      setLoginState({ phase: "error", message: e instanceof Error ? e.message : "Network error" });
+      setLoginState({ phase: "error", message: e instanceof Error ? e.message : "网络错误" });
     }
   }, [provider.id]);
 
@@ -2424,14 +2638,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
       setSelectedQuotaAccountId(accountId);
-      setLoginState({ phase: "success", message: "Account activated." });
+      setLoginState({ phase: "success", message: "账号已启用。" });
       onRefresh();
       if (isGrok) await loadGrokQuota(true, accountId);
       else if (isKiro) await loadKiroQuota(true, accountId);
       else if (isAntigravity) await loadAntigravityQuota(true, accountId);
       else await loadQuota(true, accountId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to activate account";
+      const message = error instanceof Error ? error.message : "启用账号失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
@@ -2441,10 +2655,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
     const nextLabel = await prompt({
-      title: "Account remark",
-      message: "Leave empty to clear the remark.",
+      title: "账号备注",
+      message: "留空将清除备注。",
       initialValue: account.label ?? "",
-      confirmLabel: "Save remark",
+      confirmLabel: "保存备注",
     });
     if (nextLabel === null) return;
 
@@ -2459,9 +2673,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
-      setLoginState({ phase: "success", message: nextLabel.trim() ? "Account remark saved." : "Account remark cleared." });
+      setLoginState({ phase: "success", message: nextLabel.trim() ? "账号备注已保存。" : "账号备注已清除。" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save account remark";
+      const message = error instanceof Error ? error.message : "保存账号备注失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
@@ -2486,9 +2700,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
       setEditingExtraInfoAccount(null);
-      setLoginState({ phase: "success", message: nextExtraInfo.trim() ? "Account extra info saved." : "Account extra info cleared." });
+      setLoginState({ phase: "success", message: nextExtraInfo.trim() ? "账号补充信息已保存。" : "账号补充信息已清除。" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save account extra info";
+      const message = error instanceof Error ? error.message : "保存账号补充信息失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
@@ -2507,7 +2721,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         if (!res.ok && !data.success) throw new Error(data.error?.message ?? `HTTP ${res.status}`);
         if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setGrokQuota(data);
         await loadAccounts();
-        setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error?.message ?? "Quota query failed.") });
+        setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "账号配额已刷新。" : (data.error?.message ?? "配额查询失败。") });
       } else if (isKiro) {
         const data = await res.json().catch(() => ({})) as import("@/lib/kiro-subscription-quota").KiroQuotaResultV1;
         // Prefer fixed allowlisted codes over raw upstream messages.
@@ -2533,7 +2747,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         await loadAccounts();
         setLoginState({
           phase: data.success ? "success" : "error",
-          message: data.success ? "Account quota refreshed." : (safeMessage ?? "Quota query failed."),
+          message: data.success ? "账号配额已刷新。" : (safeMessage ?? "配额查询失败。"),
         });
       } else if (isAntigravity) {
         const data = await res.json().catch(() => ({})) as import("@/lib/antigravity-subscription-quota").AntigravityQuotaResultV1;
@@ -2562,17 +2776,17 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         await loadAccounts();
         setLoginState({
           phase: data.success ? "success" : "error",
-          message: data.success ? "Account quota refreshed." : (safeMessage ?? "Quota query failed."),
+          message: data.success ? "账号配额已刷新。" : (safeMessage ?? "配额查询失败。"),
         });
       } else {
         const data = await res.json().catch(() => ({})) as SubscriptionQuota & { error?: string };
         if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
         if (selectedQuotaAccountId ? account.accountId === selectedQuotaAccountId : account.active) setQuota(data);
         await loadAccounts();
-        setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "Account quota refreshed." : (data.error ?? "Quota query failed.") });
+        setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "账号配额已刷新。" : (data.error ?? "配额查询失败。") });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to refresh account quota";
+      const message = error instanceof Error ? error.message : "刷新账号配额失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
@@ -2602,9 +2816,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       if (!res.ok || !data.success) throw new Error(data.error ?? data.credentialMessage ?? `HTTP ${res.status}`);
       setQuota(data);
       await loadAccounts();
-      setLoginState({ phase: "success", message: "Codex rate limit reset." });
+      setLoginState({ phase: "success", message: "Codex 速率限制已重置。" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to reset Codex rate limit";
+      const message = error instanceof Error ? error.message : "重置 Codex 速率限制失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
@@ -2655,11 +2869,11 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         antigravityQuotaAbortRef.current?.abort();
         antigravityQuotaGenerationRef.current += 1;
       }
-      setLoginState({ phase: "success", message: "Account deleted." });
+      setLoginState({ phase: "success", message: "账号已删除。" });
       setProtectedDeleteAccount(null);
       onRefresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete account";
+      const message = error instanceof Error ? error.message : "删除账号失败";
       setAccountsError(message);
     } finally {
       setProtectedDeleteDeleting(false);
@@ -2672,9 +2886,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       return;
     }
     const confirmed = await confirm({
-      title: "Delete saved credentials?",
-      message: <>Delete saved credentials for {account.displayName}?<br /><br />The account must be added again to restore it.</>,
-      confirmLabel: "Delete credentials",
+      title: "删除已保存凭证？",
+      message: <>确定删除 {account.displayName} 的已保存凭证吗？<br /><br />恢复后需要重新添加该账号。</>,
+      confirmLabel: "删除凭证",
       intent: "danger",
     });
     if (!confirmed) return;
@@ -2690,9 +2904,9 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
-      setLoginState({ phase: "success", message: "Account deleted." });
+      setLoginState({ phase: "success", message: "账号已删除。" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete account";
+      const message = error instanceof Error ? error.message : "删除账号失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
@@ -2715,31 +2929,38 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   const handleGrokLoginMethod = useCallback((method: "browser" | "device" | "grok_build") => {
     setShowLoginMethods(false);
-    if (method === "grok_build") {
-      // Grok Build existing credential — handled by the SSE flow picking up ~/.grok/auth.json
+    // Map UI-local method to upstream id: browser→browser, device→device, grok_build→existing.
+    const upstreamMethod: "browser" | "device" | "existing" = method === "grok_build" ? "existing" : method;
+    preferredGrokMethodRef.current = upstreamMethod;
+    const target = reauthTarget;
+    if (target) {
+      // Reauth flow: use the target account's id
+      handleLogin({ mode: "reauth", accountId: target.accountId });
+    } else {
+      handleLogin({ mode: "add" });
     }
-    // Both browser and device code flow through the SSE login; Grok always uses add mode
-    handleLogin("add");
-  }, [handleLogin]);
+  }, [handleLogin, reauthTarget]);
 
   const handleKiroLoginMethod = useCallback((method: "builder-id" | "google" | "github") => {
     setShowLoginMethods(false);
     // Remember the chosen method so the SSE select_request can be auto-answered
     // without a second click. Falls back to the select UI if options differ.
     preferredKiroMethodRef.current = method;
-    handleLogin("add");
+    handleLogin({ mode: "add" });
   }, [handleLogin]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>Subscription</SectionTitle>
+        <SectionTitle>订阅</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-          <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : accounts.length > 0 ? "#f59e0b" : "var(--border)", display: "inline-block" }} />
+          <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : accounts.length > 0 ? "#f59e0b" : "var(--text-dim)" }}>
             {provider.loggedIn
-              ? `connected${provider.accountCount ? ` (${provider.accountCount})` : ""}`
-              : "not connected"}
+              ? `已连接${provider.accountCount ? `（${provider.accountCount}）` : ""}`
+              : accounts.length > 0
+                ? `已保存 ${accounts.length} 个账号，当前凭据需恢复`
+                : "未连接"}
           </span>
         </div>
       </div>
@@ -2750,14 +2971,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <strong style={{ color: "var(--text)" }}>账号激活说明：</strong>
           {isKiro
             ? <>
-                Activate 只设置 Kiro 的<strong>全局当前 Active</strong>，不属于锁定。切换将作用于所有 live/new Session 后续请求，in-flight 请求不换 Token。若已开启 Settings 中的自动切号，额度不足时会自动切换到其他有效备用账号。
+                「启用」只设置 Kiro 的<strong>全局当前账号</strong>，不属于锁定。切换将作用于所有进行中/新建会话的后续请求，进行中的请求不会更换 Token。若已开启设置中的自动切号，额度不足时会自动切换到其他有效备用账号。
               </>
             : isAntigravity
               ? <>
-                  Activate 只设置 Antigravity 的<strong>全局当前 Active</strong>，不是锁定账号。切换后作用于所有 live/new Session 的后续请求；已经发出的 in-flight 请求不会中途更换 token。自动切号默认关闭，且必须对当前请求模型具备 fresh/live 可用额度，否则 fail-closed。
+                  「启用」只设置 Antigravity 的<strong>全局当前账号</strong>，不是锁定账号。切换后作用于所有进行中/新建会话的后续请求；已经发出的请求不会中途更换 token。自动切号默认关闭，且必须对当前请求模型具备可用额度，否则会失败关闭。
                 </>
               : <>
-                  Activate 只设置 Grok 的<strong>全局当前 Active</strong>，不是锁定账号。切换后，所有普通运行中 Session 和新 Session 的<strong>后续请求</strong>都会使用该账号；已经发出的 in-flight 请求不会中途更换 token。手动 Active 的账号若返回明确限额或限流，且 Settings 中开启了自动切号，仍会自动轮换到可用账号并重试。
+                  「启用」只设置 Grok 的<strong>全局当前账号</strong>，不是锁定账号。切换后，所有普通运行中会话和新会话的<strong>后续请求</strong>都会使用该账号；已经发出的请求不会中途更换 token。手动启用的账号若返回明确限额或限流，且设置中开启了自动切号，仍会自动轮换到可用账号并重试。
                 </>}
         </div>
       )}
@@ -2778,17 +2999,19 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
             {provider.loggedIn || accounts.length > 0
               ? (isGrok
-                ? `已连接 ${accounts.length} 个 Grok 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
+                ? (provider.loggedIn
+                    ? `已连接 ${accounts.length} 个 Grok 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
+                    : `已保存 ${accounts.length} 个 Grok 账号，当前凭据需恢复。活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`)
                 : isKiro
                   ? `已连接 ${accounts.length} 个 Kiro 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
                   : isAntigravity
                     ? `已连接 ${accounts.length} 个 Antigravity 账号。当前活动账号：${accounts.find((a) => a.active)?.displayName ?? "无"}`
-                    : "Already connected. You can re-login or disconnect.")
+                    : "已连接。你可以重新登录或断开连接。")
               : isKiro
                 ? "连接 AWS Kiro 账号（Builder ID / Google / GitHub）。"
                 : isAntigravity
                   ? "通过 Google OAuth 添加 Antigravity 账号。callback 强制绑定 127.0.0.1；远程访问可在授权后手工粘贴 Redirect URL。不支持 Credential JSON 导入。"
-                  : `Connect your ${provider.name} account.`}
+                  : `连接你的 ${provider.name} 账号。`}
           </p>
         )}
 
@@ -2823,7 +3046,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
               若设置了 <code style={{ fontFamily: "var(--font-mono)" }}>GROK_CLI_OAUTH_TOKEN</code> 环境变量，系统将使用只读凭证，但不支持多账号隔离管理及自动 Token 刷新。
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={() => setShowLoginMethods(false)} style={{ padding: "4px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>取消</button>
+              <button onClick={() => { setShowLoginMethods(false); setReauthTarget(null); }} style={{ padding: "4px 10px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>取消</button>
             </div>
           </div>
         )}
@@ -2868,7 +3091,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         )}
 
         {loginState.phase === "connecting" && (
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Opening browser…</p>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>正在打开浏览器…</p>
         )}
         {loginState.phase === "select" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2892,14 +3115,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
               {loginState.phase === "auth"
-                ? "Complete sign-in in the browser, then copy the redirect URL from the address bar and paste it below."
+                ? "请在浏览器中完成登录，然后将地址栏中的跳转 URL 复制并粘贴到下方。"
                 : loginState.message}
             </p>
             {loginState.phase === "auth" && (
               <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-                If the browser window did not open,{" "}
+                如果浏览器窗口未打开，{" "}
                 <a href={loginState.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>
-                  click here to open the login page
+                  点击这里打开登录页
                 </a>
                 .
               </p>
@@ -2914,7 +3137,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                   ? (isAntigravity
                     ? "http://localhost:51121/oauth-callback?state=…&code=…"
                     : "http://localhost:1455/auth/callback?code=…")
-                  : (loginState.placeholder ?? "Enter value…")}
+                  : (loginState.placeholder ?? "请输入…")}
                 style={{ flex: 1, padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
               />
               <button
@@ -2922,7 +3145,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 disabled={!inputValue.trim()}
                 style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 5, color: inputValue.trim() ? "#fff" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
               >
-                Submit
+                提交
               </button>
             </div>
           </div>
@@ -2930,7 +3153,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         {loginState.phase === "device_code" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-              Open the verification page and enter this code:
+              打开验证页面并输入以下验证码：
             </p>
             <div style={{ padding: "8px 10px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
               {loginState.userCode}
@@ -2939,7 +3162,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
               <a href={loginState.verificationUri} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>
                 {loginState.verificationUri}
               </a>
-              {loginState.expiresInSeconds ? ` Expires in ${Math.ceil(loginState.expiresInSeconds / 60)} minutes.` : ""}
+              {loginState.expiresInSeconds ? ` 将在 ${Math.ceil(loginState.expiresInSeconds / 60)} 分钟后过期。` : ""}
             </p>
           </div>
         )}
@@ -2947,7 +3170,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{loginState.message ?? "Connected successfully."}</p>
+          <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{loginState.message ?? "连接成功。"}</p>
         )}
         {loginState.phase === "error" && (
           <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
@@ -2958,10 +3181,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {isWorking ? (
           <button
-            onClick={() => { eventSourceRef.current?.close(); preferredKiroMethodRef.current = null; setLoginState({ phase: "idle" }); }}
+            onClick={() => { eventSourceRef.current?.close(); preferredKiroMethodRef.current = null; preferredGrokMethodRef.current = null; setLoginState({ phase: "idle" }); }}
             style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
-            Cancel
+            取消
           </button>
         ) : (
           <>
@@ -2977,7 +3200,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             ) : isAntigravity ? (
               <button
                 type="button"
-                onClick={() => handleLogin("add")}
+                onClick={() => handleLogin({ mode: "add" })}
                 style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               >
                 ➕ 添加 Antigravity 账号 (OAuth 登录)
@@ -2985,17 +3208,17 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             ) : (
               <>
                 <button
-                  onClick={() => handleLogin()}
+                  onClick={() => handleLogin({ mode: "login" })}
                   style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                 >
-                  {provider.loggedIn ? "Re-login" : "Login"}
+                  {provider.loggedIn ? "重新登录" : "登录"}
                 </button>
                 {provider.id === "openai-codex" && provider.loggedIn && (
                   <button
                     onClick={() => setAddAccountDialogView("method")}
                     style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                   >
-                    Add Account
+                    添加账号
                   </button>
                 )}
               </>
@@ -3025,7 +3248,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 onClick={handleLogout}
                 style={{ padding: "5px 12px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 5, color: "#ef4444", cursor: "pointer", fontSize: 12 }}
               >
-                Disconnect
+                断开连接
               </button>
             )}
           </>
@@ -3033,12 +3256,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       </div>
 
       {/* Quota display */}
-      {isGrok && provider.loggedIn && (
+      {isGrok && (provider.loggedIn || accounts.length > 0) && (
         <GrokQuotaView
           quota={grokQuota}
           loading={quotaLoading}
           account={selectedQuotaAccount}
           onRefresh={() => loadGrokQuota(true)}
+          onReauthenticate={selectedQuotaAccount ? () => { setReauthTarget(selectedQuotaAccount); } : undefined}
         />
       )}
 
@@ -3078,6 +3302,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           deletingAccountId={deletingAccountId}
           selectedAccountId={selectedQuotaAccount?.accountId ?? null}
           hideCodexQuotaSummary={hideCodexQuotaSummary}
+          actionsDisabled={reauthTarget !== null || isWorking || showLoginMethods}
           onRefresh={loadAccounts}
           onSelect={handleSelectQuotaAccount}
           onActivate={handleActivateAccount}
@@ -3086,6 +3311,19 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           onRefreshQuota={handleRefreshAccountQuota}
           onDelete={handleDeleteAccount}
           onWarmup={isCodex ? (() => setWarmupDialogOpen(true)) : undefined}
+          onReauthenticate={isGrok ? (account) => setReauthTarget(account) : undefined}
+        />
+      )}
+
+      {/* Grok reauth confirm dialog */}
+      {isGrok && reauthTarget && loginState.phase === "idle" && !showLoginMethods && (
+        <GrokReauthConfirmDialog
+          account={reauthTarget}
+          busy={false}
+          onConfirm={() => {
+            setShowLoginMethods(true);
+          }}
+          onClose={() => setReauthTarget(null)}
         />
       )}
 
@@ -3112,7 +3350,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           provider={provider}
           view={addAccountDialogView}
           onViewChange={setAddAccountDialogView}
-          onCodexAuth={() => { setAddAccountDialogView(null); handleLogin("add"); }}
+          onCodexAuth={() => { setAddAccountDialogView(null); handleLogin({ mode: "add" }); }}
           onImported={(nextAccounts) => {
             setAccounts(nextAccounts);
             setLoginState({ phase: "success", message: "账号保存成功。" });
@@ -3260,7 +3498,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load accounts");
+      setError(e instanceof Error ? e.message : "加载账号失败");
     } finally {
       setLoading(false);
     }
@@ -3290,12 +3528,12 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
         { method: "POST" },
       );
       const data = await res.json() as ApiKeyRevealResponse & { error?: string };
-      if (!res.ok || !data.apiKey) throw new Error(data.error ?? "Reveal failed");
+      if (!res.ok || !data.apiKey) throw new Error(data.error ?? "显示失败");
       const next = new Map(revealedKeys);
       next.set(accountId, data.apiKey);
       setRevealedKeys(next);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Reveal failed", "error");
+      showToast(e instanceof Error ? e.message : "显示失败", "error");
     } finally {
       setRevealingId(null);
     }
@@ -3313,13 +3551,13 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           { method: "POST" },
         );
         const data = await res.json() as ApiKeyRevealResponse & { error?: string };
-        if (!res.ok || !data.apiKey) throw new Error(data.error ?? "Reveal failed");
+        if (!res.ok || !data.apiKey) throw new Error(data.error ?? "显示失败");
         key = data.apiKey;
         const next = new Map(revealedKeys);
         next.set(accountId, data.apiKey);
         setRevealedKeys(next);
       } catch (e) {
-        showToast(e instanceof Error ? e.message : "Copy failed", "error");
+        showToast(e instanceof Error ? e.message : "复制失败", "error");
         setRevealingId(null);
         return;
       }
@@ -3328,9 +3566,9 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       await navigator.clipboard.writeText(key);
       setCopiedId(accountId);
       setTimeout(() => setCopiedId(null), 2000);
-      showToast("API key copied to clipboard");
+      showToast("API Key 已复制到剪贴板");
     } catch {
-      showToast("Failed to copy to clipboard", "error");
+      showToast("复制到剪贴板失败", "error");
     } finally {
       setRevealingId(null);
     }
@@ -3348,10 +3586,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
-      showToast("Account activated");
+      showToast("账号已启用");
       onRefresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to activate account");
+      setError(e instanceof Error ? e.message : "启用账号失败");
     } finally {
       setActivatingId(null);
     }
@@ -3373,10 +3611,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
-      showToast("Account enabled");
+      showToast("账号已启用");
       onRefresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to enable account");
+      setError(e instanceof Error ? e.message : "启用账号失败");
     } finally {
       setEnablingId(null);
     }
@@ -3415,10 +3653,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
       setDisableConfirm(null);
-      showToast(disableConfirm.active ? "Account disabled and active key updated" : "Account disabled");
+      showToast(disableConfirm.active ? "账号已禁用，并已更新当前密钥" : "账号已禁用");
       onRefresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to disable account");
+      setError(e instanceof Error ? e.message : "禁用账号失败");
     } finally {
       setDisableSaving(false);
     }
@@ -3436,7 +3674,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            displayName: addDisplayName.trim() || "Unnamed account",
+            displayName: addDisplayName.trim() || "未命名账号",
             description: addDescription.trim(),
             apiKey: addApiKey.trim(),
             activate: addActivate,
@@ -3451,10 +3689,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setAddDescription("");
       setAddApiKey("");
       setAddActivate(true);
-      showToast("Account added" + (addActivate ? " and activated" : ""));
+      showToast("账号已添加" + (addActivate ? "并已启用" : ""));
       onRefresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to add account");
+      setError(e instanceof Error ? e.message : "添加账号失败");
     } finally {
       setAddSaving(false);
     }
@@ -3475,7 +3713,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     setEditError(null);
     try {
       const body: Record<string, string> = {
-        displayName: editDisplayName.trim() || "Unnamed account",
+        displayName: editDisplayName.trim() || "未命名账号",
         description: editDescription.trim(),
       };
       if (editApiKey.trim()) {
@@ -3499,10 +3737,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
         next.delete(editAccount.accountId);
         setRevealedKeys(next);
       }
-      showToast("Account updated");
+      showToast("账号已更新");
       if (editApiKey.trim()) onRefresh();
     } catch (e) {
-      setEditError(e instanceof Error ? e.message : "Failed to update account");
+      setEditError(e instanceof Error ? e.message : "更新账号失败");
     } finally {
       setEditSaving(false);
     }
@@ -3531,10 +3769,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       next.delete(deleteConfirm.accountId);
       setRevealedKeys(next);
       setDeleteConfirm(null);
-      showToast("Account deleted");
+      showToast("账号已删除");
       onRefresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete account");
+      setError(e instanceof Error ? e.message : "删除账号失败");
       setDeleteConfirm(null);
     } finally {
       setDeleteDeleting(false);
@@ -3573,11 +3811,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>API Key Accounts</SectionTitle>
+        <SectionTitle>API Key 账号</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: isConfigured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
           <span style={{ fontSize: 11, color: isConfigured ? "#4ade80" : "var(--text-dim)" }}>
-            {isConfigured ? "configured" : "not configured"}
+            {isConfigured ? "已配置" : "未配置"}
           </span>
         </div>
       </div>
@@ -3585,10 +3823,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       {/* Description */}
       <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
         {activeAccount
-          ? `Active account: ${activeAccount.displayName}. You can save multiple API keys and switch between them.`
+          ? `当前账号：${activeAccount.displayName}。你可以保存多个 API Key 并在它们之间切换。`
           : accounts.length > 0
-            ? `${accounts.length} account${accounts.length !== 1 ? "s" : ""} saved but none active.`
-            : `Add your ${provider.displayName} API key${provider.modelCount > 0 ? ` to enable ${provider.modelCount} model${provider.modelCount !== 1 ? "s" : ""}` : ""}.`}
+            ? `已保存 ${accounts.length} 个账号，但尚未启用任何一个。`
+            : `添加你的 ${provider.displayName} API Key${provider.modelCount > 0 ? `，以启用 ${provider.modelCount} 个模型` : ""}。`}
       </p>
 
       {/* Error banner */}
@@ -3604,20 +3842,20 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#60a5fa", flexShrink: 0, marginTop: 1 }}>
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
-          <span>Your previous API key has been imported. You can rename it or add additional keys below.</span>
+          <span>已导入你之前的 API Key。可在下方重命名或继续添加更多密钥。</span>
         </div>
       )}
 
       {/* Account list */}
       {loading ? (
-        <div style={{ padding: "20px 0", textAlign: "center", fontSize: 12, color: "var(--text-dim)" }}>Loading accounts…</div>
+        <div style={{ padding: "20px 0", textAlign: "center", fontSize: 12, color: "var(--text-dim)" }}>正在加载账号…</div>
       ) : accounts.length === 0 && !error ? (
         <div style={{
           padding: "28px 16px", textAlign: "center", border: "1px dashed var(--border)",
           borderRadius: 8, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.6,
         }}>
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>No API keys saved</div>
-          <div>Add your first {provider.displayName} API key to get started.</div>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>尚未保存 API Key</div>
+          <div>添加你的第一个 {provider.displayName} API Key 以开始使用。</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -3651,17 +3889,17 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                     </span>
                     {isActive && (
                       <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(74,222,128,0.15)", color: "#4ade80", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(74,222,128,0.3)", flexShrink: 0 }}>
-                        ACTIVE
+                        当前
                       </span>
                     )}
                     {isDisabled && (
                       <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(239,68,68,0.12)", color: "#f87171", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(239,68,68,0.3)", flexShrink: 0 }}>
-                        DISABLED
+                        已禁用
                       </span>
                     )}
                     {account.importedFromLegacyAt && (
                       <span style={{ fontSize: 10, fontWeight: 500, background: "rgba(245,158,11,0.15)", color: "#f59e0b", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(245,158,11,0.3)", flexShrink: 0 }}>
-                        Imported
+                        已导入
                       </span>
                     )}
                   </div>
@@ -3708,15 +3946,15 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   {isActive ? (
                     <span style={{ ...actionBtnBase, color: "#4ade80", borderColor: "rgba(74,222,128,0.3)", cursor: "default" }}>
-                      Active
+                      当前
                     </span>
                   ) : isDisabled ? (
                     <button
                       disabled={true}
-                      title={account.disabledReason || "Account is disabled. Enable it first before activating."}
+                      title={account.disabledReason || "账号已禁用。请先启用后再激活。"}
                       style={{ ...actionBtnBase, color: "var(--text-dim)", cursor: "not-allowed", opacity: 0.5 }}
                     >
-                      Activate
+                      启用
                     </button>
                   ) : (
                     <button
@@ -3724,7 +3962,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                       disabled={isBusy}
                       style={{ ...actionBtnBase, color: isBusy ? "var(--text-dim)" : "var(--accent)", cursor: isBusy ? "not-allowed" : "pointer" }}
                     >
-                      {activatingId === account.accountId ? "Activating…" : "Activate"}
+                      {activatingId === account.accountId ? "启用中…" : "启用"}
                     </button>
                   )}
 
@@ -3739,9 +3977,9 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                         borderColor: isBusy ? "var(--border)" : "rgba(74,222,128,0.3)",
                         cursor: isBusy ? "not-allowed" : "pointer",
                       }}
-                      title="Re-enable this account so it can be activated"
+                      title="重新启用该账号，使其可被激活"
                     >
-                      {enablingId === account.accountId ? "Enabling…" : "Enable"}
+                      {enablingId === account.accountId ? "启用中…" : "启用"}
                     </button>
                   ) : (
                     <button
@@ -3753,9 +3991,9 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                         borderColor: isBusy ? "var(--border)" : "rgba(245,158,11,0.3)",
                         cursor: isBusy ? "not-allowed" : "pointer",
                       }}
-                      title={isActive ? "Disable this account — you will need to select a replacement or confirm clearing the active key" : "Disable this account so it cannot be activated until re-enabled"}
+                      title={isActive ? "禁用该账号——你需要选择替代账号，或确认清空当前密钥" : "禁用该账号，在重新启用前无法激活"}
                     >
-                      Disable
+                      禁用
                     </button>
                   )}
 
@@ -3769,10 +4007,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                       cursor: isRevealing ? "not-allowed" : "pointer",
                       display: "inline-flex", alignItems: "center", gap: 4,
                     }}
-                    title={isRevealed ? "Hide API key" : "Show API key"}
+                    title={isRevealed ? "隐藏 API Key" : "显示 API Key"}
                   >
                     {isRevealing ? (
-                      "Loading…"
+                      "加载中…"
                     ) : isRevealed ? (
                       <>
                         <ActionFlowIcon width={12} height={12} strokeWidth={2}>
@@ -3781,7 +4019,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                           <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
                           <path d="M1 1l22 22" />
                         </ActionFlowIcon>
-                        Hide
+                        隐藏
                       </>
                     ) : (
                       <>
@@ -3789,7 +4027,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
                           <circle cx="12" cy="12" r="3" />
                         </ActionFlowIcon>
-                        Show
+                        显示
                       </>
                     )}
                   </button>
@@ -3805,14 +4043,14 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                       cursor: isRevealing || isBusy ? "not-allowed" : "pointer",
                       display: "inline-flex", alignItems: "center", gap: 4,
                     }}
-                    title="Copy API key"
+                    title="复制 API Key"
                   >
                     {isCopied ? (
                       <>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        Copied
+                        已复制
                       </>
                     ) : (
                       <>
@@ -3820,7 +4058,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                         </ActionFlowIcon>
-                        Copy
+                        复制
                       </>
                     )}
                   </button>
@@ -3830,7 +4068,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                     disabled={isBusy}
                     style={{ ...actionBtnBase, color: "var(--text-muted)", cursor: isBusy ? "not-allowed" : "pointer" }}
                   >
-                    Edit
+                    编辑
                   </button>
 
                   <button
@@ -3838,7 +4076,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                     disabled={isBusy}
                     style={{ ...actionBtnBase, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)", cursor: isBusy ? "not-allowed" : "pointer" }}
                   >
-                    Delete
+                    删除
                   </button>
                 </div>
               </div>
@@ -3863,7 +4101,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
               fontWeight: 600,
             }}
           >
-            + Add API Key
+            + 添加 API Key
           </button>
           {isConfigured && (
             <button
@@ -3880,20 +4118,20 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                 fontWeight: 600,
               }}
             >
-              Disconnect
+              断开连接
             </button>
           )}
         </div>
       ) : (
         <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 16, background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Add API Key</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>添加 API Key</div>
 
-          <Field label="Display name">
-            <TextInput value={addDisplayName} onChange={setAddDisplayName} placeholder="e.g. Team account" />
+          <Field label="显示名称">
+            <TextInput value={addDisplayName} onChange={setAddDisplayName} placeholder="例如：团队账号" />
           </Field>
 
-          <Field label="Description (optional)">
-            <TextAreaInput value={addDescription} onChange={setAddDescription} placeholder="Notes about this key…" rows={5} />
+          <Field label="描述（可选）">
+            <TextAreaInput value={addDescription} onChange={setAddDescription} placeholder="关于此密钥的备注…" rows={5} />
           </Field>
 
           <Field label="API Key">
@@ -3908,7 +4146,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           </Field>
 
           <Check
-            label="Save and activate as current key"
+            label="保存并设为当前密钥"
             checked={addActivate}
             onChange={setAddActivate}
           />
@@ -3919,7 +4157,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
               disabled={addSaving}
               style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: addSaving ? "not-allowed" : "pointer", fontSize: 12 }}
             >
-              Cancel
+              取消
             </button>
             <button
               onClick={handleAdd}
@@ -3933,7 +4171,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                 fontSize: 12, fontWeight: 600,
               }}
             >
-              {addSaving ? "Saving…" : "Save"}
+              {addSaving ? "保存中…" : "保存"}
             </button>
           </div>
         </div>
@@ -3949,23 +4187,23 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
             <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Edit Account</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>编辑账号</div>
                 <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{editAccount.displayName}</div>
               </div>
               <button type="button" disabled={editSaving} onClick={() => setEditAccount(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
             </div>
             <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-              <Field label="Display name">
-                <TextInput value={editDisplayName} onChange={setEditDisplayName} placeholder="Account name" />
+              <Field label="显示名称">
+                <TextInput value={editDisplayName} onChange={setEditDisplayName} placeholder="账号名称" />
               </Field>
-              <Field label="Description">
-                <TextAreaInput value={editDescription} onChange={setEditDescription} placeholder="Notes…" rows={5} />
+              <Field label="描述">
+                <TextAreaInput value={editDescription} onChange={setEditDescription} placeholder="备注…" rows={5} />
               </Field>
-              <Field label="Replace API Key (leave empty to keep current)">
+              <Field label="替换 API Key（留空则保持不变）">
                 <SecretTextInput
                   value={editApiKey}
                   onChange={setEditApiKey}
-                  placeholder="Enter new key to replace…"
+                  placeholder="输入新密钥以替换…"
                   mono
                   autoComplete="off"
                   spellCheck={false}
@@ -3974,8 +4212,8 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
               {editError && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{editError}</div>}
             </div>
             <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" disabled={editSaving} onClick={() => setEditAccount(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12 }}>Cancel</button>
-              <button type="button" disabled={editSaving} onClick={handleEditSave} style={{ padding: "6px 14px", background: editSaving ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: editSaving ? "var(--text-dim)" : "#fff", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{editSaving ? "Saving…" : "Save"}</button>
+              <button type="button" disabled={editSaving} onClick={() => setEditAccount(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+              <button type="button" disabled={editSaving} onClick={handleEditSave} style={{ padding: "6px 14px", background: editSaving ? "var(--bg-panel)" : "var(--accent)", border: "none", borderRadius: 6, color: editSaving ? "var(--text-dim)" : "#fff", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{editSaving ? "保存中…" : "保存"}</button>
             </div>
           </div>
         </div>
@@ -3990,30 +4228,30 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
         >
           <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 440, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
             <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Delete account?</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>删除账号？</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
                 {deleteConfirm.active && deleteFallbackName && accounts.length > 2 ? (
                   <>
-                    This is the currently <strong style={{ color: "#4ade80" }}>active</strong> account.
-                    After deletion, the system will automatically activate <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> as the new active account.
+                    这是当前 <strong style={{ color: "#4ade80" }}>正在使用</strong> 的账号。
+                    删除后，系统将自动启用 <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> 作为新的当前账号。
                   </>
                 ) : deleteConfirm.active && accounts.length === 2 ? (
                   <>
-                    This is the currently <strong style={{ color: "#4ade80" }}>active</strong> account.
-                    After deletion, <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> will be activated automatically.
+                    这是当前 <strong style={{ color: "#4ade80" }}>正在使用</strong> 的账号。
+                    删除后，将自动启用 <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong>。
                   </>
                 ) : deleteConfirm.active && accounts.length === 1 ? (
                   <>
-                    This is the last saved account. Deleting it will <strong style={{ color: "#ef4444" }}>disconnect</strong> the {provider.displayName} provider.
+                    这是最后一个已保存账号。删除后将 <strong style={{ color: "#ef4444" }}>断开</strong> {provider.displayName} 提供商。
                   </>
                 ) : (
-                  <>Delete &ldquo;{deleteConfirm.displayName}&rdquo;?</>
+                  <>确定删除「{deleteConfirm.displayName}」？</>
                 )}
               </div>
             </div>
             <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" disabled={deleteDeleting} onClick={() => setDeleteConfirm(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12 }}>Cancel</button>
-              <button type="button" disabled={deleteDeleting} onClick={handleDeleteConfirm} style={{ padding: "6px 14px", background: deleteDeleting ? "var(--bg-panel)" : "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{deleteDeleting ? "Deleting…" : "Delete"}</button>
+              <button type="button" disabled={deleteDeleting} onClick={() => setDeleteConfirm(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+              <button type="button" disabled={deleteDeleting} onClick={handleDeleteConfirm} style={{ padding: "6px 14px", background: deleteDeleting ? "var(--bg-panel)" : "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{deleteDeleting ? "删除中…" : "删除"}</button>
             </div>
           </div>
         </div>
@@ -4042,12 +4280,12 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   {isDisablingActive ? (
                     <>
                       你正在禁用当前激活的 {provider.displayName} 账号 <strong style={{ color: "var(--text)" }}>{disableConfirm.displayName}</strong>。
-                      禁用后该账号不能被激活，直到重新 Enable。
+                      禁用后该账号不能被激活，直到重新启用。
                     </>
                   ) : (
                     <>
                       确定要禁用 &ldquo;{disableConfirm.displayName}&rdquo;？
-                      禁用后该账号不能被激活，直到重新 Enable。
+                      禁用后该账号不能被激活，直到重新启用。
                     </>
                   )}
                 </div>
@@ -4160,12 +4398,12 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
  * @returns 简短相对时间文本。
  */
 function formatBalanceQueriedAt(timestamp: number | null): string {
-  if (!timestamp) return "never";
+  if (!timestamp) return "从未";
   const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (diffSeconds < 60) return "just now";
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
-  return `${Math.floor(diffSeconds / 86400)}d ago`;
+  if (diffSeconds < 60) return "刚刚";
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} 分钟前`;
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} 小时前`;
+  return `${Math.floor(diffSeconds / 86400)} 天前`;
 }
 
 /**
@@ -4203,17 +4441,17 @@ function DeepSeekBalanceView({
     <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>Balance</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0 }}>余额</span>
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            {loading ? "Refreshing…" : `Updated ${formatBalanceQueriedAt(balance?.queriedAt ?? null)}`}
+            {loading ? "刷新中…" : `更新于 ${formatBalanceQueriedAt(balance?.queriedAt ?? null)}`}
           </span>
         </div>
         <button
           onClick={onRefresh}
           disabled={loading}
           {...iconFlowAttrs(loading ? "off" : "interactive")}
-          title="Refresh balance"
-          aria-label="Refresh balance"
+          title="刷新余额"
+          aria-label="刷新余额"
           style={{ width: 28, height: 28, border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: loading ? "var(--text-dim)" : "var(--text-muted)", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
         >
           <ActionFlowIcon width={14} height={14} strokeWidth={2}>
@@ -4232,14 +4470,14 @@ function DeepSeekBalanceView({
       {balance?.success && (
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>API calls</span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>API 调用</span>
             <span style={{ fontSize: 12, color: availableColor, fontWeight: 700 }}>
-              {balance.isAvailable === false ? "Unavailable" : "Available"}
+              {balance.isAvailable === false ? "不可用" : "可用"}
             </span>
           </div>
 
           {balance.balanceInfos.length === 0 ? (
-            <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>No balance details returned.</div>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>未返回余额详情。</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {balance.balanceInfos.map((info) => {
@@ -4251,8 +4489,8 @@ function DeepSeekBalanceView({
                       <span style={{ fontSize: 18, color: "var(--text)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{prefix}{info.totalBalance}</span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-end", justifyContent: "center" }}>
-                      <span style={{ fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>grant {prefix}{info.grantedBalance}</span>
-                      <span style={{ fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>top-up {prefix}{info.toppedUpBalance}</span>
+                      <span style={{ fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>赠送 {prefix}{info.grantedBalance}</span>
+                      <span style={{ fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>充值 {prefix}{info.toppedUpBalance}</span>
                     </div>
                   </div>
                 );
@@ -4369,15 +4607,15 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.configured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
           <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
-            {provider.configured ? "configured" : "not configured"}
+            {provider.configured ? "已配置" : "未配置"}
           </span>
         </div>
       </div>
 
       <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
         {provider.configured
-          ? `API key is stored. Enter a new key below to replace it, or disconnect to remove it.`
-          : `Enter your ${provider.displayName} API key to enable ${provider.modelCount} model${provider.modelCount !== 1 ? "s" : ""}.`}
+          ? `API Key 已保存。在下方输入新密钥可替换，或断开连接以移除。`
+          : `输入你的 ${provider.displayName} API Key，以启用 ${provider.modelCount} 个模型。`}
       </p>
 
       <Field label="API Key">
@@ -4386,7 +4624,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
             value={apiKey}
             onChange={setApiKey}
             onKeyDown={(e) => { if (e.key === "Enter" && apiKey.trim()) handleSave(); }}
-            placeholder={provider.configured ? "Enter new key to replace…" : "sk-…"}
+            placeholder={provider.configured ? "输入新密钥以替换…" : "sk-…"}
             style={{ flex: 1 }}
             autoComplete="off"
             spellCheck={false}
@@ -4410,7 +4648,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             )}
-            {savedOk ? "Saved" : saving ? "Saving…" : "Save"}
+            {savedOk ? "已保存" : saving ? "保存中…" : "保存"}
           </button>
         </div>
       </Field>
@@ -4432,7 +4670,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
             cursor: removing ? "not-allowed" : "pointer", fontSize: 12,
           }}
         >
-          {removing ? "Removing…" : "Disconnect"}
+          {removing ? "断开中…" : "断开连接"}
         </button>
       )}
     </div>
@@ -4540,7 +4778,7 @@ function AddProviderPicker({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
-            placeholder="Search providers…"
+            placeholder="搜索提供商…"
             style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 13, boxSizing: "border-box" }}
           />
         </div>
@@ -4548,11 +4786,11 @@ function AddProviderPicker({
         {/* Card grid */}
         <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
           {totalCount === 0 ? (
-            <div style={{ padding: "20px 0", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>No providers match</div>
+            <div style={{ padding: "20px 0", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>没有匹配的提供商</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 8 }}>
               {showCustom && (
-                <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Custom</div>
+                <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>自定义</div>
               )}
               {showCustom && (
                 <button
@@ -4562,8 +4800,8 @@ function AddProviderPicker({
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OpenAI / Anthropic compatible</div>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>Custom endpoint format</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OpenAI / Anthropic 兼容</div>
+                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>自定义端点格式</div>
                   </div>
                   <span style={{ width: 26, height: 26, borderRadius: 5, background: "var(--bg-hover)", border: "1px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)" }}>
@@ -4574,7 +4812,7 @@ function AddProviderPicker({
               )}
 
               {availableOAuth.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", paddingTop: showCustom ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Subscriptions</div>
+                <div style={{ gridColumn: "1 / -1", paddingTop: showCustom ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>订阅</div>
               )}
               {availableOAuth.map((p) => (
                 <button key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
@@ -4601,7 +4839,7 @@ function AddProviderPicker({
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{p.modelCount} models</div>
+                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{p.modelCount} 个模型</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
@@ -4638,7 +4876,20 @@ function jsonStableEqual(a: unknown, b: unknown): boolean {
   return true;
 }
 
-export function ModelsConfig({ onClose }: { onClose: () => void }) {
+export function ModelsConfig({
+  onClose,
+  initialProviderId,
+  initialAccountId,
+  onConsumedFocus,
+}: {
+  onClose: () => void;
+  /** Top-bar deep-link focus: provider id to auto-select. */
+  initialProviderId?: string | null;
+  /** Top-bar deep-link focus: account id within the provider to auto-select. */
+  initialAccountId?: string | null;
+  /** Called after the focus context has been consumed. */
+  onConsumedFocus?: () => void;
+}) {
   const [config, setConfig] = useState<ModelsJson>({ providers: {} });
   const [persistedConfig, setPersistedConfig] = useState<ModelsJson>({ providers: {} });
   const [configRevision, setConfigRevision] = useState<string | null>(null);
@@ -4697,6 +4948,30 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     loadOAuthProviders();
     loadApiKeyProviders();
   }, [loadOAuthProviders, loadApiKeyProviders, reloadConfigFromServer]);
+
+  // Consume top-bar deep-link focus context: auto-select provider when oauthProviders are loaded.
+  // We save initialAccountId in a ref before calling onConsumedFocus() so that the parent clearing
+  // the prop does not race with OAuthDetail mounting and consuming the target account.
+  const deepLinkAccountIdRef = useRef<string | null>(null);
+  const initialFocusConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!initialProviderId || oauthProviders.length === 0 || initialFocusConsumedRef.current) return;
+    const target = oauthProviders.find((p) => p.id === initialProviderId);
+    if (!target) return;
+    // Capture accountId in a local ref before the parent clears it via onConsumedFocus.
+    if (initialAccountId) {
+      deepLinkAccountIdRef.current = initialAccountId;
+    }
+    // For OAuth providers, select the OAuth detail view.
+    setSelection({ type: "oauth", providerId: target.id });
+    initialFocusConsumedRef.current = true;
+    onConsumedFocus?.();
+  }, [initialProviderId, initialAccountId, oauthProviders, onConsumedFocus]);
+
+  // Called by OAuthDetail after it successfully auto-selects the target account.
+  const handleOAuthAccountFocusConsumed = useCallback(() => {
+    deepLinkAccountIdRef.current = null;
+  }, []);
 
   const addCustomProvider = useCallback(() => {
     let finalName = "new-provider";
@@ -4974,7 +5249,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
   }, []);
 
   const providers = Object.entries(config.providers ?? {});
-  const activeOAuth = oauthProviders.filter((p) => p.loggedIn);
+  const activeOAuth = oauthProviders.filter((p) => p.loggedIn || (p.authMode === "managed_accounts" && (p.accountCount ?? 0) > 0));
   // A ModelRuntime OAuth credential also makes `/api/auth/all-providers` report
   // `configured`. Show that provider in its OAuth section only; a logged-out
   // OAuth provider with a separately configured API key remains visible here.
@@ -4989,7 +5264,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     if (selection.type === "oauth") {
       const p = oauthProviders.find((p) => p.id === selection.providerId);
       if (!p) return null;
-      return <OAuthDetail key={p.id} provider={p} onRefresh={loadOAuthProviders} />;
+      return <OAuthDetail key={p.id} provider={p} onRefresh={loadOAuthProviders} initialAccountId={deepLinkAccountIdRef.current} onInitialAccountConsumed={handleOAuthAccountFocusConsumed} />;
     }
     if (selection.type === "apikey") {
       const p = apiKeyProviders.find((p) => p.id === selection.providerId);
@@ -5046,7 +5321,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>Models</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>模型</span>
             <code style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>~/.pi/agent/models.json</code>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}>×</button>
@@ -5099,7 +5374,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
 
               {/* Custom providers */}
               {loading ? (
-                <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>Loading…</div>
+                <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>加载中…</div>
               ) : providers.map(([pName, pData]) => {
                 const isProviderSelected = selection?.type === "provider" && selection.name === pName;
                 const models = pData.models ?? [];
@@ -5136,7 +5411,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
                           onMouseLeave={(e) => { if (!isModelSelected) e.currentTarget.style.background = "none"; }}
                         >
                           <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: m.id ? "var(--text-muted)" : "var(--text-dim)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {m.id || "new model"}
+                            {m.id || "新模型"}
                           </span>
                           {m.reasoning && (
                             <span style={{ fontSize: 9, padding: "1px 4px", background: "rgba(99,102,241,0.12)", color: "rgba(99,102,241,0.8)", borderRadius: 3, flexShrink: 0 }}>T</span>
@@ -5152,7 +5427,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
                       onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
                     >
-                      <span style={{ fontSize: 11 }}>+ model</span>
+                      <span style={{ fontSize: 11 }}>+ 模型</span>
                     </div>
                   </div>
                 );
@@ -5169,7 +5444,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-muted)"; }}
               >
-                + Add provider
+                + 添加提供商
               </button>
             </div>
           </div>
@@ -5178,7 +5453,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
           <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
             {loading ? null : detailContent ?? (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13 }}>
-                Select a provider or model
+                请选择提供商或模型
               </div>
             )}
           </div>
@@ -5189,7 +5464,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
           {dirty && <span style={{ fontSize: 11, color: "var(--warning)", marginRight: "auto" }}>● 有未保存更改</span>}
           {saveError && <span style={{ fontSize: 12, color: "#f87171", flex: 1 }}>{saveError}</span>}
           <button onClick={onClose} style={{ padding: "6px 14px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
-            Cancel
+            取消
           </button>
           <button onClick={handleSave} disabled={saving || savedOk} style={{
             position: "relative",
@@ -5209,7 +5484,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             )}
-            <span>{savedOk ? "Saved" : saving ? "Saving…" : "Save"}</span>
+            <span>{savedOk ? "已保存" : saving ? "保存中…" : "保存"}</span>
           </button>
         </div>
       </div>

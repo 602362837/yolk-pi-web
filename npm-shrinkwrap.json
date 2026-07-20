@@ -1,12 +1,12 @@
 {
   "name": "@alan-zhao/yolk-pi-web",
-  "version": "0.7.20",
+  "version": "0.7.21",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@alan-zhao/yolk-pi-web",
-      "version": "0.7.20",
+      "version": "0.7.21",
       "license": "MIT",
       "dependencies": {
         "@earendil-works/pi-agent-core": "0.80.10",
@@ -51,7 +51,7 @@
         "eslint-config-next": "^16.2.9",
         "postcss": "^8",
         "tailwindcss": "^4.2.2",
-        "typescript": "^5.9.3"
+        "typescript": "5.9.3"
       }
     },
     "node_modules/@alloc/quick-lru": {

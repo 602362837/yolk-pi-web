@@ -3,10 +3,14 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { sanitizeAntigravityLoginError } from "@/lib/antigravity-account-token";
 import {
   ANTIGRAVITY_PROVIDER_ID,
+  GROK_CLI_PROVIDER_ID,
   isSupportedOAuthAccountProvider,
   saveOAuthAccountCredential,
   syncActiveOAuthAccountCredential,
+  listOAuthAccounts,
+  reauthenticateOAuthAccount,
 } from "@/lib/oauth-accounts";
+import { sanitizeGrokLoginError, isGrokLoginCancelled } from "@/lib/grok-login-errors";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { createInMemoryWebCredentialStore } from "@/lib/web-credential-store";
 import { createWebModelRuntime, getWebModelRuntime } from "@/lib/web-model-runtime";
@@ -60,8 +64,11 @@ export async function GET(
   { params }: { params: Promise<{ provider: string }> }
 ) {
   const { provider } = await params;
-  const accountMode = new URL(req.url).searchParams.get("accountMode");
+  const url = new URL(req.url);
+  const accountMode = url.searchParams.get("accountMode");
   const addAccountMode = accountMode === "add";
+  const reauthMode = accountMode === "reauth";
+  const reauthAccountId = reauthMode ? url.searchParams.get("accountId")?.trim() : null;
 
   const encoder = new TextEncoder();
   const send = (controller: ReadableStreamDefaultController, data: unknown) => {
@@ -74,11 +81,50 @@ export async function GET(
 
   const stream = new ReadableStream({
     async start(controller) {
-      if (accountMode && accountMode !== "add") {
+      // ── Validate accountMode ─────────────────────────────────────────
+      if (accountMode && accountMode !== "add" && accountMode !== "reauth") {
         send(controller, { type: "error", message: `Unsupported account mode: ${accountMode}` });
         controller.close();
         return;
       }
+
+      // Reject ambiguous parameters: add mode must not carry accountId
+      const addAccountId = addAccountMode ? url.searchParams.get("accountId")?.trim() : null;
+      if (addAccountMode && addAccountId) {
+        send(controller, { type: "error", message: "accountId is not valid in add mode. Use reauth mode to reauthenticate an existing account." });
+        controller.close();
+        return;
+      }
+
+      // ── reauth mode preflight ─────────────────────────────────────────
+      if (reauthMode) {
+        // P0: only grok-cli supports reauthentication.
+        if (provider !== GROK_CLI_PROVIDER_ID) {
+          send(controller, { type: "error", message: "Reauthentication is not supported for this provider." });
+          controller.close();
+          return;
+        }
+        if (!reauthAccountId) {
+          send(controller, { type: "error", message: "accountId is required for reauthentication." });
+          controller.close();
+          return;
+        }
+        // Preflight: verify the target account exists before starting OAuth.
+        try {
+          const accounts = await listOAuthAccounts(GROK_CLI_PROVIDER_ID);
+          const target = accounts.accounts.find((a) => a.accountId === reauthAccountId);
+          if (!target) {
+            send(controller, { type: "error", message: "The target account no longer exists. It may have been deleted." });
+            controller.close();
+            return;
+          }
+        } catch {
+          send(controller, { type: "error", message: "Unable to verify target account. Please try again." });
+          controller.close();
+          return;
+        }
+      }
+
       if (addAccountMode && !isSupportedOAuthAccountProvider(provider)) {
         send(controller, { type: "error", message: `Account add mode is not supported for ${provider}` });
         controller.close();
@@ -86,10 +132,11 @@ export async function GET(
       }
 
       // Fixed providers (Grok/Kiro/Antigravity) register on the target runtime.
-      // add-account uses an isolated in-memory credential store so Active is untouched.
+      // add-account and reauth use an isolated in-memory credential store so Active is untouched.
       const agentDir = getAgentDir();
-      const memoryCredentials = addAccountMode ? createInMemoryWebCredentialStore() : undefined;
-      const runtime = addAccountMode
+      const useIsolatedStore = addAccountMode || reauthMode;
+      const memoryCredentials = useIsolatedStore ? createInMemoryWebCredentialStore() : undefined;
+      const runtime = useIsolatedStore
         ? await createWebModelRuntime({
             agentDir,
             credentials: memoryCredentials,
@@ -98,8 +145,8 @@ export async function GET(
 
       // Ensure fixed extension providers are present on the admin runtime.
       // getWebModelRuntime already registers them; createWebModelRuntime for
-      // add-account needs an explicit fixed-provider load.
-      if (addAccountMode) {
+      // add-account / reauth needs an explicit fixed-provider load.
+      if (useIsolatedStore) {
         const { createWebAgentSessionServices } = await import("@/lib/web-model-runtime");
         await createWebAgentSessionServices({
           cwd: agentDir,
@@ -226,7 +273,27 @@ export async function GET(
       try {
         const credential = await runtime.login(provider, "oauth", interaction);
 
-        if (addAccountMode) {
+        if (reauthMode && reauthAccountId) {
+          // Reauthenticate: replace credential in-place, preserve account metadata.
+          const { account, active } = await reauthenticateOAuthAccount(
+            GROK_CLI_PROVIDER_ID,
+            reauthAccountId,
+            credential as Credential,
+          );
+          // Only reload live auth if the target was (and still is) Active.
+          if (active) {
+            await Promise.resolve(reloadRpcAuthState());
+          }
+          send(controller, {
+            type: "success",
+            account,
+            reauthenticated: true,
+            active,
+            message: active
+              ? "Account reauthenticated successfully. Global active credential updated."
+              : "Account reauthenticated successfully. Global active credential unchanged.",
+          });
+        } else if (addAccountMode) {
           const account = await saveOAuthAccountCredential(provider, credential as Credential);
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {
@@ -237,14 +304,23 @@ export async function GET(
           send(controller, { type: "success" });
         }
       } catch (err) {
-        const rawMsg = err instanceof Error ? err.message : String(err);
-        if (rawMsg === "Login cancelled") {
-          send(controller, { type: "cancelled" });
+        // ── Grok: use safe error mapper for all flows ────────────────────
+        if (provider === GROK_CLI_PROVIDER_ID) {
+          if (isGrokLoginCancelled(err)) {
+            send(controller, { type: "cancelled" });
+          } else {
+            send(controller, { type: "error", message: sanitizeGrokLoginError(err) });
+          }
         } else if (provider === ANTIGRAVITY_PROVIDER_ID) {
           // Upstream token exchange may embed response text; never project it.
           send(controller, { type: "error", message: sanitizeAntigravityLoginError(err) });
         } else {
-          send(controller, { type: "error", message: rawMsg });
+          const rawMsg = err instanceof Error ? err.message : String(err);
+          if (rawMsg === "Login cancelled") {
+            send(controller, { type: "cancelled" });
+          } else {
+            send(controller, { type: "error", message: rawMsg });
+          }
         }
       } finally {
         cleanup();

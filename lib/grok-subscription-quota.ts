@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
 import { getGrokAccessToken } from "./grok-account-token";
+import { withGrokProviderLock } from "./grok-account-lock";
 import { getActiveGrokAccountId } from "./grok-session-account";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -97,6 +98,12 @@ export interface GrokQuotaResultV1 {
 
 const quotaCache = new Map<string, GrokQuotaCacheEntry>();
 const inflightRequests = new Map<string, Promise<GrokQuotaResultV1>>();
+
+/**
+ * Per-account generation counter bumped by reauth to invalidate in-flight
+ * quota fetches that used the old credential.
+ */
+const quotaGenerations = new Map<string, number>();
 
 // ─── Path helpers ────────────────────────────────────────────────────────────
 
@@ -187,7 +194,10 @@ function normalizeCacheWeekly(raw: unknown): GrokBillingWeeklyRaw | null {
   return { creditUsagePercent, billingPeriodEnd };
 }
 
-async function savePersistedCache(accountId: string, entry: GrokQuotaCacheEntry): Promise<void> {
+async function savePersistedCacheUnderLock(
+  accountId: string,
+  entry: GrokQuotaCacheEntry,
+): Promise<void> {
   try {
     const dir = grokQuotaDir();
     await mkdir(dir, { recursive: true, mode: ACCOUNT_DIR_MODE });
@@ -200,6 +210,24 @@ async function savePersistedCache(accountId: string, entry: GrokQuotaCacheEntry)
   } catch {
     // Best-effort persistence; never let a cache write fail the quota request.
   }
+}
+
+/**
+ * Atomically decide whether an old quota flight may publish its outcome.
+ * Reauth holds this same provider lock while it bumps the generation and
+ * removes the persisted entry, so no old result can slip between a generation
+ * check and its memory mutation, disk write, or returned projection.
+ */
+async function finalizeCurrentGeneration<T>(
+  accountId: string,
+  startGeneration: number,
+  publish: () => Promise<T>,
+): Promise<T | null> {
+  return withGrokProviderLock(async () => {
+    // Credential was replaced mid-flight; discard instead of publishing old quota.
+    if (getGrokQuotaGeneration(accountId) !== startGeneration) return null;
+    return publish();
+  });
 }
 
 async function readPersistedCacheEntry(accountId: string): Promise<GrokQuotaCacheEntry | null> {
@@ -452,6 +480,10 @@ async function queryGrokBilling(
   if (existingFlight) return existingFlight;
 
   const promise = (async (): Promise<GrokQuotaResultV1> => {
+    // Capture the generation at the start so a concurrent reauth bump
+    // prevents this flight from writing stale data.
+    const startGeneration = getGrokQuotaGeneration(accountId);
+
     try {
       // 2. Get access token
       let accessToken: string;
@@ -459,24 +491,21 @@ async function queryGrokBilling(
         const token = await getGrokAccessToken(accountId);
         accessToken = token.accessToken;
       } catch {
-        // Can't get a token — return stale if available
-        if (memEntry) {
-          return buildStaleResult(accountId, memEntry, {
-            code: "unauthorized",
-            message: "OAuth token unavailable",
-            retryable: true,
-          });
-        }
-        // Try persisted cache
-        const persisted = await readPersistedCacheEntry(accountId);
-        if (persisted && (nowMillis() - persisted.queriedAt) < STALE_MAX_AGE_MS) {
-          return buildStaleResult(accountId, persisted, {
-            code: "unauthorized",
-            message: "OAuth token unavailable",
-            retryable: true,
-          });
-        }
-        return buildUnavailableResult(accountId);
+        // The stale fallback is a publish operation too: make its persisted
+        // read and returned projection indivisible from a reauth generation bump.
+        const unavailableError: GrokQuotaResultV1["error"] = {
+          code: "unauthorized",
+          message: "OAuth token unavailable",
+          retryable: true,
+        };
+        const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
+          const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
+          if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
+            return buildStaleResult(accountId, staleSource, unavailableError);
+          }
+          return buildUnavailableResult(accountId);
+        });
+        return published ?? buildUnavailableResult(accountId);
       }
 
       // 3. Fetch billing
@@ -495,7 +524,7 @@ async function queryGrokBilling(
         }
       }
 
-      // 5. Build cache entry
+      // 5. Publish the live result only while reauth cannot interleave.
       if (result.monthly && !result.error) {
         const entry: GrokQuotaCacheEntry = {
           monthly: result.monthly,
@@ -503,46 +532,54 @@ async function queryGrokBilling(
           success: true,
           queriedAt: nowMillis(),
         };
-        quotaCache.set(accountId, entry);
-        await savePersistedCache(accountId, entry);
-        return buildQuotaResult(accountId, entry, "live", false);
+        const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
+          quotaCache.set(accountId, entry);
+          await savePersistedCacheUnderLock(accountId, entry);
+          return buildQuotaResult(accountId, entry, "live", false);
+        });
+        return published ?? buildUnavailableResult(accountId);
       }
 
-      // Error path — try stale
+      // Error/stale paths also finalize under the provider lock. Reading the
+      // persisted entry here keeps the stale-return decision in the same
+      // boundary as reauth's generation bump and cache deletion.
       if (result.error) {
-        const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
-        if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
-          return buildStaleResult(accountId, staleSource, result.error);
-        }
-        return buildQuotaResult(
-          accountId,
-          {
+        const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
+          const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
+          if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
+            return buildStaleResult(accountId, staleSource, result.error!);
+          }
+          const reauthRequired = result.error!.code === "unauthorized";
+          const errorEntry: GrokQuotaCacheEntry = {
             monthly: null,
             weekly: null,
             success: false,
             queriedAt: nowMillis(),
-            reauthRequired: result.error.code === "unauthorized",
-          },
-          "none",
-          result.error.code === "unauthorized",
-          result.error,
-        );
+            reauthRequired,
+          };
+          quotaCache.set(accountId, errorEntry);
+          await savePersistedCacheUnderLock(accountId, errorEntry);
+          return buildQuotaResult(accountId, errorEntry, "none", reauthRequired, result.error!);
+        });
+        return published ?? buildUnavailableResult(accountId);
       }
 
       // Unexpected: monthly null but no error
       return buildUnavailableResult(accountId);
     } catch (err) {
-      // Unexpected error — try stale
       const error: GrokQuotaResultV1["error"] = {
         code: "network",
         message: err instanceof Error ? err.message : "Unexpected error",
         retryable: true,
       };
-      const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
-      if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
-        return buildStaleResult(accountId, staleSource, error);
-      }
-      return buildUnavailableResult(accountId);
+      const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
+        const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
+        if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
+          return buildStaleResult(accountId, staleSource, error);
+        }
+        return buildUnavailableResult(accountId);
+      });
+      return published ?? buildUnavailableResult(accountId);
     } finally {
       inflightRequests.delete(key);
     }
@@ -598,4 +635,45 @@ export async function getGrokActiveSubscriptionQuota(
  */
 export function invalidateGrokQuotaCache(accountId: string): void {
   quotaCache.delete(accountId);
+}
+
+// ─── Quota generation (reauth isolation) ─────────────────────────────────────
+
+/**
+ * Bump the quota generation for `accountId` so any in-flight fetches that
+ * started before reauthentication discard their results.
+ */
+export function bumpGrokQuotaGeneration(accountId: string): void {
+  const current = quotaGenerations.get(accountId) ?? 0;
+  quotaGenerations.set(accountId, current + 1);
+  // Also clear the in-memory cache so the next read is forced to re-fetch.
+  quotaCache.delete(accountId);
+}
+
+/**
+ * Return the current quota generation for `accountId`.
+ * Used by fetchers to detect staleness before writing results.
+ */
+export function getGrokQuotaGeneration(accountId: string): number {
+  return quotaGenerations.get(accountId) ?? 0;
+}
+
+/**
+ * Delete the persisted quota cache entry for `accountId` so a reauth'd
+ * account never displays stale quota from the previous credential.
+ */
+export async function deleteGrokQuotaPersistedCacheEntry(accountId: string): Promise<void> {
+  try {
+    const dir = grokQuotaDir();
+    const filePath = quotaCacheFilePath();
+    const persisted = await loadPersistedCache();
+    if (!persisted.entries[accountId]) return;
+    delete persisted.entries[accountId];
+    const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+    await mkdir(dir, { recursive: true, mode: ACCOUNT_DIR_MODE });
+    await writeFile(tmp, `${JSON.stringify(persisted, null, 2)}\n`, { encoding: "utf8", mode: JSON_FILE_MODE });
+    await rename(tmp, filePath);
+  } catch {
+    // Best-effort; never let cache cleanup fail the reauth.
+  }
 }

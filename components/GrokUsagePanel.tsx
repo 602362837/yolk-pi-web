@@ -101,8 +101,9 @@ export function GrokUsagePanel({
   presentationMode = "standalone",
   onProjectionChange,
 }: {
-  /** Optional hook so AppShell can open Models → Grok without hard coupling. */
-  onOpenModels?: () => void;
+  /** Optional hook so AppShell can open Models → Grok without hard coupling.
+   * Pass an optional accountId to focus a specific account (e.g. reauthRequired target). */
+  onOpenModels?: (options?: { accountId?: string | null }) => void;
   /** Global top-bar density from usage.providerPanelsCompact. */
   displayMode?: ProviderUsageDisplayMode;
   /**
@@ -417,10 +418,10 @@ export function GrokUsagePanel({
     }
   }, [activatingAccountId, loadQuota, refreshing]);
 
-  const openModels = useCallback(() => {
+  const openModels = useCallback((accountId?: string | null) => {
     // Close standalone dialog before Models; aggregate parent also closes via onOpenModels.
     if (!isAggregate) setOpen(false);
-    onOpenModels?.();
+    onOpenModels?.({ accountId });
   }, [isAggregate, onOpenModels]);
 
   const fullStatus = useMemo(() => {
@@ -648,7 +649,7 @@ export function GrokUsagePanel({
           </div>
           <button
             type="button"
-            onClick={openModels}
+            onClick={() => openModels()}
             style={{
               minHeight: 34,
               borderRadius: 8,
@@ -818,7 +819,7 @@ export function GrokUsagePanel({
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 2 }}>
             <button
               type="button"
-              onClick={openModels}
+              onClick={() => openModels(account?.accountId)}
               style={{
                 border: "none",
                 background: "transparent",

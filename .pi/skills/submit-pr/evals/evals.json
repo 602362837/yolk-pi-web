@@ -1,0 +1,23 @@
+{
+  "skill_name": "submit-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我把当前分支提一个 PR 到本仓库 main，PR 标题和正文都用中文，正文要固定格式并写清楚变更、验证、风险和回滚；合并后删除当前分支。先检查再操作。",
+      "expected_output": "检查当前分支、远程和 diff，运行项目验证，使用固定中文 Markdown 模板创建目标为 main 的 PR，并明确合并后删除源分支。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "请发起这个功能分支到 main 的 GitHub PR。不要直接合并，先把 PR 开出来；如果发现已有同分支 PR 就不要重复创建。描述必须按统一中文 Markdown 章节输出。",
+      "expected_output": "检查已有 PR，避免重复创建；仅创建 PR 不合并；正文严格包含固定章节并如实填写验证状态。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "这个分支的 PR 已经被合并了，请按项目规则清理源分支。先确认 PR 确实合并到 main，再删除远程和本地分支，不要误删未合并分支。",
+      "expected_output": "先用 gh 确认 state=MERGED 且 baseRefName=main，再安全删除远程和本地源分支；未满足条件时停止。",
+      "files": []
+    }
+  ]
+}

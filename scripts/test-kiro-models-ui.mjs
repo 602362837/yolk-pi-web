@@ -73,9 +73,9 @@ test("Kiro login methods expose Builder ID / Google / GitHub", () => {
 });
 
 test("Kiro Active semantics and protected delete copy are present", () => {
-  assert.match(models, /Activate 只设置 Kiro 的/);
-  assert.match(models, /全局当前 Active/);
-  assert.match(models, /in-flight 请求不换 Token/);
+  assert.match(models, /「启用」只设置 Kiro 的/);
+  assert.match(models, /全局当前账号/);
+  assert.match(models, /进行中的请求不会更换 Token/);
   assert.match(models, /providerLabel=\{isAntigravity \? "Antigravity" : isKiro \? "Kiro" : "Grok"\}/);
   assert.match(models, /自动切号并删除/);
 });

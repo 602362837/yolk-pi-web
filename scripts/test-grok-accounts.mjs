@@ -546,6 +546,172 @@ test("Deleted accounts go to auth-accounts/<provider>/deleted/", () => {
   assertIncludes(oaSource, 'DELETED_ACCOUNT_DIR = "deleted"', "deleted subdirectory");
 });
 
+// ============================================================================
+// 11. grok-account-lock.ts — provider lock
+// ============================================================================
+
+console.log("\n=== grok-account-lock.ts — provider lock ===");
+
+const grokLockSource = read("lib/grok-account-lock.ts");
+
+test("grok-account-lock uses mkdir-based locking (no third-party packages)", () => {
+  assertIncludes(grokLockSource, "LOCK_DIR_NAME", "has lock dir constant");
+  assertIncludes(grokLockSource, 'LOCK_OWNER_FILE = "owner.json"', "has owner file");
+  assertIncludes(grokLockSource, "mkdir(lockDir", "uses mkdir for exclusive lock");
+  assertNotIncludes(grokLockSource, "proper-lockfile", "no third-party lock library");
+  assertNotIncludes(grokLockSource, "lockfile", "no lockfile dependency");
+});
+
+test("grok-account-lock is independent from Kiro/Antigravity locks", () => {
+  assertNotIncludes(grokLockSource, "KIRO_PROVIDER_ID", "does not reference Kiro provider");
+  assertNotIncludes(grokLockSource, "ANTIGRAVITY_PROVIDER_ID", "does not reference Antigravity provider");
+  assertIncludes(grokLockSource, "GROK_CLI_PROVIDER_ID", "references only Grok provider");
+});
+
+test("grok-account-lock has stale lock recovery", () => {
+  assertIncludes(grokLockSource, "LOCK_STALE_MS", "has stale timeout");
+  assertIncludes(grokLockSource, "tryRemoveStaleLock", "has stale recovery function");
+  assertIncludes(grokLockSource, "LOCK_MAX_WAIT_MS", "has max wait");
+});
+
+test("grok-account-lock uses process mutex + cross-process fs dir lock", () => {
+  assertIncludes(grokLockSource, "processLock", "has process-level mutex");
+  assertIncludes(grokLockSource, "withProcessLock", "has process lock wrapper");
+  assertIncludes(grokLockSource, "withFsDirLock", "has filesystem lock wrapper");
+  assertIncludes(grokLockSource, "withGrokProviderLock", "exports public withGrokProviderLock");
+});
+
+test("grok-account-lock covers refresh + Activate + reauth", () => {
+  assertIncludes(grokLockSource, "refresh/Activate/reauth", "documents lock coverage");
+  assertIncludes(grokLockSource, "LOCK_DIR_NAME = \"provider.refresh-activate-reauth.lock\"", "lock name includes reauth");
+});
+
+test("grok-account-lock uses atomic write for owner file", () => {
+  assertIncludes(grokLockSource, "writeFile(providerLockOwnerPath", "writes owner metadata");
+  assertIncludes(grokLockSource, "JSON_FILE_MODE", "owner file has permission constant");
+});
+
+test("grok-account-lock test helper exists", () => {
+  assertIncludes(grokLockSource, "__grokLockUsesFsPrimitivesForTests", "test helper exported");
+});
+
+// ============================================================================
+// 12. oauth-accounts.ts — reauthenticateOAuthAccount
+// ============================================================================
+
+console.log("\n=== oauth-accounts.ts — reauthenticateOAuthAccount ===");
+
+test("reauthenticateOAuthAccount is exported", () => {
+  assertIncludes(oaSource, "export async function reauthenticateOAuthAccount", "function exported");
+});
+
+test("reauthenticateOAuthAccount P0 guard: only grok-cli", () => {
+  assertIncludes(oaSource, 'provider !== GROK_CLI_PROVIDER_ID', "rejects non-grok providers");
+  assertIncludes(oaSource, "Reauthentication is currently only supported for grok-cli", "clear error message");
+});
+
+test("reauthenticateOAuthAccount validates credential via adapter", () => {
+  assertIncludes(oaSource, "adapter.isCredential(credential)", "validates credential shape");
+});
+
+test("reauthenticateOAuthAccount runs under Grok provider lock", () => {
+  assertIncludes(oaSource, "withGrokProviderLock(async", "wraps in provider lock");
+});
+
+test("reauthenticateOAuthAccount lock-time verifies target exists", () => {
+  assertIncludes(oaSource, "Lock-time: verify target credential file", "documents lock-time check");
+  assertIncludes(oaSource, 'throw new OAuthAccountStoreError("Saved OAuth account not found"', "throws for missing target");
+});
+
+test("reauthenticateOAuthAccount preserves user metadata fields", () => {
+  assertIncludes(oaSource, "existingEntry", "captures old metadata entry");
+  assertIncludes(oaSource, "chatgptAccountId", "updates diagnostic id");
+  assertIncludes(oaSource, "updatedAt", "updates timestamp");
+});
+
+test("reauthenticateOAuthAccount uses atomic credential write (tmp+rename)", () => {
+  assertIncludes(oaSource, "tmpCredPath", "uses tmp file for credential");
+  assertIncludes(oaSource, "rename(tmpCredPath", "uses rename for atomic credential write");
+});
+
+test("reauthenticateOAuthAccount has best-effort credential rollback on metadata failure", () => {
+  assertIncludes(oaSource, "oldCredentialRaw", "backs up old credential");
+  assertIncludes(oaSource, "best-effort", "documents rollback is best-effort");
+});
+
+test("reauthenticateOAuthAccount updates auth.json mirror only when target is active", () => {
+  assertIncludes(oaSource, "wasActive", "tracks pre-reauth active state");
+  assertIncludes(oaSource, "getWebCredentialStore", "uses credential store for mirror");
+});
+
+test("reauthenticateOAuthAccount invalidates token flight after success", () => {
+  assertIncludes(oaSource, "invalidateGrokTokenFlight", "invalidates token flight");
+});
+
+test("reauthenticateOAuthAccount bumps quota generation and deletes persisted cache", () => {
+  assertIncludes(oaSource, "bumpGrokQuotaGeneration", "bumps quota generation");
+  assertIncludes(oaSource, "deleteGrokQuotaPersistedCacheEntry", "deletes persisted quota cache");
+});
+
+test("reauthenticateOAuthAccount no credential material in error messages", () => {
+  const reauthFn = oaSource.match(/reauthenticateOAuthAccount[\s\S]*?^export /m)?.[0] || "";
+  // Error messages use fixed strings, never variable credential content
+  assertNotIncludes(reauthFn, 'cred.access', "no credential access in error paths");
+  assertNotIncludes(reauthFn, 'cred.refresh', "no credential refresh in error paths");
+});
+
+test("activateOAuthAccount uses Grok provider lock", () => {
+  assertIncludes(oaSource, 'provider === GROK_CLI_PROVIDER_ID', "dispatches on Grok");
+  assertIncludes(oaSource, 'withGrokProviderLock(run)', "wraps activate with Grok lock");
+});
+
+// ============================================================================
+// 13. grok-account-token.ts — Grok provider lock integration
+// ============================================================================
+
+console.log("\n=== grok-account-token.ts — lock integration ===");
+
+test("getGrokAccessToken refresh runs under Grok provider lock", () => {
+  const tokenSource2 = read("lib/grok-account-token.ts");
+  assertIncludes(tokenSource2, "withGrokProviderLock", "uses Grok provider lock");
+  assertIncludes(tokenSource2, "Re-read the credential file under the lock", "documents lock reason");
+});
+
+test("grok-account-token imports lock from grok-account-lock", () => {
+  const tokenSource2 = read("lib/grok-account-token.ts");
+  assertIncludes(tokenSource2, 'import { withGrokProviderLock } from "./grok-account-lock"', "imports lock");
+});
+
+// ============================================================================
+// 14. grok-subscription-quota.ts — generation isolation
+// ============================================================================
+
+console.log("\n=== grok-subscription-quota.ts — generation isolation ===");
+
+const quotaSource = read("lib/grok-subscription-quota.ts");
+
+test("quota generation counter prevents stale writes after reauth", () => {
+  assertIncludes(quotaSource, "quotaGenerations", "has generation map");
+  assertIncludes(quotaSource, "bumpGrokQuotaGeneration", "bump function exported");
+  assertIncludes(quotaSource, "getGrokQuotaGeneration", "getter function exported");
+  assertIncludes(quotaSource, "startGeneration = getGrokQuotaGeneration", "captures generation at start");
+});
+
+test("quota fetch discards success result when generation changed", () => {
+  assertIncludes(quotaSource, "getGrokQuotaGeneration(accountId) !== startGeneration", "checks generation before writing");
+  assertIncludes(quotaSource, "Credential was replaced mid-flight", "documents discard reason");
+});
+
+test("deleteGrokQuotaPersistedCacheEntry removes entry atomically", () => {
+  assertIncludes(quotaSource, "deleteGrokQuotaPersistedCacheEntry", "delete function exported");
+  assertIncludes(quotaSource, "delete persisted.entries[accountId]", "removes account entry");
+  assertIncludes(quotaSource, "Best-effort", "documents best-effort nature");
+});
+
+test("bumpGrokQuotaGeneration clears in-memory cache entry", () => {
+  assertIncludes(quotaSource, "quotaCache.delete(accountId)", "clears memory cache");
+});
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${"─".repeat(40)}`);
