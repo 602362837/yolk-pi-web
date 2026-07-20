@@ -27,6 +27,55 @@ Use `scripts/start-pi-web-proxy.sh` or `scripts/start-pi-web-proxy.ps1` when pro
 - Stale SSH temp dirs are named `ypi-terminal-ssh-*` under the OS temp directory and are swept on server startup if older than 24h. If a crashed dev server leaves files behind, confirm they use that prefix before manually deleting them.
 - Run `node scripts/test-terminal-ssh-config.mjs` for dry-run checks covering config defaults, redaction boundaries, HostKeyAlias generation, ProxyCommand gates, proxy command secret handling, and temp cleanup assumptions.
 
+## Models Config Sync (OpenAI-compatible /models discovery)
+
+`POST /api/models-config/sync` discovers remote model ids from a saved custom OpenAI-compatible provider's `/models` or `/v1/models` endpoint. It only supports custom providers with `api: "openai-completions"` or `"openai-responses"` and a valid http(s) baseUrl. Built-in Pi providers, Grok/Kiro/Antigravity, and non-OpenAI protocols are unsupported.
+
+### Sync entry disabled / unavailable
+
+- **"请先保存当前 Models 更改"**: the ModelsConfig has unsaved draft changes. Save first, then sync.
+- **"请先保存提供商"**: the provider hasn't been saved yet. Save ModelsConfig, then sync.
+- **"仅支持 OpenAI-compatible API"**: provider `api` is `anthropic-messages` or `google-generative-ai`. Only `openai-completions` and `openai-responses` are eligible.
+- **Missing/invalid Base URL**: the provider's `baseUrl` is empty or not a valid http/https URL. Set one and save.
+- **No sync entry at all**: the provider is a Pi built-in (e.g. `openai`, `zenmux`) or fixed extension (`grok-cli`, `kiro`, `google-antigravity`). These cannot use generic /models sync; manage their models through the standard provider configuration.
+
+### Preview returns no models / auth error
+
+- **"端点拒绝了凭据" (401/403)**: the endpoint rejected the API key. Check the Key in your provider config. For local servers without auth, ensure a dummy key is configured (Pi's model availability rules require a key).
+- **"无法解析该提供商的已保存凭据"**: no API key is saved for this provider. Configure one in auth.json (Settings → Models) or via `apiKey` in models.json.
+- **"未找到 /models 或 /v1/models" (404/405)**: the provider's baseUrl does not expose a standard OpenAI model list endpoint. Verify the baseUrl is correct and the service supports `GET /models` or `GET /v1/models`.
+- **"读取模型列表超时"**: the endpoint did not respond within 10 seconds. Check the service is running and reachable.
+- **"远端模型列表超过安全读取上限"**: the response exceeded the 1 MiB safety limit or contained more than 2000 models.
+- **"端点返回的不是可识别的 OpenAI 模型列表"**: the response did not match the expected `{ data: [{ id, owned_by? }] }` shape.
+
+### Apply fails with stale revision
+
+- **"Models 配置已发生变化，请重新预览后再写入"**: another write (e.g. model price save, ModelsConfig save) changed models.json after the preview. Re-preview and re-select models.
+- **"预览已过期"**: the 5-minute preview TTL expired. Click "预览远端模型" again.
+
+### Apply succeeds but new models don't appear in selector
+
+- The server performs a best-effort live `ModelRuntime` reload after a successful sync. If the reload is partial (`runtimeReload: "partial"`), open sessions may need a refresh (close and reopen the model selector, or start a new chat). The disk write is already committed — the models are in `models.json`.
+- Run `node scripts/test-models-config-sync.mjs` to verify the backend sync pipeline (store, eligibility, URL candidates, fetch/redirect, auth, merge, revision, rollback).
+
+### URL path behavior
+
+| Saved baseUrl | First request | Fallback (only on 404/405) |
+| --- | --- | --- |
+| `https://host` | `/models` | `/v1/models` |
+| `https://host/v1` | `/v1/models` | _(none, single candidate)_ |
+| `https://host/api` | `/api/models` | `/api/v1/models` |
+| `https://host/models` | _(as-is)_ | _(none)_ |
+| `https://host/v1/models` | _(as-is)_ | _(none)_ |
+
+401/403, 429, 5xx, timeout and network errors do **not** trigger path fallback — only 404/405.
+
+### Rollback
+
+1. Hide the sync UI entry by reverting `components/ModelsConfig.tsx` changes — manual model editing continues to work.
+2. Remove `app/api/models-config/sync/route.ts` — preview cache is in-memory only and disappears on restart.
+3. Do **not** delete models already added by sync; users can manually delete unwanted `{ id }` entries in ModelsConfig.
+
 ## Managed API-key accounts (OpenCode Go, xAI)
 
 Allowlisted providers store multi-account metadata and secrets under `~/.pi/agent/auth-api-key-accounts/<provider>/`:

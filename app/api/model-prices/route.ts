@@ -119,8 +119,8 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
       changes: validation.changes,
     };
 
-    // Apply the patch atomically (backup + merge + write)
-    const result = applyPricePatch(request);
+    // Apply the patch atomically under the shared models.json write lock.
+    const result = await applyPricePatch(request);
 
     // Map internal status to HTTP responses
     switch (result.status) {

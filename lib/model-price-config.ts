@@ -2,9 +2,13 @@
  * Model price configuration service.
  *
  * Reads resolved model pricing from a ModelRuntime-compatible catalog,
- * generates sanitized projections, and provides atomic write-path helpers for
+ * generates sanitized projections, and provides price-merge helpers for
  * models.json. Callers pass ModelRuntime (or a narrow catalog view); this
  * module never constructs ModelRegistry.
+ *
+ * Storage coordination (JSONC read, revision, atomic write, backup, write lock)
+ * lives in `lib/models-config-store.ts` and is shared with ModelsConfig PUT and
+ * models sync apply. This module re-exports the store surface for compatibility.
  *
  * Security contract:
  * - Lists never contain secrets, API keys, absolute paths, or full models.json.
@@ -13,12 +17,32 @@
  *   clean JSON with a pre-write backup.
  */
 
-import { createHash, randomBytes } from "crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import type { Api } from "@earendil-works/pi-ai";
+import {
+  backupModelsJson,
+  computeRevision,
+  getModelsJsonBackupPath,
+  getModelsJsonPath,
+  mutateModelsJsonUnderLock,
+  readModelsJsonRaw,
+  stripJsonComments,
+  writeModelsJsonAtomic,
+  type ModelsJsonReadResult,
+  type ReadRawResult,
+} from "./models-config-store";
+
+// Compatibility re-exports (existing tests and callers import from this module).
+export {
+  backupModelsJson,
+  computeRevision,
+  getModelsJsonBackupPath,
+  getModelsJsonPath,
+  readModelsJsonRaw,
+  stripJsonComments,
+  writeModelsJsonAtomic,
+};
+export type { ModelsJsonReadResult, ReadRawResult };
 
 /**
  * Narrow catalog surface used by price listing / post-write verification.
@@ -52,97 +76,6 @@ import type {
 } from "./model-price-types";
 import { isValidPriceValue } from "./model-price-types";
 import { readPiWebConfig, writePiWebConfigPatch } from "./pi-web-config";
-
-// ── JSON comment stripping ────────────────────────────────────────────────────
-
-/**
- * Strip `//` line comments and trailing commas from JSON-like text,
- * leaving string literals untouched.
- *
- * Replicates the Pi SDK internal `stripJsonComments` utility since it is not
- * exported from the package.
- */
-export function stripJsonComments(input: string): string {
-  return input
-    // Remove // line comments (preserve string content)
-    .replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*/g, (m) => (m[0] === '"' ? m : ""))
-    // Remove trailing commas before ] or }
-    .replace(/"(?:\\.|[^"\\])*"|,(\s*[}\]])/g, (m, tail) =>
-      tail ?? (m[0] === '"' ? m : ""),
-    );
-}
-
-// ── Paths ─────────────────────────────────────────────────────────────────────
-
-export function getModelsJsonPath(): string {
-  return join(getAgentDir(), "models.json");
-}
-
-export function getModelsJsonBackupPath(path?: string): string {
-  const target = path ?? getModelsJsonPath();
-  return `${target}.pi-price-backup`;
-}
-
-// ── Revision ──────────────────────────────────────────────────────────────────
-
-/**
- * Compute an opaque revision token for optimistic concurrency control.
- * Uses SHA-256 of the raw file content (or a random nonce if the file doesn't exist).
- */
-export function computeRevision(content: string): string {
-  return createHash("sha256").update(content).digest("hex").slice(0, 16);
-}
-
-// ── Read ──────────────────────────────────────────────────────────────────────
-
-export interface ReadRawResult {
-  /** Raw file text (empty string if file does not exist). */
-  raw: string;
-  /** Parsed JSON object. */
-  parsed: Record<string, unknown>;
-  /** Whether the file exists. */
-  exists: boolean;
-  /** Parse error message, if any. */
-  parseError?: string;
-  /** Opaque revision token. */
-  revision: string;
-}
-
-/** Deterministic revision for the empty / non-existent models.json state. */
-const EMPTY_REVISION = computeRevision("{}");
-
-/**
- * Read models.json, returning the raw text, parsed object, and revision.
- * JSONC comments are stripped before parsing.
- */
-export function readModelsJsonRaw(): ReadRawResult {
-  const path = getModelsJsonPath();
-  if (!existsSync(path)) {
-    return {
-      raw: "{}",
-      parsed: {},
-      exists: false,
-      revision: EMPTY_REVISION,
-    };
-  }
-
-  const raw = readFileSync(path, "utf8");
-  const revision = computeRevision(raw);
-
-  try {
-    const cleaned = stripJsonComments(raw);
-    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
-    return { raw, parsed, exists: true, revision };
-  } catch (error) {
-    return {
-      raw,
-      parsed: {},
-      exists: true,
-      parseError: error instanceof Error ? error.message : String(error),
-      revision,
-    };
-  }
-}
 
 // ── Price projection ──────────────────────────────────────────────────────────
 
@@ -445,57 +378,6 @@ export function buildModelPriceListResponse(
   };
 }
 
-// ── Write ─────────────────────────────────────────────────────────────────────
-
-/**
- * Backup the current models.json before a write operation.
- * Returns the backup path or undefined if backup was not needed.
- */
-export function backupModelsJson(): string | undefined {
-  const path = getModelsJsonPath();
-  if (!existsSync(path)) return undefined;
-
-  const backupPath = getModelsJsonBackupPath();
-  const content = readFileSync(path, "utf8");
-  mkdirSync(dirname(backupPath), { recursive: true });
-  writeFileSync(backupPath, content, "utf8");
-  return backupPath;
-}
-
-/**
- * Write content atomically to the models.json path.
- *
- * Uses temp file + rename for atomicity. Sets best-effort 0600 permissions.
- * Removes temp file on failure.
- */
-export function writeModelsJsonAtomic(content: string): void {
-  const targetPath = getModelsJsonPath();
-  const dir = dirname(targetPath);
-  mkdirSync(dir, { recursive: true });
-
-  // Use a temp file in the same directory for atomic rename
-  const tmpPath = join(dir, `.models.json.${randomBytes(6).toString("hex")}.tmp`);
-
-  try {
-    writeFileSync(tmpPath, content, { encoding: "utf8", mode: 0o600 });
-    // Best-effort chmod on platforms that support it
-    try {
-      chmodSync(tmpPath, 0o600);
-    } catch {
-      // chmod may not be needed on all platforms
-    }
-    renameSync(tmpPath, targetPath);
-  } catch (error) {
-    // Clean up temp file on failure
-    try {
-      if (existsSync(tmpPath)) unlinkSync(tmpPath);
-    } catch {
-      // best-effort cleanup
-    }
-    throw error;
-  }
-}
-
 // ── Merge helpers ─────────────────────────────────────────────────────────────
 
 interface DeepRecord {
@@ -745,36 +627,21 @@ export interface ApplyPricePatchResult {
  *
  * This is the main write entry point. It:
  * 1. Validates the request batch size and structure
- * 2. Reads the current models.json
- * 3. Checks revision match (409 on conflict)
- * 4. Backs up the current file
- * 5. Merges changes into the data structure
- * 6. Atomically writes
- * 7. Updates explicit free models in pi-web.json
+ * 2. Acquires the shared models.json write lock
+ * 3. Reads the current models.json
+ * 4. Checks revision match (409 on conflict)
+ * 5. Backs up the current file
+ * 6. Merges changes into the data structure
+ * 7. Atomically writes
+ * 8. Updates explicit free models in pi-web.json
+ *
+ * Async so concurrent ModelsConfig PUT / sync apply share the same lock.
  */
-export function applyPricePatch(request: ModelPricePatchRequest): ApplyPricePatchResult {
-  // Read current state
-  const current = readModelsJsonRaw();
-  if (current.parseError) {
-    return {
-      success: false,
-      results: [],
-      revision: current.revision,
-      status: 500,
-    };
-  }
-
-  // Check revision
-  if (request.revision !== current.revision) {
-    return {
-      success: false,
-      results: [],
-      revision: current.revision,
-      status: 409,
-    };
-  }
-
-  // Compute explicit free model changes
+export async function applyPricePatch(
+  request: ModelPricePatchRequest,
+): Promise<ApplyPricePatchResult> {
+  // Compute explicit free model changes outside the models.json lock.
+  // pi-web.json updates remain best-effort after a successful models write.
   const explicitFreeSet = getExplicitFreeModels();
   const explicitFreeToAdd: string[] = [];
   const explicitFreeToRemove: string[] = [];
@@ -788,45 +655,55 @@ export function applyPricePatch(request: ModelPricePatchRequest): ApplyPricePatc
     }
   }
 
-  // Merge changes
-  const { data, results } = mergePriceChanges(
-    current.parsed,
-    request.changes,
+  const outcome = await mutateModelsJsonUnderLock<{
+    results: ModelPricePatchResultEntry[];
+    status: number;
+  }>({
+    expectedRevision: request.revision,
+    backup: true,
+    mutate: ({ parsed }) => {
+      const { data, results } = mergePriceChanges(parsed, request.changes);
+      const allSucceeded = results.every((r) => r.success);
+      if (!allSucceeded) {
+        return {
+          skip: true as const,
+          result: { results, status: 422 },
+        };
+      }
+      return {
+        data,
+        result: { results, status: 200 },
+      };
+    },
+  });
 
-  );
-
-  const allSucceeded = results.every((r) => r.success);
-
-  if (!allSucceeded) {
-    return {
-      success: false,
-      results,
-      revision: current.revision,
-      status: 422,
-    };
-  }
-
-  // Backup before writing
-  backupModelsJson();
-
-  // Write
-  const content = JSON.stringify(data, null, 2) + "\n";
-  try {
-    writeModelsJsonAtomic(content);
-  } catch (error) {
-    return {
-      success: false,
-      results: results.map((r) => ({
-        ...r,
+  if (!outcome.ok) {
+    if (outcome.status === "stale_revision") {
+      return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
-      })),
-      revision: current.revision,
+        results: [],
+        revision: outcome.revision,
+        status: 409,
+      };
+    }
+    return {
+      success: false,
+      results: [],
+      revision: outcome.revision,
       status: 500,
     };
   }
 
-  // Update explicit free models in pi-web.json
+  if (outcome.result.status === 422) {
+    return {
+      success: false,
+      results: outcome.result.results,
+      revision: outcome.revision,
+      status: 422,
+    };
+  }
+
+  // Update explicit free models in pi-web.json (best-effort after models.json write).
   if (explicitFreeToAdd.length > 0 || explicitFreeToRemove.length > 0) {
     const newExplicitFree = new Set(explicitFreeSet);
     for (const key of explicitFreeToAdd) newExplicitFree.add(key);
@@ -846,12 +723,10 @@ export function applyPricePatch(request: ModelPricePatchRequest): ApplyPricePatc
     }
   }
 
-  const newRevision = computeRevision(content);
-
   return {
     success: true,
-    results,
-    revision: newRevision,
+    results: outcome.result.results,
+    revision: outcome.revision,
     status: 200,
   };
 }

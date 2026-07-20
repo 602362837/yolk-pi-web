@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { DeepSeekBalanceResult } from "@/lib/deepseek-balance";
 import { ACCOUNT_JSON_CONVERTERS, RAW_ACCOUNT_JSON_EXAMPLE, convertOAuthAccountCredentialWithWarnings, validateRawOAuthCredentialImport, type OAuthAccountImportMode, type OAuthAccountImportWarning } from "@/lib/oauth-account-converters";
 import { earliestResetCreditExpiration, formatQuotaQueriedAt, formatResetCountdown, knownQuotaTiers, quotaColor, QUOTA_TIER_LABELS, type CodexResetCreditDisplay } from "@/lib/quota-display";
@@ -12,6 +12,12 @@ import { KiroQuotaView } from "./KiroQuotaView";
 import { iconFlowAttrs } from "./iconFlow";
 import { SelectDropdown } from "./SelectDropdown";
 import { usePrompt } from "./AppPromptProvider";
+import {
+  isOpenAICompatibleModelsSyncApi,
+  type ModelsConfigSyncPreviewResponse,
+  type ModelsSyncErrorCode,
+  MODELS_CONFIG_SYNC_APPLY_MAX_MODEL_IDS,
+} from "@/lib/models-config-sync-types";
 // Color icons (have their own fill colors — no background needed)
 import AnthropicIcon from "@lobehub/icons/es/Anthropic/components/Mono";
 import OpenAIIcon from "@lobehub/icons/es/OpenAI/components/Mono";
@@ -370,11 +376,407 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{children}</div>;
 }
 
+// ── Model sync helpers ───────────────────────────────────────────────────────
+
+const FIXED_EXTENSION_PROVIDER_IDS = ["grok-cli", "kiro", "google-antigravity"] as const;
+
+/** Stable error code → user-facing Chinese message (no raw endpoint/raw body). */
+const SYNC_ERROR_MESSAGES: Record<ModelsSyncErrorCode, string> = {
+  invalid_request: "请求参数不合法。",
+  provider_not_found: "未找到该提供商。",
+  provider_not_custom: "该提供商不属于自定义 OpenAI 兼容提供商。",
+  unsupported_protocol: "仅支持 OpenAI-compatible API（openai-completions / openai-responses）。",
+  invalid_base_url: "请先填写并保存有效的 http(s) Base URL。",
+  credential_unavailable: "无法解析该提供商的已保存凭据，请检查 API Key 配置后重试。",
+  unsupported_auth: "该提供商的认证方式不支持模型列表同步。",
+  auth_failed: "端点拒绝了凭据，请检查 API Key 或自定义认证 Header。",
+  endpoint_not_found: "未在已保存 Base URL 下找到 /models 或 /v1/models。",
+  rate_limited: "请求过于频繁，请稍后重试。",
+  upstream_unavailable: "上游模型服务暂时不可用。",
+  timeout: "读取模型列表超时，请检查服务状态后重试。",
+  network_error: "无法连接到已配置的模型服务。",
+  redirect_blocked: "模型端点发生了不允许的重定向。",
+  response_too_large: "远端模型列表超过安全读取上限。",
+  invalid_response: "端点返回的不是可识别的 OpenAI 模型列表。",
+  too_many_models: "远端模型数量超过安全上限。",
+  preview_expired: "预览已过期，请重新读取远端模型。",
+  preview_mismatch: "预览数据与当前请求不匹配，请重新预览。",
+  stale_revision: "Models 配置已发生变化，请重新预览后再写入。",
+  models_config_invalid: "models.json 格式无效，请在修复后再试。",
+  write_failed: "写入 models.json 失败。",
+  verification_failed: "写后验证失败，文件已恢复。请重试。",
+};
+
+type SyncPhase =
+  | { phase: "idle" }
+  | { phase: "previewing" }
+  | { phase: "preview"; data: ModelsConfigSyncPreviewResponse; search: string }
+  | { phase: "applying"; data: ModelsConfigSyncPreviewResponse; selectedIds: string[] }
+  | { phase: "success"; data: { added: string[]; skipped: string[]; providerId: string } }
+  | { phase: "error"; code: ModelsSyncErrorCode };
+
+type SyncSelectionState = Map<string, boolean>;
+
+// ── Model sync preview modal ──────────────────────────────────────────────────
+
+function ModelsSyncPreviewModal({
+  providerName,
+  syncState,
+  selectedNew,
+  onToggle,
+  onSelectAllNew,
+  onClearSelection,
+  onSearchChange,
+  onPreview,
+  onApply,
+  onApplyAll,
+  onClose,
+  onDismiss,
+}: {
+  providerId: string;
+  providerName: string;
+  syncState: SyncPhase;
+  selectedNew: SyncSelectionState;
+  onToggle: (modelId: string) => void;
+  onSelectAllNew: () => void;
+  onClearSelection: () => void;
+  onSearchChange: (q: string) => void;
+  onPreview: () => void;
+  onApply: () => void;
+  onApplyAll: () => void;
+  onClose: () => void;
+  onDismiss: () => void;
+}) {
+  const { confirm } = usePrompt();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const busy = syncState.phase === "previewing" || syncState.phase === "applying" || applyBusy;
+
+  // Focus search on preview ready
+  useEffect(() => {
+    if (syncState.phase === "preview") {
+      setTimeout(() => searchRef.current?.focus(), 50);
+    }
+  }, [syncState.phase]);
+
+  // Focus trap + Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (busy) return;
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [busy, onClose]);
+
+  const selectedCount = useMemo(() => {
+    let n = 0;
+    for (const v of selectedNew.values()) { if (v) n++; }
+    return n;
+  }, [selectedNew]);
+
+  const handleWriteSelected = useCallback(async () => {
+    if (selectedCount === 0) return;
+    const ok = await confirm({
+      title: `确认写入 ${selectedCount} 个模型？`,
+      message: (
+        <>
+          将向 <strong style={{ fontFamily: "var(--font-mono)" }}>{providerName}</strong>{" "}
+          追加 <strong>{selectedCount}</strong> 个模型 ID。{" "}
+          只追加 model ID；已有模型、价格、手工字段和{" "}
+          <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.95em" }}>modelOverrides</code>{" "}
+          不会被覆盖；远端缺失的本地模型不会删除。
+        </>
+      ),
+      confirmLabel: "确认写入",
+      cancelLabel: "返回预览",
+    });
+    if (!ok) return;
+    setApplyBusy(true);
+    try {
+      await onApply();
+    } finally {
+      setApplyBusy(false);
+    }
+  }, [selectedCount, confirm, providerName, onApply]);
+
+  const handleWriteAll = useCallback(async () => {
+    const newCount = selectedNew.size;
+    if (newCount === 0) return;
+    const ok = await confirm({
+      title: `写入全部 ${newCount} 个新增模型？`,
+      message: (
+        <>
+          将向 <strong style={{ fontFamily: "var(--font-mono)" }}>{providerName}</strong>{" "}
+          追加全部 <strong>{newCount}</strong> 个新增模型 ID。{" "}
+          只追加 model ID；已有模型、价格、手工字段和{" "}
+          <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.95em" }}>modelOverrides</code>{" "}
+          不会被覆盖；远端缺失的本地模型不会删除。
+        </>
+      ),
+      confirmLabel: "全部写入",
+      cancelLabel: "取消",
+    });
+    if (!ok) return;
+    setApplyBusy(true);
+    try {
+      await onApplyAll();
+    } finally {
+      setApplyBusy(false);
+    }
+  }, [selectedNew.size, confirm, providerName, onApplyAll]);
+
+  const renderContent = () => {
+    if (syncState.phase === "previewing") {
+      return (
+        <div className="models-sync-center">
+          <div className="models-sync-box">
+            <div className="models-sync-spinner" />
+            <h3>正在读取远端模型列表…</h3>
+            <p>使用已保存的提供商配置请求模型目录。不会展示凭据、Headers 或上游原始响应。</p>
+            <div className="models-sync-actions">
+              <button className="btn" onClick={onClose} disabled={busy}>取消</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (syncState.phase === "error") {
+      const message = SYNC_ERROR_MESSAGES[syncState.code] ?? "未知错误，请重试。";
+      const isStale = syncState.code === "stale_revision" || syncState.code === "preview_expired";
+      return (
+        <div className="models-sync-center">
+          <div className="models-sync-box">
+            <div className="models-sync-error-panel" role="alert">
+              <strong>{message}</strong>
+            </div>
+            <div className="models-sync-actions">
+              <button className="btn primary" onClick={isStale ? onPreview : onPreview}>
+                {isStale ? "重新预览" : "重试"}
+              </button>
+              <button className="btn" onClick={onClose}>取消</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (syncState.phase === "success") {
+      const { added, skipped } = syncState.data;
+      return (
+        <div className="models-sync-center">
+          <div className="models-sync-box">
+            <div className="models-sync-success-mark">✓</div>
+            <h3>{added.length > 0 ? `已新增 ${added.length} 个模型` : "没有新增模型"}</h3>
+            <p>Models 配置已重新载入，当前提供商保持选中。</p>
+            <div className="models-sync-result-grid">
+              <div className="models-sync-result-item"><b>{added.length}</b><span>已新增</span></div>
+              <div className="models-sync-result-item"><b>{skipped.length}</b><span>已跳过已存在</span></div>
+            </div>
+            <p className="models-sync-result-safe">✓ 没有覆盖已有配置，也没有删除本地模型</p>
+            <div className="models-sync-actions">
+              <button className="btn primary" onClick={onDismiss}>完成</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // phase === "preview" or "applying"
+    const data = (syncState.phase === "preview" || syncState.phase === "applying") ? syncState.data : null;
+    if (!data) return null;
+
+    const { totals, models } = data;
+    const query = (syncState.phase === "preview" ? syncState.search : "").toLowerCase();
+    const newCount = models.filter((m) => m.status === "new").length;
+
+    const filtered = query
+      ? models.filter((m) => m.id.toLowerCase().includes(query))
+      : models;
+
+    const isApplying = syncState.phase === "applying" || applyBusy;
+
+    return (
+      <>
+        {isApplying && (
+          <div className="models-sync-busy-strip">
+            <div className="models-sync-spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+            正在安全合并并验证配置，请勿重复提交…
+          </div>
+        )}
+
+        {totals.existing > 0 && newCount === 0 ? (
+          <div className="models-sync-center">
+            <div className="models-sync-box">
+              <div className="models-sync-icon">✓</div>
+              <h3>所有远端模型都已存在</h3>
+              <p>本地配置已经包含远端返回的 {totals.existing} 个模型。已有价格、手工字段与 modelOverrides 保持不变。</p>
+              <div className="models-sync-actions">
+                <button className="btn" onClick={onPreview}>重新读取</button>
+              </div>
+            </div>
+          </div>
+        ) : totals.remote === 0 ? (
+          <div className="models-sync-center">
+            <div className="models-sync-box">
+              <div className="models-sync-icon">∅</div>
+              <h3>远端没有返回模型</h3>
+              <p>端点返回了可识别的 OpenAI 模型列表，但列表为空。没有发生任何写入。</p>
+              <div className="models-sync-actions">
+                <button className="btn primary" onClick={onPreview}>重新读取</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Summary */}
+            <div className="models-sync-summary">
+              <div className="models-sync-metric"><span>远端</span><b>{totals.remote}</b></div>
+              <div className="models-sync-metric"><span>新增</span><b>{newCount}</b></div>
+              <div className="models-sync-metric"><span>已存在</span><b>{totals.existing}</b></div>
+              <div className="models-sync-safe-line">✓ 只会写入新增模型 ID</div>
+            </div>
+
+            {/* Toolbar */}
+            <div className="models-sync-toolbar">
+              <input
+                ref={searchRef}
+                className="input mono models-sync-search"
+                placeholder="搜索模型 ID…"
+                aria-label="搜索模型 ID"
+                value={syncState.phase === "preview" ? syncState.search : ""}
+                onChange={(e) => onSearchChange(e.target.value)}
+                disabled={isApplying}
+              />
+              <button type="button" className="btn" onClick={onSelectAllNew} disabled={isApplying}>全选新增</button>
+              <button type="button" className="btn" onClick={onClearSelection} disabled={isApplying}>清空选择</button>
+              <span className="models-sync-selected-count">已选 {selectedCount}</span>
+            </div>
+
+            {/* Model rows */}
+            <div className="models-sync-list">
+              {filtered.map((row) => (
+                <label
+                  key={row.id}
+                  className="models-sync-row"
+                  style={{ opacity: isApplying ? 0.6 : 1 }}
+                >
+                  <input
+                    type="checkbox"
+                    className="models-sync-check"
+                    checked={row.status === "new" ? (selectedNew.get(row.id) ?? true) : false}
+                    disabled={row.status === "existing" || isApplying}
+                    onChange={() => row.status === "new" && onToggle(row.id)}
+                    aria-label={row.status === "new" ? `选择 ${row.id}` : `已存在 ${row.id}，不能重复选择`}
+                  />
+                  <code className="models-sync-id" title={row.id}>{row.id}</code>
+                  <span className="models-sync-owned">{row.ownedBy ?? ""}</span>
+                  <span className={`models-sync-chip ${row.status}`}>
+                    {row.status === "new" ? "新增" : "已存在"}
+                  </span>
+                </label>
+              ))}
+              {filtered.length === 0 && query && (
+                <div className="models-sync-center" style={{ minHeight: 120 }}>
+                  <p>没有匹配的模型。</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Footer */}
+        {totals.remote > 0 && newCount > 0 && (
+          <footer className="models-sync-footer">
+            <button type="button" className="btn" onClick={onClose} disabled={isApplying}>取消</button>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={selectedCount === 0 || isApplying}
+              onClick={handleWriteSelected}
+            >
+              {isApplying ? "写入中…" : `写入所选（${selectedCount}）`}
+            </button>
+            <button
+              type="button"
+              className="btn success models-sync-btn-success"
+              disabled={newCount === 0 || isApplying}
+              onClick={handleWriteAll}
+            >
+              {isApplying ? "写入中…" : `全部新增并写入（${newCount}）`}
+            </button>
+          </footer>
+        )}
+      </>
+    );
+  };
+
+  // Phase-independent footer for empty/all-existing
+  const showFooter = (() => {
+    if (syncState.phase === "previewing" || syncState.phase === "error") return false;
+    if (syncState.phase === "success") return false;
+    const data = (syncState.phase === "preview" || syncState.phase === "applying") ? syncState.data : null;
+    if (!data) return false;
+    if (data.totals.remote === 0) return true;
+    const newCount = data.models.filter((m) => m.status === "new").length;
+    if (newCount === 0) return true;
+    return false;
+  })();
+
+  return (
+    <div className="models-sync-overlay" role="presentation" onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <section
+        ref={dialogRef}
+        className="models-sync-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="models-sync-title"
+      >
+        <header className="models-sync-header">
+          <div className="models-sync-title">
+            <strong id="models-sync-title">从端点同步模型</strong>
+            <code>{providerName}</code>
+          </div>
+          <button
+            className="models-sync-close"
+            aria-label="关闭预览"
+            onClick={onClose}
+            disabled={busy}
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="models-sync-body">
+          {renderContent()}
+        </div>
+
+        {showFooter && (
+          <footer className="models-sync-footer">
+            <button className="btn" onClick={onClose}>取消</button>
+          </footer>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ── Provider detail ───────────────────────────────────────────────────────────
 
-function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
+function ProviderDetail({ name, provider, onChange, onRename, onDelete, dirty, isCustomDistinct, onSyncPreview }: {
   name: string; provider: ProviderEntry;
   onChange: (p: ProviderEntry) => void; onRename: (n: string) => void; onDelete: () => void;
+  /** True when the whole models.json has unsaved local edits. */
+  dirty: boolean;
+  /** True when this is a custom provider NOT in builtin or fixed extension set. */
+  isCustomDistinct: boolean;
+  /** Start sync preview flow for this provider. */
+  onSyncPreview: () => void;
 }) {
   const [editingName, setEditingName] = useState(name);
   useEffect(() => setEditingName(name), [name]);
@@ -421,7 +823,90 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
       <Field label="API">
         <Select value={provider.api ?? "openai-completions"} onChange={(v) => set("api", v)} options={API_OPTIONS} required />
       </Field>
+
+      {/* ── Model sync discovery block ── */}
+      {isCustomDistinct && <ModelSyncDiscovery
+        providerName={name}
+        provider={provider}
+        dirty={dirty}
+        onSyncPreview={onSyncPreview}
+      />}
     </div>
+  );
+}
+
+// ── Model sync discovery block ───────────────────────────────────────────────
+
+function ModelSyncDiscovery({
+  providerName,
+  provider,
+  dirty,
+  onSyncPreview,
+}: {
+  providerName: string;
+  provider: ProviderEntry;
+  dirty: boolean;
+  onSyncPreview: () => void;
+}) {
+  const api = provider.api ?? "";
+  const baseUrl = (provider.baseUrl ?? "").trim();
+
+  // Eligibility
+  const isOpenAI = isOpenAICompatibleModelsSyncApi(api);
+  let hasValidBaseUrl = false;
+  if (baseUrl) {
+    try {
+      const u = new URL(baseUrl);
+      hasValidBaseUrl = u.protocol === "http:" || u.protocol === "https:";
+    } catch { /* invalid */ }
+  }
+
+  const eligible = isOpenAI && hasValidBaseUrl && !dirty;
+
+  // Disabled reason
+  let reason = "";
+  if (dirty) reason = "请先保存当前 Models 更改，再从已保存的端点读取模型。";
+  else if (!isOpenAI) reason = "仅支持 OpenAI-compatible API（openai-completions / openai-responses）。";
+  else if (!hasValidBaseUrl) reason = "请先填写并保存有效的 http(s) Base URL。";
+
+  return (
+    <section className="models-sync-discovery">
+      <div className="models-sync-discovery-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="models-sync-discovery-title">从端点同步模型</div>
+          <div className="models-sync-discovery-copy">
+            读取 <code>{providerName}</code> 已保存 Base URL 的 OpenAI-compatible{" "}
+            <code>/models</code>{" "}
+            列表。只新增模型 ID，不覆盖已有价格和手工配置。
+          </div>
+        </div>
+        <div className="models-sync-discovery-tags">
+          <span className="models-sync-tag models-sync-tag-safe">仅新增</span>
+          <span className="models-sync-tag models-sync-tag-confirm">需确认</span>
+        </div>
+      </div>
+
+      {reason && (
+        <div className="models-sync-discovery-reason">
+          <span>ⓘ</span>
+          <span>{reason}</span>
+        </div>
+      )}
+
+      <div className="models-sync-discovery-actions">
+        <button
+          type="button"
+          className="btn primary"
+          disabled={!eligible}
+          onClick={eligible ? onSyncPreview : undefined}
+        >
+          预览远端模型
+        </button>
+        <span className="models-sync-discovery-help">
+          不会删除本地模型，也不会写入远端返回的能力或价格字段。
+        </span>
+      </div>
+    </section>
   );
 }
 
@@ -4132,8 +4617,31 @@ function AddProviderPicker({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// ── Deep equality helper for dirty detection ─────────────────────────
+
+function jsonStableEqual(a: unknown, b: unknown): boolean {
+  // Fast path: same reference or both primitively equal
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return false;
+  if (typeof a !== "object") return false;
+
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const aKeys = Object.keys(aObj).sort();
+  const bKeys = Object.keys(bObj).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) return false;
+    if (!jsonStableEqual(aObj[aKeys[i]], bObj[bKeys[i]])) return false;
+  }
+  return true;
+}
+
 export function ModelsConfig({ onClose }: { onClose: () => void }) {
   const [config, setConfig] = useState<ModelsJson>({ providers: {} });
+  const [persistedConfig, setPersistedConfig] = useState<ModelsJson>({ providers: {} });
+  const [configRevision, setConfigRevision] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -4142,6 +4650,14 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
   const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([]);
   const [apiKeyProviders, setApiKeyProviders] = useState<ApiKeyProvider[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // ── Sync state ──
+  const [syncState, setSyncState] = useState<SyncPhase>({ phase: "idle" });
+  const [syncStateMap, setSyncStateMap] = useState<SyncSelectionState>(new Map());
+  // Cache last preview response to survive re-renders
+  const syncPreviewRef = useRef<ModelsConfigSyncPreviewResponse | null>(null);
+
+  const dirty = useMemo(() => !jsonStableEqual(config, persistedConfig), [config, persistedConfig]);
 
   const loadOAuthProviders = useCallback(() => {
     fetch("/api/auth/providers")
@@ -4157,20 +4673,30 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  // Reload full config from server (used after sync apply)
+  const reloadConfigFromServer = useCallback(() => {
     fetch("/api/models-config")
-      .then((r) => r.json())
-      .then((d: ModelsJson) => {
-        const normalized = d.providers ? d : { ...d, providers: {} };
+      .then((r) => {
+        const rev = r.headers.get("X-Models-Config-Revision") ?? r.headers.get("ETag")?.replace(/^W\//, "").replace(/^"|"$/g, "") ?? null;
+        return r.json().then((d: ModelsJson) => ({ data: d, revision: rev }));
+      })
+      .then(({ data: d, revision: rev }) => {
+        const normalized: ModelsJson = d.providers ? d : { ...(d as Record<string, unknown>), providers: {} as Record<string, ProviderEntry> };
         setConfig(normalized);
+        setPersistedConfig(normalized);
+        if (rev) setConfigRevision(rev);
         const keys = Object.keys(normalized.providers ?? {});
         if (keys.length > 0) setSelection({ type: "provider", name: keys[0] });
       })
-      .catch(() => setConfig({ providers: {} }))
+      .catch(() => { setConfig({ providers: {} }); setPersistedConfig({ providers: {} }); })
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    reloadConfigFromServer();
     loadOAuthProviders();
     loadApiKeyProviders();
-  }, [loadOAuthProviders, loadApiKeyProviders]);
+  }, [loadOAuthProviders, loadApiKeyProviders, reloadConfigFromServer]);
 
   const addCustomProvider = useCallback(() => {
     let finalName = "new-provider";
@@ -4250,20 +4776,202 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     setSaveError(null);
     setSavedOk(false);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (configRevision) headers["If-Match"] = `"${configRevision}"`;
       const res = await fetch("/api/models-config", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(config),
       });
-      const d = await res.json() as { success?: boolean; error?: string };
-      if (!res.ok || d.error) setSaveError(d.error ?? `HTTP ${res.status}`);
-      else { setSavedOk(true); setTimeout(() => setSavedOk(false), 2000); }
+      const rev = res.headers.get("X-Models-Config-Revision") ?? res.headers.get("ETag")?.replace(/^W\//, "").replace(/^"|"$/g, "") ?? null;
+      const d = await res.json() as { success?: boolean; error?: string; revision?: string; code?: string };
+      if (!res.ok || d.error) {
+        if (d.code === "stale_revision") {
+          setSaveError("配置已被其他操作修改，请重新载入后再保存。");
+        } else {
+          setSaveError(d.error ?? `HTTP ${res.status}`);
+        }
+      } else {
+        setSavedOk(true);
+        setTimeout(() => setSavedOk(false), 2000);
+        setPersistedConfig(config);
+        if (rev ?? d.revision) setConfigRevision(rev ?? d.revision ?? null);
+      }
     } catch (e) {
       setSaveError(String(e));
     } finally {
       setSaving(false);
     }
-  }, [config]);
+  }, [config, configRevision]);
+
+  // ── Model sync handlers ──
+
+  const handleSyncPreview = useCallback(async (providerId: string) => {
+    setSyncState({ phase: "previewing" });
+    try {
+      const res = await fetch("/api/models-config/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preview", providerId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: { code?: ModelsSyncErrorCode } };
+        setSyncState({ phase: "error", code: d.error?.code ?? "invalid_response" });
+        return;
+      }
+      const data = await res.json() as ModelsConfigSyncPreviewResponse;
+      syncPreviewRef.current = data;
+      // Default select all new
+      const nextMap = new Map<string, boolean>();
+      for (const row of data.models) {
+        if (row.status === "new") nextMap.set(row.id, true);
+      }
+      setSyncStateMap(nextMap);
+      setSyncState({ phase: "preview", data, search: "" });
+    } catch {
+      setSyncState({ phase: "error", code: "network_error" });
+    }
+  }, []);
+
+  const handleSyncApply = useCallback(async () => {
+    const preview = syncPreviewRef.current;
+    if (!preview) return;
+    const selected = [...syncStateMap.entries()].filter(([, v]) => v).map(([k]) => k);
+    if (selected.length === 0 || selected.length > MODELS_CONFIG_SYNC_APPLY_MAX_MODEL_IDS) return;
+    setSyncState({ phase: "applying", data: preview, selectedIds: selected });
+    try {
+      const res = await fetch("/api/models-config/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "apply",
+          providerId: preview.providerId,
+          previewId: preview.previewId,
+          revision: preview.revision,
+          modelIds: selected,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: { code?: ModelsSyncErrorCode } };
+        setSyncState({ phase: "error", code: d.error?.code ?? "write_failed" });
+        return;
+      }
+      const result = await res.json() as { addedIds?: string[]; skippedExistingIds?: string[]; providerId?: string };
+      // Reload config from server to get fresh revision
+      const reloadRes = await fetch("/api/models-config");
+      const rev = reloadRes.headers.get("X-Models-Config-Revision") ?? reloadRes.headers.get("ETag")?.replace(/^W\//, "").replace(/^"|"$/g, "") ?? null;
+      const reloadData = await reloadRes.json() as ModelsJson;
+      const normalized: ModelsJson = reloadData.providers ? reloadData : { ...(reloadData as Record<string, unknown>), providers: {} as Record<string, ProviderEntry> };
+      setConfig(normalized);
+      setPersistedConfig(normalized);
+      if (rev) setConfigRevision(rev);
+      syncPreviewRef.current = null;
+      setSyncState({
+        phase: "success",
+        data: {
+          added: result.addedIds ?? [],
+          skipped: result.skippedExistingIds ?? [],
+          providerId: result.providerId ?? preview.providerId,
+        },
+      });
+    } catch {
+      setSyncState({ phase: "error", code: "network_error" });
+    }
+  }, [syncStateMap]);
+
+  const handleSyncApplyAll = useCallback(async () => {
+    const preview = syncPreviewRef.current;
+    if (!preview) return;
+    const allNew = preview.models.filter((m) => m.status === "new").map((m) => m.id);
+    if (allNew.length === 0 || allNew.length > MODELS_CONFIG_SYNC_APPLY_MAX_MODEL_IDS) return;
+    // Select all and apply
+    const nextMap = new Map<string, boolean>();
+    for (const id of allNew) nextMap.set(id, true);
+    setSyncStateMap(nextMap);
+    // Use a small delay so state settles, then apply
+    setSyncState({ phase: "applying", data: preview, selectedIds: allNew });
+    try {
+      const res = await fetch("/api/models-config/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "apply",
+          providerId: preview.providerId,
+          previewId: preview.previewId,
+          revision: preview.revision,
+          modelIds: allNew,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: { code?: ModelsSyncErrorCode } };
+        setSyncState({ phase: "error", code: d.error?.code ?? "write_failed" });
+        return;
+      }
+      const result = await res.json() as { addedIds?: string[]; skippedExistingIds?: string[]; providerId?: string };
+      const reloadRes = await fetch("/api/models-config");
+      const rev = reloadRes.headers.get("X-Models-Config-Revision") ?? reloadRes.headers.get("ETag")?.replace(/^W\//, "").replace(/^"|"$/g, "") ?? null;
+      const reloadData = await reloadRes.json() as ModelsJson;
+      const normalized: ModelsJson = reloadData.providers ? reloadData : { ...(reloadData as Record<string, unknown>), providers: {} as Record<string, ProviderEntry> };
+      setConfig(normalized);
+      setPersistedConfig(normalized);
+      if (rev) setConfigRevision(rev);
+      syncPreviewRef.current = null;
+      setSyncState({
+        phase: "success",
+        data: {
+          added: result.addedIds ?? [],
+          skipped: result.skippedExistingIds ?? [],
+          providerId: result.providerId ?? preview.providerId,
+        },
+      });
+    } catch {
+      setSyncState({ phase: "error", code: "network_error" });
+    }
+  }, []);
+
+  const handleSyncClose = useCallback(() => {
+    if (syncState.phase === "applying") return;
+    setSyncState({ phase: "idle" });
+    syncPreviewRef.current = null;
+    setSyncStateMap(new Map());
+  }, [syncState.phase]);
+
+  const handleSyncDismiss = useCallback(() => {
+    setSyncState({ phase: "idle" });
+    syncPreviewRef.current = null;
+    setSyncStateMap(new Map());
+  }, []);
+
+  const handleSyncToggle = useCallback((modelId: string) => {
+    setSyncStateMap((prev) => {
+      const next = new Map(prev);
+      next.set(modelId, !next.get(modelId));
+      return next;
+    });
+  }, []);
+
+  const handleSyncSelectAllNew = useCallback(() => {
+    setSyncStateMap((prev) => {
+      const next = new Map(prev);
+      for (const [k] of next) next.set(k, true);
+      return next;
+    });
+  }, []);
+
+  const handleSyncClearSelection = useCallback(() => {
+    setSyncStateMap((prev) => {
+      const next = new Map(prev);
+      for (const [k] of next) next.set(k, false);
+      return next;
+    });
+  }, []);
+
+  const handleSyncSearchChange = useCallback((q: string) => {
+    setSyncState((prev) => {
+      if (prev.phase !== "preview") return prev;
+      return { ...prev, search: q };
+    });
+  }, []);
 
   const providers = Object.entries(config.providers ?? {});
   const activeOAuth = oauthProviders.filter((p) => p.loggedIn);
@@ -4294,6 +5002,12 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
     if (selection.type === "provider") {
       const provider = config.providers?.[selection.name];
       if (!provider) return null;
+      // Determine if this provider is a custom (non-builtin, non-fixed) provider
+      const knownPiProviderIds = new Set([
+        ...Object.keys(PROVIDER_ICONS),
+        ...FIXED_EXTENSION_PROVIDER_IDS,
+      ]);
+      const isCustomDistinct = !knownPiProviderIds.has(selection.name);
       return (
         <ProviderDetail
           key={selection.name}
@@ -4302,6 +5016,9 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
           onChange={(p) => updateProvider(selection.name, p)}
           onRename={(n) => renameProvider(selection.name, n)}
           onDelete={() => deleteProvider(selection.name)}
+          dirty={dirty}
+          isCustomDistinct={isCustomDistinct}
+          onSyncPreview={() => handleSyncPreview(selection.name)}
         />
       );
     }
@@ -4469,6 +5186,7 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
 
         {/* Footer */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "10px 18px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+          {dirty && <span style={{ fontSize: 11, color: "var(--warning)", marginRight: "auto" }}>● 有未保存更改</span>}
           {saveError && <span style={{ fontSize: 12, color: "#f87171", flex: 1 }}>{saveError}</span>}
           <button onClick={onClose} style={{ padding: "6px 14px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
             Cancel
@@ -4506,6 +5224,35 @@ export function ModelsConfig({ onClose }: { onClose: () => void }) {
         onClose={() => setPickerOpen(false)}
       />
     )}
+
+    {/* ── Model sync preview modal ── */}
+    {syncState.phase !== "idle" && (() => {
+      const providerId = (() => {
+        if (syncState.phase === "preview" || syncState.phase === "applying") return syncState.data.providerId;
+        if (syncState.phase === "success") return syncState.data.providerId;
+        return "";
+      })();
+      return (
+        <ModelsSyncPreviewModal
+          providerId={providerId}
+          providerName={selection?.type === "provider" ? selection.name : providerId}
+          syncState={syncState}
+          selectedNew={syncStateMap}
+          onToggle={handleSyncToggle}
+          onSelectAllNew={handleSyncSelectAllNew}
+          onClearSelection={handleSyncClearSelection}
+          onSearchChange={handleSyncSearchChange}
+          onPreview={() => {
+            const id = selection?.type === "provider" ? selection.name : providerId;
+            if (id) handleSyncPreview(id);
+          }}
+          onApply={handleSyncApply}
+          onApplyAll={handleSyncApplyAll}
+          onClose={handleSyncClose}
+          onDismiss={handleSyncDismiss}
+        />
+      );
+    })()}
     </>
   );
 }
