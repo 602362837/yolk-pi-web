@@ -8,7 +8,9 @@ import {
   clampThinkingLevelToSupported,
   normalizeSessionModelRef,
   resolveChatDisplayModel,
+  resolveColdStartModelPreference,
   resolveDesiredSessionModel,
+  resolveYolkColdStartModel,
   sessionModelsEqual,
   shouldPinSessionModel,
   withSessionScopedSettingsDefaults,
@@ -280,6 +282,91 @@ test("PIN-4: clampThinkingLevelToSupported prefers medium then auto", () => {
 test("PIN-4: clampThinkingLevelToSupported keeps current when levels unknown", () => {
   assert.equal(clampThinkingLevelToSupported("medium", null), "medium");
   assert.equal(clampThinkingLevelToSupported("medium", []), "medium");
+});
+
+// ---- MODEL-PIN-CS-01: liveConfirmed pin semantics ----
+
+test("CS-01: liveConfirmed=false forces pin even when desired==lastPinned", () => {
+  // Cold start / idle destroy: lastPinned may still equal desired from a
+  // previous live session, but the current wrapper is unconfirmed.
+  assert.equal(shouldPinSessionModel(grok, grok, { liveConfirmed: false }), true);
+  assert.equal(shouldPinSessionModel(grok, null, { liveConfirmed: false }), true);
+  assert.equal(shouldPinSessionModel(grok, gpt, { liveConfirmed: false }), true);
+});
+
+test("CS-01: liveConfirmed=true keeps equal-skip behaviour", () => {
+  assert.equal(shouldPinSessionModel(grok, grok, { liveConfirmed: true }), false);
+  assert.equal(shouldPinSessionModel(grok, null, { liveConfirmed: true }), true);
+  assert.equal(shouldPinSessionModel(grok, gpt, { liveConfirmed: true }), true);
+});
+
+test("CS-01: liveConfirmed=false still rejects invalid desired", () => {
+  assert.equal(shouldPinSessionModel(null, grok, { liveConfirmed: false }), false);
+  assert.equal(shouldPinSessionModel({ provider: "", modelId: "x" }, null, { liveConfirmed: false }), false);
+  assert.equal(shouldPinSessionModel(undefined, grok, { liveConfirmed: false }), false);
+});
+
+test("CS-01: omitted options preserves legacy equal-comparison", () => {
+  // Pre-CS callers that do not pass liveConfirmed keep old behaviour.
+  assert.equal(shouldPinSessionModel(grok, grok), false);
+  assert.equal(shouldPinSessionModel(grok, gpt), true);
+  assert.equal(shouldPinSessionModel(grok, null), true);
+  assert.equal(shouldPinSessionModel(null, grok), false);
+});
+
+// ---- MODEL-PIN-CS-01: yolk cold-start helpers ----
+
+test("CS-01: resolveYolkColdStartModel returns model+thinking for specific", () => {
+  const yolk = {
+    defaultModel: { mode: "specific", provider: "grok-cli", modelId: "grok-4.5", thinking: "high" },
+    defaultThinkingLevel: "auto",
+  };
+  const result = resolveYolkColdStartModel(yolk);
+  assert.deepEqual(result, { provider: "grok-cli", modelId: "grok-4.5", thinking: "high" });
+});
+
+test("CS-01: resolveYolkColdStartModel falls back to defaultThinkingLevel", () => {
+  const yolk = {
+    defaultModel: { mode: "specific", provider: "openai-codex", modelId: "gpt-5.6" },
+    defaultThinkingLevel: "medium",
+  };
+  const result = resolveYolkColdStartModel(yolk);
+  assert.deepEqual(result, { provider: "openai-codex", modelId: "gpt-5.6", thinking: "medium" });
+});
+
+test("CS-01: resolveYolkColdStartModel returns null for piDefault", () => {
+  assert.equal(
+    resolveYolkColdStartModel({
+      defaultModel: { mode: "piDefault" },
+      defaultThinkingLevel: "auto",
+    }),
+    null,
+  );
+});
+
+test("CS-01: resolveYolkColdStartModel returns null for missing config", () => {
+  assert.equal(resolveYolkColdStartModel(null), null);
+  assert.equal(resolveYolkColdStartModel(undefined), null);
+  assert.equal(resolveYolkColdStartModel({}), null);
+  assert.equal(
+    resolveYolkColdStartModel({
+      defaultModel: { mode: "specific", provider: "", modelId: "x" },
+    }),
+    null,
+  );
+  assert.equal(
+    resolveYolkColdStartModel({
+      defaultModel: { mode: "specific", provider: "x", modelId: "" },
+    }),
+    null,
+  );
+});
+
+test("CS-01: resolveColdStartModelPreference — recoverable > yolk > sdk", () => {
+  assert.equal(resolveColdStartModelPreference({ recoverable: true, yolk: true }), "recoverable");
+  assert.equal(resolveColdStartModelPreference({ recoverable: true, yolk: false }), "recoverable");
+  assert.equal(resolveColdStartModelPreference({ recoverable: false, yolk: true }), "yolk");
+  assert.equal(resolveColdStartModelPreference({ recoverable: false, yolk: false }), "sdk");
 });
 
 if (failures > 0) {

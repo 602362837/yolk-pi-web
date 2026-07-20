@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-17T08:38:17.841Z",
+  "updatedAt": "2026-07-19T12:21:19.354Z",
   "entries": [
+    {
+      "id": "20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "title": "修复 Chat 首轮发送未遵从会话选中模型（冷启动误用虚空默认模型）",
+      "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "taskKey": "archived:2026-07:20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "workflowId": "feature-dev",
+      "summary": "## 状态 子任务 MODEL-PIN-CS-04（文档同步与回归验证）已完成。全部 4 个子任务实现就绪，等待检查员审阅。 ## 实现摘要（全部子任务 CS-01..04） | 子任务 | 文件 | 改动 | | --- | --- | --- | | CS-01 | `lib/session-model-pin.ts` | `shouldPinSessionModel` 新增 `liveConfirmed` 选项；新增 `resolveYolkColdStartModel`、`resolveColdStartModelPreference`；文件头注释写入服务端冷启动优先级与 MODEL-PIN-3 约束 | | CS-01 | `scripts/test-session-model-pin.mjs` | 新增 8 个测试用例（liveConfirmed 语义 4 + yolk 解析 3 + 优先级 1），保留全部 PIN-1..4 原有用例 | | CS-02 | `hooks/useAgentSession.ts` | `loadSession`：删除 context.model→lastPinned 赋值；`liveAgentConfirmedRef` 跟踪 live 确认状态；`ensureSessionModel` 传 `{ liveConfirmed }`；agent_end/includeState live 模型确认；无 live 时清空 lastPinned 和 confirmed | | CS-03 | `lib/rpc-manager.ts` | 新增 `applyWebSessionColdStartDefaults`：优先 session 可恢复模型（path `model_change` + runtime 可用），否则 yolk specific + thinking（`mode === \"specific\"`），否则 SDK/settings；Studio child 跳过；全部走 `withSessionScopedSetting…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "knowledgePath": ".ypi/knowledge/20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型.md",
+      "createdAt": "2026-07-19T12:21:19.354Z",
+      "archivedAt": "2026-07-19T12:21:19.354Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260717-163817-将-pi-sdk-从-0-80-7-升级到-0-80-10-并完成-auth-modelrunt",
       "title": "将 pi SDK 从 0.80.7 升级到 0.80.10 并完成 Auth/ModelRuntime 适配迁移",
