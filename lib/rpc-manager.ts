@@ -34,7 +34,8 @@ import {
   type RpcRuntimeDiagnostic,
 } from "./memory-diagnostics-types";
 import { getOpenAICodexWebSocketDebugStats } from "@earendil-works/pi-ai/api/openai-codex-responses";
-import { withSessionScopedSettingsDefaults } from "./session-model-pin";
+import { resolveYolkColdStartModel, withSessionScopedSettingsDefaults } from "./session-model-pin";
+import { readPiWebConfig } from "./pi-web-config";
 
 // ============================================================================
 // Types
@@ -1530,6 +1531,112 @@ export function destroyRpcSessionsForCwd(cwd: string): string[] {
 }
 
 /**
+ * Cold-start model defaults for session wrappers (plan B · MODEL-PIN-CS-03).
+ *
+ * Priority:
+ * 1. Recoverable session model (path model_change + runtime available) → keep/restore.
+ * 2. Yolk specific (pi-web.json yolk.defaultModel.mode === "specific") → apply.
+ * 3. Otherwise → no-op (keep SDK/settings default).
+ *
+ * Studio child sessions are skipped so user yolk does not pollute subagent policy.
+ * All setModel calls are session-scoped (MODEL-PIN-3).  Failures are logged and
+ * do NOT block session creation.
+ */
+async function applyWebSessionColdStartDefaults(
+  wrapper: AgentSessionWrapper,
+  sessionFile: string,
+): Promise<void> {
+  // Skip for studio child sessions — don't pollute subagent model policy
+  if (sessionFile) {
+    try {
+      const header = readSessionHeaderFromFile(sessionFile);
+      if (header?.studioChild) return;
+    } catch {
+      // Header read is best-effort; proceed with cold-start fallback
+    }
+  }
+
+  const inner = wrapper.inner;
+
+  // 1. Try to recover session model from path entries (existing sessions only)
+  let recoverableModel: { provider: string; modelId: string } | null = null;
+
+  if (sessionFile) {
+    try {
+      const entries = inner.sessionManager.getBranch() as Array<{
+        type: string;
+        provider?: string;
+        modelId?: string;
+      }>;
+      for (let i = entries.length - 1; i >= 0; i -= 1) {
+        const entry = entries[i];
+        if (entry.type === "model_change" && entry.provider && entry.modelId) {
+          recoverableModel = { provider: entry.provider, modelId: entry.modelId };
+          break;
+        }
+      }
+    } catch {
+      // Entry scan is best-effort; proceed without recoverable model
+    }
+  }
+
+  // 2. If recoverable model exists and is available in runtime, ensure runtime uses it
+  if (recoverableModel) {
+    const model = inner.modelRuntime.getModel(recoverableModel.provider, recoverableModel.modelId);
+    if (model) {
+      const current = inner.model;
+      if (
+        current?.provider === recoverableModel.provider
+        && current?.id === recoverableModel.modelId
+      ) {
+        return; // Already correct, no-op
+      }
+      try {
+        await withSessionScopedSettingsDefaults(inner.settingsManager, () =>
+          inner.setModel(model),
+        );
+      } catch (err) {
+        console.warn(
+          "applyWebSessionColdStartDefaults: failed to restore recoverable model",
+          err,
+        );
+      }
+      return;
+    }
+    // Model not available in runtime → fall through to yolk / sdk
+  }
+
+  // 3. No recoverable model → try yolk specific, else keep SDK/settings default
+  const yolkConfig = readPiWebConfig().yolk;
+  const yolkModel = resolveYolkColdStartModel(yolkConfig);
+
+  if (yolkModel) {
+    const model = inner.modelRuntime.getModel(yolkModel.provider, yolkModel.modelId);
+    if (model) {
+      try {
+        await withSessionScopedSettingsDefaults(inner.settingsManager, async () => {
+          await inner.setModel(model);
+        });
+        if (yolkModel.thinking) {
+          // pi SDK setThinkingLevel already clamps internally; just apply
+          inner.setThinkingLevel(yolkModel.thinking);
+        }
+      } catch (err) {
+        console.warn(
+          "applyWebSessionColdStartDefaults: failed to apply yolk model, keeping SDK default",
+          err,
+        );
+      }
+    } else {
+      console.warn(
+        `applyWebSessionColdStartDefaults: yolk model ${yolkModel.provider}/${yolkModel.modelId} not found in runtime`,
+      );
+    }
+  }
+  // else: piDefault or yolk unavailable → keep SDK/settings default (no-op)
+}
+
+/**
  * Get or create an AgentSession for the given session.
  * For new sessions (sessionFile === ""), pi generates its own id.
  * Pass toolNames to pre-configure active tools (empty array = all tools disabled).
@@ -1606,6 +1713,11 @@ export async function startRpcSession(
 
     // Historical grokAccountStorageId headers are ignored; sessions always use
     // the current global Active Grok account after auth reload.
+
+    // Cold-start model defaults (plan B · MODEL-PIN-CS-03): apply session
+    // recoverable model or yolk specific before returning.  Failures are
+    // logged and do NOT block session creation.
+    await applyWebSessionColdStartDefaults(wrapper, sessionFile);
 
     wrapper.onDestroy(() => registry.delete(realSessionId));
     registry.set(realSessionId, wrapper);

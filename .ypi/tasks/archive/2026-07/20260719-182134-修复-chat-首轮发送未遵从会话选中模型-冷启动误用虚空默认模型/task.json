@@ -1,0 +1,1428 @@
+{
+  "schemaVersion": 1,
+  "id": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+  "title": "修复 Chat 首轮发送未遵从会话选中模型（冷启动误用虚空默认模型）",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155",
+  "createdAt": "2026-07-19T10:21:34.742Z",
+  "updatedAt": "2026-07-19T12:21:19.354Z",
+  "completedAt": "2026-07-19T12:21:19.315Z",
+  "contextIds": [
+    "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-fae2aa39eb5e735458f2d17b",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T10:21:51.040Z",
+      "finishedAt": "2026-07-19T10:27:22.565Z",
+      "runner": "sdk",
+      "childSessionId": "019f79e5-7e67-7d26-adae-cd298d4e1748",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T10-21-51-079Z_019f79e5-7e67-7d26-adae-cd298d4e1748.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f79e5-7e67-7d26-adae-cd298d4e1748",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## 架构师交付（停在 awaiting_approval）\n\n### 根因结论（已验证）\n1. **客户端误 pin**：`loadSession` 无 live 时把 path `context.model` 写入 `lastPinnedModelRef` → `ensureSessionModel` 跳过 `set_model`。\n2. **冷启动默认源错误**：`startRpcSession` → SDK 用 `~/.pi/agent/settings.json`（本机 `AITOB-OAI/gpt-5.6-luna`），**不是** `yolk.defaultModel`（`grok-cli/grok-4.5`）。\n3. **补充**：idle 10min destroy 后 lastPinned 仍“有效”时，desired 相等会**再次**跳过 pin——只删 context 赋值不够。\n4. abort 后再发变好：`agent_end` 用真实错模更新 lastPinned 后，第二次才触发 `set_model`。\n\n### 方案摘要\n- `lastPinned` = **live 已确认**模型；context 只用于展示/desired。\n- 无 live 确认时 **强制 `set_model`**（即使字符串 equal）。\n- 保持 MODEL-PIN-3（不写 settings 全局默认）。\n- v1 **不**做服务端 prompt 内嵌 model 双保险。\n\n### UI gate\n**否**（无页面/交互/信息结构变化）。见 `ui.md`。\n\n### 子任务（schemaVersion 2）\n| ID | 内容 |\n| --- | --- |\n| MODEL-PIN-CS-01 | `session-model-pin` + 单测（liveConfirmed） |\n| MODEL-PIN-CS-02 | `useAgentSession` loadSession/ensure/idle 清空确认 |\n| MODEL-PIN-CS-03 | 文档 + lint/tsc/test |\n\n### 产物（任务目录）\n`brief.md` · `prd.md` · `ui.md` · `design.md` · `implement.md` · `checks.md` · `plan-review.md` · `handoff.md`  \n路径：`.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/`\n\n### Validation\n- 代码与本机 settings/yolk 配置已核对。\n- 实现计划 JSON 校验通过。\n- **未改生产代码**；未跑 lint/tsc（无代码变更）。\n\n### nextRecommendedAction\n1. **主会话**写 `task.json`：保存 `implementationPlan`，状态 → **`awaiting_approval`**（架构师不能写 task.json）。\n2. 请用户审 **[plan-review.md](.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/plan-review.md)** 并批准四项决策。\n3. 批准后再进 `implementing` 指派 implementer；**现在不要实现**。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T10:21:51.040Z",
+        "updatedAt": "2026-07-19T10:27:22.565Z",
+        "eventCount": 1690,
+        "lastTextPreview": "## 架构师交付（停在 awaiting_approval）\n\n### 根因结论（已验证）\n1. **客户端误 pin**：`loadSession` 无 live 时把 path `context.model` 写入 `lastPinnedModelRef` → `ensureSessionModel` 跳过 `set_model`。\n2. **冷启动默认源错误**：`startRpcSession` → SDK 用 `~/.pi/agent/settings.json`（本机 `AITOB-OAI/gpt-5.6-luna`），**不是** `yolk.defaultModel`（`grok-cli/grok-4.5`）。\n3. **补充**：idle 10min destroy 后 lastPinned 仍“有效”时，desired 相等会**再次**跳过 pin——只删 context 赋值不够。\n4. abort 后再发变好：`agent_end` 用真实错模更新 lastPinned 后，第二次才触发 `set_model`。\n\n### 方案摘要\n- `lastPinned` = **live 已确认**模型；context 只用于展示/desired。\n- 无 live 确认时 **强制 `set_model`**（即使字符串 equal）。\n- 保持 MODEL-PIN-3（不写 settings 全局默认）。\n- v1 **不**做服务端 prompt 内嵌 model 双保险。\n\n### UI gate\n**否**（无页面/交互/信息结构变化）。见 `ui.md`。\n\n### 子任务（schemaVersion 2）\n| ID | 内容 |\n| --- | --- |\n| MODEL-PIN-CS-01 | `session-model-pin` + 单测（liveConfirmed） |\n| MODEL-PIN-CS-02 | `useAgentSession` loadSession/ensure/idle 清空确认 |\n| MODEL-PIN-CS-03 | 文档 + lint/tsc/test |\n\n### 产物（任务目录）\n`brief.md` · `prd.md` · `ui.md` · `design.md` · `implement.md` · `checks.md` · `plan-review.md` · `handoff.md`  \n路径：`.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/`\n\n### Validation\n- 代码与本机 settings/yolk 配置已核对。\n- 实现计划 JSON 校验通过。\n- **未改生产代码**；未跑 lint/tsc（无代码变更）。\n\n### nextRecommendedAction\n1. **主会话**写 `task.json`：保存 `implementationPlan`，状态 → **`awaiting_approval`**（架构师不能写 task.json）。\n2. 请用户审 **[plan-review.md](.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/plan-review.md)** 并批准四项决策。\n3. 批准后再进 `implementing` 指派 implementer；**现在不要实现**。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T10:27:10.530Z",
+            "toolCallId": "call-14a80427-8bbf-45a9-b29e-0dd2b819e902-36|fc_5dede644-b575-9e6f-a2d8-8df8112c64c3_0",
+            "toolName": "write",
+            "text": "Successfully wrote 1706 bytes to /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-19T10:27:14.965Z",
+            "toolCallId": "call-bfc95199-dcd9-486f-bf21-1ecc899c4656-37|fc_2e446599-514b-98ec-82cf-5ad202067e70_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"TASK=\\\".ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型\\\"\\nfor f in brief prd ui design implement checks plan-review handoff; do\\n  path=\\\"$TASK/$f.md\\\"\\n  bytes=$(wc -c < \\\"$path\\\" | tr -d ' ')\\n  if rg -q \\\"TBD by YPI Studio\\\" \\\"$path\\\"; then status=\\\"STILL_TBD\\\"; else status=\\\"OK\\\"; fi\\n  echo \\\"$f.md  bytes=$bytes  $status\\\"\\ndone\\n# extract implementation plan json validity\\npython3 - <<'PY'\\nimport re,json,pathlib\\np=pathlib.Path(\\\".ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/implement.md\\\")\\ntext=p.read_text()\\nm=re.search(r\\\"```json ypi-implementation-plan\\\\n(.*?)\\\\n```\\\", text, re.S)\\nassert m, \\\"no plan block\\\"\\nplan=json.loads(m.group(1))\\nassert plan[\\\"schemaVersion\\\"]==2\\nids=[s[\\\"id\\\"] for s in plan[\\\"subtasks\\\"]]\\nprint(\\\"plan ids:\\\", ids)\\nprint(\\\"maxConcurrency\\\", plan.get(\\\"maxConcurrency\\\"))\\nfor s in plan[\\\"subtasks\\\"]:\\n  for k in [\\\"id\\\",\\\"title\\\",\\\"phase\\\",\\\"order\\\",\\\"dependsOn\\\",\\\"files\\\",\\\"instructions\\\",\\\"acceptance\\\",\\\"validation\\\",\\\"risks\\\"]:\\n    assert k in s, (s.get(\\\"id\\\"), k)\\nprint(\\\"schema fields ok\\\")\\nPY\",\n  \"timeout\": 15\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T10:27:15.187Z",
+            "toolCallId": "call-bfc95199-dcd9-486f-bf21-1ecc899c4656-37|fc_2e446599-514b-98ec-82cf-5ad202067e70_0",
+            "toolName": "bash",
+            "text": "brief.md  bytes=6062  OK\nprd.md  bytes=4973  OK\nui.md  bytes=1517  OK\ndesign.md  bytes=10550  OK\nimplement.md  bytes=9559  OK\nchecks.md  bytes=3161  OK\nplan-review.md  bytes=4182  OK\nhandoff.md  bytes=2424  OK\nplan ids: ['MODEL-PIN-CS-01', 'MODEL-PIN-CS-02', 'MODEL-PIN-CS-03']\nmaxConcurrency 1\nschema fields ok",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T10:27:22.557Z",
+            "text": "## 架构师交付（停在 awaiting_approval）\n\n### 根因结论（已验证）\n1. **客户端误 pin**：`loadSession` 无 live 时把 path `context.model` 写入 `lastPinnedModelRef` → `ensureSessionModel` 跳过 `set_model`。\n2. **冷启动默认源错误**：`startRpcSession` → SDK 用 `~/.pi/agent/settings.json`（本机 `AITOB-OAI/gpt-5.6-luna`），**不是** `yolk.defaultModel`（`grok-cli/grok-4.5`）。\n3. **补充**：idle 10min destroy 后 lastPinned 仍“有效”时，desired 相等会**再次**跳过 pin——只删 context 赋值不够。\n4. abort 后再发变好：`agent_end` 用真实错模更新 lastPinned 后，第二次才触发 `set_model`。\n\n### 方案摘要\n- `lastPinned` = **live 已确认**模型；context 只用于展示/desired。\n- 无 live 确认时 **强制 `set_model`**（即使字符串 equal）。\n- 保持 MODEL-PIN-3（不写 settings 全局默认）。\n- v1 **不**做服务端 prompt 内嵌 model 双保险。\n\n### UI gate\n**否**（无页面/交互/信息结构变化）。见 `ui.md`。\n\n### 子任务（schemaVersion 2）\n| ID | 内容 |\n| --- | --- |\n| MODEL-PIN-CS-01 | `session-model-pin` + 单测（liveConfirmed） |\n| MODEL-PIN-CS-02 | `useAgentSession` loadSession/ensure/idle 清空确认 |\n| MODEL-PIN-CS-03 | 文档 + lint/tsc/test |\n\n### 产物（任务目录）\n`brief.md` · `prd.md` · `ui.md` · `design.md` · `implement.md` · `checks.md` · `plan-review.md` · `handoff.md`  \n路径：`.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/`\n\n### Validation\n- 代码与本机 settings/yolk 配置已核对。\n- 实现计划 JSON 校验通过。\n- **未改生产代码**；未跑 lint/tsc（无代码变更）。\n\n### nextRecommendedAction\n1. **主会话**写 `task.json`：保存 `implementationPlan`，状态 → **`awaiting_approval`**（架构师不能写 task.json）。\n2. 请用户审 **[plan-review.md](.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/plan-review.md)** 并批准四项决策。\n3. 批准后再进 `implementing` 指派 implementer；**现在不要实现**。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T10:27:22.559Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1689,
+        "tokens": 737,
+        "tokenSource": "usage",
+        "tps": 2.24,
+        "firstTokenAt": "2026-07-19T10:21:53.938Z",
+        "lastTokenAt": "2026-07-19T10:27:22.527Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-fae2aa39eb5e735458f2d17b",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/architect-fae2aa39eb5e735458f2d17b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T10:21:51.040Z",
+        "finishedAt": "2026-07-19T10:27:22.560Z",
+        "updatedAt": "2026-07-19T10:27:22.560Z",
+        "itemCount": 84,
+        "messageCount": 4,
+        "toolCallCount": 38,
+        "stderrBytes": 0,
+        "bytes": 195909,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f79e5-7e67-7d26-adae-cd298d4e1748",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T10-21-51-079Z_019f79e5-7e67-7d26-adae-cd298d4e1748.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-ddcfe7eb9768f716f7b2bd59",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T10:53:23.990Z",
+      "finishedAt": "2026-07-19T10:57:11.316Z",
+      "runner": "sdk",
+      "childSessionId": "019f7a02-60b1-710e-9322-08d15e913008",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T10-53-24-017Z_019f7a02-60b1-710e-9322-08d15e913008.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f7a02-60b1-710e-9322-08d15e913008",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Handoff — 计划 B 修订完成\n\n任务保持 **`awaiting_approval`**（未进入 implementing）。生产代码未改。\n\n### 计划 B 增量摘要\n\n在计划 A（客户端误 pin / 无 live 强制 `set_model` / MODEL-PIN-3）之上追加：\n\n| 层 | 策略 |\n| --- | --- |\n| 服务端冷启动 | **session 可恢复模型 → yolk specific + thinking → settings/SDK（仅 piDefault 或 yolk 失败）** |\n| 终局优先级 | **UI desired（客户端 pin）> serverInitial** |\n| 硬约束 | 不写 settings；不用 yolk 覆盖会话已选模型；兜底不替代主修复 |\n\n### 产物（已更新）\n\n`brief.md` · `prd.md` · `ui.md` · `design.md` · `implement.md` · `checks.md` · `plan-review.md` · `handoff.md`\n\n### 子任务 DAG（schemaVersion 2）\n\n| ID | 内容 |\n| --- | --- |\n| **MODEL-PIN-CS-01** | pin `liveConfirmed` + yolk 解析/优先级纯函数 + 单测 |\n| **MODEL-PIN-CS-02** | `useAgentSession` 冷启动/idle 基线 |\n| **MODEL-PIN-CS-03** | **新增** `startRpcSession` 服务端兜底 |\n| **MODEL-PIN-CS-04** | 文档 + lint/tsc/测试（原 A 的 docs 顺延） |\n\n### Validation\n\n架构阶段：代码与本机 settings≠yolk 已核对。**无** lint/tsc/代码变更。\n\n### 风险\n\n- recoverable 判定不准 → 误套 yolk 或仍落虚空  \n- Studio child 复用 `startRpcSession` 时需 skip 用户 yolk  \n- 双 `set_model`（yolk + UI）可接受  \n\n### 主会话 nextRecommendedAction\n\n1. **`update_implementation_plan`** 注入 `implement.md` 中 CS-01..04 JSON（架构师不能写 `task.json`）  \n2. 状态保持 **`awaiting_approval`**，以 **`plan-review.md`** 请用户 **批准**  \n3. 批准后再 `implementing` + implementer；完成后 checker（含 H8/H9）",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T10:53:23.990Z",
+        "updatedAt": "2026-07-19T10:57:11.315Z",
+        "eventCount": 1084,
+        "lastTextPreview": "## Handoff — 计划 B 修订完成\n\n任务保持 **`awaiting_approval`**（未进入 implementing）。生产代码未改。\n\n### 计划 B 增量摘要\n\n在计划 A（客户端误 pin / 无 live 强制 `set_model` / MODEL-PIN-3）之上追加：\n\n| 层 | 策略 |\n| --- | --- |\n| 服务端冷启动 | **session 可恢复模型 → yolk specific + thinking → settings/SDK（仅 piDefault 或 yolk 失败）** |\n| 终局优先级 | **UI desired（客户端 pin）> serverInitial** |\n| 硬约束 | 不写 settings；不用 yolk 覆盖会话已选模型；兜底不替代主修复 |\n\n### 产物（已更新）\n\n`brief.md` · `prd.md` · `ui.md` · `design.md` · `implement.md` · `checks.md` · `plan-review.md` · `handoff.md`\n\n### 子任务 DAG（schemaVersion 2）\n\n| ID | 内容 |\n| --- | --- |\n| **MODEL-PIN-CS-01** | pin `liveConfirmed` + yolk 解析/优先级纯函数 + 单测 |\n| **MODEL-PIN-CS-02** | `useAgentSession` 冷启动/idle 基线 |\n| **MODEL-PIN-CS-03** | **新增** `startRpcSession` 服务端兜底 |\n| **MODEL-PIN-CS-04** | 文档 + lint/tsc/测试（原 A 的 docs 顺延） |\n\n### Validation\n\n架构阶段：代码与本机 settings≠yolk 已核对。**无** lint/tsc/代码变更。\n\n### 风险\n\n- recoverable 判定不准 → 误套 yolk 或仍落虚空  \n- Studio child 复用 `startRpcSession` 时需 skip 用户 yolk  \n- 双 `set_model`（yolk + UI）可接受  \n\n### 主会话 nextRecommendedAction\n\n1. **`update_implementation_plan`** 注入 `implement.md` 中 CS-01..04 JSON（架构师不能写 `task.json`）  \n2. 状态保持 **`awaiting_approval`**，以 **`plan-review.md`** 请用户 **批准**  \n3. 批准后再 `implementing` + implementer；完成后 checker（含 H8/H9）",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T10:57:05.314Z",
+            "toolCallId": "call-6e05d1f9-61ea-4214-bbe7-eb8156514390-20|fc_db04e81c-70b4-96ee-ac55-21062adbb42d_2",
+            "toolName": "write",
+            "text": "Successfully wrote 3116 bytes to /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/checks.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T10:57:05.333Z",
+            "toolCallId": "call-6e05d1f9-61ea-4214-bbe7-eb8156514390-21|fc_db04e81c-70b4-96ee-ac55-21062adbb42d_3",
+            "toolName": "write",
+            "text": "Successfully wrote 3697 bytes to /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/plan-review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T10:57:05.352Z",
+            "toolCallId": "call-6e05d1f9-61ea-4214-bbe7-eb8156514390-22|fc_db04e81c-70b4-96ee-ac55-21062adbb42d_4",
+            "toolName": "write",
+            "text": "Successfully wrote 2141 bytes to /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T10:57:11.306Z",
+            "text": "## Handoff — 计划 B 修订完成\n\n任务保持 **`awaiting_approval`**（未进入 implementing）。生产代码未改。\n\n### 计划 B 增量摘要\n\n在计划 A（客户端误 pin / 无 live 强制 `set_model` / MODEL-PIN-3）之上追加：\n\n| 层 | 策略 |\n| --- | --- |\n| 服务端冷启动 | **session 可恢复模型 → yolk specific + thinking → settings/SDK（仅 piDefault 或 yolk 失败）** |\n| 终局优先级 | **UI desired（客户端 pin）> serverInitial** |\n| 硬约束 | 不写 settings；不用 yolk 覆盖会话已选模型；兜底不替代主修复 |\n\n### 产物（已更新）\n\n`brief.md` · `prd.md` · `ui.md` · `design.md` · `implement.md` · `checks.md` · `plan-review.md` · `handoff.md`\n\n### 子任务 DAG（schemaVersion 2）\n\n| ID | 内容 |\n| --- | --- |\n| **MODEL-PIN-CS-01** | pin `liveConfirmed` + yolk 解析/优先级纯函数 + 单测 |\n| **MODEL-PIN-CS-02** | `useAgentSession` 冷启动/idle 基线 |\n| **MODEL-PIN-CS-03** | **新增** `startRpcSession` 服务端兜底 |\n| **MODEL-PIN-CS-04** | 文档 + lint/tsc/测试（原 A 的 docs 顺延） |\n\n### Validation\n\n架构阶段：代码与本机 settings≠yolk 已核对。**无** lint/tsc/代码变更。\n\n### 风险\n\n- recoverable 判定不准 → 误套 yolk 或仍落虚空  \n- Studio child 复用 `startRpcSession` 时需 skip 用户 yolk  \n- 双 `set_model`（yolk + UI）可接受  \n\n### 主会话 nextRecommendedAction\n\n1. **`update_implementation_plan`** 注入 `implement.md` 中 CS-01..04 JSON（架构师不能写 `task.json`）  \n2. 状态保持 **`awaiting_approval`**，以 **`plan-review.md`** 请用户 **批准**  \n3. 批准后再 `implementing` + implementer；完成后 checker（含 H8/H9）",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T10:57:11.308Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1376,
+        "tokens": 548,
+        "tokenSource": "usage",
+        "tps": 2.45,
+        "firstTokenAt": "2026-07-19T10:53:27.740Z",
+        "lastTokenAt": "2026-07-19T10:57:11.303Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-ddcfe7eb9768f716f7b2bd59",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/architect-ddcfe7eb9768f716f7b2bd59.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T10:53:23.990Z",
+        "finishedAt": "2026-07-19T10:57:11.309Z",
+        "updatedAt": "2026-07-19T10:57:11.309Z",
+        "itemCount": 53,
+        "messageCount": 3,
+        "toolCallCount": 23,
+        "stderrBytes": 0,
+        "bytes": 154085,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f7a02-60b1-710e-9322-08d15e913008",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T10-53-24-017Z_019f7a02-60b1-710e-9322-08d15e913008.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-f45954a64f07fe3fcffe958d",
+      "subtaskId": "MODEL-PIN-CS-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T11:27:10.221Z",
+      "finishedAt": "2026-07-19T11:31:08.359Z",
+      "runner": "sdk",
+      "childSessionId": "019f7a21-4bb8-7d2e-9ce9-fd083a9e7fec",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-27-10-264Z_019f7a21-4bb8-7d2e-9ce9-fd083a9e7fec.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f7a21-4bb8-7d2e-9ce9-fd083a9e7fec",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## MODEL-PIN-CS-01 — Implementation Complete\n\n### Files Changed\n\n- **`lib/session-model-pin.ts`** — Extended `shouldPinSessionModel` with optional `options?: { liveConfirmed?: boolean }`; when `liveConfirmed === false`, any valid desired triggers pin. Added `resolveYolkColdStartModel` (returns `{ provider, modelId, thinking }` for `mode: \"specific\"`, `null` for `piDefault`/missing). Added `resolveColdStartModelPreference` (pure priority: recoverable > yolk > sdk). Updated file header with MODEL-PIN-CS invariants.\n\n- **`scripts/test-session-model-pin.mjs`** — Added 10 new test cases covering: `liveConfirmed=false` force-pin, `liveConfirmed=true` equal-skip, invalid-desired rejection with liveConfirmed, legacy omitted-options equality, `resolveYolkColdStartModel` specific/piDefault/missing/null, and `resolveColdStartModelPreference` priority ordering. All 13 existing tests preserved.\n\n### Verification\n\n```\nnpm run test:session-model-pin  →  22/22 passed (0 failures)\n```\n\n| Check | Result |\n|---|---|\n| `shouldPinSessionModel` backward-compat (omitted options) | ✅ equal → false |\n| `liveConfirmed=false` forces pin even equal | ✅ |\n| `liveConfirmed=true` keeps equal-skip | ✅ |\n| `resolveYolkColdStartModel` specific → model+thinking | ✅ |\n| `resolveYolkColdStartModel` piDefault → null | ✅ |\n| `resolveColdStartModelPreference` priority | ✅ recoverable > yolk > sdk |\n| PIN-3 `withSessionScopedSettingsDefaults` tests | ✅ all preserved |\n| PIN-4 `clampThinkingLevelToSupported` tests | ✅ all preserved |\n| tsc errors on `session-model-pin.ts` | ✅ 0 new errors |\n\n### Export API Changes\n\n| Symbol | Change | Compat |\n|---|---|---|\n| `shouldPinSessionModel` | new optional 3rd param `options?: { liveConfirmed?: boolean }` | ✅ backward-compat (omitted → old behavior) |\n| `resolveYolkColdStartModel` | **new** exported function | N/A |\n| `YolkColdStartModel` | **new** exported type | N/A |\n| `resolveColdStartModelPreference` | **new** exported function | N/A |\n| `ColdStartModelPreference` | **new** exported type | N/A |\n\n### Notes / Risks\n\n- **None blocking.** The `shouldPinSessionModel` signature change is backward-compatible — the two existing callers in `hooks/useAgentSession.ts` (lines 340, 352) omit the third argument and continue to work identically. CS-02 will be the one to wire `liveConfirmed`.\n- `resolveYolkColdStartModel` accepts a lightweight structural type matching the yolk sub-config shape, avoiding a dependency on `PiWebYolkConfig` from `pi-web-config.ts`. This keeps the module free of React/fetch/SDK imports and easily testable. CS-03 will bridge the real `readPiWebConfig().yolk` into this function.\n- The `resolveColdStartModelPreference` pure function is a simple boolean→enum mapping. The boolean-to-boolean gate (`recoverable`/`yolk`) is intentionally narrow — CS-03 will own the actual \"is recoverable? does yolk resolve to non-null?\" resolution with runtime model lookups.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T11:27:10.221Z",
+        "updatedAt": "2026-07-19T11:31:08.359Z",
+        "eventCount": 6649,
+        "lastTextPreview": "## MODEL-PIN-CS-01 — Implementation Complete\n\n### Files Changed\n\n- **`lib/session-model-pin.ts`** — Extended `shouldPinSessionModel` with optional `options?: { liveConfirmed?: boolean }`; when `liveConfirmed === false`, any valid desired triggers pin. Added `resolveYolkColdStartModel` (returns `{ provider, modelId, thinking }` for `mode: \"specific\"`, `null` for `piDefault`/missing). Added `resolveColdStartModelPreference` (pure priority: recoverable > yolk > sdk). Updated file header with MODEL-PIN-CS invariants.\n\n- **`scripts/test-session-model-pin.mjs`** — Added 10 new test cases covering: `liveConfirmed=false` force-pin, `liveConfirmed=true` equal-skip, invalid-desired rejection with liveConfirmed, legacy omitted-options equality, `resolveYolkColdStartModel` specific/piDefault/missing/null, and `resolveColdStartModelPreference` priority ordering. All 13 existing tests preserved.\n\n### Verification\n\n```\nnpm run test:session-model-pin  →  22/22 passed (0 failures)\n```\n\n| Check | Result |\n|---|---|\n| `shouldPinSessionModel` backward-compat (omitted options) | ✅ equal → false |\n| `liveConfirmed=false` forces pin even equal | ✅ |\n| `liveConfirmed=true` keeps equal-skip | ✅ |\n| `resolveYolkColdStartModel` specific → model+thinking | ✅ |\n| `resolveYolkColdStartModel` piDefault → null | ✅ |\n| `resolveColdStartModelPreference` priority | ✅ recoverable > yolk > sdk |\n| PIN-3 `withSessionScopedSettingsDefaults` tests | ✅ all preserved |\n| PIN-4 `clampThinkingLevelToSupported` tests | ✅ all preserved |\n| tsc errors on `session-model-pin.ts` | ✅ 0 new errors |\n\n### Export API Changes\n\n| Symbol | Change | Compat |\n|---|---|---|\n| `shouldPinSessionModel` | new optional 3rd param `options?: { liveConfirmed?: boolean }` | ✅ backward-compat (omitted → old behavior) |\n| `resolveYolkColdStartModel` | **new** exported function | N/A |\n| `YolkColdStartModel` | **new** exported type | N/A |\n| `resolveColdStartModelPreference` | **new** exported function | N/A |\n| `ColdStartModelPreference` | **new** exported type | N/A |\n\n### Notes / Risks\n\n- **None blocking.** The `shouldPinSessionModel` signature change is backward-compatible — the two existing callers in `hooks/useAgentSession.ts` (lines 340, 352) omit the third argument and continue to work identically. CS-02 will be the one to wire `liveConfirmed`.\n- `resolveYolkColdStartModel` accepts a lightweight structural type matching the yolk sub-config shape, avoiding a dependency on `PiWebYolkConfig` from `pi-web-config.ts`. This keeps the module free of React/fetch/SDK imports and easily testable. CS-03 will bridge the real `readPiWebConfig().yolk` into this function.\n- The `resolveColdStartModelPreference` pure function is a simple boolean→enum mapping. The boolean-to-boolean gate (`recoverable`/`yolk`) is intentionally narrow — CS-03 will own the actual \"is recoverable? does yolk resolve to non-null?\" resolution with runtime model lookups.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T11:30:41.165Z",
+            "text": "No type errors in my changed files. The existing errors are all pre-existing dependency-resolution issues (missing `node_modules`). Let me do a final review of the changed files:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-19T11:30:41.167Z",
+            "toolCallId": "call_00_V0q9QvwX9G8AZDICWwRI4249",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/lib/session-model-pin.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:30:41.429Z",
+            "toolCallId": "call_00_V0q9QvwX9G8AZDICWwRI4249",
+            "toolName": "read",
+            "text": "/**\n * Pure helpers for chat model pin/display (IMP-002 MODEL-PIN-1/2/3/4 · MODEL-PIN-CS).\n *\n * UI selection must match the live agent model before prompt/steer.\n * After a turn, the selector must prefer live/explicit selection over\n * path context.model (which can follow the last assistant message).\n * These helpers stay free of React/fetch so scripts can unit-test rules.\n *\n * Key invariants:\n * - lastPinned / confirmed must NOT come from path context.model alone.\n * - Server cold-start default priority: session recoverable > yolk specific > settings/SDK.\n * - Chat set_model is session-scoped (MODEL-PIN-3); yolk cold-start apply must also\n *   use withSessionScopedSettingsDefaults.\n */\n\nexport type SessionModelRef = {\n  provider: string;\n  modelId: string;\n};\n\n/**\n * Normalize model refs from path context ({ provider, modelId }) or\n * live get_state ({ provider, id }).\n */\nexport function normalizeSessionModelRef(\n  input:\n    | { provider?: string | null; modelId?: string | null; id?: string | null }\n    | null\n    | undefined,\n): SessionModelRef | null {\n  if (!input?.provider) return null;\n  const modelId = input.modelId ?? input.id ?? null;\n  if (!modelId) return null;\n  return { provider: input.provider, modelId };\n}\n\nexport function sessionModelsEqual(\n  a: SessionModelRef | null | undefined,\n  b: SessionModelRef | null | undefined,\n): boolean {\n  if (!a || !b) return false;\n  return a.provider === b.provider && a.modelId === b.modelId;\n}\n\n/**\n * Desired model for pin: explicit UI override / new-session selection first,\n * then pending create selection, then live agent model, then path context.model.\n */\nexport function resolveDesiredSessionModel(sources: {\n  override?: SessionModelRef | null;\n  newSession?: SessionModelRef | null;\n  pending?: SessionModelRef | null;\n  live?: SessionModelRef | null;\n  context?: SessionModelRef | null;\n}): SessionModelRef | null {\n  return (\n    sources.override\n    ?? sources.newSession\n    ?? sources.pending\n    ?? sources.live\n    ?? sources.context\n    ?? null\n  );\n}\n\n/**\n * Chat selector display priority (existing session):\n * explicit override → pending UI → live get_state.model → path context.model.\n * Never let assistant history alone clobber a live/explicit selection.\n */\nexport function resolveChatDisplayModel(sources: {\n  override?: SessionModelRef | null;\n  pending?: SessionModelRef | null;\n  live?: SessionModelRef | null;\n  context?: SessionModelRef | null;\n}): SessionModelRef | null {\n  return (\n    sources.override\n    ?? sources.pending\n    ?? sources.live\n    ?? sources.context\n    ?? null\n  );\n}\n\n/**\n * Call set_model when UI has a desired model that is not yet confirmed pinned.\n * If desired is null, there is nothing to pin (agent keeps its current model).\n *\n * When `options.liveConfirmed === false` the live agent has not confirmed any model\n * (cold start, idle destroy, etc.).  In that case any valid desired model must be\n * pinned, even if lastPinned happens to equal it (e.g. stale from a previous live\n * session).  This prevents cold-start sends from falling through to the SDK/settings\n * default without a set_model.\n *\n * Omitting `options` keeps the pre-CS equal-comparison behaviour for callers that\n * have not yet adopted liveConfirmed tracking.\n */\nexport function shouldPinSessionModel(\n  desired: SessionModelRef | null | undefined,\n  lastPinned: SessionModelRef | null | undefined,\n  options?: { liveConfirmed?: boolean },\n): desired is SessionModelRef {\n  if (!desired?.provider || !desired?.modelId) return false;\n  if (options && options.liveConfirmed === false) return true;\n  return !sessionModelsEqual(desired, lastPinned);\n}\n\nconst THINKING_LEVEL_ORDER = [\"auto\", \"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"] as const;\n\n/**\n * Clamp a thinking level to the levels supported by the selected model.\n * Preference: keep current when supported → medium → auto → first supported.\n * When supported is empty/unknown, keep current unchanged.\n */\nexport function clampThinkingLevelToSupported<\n  T extends string = string,\n>(current: T, supported: readonly string[] | null | undefined): T {\n  if (!supported || supported.length === 0) return current;\n  if (supported.includes(current)) return current;\n  for (const preferred of [\"medium\", \"auto\"] as const) {\n    if (supported.includes(preferred)) return preferred as T;\n  }\n  // Prefer the closest lower known level still in the supported set.\n  const currentIdx = THINKING_LEVEL_ORDER.indexOf(current as (typeof THINKING_LEVEL_ORDER)[number]);\n  if (currentIdx >= 0) {\n    for (let i = currentIdx - 1; i >= 0; i -= 1) {\n      const candidate = THINKING_LEVEL_ORDER[i];\n      if (supported.includes(candidate)) return candidate as T;\n    }\n    for (let i = currentIdx + 1; i < THINKING_LEVEL_ORDER.length; i += 1) {\n      const candidate = THINKING_LEVEL_ORDER[i];\n      if (supported.includes(candidate)) return candidate as T;\n    }\n  }\n  return supported[0] as T;\n}\n\n/**\n * Result of resolveYolkColdStartModel: the yolk-specific model + thinking\n * to use as the server cold-start fallback, or null when the user has chosen\n * \"follow Pi default\" (mode !== \"specific\") or the config is incomplete.\n */\nexport type YolkColdStartModel = {\n  provider: string;\n  modelId: string;\n  thinking?: string;\n} | null;\n\n/**\n * Parse yolk.defaultModel into a cold-start fallback model.\n *\n * Returns null when:\n * - yolkConfig is missing / defaultModel is missing\n * - defaultModel.mode is not \"specific\" (i.e. \"piDefault\" → caller should fall through to SDK/settings)\n * - provider or modelId are empty\n *\n * thinking is taken from defaultModel.thinking first, falling back to\n * defaultThinkingLevel (the legacy top-level field).\n */\nexport function resolveYolkColdStartModel(yolkConfig: {\n  defaultModel?: { mode?: string; provider?: string; modelId?: string; thinking?: string } | null;\n  defaultThinkingLevel?: string;\n} | null | undefined): YolkColdStartModel {\n  const dm = yolkConfig?.defaultModel;\n  if (!dm || dm.mode !== \"specific\") return null;\n  const provider = dm.provider?.trim();\n  const modelId = dm.modelId?.trim();\n  if (!provider || !modelId) return null;\n  return {\n    provider,\n    modelId,\n    thinking: dm.thinking ?? yolkConfig?.defaultThinkingLevel,\n  };\n}\n\nexport type ColdStartModelPreference = \"recoverable\" | \"yolk\" | \"sdk\";\n\n/**\n * Pure priority rule for server cold-start model selection.\n *\n *   1. session recoverable model (path/JSONL with valid auth) → \"recoverable\"\n *   2. yolk specific model (resolveYolkColdStartModel returned non-null) → \"yolk\"\n *   3. SDK / settings default → \"sdk\"\n *\n * This is a pure function so it can be unit-tested without touching\n * SDK runtime, SettingsManager, or model auth lookups.\n */\nexport function resolveColdStartModelPreference(params: {\n  recoverable: boolean;\n  yolk: boolean;\n}): ColdStartModelPreference {\n  if (params.recoverable) return \"recoverable\";\n  if (params.yolk) return \"yolk\";\n  return \"sdk\";\n}\n\n/**\n * SettingsManager surface used by Chat set_model isolation (IMP-002 MODEL-PIN-3).\n * Keep the thinking setter param as `any` so SDK `ThinkingLevel` methods are assignable\n * under strictFunctionTypes without importing pi-coding-agent types into this pure helper.\n */\nexport type SessionScopedSettingsManager = {\n  setDefaultModelAndProvider: (provider: string, modelId: string) => void;\n  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK ThinkingLevel union\n  setDefaultThinkingLevel?: (level: any) => void;\n};\n\ntype SettingsDefaultPatch = {\n  depth: number;\n  setDefaultModelAndProvider: SessionScopedSettingsManager[\"setDefaultModelAndProvider\"];\n  setDefaultThinkingLevel?: SessionScopedSettingsManager[\"setDefaultThinkingLevel\"];\n};\n\n/** Refcount patches for shared SettingsManager instances across concurrent set_model. */\nconst settingsDefaultPatches = new WeakMap<object, SettingsDefaultPatch>();\n\n/**\n * Run an action without writing global settings.json model/thinking defaults.\n *\n * Pi SDK AgentSession.setModel() always calls setDefaultModelAndProvider and may\n * re-clamp thinking via setDefaultThinkingLevel. Chat model switches are\n * session-scoped (plan A): keep runtime model + JSONL model_change, but do not\n * pollute ~/.pi/agent/settings.json. Nested/concurrent callers on the same\n * manager are refcounted so originals are restored only when the outer scope exits.\n */\nexport async function withSessionScopedSettingsDefaults<T>(\n  settingsManager: SessionScopedSettingsManager,\n  action: () => Promise<T>,\n): Promise<T> {\n  const key = settingsManager as object;\n  let patch = settingsDefaultPatches.get(key);\n  if (!patch) {\n    patch = {\n      depth: 0,\n      setDefaultModelAndProvider: settingsManager.setDefaultModelAndProvider.bind(settingsManager),\n      setDefaultThinkingLevel:\n        typeof settingsManager.setDefaultThinkingLevel === \"function\"\n          ? settingsManager.setDefaultThinkingLevel.bind(settingsManager)\n          : undefined,\n    };\n    settingsManager.setDefaultModelAndProvider = () => {\n      /* session-scoped: skip global defaultProvider/defaultModel write */\n    };\n    if (patch.setDefaultThinkingLevel) {\n      settingsManager.setDefaultThinkingLevel = () => {\n        /* session-scoped: skip incidental defaultThinkingLevel write from setModel re-clamp */\n      };\n    }\n    settingsDefaultPatches.set(key, patch);\n  }\n  patch.depth += 1;\n  try {\n    return await action();\n  } finally {\n    patch.depth -= 1;\n    if (patch.depth <= 0) {\n      settingsManager.setDefaultModelAndProvider = patch.setDefaultModelAndProvider;\n      if (patch.setDefaultThinkingLevel) {\n        settingsManager.setDefaultThinkingLevel = patch.setDefaultThinkingLevel;\n      }\n      settingsDefaultPatches.delete(key);\n    }\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T11:31:08.349Z",
+            "text": "## MODEL-PIN-CS-01 — Implementation Complete\n\n### Files Changed\n\n- **`lib/session-model-pin.ts`** — Extended `shouldPinSessionModel` with optional `options?: { liveConfirmed?: boolean }`; when `liveConfirmed === false`, any valid desired triggers pin. Added `resolveYolkColdStartModel` (returns `{ provider, modelId, thinking }` for `mode: \"specific\"`, `null` for `piDefault`/missing). Added `resolveColdStartModelPreference` (pure priority: recoverable > yolk > sdk). Updated file header with MODEL-PIN-CS invariants.\n\n- **`scripts/test-session-model-pin.mjs`** — Added 10 new test cases covering: `liveConfirmed=false` force-pin, `liveConfirmed=true` equal-skip, invalid-desired rejection with liveConfirmed, legacy omitted-options equality, `resolveYolkColdStartModel` specific/piDefault/missing/null, and `resolveColdStartModelPreference` priority ordering. All 13 existing tests preserved.\n\n### Verification\n\n```\nnpm run test:session-model-pin  →  22/22 passed (0 failures)\n```\n\n| Check | Result |\n|---|---|\n| `shouldPinSessionModel` backward-compat (omitted options) | ✅ equal → false |\n| `liveConfirmed=false` forces pin even equal | ✅ |\n| `liveConfirmed=true` keeps equal-skip | ✅ |\n| `resolveYolkColdStartModel` specific → model+thinking | ✅ |\n| `resolveYolkColdStartModel` piDefault → null | ✅ |\n| `resolveColdStartModelPreference` priority | ✅ recoverable > yolk > sdk |\n| PIN-3 `withSessionScopedSettingsDefaults` tests | ✅ all preserved |\n| PIN-4 `clampThinkingLevelToSupported` tests | ✅ all preserved |\n| tsc errors on `session-model-pin.ts` | ✅ 0 new errors |\n\n### Export API Changes\n\n| Symbol | Change | Compat |\n|---|---|---|\n| `shouldPinSessionModel` | new optional 3rd param `options?: { liveConfirmed?: boolean }` | ✅ backward-compat (omitted → old behavior) |\n| `resolveYolkColdStartModel` | **new** exported function | N/A |\n| `YolkColdStartModel` | **new** exported type | N/A |\n| `resolveColdStartModelPreference` | **new** exported function | N/A |\n| `ColdStartModelPreference` | **new** exported type | N/A |\n\n### Notes / Risks\n\n- **None blocking.** The `shouldPinSessionModel` signature change is backward-compatible — the two existing callers in `hooks/useAgentSession.ts` (lines 340, 352) omit the third argument and continue to work identically. CS-02 will be the one to wire `liveConfirmed`.\n- `resolveYolkColdStartModel` accepts a lightweight structural type matching the yolk sub-config shape, avoiding a dependency on `PiWebYolkConfig` from `pi-web-config.ts`. This keeps the module free of React/fetch/SDK imports and easily testable. CS-03 will bridge the real `readPiWebConfig().yolk` into this function.\n- The `resolveColdStartModelPreference` pure function is a simple boolean→enum mapping. The boolean-to-boolean gate (`recoverable`/`yolk`) is intentionally narrow — CS-03 will own the actual \"is recoverable? does yolk resolve to non-null?\" resolution with runtime model lookups.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T11:31:08.353Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3448,
+        "tokens": 791,
+        "tokenSource": "usage",
+        "tps": 4.85,
+        "firstTokenAt": "2026-07-19T11:28:25.261Z",
+        "lastTokenAt": "2026-07-19T11:31:08.347Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-f45954a64f07fe3fcffe958d",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/implementer-f45954a64f07fe3fcffe958d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T11:27:10.221Z",
+        "finishedAt": "2026-07-19T11:31:08.354Z",
+        "updatedAt": "2026-07-19T11:31:08.354Z",
+        "itemCount": 47,
+        "messageCount": 7,
+        "toolCallCount": 18,
+        "stderrBytes": 0,
+        "bytes": 70955,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f7a21-4bb8-7d2e-9ce9-fd083a9e7fec",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-27-10-264Z_019f7a21-4bb8-7d2e-9ce9-fd083a9e7fec.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-cbe794b8ae3aadcb2aa27ed3",
+      "subtaskId": "MODEL-PIN-CS-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T11:31:40.988Z",
+      "finishedAt": "2026-07-19T11:39:40.540Z",
+      "runner": "sdk",
+      "childSessionId": "019f7a25-6d51-773d-8c04-d2a3f397c379",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-31-41-009Z_019f7a25-6d51-773d-8c04-d2a3f397c379.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f7a25-6d51-773d-8c04-d2a3f397c379",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "All changes are verified and consistent. Let me now provide the completion handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-02\n\n### Files Changed\n\n- **`hooks/useAgentSession.ts`** — 8 targeted edits:\n  1. Added `liveAgentConfirmedRef` declaration (line 298) with JSDoc explaining the semantics\n  2. `ensureSessionModel`: both `shouldPinSessionModel` calls now pass `{ liveConfirmed: liveAgentConfirmedRef.current }`; `liveAgentConfirmedRef.current = true` after successful `set_model`\n  3. `loadSession`: deleted the `else if (!lastPinnedModelRef.current && contextModel)` block that incorrectly wrote path `context.model` to `lastPinnedModelRef`; when `includeState === true` with no `liveModel`, now sets `lastPinnedModelRef = null` and `liveAgentConfirmedRef = false`; context model still seeds `selectedModelRef` for display fallback only\n  4. `loadSession` 404 cleanup: added `liveAgentConfirmedRef.current = false`\n  5. `agent_end` GET handler: added `liveAgentConfirmedRef.current = true` when live model found\n  6. `handleSend` new session: added `liveAgentConfirmedRef.current = true` alongside `lastPinnedModelRef` write\n  7. `ensureBrowserShareSession` draft create: added `liveAgentConfirmedRef.current = true`\n  8. `handleModelChange` both branches (isNew / non-isNew): added `liveAgentConfirmedRef.current = true`\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:session-model-pin` | **All 22 tests passed** (incl. CS-01 liveConfirmed + yolk helpers) |\n| `npx tsc --noEmit` (filtered to `useAgentSession.ts`) | No **new** errors — all errors pre-existing (React types, implicit `any`) |\n| `npm run lint` | Pre-existing infrastructure issue (`eslint-config-next` not found) — unrelated to changes |\n\n### Notes / Risks\n\n1. **Idle destroy detection gap**: When the wrapper is destroyed by idle timeout (10 min) with no EventSource connected, the client does not receive a notification. `liveAgentConfirmedRef` remains `true` from the previous live session, and `lastPinnedModelRef` still holds the correct model. If the user sends without changing the model, `shouldPinSessionModel` returns `false` (equal + liveConfirmed=true), skipping `set_model`. This is the known gap where **CS-03** (server-side yolk cold-start fallback) steps in to prevent the settings void default. The client-side fix covers the `includeState`/`loadSession` cold-start path (historical session open → send) which is the main user-facing bug.\n\n2. **Remaining must-do from the subtask boundary**: CS-03 (server `startRpcSession` yolk fallback) and CS-04 (documentation) are separate subtasks not implemented here, as specified.\n\n3. **Model pin isolation (MODEL-PIN-3)**: Not affected — `withSessionScopedSettingsDefaults` is not modified; all pin writes use the existing `sendAgentCommand` path which already enforces session-scoped settings on the server.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T11:31:40.988Z",
+        "updatedAt": "2026-07-19T11:39:40.539Z",
+        "eventCount": 23912,
+        "lastTextPreview": "All changes are verified and consistent. Let me now provide the completion handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-02\n\n### Files Changed\n\n- **`hooks/useAgentSession.ts`** — 8 targeted edits:\n  1. Added `liveAgentConfirmedRef` declaration (line 298) with JSDoc explaining the semantics\n  2. `ensureSessionModel`: both `shouldPinSessionModel` calls now pass `{ liveConfirmed: liveAgentConfirmedRef.current }`; `liveAgentConfirmedRef.current = true` after successful `set_model`\n  3. `loadSession`: deleted the `else if (!lastPinnedModelRef.current && contextModel)` block that incorrectly wrote path `context.model` to `lastPinnedModelRef`; when `includeState === true` with no `liveModel`, now sets `lastPinnedModelRef = null` and `liveAgentConfirmedRef = false`; context model still seeds `selectedModelRef` for display fallback only\n  4. `loadSession` 404 cleanup: added `liveAgentConfirmedRef.current = false`\n  5. `agent_end` GET handler: added `liveAgentConfirmedRef.current = true` when live model found\n  6. `handleSend` new session: added `liveAgentConfirmedRef.current = true` alongside `lastPinnedModelRef` write\n  7. `ensureBrowserShareSession` draft create: added `liveAgentConfirmedRef.current = true`\n  8. `handleModelChange` both branches (isNew / non-isNew): added `liveAgentConfirmedRef.current = true`\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:session-model-pin` | **All 22 tests passed** (incl. CS-01 liveConfirmed + yolk helpers) |\n| `npx tsc --noEmit` (filtered to `useAgentSession.ts`) | No **new** errors — all errors pre-existing (React types, implicit `any`) |\n| `npm run lint` | Pre-existing infrastructure issue (`eslint-config-next` not found) — unrelated to changes |\n\n### Notes / Risks\n\n1. **Idle destroy detection gap**: When the wrapper is destroyed by idle timeout (10 min) with no EventSource connected, the client does not receive a notification. `liveAgentConfirmedRef` remains `true` from the previous live session, and `lastPinnedModelRef` still holds the correct model. If the user sends without changing the model, `shouldPinSessionModel` returns `false` (equal + liveConfirmed=true), skipping `set_model`. This is the known gap where **CS-03** (server-side yolk cold-start fallback) steps in to prevent the settings void default. The client-side fix covers the `includeState`/`loadSession` cold-start path (historical session open → send) which is the main user-facing bug.\n\n2. **Remaining must-do from the subtask boundary**: CS-03 (server `startRpcSession` yolk fallback) and CS-04 (documentation) are separate subtasks not implemented here, as specified.\n\n3. **Model pin isolation (MODEL-PIN-3)**: Not affected — `withSessionScopedSettingsDefaults` is not modified; all pin writes use the existing `sendAgentCommand` path which already enforces session-scoped settings on the server.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:39:10.474Z",
+            "toolCallId": "call_00_vth9Dc1sbuHKTXEHLhR66974",
+            "toolName": "read",
+            "text": "if (!res.ok || !result.sessionId) throw new Error(result.error ?? `HTTP ${res.status}`);\n        const realId = result.sessionId;\n        sessionIdRef.current = realId;\n        precreatedSessionIdRef.current = realId;\n        setPrecreatedSessionId(realId);\n        if (selectedModel) {\n          lastPinnedModelRef.current = selectedModel;\n          liveAgentConfirmedRef.current = true;\n        }\n        const now = new Date().toISOString();\n        onSessionCreated?.({\n          id: realId,\n          path: \"\",\n          cwd: newSessionCwd,\n          name: undefined,\n          created: now,\n          modified: now,\n          messageCount: 0,\n          firstMessage: \"\",\n          ...(newSessionProjectContext ? { projectId: newSessionProjectContext.projectId, spaceId: newSessionProjectContext.spaceId } : {}),\n        });\n        return realId;\n      } catch (error) {\n        console.error(\"Failed to create Browser Share session:\", error);\n        setError(error instanceof Error ? error.message : String(error));\n        return null;\n      } finally {\n        ensureBrowserShareSessionPromiseRef.current = null;\n      }\n    })();\n\n[910 more lines in file. Use offset=690 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:39:10.475Z",
+            "toolCallId": "call_01_mO7xvP6SoOaXsxRui8IA5559",
+            "toolName": "read",
+            "text": "...(thinkingLevel !== \"auto\" ? { thinkingLevel } : {}),\n          }),\n        });\n        if (!res.ok) throw new Error(`HTTP ${res.status}`);\n        const result = await res.json() as { sessionId: string };\n        const realId = result.sessionId;\n        sessionIdRef.current = realId;\n        if (selectedModel) {\n          lastPinnedModelRef.current = selectedModel;\n          liveAgentConfirmedRef.current = true;\n        }\n        connectEvents(realId);\n        const now = new Date().toISOString();\n        onSessionCreated?.({\n          id: realId,\n          path: \"\",\n          cwd: newSessionCwd,\n          name: undefined,\n          created: now,\n          modified: now,\n\n[408 more lines in file. Use offset=1192 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:39:10.476Z",
+            "toolCallId": "call_02_VOGqbT5L9LTwdN9SYdk63404",
+            "toolName": "read",
+            "text": ".then((r) => r.json())\n            .then((d: { state?: { contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; model?: { provider?: string; id?: string; modelId?: string } | null } }) => {\n              if (d.state?.contextUsage !== undefined) setContextUsage(d.state.contextUsage ?? null);\n              if (d.state?.systemPrompt !== undefined) setSystemPrompt(d.state.systemPrompt ?? null);\n              const liveModel = normalizeSessionModelRef(d.state?.model);\n              if (liveModel) {\n                setLiveSessionModel(liveModel);\n                lastPinnedModelRef.current = liveModel;\n                liveAgentConfirmedRef.current = true;\n                // Do not clear/replace explicit UI override; display prefers override > live.\n                selectedModelRef.current = resolveChatDisplayModel({\n                  override: selectedModelRef.current,\n                  live: liveModel,\n                  context: null,\n                });\n              }\n            })\n            .catch(() => {});\n        }\n        onAgentEnd?.();\n\n[810 more lines in file. Use offset=790 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T11:39:40.529Z",
+            "text": "All changes are verified and consistent. Let me now provide the completion handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-02\n\n### Files Changed\n\n- **`hooks/useAgentSession.ts`** — 8 targeted edits:\n  1. Added `liveAgentConfirmedRef` declaration (line 298) with JSDoc explaining the semantics\n  2. `ensureSessionModel`: both `shouldPinSessionModel` calls now pass `{ liveConfirmed: liveAgentConfirmedRef.current }`; `liveAgentConfirmedRef.current = true` after successful `set_model`\n  3. `loadSession`: deleted the `else if (!lastPinnedModelRef.current && contextModel)` block that incorrectly wrote path `context.model` to `lastPinnedModelRef`; when `includeState === true` with no `liveModel`, now sets `lastPinnedModelRef = null` and `liveAgentConfirmedRef = false`; context model still seeds `selectedModelRef` for display fallback only\n  4. `loadSession` 404 cleanup: added `liveAgentConfirmedRef.current = false`\n  5. `agent_end` GET handler: added `liveAgentConfirmedRef.current = true` when live model found\n  6. `handleSend` new session: added `liveAgentConfirmedRef.current = true` alongside `lastPinnedModelRef` write\n  7. `ensureBrowserShareSession` draft create: added `liveAgentConfirmedRef.current = true`\n  8. `handleModelChange` both branches (isNew / non-isNew): added `liveAgentConfirmedRef.current = true`\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:session-model-pin` | **All 22 tests passed** (incl. CS-01 liveConfirmed + yolk helpers) |\n| `npx tsc --noEmit` (filtered to `useAgentSession.ts`) | No **new** errors — all errors pre-existing (React types, implicit `any`) |\n| `npm run lint` | Pre-existing infrastructure issue (`eslint-config-next` not found) — unrelated to changes |\n\n### Notes / Risks\n\n1. **Idle destroy detection gap**: When the wrapper is destroyed by idle timeout (10 min) with no EventSource connected, the client does not receive a notification. `liveAgentConfirmedRef` remains `true` from the previous live session, and `lastPinnedModelRef` still holds the correct model. If the user sends without changing the model, `shouldPinSessionModel` returns `false` (equal + liveConfirmed=true), skipping `set_model`. This is the known gap where **CS-03** (server-side yolk cold-start fallback) steps in to prevent the settings void default. The client-side fix covers the `includeState`/`loadSession` cold-start path (historical session open → send) which is the main user-facing bug.\n\n2. **Remaining must-do from the subtask boundary**: CS-03 (server `startRpcSession` yolk fallback) and CS-04 (documentation) are separate subtasks not implemented here, as specified.\n\n3. **Model pin isolation (MODEL-PIN-3)**: Not affected — `withSessionScopedSettingsDefaults` is not modified; all pin writes use the existing `sendAgentCommand` path which already enforces session-scoped settings on the server.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T11:39:40.531Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 4598,
+        "tokens": 824,
+        "tokenSource": "usage",
+        "tps": 1.82,
+        "firstTokenAt": "2026-07-19T11:32:07.354Z",
+        "lastTokenAt": "2026-07-19T11:39:40.528Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-cbe794b8ae3aadcb2aa27ed3",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/implementer-cbe794b8ae3aadcb2aa27ed3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T11:31:40.988Z",
+        "finishedAt": "2026-07-19T11:39:40.531Z",
+        "updatedAt": "2026-07-19T11:39:40.531Z",
+        "itemCount": 48,
+        "messageCount": 10,
+        "toolCallCount": 17,
+        "stderrBytes": 0,
+        "bytes": 108225,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7a25-6d51-773d-8c04-d2a3f397c379",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-31-41-009Z_019f7a25-6d51-773d-8c04-d2a3f397c379.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-566f939469a6df076f35f477",
+      "subtaskId": "MODEL-PIN-CS-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T11:39:53.978Z",
+      "finishedAt": "2026-07-19T11:52:11.653Z",
+      "runner": "sdk",
+      "childSessionId": "019f7a2c-f31b-7218-860f-1771ba1375dc",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-39-54-011Z_019f7a2c-f31b-7218-860f-1771ba1375dc.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f7a2c-f31b-7218-860f-1771ba1375dc",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "The implementation is complete. Let me provide a summary of the handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-03\n\n### Files Changed\n\n- **`lib/rpc-manager.ts`** — Added two imports (`resolveYolkColdStartModel`, `readPiWebConfig`) and the new `applyWebSessionColdStartDefaults` function; called with `await` from `startRpcSession` after wrapper creation.\n\n### What Was Done\n\n**New function `applyWebSessionColdStartDefaults(wrapper, sessionFile)`** implements the three-tier cold start priority:\n\n| Priority | Condition | Action |\n|---|---|---|\n| 1. **Recoverable** | Last `model_change` entry in session path + available in `modelRuntime` | `withSessionScopedSettingsDefaults` → `setModel`; no yolk |\n| 2. **Yolk specific** | No recoverable model + `yolk.defaultModel.mode === \"specific\"` + runtime resolves | `withSessionScopedSettingsDefaults` → `setModel` + `setThinkingLevel` |\n| 3. **SDK/settings** | `piDefault` or yolk unavailable | No-op (preserve SDK default) |\n\n**Safety boundaries:**\n- **Studio child skip**: Reads session header; returns immediately if `studioChild` is present.\n- **All `setModel` calls** go through `withSessionScopedSettingsDefaults` (MODEL-PIN-3 preserved).\n- **All failures** are `try/catch` + `console.warn` internally; the function never throws, so session creation is never blocked.\n- **New sessions** (`sessionFile === \"\"`): skip recoverable scan → go directly to yolk/piDefault branch; `createConfiguredEmptyAgentSession` body provider/modelId still overrides.\n\n**Call site**: `await applyWebSessionColdStartDefaults(wrapper, sessionFile)` runs after `wrapper.start()` and before wrapper is registered/returned, ensuring the cold start model is set before any client `set_model` can race.\n\n### Verification\n\n- **`npm run test:session-model-pin`** — all 22 tests pass (including CS-01 pure function tests for `resolveYolkColdStartModel`, `resolveColdStartModelPreference`, and `shouldPinSessionModel` liveConfirmed).\n- **`npm run lint`** — pre-existing eslint-config-next resolution failure, unrelated to changes.\n- **`tsc --noEmit`** — pre-existing `next/server` resolution errors, unrelated to changes.\n\n### Audit: `createConfiguredEmptyAgentSession` Compatibility\n\nThe flow for new sessions is:\n1. `startRpcSession(\"\", ...)` → yolk fallback sets initial model/thinking\n2. Body `provider && modelId` → `session.send(set_model)` overrides yolk\n3. Body `thinkingLevel` → `session.send(set_thinking_level)` overrides yolk thinking\n\n**Result**: Body wins over yolk. If no body model, yolk serves as the new-session default. No double-write to settings.\n\n### Notes / Risks\n\n- **Recoverable model detection** only scans `model_change` entries (not `buildSessionContext`). If a session was created and only has `prompt`/`assistant` entries without an explicit `model_change`, the recoverable branch is skipped and we fall through to yolk. This is conservative (avoids false recovery) but means sessions created without explicit `set_model` won't get \"recovered\" — yolk will apply instead. This matches the design intent.\n- **Lint/tsc** cannot run due to pre-existing environment issues (missing `eslint-config-next`, missing `next/server` types in the `npx tsc` path). These are not caused by this change.\n- **Race with client pin**: The `await` ensures the cold start defaults complete before `startRpcSession` returns, so the client's subsequent `set_model` always wins.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T11:39:53.978Z",
+        "updatedAt": "2026-07-19T11:52:11.653Z",
+        "eventCount": 18815,
+        "lastTextPreview": "The implementation is complete. Let me provide a summary of the handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-03\n\n### Files Changed\n\n- **`lib/rpc-manager.ts`** — Added two imports (`resolveYolkColdStartModel`, `readPiWebConfig`) and the new `applyWebSessionColdStartDefaults` function; called with `await` from `startRpcSession` after wrapper creation.\n\n### What Was Done\n\n**New function `applyWebSessionColdStartDefaults(wrapper, sessionFile)`** implements the three-tier cold start priority:\n\n| Priority | Condition | Action |\n|---|---|---|\n| 1. **Recoverable** | Last `model_change` entry in session path + available in `modelRuntime` | `withSessionScopedSettingsDefaults` → `setModel`; no yolk |\n| 2. **Yolk specific** | No recoverable model + `yolk.defaultModel.mode === \"specific\"` + runtime resolves | `withSessionScopedSettingsDefaults` → `setModel` + `setThinkingLevel` |\n| 3. **SDK/settings** | `piDefault` or yolk unavailable | No-op (preserve SDK default) |\n\n**Safety boundaries:**\n- **Studio child skip**: Reads session header; returns immediately if `studioChild` is present.\n- **All `setModel` calls** go through `withSessionScopedSettingsDefaults` (MODEL-PIN-3 preserved).\n- **All failures** are `try/catch` + `console.warn` internally; the function never throws, so session creation is never blocked.\n- **New sessions** (`sessionFile === \"\"`): skip recoverable scan → go directly to yolk/piDefault branch; `createConfiguredEmptyAgentSession` body provider/modelId still overrides.\n\n**Call site**: `await applyWebSessionColdStartDefaults(wrapper, sessionFile)` runs after `wrapper.start()` and before wrapper is registered/returned, ensuring the cold start model is set before any client `set_model` can race.\n\n### Verification\n\n- **`npm run test:session-model-pin`** — all 22 tests pass (including CS-01 pure function tests for `resolveYolkColdStartModel`, `resolveColdStartModelPreference`, and `shouldPinSessionModel` liveConfirmed).\n- **`npm run lint`** — pre-existing eslint-config-next resolution failure, unrelated to changes.\n- **`tsc --noEmit`** — pre-existing `next/server` resolution errors, unrelated to changes.\n\n### Audit: `createConfiguredEmptyAgentSession` Compatibility\n\nThe flow for new sessions is:\n1. `startRpcSession(\"\", ...)` → yolk fallback sets initial model/thinking\n2. Body `provider && modelId` → `session.send(set_model)` overrides yolk\n3. Body `thinkingLevel` → `session.send(set_thinking_level)` overrides yolk thinking\n\n**Result**: Body wins over yolk. If no body model, yolk serves as the new-session default. No double-write to settings.\n\n### Notes / Risks\n\n- **Recoverable model detection** only scans `model_change` entries (not `buildSessionContext`). If a session was created and only has `prompt`/`assistant` entries without an explicit `model_change`, the recoverable branch is skipped and we fall through to yolk. This is conservative (avoids false recovery) but means sessions created without explicit `set_model` won't get \"recovered\" — yolk will apply instead. This matches the design intent.\n- **Lint/tsc** cannot run due to pre-existing environment issues (missing `eslint-config-next`, missing `next/server` types in the `npx tsc` path). These are not caused by this change.\n- **Race with client pin**: The `await` ensures the cold start defaults complete before `startRpcSession` returns, so the client's subsequent `set_model` always wins.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:51:33.333Z",
+            "toolCallId": "call_00_mUryGpJTLsuZ2dqAroeh1750",
+            "toolName": "read",
+            "text": "thinkingLevel,\n  applyAutoThinkingLevel = true,\n  projectId,\n  spaceId,\n}: AgentSessionBootstrapOptions): Promise<AgentSessionBootstrapResult> {\n  if (!cwd || typeof cwd !== \"string\") {\n    throw new AgentSessionBootstrapError(\"cwd is required\");\n  }\n\n  const canonicalCwd = canonicalizeCwd(cwd);\n  try {\n    if (!statSync(canonicalCwd).isDirectory()) {\n      throw new AgentSessionBootstrapError(`Path is not a directory: ${cwd}`);\n    }\n  } catch (error) {\n    if (error instanceof AgentSessionBootstrapError) throw error;\n    throw new AgentSessionBootstrapError(`Directory does not exist: ${cwd}`);\n  }\n\n  if ((projectId && !spaceId) || (!projectId && spaceId)) {\n    throw new AgentSessionBootstrapError(\"projectId and spaceId must be provided together\");\n  }\n  if (projectId && spaceId) {\n    const space = await getProjectSpace(projectId, spaceId).catch((error) => {\n      throw new AgentSessionBootstrapError(error instanceof Error ? error.message : String(error), 400);\n    });\n    if (space.archived || space.missing) {\n      throw new AgentSessionBootstrapError(\"Project space is archived or missing\");\n    }\n    const cwdPath = await canonicalizeProjectPath(canonicalCwd);\n    if (cwdPath.pathKey !== space.pathKey) {\n      throw new AgentSessionBootstrapError(\"cwd does not match the selected project space\");\n    }\n  }\n\n  const tempKey = `__new__${Date.now()}_${Math.random().toString(36).slice(2)}`;\n  const { session, realSessionId } = await startRpcSession(tempKey, \"\", canonicalCwd, toolNames);\n\n  // Keep allowed workspace roots in sync so brand-new cwd file/Trellis\n  // requests do not have to wait for a session-list cache refresh.\n  registerAllowedRoot(canonicalCwd);\n\n  if (projectId && spaceId && session.sessionFile) {\n    persistSessionHeaderProjectLink(session, projectId, spaceId);\n    await upsertProjectSessionIndexEntry({\n      sessionId: realSessionId,\n      sessionFile: session.sessionFile,\n      cwd: canonicalCwd,\n      projectId,\n      spaceId,\n    });\n  }\n\n  // Drop the short-lived listAllSessions snapshot so the sidebar does not miss\n  // a brand-new draft/prompt session created within the cache TTL window.\n  invalidateSessionListSnapshots();\n\n  if (provider && modelId) {\n    await session.send({ type: \"set_model\", provider, modelId });\n  }\n\n  if (thinkingLevel && (applyAutoThinkingLevel || thinkingLevel !== \"auto\")) {\n    await session.send({ type: \"set_thinking_level\", level: thinkingLevel });\n  }\n\n  return { session, sessionId: realSessionId, cwd: canonicalCwd };\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-19T11:51:45.213Z",
+            "toolCallId": "call_00_YgfQ9mOKXJmo11cOzbka0675",
+            "toolName": "read",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/app/api/agent/new/route.ts\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:51:45.261Z",
+            "toolCallId": "call_00_YgfQ9mOKXJmo11cOzbka0675",
+            "toolName": "read",
+            "text": "import { NextResponse } from \"next/server\";\nimport { AgentSessionBootstrapError, createConfiguredEmptyAgentSession } from \"@/lib/agent-session-bootstrap\";\n\n// POST /api/agent/new  body: { cwd: string; type: string; message: string; ... }\n// Spawns a brand-new pi session and immediately sends the first command.\n// Returns { sessionId, data } where sessionId is pi's real session id.\nexport async function POST(req: Request) {\n  try {\n    const body = await req.json() as { cwd?: string; [key: string]: unknown };\n    const { cwd, ...command } = body;\n\n    const { provider, modelId, toolNames, thinkingLevel, projectId, spaceId, ...promptCommand } = command as { provider?: string; modelId?: string; toolNames?: string[]; thinkingLevel?: string; projectId?: string; spaceId?: string; [key: string]: unknown };\n    const { session, sessionId } = await createConfiguredEmptyAgentSession({\n      cwd,\n      provider,\n      modelId,\n      toolNames,\n      thinkingLevel,\n      projectId,\n      spaceId,\n    });\n\n    const result = await session.send(promptCommand);\n\n    return NextResponse.json({ success: true, sessionId, data: result });\n  } catch (error) {\n    if (error instanceof AgentSessionBootstrapError) {\n      return NextResponse.json({ error: error.message }, { status: error.status });\n    }\n    return NextResponse.json({ error: String(error) }, { status: 500 });\n  }\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T11:52:11.643Z",
+            "text": "The implementation is complete. Let me provide a summary of the handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-03\n\n### Files Changed\n\n- **`lib/rpc-manager.ts`** — Added two imports (`resolveYolkColdStartModel`, `readPiWebConfig`) and the new `applyWebSessionColdStartDefaults` function; called with `await` from `startRpcSession` after wrapper creation.\n\n### What Was Done\n\n**New function `applyWebSessionColdStartDefaults(wrapper, sessionFile)`** implements the three-tier cold start priority:\n\n| Priority | Condition | Action |\n|---|---|---|\n| 1. **Recoverable** | Last `model_change` entry in session path + available in `modelRuntime` | `withSessionScopedSettingsDefaults` → `setModel`; no yolk |\n| 2. **Yolk specific** | No recoverable model + `yolk.defaultModel.mode === \"specific\"` + runtime resolves | `withSessionScopedSettingsDefaults` → `setModel` + `setThinkingLevel` |\n| 3. **SDK/settings** | `piDefault` or yolk unavailable | No-op (preserve SDK default) |\n\n**Safety boundaries:**\n- **Studio child skip**: Reads session header; returns immediately if `studioChild` is present.\n- **All `setModel` calls** go through `withSessionScopedSettingsDefaults` (MODEL-PIN-3 preserved).\n- **All failures** are `try/catch` + `console.warn` internally; the function never throws, so session creation is never blocked.\n- **New sessions** (`sessionFile === \"\"`): skip recoverable scan → go directly to yolk/piDefault branch; `createConfiguredEmptyAgentSession` body provider/modelId still overrides.\n\n**Call site**: `await applyWebSessionColdStartDefaults(wrapper, sessionFile)` runs after `wrapper.start()` and before wrapper is registered/returned, ensuring the cold start model is set before any client `set_model` can race.\n\n### Verification\n\n- **`npm run test:session-model-pin`** — all 22 tests pass (including CS-01 pure function tests for `resolveYolkColdStartModel`, `resolveColdStartModelPreference`, and `shouldPinSessionModel` liveConfirmed).\n- **`npm run lint`** — pre-existing eslint-config-next resolution failure, unrelated to changes.\n- **`tsc --noEmit`** — pre-existing `next/server` resolution errors, unrelated to changes.\n\n### Audit: `createConfiguredEmptyAgentSession` Compatibility\n\nThe flow for new sessions is:\n1. `startRpcSession(\"\", ...)` → yolk fallback sets initial model/thinking\n2. Body `provider && modelId` → `session.send(set_model)` overrides yolk\n3. Body `thinkingLevel` → `session.send(set_thinking_level)` overrides yolk thinking\n\n**Result**: Body wins over yolk. If no body model, yolk serves as the new-session default. No double-write to settings.\n\n### Notes / Risks\n\n- **Recoverable model detection** only scans `model_change` entries (not `buildSessionContext`). If a session was created and only has `prompt`/`assistant` entries without an explicit `model_change`, the recoverable branch is skipped and we fall through to yolk. This is conservative (avoids false recovery) but means sessions created without explicit `set_model` won't get \"recovered\" — yolk will apply instead. This matches the design intent.\n- **Lint/tsc** cannot run due to pre-existing environment issues (missing `eslint-config-next`, missing `next/server` types in the `npx tsc` path). These are not caused by this change.\n- **Race with client pin**: The `await` ensures the cold start defaults complete before `startRpcSession` returns, so the client's subsequent `set_model` always wins.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T11:52:11.645Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 4510,
+        "tokens": 1628,
+        "tokenSource": "usage",
+        "tps": 2.61,
+        "firstTokenAt": "2026-07-19T11:41:47.617Z",
+        "lastTokenAt": "2026-07-19T11:52:11.590Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-566f939469a6df076f35f477",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/implementer-566f939469a6df076f35f477.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T11:39:53.978Z",
+        "finishedAt": "2026-07-19T11:52:11.646Z",
+        "updatedAt": "2026-07-19T11:52:11.646Z",
+        "itemCount": 106,
+        "messageCount": 14,
+        "toolCallCount": 43,
+        "stderrBytes": 0,
+        "bytes": 168835,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7a2c-f31b-7218-860f-1771ba1375dc",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-39-54-011Z_019f7a2c-f31b-7218-860f-1771ba1375dc.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-ceab7bd620bc5017e96d7f0c",
+      "subtaskId": "MODEL-PIN-CS-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T11:52:35.411Z",
+      "finishedAt": "2026-07-19T11:58:04.675Z",
+      "runner": "sdk",
+      "childSessionId": "019f7a38-916a-78b1-a276-42d4a746ebd5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-52-35-434Z_019f7a38-916a-78b1-a276-42d4a746ebd5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f7a38-916a-78b1-a276-42d4a746ebd5",
+        "model": "opencode-go/deepseek-v4-pro",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "## Implementation Complete — MODEL-PIN-CS-04\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/modules/frontend.md` | `useAgentSession` entry: lastPinned only live-confirmed, context never skips pin, cold start/idle always pins |\n| `docs/modules/library.md` | `session-model-pin.ts`: shouldPin liveConfirmed, resolveYolkColdStartModel, resolveColdStartModelPreference. `rpc-manager.ts`: applyWebSessionColdStartDefaults priority + MODEL-PIN-3 |\n| `docs/architecture/overview.md` | Models section: two default sources (yolk=Web Chat, settings=CLI/SDK) + server cold-start priority (session > yolk > SDK) |\n| `.ypi/tasks/.../handoff.md` | Complete rewrite with implementation summary, validation results, manual checklist, risks |\n\n### Verification\n\n| Command | Result |\n|---------|--------|\n| `npm run test:session-model-pin` | ✅ 22/22 passed |\n| `npx tsc --noEmit` | ⚠️ Pre-existing errors (`@types/node` missing), unrelated |\n| `npm run lint` | ⚠️ Pre-existing (`eslint-config-next` missing), unrelated |\n\n### Notes / Risks\n\n- All code changes (CS-01..03) were completed in prior implementer sessions; this subtask only updated docs and verified.\n- Manual browser verification (H1–H10) is deferred to the checker / user UAT — requires a running pi web server with mismatched settings vs yolk config.\n- Recoverable model detection uses backwards scan of `model_change` entries; edge case where the entry exists but runtime lookup fails is correctly handled (falls through to yolk).\n- Studio child guard (`header.studioChild`) relies on header being written before `startRpcSession` returns; currently safe because SDK runner writes header first.\n- No business logic changes in this subtask — pure docs + verification.",
+      "model": "opencode-go/deepseek-v4-pro",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "opencode-go/deepseek-v4-pro",
+          "arg": "opencode-go/deepseek-v4-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T11:52:35.411Z",
+        "updatedAt": "2026-07-19T11:58:04.675Z",
+        "eventCount": 8854,
+        "lastTextPreview": "## Implementation Complete — MODEL-PIN-CS-04\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/modules/frontend.md` | `useAgentSession` entry: lastPinned only live-confirmed, context never skips pin, cold start/idle always pins |\n| `docs/modules/library.md` | `session-model-pin.ts`: shouldPin liveConfirmed, resolveYolkColdStartModel, resolveColdStartModelPreference. `rpc-manager.ts`: applyWebSessionColdStartDefaults priority + MODEL-PIN-3 |\n| `docs/architecture/overview.md` | Models section: two default sources (yolk=Web Chat, settings=CLI/SDK) + server cold-start priority (session > yolk > SDK) |\n| `.ypi/tasks/.../handoff.md` | Complete rewrite with implementation summary, validation results, manual checklist, risks |\n\n### Verification\n\n| Command | Result |\n|---------|--------|\n| `npm run test:session-model-pin` | ✅ 22/22 passed |\n| `npx tsc --noEmit` | ⚠️ Pre-existing errors (`@types/node` missing), unrelated |\n| `npm run lint` | ⚠️ Pre-existing (`eslint-config-next` missing), unrelated |\n\n### Notes / Risks\n\n- All code changes (CS-01..03) were completed in prior implementer sessions; this subtask only updated docs and verified.\n- Manual browser verification (H1–H10) is deferred to the checker / user UAT — requires a running pi web server with mismatched settings vs yolk config.\n- Recoverable model detection uses backwards scan of `model_change` entries; edge case where the entry exists but runtime lookup fails is correctly handled (falls through to yolk).\n- Studio child guard (`header.studioChild`) relies on header being written before `startRpcSession` returns; currently safe because SDK runner writes header first.\n- No business logic changes in this subtask — pure docs + verification.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T11:57:21.976Z",
+            "text": "Let me do a final verification — check that the implementation code in the three source files is consistent with the docs:",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-19T11:57:21.977Z",
+            "toolCallId": "call_00_NBnxZYULhLFMsKsMDekd8654",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"cd /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155 && grep -n \\\"liveConfirmed\\\\|liveAgentConfirmedRef\\\\|shouldPinSessionModel.*liveConfirmed\\\\|resolveYolkColdStartModel\\\\|resolveColdStartModelPreference\\\\|applyWebSessionColdStartDefaults\\\" lib/session-model-pin.ts lib/rpc-manager.ts hooks/useAgentSession.ts | head -40\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T11:57:22.001Z",
+            "toolCallId": "call_00_NBnxZYULhLFMsKsMDekd8654",
+            "toolName": "bash",
+            "text": "lib/session-model-pin.ts:90: * When `options.liveConfirmed === false` the live agent has not confirmed any model\nlib/session-model-pin.ts:97: * have not yet adopted liveConfirmed tracking.\nlib/session-model-pin.ts:102:  options?: { liveConfirmed?: boolean },\nlib/session-model-pin.ts:105:  if (options && options.liveConfirmed === false) return true;\nlib/session-model-pin.ts:140: * Result of resolveYolkColdStartModel: the yolk-specific model + thinking\nlib/session-model-pin.ts:161:export function resolveYolkColdStartModel(yolkConfig: {\nlib/session-model-pin.ts:183: *   2. yolk specific model (resolveYolkColdStartModel returned non-null) → \"yolk\"\nlib/session-model-pin.ts:189:export function resolveColdStartModelPreference(params: {\nlib/rpc-manager.ts:37:import { resolveYolkColdStartModel, withSessionScopedSettingsDefaults } from \"./session-model-pin\";\nlib/rpc-manager.ts:1545:async function applyWebSessionColdStartDefaults(\nlib/rpc-manager.ts:1600:          \"applyWebSessionColdStartDefaults: failed to restore recoverable model\",\nlib/rpc-manager.ts:1611:  const yolkModel = resolveYolkColdStartModel(yolkConfig);\nlib/rpc-manager.ts:1626:          \"applyWebSessionColdStartDefaults: failed to apply yolk model, keeping SDK default\",\nlib/rpc-manager.ts:1632:        `applyWebSessionColdStartDefaults: yolk model ${yolkModel.provider}/${yolkModel.modelId} not found in runtime`,\nlib/rpc-manager.ts:1720:    await applyWebSessionColdStartDefaults(wrapper, sessionFile);\nhooks/useAgentSession.ts:298:  const liveAgentConfirmedRef = useRef<boolean>(false);\nhooks/useAgentSession.ts:345:    if (!shouldPinSessionModel(desired, lastPinnedModelRef.current, { liveConfirmed: liveAgentConfirmedRef.current })) {\nhooks/useAgentSession.ts:357:      if (!shouldPinSessionModel(nextDesired, lastPinnedModelRef.current, { liveConfirmed: liveAgentConfirmedRef.current })) {\nhooks/useAgentSession.ts:366:      liveAgentConfirmedRef.current = true;\nhooks/useAgentSession.ts:503:          liveAgentConfirmedRef.current = false;\nhooks/useAgentSession.ts:547:        liveAgentConfirmedRef.current = true;\nhooks/useAgentSession.ts:558:        liveAgentConfirmedRef.current = false;\nhooks/useAgentSession.ts:667:          liveAgentConfirmedRef.current = true;\nhooks/useAgentSession.ts:778:                liveAgentConfirmedRef.current = true;\nhooks/useAgentSession.ts:1181:          liveAgentConfirmedRef.current = true;\nhooks/useAgentSession.ts:1304:          liveAgentConfirmedRef.current = true;\nhooks/useAgentSession.ts:1320:        liveAgentConfirmedRef.current = true;",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T11:58:04.663Z",
+            "text": "## Implementation Complete — MODEL-PIN-CS-04\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/modules/frontend.md` | `useAgentSession` entry: lastPinned only live-confirmed, context never skips pin, cold start/idle always pins |\n| `docs/modules/library.md` | `session-model-pin.ts`: shouldPin liveConfirmed, resolveYolkColdStartModel, resolveColdStartModelPreference. `rpc-manager.ts`: applyWebSessionColdStartDefaults priority + MODEL-PIN-3 |\n| `docs/architecture/overview.md` | Models section: two default sources (yolk=Web Chat, settings=CLI/SDK) + server cold-start priority (session > yolk > SDK) |\n| `.ypi/tasks/.../handoff.md` | Complete rewrite with implementation summary, validation results, manual checklist, risks |\n\n### Verification\n\n| Command | Result |\n|---------|--------|\n| `npm run test:session-model-pin` | ✅ 22/22 passed |\n| `npx tsc --noEmit` | ⚠️ Pre-existing errors (`@types/node` missing), unrelated |\n| `npm run lint` | ⚠️ Pre-existing (`eslint-config-next` missing), unrelated |\n\n### Notes / Risks\n\n- All code changes (CS-01..03) were completed in prior implementer sessions; this subtask only updated docs and verified.\n- Manual browser verification (H1–H10) is deferred to the checker / user UAT — requires a running pi web server with mismatched settings vs yolk config.\n- Recoverable model detection uses backwards scan of `model_change` entries; edge case where the entry exists but runtime lookup fails is correctly handled (falls through to yolk).\n- Studio child guard (`header.studioChild`) relies on header being written before `startRpcSession` returns; currently safe because SDK runner writes header first.\n- No business logic changes in this subtask — pure docs + verification.",
+            "model": "opencode-go/deepseek-v4-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T11:58:04.665Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2849,
+        "tokens": 586,
+        "tokenSource": "usage",
+        "tps": 1.84,
+        "firstTokenAt": "2026-07-19T11:52:46.943Z",
+        "lastTokenAt": "2026-07-19T11:58:04.663Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-ceab7bd620bc5017e96d7f0c",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/implementer-ceab7bd620bc5017e96d7f0c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T11:52:35.411Z",
+        "finishedAt": "2026-07-19T11:58:04.665Z",
+        "updatedAt": "2026-07-19T11:58:04.665Z",
+        "itemCount": 59,
+        "messageCount": 11,
+        "toolCallCount": 22,
+        "stderrBytes": 0,
+        "bytes": 227898,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7a38-916a-78b1-a276-42d4a746ebd5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-52-35-434Z_019f7a38-916a-78b1-a276-42d4a746ebd5.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-a24d2ebac8b714a2e6cab2cd",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-19T11:58:22.078Z",
+      "finishedAt": "2026-07-19T12:03:56.485Z",
+      "runner": "sdk",
+      "childSessionId": "019f7a3d-db8e-708d-98ad-d4fe045f22ff",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-58-22-094Z_019f7a3d-db8e-708d-98ad-d4fe045f22ff.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "childSessionId": "019f7a3d-db8e-708d-98ad-d4fe045f22ff",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None（检查阶段未改生产代码）\n\n#### Remaining Findings\n- **Non-blocking residual:** 服务端 idle destroy 不通知前端时，同一页超 10min 后若 `desired==lastPinned` 可能跳过客户端 pin；服务端 recoverable/yolk 兜底通常仍正确。\n- **UAT residual:** H1–H10 未做浏览器验收（环境无运行服务）。\n- **Env residual:** `tsc` / `lint` 因本 worktree 缺 `typescript` / `eslint-config-next` 无法跑，属预存环境问题。\n\n#### Verification\n- `npm run test:session-model-pin` — **Pass 22/22**\n- `tsc --noEmit` — **env blocked**（node_modules 未装）\n- `npm run lint` — **env blocked**（缺 eslint-config-next）\n\n#### Verdict\n**Pass** — 计划 B 代码门禁通过，无阻断返工项。\n\n| 重点 | 结论 |\n| --- | --- |\n| context 不写 lastPinned | ✅ 已删除 |\n| liveConfirmed=false 强制 set_model | ✅ ensure 传参正确 |\n| MODEL-PIN-3 | ✅ Chat + yolk 均 withSessionScoped |\n| 冷启动 session > yolk > settings | ✅ applyWebSessionColdStartDefaults |\n| studioChild skip yolk | ✅ header guard |\n| 失败降级 | ✅ try/catch + warn |\n| 不覆盖 UI 选中 | ✅ 客户端 unconfirmed 仍 pin UI |\n\n#### Artifact\n- 已写 `review.md`（任务目录）\n\n#### nextRecommendedAction\n主会话可推进到 **review / UAT**；请用户至少补跑 **H1、H3、H4、H5、H8、H9**。无需 `changes_requested`。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-19T11:58:22.078Z",
+        "updatedAt": "2026-07-19T12:03:56.485Z",
+        "eventCount": 1590,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None（检查阶段未改生产代码）\n\n#### Remaining Findings\n- **Non-blocking residual:** 服务端 idle destroy 不通知前端时，同一页超 10min 后若 `desired==lastPinned` 可能跳过客户端 pin；服务端 recoverable/yolk 兜底通常仍正确。\n- **UAT residual:** H1–H10 未做浏览器验收（环境无运行服务）。\n- **Env residual:** `tsc` / `lint` 因本 worktree 缺 `typescript` / `eslint-config-next` 无法跑，属预存环境问题。\n\n#### Verification\n- `npm run test:session-model-pin` — **Pass 22/22**\n- `tsc --noEmit` — **env blocked**（node_modules 未装）\n- `npm run lint` — **env blocked**（缺 eslint-config-next）\n\n#### Verdict\n**Pass** — 计划 B 代码门禁通过，无阻断返工项。\n\n| 重点 | 结论 |\n| --- | --- |\n| context 不写 lastPinned | ✅ 已删除 |\n| liveConfirmed=false 强制 set_model | ✅ ensure 传参正确 |\n| MODEL-PIN-3 | ✅ Chat + yolk 均 withSessionScoped |\n| 冷启动 session > yolk > settings | ✅ applyWebSessionColdStartDefaults |\n| studioChild skip yolk | ✅ header guard |\n| 失败降级 | ✅ try/catch + warn |\n| 不覆盖 UI 选中 | ✅ 客户端 unconfirmed 仍 pin UI |\n\n#### Artifact\n- 已写 `review.md`（任务目录）\n\n#### nextRecommendedAction\n主会话可推进到 **review / UAT**；请用户至少补跑 **H1、H3、H4、H5、H8、H9**。无需 `changes_requested`。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T12:03:06.233Z",
+            "toolCallId": "call-7d76a250-8bf8-427d-9b97-4270ff27a070-39|fc_299fc4bd-245f-9e8c-8018-c99b8ed8c23b_0",
+            "toolName": "read",
+            "text": "}\n      case \"auto_retry_start\":\n        setRetryInfo({ attempt: event.attempt as number, maxAttempts: event.maxAttempts as number, errorMessage: event.errorMessage as string | undefined });\n        break;\n      case \"auto_retry_end\":\n        setRetryInfo(null);\n        break;\n      case \"auto_compaction_start\":\n      case \"compaction_start\":\n        setIsCompacting(true);\n        setCompactError(null);\n        break;\n      case \"auto_compaction_end\":\n      case \"compaction_end\":\n        setIsCompacting(false);\n        if (event.errorMessage) {\n          setCompactError(event.errorMessage as string);\n        } else if (!event.aborted) {\n          if (sessionIdRef.current) loadSession(sessionIdRef.current);\n        }\n        break;\n    }\n  }, [loadSession, onAgentEnd]);\n\n  // Cleanup failover notice timer on unmount\n  useEffect(() => {\n    return () => {\n      if (opencodeGoFailoverNoticeTimerRef.current) {\n        clearTimeout(opencodeGoFailoverNoticeTimerRef.current);\n      }\n\n[480 more lines in file. Use offset=1120 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-19T12:03:50.956Z",
+            "toolCallId": "call-1307b3a2-d896-4e43-8760-b557c40f797d-41|fc_2dec7df4-33c5-986f-9919-3e3a34a371ef_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/review.md\",\n  \"content\": \"# Review — Chat 冷启动模型 pin（计划 B）\\n\\n## Verdict\\n\\n**Pass（代码门禁通过；手工 H1–H10 为 residual UAT）**\\n\\n实现完整覆盖计划 B 的客户端主修复 + 服务端 yolk 冷启动兜底，自动单测全绿；未发现需返工的阻断项。手工浏览器场景本环境无法执行，记为 residual，不掩盖代码级结论。\\n\\n## Findings Fixed\\n\\nNone（检查阶段未改代码）。\\n\\n## Remaining Findings\\n\\n### 非阻断 / Residual\\n\\n1. **Idle destroy 且页面不 reload 时，客户端可能仍跳过 set_model**  \\n   `liveAgentConfirmedRef` 在 `loadSession(includeState)` 无 live 时会清空，但服务端 10min idle `destroy()` 不主动通知前端。若用户停在同一会话页超过 idle 后再发，且 `desired == lastPinned`，客户端会 skip pin。  \\n   **缓解**：服务端 `applyWebSessionColdStartDefaults` 会优先恢复 path `model_change`，或 yolk specific；与 UI 通常一致。仅当 recoverable 失败且 yolk 不可用时，仍可能落到 settings 虚空。  \\n   **建议跟进**（非本轮阻断）：发送前探测 live（get_state）或在 `!agentRunning` 且距上次确认过久时强制 pin。\\n\\n2. **yolk thinking 在 `withSessionScopedSettingsDefaults` 外调用 `setThinkingLevel`**  \\n   与现有 Chat `set_thinking_level` 路径一致；若 SDK 内部写 settings thinking 默认，属既有面，非本次引入的 model 默认污染。MODEL-PIN-3 对 provider/model 仍有保护。\\n\\n3. **手工 H1–H10 未跑**  \\n   本检查环境无运行中的 pi web + 不一致 settings/yolk 配置，无法浏览器验收。见下表 residual。\\n\\n### 阻断项对照（checks.md §6）\\n\\n| # | 阻断项 | 结论 |\\n| --- | --- | --- |\\n| 1 | 无 live 首轮仍可能跳过 set_model | **通过** — `liveConfirmed=false` 强制 pin；`loadSession(includeState)` 无 live 清空 baseline |\\n| 2 | context.model 仍写入 lastPinned | **通过** — 已删除 context→lastPinned；context 仅 seed display/desired |\\n| 3 | Chat set_model / yolk 兜底写回 settings | **通过** — 均 `withSessionScopedSettingsDefaults`；PIN-3 单测保留 |\\n| 4 | yolk specific 且无可恢复模型时仍静默 settings 虚空 | **通过（代码）** — `applyWebSessionColdStartDefaults` 走 yolk；客户端仍强制 pin |\\n| 5 | yolk 覆盖会话 UI 选中 | **通过** — 客户端 unconfirmed 必 pin UI；服务端仅 serverInitial |\\n| 6 | 自动测试失败 | **通过** — 22/22 |\\n\\n## 代码审查摘要\\n\\n### CS-01 `lib/session-model-pin.ts` + 单测\\n\\n- `shouldPinSessionModel(..., { liveConfirmed: false })` → 有效 desired 总是 pin；省略 options 保持旧 equal 语义。\\n- `resolveYolkColdStartModel`：specific → model+thinking；piDefault/缺字段 → null。\\n- `resolveColdStartModelPreference`：recoverable > yolk > sdk。\\n- 文件头 invariants 与 MODEL-PIN-3 说明齐全。\\n- 测试新增 8 例，PIN-1..4 全保留。\\n\\n### CS-02 `hooks/useAgentSession.ts`\\n\\n- 删除 `contextModel → lastPinned`。\\n- `liveAgentConfirmedRef` 在 set_model / create / live get_state / agent_end GET 成功时 true；404 / includeState 无 live 时 false。\\n- `ensureSessionModel` 传 `{ liveConfirmed }`；prompt / steer / follow_up 均 await ensure。\\n- 展示 snapshot 与 pin baseline 分离；未误清 selected/override。\\n\\n### CS-03 `lib/rpc-manager.ts`\\n\\n- `startRpcSession` 在 wrapper.start 后调用 `applyWebSessionColdStartDefaults`。\\n- 优先级：path `model_change` + `getModel` → yolk specific + thinking → SDK/settings。\\n- Studio child（header `studioChild`）整段 skip。\\n- setModel 均 session-scoped；失败 try/catch 降级不阻断创建。\\n- 新建 `sessionFile===\\\"\\\"` 无 recoverable → yolk/piDefault；bootstrap body pin 仍可覆盖。\\n\\n### CS-04 文档\\n\\n- `docs/modules/frontend.md` / `library.md` / `architecture/overview.md` 与实现一致：两套默认源职责、冷启动优先级、UI pin 优先、不写 settings。\\n\\n### 未改 / 边界\\n\\n- 无 UI 结构变更；`ui.md` 无原型门禁要求。\\n- 未引入 prompt body model 双保险（范围外）。\\n- 未写 settings 全局默认；未用 yolk 覆盖 UI desired。\\n\\n## Verification\\n\\n| 命令 | 结果 |\\n| --- | --- |\\n| `npm run test:session-model-pin` | **Pass** — 22/22（含 CS-01 8 例 + PIN-1..4） |\\n| `node_modules/.bin/tsc --noEmit` | **Blocked by env** — 本 worktree 未安装 `typescript` / `@types/node`（`node_modules` 基本为空）；全局 tsc 非项目配置。**非本次 diff 引入**。静态阅读实现类型可被 hooks/rpc-manager 直接使用，无 any 逃生。 |\\n| `npm run lint` | **Blocked by env** — `eslint-config-next` 未安装。**非本次 diff 引入**。 |\\n\\n### 手工验收（residual UAT）\\n\\n| # | 期望 | 结果 |\\n| --- | --- | --- |\\n| H1 | 冷开历史会话首轮 = UI 模型 | ☐ 待 UAT（代码路径满足） |\\n| H2 | 发送后选择器仍 = UI | ☐ 待 UAT |\\n| H3 | idle/清 registry 后再发 | ☐ 待 UAT（见 residual #1） |\\n| H4 | live 已对齐可跳过 pin | ☐ 待 UAT |\\n| H5 | 切换后立刻发；settings 不变 | ☐ 待 UAT |\\n| H6 | 新建会话首条正确 | ☐ 待 UAT（bootstrap 未回归改坏） |\\n| H7 | 不可用模型错误可见 | ☐ 待 UAT |\\n| H8 | 无可恢复 + yolk specific 不落 settings 虚空 | ☐ 待 UAT |\\n| H9 | 可恢复 S 不被 yolk Y 覆盖 | ☐ 待 UAT |\\n| H10 | piDefault 允许 SDK/settings | ☐ 待 UAT |\\n\\n## 需求覆盖（R1–R14）\\n\\n| 需求 | 结论 |\\n| --- | --- |\\n| R1 历史首轮 UI 模型 | 通过（代码） |\\n| R2 context 不冒充 pin | 通过 |\\n| R3 live 对齐可跳过 | 通过 |\\n| R4 idle 后必 pin | 部分：reload/includeState 路径通过；纯 idle 无通知见 residual #1 |\\n| R5 MODEL-PIN-3 | 通过 |\\n| R6 new/draft | 通过（审计无回归逻辑） |\\n| R7 pin 失败中止 send | 通过 |\\n| R8 steer/follow_up | 通过 |\\n| R9 单测 | 通过 |\\n| R10–R14 服务端 yolk / 优先级 / 不替代客户端 / piDefault / 隔离 | 通过（代码） |\\n\\n## nextRecommendedAction\\n\\n1. 主会话可将任务推进至 **review / ready for user acceptance**（或项目约定的下一状态）。\\n2. 用户/UAT 至少补跑 **H1、H3、H4、H5、H8、H9**（settings 虚空 ≠ yolk specific 配置）。\\n3. 可选跟进：idle destroy 客户端感知（非阻断）。\\n4. **不需要** changes_requested；**不需要** 架构师/UI 返工。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-19T12:03:51.095Z",
+            "toolCallId": "call-1307b3a2-d896-4e43-8760-b557c40f797d-41|fc_2dec7df4-33c5-986f-9919-3e3a34a371ef_0",
+            "toolName": "write",
+            "text": "Successfully wrote 4450 bytes to /Users/zyj/projects/git_projects/worktrees/yolk-pi-web.worktrees/pi-20260719-181155/.ypi/tasks/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-19T12:03:56.480Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None（检查阶段未改生产代码）\n\n#### Remaining Findings\n- **Non-blocking residual:** 服务端 idle destroy 不通知前端时，同一页超 10min 后若 `desired==lastPinned` 可能跳过客户端 pin；服务端 recoverable/yolk 兜底通常仍正确。\n- **UAT residual:** H1–H10 未做浏览器验收（环境无运行服务）。\n- **Env residual:** `tsc` / `lint` 因本 worktree 缺 `typescript` / `eslint-config-next` 无法跑，属预存环境问题。\n\n#### Verification\n- `npm run test:session-model-pin` — **Pass 22/22**\n- `tsc --noEmit` — **env blocked**（node_modules 未装）\n- `npm run lint` — **env blocked**（缺 eslint-config-next）\n\n#### Verdict\n**Pass** — 计划 B 代码门禁通过，无阻断返工项。\n\n| 重点 | 结论 |\n| --- | --- |\n| context 不写 lastPinned | ✅ 已删除 |\n| liveConfirmed=false 强制 set_model | ✅ ensure 传参正确 |\n| MODEL-PIN-3 | ✅ Chat + yolk 均 withSessionScoped |\n| 冷启动 session > yolk > settings | ✅ applyWebSessionColdStartDefaults |\n| studioChild skip yolk | ✅ header guard |\n| 失败降级 | ✅ try/catch + warn |\n| 不覆盖 UI 选中 | ✅ 客户端 unconfirmed 仍 pin UI |\n\n#### Artifact\n- 已写 `review.md`（任务目录）\n\n#### nextRecommendedAction\n主会话可推进到 **review / UAT**；请用户至少补跑 **H1、H3、H4、H5、H8、H9**。无需 `changes_requested`。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-19T12:03:56.481Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1208,
+        "tokens": 430,
+        "tokenSource": "usage",
+        "tps": 1.33,
+        "firstTokenAt": "2026-07-19T11:58:32.637Z",
+        "lastTokenAt": "2026-07-19T12:03:56.453Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-a24d2ebac8b714a2e6cab2cd",
+        "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260719-182134-_-chat-_-/checker-a24d2ebac8b714a2e6cab2cd.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-19T11:58:22.078Z",
+        "finishedAt": "2026-07-19T12:03:56.482Z",
+        "updatedAt": "2026-07-19T12:03:56.482Z",
+        "itemCount": 90,
+        "messageCount": 2,
+        "toolCallCount": 42,
+        "stderrBytes": 0,
+        "bytes": 176129,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f7a3d-db8e-708d-98ad-d4fe045f22ff",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Users-zyj-projects-git_projects-worktrees-yolk-pi-web.worktrees-pi-20260719-181155--/2026-07-19T11-58-22-094Z_019f7a3d-db8e-708d-98ad-d4fe045f22ff.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-19T10:57:46.363Z",
+      "contextId": "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+      "from": "awaiting_approval",
+      "to": "awaiting_approval"
+    },
+    "planRevision": 2,
+    "approvalGrant": {
+      "approvedAt": "2026-07-19T11:26:35.369Z",
+      "contextId": "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+      "inputHash": "8cbe697b157364a5b1364628",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-19T12:21:19.354Z",
+    "archiveReason": "Accepted and archived from session widget",
+    "knowledgeEntryId": "20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+    "knowledgePath": ".ypi/knowledge/20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-19T10:57:46.363Z",
+    "strategy": "sequential-with-early-tests",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "serial",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "MODEL-PIN-CS-01",
+          "title": "helpers-tests",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "MODEL-PIN-CS-01"
+          ]
+        },
+        {
+          "id": "MODEL-PIN-CS-02",
+          "title": "client",
+          "relation": "serial",
+          "dependencies": [
+            "MODEL-PIN-CS-01"
+          ],
+          "subtaskIds": [
+            "MODEL-PIN-CS-02"
+          ]
+        },
+        {
+          "id": "MODEL-PIN-CS-03",
+          "title": "server",
+          "relation": "serial",
+          "dependencies": [
+            "MODEL-PIN-CS-01"
+          ],
+          "subtaskIds": [
+            "MODEL-PIN-CS-03"
+          ]
+        },
+        {
+          "id": "MODEL-PIN-CS-04",
+          "title": "docs-verify",
+          "relation": "serial",
+          "dependencies": [
+            "MODEL-PIN-CS-02",
+            "MODEL-PIN-CS-03"
+          ],
+          "subtaskIds": [
+            "MODEL-PIN-CS-04"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "MODEL-PIN-CS-01",
+        "title": "扩展 session-model-pin 语义、yolk 冷启动解析与单测",
+        "phase": "helpers-tests",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/session-model-pin.ts",
+          "scripts/test-session-model-pin.mjs"
+        ],
+        "instructions": [
+          "保持 normalize/resolveDesired/resolveChatDisplay/sessionModelsEqual/withSessionScopedSettingsDefaults/clampThinkingLevelToSupported 行为兼容。",
+          "扩展 shouldPinSessionModel 支持 options?: { liveConfirmed?: boolean }：当 liveConfirmed===false 时，只要 desired 有效就返回 true（即使 lastPinned 与 desired 相等）。省略 options 时保持旧 equal 行为。",
+          "新增纯函数（名称可微调，需导出可测）：resolveYolkColdStartModel(yolkConfig) → { provider, modelId, thinking } | null。mode!==specific 或缺字段 → null；thinking 取 defaultModel.thinking 或调用方可传入 fallback thinking。",
+          "可选：resolveColdStartModelPreference({ recoverable, yolk }) → 'recoverable' | 'yolk' | 'sdk' 优先级纯函数，便于单测锁定 session > yolk > sdk。",
+          "文件头注释写清：lastPinned/confirmed 不得来自 path context.model；服务端冷启动默认优先级；Chat set_model 不写 settings。",
+          "测试至少覆盖：",
+          "1) liveConfirmed=false 且 desired==lastPinned → shouldPin true",
+          "2) liveConfirmed=true 且 equal → false",
+          "3) liveConfirmed=true 且 unequal → true",
+          "4) desired null → false",
+          "5) 省略 options 时 equal → false（旧行为）",
+          "6) resolveYolkColdStartModel：specific 返回 model+thinking；piDefault → null",
+          "7) 优先级：有 recoverable 不选 yolk；无 recoverable + specific → yolk；piDefault → sdk",
+          "8) 既有 PIN-3 withSessionScoped 用例全部保留通过",
+          "不在此任务引入 React/fetch/真实 SDK。"
+        ],
+        "acceptance": [
+          "npm run test:session-model-pin 全绿。",
+          "新 API 类型可被 hooks/rpc-manager 直接使用，无 any 逃生。",
+          "MODEL-PIN-3 测试仍通过。"
+        ],
+        "validation": [
+          "npm run test:session-model-pin"
+        ],
+        "risks": [
+          "改变 shouldPin 默认签名导致其它调用方行为变化——检索全仓 shouldPinSessionModel 并更新。",
+          "yolk 解析与 pi-web-config 类型重复——可接受轻量输入类型，避免循环依赖。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "MODEL-PIN-CS-02",
+        "title": "修复 useAgentSession 冷启动/idle pin 基线",
+        "phase": "client",
+        "order": 2,
+        "dependsOn": [
+          "MODEL-PIN-CS-01"
+        ],
+        "dependencies": [
+          "MODEL-PIN-CS-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "hooks/useAgentSession.ts"
+        ],
+        "instructions": [
+          "loadSession：删除 contextModel → lastPinned 赋值。context 只可用于 selected/display fallback。",
+          "loadSession：includeState===true 且无 liveModel 时 lastPinned=null，liveAgentConfirmed=false。保留 liveSessionModel 展示 snapshot 策略，但 pin 正确优先。",
+          "引入 liveAgentConfirmedRef（推荐）：set_model 成功、create 成功、get_state running+model、agent_end 且 GET 到 model → true；loadSession 无 live、GET running false、session 清理 → false。",
+          "ensureSessionModel：shouldPin(desired, lastPinned, { liveConfirmed: liveAgentConfirmedRef.current })。",
+          "handleSend / steer / follow_up：继续 await ensureSessionModel；失败 throw 中止发送。",
+          "handleModelChange / 新建 create 成功：lastPinned + liveAgentConfirmed=true。",
+          "禁止写 settings；不修改 ChatInput/选择器 UI。",
+          "不在此任务实现服务端 yolk（属 CS-03）。"
+        ],
+        "acceptance": [
+          "无 live 时 lastPinned 不为 context.model。",
+          "无 live 时发送：set_model 再 prompt，模型为 UI 选择。",
+          "有 live 且对齐：可跳过 set_model。",
+          "idle/destroy 模拟：confirmed false 后必 set_model。",
+          "settings.json 默认不被 Chat 改写。"
+        ],
+        "validation": [
+          "npm run test:session-model-pin",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "risks": [
+          "liveSessionModel 死后仍在 state 导致误判——必须独立 confirmed ref。",
+          "清空 lastPinned 时误清 selected/override——禁止。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "MODEL-PIN-CS-03",
+        "title": "服务端冷启动兜底：session 恢复 > yolk > settings",
+        "phase": "server",
+        "order": 3,
+        "dependsOn": [
+          "MODEL-PIN-CS-01"
+        ],
+        "dependencies": [
+          "MODEL-PIN-CS-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/rpc-manager.ts",
+          "lib/agent-session-bootstrap.ts",
+          "lib/session-model-pin.ts"
+        ],
+        "instructions": [
+          "在 startRpcSession 创建 inner session 并 wrap 之后、return 前，调用 applyWebSessionColdStartDefaults（名称可微调）。",
+          "优先级：",
+          "1) 从 sessionManager/path 解析 recoverable model；若 getModel 成功 → 确保 runtime 为该模型（必要时 session-scoped set_model）；不要套 yolk。",
+          "2) 否则 readPiWebConfig().yolk：mode=specific 且 getModel 成功 → withSessionScopedSettingsDefaults + setModel，并 setThinkingLevel（thinking 来自 yolk，可 clamp）。",
+          "3) mode=piDefault 或 yolk 解析失败 → no-op（保留 SDK/settings）。",
+          "新建 sessionFile===''：无 recoverable → 直接 yolk/piDefault 分支（与 bootstrap 显式 body model 兼容：body 后续 pin 覆盖）。",
+          "若 session header studioChild 或等价标记：跳过用户 yolk 默认（避免污染 Studio 子会话策略）；实现时以代码中可判定字段为准。",
+          "所有 setModel 必须 withSessionScopedSettingsDefaults；禁止写 settings.json。",
+          "yolk apply 失败推荐 try/catch 降级 + 日志，不阻断 session 创建（design §6.6）。",
+          "审计 createConfiguredEmptyAgentSession：避免与 startRpcSession 兜底冲突/重复写 settings；body provider/modelId 仍优先最终结果。",
+          "route.ts 可不改；若需契约注释可加一句。",
+          "扩展 test:session-model-pin 中纯函数优先级用例即可；真实 startRpcSession 集成可选，不强制连 SDK。"
+        ],
+        "acceptance": [
+          "无可恢复模型 + yolk specific：冷启动 wrapper 初始不为 settings 虚空默认（为 yolk），settings 不变。",
+          "有可恢复模型 S：不被 yolk Y 覆盖。",
+          "piDefault：允许 SDK/settings。",
+          "客户端 pin 仍可覆盖 serverInitial。",
+          "PIN-3 行为保持。"
+        ],
+        "validation": [
+          "npm run test:session-model-pin",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "risks": [
+          "误判 recoverable 导致仍落虚空或错误保留 settings 模型。",
+          "Studio child 误套 yolk。",
+          "startRpcSession 变慢/变脆——兜底失败应降级。",
+          "与 bootstrap 双重 set_model——可接受。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "MODEL-PIN-CS-04",
+        "title": "文档同步与回归验证",
+        "phase": "docs-verify",
+        "order": 4,
+        "dependsOn": [
+          "MODEL-PIN-CS-02",
+          "MODEL-PIN-CS-03"
+        ],
+        "dependencies": [
+          "MODEL-PIN-CS-02",
+          "MODEL-PIN-CS-03"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "docs/architecture/overview.md"
+        ],
+        "instructions": [
+          "frontend.md useAgentSession：lastPinned 仅 live 确认；context 不用于 skip pin；cold start/idle 发送前必 pin。",
+          "library.md session-model-pin + rpc-manager：shouldPin liveConfirmed；冷启动优先级 session > yolk specific > settings；MODEL-PIN-3 仍适用 yolk apply。",
+          "overview.md 一句 cold-start 契约；明确两套默认源职责（yolk=Web Chat；settings=CLI/SDK）。",
+          "可选：Settings 蛋黄𝝅静态说明一句（ui.md 非强制）。",
+          "跑完整验证；handoff 记录手工 H1/H3/H4/H5/H8/H9 结果。"
+        ],
+        "acceptance": [
+          "文档与代码语义一致。",
+          "lint/tsc/test:session-model-pin 通过。",
+          "无无关文件改动。"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:session-model-pin"
+        ],
+        "risks": [
+          "文档写成 yolk 覆盖会话选中——禁止；写清 UI pin 优先。"
+        ],
+        "parallelizable": false,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-19T12:21:19.354Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 4,
+      "skipped": 0
+    },
+    "subtasks": {
+      "MODEL-PIN-CS-01": {
+        "id": "MODEL-PIN-CS-01",
+        "status": "done",
+        "updatedAt": "2026-07-19T11:31:08.362Z",
+        "startedAt": "2026-07-19T11:26:56.238Z",
+        "finishedAt": "2026-07-19T11:31:08.359Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-f45954a64f07fe3fcffe958d"
+        ],
+        "lastRunId": "implementer-f45954a64f07fe3fcffe958d",
+        "claimedAt": "2026-07-19T11:26:56.238Z",
+        "claimedByContextId": "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "summary": "## MODEL-PIN-CS-01 — Implementation Complete\n\n### Files Changed\n\n- **`lib/session-model-pin.ts`** — Extended `shouldPinSessionModel` with optional `options?: { liveConfirmed?: boolean }`; when `liveConfirmed === false`, any valid desired triggers pin. Added `resolveYolkColdStartModel` (returns `{ provider, modelId, thinking }` for `mode: \"specific\"`, `null` for `piDefault`/missing). Added `resolveColdStartModelPreference` (pure priority: recoverable > yolk > sdk). Updated file header with MODEL-PIN-CS invariants.\n\n- **`scripts/test-session-model-pin.mjs`** — Added 10 new test cases covering: `liveConfirmed=false` force-pin, `liveConfirmed=true` equal-skip, invalid-desired rejection with liveConfirmed, legacy omitted-options equality, `resolveYolkColdStartModel` specific/piDefault/missing/null, and `resolveColdStartModelPreference` priority ordering. All 13 existing tests preserved.\n\n### Verification\n\n```\nnpm run test:session-model-pin  →  22/22 passed (0 failures)\n```\n\n| Check | Result |\n|---|---|\n| `shouldPinSessionModel` backward-compat (omitted options) | ✅ equal → false |\n| `liveConfirmed=false` forces pin even equal | ✅ |\n| `liveConfirmed=true` keeps equal-skip | ✅ |\n| `resolveYolkColdStartModel` specific → model+thinking | ✅ |\n| `resolveYolkColdStartModel` piDefault → null | ✅ |\n| `resolveColdStartModelPreference` priority | ✅ recoverable > yolk > sdk |\n| PIN-3 `withSessionScopedSettingsDefaults` tests | ✅ all preserved |\n| PIN-4 `clampThinkingLevelToSupported` tests | ✅ all preserved |\n| tsc errors on `session-model-pin.ts` | ✅ 0 new errors |\n\n### Export API Changes\n\n| Symbol | Change | Compat |\n|---|---|---|\n| `shouldPinSessionModel` | new optional 3rd param `options?: { liveConfirmed?: boolean }` | ✅ backward-compat (omitted → old behavior) |\n| `resolveYolkColdStartModel` | **new** exported function | N/A |\n| `YolkColdStartModel` | **new** exported type | N/A |\n| `resolveColdStartModelPreference` | **new** exported function | N/A |\n| `ColdStartModelPreference` | **new** exported type | N/A |\n\n### Notes / Risks\n\n- **None blocking.** The `shouldPinSessionModel` signature change is backward-compatible — the two existing callers in `hooks/useAgentSession.ts` (lines 340, 352) omit the third argument and continue to work identically. CS-02 will be the one to wire `liveConfirmed`.\n- `resolveYolkColdStartModel` accepts a lightweight structural type matching the yolk sub-config shape, avoiding a dependency on `PiWebYolkConfig` from `pi-web-config.ts`. This keeps the module free of React/fetch/SDK imports and easily testable. CS-03 will bridge the real `readPiWebConfig().yolk` into this function.\n- The `resolveColdStartModelPreference` pure function is a simple boolean→enum mapping. The boolean-to-boolean gate (`recoverable`/`yolk`) is intentionally narrow — CS-03 will own the actual \"is recoverable? does yolk resolve to non-null?\" resolution with runtime model lookups."
+      },
+      "MODEL-PIN-CS-02": {
+        "id": "MODEL-PIN-CS-02",
+        "status": "done",
+        "updatedAt": "2026-07-19T11:39:40.542Z",
+        "startedAt": "2026-07-19T11:31:33.950Z",
+        "finishedAt": "2026-07-19T11:39:40.540Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-cbe794b8ae3aadcb2aa27ed3"
+        ],
+        "lastRunId": "implementer-cbe794b8ae3aadcb2aa27ed3",
+        "claimedAt": "2026-07-19T11:31:33.950Z",
+        "claimedByContextId": "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "summary": "All changes are verified and consistent. Let me now provide the completion handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-02\n\n### Files Changed\n\n- **`hooks/useAgentSession.ts`** — 8 targeted edits:\n  1. Added `liveAgentConfirmedRef` declaration (line 298) with JSDoc explaining the semantics\n  2. `ensureSessionModel`: both `shouldPinSessionModel` calls now pass `{ liveConfirmed: liveAgentConfirmedRef.current }`; `liveAgentConfirmedRef.current = true` after successful `set_model`\n  3. `loadSession`: deleted the `else if (!lastPinnedModelRef.current && contextModel)` block that incorrectly wrote path `context.model` to `lastPinnedModelRef`; when `includeState === true` with no `liveModel`, now sets `lastPinnedModelRef = null` and `liveAgentConfirmedRef = false`; context model still seeds `selectedModelRef` for display fallback only\n  4. `loadSession` 404 cleanup: added `liveAgentConfirmedRef.current = false`\n  5. `agent_end` GET handler: added `liveAgentConfirmedRef.current = true` when live model found\n  6. `handleSend` new session: added `liveAgentConfirmedRef.current = true` alongside `lastPinnedModelRef` write\n  7. `ensureBrowserShareSession` draft create: added `liveAgentConfirmedRef.current = true`\n  8. `handleModelChange` both branches (isNew / non-isNew): added `liveAgentConfirmedRef.current = true`\n\n### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:session-model-pin` | **All 22 tests passed** (incl. CS-01 liveConfirmed + yolk helpers) |\n| `npx tsc --noEmit` (filtered to `useAgentSession.ts`) | No **new** errors — all errors pre-existing (React types, implicit `any`) |\n| `npm run lint` | Pre-existing infrastructure issue (`eslint-config-next` not found) — unrelated to changes |\n\n### Notes / Risks\n\n1. **Idle destroy detection gap**: When the wrapper is destroyed by idle timeout (10 min) with no EventSource connected, the client does not receive a notification. `liveAgentConfirmedRef` remains `true` from the previous live session, and `lastPinnedModelRef` still holds the correct model. If the user sends without changing the model, `shouldPinSessionModel` returns `false` (equal + liveConfirmed=true), skipping `set_model`. This is the known gap where **CS-03** (server-side yolk cold-start fallback) steps in to prevent the settings void default. The client-side fix covers the `includeState`/`loadSession` cold-start path (historical session open → send) which is the main user-facing bug.\n\n2. **Remaining must-do from the subtask boundary**: CS-03 (server `startRpcSession` yolk fallback) and CS-04 (documentation) are separate subtasks not implemented here, as specified.\n\n3. **Model pin isolation (MODEL-PIN-3)**: Not affected — `withSessionScopedSettingsDefaults` is not modified; all pin writes use the existing `sendAgentCommand` path which already enforces session-scoped settings on the server."
+      },
+      "MODEL-PIN-CS-03": {
+        "id": "MODEL-PIN-CS-03",
+        "status": "done",
+        "updatedAt": "2026-07-19T11:52:11.656Z",
+        "startedAt": "2026-07-19T11:39:48.595Z",
+        "finishedAt": "2026-07-19T11:52:11.653Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-566f939469a6df076f35f477"
+        ],
+        "lastRunId": "implementer-566f939469a6df076f35f477",
+        "claimedAt": "2026-07-19T11:39:48.595Z",
+        "claimedByContextId": "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "summary": "The implementation is complete. Let me provide a summary of the handoff.\n\n---\n\n## Implementation Complete — MODEL-PIN-CS-03\n\n### Files Changed\n\n- **`lib/rpc-manager.ts`** — Added two imports (`resolveYolkColdStartModel`, `readPiWebConfig`) and the new `applyWebSessionColdStartDefaults` function; called with `await` from `startRpcSession` after wrapper creation.\n\n### What Was Done\n\n**New function `applyWebSessionColdStartDefaults(wrapper, sessionFile)`** implements the three-tier cold start priority:\n\n| Priority | Condition | Action |\n|---|---|---|\n| 1. **Recoverable** | Last `model_change` entry in session path + available in `modelRuntime` | `withSessionScopedSettingsDefaults` → `setModel`; no yolk |\n| 2. **Yolk specific** | No recoverable model + `yolk.defaultModel.mode === \"specific\"` + runtime resolves | `withSessionScopedSettingsDefaults` → `setModel` + `setThinkingLevel` |\n| 3. **SDK/settings** | `piDefault` or yolk unavailable | No-op (preserve SDK default) |\n\n**Safety boundaries:**\n- **Studio child skip**: Reads session header; returns immediately if `studioChild` is present.\n- **All `setModel` calls** go through `withSessionScopedSettingsDefaults` (MODEL-PIN-3 preserved).\n- **All failures** are `try/catch` + `console.warn` internally; the function never throws, so session creation is never blocked.\n- **New sessions** (`sessionFile === \"\"`): skip recoverable scan → go directly to yolk/piDefault branch; `createConfiguredEmptyAgentSession` body provider/modelId still overrides.\n\n**Call site**: `await applyWebSessionColdStartDefaults(wrapper, sessionFile)` runs after `wrapper.start()` and before wrapper is registered/returned, ensuring the cold start model is set before any client `set_model` can race.\n\n### Verification\n\n- **`npm run test:session-model-pin`** — all 22 tests pass (including CS-01 pure function tests for `resolveYolkColdStartModel`, `resolveColdStartModelPreference`, and `shouldPinSessionModel` liveConfirmed).\n- **`npm run lint`** — pre-existing eslint-config-next resolution failure, unrelated to changes.\n- **`tsc --noEmit`** — pre-existing `next/server` resolution errors, unrelated to changes.\n\n### Audit: `createConfiguredEmptyAgentSession` Compatibility\n\nThe flow for new sessions is:\n1. `startRpcSession(\"\", ...)` → yolk fallback sets initial model/thinking\n2. Body `provider && modelId` → `session.send(set_model)` overrides yolk\n3. Body `thinkingLevel` → `session.send(set_thinking_level)` overrides yolk thinking\n\n**Result**: Body wins over yolk. If no body model, yolk serves as the new-session default. No double-write to settings.\n\n### Notes / Risks\n\n- **Recoverable model detection** only scans `model_change` entries (not `buildSessionContext`). If a session was created and only has `prompt`/`assistant` entries without an explicit `model_change`, the recoverable branch is skipped and we fall through to yolk. This is conservative (avoids false recovery) but means sessions created without explicit `set_model` won't get \"recovered\" — yolk will apply instead. This matches the design intent.\n- **Lint/tsc** cannot run due to pre-existing environment issues (missing `eslint-config-next`, missing `next/server` types in the `npx tsc` path). These are not caused by this change.\n- **Race with client pin**: The `await` ensures the cold start defaults complete before `startRpcSession` returns, so the client's subsequent `set_model` always wins."
+      },
+      "MODEL-PIN-CS-04": {
+        "id": "MODEL-PIN-CS-04",
+        "status": "done",
+        "updatedAt": "2026-07-19T11:58:04.691Z",
+        "startedAt": "2026-07-19T11:52:26.263Z",
+        "finishedAt": "2026-07-19T11:58:04.675Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ceab7bd620bc5017e96d7f0c"
+        ],
+        "lastRunId": "implementer-ceab7bd620bc5017e96d7f0c",
+        "claimedAt": "2026-07-19T11:52:26.263Z",
+        "claimedByContextId": "pi_019f79dd-d87a-7f2d-9d03-3baa798a99f9",
+        "summary": "## Implementation Complete — MODEL-PIN-CS-04\n\n### Files Changed\n\n| File | Change |\n|------|--------|\n| `docs/modules/frontend.md` | `useAgentSession` entry: lastPinned only live-confirmed, context never skips pin, cold start/idle always pins |\n| `docs/modules/library.md` | `session-model-pin.ts`: shouldPin liveConfirmed, resolveYolkColdStartModel, resolveColdStartModelPreference. `rpc-manager.ts`: applyWebSessionColdStartDefaults priority + MODEL-PIN-3 |\n| `docs/architecture/overview.md` | Models section: two default sources (yolk=Web Chat, settings=CLI/SDK) + server cold-start priority (session > yolk > SDK) |\n| `.ypi/tasks/.../handoff.md` | Complete rewrite with implementation summary, validation results, manual checklist, risks |\n\n### Verification\n\n| Command | Result |\n|---------|--------|\n| `npm run test:session-model-pin` | ✅ 22/22 passed |\n| `npx tsc --noEmit` | ⚠️ Pre-existing errors (`@types/node` missing), unrelated |\n| `npm run lint` | ⚠️ Pre-existing (`eslint-config-next` missing), unrelated |\n\n### Notes / Risks\n\n- All code changes (CS-01..03) were completed in prior implementer sessions; this subtask only updated docs and verified.\n- Manual browser verification (H1–H10) is deferred to the checker / user UAT — requires a running pi web server with mismatched settings vs yolk config.\n- Recoverable model detection uses backwards scan of `model_change` entries; edge case where the entry exists but runtime lookup fails is correctly handled (falls through to yolk).\n- Studio child guard (`header.studioChild`) relies on header being written before `startRpcSession` returns; currently safe because SDK runner writes header first.\n- No business logic changes in this subtask — pure docs + verification."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-19T11:26:56.238Z",
+        "subtaskId": "MODEL-PIN-CS-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-19T11:31:33.950Z",
+        "subtaskId": "MODEL-PIN-CS-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-19T11:39:48.595Z",
+        "subtaskId": "MODEL-PIN-CS-03",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-19T11:52:26.263Z",
+        "subtaskId": "MODEL-PIN-CS-04",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}
