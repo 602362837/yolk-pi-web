@@ -24,6 +24,7 @@ import {
   PENDING_SESSION_TITLE,
   SESSION_TITLE_MAX_LENGTH,
   displayTitleForSession,
+  sessionTitleSeedFromUserMessage,
   studioChildSessionTitle,
   truncateSessionTitle,
 } from "../lib/session-title.ts";
@@ -242,6 +243,48 @@ await test("ordinary session fallback is unchanged", () => {
       messageCount: 3,
     }),
     "aaaaaaaa-bbb",
+  );
+});
+
+// SCI-04: strip Studio injection blocks from title seed / firstMessage display.
+await test("sessionTitleSeedFromUserMessage strips studio injections", () => {
+  const dirty =
+    "请帮我做功能\n\n<ypi-studio-state>\nStatus: implementing\n</ypi-studio-state>\n\n" +
+    "<ypi-studio-knowledge>\nk1\n</ypi-studio-knowledge>";
+  const seed = sessionTitleSeedFromUserMessage(dirty);
+  assert.equal(seed, "请帮我做功能");
+  assert.ok(!seed.includes("<ypi-studio-state>"));
+  assert.ok(!seed.startsWith("<ypi-studio-"));
+
+  // Clean titles unchanged.
+  assert.equal(sessionTitleSeedFromUserMessage("  hello   world  "), "hello world");
+  assert.equal(sessionTitleSeedFromUserMessage(""), PENDING_SESSION_TITLE);
+  // Injection-only message falls back to pending placeholder.
+  assert.equal(
+    sessionTitleSeedFromUserMessage("<ypi-studio-state>\nStatus: no_task\n</ypi-studio-state>"),
+    PENDING_SESSION_TITLE,
+  );
+});
+
+await test("displayTitleForSession strips dirty firstMessage", () => {
+  assert.equal(
+    displayTitleForSession({
+      id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      firstMessage:
+        "用户原文\n\n<ypi-studio-state>\nStatus: awaiting_approval\n</ypi-studio-state>",
+      messageCount: 1,
+    }),
+    "用户原文",
+  );
+  // Explicit name still wins over dirty firstMessage.
+  assert.equal(
+    displayTitleForSession({
+      id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      name: "Named Session",
+      firstMessage: "<ypi-studio-state>\nStatus: no_task\n</ypi-studio-state>",
+      messageCount: 2,
+    }),
+    "Named Session",
   );
 });
 

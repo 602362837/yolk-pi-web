@@ -53,17 +53,22 @@ const {
 
 let passed = 0;
 let failed = 0;
+// Sequential chain so async applyPricePatch tests do not race shared agentDir state.
+let testChain = Promise.resolve();
 
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ✓ ${name}`);
-  } catch (err) {
-    failed++;
-    console.log(`  ✗ ${name}`);
-    console.log(`    ${err.message}`);
-  }
+  testChain = testChain.then(async () => {
+    try {
+      await fn();
+      passed++;
+      console.log(`  ✓ ${name}`);
+    } catch (err) {
+      failed++;
+      console.log(`  ✗ ${name}`);
+      console.log(`    ${err.message}`);
+    }
+  });
+  return testChain;
 }
 
 function assertStringContains(haystack, needle, msg) {
@@ -425,11 +430,11 @@ test("writeModelsJsonAtomic creates parent directories", () => {
 
 console.log("\napplyPricePatch");
 
-test("returns 409 when revision does not match", () => {
+test("returns 409 when revision does not match", async () => {
   // Write initial content
   writeModelsJsonAtomic(JSON.stringify({ providers: {} }, null, 2) + "\n");
 
-  const result = applyPricePatch({
+  const result = await applyPricePatch({
     revision: "0000000000000000", // wrong revision
     changes: [{ provider: "test", model: "m", prices: { input: 1 } }],
   });
@@ -438,11 +443,11 @@ test("returns 409 when revision does not match", () => {
   assert.equal(result.success, false);
 });
 
-test("returns 422 for invalid batch", () => {
+test("returns 422 for invalid batch", async () => {
   const current = readModelsJsonRaw();
   const rev = current.revision;
 
-  const result = applyPricePatch({
+  const result = await applyPricePatch({
     revision: rev,
     changes: [{ provider: "test", model: "bad", prices: { input: -5 } }],
   });
@@ -451,14 +456,14 @@ test("returns 422 for invalid batch", () => {
   assert.equal(result.success, false);
 });
 
-test("successful apply returns 200 and new revision", () => {
+test("successful apply returns 200 and new revision", async () => {
   // Write clean content first
   writeModelsJsonAtomic(JSON.stringify({ providers: {} }, null, 2) + "\n");
 
   const current = readModelsJsonRaw();
   const rev = current.revision;
 
-  const result = applyPricePatch({
+  const result = await applyPricePatch({
     revision: rev,
     changes: [{ provider: "openai", model: "gpt-5", prices: { input: 5, output: 15, cacheRead: 1 } }],
   });
@@ -641,6 +646,8 @@ test("tryDeterministicMatch matches any/gpt against openai catalog", async () =>
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
+
+await testChain;
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 
