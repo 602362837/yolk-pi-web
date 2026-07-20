@@ -291,6 +291,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const lastPinnedModelRef = useRef<SessionModelRef | null>(null);
   /** Synchronous UI selection (updated in handleModelChange before React re-render). */
   const selectedModelRef = useRef<SessionModelRef | null>(null);
+  /** Tracks whether the current live agent has confirmed a model.
+   *  true after a successful set_model, create-body pin, get_state running+model,
+   *  or agent_end GET model. false when loadSession finds no live wrapper,
+   *  GET returns not running, or session cleanup. */
+  const liveAgentConfirmedRef = useRef<boolean>(false);
 
   const setNewSessionModel = opts.setNewSessionModel ?? setNewSessionModelState;
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
@@ -337,7 +342,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       live: liveSessionModel,
       context: data?.context.model ?? null,
     });
-    if (!shouldPinSessionModel(desired, lastPinnedModelRef.current)) {
+    if (!shouldPinSessionModel(desired, lastPinnedModelRef.current, { liveConfirmed: liveAgentConfirmedRef.current })) {
       return desired ?? lastPinnedModelRef.current;
     }
     return enqueueModelChange(async () => {
@@ -349,7 +354,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         live: liveSessionModel,
         context: data?.context.model ?? null,
       });
-      if (!shouldPinSessionModel(nextDesired, lastPinnedModelRef.current)) {
+      if (!shouldPinSessionModel(nextDesired, lastPinnedModelRef.current, { liveConfirmed: liveAgentConfirmedRef.current })) {
         return nextDesired ?? lastPinnedModelRef.current;
       }
       await sendAgentCommand(sid, {
@@ -358,6 +363,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         modelId: nextDesired.modelId,
       });
       lastPinnedModelRef.current = nextDesired;
+      liveAgentConfirmedRef.current = true;
       setCurrentModelOverride(nextDesired);
       setPendingModel(nextDesired);
       setLiveSessionModel(nextDesired);
@@ -494,6 +500,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           setCurrentModelOverride(null);
           setPendingModel(null);
           lastPinnedModelRef.current = null;
+          liveAgentConfirmedRef.current = false;
           selectedModelRef.current = null;
         }
         return null;
@@ -532,20 +539,28 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setLiveSessionModel(liveModel);
       }
       const contextModel = normalizeSessionModelRef(d.context.model);
-      // Pin baseline: live agent truth first; never overwrite a confirmed pin with
-      // path context alone (assistant history).
+      // Pin baseline: only live-agent confirmed models.
+      // Path context.model is for display/desired fallback only — it must never
+      // populate lastPinnedModelRef (assistant history can lag or be wrong).
       if (liveModel) {
         lastPinnedModelRef.current = liveModel;
+        liveAgentConfirmedRef.current = true;
         selectedModelRef.current = resolveChatDisplayModel({
           override: selectedModelRef.current,
           live: liveModel,
           context: contextModel,
         });
-      } else if (!lastPinnedModelRef.current && contextModel) {
-        lastPinnedModelRef.current = contextModel;
-        if (!selectedModelRef.current) {
-          selectedModelRef.current = contextModel;
-        }
+      } else if (includeState) {
+        // No live agent → pin baseline is unconfirmed.
+        // Force set_model on next send even if lastPinned matches desired
+        // (cold start / idle destroy scenarios).
+        lastPinnedModelRef.current = null;
+        liveAgentConfirmedRef.current = false;
+      }
+      // Context model can still seed selectedModelRef for display fallback
+      // when no explicit selection exists (does NOT mark as pinned).
+      if (!selectedModelRef.current && contextModel) {
+        selectedModelRef.current = contextModel;
       }
 
       setError(null);
@@ -647,7 +662,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         sessionIdRef.current = realId;
         precreatedSessionIdRef.current = realId;
         setPrecreatedSessionId(realId);
-        if (selectedModel) lastPinnedModelRef.current = selectedModel;
+        if (selectedModel) {
+          lastPinnedModelRef.current = selectedModel;
+          liveAgentConfirmedRef.current = true;
+        }
         const now = new Date().toISOString();
         onSessionCreated?.({
           id: realId,
@@ -757,6 +775,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               if (liveModel) {
                 setLiveSessionModel(liveModel);
                 lastPinnedModelRef.current = liveModel;
+                liveAgentConfirmedRef.current = true;
                 // Do not clear/replace explicit UI override; display prefers override > live.
                 selectedModelRef.current = resolveChatDisplayModel({
                   override: selectedModelRef.current,
@@ -1157,7 +1176,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const result = await res.json() as { sessionId: string };
         const realId = result.sessionId;
         sessionIdRef.current = realId;
-        if (selectedModel) lastPinnedModelRef.current = selectedModel;
+        if (selectedModel) {
+          lastPinnedModelRef.current = selectedModel;
+          liveAgentConfirmedRef.current = true;
+        }
         connectEvents(realId);
         const now = new Date().toISOString();
         onSessionCreated?.({
@@ -1279,6 +1301,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         await enqueueModelChange(async () => {
           await sendAgentCommand(draftSid, { type: "set_model", provider, modelId });
           lastPinnedModelRef.current = next;
+          liveAgentConfirmedRef.current = true;
           setLiveSessionModel(next);
           return next;
         });
@@ -1294,6 +1317,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       await enqueueModelChange(async () => {
         await sendAgentCommand(sid, { type: "set_model", provider, modelId });
         lastPinnedModelRef.current = next;
+        liveAgentConfirmedRef.current = true;
         setLiveSessionModel(next);
         return next;
       });

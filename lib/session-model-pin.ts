@@ -1,10 +1,16 @@
 /**
- * Pure helpers for chat model pin/display (IMP-002 MODEL-PIN-1/2).
+ * Pure helpers for chat model pin/display (IMP-002 MODEL-PIN-1/2/3/4 · MODEL-PIN-CS).
  *
  * UI selection must match the live agent model before prompt/steer.
  * After a turn, the selector must prefer live/explicit selection over
  * path context.model (which can follow the last assistant message).
  * These helpers stay free of React/fetch so scripts can unit-test rules.
+ *
+ * Key invariants:
+ * - lastPinned / confirmed must NOT come from path context.model alone.
+ * - Server cold-start default priority: session recoverable > yolk specific > settings/SDK.
+ * - Chat set_model is session-scoped (MODEL-PIN-3); yolk cold-start apply must also
+ *   use withSessionScopedSettingsDefaults.
  */
 
 export type SessionModelRef = {
@@ -80,12 +86,23 @@ export function resolveChatDisplayModel(sources: {
 /**
  * Call set_model when UI has a desired model that is not yet confirmed pinned.
  * If desired is null, there is nothing to pin (agent keeps its current model).
+ *
+ * When `options.liveConfirmed === false` the live agent has not confirmed any model
+ * (cold start, idle destroy, etc.).  In that case any valid desired model must be
+ * pinned, even if lastPinned happens to equal it (e.g. stale from a previous live
+ * session).  This prevents cold-start sends from falling through to the SDK/settings
+ * default without a set_model.
+ *
+ * Omitting `options` keeps the pre-CS equal-comparison behaviour for callers that
+ * have not yet adopted liveConfirmed tracking.
  */
 export function shouldPinSessionModel(
   desired: SessionModelRef | null | undefined,
   lastPinned: SessionModelRef | null | undefined,
+  options?: { liveConfirmed?: boolean },
 ): desired is SessionModelRef {
   if (!desired?.provider || !desired?.modelId) return false;
+  if (options && options.liveConfirmed === false) return true;
   return !sessionModelsEqual(desired, lastPinned);
 }
 
@@ -117,6 +134,65 @@ export function clampThinkingLevelToSupported<
     }
   }
   return supported[0] as T;
+}
+
+/**
+ * Result of resolveYolkColdStartModel: the yolk-specific model + thinking
+ * to use as the server cold-start fallback, or null when the user has chosen
+ * "follow Pi default" (mode !== "specific") or the config is incomplete.
+ */
+export type YolkColdStartModel = {
+  provider: string;
+  modelId: string;
+  thinking?: string;
+} | null;
+
+/**
+ * Parse yolk.defaultModel into a cold-start fallback model.
+ *
+ * Returns null when:
+ * - yolkConfig is missing / defaultModel is missing
+ * - defaultModel.mode is not "specific" (i.e. "piDefault" → caller should fall through to SDK/settings)
+ * - provider or modelId are empty
+ *
+ * thinking is taken from defaultModel.thinking first, falling back to
+ * defaultThinkingLevel (the legacy top-level field).
+ */
+export function resolveYolkColdStartModel(yolkConfig: {
+  defaultModel?: { mode?: string; provider?: string; modelId?: string; thinking?: string } | null;
+  defaultThinkingLevel?: string;
+} | null | undefined): YolkColdStartModel {
+  const dm = yolkConfig?.defaultModel;
+  if (!dm || dm.mode !== "specific") return null;
+  const provider = dm.provider?.trim();
+  const modelId = dm.modelId?.trim();
+  if (!provider || !modelId) return null;
+  return {
+    provider,
+    modelId,
+    thinking: dm.thinking ?? yolkConfig?.defaultThinkingLevel,
+  };
+}
+
+export type ColdStartModelPreference = "recoverable" | "yolk" | "sdk";
+
+/**
+ * Pure priority rule for server cold-start model selection.
+ *
+ *   1. session recoverable model (path/JSONL with valid auth) → "recoverable"
+ *   2. yolk specific model (resolveYolkColdStartModel returned non-null) → "yolk"
+ *   3. SDK / settings default → "sdk"
+ *
+ * This is a pure function so it can be unit-tested without touching
+ * SDK runtime, SettingsManager, or model auth lookups.
+ */
+export function resolveColdStartModelPreference(params: {
+  recoverable: boolean;
+  yolk: boolean;
+}): ColdStartModelPreference {
+  if (params.recoverable) return "recoverable";
+  if (params.yolk) return "yolk";
+  return "sdk";
 }
 
 /**

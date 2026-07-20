@@ -1,7 +1,61 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-18T12:19:30.289Z",
+  "updatedAt": "2026-07-19T12:21:19.354Z",
   "entries": [
+    {
+      "id": "20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "title": "修复 Chat 首轮发送未遵从会话选中模型（冷启动误用虚空默认模型）",
+      "taskId": "20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "taskKey": "archived:2026-07:20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "workflowId": "feature-dev",
+      "summary": "## 状态 子任务 MODEL-PIN-CS-04（文档同步与回归验证）已完成。全部 4 个子任务实现就绪，等待检查员审阅。 ## 实现摘要（全部子任务 CS-01..04） | 子任务 | 文件 | 改动 | | --- | --- | --- | | CS-01 | `lib/session-model-pin.ts` | `shouldPinSessionModel` 新增 `liveConfirmed` 选项；新增 `resolveYolkColdStartModel`、`resolveColdStartModelPreference`；文件头注释写入服务端冷启动优先级与 MODEL-PIN-3 约束 | | CS-01 | `scripts/test-session-model-pin.mjs` | 新增 8 个测试用例（liveConfirmed 语义 4 + yolk 解析 3 + 优先级 1），保留全部 PIN-1..4 原有用例 | | CS-02 | `hooks/useAgentSession.ts` | `loadSession`：删除 context.model→lastPinned 赋值；`liveAgentConfirmedRef` 跟踪 live 确认状态；`ensureSessionModel` 传 `{ liveConfirmed }`；agent_end/includeState live 模型确认；无 live 时清空 lastPinned 和 confirmed | | CS-03 | `lib/rpc-manager.ts` | 新增 `applyWebSessionColdStartDefaults`：优先 session 可恢复模型（path `model_change` + runtime 可用），否则 yolk specific + thinking（`mode === \"specific\"`），否则 SDK/settings；Studio child 跳过；全部走 `withSessionScopedSetting…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260719-182134-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型",
+      "knowledgePath": ".ypi/knowledge/20260719-202119-修复-chat-首轮发送未遵从会话选中模型-冷启动误用虚空默认模型.md",
+      "createdAt": "2026-07-19T12:21:19.354Z",
+      "archivedAt": "2026-07-19T12:21:19.354Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
+    {
+      "id": "20260719-192424-studio-上下文注入收敛-chat-折叠展示-system-单通道-保留-knowledge",
+      "title": "Studio 上下文注入收敛：Chat 折叠展示 + system 单通道（保留 knowledge 与子代理）",
+      "taskId": "20260718-195741-studio-上下文注入收敛-chat-折叠展示-system-单通道-保留-knowledge",
+      "taskKey": "archived:2026-07:20260718-195741-studio-上下文注入收敛-chat-折叠展示-system-单通道-保留-knowledge",
+      "workflowId": "feature-dev",
+      "summary": "## Status - 规划产物已写满（brief / prd / ui / design / implement / checks / plan-review + HTML） - **未改生产代码** - **未** `commit` / `push` / `merge` - Task state 仍可能显示 `intake`：子代理环境缺少 Studio 工具，无法 `update_implementation_plan` / `transition` ## Artifacts produced 目录：`.ypi/tasks/20260718-195741-studio-上下文注入收敛-chat-折叠展示-system-单通道-保留-knowledge/` | File | Notes | | --- | --- | | brief.md | 问题与证据 | | prd.md | R1–R17 + 范围 | | design.md | AS-IS/TO-BE、契约、风险 | | implement.md | SCI-01…06 DAG + ypi-implementation-plan JSON | | checks.md | 全覆盖矩阵 | | ui.md | UI 门禁说明 | | sci-user-message-prototype.html | L0 HTML 原型 | | plan-review.md | 用户审批入口 | ## Validation run - 源码与 Pi `extensions.md` 已对照阅读 - 未跑 lint/tsc（无代码改动） ## Remaining risks 1. UI 原型未经独立 ui-designer 流程（环境阻塞） 2. implementationPlan 未写入 task.json（需主会话 tool） 3. 用户尚未批 Q1–Q4 默认决策 ## Decisions needed from main session 1. 保存 implementationPlan 并 transition → **…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260718-195741-studio-上下文注入收敛-chat-折叠展示-system-单通道-保留-knowledge",
+      "knowledgePath": ".ypi/knowledge/20260719-192424-studio-上下文注入收敛-chat-折叠展示-system-单通道-保留-knowledge.md",
+      "createdAt": "2026-07-19T11:24:24.717Z",
+      "archivedAt": "2026-07-19T11:24:24.717Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260718-201930-自定义-openai-兼容提供商支持从-models-端点同步模型列表",
       "title": "自定义 OpenAI 兼容提供商支持从 /models 端点同步模型列表",

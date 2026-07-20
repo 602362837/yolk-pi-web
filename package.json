@@ -40,6 +40,8 @@
     "start": "next start -p 30141",
     "lint": "eslint .",
     "test:studio-policy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-policy.mjs",
+    "test:studio-message-display": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-message-display.mjs",
+    "test:studio-extension-sci": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-extension-sci.mjs",
     "test:studio-task-preview": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-task-preview.mjs",
     "test:studio-dag": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-dag.mjs",
     "test:studio-session-ownership": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-session-ownership.mjs",

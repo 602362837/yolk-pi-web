@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMP-001 — Studio tag injection preview prototype</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --bg-subtle: #eef0f3;
+      --bg-elevated: #ffffff;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --border: #d8dee6;
+      --accent: #3b82f6;
+      --user-bg: #eff6ff;
+      --control-radius-pill: 999px;
+      --usage-status-info-fg: #1d4ed8;
+      --usage-status-info-bg: #dbeafe;
+      --usage-status-info-border: #93c5fd;
+      --usage-status-warning-fg: #b45309;
+      --usage-status-warning-bg: #fef3c7;
+      --usage-status-success-fg: #047857;
+      --usage-status-success-bg: #d1fae5;
+      --usage-status-danger-fg: #b91c1c;
+      --usage-status-danger-bg: #fee2e2;
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    html.dark {
+      --bg: #0f1419;
+      --bg-subtle: #1a222c;
+      --bg-elevated: #1c2430;
+      --text: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --border: #2d3748;
+      --user-bg: #1e293b;
+      --usage-status-info-fg: #93c5fd;
+      --usage-status-info-bg: #1e3a5f;
+      --usage-status-info-border: #334155;
+      --usage-status-warning-fg: #fbbf24;
+      --usage-status-warning-bg: #3b2f14;
+      --usage-status-success-fg: #6ee7b7;
+      --usage-status-success-bg: #14352b;
+      --usage-status-danger-fg: #fca5a5;
+      --usage-status-danger-bg: #3f1d1d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px 64px;
+    }
+    .page { max-width: 880px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; }
+    h2 { font-size: 1.05rem; margin: 28px 0 10px; }
+    .lead, .note, .meta { color: var(--text-muted); font-size: 0.92rem; }
+    .banner {
+      border: 1px solid var(--usage-status-warning-fg);
+      background: var(--usage-status-warning-bg);
+      color: var(--usage-status-warning-fg);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      margin: 12px 0 20px;
+    }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      margin-bottom: 18px;
+    }
+    .toolbar button, .chip-btn {
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .toolbar button:focus-visible,
+    .chip-btn:focus-visible,
+    .message-studio-tag:focus-visible,
+    .pop-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .section {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 14px 18px;
+      margin-bottom: 16px;
+    }
+    .section h3 {
+      margin: 0 0 6px;
+      font-size: 0.95rem;
+    }
+    .label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    /* --- Chat chrome (simplified) --- */
+    .chat-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0;
+    }
+    .message-user-meta-row {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+      max-width: 85%;
+      margin-bottom: 4px;
+      min-width: 0;
+      position: relative;
+    }
+    .message-studio-tag-wrap {
+      position: relative;
+      max-width: 100%;
+    }
+    .message-studio-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      max-width: 100%;
+      min-width: 0;
+      border-radius: var(--control-radius-pill);
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 650;
+      line-height: 1.4;
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: inherit;
+    }
+    .message-studio-tag::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex: 0 0 auto;
+    }
+    .message-studio-tag .chev {
+      font-size: 9px;
+      opacity: 0.75;
+      margin-left: 1px;
+    }
+    .message-studio-tag[data-interactive="false"] {
+      pointer-events: none;
+      cursor: default;
+    }
+    .message-studio-tag[data-interactive="true"] {
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .message-studio-tag[data-status="implementing"],
+    .message-studio-tag[data-status="no_task"],
+    .message-studio-tag[data-status="checking"] {
+      color: var(--usage-status-info-fg);
+      background: var(--usage-status-info-bg);
+      border-color: var(--usage-status-info-border);
+    }
+    .message-studio-tag[data-status="awaiting_approval"],
+    .message-studio-tag[data-status="waiting_for_improvements"] {
+      color: var(--usage-status-warning-fg);
+      background: var(--usage-status-warning-bg);
+    }
+    .message-studio-tag[data-status="completed"] {
+      color: var(--usage-status-success-fg);
+      background: var(--usage-status-success-bg);
+    }
+    .message-studio-tag[data-status="failed"] {
+      color: var(--usage-status-danger-fg);
+      background: var(--usage-status-danger-bg);
+    }
+    .message-studio-tag[data-status="context"] {
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+    }
+    .message-bubble-row {
+      max-width: 85%;
+      width: fit-content;
+    }
+    .bubble {
+      background: var(--user-bg);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 4px;
+      max-width: 85%;
+      width: 100%;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    .actions button {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 4px;
+    }
+
+    /* --- Popover --- */
+    .message-studio-injection-popover {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 40;
+      width: min(420px, 92vw);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      padding: 10px;
+      text-align: left;
+    }
+    .message-studio-injection-popover[hidden] { display: none !important; }
+    .pop-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .pop-title {
+      font-size: 12px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .pop-close {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .pop-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin: 0 0 8px;
+      line-height: 1.4;
+    }
+    .pop-pre {
+      margin: 0;
+      max-height: min(320px, 50vh);
+      overflow: auto;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text);
+    }
+    .pop-trunc {
+      font-size: 11px;
+      color: var(--usage-status-warning-fg);
+      margin: 6px 0 0;
+    }
+    .pop-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .pop-btn {
+      border: 1px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 5px 9px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .pop-btn.primary {
+      background: color-mix(in srgb, var(--accent) 16%, var(--bg-elevated));
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+      color: var(--accent);
+      font-weight: 650;
+    }
+
+    .before .bubble {
+      border-color: color-mix(in srgb, var(--usage-status-danger-fg) 35%, var(--border));
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 800px) {
+      .grid-2.side { grid-template-columns: 1fr 1fr; }
+    }
+    .raw-sample {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      white-space: pre-wrap;
+      max-height: 160px;
+      overflow: auto;
+      color: var(--text-muted);
+    }
+    .checklist { font-size: 0.9rem; padding-left: 1.2em; }
+    .checklist li { margin: 4px 0; }
+    .narrow-demo {
+      max-width: 360px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 8px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      display: none;
+      z-index: 100;
+    }
+    .toast.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>IMP-001 · Studio tag 注入预览</h1>
+    <p class="lead">
+      SCI L0 干净气泡保留；仅在历史脏消息的 compact tag 上提供<strong>点击 → 只读 popover</strong>，查看被剥离的注入块并复制。
+    </p>
+    <div class="banner">
+      <strong>能力边界：</strong>预览 = 该条 <em>user</em> 消息里历史写入、现被 strip 的
+      <code>&lt;ypi-studio-*&gt;</code> 块。
+      <strong>不是</strong>当前 agent 本轮 system 通道 live 注入。
+      L1 之后的新用户消息通常无 tag、无可预览 user 注入。
+    </div>
+
+    <div class="toolbar">
+      <button type="button" id="themeToggle">切换明/暗主题</button>
+      <span class="meta">Esc / 点击外侧关闭 · 键盘可聚焦 tag</span>
+    </div>
+
+    <h2>1. Before / After</h2>
+    <div class="grid-2 side">
+      <div class="section before">
+        <div class="label">Before SCI（脏气泡）</div>
+        <div class="bubble">
+          确认，开始实现
+          <div class="raw-sample" style="margin-top:8px;max-height:120px;color:var(--usage-status-danger-fg)">
+&lt;ypi-studio-state&gt;
+Status: awaiting_approval
+Task: 20260718-demo (awaiting_approval)
+&lt;/ypi-studio-state&gt;
+&lt;ypi-studio-knowledge&gt;
+…大段 knowledge…
+&lt;/ypi-studio-knowledge&gt;</div>
+        </div>
+        <p class="note" style="margin:8px 0 0">主阅读路径被注入淹没；Copy 也脏。</p>
+      </div>
+      <div class="section">
+        <div class="label">After SCI + IMP-001（默认干净，可点排查）</div>
+        <div class="chat-col demo" data-demo="after">
+          <div class="message-user-meta-row">
+            <div class="message-studio-tag-wrap">
+              <button
+                type="button"
+                class="message-studio-tag"
+                data-status="awaiting_approval"
+                data-interactive="true"
+                aria-expanded="false"
+                aria-controls="pop-after"
+                id="tag-after"
+                title="Studio · awaiting_approval — view stripped injection"
+              >
+                Studio · awaiting_approval
+                <span class="chev" aria-hidden="true">▾</span>
+              </button>
+              <div
+                class="message-studio-injection-popover"
+                id="pop-after"
+                role="dialog"
+                aria-labelledby="pop-after-title"
+                hidden
+              >
+                <div class="pop-head">
+                  <p class="pop-title" id="pop-after-title">Studio · awaiting_approval</p>
+                  <button type="button" class="pop-close" data-close aria-label="Close injection preview">×</button>
+                </div>
+                <p class="pop-note">来自此条用户消息的历史注入（已从气泡剥离）。不是当前 system 通道的实时注入。</p>
+                <pre class="pop-pre" id="pre-after"></pre>
+                <div class="pop-actions">
+                  <button type="button" class="pop-btn primary" data-copy="injection">Copy injection</button>
+                  <button type="button" class="pop-btn" data-copy="raw">Copy full raw</button>
+                  <button type="button" class="pop-btn" data-close>Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="message-bubble-row">
+            <div class="bubble">确认，开始实现</div>
+          </div>
+          <div class="actions">
+            <button type="button" data-copy-display>Copy</button>
+            <span>Edit from here</span>
+            <span>12:04</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>2. 多 status / context</h2>
+    <div class="section">
+      <div class="chat-col" style="gap: 18px; align-items: stretch">
+        <div class="chat-col demo" data-demo="impl" style="align-items:flex-end">
+          <div class="message-user-meta-row">
+            <div class="message-studio-tag-wrap">
+              <button type="button" class="message-studio-tag" data-status="implementing" data-interactive="true" aria-expanded="false" aria-controls="pop-impl" id="tag-impl">
+                Studio · implementing <span class="chev" aria-hidden="true">▾</span>
+              </button>
+              <div class="message-studio-injection-popover" id="pop-impl" role="dialog" aria-labelledby="pop-impl-title" hidden>
+                <div class="pop-head">
+                  <p class="pop-title" id="pop-impl-title">Studio · implementing</p>
+                  <button type="button" class="pop-close" data-close aria-label="Close injection preview">×</button>
+                </div>
+                <p class="pop-note">Stripped from this user message (historical). Not the live system prompt.</p>
+                <pre class="pop-pre" id="pre-impl"></pre>
+                <div class="pop-actions">
+                  <button type="button" class="pop-btn primary" data-copy="injection">Copy injection</button>
+                  <button type="button" class="pop-btn" data-copy="raw">Copy full raw</button>
+                  <button type="button" class="pop-btn" data-close>Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="message-bubble-row"><div class="bubble">继续实现 SCI-03</div></div>
+        </div>
+
+        <div class="chat-col demo" data-demo="ctx" style="align-items:flex-end">
+          <div class="message-user-meta-row">
+            <div class="message-studio-tag-wrap">
+              <button type="button" class="message-studio-tag" data-status="context" data-interactive="true" aria-expanded="false" aria-controls="pop-ctx" id="tag-ctx">
+                Studio · context <span class="chev" aria-hidden="true">▾</span>
+              </button>
+              <div class="message-studio-injection-popover" id="pop-ctx" role="dialog" aria-labelledby="pop-ctx-title" hidden>
+                <div class="pop-head">
+                  <p class="pop-title" id="pop-ctx-title">Studio · context</p>
+                  <button type="button" class="pop-close" data-close aria-label="Close injection preview">×</button>
+                </div>
+                <p class="pop-note">仅 knowledge 块、无 state 时 status 回落 context。</p>
+                <pre class="pop-pre" id="pre-ctx"></pre>
+                <div class="pop-actions">
+                  <button type="button" class="pop-btn primary" data-copy="injection">Copy injection</button>
+                  <button type="button" class="pop-btn" data-close>Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="message-bubble-row"><div class="bubble">参考一下相关知识</div></div>
+        </div>
+      </div>
+    </div>
+
+    <h2>3. 无注入 / partial（不提供成功可点 tag）</h2>
+    <div class="grid-2 side">
+      <div class="section">
+        <div class="label">干净消息（新 SCI 或从未注入）</div>
+        <div class="chat-col" style="align-items:flex-end">
+          <div class="message-bubble-row"><div class="bubble">普通聊天，无 Studio tag</div></div>
+          <p class="note" style="margin:8px 0 0;max-width:85%;text-align:right">L1 后新 JSONL 通常如此 — <strong>无本改进入口</strong>。</p>
+        </div>
+      </div>
+      <div class="section">
+        <div class="label">partial 半截标签（SCI 保守）</div>
+        <div class="chat-col" style="align-items:flex-end">
+          <div class="message-bubble-row">
+            <div class="bubble">用户正文保留半截…<br /><code>&lt;ypi-studio-state&gt;Status: implementing</code></div>
+          </div>
+          <p class="note" style="margin:8px 0 0;max-width:85%;text-align:right">无成功态可点 tag（不伪造已清理）。</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>4. 窄屏</h2>
+    <div class="section">
+      <div class="narrow-demo">
+        <div class="chat-col demo" data-demo="narrow" style="align-items:flex-end">
+          <div class="message-user-meta-row" style="max-width:96%">
+            <div class="message-studio-tag-wrap">
+              <button type="button" class="message-studio-tag" data-status="no_task" data-interactive="true" aria-expanded="false" aria-controls="pop-narrow" id="tag-narrow">
+                Studio · no_task <span class="chev" aria-hidden="true">▾</span>
+              </button>
+              <div class="message-studio-injection-popover" id="pop-narrow" role="dialog" aria-labelledby="pop-narrow-title" hidden style="width:min(320px,88vw)">
+                <div class="pop-head">
+                  <p class="pop-title" id="pop-narrow-title">Studio · no_task</p>
+                  <button type="button" class="pop-close" data-close aria-label="Close injection preview">×</button>
+                </div>
+                <p class="pop-note">窄屏下 popover 仍右对齐 tag，主按钮可点。</p>
+                <pre class="pop-pre" id="pre-narrow" style="max-height:160px"></pre>
+                <div class="pop-actions">
+                  <button type="button" class="pop-btn primary" data-copy="injection">Copy injection</button>
+                  <button type="button" class="pop-btn" data-close>Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="message-bubble-row" style="max-width:96%"><div class="bubble">用工作室做个功能</div></div>
+        </div>
+      </div>
+    </div>
+
+    <h2>5. 实现映射 / 验收</h2>
+    <div class="section">
+      <ul class="checklist">
+        <li>类名：<code>.message-user-meta-row</code> / <code>.message-studio-tag</code> / <code>.message-studio-injection-popover</code></li>
+        <li>tag：<code>button</code> + <code>data-interactive="true"</code> + <code>aria-expanded</code></li>
+        <li>数据：<code>injectionText</code> → pre；气泡 Copy → <code>displayText</code></li>
+        <li>关闭：Esc / outside / Close / toggle</li>
+        <li>L1 extension <strong>零改动</strong></li>
+      </ul>
+      <p class="meta">批准本 HTML 后实现 IMP1-02。文件：improvements/imp_xtv1yw4y/sci-injection-preview-prototype.html</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const SAMPLES = {
+      after: {
+        display: "确认，开始实现",
+        injection: `<ypi-studio-state>
+Status: awaiting_approval
+Task: 20260718-demo (awaiting_approval)
+Title: Studio Context Integrity
+</ypi-studio-state>
+
+<ypi-studio-knowledge>
+Reusable knowledge (bounded)…
+- plan-review as approval entry
+</ypi-studio-knowledge>`,
+      },
+      impl: {
+        display: "继续实现 SCI-03",
+        injection: `<ypi-studio-state>
+Task: 20260718-demo (implementing)
+Active: SCI-03
+</ypi-studio-state>`,
+      },
+      ctx: {
+        display: "参考一下相关知识",
+        injection: `<ypi-studio-knowledge>
+Only knowledge block — status falls back to context
+</ypi-studio-knowledge>`,
+      },
+      narrow: {
+        display: "用工作室做个功能",
+        injection: `<ypi-studio-state>
+Status: no_task
+No active Studio task.
+</ypi-studio-state>`,
+      },
+    };
+
+    function toast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove("show"), 1400);
+    }
+
+    function closeAll(except) {
+      document.querySelectorAll(".message-studio-injection-popover").forEach((p) => {
+        if (except && p === except) return;
+        p.hidden = true;
+      });
+      document.querySelectorAll(".message-studio-tag[data-interactive='true']").forEach((b) => {
+        if (except && b.getAttribute("aria-controls") === except.id) return;
+        b.setAttribute("aria-expanded", "false");
+      });
+    }
+
+    function wireDemo(root) {
+      const key = root.getAttribute("data-demo");
+      const sample = SAMPLES[key];
+      if (!sample) return;
+      const tag = root.querySelector(".message-studio-tag");
+      const pop = root.querySelector(".message-studio-injection-popover");
+      const pre = root.querySelector(".pop-pre");
+      if (!tag || !pop || !pre) return;
+      pre.textContent = sample.injection;
+
+      const open = () => {
+        closeAll(pop);
+        pop.hidden = false;
+        tag.setAttribute("aria-expanded", "true");
+      };
+      const close = () => {
+        pop.hidden = true;
+        tag.setAttribute("aria-expanded", "false");
+        tag.focus();
+      };
+
+      tag.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (pop.hidden) open();
+        else close();
+      });
+
+      pop.querySelectorAll("[data-close]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          close();
+        });
+      });
+
+      pop.querySelectorAll("[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const kind = btn.getAttribute("data-copy");
+          const text =
+            kind === "raw"
+              ? sample.display + "\n\n" + sample.injection
+              : sample.injection;
+          try {
+            await navigator.clipboard.writeText(text);
+            toast(kind === "raw" ? "Copied full raw" : "Copied injection");
+          } catch {
+            toast("Clipboard failed (prototype)");
+          }
+        });
+      });
+
+      const displayBtn = root.querySelector("[data-copy-display]");
+      if (displayBtn) {
+        displayBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(sample.display);
+            toast("Copied clean displayText");
+          } catch {
+            toast("Clipboard failed");
+          }
+        });
+      }
+
+      pop.addEventListener("click", (e) => e.stopPropagation());
+    }
+
+    document.querySelectorAll(".demo").forEach(wireDemo);
+
+    document.addEventListener("mousedown", (e) => {
+      const t = e.target;
+      if (t.closest && (t.closest(".message-studio-injection-popover") || t.closest(".message-studio-tag"))) {
+        return;
+      }
+      closeAll();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const openPop = document.querySelector(".message-studio-injection-popover:not([hidden])");
+        if (!openPop) return;
+        const id = openPop.id;
+        const tag = document.querySelector(`.message-studio-tag[aria-controls="${id}"]`);
+        openPop.hidden = true;
+        if (tag) {
+          tag.setAttribute("aria-expanded", "false");
+          tag.focus();
+        }
+      }
+    });
+
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      document.documentElement.classList.toggle("dark");
+    });
+  </script>
+</body>
+</html>
