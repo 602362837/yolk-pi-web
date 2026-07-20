@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCI L0 — User Message Display Prototype (UI Gate)</title>
+  <style>
+    /*
+     * Token mapping mirrors app/globals.css light (:root) / dark (html.dark).
+     * Implementation must reuse real CSS variables — do not invent a new palette.
+     */
+    :root {
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --user-bg: #eff6ff;
+      --bg-subtle: rgba(0, 0, 0, 0.03);
+      --control-radius-pill: 999px;
+      --control-motion-fast: 140ms;
+
+      --usage-status-success-fg: #15803d;
+      --usage-status-success-bg: rgba(34, 197, 94, 0.10);
+      --usage-status-warning-fg: #b45309;
+      --usage-status-warning-bg: rgba(245, 158, 11, 0.10);
+      --usage-status-danger-fg: #b91c1c;
+      --usage-status-danger-bg: rgba(239, 68, 68, 0.08);
+      --usage-status-info-fg: color-mix(in srgb, var(--text) 72%, var(--accent) 28%);
+      --usage-status-info-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+      --usage-status-info-border: color-mix(in srgb, var(--accent) 28%, var(--border) 72%);
+
+      --user-border: color-mix(in srgb, var(--accent) 20%, transparent);
+      --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --ok-soft: var(--usage-status-success-bg);
+      --danger-soft: var(--usage-status-danger-bg);
+    }
+
+    html.dark {
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --user-bg: #1e293b;
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+      --usage-status-success-fg: #4ade80;
+      --usage-status-success-bg: rgba(34, 197, 94, 0.10);
+      --usage-status-warning-fg: #fbbf24;
+      --usage-status-warning-bg: rgba(251, 191, 36, 0.10);
+      --usage-status-danger-fg: #fb7185;
+      --usage-status-danger-bg: rgba(239, 68, 68, 0.10);
+      --usage-status-info-fg: color-mix(in srgb, var(--text) 70%, var(--accent) 30%);
+      --usage-status-info-bg: rgba(96, 165, 250, 0.08);
+      --usage-status-info-border: rgba(96, 165, 250, 0.28);
+      --user-border: color-mix(in srgb, var(--accent) 22%, transparent);
+      --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg-panel);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 72px;
+    }
+    header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 6px;
+      letter-spacing: -0.01em;
+    }
+    header .lead {
+      margin: 0 0 12px;
+      color: var(--text-muted);
+      font-size: 13px;
+      max-width: 72ch;
+    }
+    .gate-banner {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      border-radius: 10px;
+      border: 1px solid color-mix(in srgb, var(--usage-status-warning-fg) 35%, var(--border));
+      background: var(--usage-status-warning-bg);
+      color: var(--text);
+      font-size: 12.5px;
+    }
+    .gate-banner strong { color: var(--usage-status-warning-fg); }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      align-items: center;
+    }
+    .toolbar .hint {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .btn {
+      font: inherit;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn[aria-pressed="true"] {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+      color: var(--accent);
+    }
+    .panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px 10px;
+      margin-bottom: 14px;
+    }
+    .panel h2 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .panel h3 {
+      margin: 12px 0 6px;
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .panel .desc {
+      margin: 0 0 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      border-radius: var(--control-radius-pill);
+      padding: 2px 8px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .badge-before {
+      background: var(--danger-soft);
+      color: var(--usage-status-danger-fg);
+    }
+    .badge-after {
+      background: var(--ok-soft);
+      color: var(--usage-status-success-fg);
+    }
+    .badge-spec {
+      background: var(--usage-status-info-bg);
+      color: var(--usage-status-info-fg);
+    }
+
+    /* Simulated chat column */
+    .chat-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 8px 12px;
+      background: var(--bg-panel);
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+    }
+    .chat-col.is-narrow {
+      max-width: 360px;
+      margin-inline: auto;
+    }
+
+    /* ===== Existing UserMessageView pattern ===== */
+    .message-view-user {
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .message-bubble-row-user {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      max-width: 85%;
+    }
+    .message-bubble-user {
+      flex: 1;
+      min-width: 0;
+      background: var(--user-bg);
+      border: 1px solid var(--user-border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .message-bubble-user p { margin: 0; white-space: pre-wrap; }
+    .message-bubble-user p + p { margin-top: 0.5em; }
+    .message-bubble-user code {
+      font-family: var(--mono);
+      font-size: 0.9em;
+      background: var(--bg-subtle);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .message-bubble-user .md-list {
+      margin: 0.35em 0 0;
+      padding-left: 1.2em;
+    }
+    .message-bubble-user .md-list li { margin: 0.15em 0; }
+    .message-action-row-user {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 3px;
+      max-width: 100%;
+    }
+    .message-hover-actions {
+      display: flex;
+      gap: 3px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.12s;
+    }
+    .message-view-user:hover .message-hover-actions,
+    .message-view-user:focus-within .message-hover-actions,
+    .chat-col.show-actions .message-hover-actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .ghost-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      padding: 3px 8px;
+      height: 22px;
+      border-radius: 5px;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.12s;
+    }
+    .ghost-btn:hover { color: var(--accent); }
+    .ghost-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      color: var(--accent);
+    }
+    .ghost-btn.is-copied { color: var(--accent); }
+    .msg-time {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* ===== SCI L0 additions (implement these classes) ===== */
+    .message-user-meta-row {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+      max-width: 85%;
+      margin-bottom: 4px;
+      min-width: 0;
+    }
+    .message-studio-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      max-width: 100%;
+      min-width: 0;
+      border-radius: var(--control-radius-pill);
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 650;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      color: var(--usage-status-info-fg);
+      background: var(--usage-status-info-bg);
+      border: 1px solid var(--usage-status-info-border);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      user-select: none;
+      cursor: default;
+    }
+    .message-studio-tag::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.9;
+      flex: 0 0 auto;
+    }
+    /* Light status tints — keep secondary to bubble text */
+    .message-studio-tag[data-status="no_task"],
+    .message-studio-tag[data-status="planning"],
+    .message-studio-tag[data-status="intake"],
+    .message-studio-tag[data-status="implementing"],
+    .message-studio-tag[data-status="checking"] {
+      color: var(--usage-status-info-fg);
+      background: var(--usage-status-info-bg);
+      border-color: var(--usage-status-info-border);
+    }
+    .message-studio-tag[data-status="awaiting_approval"],
+    .message-studio-tag[data-status="waiting_for_improvements"],
+    .message-studio-tag[data-status="review"],
+    .message-studio-tag[data-status="user_acceptance"] {
+      color: var(--usage-status-warning-fg);
+      background: var(--usage-status-warning-bg);
+      border-color: color-mix(in srgb, var(--usage-status-warning-fg) 28%, var(--border));
+    }
+    .message-studio-tag[data-status="awaiting_approval"]::before,
+    .message-studio-tag[data-status="waiting_for_improvements"]::before,
+    .message-studio-tag[data-status="review"]::before,
+    .message-studio-tag[data-status="user_acceptance"]::before {
+      background: var(--usage-status-warning-fg);
+    }
+    .message-studio-tag[data-status="completed"] {
+      color: var(--usage-status-success-fg);
+      background: var(--usage-status-success-bg);
+      border-color: color-mix(in srgb, var(--usage-status-success-fg) 28%, var(--border));
+    }
+    .message-studio-tag[data-status="completed"]::before {
+      background: var(--usage-status-success-fg);
+    }
+    .message-studio-tag[data-status="failed"],
+    .message-studio-tag[data-status="cancelled"] {
+      color: var(--usage-status-danger-fg);
+      background: var(--usage-status-danger-bg);
+      border-color: color-mix(in srgb, var(--usage-status-danger-fg) 28%, var(--border));
+    }
+    .message-studio-tag[data-status="failed"]::before,
+    .message-studio-tag[data-status="cancelled"]::before {
+      background: var(--usage-status-danger-fg);
+    }
+    .message-studio-tag[data-status="context"],
+    .message-studio-tag[data-status="unknown"] {
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      border-color: var(--border);
+    }
+    .message-studio-tag[data-status="context"]::before,
+    .message-studio-tag[data-status="unknown"]::before {
+      background: var(--text-dim);
+    }
+
+    /* Tag is not interactive in L0 */
+    .message-studio-tag[data-interactive="false"] {
+      pointer-events: none;
+    }
+
+    .raw-block {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 180px;
+      overflow: auto;
+    }
+    .note {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 8px 0 0;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 4px;
+    }
+    .state-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .state-table th,
+    .state-table td {
+      border: 1px solid var(--border);
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .state-table th {
+      background: var(--bg-panel);
+      font-weight: 650;
+      color: var(--text-muted);
+    }
+    .checklist {
+      margin: 0;
+      padding-left: 1.15em;
+      font-size: 12.5px;
+      color: var(--text);
+    }
+    .checklist li { margin: 0.35em 0; }
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 16px;
+    }
+    .toc a {
+      font-size: 11px;
+      color: var(--accent);
+      text-decoration: none;
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+      background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+      border-radius: var(--control-radius-pill);
+      padding: 3px 9px;
+    }
+    .toc a:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+    .toc a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .kbd {
+      font-family: var(--mono);
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 0 4px;
+      background: var(--bg-panel);
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .message-bubble-row-user,
+      .message-user-meta-row { max-width: 96%; }
+      .message-hover-actions {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>SCI L0 — 用户消息展示原型</h1>
+      <p class="lead">
+        定稿 UI 门禁材料。对齐现网 <code>UserMessageView</code>：右对齐、
+        <code>--user-bg</code>、hover 显隐 actions。SCI 仅在<strong>有可识别注入</strong>时
+        于气泡上方增加 compact <strong>Studio · &lt;status&gt;</strong> tag；气泡正文与
+        Copy / Edit 使用剥离后的干净文本。L0 <strong>不</strong>支持点击展开原始注入。
+      </p>
+      <div class="gate-banner" role="note">
+        <div>
+          <strong>审批门禁：</strong>
+          请用户批准本 HTML 原型后方可实现 SCI-03（UserMessageView + CSS）。
+          批准后实现员必须按本文件 DOM / 类名 / 状态矩阵落地；偏离需重新 UI 审阅。
+        </div>
+      </div>
+      <nav class="toc" aria-label="原型章节">
+        <a href="#legend">图例</a>
+        <a href="#before-after">Before / After</a>
+        <a href="#status-matrix">状态矩阵</a>
+        <a href="#fallback">Fallback</a>
+        <a href="#clean">无注入</a>
+        <a href="#narrow">窄屏</a>
+        <a href="#ia">信息架构</a>
+        <a href="#impl">实现映射</a>
+        <a href="#a11y">A11y</a>
+        <a href="#checks">验收点</a>
+      </nav>
+      <div class="toolbar">
+        <button type="button" class="btn" id="themeToggle" aria-pressed="false">切换暗色主题</button>
+        <button type="button" class="btn" id="actionsToggle" aria-pressed="false">强制显示 actions</button>
+        <span class="hint">桌面：悬停消息显示 Copy / Edit · 窄屏：actions 常显（对齐 globals 移动端）</span>
+      </div>
+    </header>
+
+    <section class="panel" id="legend">
+      <h2>Tag 样式图例 <span class="badge badge-spec">L0</span></h2>
+      <p class="desc">
+        文案固定 <code>Studio · {status}</code>；status 来自 state 解析，无法解析时用
+        <code>context</code>。色差仅作轻量扫读辅助，不替代正文。
+      </p>
+      <div class="legend" aria-label="Studio tag samples">
+        <span class="message-studio-tag" data-status="no_task" data-interactive="false" title="Studio · no_task">Studio · no_task</span>
+        <span class="message-studio-tag" data-status="planning" data-interactive="false" title="Studio · planning">Studio · planning</span>
+        <span class="message-studio-tag" data-status="awaiting_approval" data-interactive="false" title="Studio · awaiting_approval">Studio · awaiting_approval</span>
+        <span class="message-studio-tag" data-status="implementing" data-interactive="false" title="Studio · implementing">Studio · implementing</span>
+        <span class="message-studio-tag" data-status="completed" data-interactive="false" title="Studio · completed">Studio · completed</span>
+        <span class="message-studio-tag" data-status="failed" data-interactive="false" title="Studio · failed">Studio · failed</span>
+        <span class="message-studio-tag" data-status="context" data-interactive="false" title="Studio · context">Studio · context</span>
+      </div>
+      <p class="note">
+        语义分组：info（流程中）/ warning（待用户）/ success（完成）/ danger（失败取消）/
+        muted（context/unknown）。实现可用 <code>data-status</code> 映射，不必为每个 status 单独组件。
+      </p>
+    </section>
+
+    <div class="grid-2" id="before-after">
+      <section class="panel">
+        <h2>Before <span class="badge badge-before">现网脏气泡</span></h2>
+        <p class="desc">JSONL 全文直接进 Markdown；注入淹没用户意图；Copy 带整段 XML。</p>
+        <div class="chat-col">
+          <div class="message-view-user">
+            <div class="message-bubble-row-user">
+              <div class="message-bubble-user">
+                <p>用工作室做：把 Studio 注入从 Chat 用户气泡里拿掉。</p>
+                <p>&lt;ypi-studio-state&gt;
+Status: no_task
+Existing Studio tasks: 20260718-…(intake)
+If the user asks for non-trivial development work…
+&lt;/ypi-studio-state&gt;
+&lt;ypi-studio-knowledge&gt;
+Reusable YPI Studio knowledge…
+- 优化计划审批书…
+&lt;/ypi-studio-knowledge&gt;</p>
+              </div>
+            </div>
+            <div class="message-action-row-user">
+              <div class="message-hover-actions">
+                <button type="button" class="ghost-btn" title="Copy message">Copy</button>
+                <button type="button" class="ghost-btn" title="Edit from here">Edit from here</button>
+              </div>
+              <span class="msg-time">19:57</span>
+            </div>
+          </div>
+        </div>
+        <p class="note">问题：主阅读路径被污染；标题种子 / 剪贴板也可能带噪声。</p>
+      </section>
+
+      <section class="panel">
+        <h2>After <span class="badge badge-after">SCI L0</span></h2>
+        <p class="desc">主阅读路径 = 用户原文；tag 仅提示“当时附过 Studio 上下文”。</p>
+        <div class="chat-col">
+          <!-- Dirty historical → clean + tag -->
+          <div class="message-view-user">
+            <div class="message-user-meta-row">
+              <span
+                class="message-studio-tag"
+                data-status="no_task"
+                data-interactive="false"
+                title="Studio · no_task — context was attached; display stripped"
+              >Studio · no_task</span>
+            </div>
+            <div class="message-bubble-row-user">
+              <div class="message-bubble-user">
+                <p>用工作室做：把 Studio 注入从 Chat 用户气泡里拿掉。</p>
+              </div>
+            </div>
+            <div class="message-action-row-user">
+              <div class="message-hover-actions">
+                <button type="button" class="ghost-btn" title="Copy clean text" data-demo-copy="用工作室做：把 Studio 注入从 Chat 用户气泡里拿掉。">Copy</button>
+                <button type="button" class="ghost-btn" title="Edit clean text">Edit from here</button>
+              </div>
+              <span class="msg-time">19:57</span>
+            </div>
+          </div>
+
+          <!-- Approval message -->
+          <div class="message-view-user">
+            <div class="message-user-meta-row">
+              <span
+                class="message-studio-tag"
+                data-status="awaiting_approval"
+                data-interactive="false"
+                title="Studio · awaiting_approval"
+              >Studio · awaiting_approval</span>
+            </div>
+            <div class="message-bubble-row-user">
+              <div class="message-bubble-user">
+                <p>确认，开始实现。</p>
+              </div>
+            </div>
+            <div class="message-action-row-user">
+              <div class="message-hover-actions">
+                <button type="button" class="ghost-btn" title="Copy clean text" data-demo-copy="确认，开始实现。">Copy</button>
+                <button type="button" class="ghost-btn" title="Edit clean text">Edit from here</button>
+              </div>
+              <span class="msg-time">20:12</span>
+            </div>
+          </div>
+
+          <!-- Clean new message after L1: no tag -->
+          <div class="message-view-user">
+            <div class="message-bubble-row-user">
+              <div class="message-bubble-user">
+                <p>继续，先做 strip 纯函数。</p>
+              </div>
+            </div>
+            <div class="message-action-row-user">
+              <div class="message-hover-actions">
+                <button type="button" class="ghost-btn" title="Copy message" data-demo-copy="继续，先做 strip 纯函数。">Copy</button>
+                <button type="button" class="ghost-btn" title="Edit from here">Edit from here</button>
+              </div>
+              <span class="msg-time">20:30</span>
+            </div>
+          </div>
+        </div>
+        <p class="note">L1 后新消息 JSONL 干净 → 无 tag，与普通 Chat 零差异。LLM 上下文改走 system 单通道（UI 不可见）。</p>
+      </section>
+    </div>
+
+    <section class="panel" id="status-matrix">
+      <h2>状态矩阵（历史脏消息）</h2>
+      <p class="desc">同一布局，仅 tag 文案 / data-status 变化。实现不得把注入正文塞进气泡。</p>
+      <div class="chat-col">
+        <div class="message-view-user">
+          <div class="message-user-meta-row">
+            <span class="message-studio-tag" data-status="implementing" data-interactive="false" title="Studio · implementing">Studio · implementing</span>
+          </div>
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>卡住了的话先 claim 下一个 ready subtask。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+            </div>
+            <span class="msg-time">21:04</span>
+          </div>
+        </div>
+
+        <div class="message-view-user">
+          <div class="message-user-meta-row">
+            <span class="message-studio-tag" data-status="planning" data-interactive="false" title="Studio · planning">Studio · planning</span>
+          </div>
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>补充：L0 不要做点击展开，先保证可读。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+            </div>
+            <span class="msg-time">21:08</span>
+          </div>
+        </div>
+
+        <div class="message-view-user">
+          <div class="message-user-meta-row">
+            <span class="message-studio-tag" data-status="context" data-interactive="false" title="Studio · context — knowledge only / status unknown">Studio · context</span>
+          </div>
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>只带 knowledge、没有可解析 Status 的历史消息走 context。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+            </div>
+            <span class="msg-time">21:09</span>
+          </div>
+        </div>
+
+        <div class="message-view-user">
+          <div class="message-user-meta-row">
+            <span class="message-studio-tag" data-status="completed" data-interactive="false" title="Studio · completed">Studio · completed</span>
+          </div>
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>收尾文档也写进 checks 吧。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+            </div>
+            <span class="msg-time">21:11</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="fallback">
+      <h2>Fallback / 半截标签 / Markdown 保留</h2>
+      <p class="desc">
+        只剥离<strong>完整闭合</strong>注入块。半截 / 解析异常：不伪造“已清理成功”；
+        Copy/Edit 与气泡同用保守结果（完整块已剥、半截保留；异常则全文）。
+      </p>
+
+      <h3>A. 半截开标签（stripConfidence=partial）</h3>
+      <div class="chat-col">
+        <div class="message-view-user">
+          <!-- partial: may omit success tag or use context; prototype chooses NO success-clean tag -->
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>请看这个半截示例：&lt;ypi-studio-state&gt;Status: no_task</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn" title="Copy full/partial text">Copy</button>
+            </div>
+            <span class="msg-time">21:10</span>
+          </div>
+        </div>
+      </div>
+      <p class="note">推荐 UI：不显示“已干净”成功态 tag。若 partial 且仍解析到 status，可用中性 tag，但 L0 默认不显示更安全。</p>
+
+      <h3>B. 用户讨论标签字面量（不得误伤）</h3>
+      <div class="chat-col">
+        <div class="message-view-user">
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>文档里会提到字面量 <code>ypi-studio-state</code>，以及示例写法 <code>&lt;ypi-studio-state&gt;</code>，这些不是完整注入块。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+            </div>
+            <span class="msg-time">21:12</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>C. 用户 Markdown 多段（剥离后仍渲染）</h3>
+      <div class="chat-col">
+        <div class="message-view-user">
+          <div class="message-user-meta-row">
+            <span class="message-studio-tag" data-status="implementing" data-interactive="false" title="Studio · implementing">Studio · implementing</span>
+          </div>
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>请按这个顺序：</p>
+              <ul class="md-list">
+                <li>先做 strip 纯函数</li>
+                <li>再挂 UserMessageView</li>
+              </ul>
+              <p>注意保留代码块与列表。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+              <button type="button" class="ghost-btn">Edit from here</button>
+            </div>
+            <span class="msg-time">21:15</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="clean">
+      <h2>无注入 / 普通聊天（零回归）</h2>
+      <p class="desc">hadInjection=false → 不渲染 meta-row / tag；布局、间距与现网一致。</p>
+      <div class="chat-col">
+        <div class="message-view-user">
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>帮我解释一下 session title 是怎么生成的？</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+              <button type="button" class="ghost-btn">Edit from here</button>
+              <button type="button" class="ghost-btn">New session</button>
+            </div>
+            <span class="msg-time">09:41</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="narrow">
+      <h2>窄屏 / 长 status</h2>
+      <p class="desc">
+        max-width 对齐 bubble row（桌面 ~85%，移动 ~96%）。tag 可 ellipsis，不把气泡挤破。
+        移动端 hover actions 常显（对齐 <code>globals.css</code>）。
+      </p>
+      <div class="chat-col is-narrow show-actions">
+        <div class="message-view-user">
+          <div class="message-user-meta-row">
+            <span
+              class="message-studio-tag"
+              data-status="waiting_for_improvements"
+              data-interactive="false"
+              title="Studio · waiting_for_improvements"
+            >Studio · waiting_for_improvements</span>
+          </div>
+          <div class="message-bubble-row-user">
+            <div class="message-bubble-user">
+              <p>窄屏下长 status 也要可读，正文仍是主视觉。</p>
+            </div>
+          </div>
+          <div class="message-action-row-user">
+            <div class="message-hover-actions">
+              <button type="button" class="ghost-btn">Copy</button>
+              <button type="button" class="ghost-btn">Edit from here</button>
+            </div>
+            <span class="msg-time">21:20</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="ia">
+      <h2>信息架构与 DOM</h2>
+      <p class="desc">仅 user 消息；assistant / tool 不改。</p>
+      <div class="raw-block">.message-view.message-view-user
+  [.message-user-meta-row]                    ← only if hadInjection && showTag
+    span.message-studio-tag[data-status][title]
+  .message-bubble-row.message-bubble-row-user  ← max-width 85% (96% mobile)
+    .message-bubble-user / markdown-user-message
+      images? + MarkdownBody(displayText)
+  .message-action-row.message-action-row-user
+    .message-hover-actions → Copy | Edit from here | New session
+    time</div>
+      <table class="state-table" style="margin-top:12px">
+        <thead>
+          <tr>
+            <th>场景</th>
+            <th>展示</th>
+            <th>用户操作</th>
+            <th>反馈</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>历史脏消息（完整块）</td>
+            <td>tag + 干净正文</td>
+            <td>读 / Copy / Edit</td>
+            <td>剪贴板与回填 = displayText</td>
+          </tr>
+          <tr>
+            <td>新消息（L1 后）</td>
+            <td>仅正文，无 tag</td>
+            <td>同现网</td>
+            <td>零视觉回归</td>
+          </tr>
+          <tr>
+            <td>半截 / parse 异常</td>
+            <td>保守全文或 partial 文本；默认无成功 tag</td>
+            <td>Copy/Edit 同展示文本</td>
+            <td>不丢用户内容</td>
+          </tr>
+          <tr>
+            <td>点击 tag</td>
+            <td>L0 无响应（非按钮）</td>
+            <td>—</td>
+            <td>L2 才考虑展开</td>
+          </tr>
+          <tr>
+            <td>悬停消息</td>
+            <td>actions 淡入</td>
+            <td>Copy / Edit / Fork</td>
+            <td>保持现网显隐</td>
+          </tr>
+          <tr>
+            <td>仅图片无文本</td>
+            <td>无 tag（无文本可剥）；图保留</td>
+            <td>同现网</td>
+            <td>不因 SCI 隐藏图</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="impl">
+      <h2>实现映射（SCI-03）</h2>
+      <div class="raw-block">// components/MessageView.tsx — UserMessageView
+const raw = /* existing content join */;
+let parsed;
+try {
+  parsed = parseYpiStudioUserMessage(raw);
+} catch {
+  parsed = { displayText: raw, rawText: raw, hadInjection: false, studioStatus: null, stripConfidence: "none" };
+}
+const bodyText = parsed.displayText;
+const showTag = parsed.hadInjection && parsed.stripConfidence === "full" && parsed.studioStatus;
+
+// render:
+//   {showTag && (
+//     &lt;div className="message-user-meta-row"&gt;
+//       &lt;span className="message-studio-tag" data-status={parsed.studioStatus}
+//             title={formatYpiStudioMessageTag(parsed.studioStatus)}&gt;
+//         {formatYpiStudioMessageTag(parsed.studioStatus)}
+//       &lt;/span&gt;
+//     &lt;/div&gt;
+//   )}
+//   MarkdownBody → bodyText
+//   Copy / Edit → bodyText (not raw)
+
+// app/globals.css
+.message-user-meta-row { ... }
+.message-studio-tag,
+.message-studio-tag[data-status="..."] { ... }
+// prefer existing --accent / --usage-status-* / --text-dim / --user-bg
+
+// lib/ypi-studio-message-display.ts (SCI-01)
+parseYpiStudioUserMessage / stripYpiStudioInjections / formatYpiStudioMessageTag
+
+// Out of L0 visual scope
+// L1: input continue + before_agent_start system single-channel
+// L2: click-to-expand raw injection, history rewrite, token budget</div>
+    </section>
+
+    <section class="panel" id="a11y">
+      <h2>可访问性</h2>
+      <ul class="checklist">
+        <li>Tag 是<strong>纯文本装饰</strong>（<code>span</code>，非 button/link）；L0 不抢焦点。</li>
+        <li><code>title</code> 提供完整 status 文案；信息不以颜色为唯一通道（始终有 <code>Studio · status</code> 文字）。</li>
+        <li>Copy / Edit 保持可键盘聚焦；<code>:focus-visible</code> 使用 <code>--accent</code> 描边。</li>
+        <li>消息容器 <code>:focus-within</code> 时显示 hover actions，便于键盘用户。</li>
+        <li>对比度：明暗主题均用现网 status token；实现后人工扫一眼 dark 模式 tag。</li>
+        <li>不要用仅 icon 的 tag；不要把注入全文塞进 <code>aria-label</code>（过长且 L0 不展开）。</li>
+      </ul>
+    </section>
+
+    <section class="panel" id="checks">
+      <h2>UI 验收点（实现员 / 检查员）</h2>
+      <ul class="checklist">
+        <li>脏消息气泡不再渲染 <code>&lt;ypi-studio-state&gt;</code> / knowledge 大段正文。</li>
+        <li>tag 文案严格 <code>Studio · {status}</code>；未知注入 → <code>Studio · context</code>。</li>
+        <li>干净消息：无 meta-row、无额外间距回归。</li>
+        <li>Copy / Edit from here 使用 displayText；失败路径用全文。</li>
+        <li>tag 右对齐于 user 列；与 bubble 间距约 4px；max-width 与 bubble row 一致。</li>
+        <li>窄屏长 status 不横向撑破布局（ellipsis / shrink）。</li>
+        <li>明暗主题对比度可接受；hover actions 显隐与现网一致。</li>
+        <li>L0 点击 tag 无展开 / 无 modal。</li>
+      </ul>
+      <p class="note">
+        <strong>请用户批准本 HTML 后方可实现 SCI-03。</strong>
+        批准用语示例：<span class="kbd">UI 原型确认，可按 sci-user-message-prototype.html 实现</span>
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const themeBtn = document.getElementById("themeToggle");
+    const actionsBtn = document.getElementById("actionsToggle");
+
+    themeBtn.addEventListener("click", () => {
+      const dark = root.classList.toggle("dark");
+      themeBtn.setAttribute("aria-pressed", dark ? "true" : "false");
+      themeBtn.textContent = dark ? "切换亮色主题" : "切换暗色主题";
+    });
+
+    actionsBtn.addEventListener("click", () => {
+      const on = !document.body.classList.contains("force-actions");
+      document.body.classList.toggle("force-actions", on);
+      document.querySelectorAll(".chat-col").forEach((el) => {
+        el.classList.toggle("show-actions", on || el.classList.contains("is-narrow"));
+      });
+      actionsBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      actionsBtn.textContent = on ? "恢复 hover actions" : "强制显示 actions";
+    });
+
+    document.querySelectorAll("[data-demo-copy]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const text = btn.getAttribute("data-demo-copy") || "";
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.classList.add("is-copied");
+          const prev = btn.textContent;
+          btn.textContent = "Copied";
+          setTimeout(() => {
+            btn.classList.remove("is-copied");
+            btn.textContent = prev;
+          }, 1200);
+        } catch {
+          /* clipboard may be blocked in file:// — ignore for prototype */
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -351,7 +351,8 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
 }
 
 function startupContext(root: string): string {
-  const knowledge = getYpiStudioKnowledgeContextForPrompt(root, "recent studio task knowledge", { maxEntries: 3, maxTotalChars: 2200 });
+  // SCI: startup is one-shot first-reply + orchestration brief only.
+  // Knowledge is injected per turn via buildStudioState (system single channel).
   return [
     "<ypi-studio-context>",
     "YPI Studio workflow context is available. Studio tasks are structured under .ypi/tasks and workflows under .ypi/workflows.",
@@ -360,7 +361,6 @@ function startupContext(root: string): string {
     PLAN_REVIEW_PROMPT,
     UI_PROTOTYPE_GATE_PROMPT,
     "</ypi-studio-context>",
-    knowledge,
     FIRST_REPLY_NOTICE,
     `Workspace: ${root}`,
   ].filter(Boolean).join("\n");
@@ -2780,6 +2780,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
     }
   });
 
+  // SCI: input only records approval side effects; user JSONL stays clean (no transform).
+  // State/knowledge/rules inject solely via before_agent_start systemPrompt.
   pi.on?.("input", (event, ctx) => {
     const key = getKey(event, ctx);
     const ev = event as { text?: string };
@@ -2787,22 +2789,26 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
     try {
       recordYpiStudioUserApproval(root, key, ev.text);
     } catch {
-      // Approval recording is best-effort; the injected state still tells the model to wait.
+      // Approval recording is best-effort; system-injected state still tells the model to wait.
     }
-    const injection = buildStudioState(root, key, ev.text);
-    return { action: "transform", text: [ev.text, injection].join("\n\n") };
+    return { action: "continue" };
   });
 
+  // SCI: system is the sole main-session injection channel (state + knowledge + rule).
   pi.on?.("before_agent_start", (event, ctx) => {
     const key = getKey(event, ctx);
     const cur = (event as { systemPrompt?: string }).systemPrompt ?? "";
+    // event.prompt is the user prompt for this turn (knowledge query parity with former input path).
+    const prompt = typeof (event as { prompt?: string }).prompt === "string"
+      ? (event as { prompt?: string }).prompt!
+      : "";
     const startup = startupKeys.has(key) ? "" : startupContext(root);
     startupKeys.add(key);
     return {
       systemPrompt: [
         cur,
         startup,
-        buildStudioState(root, key),
+        buildStudioState(root, key, prompt),
         "YPI Studio rule: the main session must orchestrate task state. For member work, call ypi_studio_subagent instead of pretending to be that member.",
       ].filter(Boolean).join("\n\n"),
     };

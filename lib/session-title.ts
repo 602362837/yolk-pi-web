@@ -1,4 +1,5 @@
 import type { AgentMessage, SessionInfo, TextContent } from "@/lib/types";
+import { stripYpiStudioInjections } from "@/lib/ypi-studio-message-display";
 
 export const PENDING_SESSION_TITLE = "待首条消息命名";
 export const SESSION_TITLE_MAX_LENGTH = 50;
@@ -21,8 +22,10 @@ export function firstTextFromMessageContent(content: AgentMessage["content"]): s
     .join(" ");
 }
 
+/** Title seed from user text; strip historical Studio injection blocks before truncate (SCI-04). */
 export function sessionTitleSeedFromUserMessage(message: string): string {
-  return truncateSessionTitle(message) || PENDING_SESSION_TITLE;
+  const cleaned = stripYpiStudioInjections(message);
+  return truncateSessionTitle(cleaned) || PENDING_SESSION_TITLE;
 }
 
 function taskIdTitleFallback(taskId?: string): string {
@@ -109,7 +112,8 @@ export function displayTitleForSession(session: Pick<SessionInfo, "id" | "name" 
     if (title) return title;
   }
   if (session.name?.trim()) return session.name.trim();
-  const firstMessage = truncateSessionTitle(session.firstMessage ?? "");
+  // Sidebar display: strip Studio injection noise from firstMessage without rewriting stored metadata.
+  const firstMessage = truncateSessionTitle(stripYpiStudioInjections(session.firstMessage ?? ""));
   if (firstMessage) return firstMessage;
   if (session.messageCount === 0) return PENDING_SESSION_TITLE;
   return session.id.slice(0, 12);
