@@ -153,14 +153,16 @@ export function ChatMinimap({ messages, streamingMessage, scrollContainer, messa
     return () => clearTimeout(t);
   }, [messages.length, updatePositions]);
 
-  const scrollToMinimapRatio = useCallback((viewportTopRatio: number) => {
+  // Plain function (not useCallback): React Compiler cannot preserve memoization when
+  // the body only reads scrollContainer.current while deps list the RefObject itself.
+  const scrollToMinimapRatio = (viewportTopRatio: number) => {
     const el = scrollContainer.current;
     if (!el) return;
     const scrollable = el.scrollHeight - el.clientHeight;
     if (scrollable <= 0) return;
     const clamped = Math.max(0, Math.min(1 - viewportRatio, viewportTopRatio));
     el.scrollTop = (clamped / (1 - viewportRatio)) * scrollable;
-  }, [scrollContainer, viewportRatio]);
+  };
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!visible) return;

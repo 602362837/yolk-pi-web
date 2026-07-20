@@ -162,7 +162,8 @@ function DetailPane({ selected, warnings, cwd }: { selected: SelectedNode | null
   const [assistResults, setAssistResults] = useState<Record<string, TrellisWorkflowAssistResponse>>({});
   const [assistLoadingId, setAssistLoadingId] = useState<string | null>(null);
   const [assistStartedAt, setAssistStartedAt] = useState<number | null>(null);
-  const [assistNow, setAssistNow] = useState(Date.now());
+  // Seed 0 during render (pure); real clock starts when assistLoadingId is set.
+  const [assistNow, setAssistNow] = useState(0);
   const [assistError, setAssistError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -349,16 +350,25 @@ export function TrellisWorkflowVisualizer({ cwd, onClose }: Props) {
     return () => controller.abort();
   }, [loadWorkflow, refreshKey]);
 
-  const selected = useMemo<SelectedNode | null>(() => {
-    if (!data?.workflow || !selectedId) return null;
+  // Derived during render (cheap); avoid useMemo so React Compiler does not fight manual memo.
+  let selected: SelectedNode | null = null;
+  if (data?.workflow && selectedId) {
     for (const phase of data.workflow.phases) {
-      if (phase.id === selectedId) return { kind: "phase", id: phase.id, phase };
+      if (phase.id === selectedId) {
+        selected = { kind: "phase", id: phase.id, phase };
+        break;
+      }
       const step = phase.steps.find((item) => item.id === selectedId);
-      if (step) return { kind: "step", id: step.id, phase, step };
+      if (step) {
+        selected = { kind: "step", id: step.id, phase, step };
+        break;
+      }
     }
-    const state = data.workflow.states.find((item) => item.id === selectedId);
-    return state ? { kind: "state", id: state.id, state } : null;
-  }, [data, selectedId]);
+    if (!selected) {
+      const state = data.workflow.states.find((item) => item.id === selectedId);
+      selected = state ? { kind: "state", id: state.id, state } : null;
+    }
+  }
 
   const warningCounts = useMemo(() => {
     const warnings = data?.warnings ?? [];
