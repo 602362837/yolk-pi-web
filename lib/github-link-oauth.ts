@@ -65,6 +65,21 @@ const USER_AGENT_VERSION = "yolk-pi-web";
 /** Timeout for upstream HTTP calls (seconds). */
 const UPSTREAM_TIMEOUT_S = 15;
 
+/** Test-only override; production always uses the fixed 15 second deadline. */
+let _testTimeoutMs: number | undefined;
+
+function upstreamTimeoutMs(): number {
+  return _testTimeoutMs ?? UPSTREAM_TIMEOUT_S * 1000;
+}
+
+/** Override the per-request deadline for focused tests; pass undefined to reset. */
+export function _testOverrideGithubRequestTimeoutMs(timeoutMs: number | undefined): void {
+  _testTimeoutMs =
+    typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs >= 0
+      ? timeoutMs
+      : undefined;
+}
+
 /** Maximum response body size (bytes). */
 const MAX_RESPONSE_SIZE = 64 * 1024; // 64 KiB
 
@@ -192,108 +207,177 @@ export function parseGrantedScopes(raw: unknown): string[] {
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
+interface RequestDeadline {
+  signal: AbortSignal;
+  didTimeout(): boolean;
+  didCallerAbort(): boolean;
+  dispose(): void;
+}
+
+/** Compose caller cancellation with an independent internal deadline. */
+function createRequestDeadline(caller: AbortSignal | undefined): RequestDeadline {
+  const controller = new AbortController();
+  let timedOut = false;
+  let callerAborted = false;
+  const abortFromCaller = (): void => {
+    if (timedOut || callerAborted) return;
+    callerAborted = true;
+    controller.abort();
+  };
+
+  if (caller?.aborted) {
+    abortFromCaller();
+  } else {
+    caller?.addEventListener("abort", abortFromCaller, { once: true });
+  }
+
+  const timer = setTimeout(() => {
+    if (callerAborted || timedOut) return;
+    timedOut = true;
+    controller.abort();
+  }, upstreamTimeoutMs());
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    didCallerAbort: () => callerAborted,
+    dispose: () => {
+      clearTimeout(timer);
+      caller?.removeEventListener("abort", abortFromCaller);
+    },
+  };
+}
+
+function cancellationError(): DOMException {
+  return new DOMException("Aborted", "AbortError");
+}
+
+function deadlineError(deadline: RequestDeadline): Error {
+  if (deadline.didTimeout()) {
+    return Object.assign(new Error(SAFE_ERRORS.timeout), {
+      code: "github_timeout" as LinkAuthorizationErrorCode,
+    });
+  }
+  // Caller aborts deliberately preserve native AbortError semantics.
+  if (deadline.didCallerAbort()) return cancellationError();
+  return cancellationError();
+}
+
+/** Race an operation with cancellation even when a custom stream ignores its signal. */
+function raceDeadline<T>(operation: Promise<T>, deadline: RequestDeadline): Promise<T> {
+  if (deadline.signal.aborted) return Promise.reject(deadlineError(deadline));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(deadlineError(deadline));
+    deadline.signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(
+      (value) => {
+        deadline.signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        deadline.signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function safeFetch(
   url: string,
   init: RequestInit & { maxSize?: number },
 ): Promise<{ status: number; body: unknown; headers: Headers }> {
   const maxSize = init.maxSize ?? MAX_RESPONSE_SIZE;
+  const deadline = createRequestDeadline(init.signal ?? undefined);
 
-  let response: Response;
   try {
-    response = await fetch(url, {
-      ...init,
-      redirect: "manual",
-      signal: init.signal ?? AbortSignal.timeout(UPSTREAM_TIMEOUT_S * 1000),
-    });
-  } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw Object.assign(
-        new Error(SAFE_ERRORS.timeout),
-        { code: "github_timeout" as LinkAuthorizationErrorCode },
-      );
+    let response: Response;
+    try {
+      response = await raceDeadline(fetch(url, {
+        ...init,
+        redirect: "manual",
+        signal: deadline.signal,
+      }), deadline);
+    } catch {
+      if (deadline.signal.aborted) throw deadlineError(deadline);
+      throw Object.assign(new Error(SAFE_ERRORS.network), {
+        code: "github_network_error" as LinkAuthorizationErrorCode,
+      });
     }
-    if (err instanceof DOMException && err.name === "TimeoutError") {
-      throw Object.assign(
-        new Error(SAFE_ERRORS.timeout),
-        { code: "github_timeout" as LinkAuthorizationErrorCode },
-      );
+
+    const status = response.status;
+    const location = response.headers.get("location");
+    if (status >= 300 && status < 400 && location) {
+      throw Object.assign(new Error(SAFE_ERRORS.redirect_rejected), {
+        code: "github_bad_response" as LinkAuthorizationErrorCode,
+      });
     }
-    throw Object.assign(
-      new Error(SAFE_ERRORS.network),
-      { code: "github_network_error" as LinkAuthorizationErrorCode },
-    );
-  }
 
-  // Handle redirects manually
-  const status = response.status;
-  const location = response.headers.get("location");
-
-  if (status >= 300 && status < 400 && location) {
-    // We use redirect: "manual" above so we get the 3xx response.
-    // Reject any redirect — GitHub endpoints should not redirect.
-    throw Object.assign(
-      new Error(SAFE_ERRORS.redirect_rejected),
-      { code: "github_bad_response" as LinkAuthorizationErrorCode },
-    );
-  }
-
-  // Read body with size cap
-  let bodyText: string;
-  try {
+    let bodyText: string;
     const reader = response.body?.getReader();
-    if (!reader) {
-      bodyText = "";
-    } else {
-      const chunks: Uint8Array[] = [];
-      let total = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.length;
-        if (total > maxSize) {
-          reader.cancel();
-          throw Object.assign(
-            new Error(SAFE_ERRORS.oversized),
-            { code: "github_bad_response" as LinkAuthorizationErrorCode },
-          );
+    let completed = false;
+    try {
+      if (!reader) {
+        bodyText = "";
+      } else {
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        while (true) {
+          const { done, value } = await raceDeadline(reader.read(), deadline);
+          if (done) break;
+          total += value.length;
+          if (total > maxSize) {
+            throw Object.assign(new Error(SAFE_ERRORS.oversized), {
+              code: "github_bad_response" as LinkAuthorizationErrorCode,
+            });
+          }
+          chunks.push(value);
         }
-        chunks.push(value);
+        completed = true;
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, offset);
+          offset += chunk.length;
+        }
+        bodyText = new TextDecoder().decode(bytes);
       }
-      bodyText = new TextDecoder().decode(
-        chunks.reduce((acc, c) => {
-          const tmp = new Uint8Array(acc.length + c.length);
-          tmp.set(acc);
-          tmp.set(c, acc.length);
-          return tmp;
-        }, new Uint8Array(0)),
-      );
+    } catch (err: unknown) {
+      if (deadline.signal.aborted) throw deadlineError(deadline);
+      if (err instanceof Error && (err as Error & { code?: string }).code === "github_bad_response") {
+        throw err;
+      }
+      throw Object.assign(new Error(SAFE_ERRORS.network), {
+        code: "github_network_error" as LinkAuthorizationErrorCode,
+      });
+    } finally {
+      if (reader) {
+        const releaseReader = (): void => {
+          try {
+            reader.releaseLock();
+          } catch {
+            // Best effort: a nonstandard reader may already be released.
+          }
+        };
+        if (completed) {
+          releaseReader();
+        } else {
+          // A pending read prevents immediate release; cancel first without
+          // awaiting a nonstandard stream that might itself remain stuck.
+          void reader.cancel().catch(() => {}).finally(releaseReader);
+        }
+      }
     }
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      "code" in err &&
-      (err as Error & { code: string }).code === "github_bad_response"
-    ) {
-      throw err;
+
+    try {
+      return { status, body: bodyText ? JSON.parse(bodyText) : null, headers: response.headers };
+    } catch {
+      throw Object.assign(new Error(SAFE_ERRORS.bad_response), {
+        code: "github_bad_response" as LinkAuthorizationErrorCode,
+      });
     }
-    throw Object.assign(
-      new Error(SAFE_ERRORS.network),
-      { code: "github_network_error" as LinkAuthorizationErrorCode },
-    );
+  } finally {
+    deadline.dispose();
   }
-
-  // Parse JSON
-  let body: unknown;
-  try {
-    body = bodyText ? JSON.parse(bodyText) : null;
-  } catch {
-    throw Object.assign(
-      new Error(SAFE_ERRORS.bad_response),
-      { code: "github_bad_response" as LinkAuthorizationErrorCode },
-    );
-  }
-
-  return { status, body, headers: response.headers };
 }
 
 // ─── Device code request ─────────────────────────────────────────────────────
@@ -619,6 +703,9 @@ export async function attemptPollAccessToken(
     return { pending: false, slowDown: false, credential };
   } catch (err: unknown) {
     if (err instanceof Error) {
+      // Preserve caller cancellation so the authorization manager can exit without a false terminal failure.
+      if (err.name === "AbortError") throw err;
+
       const code = (err as Error & { code?: string }).code;
       const isPending = (err as Error & { _pending?: boolean })._pending === true;
       const isSlowDown = (err as Error & { _slowDown?: boolean })._slowDown === true;

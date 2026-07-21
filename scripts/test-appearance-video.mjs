@@ -127,6 +127,40 @@ async function makeShortMp4({ width = 320, height = 180, seconds = 1 } = {}) {
   return bytes;
 }
 
+function topLevelBoxes(bytes) {
+  const boxes = [];
+  let offset = 0;
+  while (offset + 8 <= bytes.length) {
+    let size = bytes.readUInt32BE(offset);
+    let headerSize = 8;
+    if (size === 1) {
+      if (offset + 16 > bytes.length) throw new Error("truncated fixture box");
+      const high = bytes.readUInt32BE(offset + 8);
+      const low = bytes.readUInt32BE(offset + 12);
+      size = high * 0x1_0000_0000 + low;
+      headerSize = 16;
+    } else if (size === 0) {
+      size = bytes.length - offset;
+    }
+    if (!Number.isSafeInteger(size) || size < headerSize || offset + size > bytes.length) {
+      throw new Error("malformed fixture box");
+    }
+    boxes.push({ type: bytes.subarray(offset + 4, offset + 8).toString("latin1"), offset, size });
+    offset += size;
+  }
+  if (offset !== bytes.length) throw new Error("truncated fixture tail");
+  return boxes;
+}
+
+function insertFreeBeforeMoov(bytes, paddingBytes) {
+  const moov = topLevelBoxes(bytes).find((box) => box.type === "moov");
+  if (!moov) throw new Error("fixture has no top-level moov");
+  const free = Buffer.alloc(8 + paddingBytes);
+  free.writeUInt32BE(free.length, 0);
+  free.write("free", 4, "latin1");
+  return Buffer.concat([bytes.subarray(0, moov.offset), free, bytes.subarray(moov.offset)]);
+}
+
 async function stageNamed(fullBytes, thumbBytes, suffix, fullExt = "mp4") {
   const dir = store.getAppearanceTemporaryDirectoryForServer();
   await mkdir(dir, { recursive: true });
@@ -222,6 +256,28 @@ test("inspectAppearanceMp4 accepts short real clips and never returns remote URL
   assert.equal(typeof meta.durationMs, "number");
   assert.equal(JSON.stringify(meta).includes("http"), false);
   assert.equal(JSON.stringify(meta).includes("file:"), false);
+});
+
+test("parses a real top-level tail moov by skipping large free payloads", async () => {
+  const bytes = await makeShortMp4({ width: 160, height: 90, seconds: 1 });
+  const tailMoov = insertFreeBeforeMoov(bytes, 9 * 1024 * 1024);
+  const moov = topLevelBoxes(tailMoov).find((box) => box.type === "moov");
+  assert.ok(moov && moov.offset > 8 * 1024 * 1024);
+
+  const meta = video.inspectAppearanceMp4(tailMoov);
+  assert.ok(meta.durationMs > 0);
+  assert.equal(meta.width, 160);
+  assert.equal(meta.height, 90);
+});
+
+test("does not mistake moov text in mdat payload for a top-level metadata box", () => {
+  const ftyp = makeFtypOnlyMp4();
+  const mdatPayload = Buffer.from("not a box: moov");
+  const mdat = Buffer.concat([writeU32(8 + mdatPayload.length), Buffer.from("mdat"), mdatPayload]);
+  assert.throws(
+    () => video.inspectAppearanceMp4(Buffer.concat([ftyp, mdat])),
+    (error) => error instanceof video.AppearanceVideoError && error.code === "invalid_media",
+  );
 });
 
 test("normalizeAppearanceVideo stages opaque paths and strips source path segments", async () => {
