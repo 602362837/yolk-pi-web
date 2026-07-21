@@ -30,7 +30,8 @@ Handle an inbound GitHub PR end-to-end for **yolk-pi-web / pi-agnet-web**: claim
    If not logged in, stop and ask the user to run `gh auth login` (need `repo` scope; merge may need write access on the target repo).
 2. Never force-push, never push to `upstream` unless the user explicitly asks.
 3. Never merge when checks are failing, the PR is draft, or merge is blocked — report the blocker and stop.
-4. Do not invent review findings. Base comments on actual diff / CI / project invariants (`AGENTS.md`, `docs/`).
+4. If the current GitHub user is the PR author, GitHub will reject `gh pr review --approve` with “Review Can not approve your own pull request”. This is not by itself a merge blocker: after posting the structured review as a comment and confirming all other gates, direct squash merge is allowed when the repository permits it. Do not retry self-approval or incorrectly report that self-merge is impossible.
+5. Do not invent review findings. Base comments on actual diff / CI / project invariants (`AGENTS.md`, `docs/`).
 
 ## Resolve the PR
 
@@ -182,7 +183,7 @@ Submit the review **with an explicit GitHub event**:
 | --- | --- | --- |
 | 允许合并 | `--approve` | Approve |
 | 不允许合并 | `--request-changes` | Request changes (preferred over plain comment) |
-| 仅评论、暂不裁决 | `--comment` | Only if user asked for comment-only |
+| 仅评论、暂不裁决 | `--comment` | Only if user asked for comment-only; also use this when GitHub rejects self-approval, then continue to the direct-merge exception if all merge gates pass |
 
 ```bash
 # Approve path (step 5 continues to merge)
@@ -236,10 +237,13 @@ Do not do this on the reject path by default.
 Pre-merge gates (all must hold):
 
 - PR is open and not draft (`isDraft == false`)
-- Review event was approve
+- For a PR authored by another user: review event was approve.
+- For a PR authored by the current user: `--approve` is expected to fail; a structured `--comment` review with an explicit allow-merge verdict is sufficient, provided the repository does not require an independent approval.
 - `mergeable` is not `CONFLICTING`
 - Checks: no failing required checks (if checks still pending, wait or ask the user; do not merge over red X)
 - User did not forbid auto-merge
+
+Default merge action for this project is **squash**. Once the gates pass, use:
 
 Merge strategy (default for this project):
 
@@ -281,7 +285,7 @@ PR input
   → read diff + checks + AGENTS invariants
   → write review with explicit 允许/不允许
        ├─ 不允许 → request-changes + follow-up comment → STOP
-       └─ 允许   → approve → gate checks → squash merge → report
+       └─ 允许   → approve（作者 PR 则 comment，不能自我 approve）→ gate checks → squash merge → report
 ```
 
 ## Safety / anti-patterns
