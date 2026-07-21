@@ -88,6 +88,60 @@ export function registerOAuthProvider(provider: LegacyOAuthProvider): void {
   providers.set(provider.id, provider);
 }
 
+/**
+ * Register only when the provider id is not already present.
+ *
+ * Used by production bridges that project a public ModelRuntime OAuth config
+ * into this legacy map. Explicit test fixtures / native compat registrations
+ * must not be overwritten by a later bridge attempt.
+ *
+ * @returns true when the provider was newly registered.
+ */
+export function registerOAuthProviderIfAbsent(provider: LegacyOAuthProvider): boolean {
+  if (!provider || typeof provider !== "object" || typeof provider.id !== "string" || !provider.id) {
+    throw new Error("registerOAuthProviderIfAbsent requires a provider with a string id");
+  }
+  if (providers.has(provider.id)) return false;
+  providers.set(provider.id, provider);
+  return true;
+}
+
+/**
+ * Project a public extension/ModelRuntime OAuth config into the legacy registry.
+ *
+ * Does not copy secrets, endpoints, or private package modules — only the
+ * already-constructed public function references from ProviderConfig.oauth.
+ * Never overwrites an existing explicit registration.
+ */
+export function bridgePublicProviderOAuthToCompat(
+  providerId: string,
+  oauth: {
+    name?: string;
+    login?: LegacyOAuthProvider["login"];
+    refreshToken?: LegacyOAuthProvider["refreshToken"];
+    getApiKey?: LegacyOAuthProvider["getApiKey"];
+    modifyModels?: LegacyOAuthProvider["modifyModels"];
+  } | null | undefined,
+): boolean {
+  if (typeof providerId !== "string" || providerId.length === 0) return false;
+  if (!oauth || typeof oauth !== "object") return false;
+
+  const login = typeof oauth.login === "function" ? oauth.login : undefined;
+  const refreshToken = typeof oauth.refreshToken === "function" ? oauth.refreshToken : undefined;
+  const getApiKey = typeof oauth.getApiKey === "function" ? oauth.getApiKey : undefined;
+  const modifyModels = typeof oauth.modifyModels === "function" ? oauth.modifyModels : undefined;
+  if (!login && !refreshToken && !getApiKey) return false;
+
+  return registerOAuthProviderIfAbsent({
+    id: providerId,
+    name: typeof oauth.name === "string" ? oauth.name : undefined,
+    login,
+    refreshToken,
+    getApiKey,
+    modifyModels,
+  });
+}
+
 export function unregisterOAuthProvider(providerId: string): void {
   providers.delete(providerId);
 }

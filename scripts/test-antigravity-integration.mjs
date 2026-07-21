@@ -260,15 +260,19 @@ test("Antigravity adapter is registered and import-disabled", () => {
   assertIncludes(oauthProviders, "projectId", "credential requires projectId server-side");
 });
 
-test("token refresh uses CAS + forceRefresh + provider lock + 0600 write", () => {
+test("token refresh uses slot-first CAS + forceRefresh + provider lock + 0600 write", () => {
   assertIncludes(token, "forceRefresh", "forceRefresh");
-  assertIncludes(token, "mirrorActiveCredentialIfActive", "CAS");
-  assertIncludes(token, "0o600", "secret mode");
+  assertIncludes(token, "commitAntigravityCredentialUnderLock", "slot-first CAS");
+  assertIncludes(token, "reconcileAntigravityActiveMirrorUnderLock", "mirror reconcile");
   assertIncludes(token, "getOAuthApiKey", "registered refresh");
   assertIncludes(token, "withAntigravityProviderLock", "shared provider lock");
   assertIncludes(token, "projectId", "merge/projectId awareness");
   assertIncludes(lock, "withAntigravityProviderLock", "lock export");
   assertIncludes(oauth, "withAntigravityProviderLock", "Activate shares provider lock");
+  const transaction = read("lib/antigravity-credential-transaction.ts");
+  assertIncludes(transaction, "0o600", "secret mode");
+  const runtime = read("lib/web-model-runtime.ts");
+  assertIncludes(runtime, "createAntigravityCoordinatedCredentialStore", "runtime wraps Antigravity coordinated store");
 });
 
 test("quota only hits fixed fetchAvailableModels endpoint", () => {

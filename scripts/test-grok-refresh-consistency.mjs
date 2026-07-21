@@ -120,10 +120,19 @@ try {
     // commit, simulating a mirror write failure without mocking production code.
     await mkdir(authPath);
     const before = fixture.calls;
-    await assert.rejects(() => tokens.getGrokAccessToken(account.accountId, { forceRefresh: true }));
+    await assert.rejects(
+      () => tokens.getGrokAccessToken(account.accountId, { forceRefresh: true }),
+      (error) => error instanceof tokens.GrokTokenError && error.code === "unavailable",
+    );
     const rotatedSlot = await readJson(slotPath(account.accountId));
     assert.equal(rotatedSlot.refresh, "R1", "slot stays durable after mirror failure");
     assert.equal(fixture.calls, before + 1, "only the forced refresh calls the fixture");
+
+    // Valid AT must remain usable even while Active mirror repair is still failing.
+    const stillBroken = await tokens.getGrokAccessToken(account.accountId, { minValidityMs: 0 });
+    assert.equal(stillBroken.refreshed, false, "valid AT path does not force another refresh");
+    assert.equal(stillBroken.accessToken, rotatedSlot.access, "returns authoritative slot AT while mirror is broken");
+    assert.equal(fixture.calls, before + 1, "temporary mirror failure does not consume another refresh token");
 
     await rm(authPath, { recursive: true, force: true });
     await writeFile(authPath, oldMirror, { mode: 0o600 });
@@ -131,6 +140,43 @@ try {
     assert.equal(result.refreshed, false, "recovery uses the valid slot token");
     assert.equal((await rawStore.read(providerId))?.refresh, "R1", "mirror converges slot → mirror");
     assert.equal(fixture.calls, before + 1, "recovery does not consume another refresh token");
+  });
+
+  await test("structured token evidence maps provider/generic refresh and reloginRequired", async () => {
+    const { mapGrokOAuthError, GrokTokenError } = tokens;
+    const missing = mapGrokOAuthError(Object.assign(new Error("missing rt"), {
+      name: "XaiOAuthError",
+      code: "refresh_missing",
+      reloginRequired: true,
+    }));
+    assert.equal(missing.code, "missing_refresh");
+
+    const relogin = mapGrokOAuthError(Object.assign(new Error("revoked body must not leak"), {
+      name: "XaiOAuthError",
+      code: "refresh_failed",
+      reloginRequired: true,
+    }));
+    assert.equal(relogin.code, "unauthorized");
+    assert.equal(relogin.message.includes("revoked body"), false);
+
+    const generic = mapGrokOAuthError(Object.assign(new Error("temporary refresh glitch"), {
+      name: "XaiOAuthError",
+      code: "refresh_failed",
+      reloginRequired: false,
+    }));
+    assert.equal(generic.code, "refresh_failed");
+
+    const provider = mapGrokOAuthError(new Error("OAuth provider is not available for grok-cli"));
+    assert.equal(provider.code, "provider_unavailable");
+
+    await assert.rejects(
+      () => tokens.getGrokAccessToken(""),
+      (error) => error instanceof GrokTokenError && error.code === "missing_storage_id",
+    );
+    await assert.rejects(
+      () => tokens.getGrokAccessToken("missing-account-id"),
+      (error) => error instanceof GrokTokenError && error.code === "account_not_found",
+    );
   });
 
   await test("matching valid mirror is a zero-write read and non-Active slots cannot repair it", async () => {

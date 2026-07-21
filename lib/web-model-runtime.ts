@@ -31,6 +31,7 @@ import {
   getWebCredentialStore,
   type WebCredentialStore,
 } from "./web-credential-store";
+import { createAntigravityCoordinatedCredentialStore } from "./antigravity-active-credential-store";
 import { createGrokCoordinatedCredentialStore } from "./grok-active-credential-store";
 import { webExtensionFactories, webProviderExtensions } from "./pi-provider-extensions";
 
@@ -115,10 +116,16 @@ export async function createWebModelRuntime(
       authPath,
       agentDir,
     }));
-  // Only the persistent Active auth store participates in Grok's managed-slot
-  // transaction. In-memory OAuth add/login stores must stay isolated.
+  // Only the persistent Active auth store participates in managed-slot
+  // transactions (Grok + Antigravity). In-memory OAuth add/login stores must
+  // stay isolated so temporary login credentials never touch Active slots.
+  // Wrap Grok first, then Antigravity on top so each decorator only intercepts
+  // its own provider id and both transactions use the same raw file store.
   const credentials = isWebCredentialStore(rawCredentials)
-    ? createGrokCoordinatedCredentialStore(rawCredentials)
+    ? createAntigravityCoordinatedCredentialStore(
+        rawCredentials,
+        createGrokCoordinatedCredentialStore(rawCredentials),
+      )
     : rawCredentials;
 
   const modelsPath =

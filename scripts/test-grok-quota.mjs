@@ -11,15 +11,21 @@
  * 4. Error code classification (network, rate_limited, unauthorized, etc.)
  * 5. Safe projection — no credentials or raw payloads leak
  * 6. Edge cases (used > limit, invalid dates, negative values, NaN)
+ * 7. Runtime classification matrix: 401/403 retry, token mapper, stale/reauth
+ *    (temp agent dir + mock OAuth/billing fetch only)
  *
  * Run: node scripts/test-grok-quota.mjs
  */
 
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createJiti } from "jiti";
 
-const root = process.cwd();
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 
 // ─── Test harness ────────────────────────────────────────────────────────────
@@ -590,6 +596,448 @@ test("GrokQuotaResultV1 kind and schemaVersion are fixed", () => {
   assert.strictEqual(result.kind, "grok_subscription_quota");
   assert.strictEqual(result.schemaVersion, 1);
   assert.strictEqual(result.provider, "grok-cli");
+});
+
+test("token→quota mapper and unconditional billing retry after force refresh", () => {
+  assertIncludes(grokQuotaSource, "mapGrokTokenErrorToQuotaError", "token→quota mapper");
+  assertIncludes(grokQuotaSource, "mapGrokBillingHttpError", "billing HTTP mapper");
+  assertIncludes(grokQuotaSource, "forceRefresh: true", "force refresh once");
+  assertIncludes(grokQuotaSource, "after a successful force refresh", "unconditional retry comment");
+  assertIncludes(grokQuotaSource, "normalizeQuotaCacheEntry", "success cache normalization");
+  assertIncludes(grokQuotaSource, "__resetGrokQuotaStateForTests", "test reset helper");
+  // First-pass 403 must not be unauthorized/reauth evidence.
+  assertIncludes(grokQuotaSource, "access_denied", "403 access denied messaging");
+  const forceRefreshCalls = grokQuotaSource.split("forceRefresh: true").length - 1;
+  assert.equal(forceRefreshCalls, 1, "exactly one forceRefresh:true site (single retry)");
+});
+
+// ============================================================================
+// 8. Runtime classification matrix (temp dir + mock fetch, no xAI network)
+// ============================================================================
+
+console.log("\n=== Runtime reauth classification matrix ===");
+
+async function testAsync(name, fn) {
+  try {
+    await fn();
+    console.log(`  \x1b[32m✓\x1b[0m ${name}`);
+    passed++;
+  } catch (err) {
+    console.log(`  \x1b[31m✗\x1b[0m ${name}: ${err instanceof Error ? err.message : String(err)}`);
+    failed++;
+  }
+}
+
+function jsonResponse(status, body) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function billingOkBody() {
+  return {
+    config: {
+      monthlyLimit: { val: 5000 },
+      used: { val: 1200 },
+      billingPeriodEnd: "2026-08-01T00:00:00Z",
+    },
+  };
+}
+
+const jiti = createJiti(import.meta.url, { alias: { "@": root } });
+
+await testAsync("mapGrokTokenErrorToQuotaError + 401/403/stale runtime matrix", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "ypi-grok-quota-"));
+  const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const originalFetch = globalThis.fetch;
+
+  const oauth = await jiti.import(pathToFileURL(join(root, "lib/pi-ai-oauth-compat.ts")).href);
+  const {
+    registerOAuthProvider,
+    unregisterOAuthProvider,
+    getOAuthProvider,
+  } = oauth;
+  const previous = getOAuthProvider("grok-cli");
+
+  /** @type {{ mode: "ok" | "invalid_grant" | "network" | "generic" | "provider", calls: number }} */
+  const refreshControl = { mode: "ok", calls: 0 };
+
+  registerOAuthProvider({
+    id: "grok-cli",
+    name: "Grok (quota classification fixture)",
+    async login() {
+      throw new Error("login not used in quota classification test");
+    },
+    async refreshToken(credentials) {
+      refreshControl.calls += 1;
+      if (refreshControl.mode === "invalid_grant") {
+        const err = new Error("invalid_grant");
+        err.code = "refresh_failed";
+        err.reloginRequired = true;
+        throw err;
+      }
+      if (refreshControl.mode === "network") {
+        throw new Error("fetch failed: ECONNRESET");
+      }
+      if (refreshControl.mode === "generic") {
+        throw new Error("Grok OAuth token refresh failed: upstream 503");
+      }
+      if (refreshControl.mode === "provider") {
+        const err = new Error("provider unavailable");
+        err.code = "discovery_failed";
+        throw err;
+      }
+      const refresh = typeof credentials.refresh === "string" ? credentials.refresh : "";
+      return {
+        access: `quota-refreshed-access-${refreshControl.calls}`,
+        refresh,
+        expires: Date.now() + 3_600_000,
+        type: "oauth",
+      };
+    },
+    getApiKey(credentials) {
+      return typeof credentials.access === "string" ? credentials.access : "";
+    },
+  });
+
+  try {
+    const {
+      mapGrokTokenErrorToQuotaError,
+      mapGrokBillingHttpError,
+      getGrokAccountSubscriptionQuota,
+      __resetGrokQuotaStateForTests,
+    } = await jiti.import(pathToFileURL(join(root, "lib/grok-subscription-quota.ts")).href);
+    const { GrokTokenError } = await jiti.import(
+      pathToFileURL(join(root, "lib/grok-account-token.ts")).href,
+    );
+    const { GROK_CLI_PROVIDER_ID, saveOAuthAccountCredential, activateOAuthAccount } =
+      await jiti.import(pathToFileURL(join(root, "lib/oauth-accounts.ts")).href);
+
+    // ── Pure mapper matrix (no network) ──
+    const matrix = [
+      ["unauthorized", "unauthorized", true],
+      ["missing_refresh", "unauthorized", true],
+      ["account_not_found", "unauthorized", true],
+      ["invalid_credential", "unauthorized", true],
+      ["missing_storage_id", "unauthorized", true],
+      ["refresh_failed", "upstream", false],
+      ["provider_unavailable", "upstream", false],
+      ["unavailable", "upstream", false],
+      ["network", "network", false],
+    ];
+    for (const [tokenCode, quotaCode, reauth] of matrix) {
+      const mapped = mapGrokTokenErrorToQuotaError(new GrokTokenError(/** @type {any} */ (tokenCode)));
+      assert.equal(mapped.code, quotaCode, `${tokenCode} → ${quotaCode}`);
+      if (reauth) assert.equal(mapped.code, "unauthorized", `${tokenCode} reauth code`);
+      else assert.notEqual(mapped.code, "unauthorized", `${tokenCode} non-reauth`);
+      const json = JSON.stringify(mapped);
+      assert.ok(!json.includes("cli-chat-proxy"), "no billing host leak");
+      assert.ok(!json.includes("refresh-"), "no refresh leak");
+    }
+    const unknownMapped = mapGrokTokenErrorToQuotaError(new Error("totally unknown boom"));
+    assert.equal(unknownMapped.code, "upstream");
+
+    assert.equal(mapGrokBillingHttpError(401).code, "unauthorized");
+    assert.equal(mapGrokBillingHttpError(403).code, "upstream", "403 is non-reauth");
+    assert.equal(mapGrokBillingHttpError(429).code, "rate_limited");
+    assert.equal(mapGrokBillingHttpError(503).code, "upstream");
+
+    // ── 401 → force refresh → 200 ──
+    __resetGrokQuotaStateForTests();
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    const stillValid = await saveOAuthAccountCredential(GROK_CLI_PROVIDER_ID, {
+      access: "still-valid-access",
+      refresh: "quota-valid-refresh-2",
+      expires: Date.now() + 3_600_000,
+    });
+    await activateOAuthAccount(GROK_CLI_PROVIDER_ID, stillValid.accountId);
+
+    /** @type {number} */
+    let fetchCalls = 0;
+    globalThis.fetch = async (input, init) => {
+      fetchCalls += 1;
+      const url = String(input);
+      assert.ok(url.includes("cli-chat-proxy.grok.com/v1/billing"), "only fixed billing host");
+      const headers = init?.headers || {};
+      const auth =
+        (typeof headers.get === "function" ? headers.get("authorization") : null)
+        || headers.authorization
+        || headers.Authorization
+        || "";
+      if (fetchCalls === 1) {
+        assert.ok(auth.includes("still-valid-access"), "first fetch uses current AT");
+        return jsonResponse(401, { error: "invalid authentication" });
+      }
+      // Second call is monthly retry; weekly may follow as best-effort.
+      if (auth.includes("quota-refreshed-access-")) {
+        if (url.includes("format=credits")) {
+          return jsonResponse(200, {
+            config: {
+              currentPeriod: { type: "USAGE_PERIOD_TYPE_WEEKLY" },
+              creditUsagePercent: 12,
+              billingPeriodEnd: "2026-07-21T00:00:00Z",
+            },
+          });
+        }
+        return jsonResponse(200, billingOkBody());
+      }
+      return jsonResponse(500, { error: "unexpected token on retry" });
+    };
+
+    const retryOk = await getGrokAccountSubscriptionQuota(stillValid.accountId, { forceRefresh: true });
+    assert.equal(retryOk.success, true, "401→refresh→200 success");
+    assert.equal(retryOk.reauthRequired, false);
+    assert.equal(retryOk.cache.state, "live");
+    assert.ok(retryOk.monthly, "monthly present");
+    assert.equal(refreshControl.calls, 1, "exactly one force refresh");
+    // monthly first 401 + monthly retry 200 (+ optional weekly) => >=2 billing monthly-ish calls
+    assert.ok(fetchCalls >= 2, "at least one retry fetch");
+    // monthly path only twice (401 then 200); weekly may add one more
+    assert.ok(fetchCalls <= 3, "refresh/retry bounded");
+    const retryJson = JSON.stringify(retryOk);
+    assert.ok(!retryJson.includes("still-valid-access"), "wire omits access");
+    assert.ok(!retryJson.includes("quota-valid-refresh-2"), "wire omits refresh");
+    assert.ok(!retryJson.includes(agentDir), "wire omits absolute path");
+
+    // ── 401 → force refresh → still 401 (reauth) ──
+    __resetGrokQuotaStateForTests();
+    const still401 = await saveOAuthAccountCredential(GROK_CLI_PROVIDER_ID, {
+      access: "still-401-access",
+      refresh: "quota-valid-refresh-401",
+      expires: Date.now() + 3_600_000,
+    });
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    fetchCalls = 0;
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      return jsonResponse(401, { error: "still unauthorized" });
+    };
+    const retryStill401 = await getGrokAccountSubscriptionQuota(still401.accountId, { forceRefresh: true });
+    assert.equal(retryStill401.success, false);
+    assert.equal(retryStill401.reauthRequired, true, "refresh then 401 reauth");
+    assert.equal(retryStill401.error?.code, "unauthorized");
+    assert.equal(refreshControl.calls, 1, "one force refresh on 401 path");
+    assert.equal(fetchCalls, 2, "exactly one billing retry after refresh");
+
+    // ── 403 → force refresh → 403 (non-reauth) ──
+    __resetGrokQuotaStateForTests();
+    const denied = await saveOAuthAccountCredential(GROK_CLI_PROVIDER_ID, {
+      access: "denied-access",
+      refresh: "quota-valid-refresh-403",
+      expires: Date.now() + 3_600_000,
+    });
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    fetchCalls = 0;
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      return jsonResponse(403, { error: "access denied" });
+    };
+    const deniedResult = await getGrokAccountSubscriptionQuota(denied.accountId, { forceRefresh: true });
+    assert.equal(deniedResult.success, false);
+    assert.equal(deniedResult.reauthRequired, false, "final 403 non-reauth");
+    assert.equal(deniedResult.error?.code, "upstream");
+    assert.equal(refreshControl.calls, 1, "one compatibility force refresh on 403");
+    assert.equal(fetchCalls, 2, "exactly one billing retry after 403 refresh");
+
+    // ── invalid_grant / reloginRequired on force refresh → reauth ──
+    __resetGrokQuotaStateForTests();
+    const revoked = await saveOAuthAccountCredential(GROK_CLI_PROVIDER_ID, {
+      access: "revoked-access",
+      refresh: "revoked-refresh",
+      expires: Date.now() + 3_600_000,
+    });
+    refreshControl.mode = "invalid_grant";
+    refreshControl.calls = 0;
+    fetchCalls = 0;
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      return jsonResponse(401, { error: "invalid authentication" });
+    };
+    const reauthResult = await getGrokAccountSubscriptionQuota(revoked.accountId, { forceRefresh: true });
+    assert.equal(reauthResult.success, false);
+    assert.equal(reauthResult.reauthRequired, true, "reloginRequired must reauth");
+    assert.equal(reauthResult.error?.code, "unauthorized");
+    assert.equal(refreshControl.calls, 1);
+    assert.equal(fetchCalls, 1, "no billing retry when force refresh fails");
+
+    // ── provider/network/generic refresh failure after 401 → non-reauth ──
+    __resetGrokQuotaStateForTests();
+    const transient = await saveOAuthAccountCredential(GROK_CLI_PROVIDER_ID, {
+      access: "transient-access",
+      refresh: "transient-refresh",
+      expires: Date.now() + 3_600_000,
+    });
+    globalThis.fetch = async () => jsonResponse(401, { error: "invalid authentication" });
+
+    refreshControl.mode = "generic";
+    refreshControl.calls = 0;
+    const upstreamFail = await getGrokAccountSubscriptionQuota(transient.accountId, { forceRefresh: true });
+    assert.equal(upstreamFail.success, false);
+    assert.equal(upstreamFail.reauthRequired, false, "generic refresh failure must not reauth");
+    assert.notEqual(upstreamFail.error?.code, "unauthorized");
+
+    __resetGrokQuotaStateForTests();
+    refreshControl.mode = "network";
+    refreshControl.calls = 0;
+    const networkFail = await getGrokAccountSubscriptionQuota(transient.accountId, { forceRefresh: true });
+    assert.equal(networkFail.success, false);
+    assert.equal(networkFail.reauthRequired, false, "network refresh failure must not reauth");
+    assert.equal(networkFail.error?.code, "network");
+
+    __resetGrokQuotaStateForTests();
+    refreshControl.mode = "provider";
+    refreshControl.calls = 0;
+    const providerFail = await getGrokAccountSubscriptionQuota(transient.accountId, { forceRefresh: true });
+    assert.equal(providerFail.success, false);
+    assert.equal(providerFail.reauthRequired, false, "provider/discovery failure must not reauth");
+    assert.notEqual(providerFail.error?.code, "unauthorized");
+
+    // ── stale success + transient (non-reauth) / credential loss (reauth) ──
+    __resetGrokQuotaStateForTests();
+    const staleAccount = await saveOAuthAccountCredential(GROK_CLI_PROVIDER_ID, {
+      access: "stale-access",
+      refresh: "stale-refresh",
+      expires: Date.now() + 3_600_000,
+    });
+    // Seed a sticky historical success+reauth cache entry and ensure it is normalized.
+    const cacheDir = join(agentDir, "auth-accounts", "grok-cli");
+    await mkdir(cacheDir, { recursive: true, mode: 0o700 });
+    const cachePath = join(cacheDir, ".quota-cache.json");
+    await writeFile(
+      cachePath,
+      JSON.stringify({
+        schemaVersion: 1,
+        entries: {
+          [staleAccount.accountId]: {
+            monthly: {
+              monthlyLimit: 5000,
+              used: 100,
+              billingPeriodEnd: "2026-08-01T00:00:00Z",
+            },
+            weekly: null,
+            success: true,
+            queriedAt: Date.now() - 120_000,
+            reauthRequired: true,
+          },
+        },
+      }, null, 2),
+      { encoding: "utf8", mode: 0o600 },
+    );
+
+    refreshControl.mode = "network";
+    refreshControl.calls = 0;
+    globalThis.fetch = async () => jsonResponse(401, { error: "invalid authentication" });
+    const staleTransient = await getGrokAccountSubscriptionQuota(staleAccount.accountId, {
+      forceRefresh: true,
+    });
+    assert.equal(staleTransient.success, true, "stale success retained");
+    assert.equal(staleTransient.cache.state, "stale");
+    assert.equal(staleTransient.reauthRequired, false, "transient+stale non-reauth");
+    assert.ok(staleTransient.monthly, "monthly retained from stale cache");
+    assert.equal(staleTransient.monthly.used, 100);
+
+    // Confirmed credential loss + stale keeps monthly and reauth=true.
+    __resetGrokQuotaStateForTests();
+    // Re-seed success cache without sticky reauth after previous read normalization path.
+    await writeFile(
+      cachePath,
+      JSON.stringify({
+        schemaVersion: 1,
+        entries: {
+          [staleAccount.accountId]: {
+            monthly: {
+              monthlyLimit: 5000,
+              used: 100,
+              billingPeriodEnd: "2026-08-01T00:00:00Z",
+            },
+            weekly: null,
+            success: true,
+            queriedAt: Date.now() - 120_000,
+            reauthRequired: true,
+          },
+        },
+      }, null, 2),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    refreshControl.mode = "invalid_grant";
+    refreshControl.calls = 0;
+    globalThis.fetch = async () => jsonResponse(401, { error: "invalid authentication" });
+    const staleReauth = await getGrokAccountSubscriptionQuota(staleAccount.accountId, {
+      forceRefresh: true,
+    });
+    assert.equal(staleReauth.success, true, "stale monthly retained with credential loss");
+    assert.equal(staleReauth.cache.state, "stale");
+    assert.equal(staleReauth.reauthRequired, true, "confirmed credential loss + stale reauth");
+    assert.equal(staleReauth.error?.code, "unauthorized");
+
+    // Live success clears historical reauth: first force a success after sticky seed.
+    __resetGrokQuotaStateForTests();
+    await writeFile(
+      cachePath,
+      JSON.stringify({
+        schemaVersion: 1,
+        entries: {
+          [staleAccount.accountId]: {
+            monthly: {
+              monthlyLimit: 5000,
+              used: 100,
+              billingPeriodEnd: "2026-08-01T00:00:00Z",
+            },
+            weekly: null,
+            success: true,
+            queriedAt: Date.now() - 120_000,
+            reauthRequired: true,
+          },
+        },
+      }, null, 2),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("format=credits")) {
+        return jsonResponse(200, {
+          config: {
+            currentPeriod: { type: "USAGE_PERIOD_TYPE_WEEKLY" },
+            creditUsagePercent: 5,
+            billingPeriodEnd: "2026-07-21T00:00:00Z",
+          },
+        });
+      }
+      return jsonResponse(200, billingOkBody());
+    };
+    const live = await getGrokAccountSubscriptionQuota(staleAccount.accountId, { forceRefresh: true });
+    assert.equal(live.success, true);
+    assert.equal(live.reauthRequired, false, "live success clears reauth");
+    assert.equal(live.cache.state, "live");
+    const persistedAfter = JSON.parse(await readFile(cachePath, "utf8"));
+    const liveEntry = persistedAfter.entries[staleAccount.accountId];
+    assert.equal(liveEntry.success, true);
+    assert.ok(!liveEntry.reauthRequired, "persisted success entry has no sticky reauth");
+  } finally {
+    globalThis.fetch = originalFetch;
+    try {
+      unregisterOAuthProvider("grok-cli");
+    } catch {
+      // ignore
+    }
+    if (previous) {
+      try {
+        registerOAuthProvider(previous);
+      } catch {
+        // ignore
+      }
+    }
+    if (prevAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = prevAgentDir;
+    await rm(agentDir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

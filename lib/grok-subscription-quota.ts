@@ -21,7 +21,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
-import { getGrokAccessToken } from "./grok-account-token";
+import { getGrokAccessToken, type GrokTokenError } from "./grok-account-token";
 import { withGrokProviderLock } from "./grok-account-lock";
 import { getActiveGrokAccountId } from "./grok-session-account";
 
@@ -34,6 +34,30 @@ const FETCH_TIMEOUT_MS = 10_000;
 const QUOTA_CACHE_FILE = ".quota-cache.json";
 const JSON_FILE_MODE = 0o600;
 const ACCOUNT_DIR_MODE = 0o700;
+
+type QuotaErrorCode = "network" | "rate_limited" | "unauthorized" | "upstream" | "invalid_payload";
+
+const SAFE_ERROR_MESSAGES = {
+  network: "Grok billing network error. Please try again.",
+  rate_limited: "Grok billing is rate limited. Please try again shortly.",
+  unauthorized: "Grok authorization expired. Please re-authenticate.",
+  upstream: "Grok billing is temporarily unavailable. Please try again.",
+  invalid_payload: "Grok billing returned an invalid payload.",
+  no_cache: "No cached quota data available",
+  missing_credential: "Grok saved account credential is missing or invalid. Please re-authenticate.",
+  provider_unavailable: "Grok OAuth provider is temporarily unavailable",
+  refresh_failed: "Grok OAuth token refresh failed temporarily",
+  unavailable: "Grok OAuth is temporarily unavailable",
+  access_denied: "Grok billing access was denied.",
+} as const;
+
+function fixedError(
+  code: QuotaErrorCode,
+  message: string,
+  retryable: boolean,
+): NonNullable<GrokQuotaResultV1["error"]> {
+  return { code, message, retryable };
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -150,13 +174,17 @@ async function loadPersistedCache(): Promise<GrokQuotaPersistedCache> {
     if (isRecord(rawEntries)) {
       for (const [key, value] of Object.entries(rawEntries)) {
         if (isRecord(value) && typeof value.queriedAt === "number") {
-          entries[key] = {
-            monthly: normalizeCacheMonthly(value.monthly),
-            weekly: normalizeCacheWeekly(value.weekly),
-            success: value.success === true,
+          const monthly = normalizeCacheMonthly(value.monthly);
+          const weekly = normalizeCacheWeekly(value.weekly);
+          const success = value.success === true && monthly !== null;
+          entries[key] = normalizeQuotaCacheEntry({
+            monthly,
+            weekly,
+            success,
             queriedAt: value.queriedAt,
-            reauthRequired: value.reauthRequired === true || undefined,
-          };
+            // Historical success+reauth must not stick as current credential evidence.
+            reauthRequired: success ? undefined : value.reauthRequired === true || undefined,
+          });
         }
       }
     }
@@ -192,6 +220,21 @@ function normalizeCacheWeekly(raw: unknown): GrokBillingWeeklyRaw | null {
     return null;
   }
   return { creditUsagePercent, billingPeriodEnd };
+}
+
+/**
+ * Success entries never carry sticky reauthRequired. Stale reauth must come from
+ * the current credential evidence, not a historical success cache mark.
+ */
+function normalizeQuotaCacheEntry(entry: GrokQuotaCacheEntry): GrokQuotaCacheEntry {
+  const success = entry.success === true && entry.monthly !== null;
+  return {
+    monthly: entry.monthly ?? null,
+    weekly: entry.weekly ?? null,
+    success,
+    queriedAt: entry.queriedAt,
+    reauthRequired: success ? undefined : entry.reauthRequired === true || undefined,
+  };
 }
 
 async function savePersistedCacheUnderLock(
@@ -290,13 +333,39 @@ function billingHeaders(accessToken: string): Record<string, string> {
   };
 }
 
-type QuotaErrorCode = "network" | "rate_limited" | "unauthorized" | "upstream" | "invalid_payload";
-
 interface BillingFetchResult {
   monthly: GrokBillingMonthlyRaw | null;
   weekly: GrokBillingWeeklyRaw | null;
-  error: { code: QuotaErrorCode; message: string; retryable: boolean } | null;
+  error: NonNullable<GrokQuotaResultV1["error"]> | null;
   statusCode: number | null;
+}
+
+/**
+ * Classify billing HTTP status into fixed safe error codes.
+ * First-pass 401/403 stay retryable so the caller can force-refresh once.
+ * Final 403 after that path is mapped to non-reauth upstream/access-denied.
+ */
+export function mapGrokBillingHttpError(
+  statusCode: number,
+): NonNullable<GrokQuotaResultV1["error"]> | null {
+  if (statusCode === 401) {
+    return fixedError("unauthorized", SAFE_ERROR_MESSAGES.unauthorized, true);
+  }
+  if (statusCode === 403) {
+    // 403 is access-denied / non-reauth. Callers may still force-refresh once
+    // for compatibility, but the final classification stays non-reauth.
+    return fixedError("upstream", SAFE_ERROR_MESSAGES.access_denied, true);
+  }
+  if (statusCode === 429) {
+    return fixedError("rate_limited", SAFE_ERROR_MESSAGES.rate_limited, true);
+  }
+  if (statusCode >= 500) {
+    return fixedError("upstream", SAFE_ERROR_MESSAGES.upstream, true);
+  }
+  if (statusCode < 200 || statusCode >= 300) {
+    return fixedError("upstream", SAFE_ERROR_MESSAGES.upstream, true);
+  }
+  return null;
 }
 
 async function fetchBillingData(accessToken: string): Promise<BillingFetchResult> {
@@ -309,52 +378,22 @@ async function fetchBillingData(accessToken: string): Promise<BillingFetchResult
       headers,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-  } catch (err) {
+  } catch {
     return {
       monthly: null,
       weekly: null,
-      error: { code: "network", message: err instanceof Error ? err.message : "Network error", retryable: true },
+      error: fixedError("network", SAFE_ERROR_MESSAGES.network, true),
       statusCode: null,
     };
   }
 
   const statusCode = monthlyResponse.status;
-
-  // 401/403 — signal to caller for refresh+retry
-  if (statusCode === 401 || statusCode === 403) {
+  const httpError = mapGrokBillingHttpError(statusCode);
+  if (httpError) {
     return {
       monthly: null,
       weekly: null,
-      error: { code: "unauthorized", message: `Billing endpoint returned ${statusCode}`, retryable: true },
-      statusCode,
-    };
-  }
-
-  // 429 — rate limited
-  if (statusCode === 429) {
-    return {
-      monthly: null,
-      weekly: null,
-      error: { code: "rate_limited", message: "Rate limited by billing endpoint", retryable: true },
-      statusCode,
-    };
-  }
-
-  // 5xx — upstream error
-  if (statusCode >= 500) {
-    return {
-      monthly: null,
-      weekly: null,
-      error: { code: "upstream", message: `Billing endpoint returned ${statusCode}`, retryable: true },
-      statusCode,
-    };
-  }
-
-  if (!monthlyResponse.ok) {
-    return {
-      monthly: null,
-      weekly: null,
-      error: { code: "upstream", message: `Billing endpoint returned ${statusCode}`, retryable: true },
+      error: httpError,
       statusCode,
     };
   }
@@ -368,7 +407,7 @@ async function fetchBillingData(accessToken: string): Promise<BillingFetchResult
     return {
       monthly: null,
       weekly: null,
-      error: { code: "invalid_payload", message: "Invalid monthly billing payload", retryable: false },
+      error: fixedError("invalid_payload", SAFE_ERROR_MESSAGES.invalid_payload, false),
       statusCode,
     };
   }
@@ -444,10 +483,17 @@ function buildStaleResult(
   entry: GrokQuotaCacheEntry,
   error: GrokQuotaResultV1["error"],
 ): GrokQuotaResultV1 {
-  return buildQuotaResult(accountId, entry, "stale", entry.reauthRequired === true, error);
+  // stale only means "showing last successful quota". reauthRequired comes from
+  // the current error evidence, never sticky historical success+reauth marks.
+  const normalized = normalizeQuotaCacheEntry(entry);
+  const reauthRequired = error?.code === "unauthorized";
+  return buildQuotaResult(accountId, normalized, "stale", reauthRequired, error);
 }
 
-function buildUnavailableResult(accountId: string): GrokQuotaResultV1 {
+function buildUnavailableResult(
+  accountId: string,
+  error?: GrokQuotaResultV1["error"],
+): GrokQuotaResultV1 {
   return {
     kind: "grok_subscription_quota",
     schemaVersion: 1,
@@ -455,9 +501,61 @@ function buildUnavailableResult(accountId: string): GrokQuotaResultV1 {
     provider: "grok-cli",
     accountId,
     cache: { state: "none", queriedAt: null, ageMs: null },
-    reauthRequired: false,
-    error: { code: "network", message: "No cached quota data available", retryable: true },
+    reauthRequired: error?.code === "unauthorized",
+    error: error ?? fixedError("network", SAFE_ERROR_MESSAGES.no_cache, true),
   };
+}
+
+/**
+ * Map token-resolver failures to quota wire errors.
+ *
+ * Only confirmed credential problems become unauthorized/reauth:
+ * - unauthorized (invalid_grant / revoked / reloginRequired)
+ * - missing_refresh when AT is unusable
+ * - missing/corrupt saved credential
+ *
+ * Provider bridge, storage/lock/mirror, network, and generic refresh failures
+ * stay non-reauth (upstream/network).
+ */
+export function mapGrokTokenErrorToQuotaError(
+  err: unknown,
+): NonNullable<GrokQuotaResultV1["error"]> {
+  const code =
+    err && typeof err === "object" && "code" in err
+      ? String((err as GrokTokenError).code)
+      : "";
+  if (code === "unauthorized" || code === "missing_refresh") {
+    return fixedError("unauthorized", SAFE_ERROR_MESSAGES.unauthorized, true);
+  }
+  if (code === "network") {
+    return fixedError("network", SAFE_ERROR_MESSAGES.network, true);
+  }
+  if (
+    code === "provider_unavailable"
+    || code === "unavailable"
+    || code === "refresh_failed"
+  ) {
+    return fixedError(
+      "upstream",
+      code === "provider_unavailable"
+        ? SAFE_ERROR_MESSAGES.provider_unavailable
+        : code === "refresh_failed"
+          ? SAFE_ERROR_MESSAGES.refresh_failed
+          : SAFE_ERROR_MESSAGES.unavailable,
+      true,
+    );
+  }
+  if (
+    code === "account_not_found"
+    || code === "invalid_credential"
+    || code === "missing_storage_id"
+  ) {
+    // Missing/corrupt local credential still requires re-login to restore a slot.
+    return fixedError("unauthorized", SAFE_ERROR_MESSAGES.missing_credential, false);
+  }
+  // Unknown token errors default to non-reauth upstream. Confirmed unauthorized
+  // must already be tagged by the token resolver.
+  return fixedError("upstream", SAFE_ERROR_MESSAGES.upstream, true);
 }
 
 // ─── Core query ──────────────────────────────────────────────────────────────
@@ -466,8 +564,12 @@ async function queryGrokBilling(
   accountId: string,
   forceRefresh: boolean,
 ): Promise<GrokQuotaResultV1> {
-  // 1. Check in-memory cache for fresh data
-  const memEntry = quotaCache.get(accountId);
+  // 1. Check in-memory cache for fresh data. Success entries never sticky-reauth.
+  const memEntryRaw = quotaCache.get(accountId);
+  const memEntry = memEntryRaw ? normalizeQuotaCacheEntry(memEntryRaw) : null;
+  if (memEntry && memEntry !== memEntryRaw) {
+    quotaCache.set(accountId, memEntry);
+  }
   if (!forceRefresh && memEntry) {
     const age = nowMillis() - memEntry.queriedAt;
     if (age < FRESH_TTL_MS) {
@@ -485,56 +587,62 @@ async function queryGrokBilling(
     const startGeneration = getGrokQuotaGeneration(accountId);
 
     try {
-      // 2. Get access token
+      // 2. Get access token — map structured evidence; never default unauthorized.
       let accessToken: string;
       try {
         const token = await getGrokAccessToken(accountId);
         accessToken = token.accessToken;
-      } catch {
-        // The stale fallback is a publish operation too: make its persisted
-        // read and returned projection indivisible from a reauth generation bump.
-        const unavailableError: GrokQuotaResultV1["error"] = {
-          code: "unauthorized",
-          message: "OAuth token unavailable",
-          retryable: true,
-        };
+      } catch (err) {
+        const tokenError = mapGrokTokenErrorToQuotaError(err);
         const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
           const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
           if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
-            return buildStaleResult(accountId, staleSource, unavailableError);
+            return buildStaleResult(accountId, staleSource, tokenError);
           }
-          return buildUnavailableResult(accountId);
+          return buildUnavailableResult(accountId, tokenError);
         });
-        return published ?? buildUnavailableResult(accountId);
+        return published ?? buildUnavailableResult(accountId, tokenError);
       }
 
       // 3. Fetch billing
       let result = await fetchBillingData(accessToken);
 
-      // 4. 401/403 → force-refresh credential + retry once (parenthesized condition).
-      if (result.error?.code === "unauthorized" && (result.statusCode === 401 || result.statusCode === 403)) {
+      // 4. 401/403 → exactly one force-refresh + one billing retry.
+      // Trigger on status codes (not final error code): 403 stays non-reauth
+      // even while still allowing a compatibility force refresh.
+      // After a successful force refresh, always retry with the returned AT
+      // (no token-string / refreshed-boolean gate). Refresh infrastructure
+      // failures replace provisional billing errors via the structured mapper.
+      if (result.statusCode === 401 || result.statusCode === 403) {
         try {
           const refreshed = await getGrokAccessToken(accountId, { forceRefresh: true });
-          // A provider may rotate refresh state while retaining the same access
-          // string. Retry based on the real forced-refresh outcome, not a token
-          // string comparison, and do it exactly once.
-          if (refreshed.refreshed) {
-            accessToken = refreshed.accessToken;
-            result = await fetchBillingData(accessToken);
-          }
-        } catch {
-          // Refresh failed — use original result
+          // Unconditional retry after a successful force refresh — no token
+          // string comparison and no refreshed-boolean gate.
+          accessToken = refreshed.accessToken;
+          result = await fetchBillingData(accessToken);
+        } catch (refreshErr) {
+          // Structured token evidence always overrides the provisional billing
+          // classification: confirmed unauthorized stays reauth; provider /
+          // network / store / generic refresh stay non-reauth.
+          const mapped = mapGrokTokenErrorToQuotaError(refreshErr);
+          result = {
+            monthly: null,
+            weekly: null,
+            error: mapped,
+            statusCode: null,
+          };
         }
       }
 
       // 5. Publish the live result only while reauth cannot interleave.
+      // Live success always clears historical reauthRequired.
       if (result.monthly && !result.error) {
-        const entry: GrokQuotaCacheEntry = {
+        const entry = normalizeQuotaCacheEntry({
           monthly: result.monthly,
           weekly: result.weekly,
           success: true,
           queriedAt: nowMillis(),
-        };
+        });
         const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
           quotaCache.set(accountId, entry);
           await savePersistedCacheUnderLock(accountId, entry);
@@ -550,39 +658,38 @@ async function queryGrokBilling(
         const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
           const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
           if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
+            // Current evidence decides reauth; do not mutate sticky reauth onto
+            // a successful historical cache entry.
             return buildStaleResult(accountId, staleSource, result.error!);
           }
           const reauthRequired = result.error!.code === "unauthorized";
-          const errorEntry: GrokQuotaCacheEntry = {
+          const errorEntry = normalizeQuotaCacheEntry({
             monthly: null,
             weekly: null,
             success: false,
             queriedAt: nowMillis(),
             reauthRequired,
-          };
+          });
+          // Only non-success error entries may persist reauthRequired.
           quotaCache.set(accountId, errorEntry);
           await savePersistedCacheUnderLock(accountId, errorEntry);
           return buildQuotaResult(accountId, errorEntry, "none", reauthRequired, result.error!);
         });
-        return published ?? buildUnavailableResult(accountId);
+        return published ?? buildUnavailableResult(accountId, result.error);
       }
 
       // Unexpected: monthly null but no error
       return buildUnavailableResult(accountId);
-    } catch (err) {
-      const error: GrokQuotaResultV1["error"] = {
-        code: "network",
-        message: err instanceof Error ? err.message : "Unexpected error",
-        retryable: true,
-      };
+    } catch {
+      const error = fixedError("network", SAFE_ERROR_MESSAGES.network, true);
       const published = await finalizeCurrentGeneration(accountId, startGeneration, async () => {
         const staleSource = memEntry ?? await readPersistedCacheEntry(accountId);
         if (staleSource && (nowMillis() - staleSource.queriedAt) < STALE_MAX_AGE_MS) {
           return buildStaleResult(accountId, staleSource, error);
         }
-        return buildUnavailableResult(accountId);
+        return buildUnavailableResult(accountId, error);
       });
-      return published ?? buildUnavailableResult(accountId);
+      return published ?? buildUnavailableResult(accountId, error);
     } finally {
       inflightRequests.delete(key);
     }
@@ -638,6 +745,13 @@ export async function getGrokActiveSubscriptionQuota(
  */
 export function invalidateGrokQuotaCache(accountId: string): void {
   quotaCache.delete(accountId);
+}
+
+/** Test-only: clear process-local quota cache / flights / generations. */
+export function __resetGrokQuotaStateForTests(): void {
+  quotaCache.clear();
+  inflightRequests.clear();
+  quotaGenerations.clear();
 }
 
 // ─── Quota generation (reauth isolation) ─────────────────────────────────────

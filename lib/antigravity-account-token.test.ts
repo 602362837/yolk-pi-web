@@ -92,6 +92,28 @@ import {
   strictEqual(mapped.code, "network");
 }
 
+// Generic refresh/infrastructure failures must not be classified as reauth.
+{
+  const mapped = mapAntigravityOAuthError(new Error("Antigravity token refresh failed temporarily"));
+  strictEqual(mapped.code, "refresh_failed");
+  ok(!mapped.message.toLowerCase().includes("re-authenticate"));
+}
+
+{
+  const mapped = mapAntigravityOAuthError(new Error("Antigravity Active credential mirror reconciliation failed"));
+  strictEqual(mapped.code, "unavailable");
+}
+
+{
+  const mapped = mapAntigravityOAuthError(new Error("provider lock timed out"));
+  strictEqual(mapped.code, "unavailable");
+}
+
+{
+  const mapped = mapAntigravityOAuthError(new Error("OAuth provider is not available for google-antigravity"));
+  strictEqual(mapped.code, "provider_unavailable");
+}
+
 {
   const sanitized = sanitizeAntigravityLoginError(
     new Error("Token exchange failed: client_secret=abc access_token=xyz projectId=leaky"),

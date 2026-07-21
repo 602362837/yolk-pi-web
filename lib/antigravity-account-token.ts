@@ -1,18 +1,22 @@
 /**
  * antigravity-account-token — per-account access token resolver with refresh isolation
  *
- * Provides process-level single-flight refresh keyed by opaque storage id,
- * provider-level locking shared with Activate, atomic credential updates, and
- * active-mirror compare-and-set so a refresh of a non-active account never
- * overwrites the auth.json mirror of the current active account.
+ * Managed refreshes share the Antigravity provider critical section and the same
+ * slot-first transaction as ModelRuntime's coordinated Active credential store.
+ * The managed slot is authoritative; auth.json is only mirrored after its durable
+ * commit and only while the slot remains Active.
  *
  * ## Invariants
  *
- * - One in-flight refresh per storageId at a time (single-flight).
+ * - One in-flight refresh per storageId at a time (single-flight), with
+ *   force-aware sharing so a forced caller is never satisfied by an ordinary
+ *   flight that only returned a still-valid token.
  * - Refresh holds the Antigravity provider lock shared with Activate coordination.
  * - Secret writes use tmp + rename for atomicity (0600 file / 0700 dir).
  * - auth.json mirror is only updated when the refreshed account IS the
  *   current active account at the time of completion (lock-held re-read CAS).
+ * - Mirror failure never rolls back a durable slot; ordinary valid-token reads
+ *   reconcile still-Active mirrors without consuming another refresh token.
  * - Refresh results are merged with the existing credential so a missing
  *   projectId in the refresh response never drops the server-side projectId.
  * - getOAuthApiKey returns a JSON string `{ token, projectId }`; this resolver
@@ -23,15 +27,18 @@
  *   (Turbopack rejects that export subpath and breaks cold Auth routes).
  */
 
-import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { Credential, OAuthCredentials } from "@earendil-works/pi-ai";
 import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
 import { getWebCredentialStore } from "@/lib/web-credential-store";
 import { ANTIGRAVITY_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
-import { readOAuthActiveAccountId } from "./oauth-accounts";
 import { withAntigravityProviderLock } from "./antigravity-account-lock";
+import {
+  commitAntigravityCredentialUnderLock,
+  reconcileAntigravityActiveMirrorUnderLock,
+} from "./antigravity-credential-transaction";
 
 // ─── Fixed safe error codes / messages ───────────────────────────────────────
 
@@ -44,7 +51,8 @@ export type AntigravityTokenErrorCode =
   | "refresh_failed"
   | "unauthorized"
   | "network"
-  | "unavailable";
+  | "unavailable"
+  | "provider_unavailable";
 
 const SAFE_ERROR_MESSAGES: Record<AntigravityTokenErrorCode, string> = {
   missing_storage_id: "Antigravity account storage id is required",
@@ -52,10 +60,13 @@ const SAFE_ERROR_MESSAGES: Record<AntigravityTokenErrorCode, string> = {
   invalid_credential: "Antigravity saved account credential is invalid",
   missing_refresh: "Antigravity OAuth access token expired and no refresh token is available. Please re-authenticate.",
   missing_project: "Antigravity credential is missing project binding. Please re-authenticate.",
-  refresh_failed: "Antigravity OAuth token refresh failed. Please re-authenticate.",
+  // refresh_failed is infrastructure/upstream failure, not confirmed credential revocation.
+  refresh_failed: "Antigravity OAuth token refresh failed. Please try again.",
   unauthorized: "Antigravity OAuth authorization expired. Please re-authenticate.",
   network: "Antigravity OAuth network error. Please try again.",
   unavailable: "Antigravity OAuth is temporarily unavailable. Please try again.",
+  provider_unavailable:
+    "Antigravity OAuth provider is not available. Please try again after the provider finishes loading.",
 };
 
 export class AntigravityTokenError extends Error {
@@ -75,7 +86,13 @@ export function mapAntigravityOAuthError(error: unknown): { code: AntigravityTok
   const raw = error instanceof Error ? error.message : String(error ?? "");
   const lower = raw.toLowerCase();
 
-  if (/invalid.?grant|invalid.?token|unauthorized|401|expired|revoked|reauth/.test(lower)) {
+  // Confirmed credential revocation / authorization loss only.
+  // Generic "refresh failed" / temporary upstream text must NOT become reauth.
+  if (
+    /invalid.?grant|invalid.?token|token.?revoked|access.?denied|unauthorized|\b401\b|revoked|reauth|re-?authenticate/.test(
+      lower,
+    )
+  ) {
     return { code: "unauthorized", message: SAFE_ERROR_MESSAGES.unauthorized };
   }
   if (/missing projectid|missing project|projectid/.test(lower) && /missing|required|invalid/.test(lower)) {
@@ -83,6 +100,21 @@ export function mapAntigravityOAuthError(error: unknown): { code: AntigravityTok
   }
   if (/network|fetch failed|econn|enotfound|socket|dns|timeout|aborted|abort/.test(lower)) {
     return { code: "network", message: SAFE_ERROR_MESSAGES.network };
+  }
+  // Storage / lock / Active-mirror failures are local infrastructure, not reauth.
+  if (
+    /mirror|reconciliation failed|credential write|atomic write|eacces|eperm|enospc|erofs|lock timed? ?out|lock timeout|provider lock/.test(
+      lower,
+    )
+  ) {
+    return { code: "unavailable", message: SAFE_ERROR_MESSAGES.unavailable };
+  }
+  if (
+    /provider.?unavailable|provider is not available|oauth provider is not available|oauth provider not registered|missing oauth provider/.test(
+      lower,
+    )
+  ) {
+    return { code: "provider_unavailable", message: SAFE_ERROR_MESSAGES.provider_unavailable };
   }
   if (/refresh|token exchange|oauth|antigravity token/.test(lower)) {
     return { code: "refresh_failed", message: SAFE_ERROR_MESSAGES.refresh_failed };
@@ -118,8 +150,6 @@ export interface AntigravityAccessTokenOptions {
 // ─── File path helpers ───────────────────────────────────────────────────────
 
 const ACCOUNT_STORE_DIR = "auth-accounts";
-const JSON_FILE_MODE = 0o600;
-const ACCOUNT_DIR_MODE = 0o700;
 
 function antigravityAccountDir(): string {
   return join(getAgentDir(), ACCOUNT_STORE_DIR, ANTIGRAVITY_PROVIDER_ID);
@@ -129,10 +159,11 @@ function credentialFilePath(storageId: string): string {
   return join(antigravityAccountDir(), `${encodeURIComponent(storageId)}.json`);
 }
 
-// ─── In-flight registry (single-flight) ──────────────────────────────────────
+// ─── In-flight registry (force-aware single-flight) ──────────────────────────
 
 type FlightEntry = {
   promise: Promise<AntigravityAccessToken>;
+  forceRefresh: boolean;
   storageId: string;
 };
 
@@ -219,60 +250,12 @@ export function mergeAntigravityCredential(
   return merged;
 }
 
-// ─── Atomic write ────────────────────────────────────────────────────────────
-
-async function atomicWriteJson(dir: string, filename: string, data: unknown): Promise<string> {
-  await mkdir(dir, { recursive: true, mode: ACCOUNT_DIR_MODE });
-  const target = join(dir, filename);
-  const tmp = `${target}.tmp.${process.pid}.${Date.now()}`;
-  await writeFile(tmp, `${JSON.stringify(data, null, 2)}\n`, { encoding: "utf8", mode: JSON_FILE_MODE });
-  await rename(tmp, target);
-  return target;
-}
-
-// ─── Active-mirror compare-and-set ───────────────────────────────────────────
-
-/**
- * Read the current Active pointer under the provider lock before writing the
- * mirror. The reader is metadata-only and has no reconciliation side effects.
- */
-async function readActiveStorageId(): Promise<string | null> {
-  try {
-    return await readOAuthActiveAccountId(ANTIGRAVITY_PROVIDER_ID);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Update auth.json for google-antigravity only when `storageId` is still the
- * active account. Re-reads active id under the provider lock (CAS), then uses
- * CredentialStore.modify which holds the auth.json file lock.
- */
-async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<void> {
-  try {
-    // Lock-held re-read: if Activate flipped Active after our refresh started,
-    // skip the mirror so non-active refresh never overwrites auth.json.
-    const currentActiveStorageId = await readActiveStorageId();
-    if (currentActiveStorageId !== storageId) return;
-
-    // CredentialStore expects type:"oauth". Antigravity credentials from the
-    // package lack the sentinel but are otherwise compatible.
-    const authCredential = (credential as Record<string, unknown>).type
-      ? credential
-      : { ...credential, type: "oauth" as const };
-    const store = await getWebCredentialStore();
-    await store.modify(ANTIGRAVITY_PROVIDER_ID, async () => authCredential as Credential);
-  } catch {
-    // Mirror update is best-effort; never let it break the token resolution.
-  }
-}
-
 // ─── Refresh logic ───────────────────────────────────────────────────────────
 
-async function refreshAntigravityCredential(
+async function refreshAntigravityCredentialUnderLock(
   storageId: string,
   currentCredential: Record<string, unknown>,
+  rawStore: Awaited<ReturnType<typeof getWebCredentialStore>>,
 ): Promise<AntigravityAccessToken> {
   // Validate adapter support
   if (!isSupportedOAuthAccountProvider(ANTIGRAVITY_PROVIDER_ID)) {
@@ -295,49 +278,139 @@ async function refreshAntigravityCredential(
   try {
     // Use the public OAuth compatibility helper. It calls the registered
     // google-antigravity OAuth provider's refreshToken(), which requires projectId.
+    // The real package only registers on ModelRuntime; Web bridges that public
+    // oauth config into pi-ai-oauth-compat during fixed-provider bootstrap.
     const { getOAuthProvider } = await import("./pi-ai-oauth-compat");
     if (!getOAuthProvider(ANTIGRAVITY_PROVIDER_ID)) {
       const { ensureWebProvidersBootstrapped } = await import("./pi-provider-extensions");
       await ensureWebProvidersBootstrapped();
     }
-    result = await getOAuthApiKey(ANTIGRAVITY_PROVIDER_ID, {
-      [ANTIGRAVITY_PROVIDER_ID]: currentCredential as OAuthCredentials,
-    });
+    if (!getOAuthProvider(ANTIGRAVITY_PROVIDER_ID)) {
+      // Missing bridge/provider is infrastructure failure, not revoked auth.
+      throw new AntigravityTokenError("provider_unavailable");
+    }
+    // Caller already decided refresh is required. forceRefresh ensures the
+    // compatibility helper does not skip remote RT→AT based on local expires.
+    result = await getOAuthApiKey(
+      ANTIGRAVITY_PROVIDER_ID,
+      {
+        [ANTIGRAVITY_PROVIDER_ID]: currentCredential as OAuthCredentials,
+      },
+      { forceRefresh: true },
+    );
   } catch (error) {
+    if (error instanceof AntigravityTokenError) throw error;
     const mapped = mapAntigravityOAuthError(error);
     throw new AntigravityTokenError(mapped.code, mapped.message);
   }
 
   if (!result?.apiKey) {
+    // getOAuthApiKey returns null for missing provider/refresh adapter as well
+    // as empty keys. After the explicit provider check above, treat this as a
+    // refresh infrastructure failure rather than a confirmed invalid_grant.
     throw new AntigravityTokenError("refresh_failed", "Antigravity OAuth token refresh returned no API key");
   }
 
   // Merge so projectId / email / unknown secret fields survive a partial refresh.
   const refreshedRaw = (result.newCredentials ?? {}) as Record<string, unknown>;
-  const newCredential = mergeAntigravityCredential(currentCredential, refreshedRaw);
+  const newCredentialRecord = mergeAntigravityCredential(currentCredential, refreshedRaw);
 
   // Final projectId guard after merge.
-  if (!isNonEmptyString(newCredential.projectId)) {
+  if (!isNonEmptyString(newCredentialRecord.projectId)) {
     throw new AntigravityTokenError("missing_project");
   }
 
-  await atomicWriteJson(antigravityAccountDir(), `${encodeURIComponent(storageId)}.json`, newCredential);
+  const credential = {
+    ...newCredentialRecord,
+    type: "oauth" as const,
+  } as Credential;
 
-  // Mirror to auth.json only if still the active account (CAS under provider lock).
-  await mirrorActiveCredentialIfActive(storageId, newCredential);
+  // Slot-first commit: durable managed slot before Active CAS mirror. Mirror
+  // failure deliberately leaves the new slot in place for later reconciliation.
+  // Map storage/mirror failures to structured unavailable, never reauth.
+  try {
+    await commitAntigravityCredentialUnderLock({
+      rawStore,
+      storageId,
+      credential,
+    });
+  } catch (error) {
+    if (error instanceof AntigravityTokenError) throw error;
+    const mapped = mapAntigravityOAuthError(error);
+    throw new AntigravityTokenError(
+      mapped.code === "unauthorized" ? "unavailable" : mapped.code,
+      mapped.code === "unauthorized" ? SAFE_ERROR_MESSAGES.unavailable : mapped.message,
+    );
+  }
 
   const accessToken = parseAntigravityApiKeyPayload(result.apiKey)
-    || (typeof newCredential.access === "string" ? newCredential.access : "");
+    || (typeof newCredentialRecord.access === "string" ? newCredentialRecord.access : "");
   if (!accessToken) {
     throw new AntigravityTokenError("refresh_failed", "Antigravity OAuth token refresh returned no access token");
   }
 
-  const expires = typeof newCredential.expires === "number" ? newCredential.expires : epochNow() + 3600_000;
+  const expires = typeof newCredentialRecord.expires === "number"
+    ? newCredentialRecord.expires
+    : epochNow() + 3600_000;
   return {
     accessToken,
     refreshed: true,
     expiresAt: expires,
   };
+}
+
+async function createFlight(
+  storageId: string,
+  opts: Required<Pick<AntigravityAccessTokenOptions, "minValidityMs" | "forceRefresh">> & Pick<AntigravityAccessTokenOptions, "signal">,
+): Promise<AntigravityAccessToken> {
+  // Read saved credential outside the lock for the fast path existence check.
+  const credPath = credentialFilePath(storageId);
+  if (!(await pathExists(credPath))) {
+    throw new AntigravityTokenError("account_not_found", `Antigravity saved account not found: ${storageId}`);
+  }
+
+  opts.signal?.throwIfAborted();
+
+  return withAntigravityProviderLock(async () => {
+    // Re-read under lock so we refresh the latest on-disk credential.
+    let lockedRaw: unknown;
+    try {
+      lockedRaw = JSON.parse(await readFile(credPath, "utf8")) as unknown;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+        throw new AntigravityTokenError("account_not_found", `Antigravity saved account not found: ${storageId}`);
+      }
+      throw new AntigravityTokenError("invalid_credential", `Antigravity saved account credential is invalid: ${storageId}`);
+    }
+    if (!isRecord(lockedRaw)) {
+      throw new AntigravityTokenError("invalid_credential", `Antigravity saved account credential is invalid: ${storageId}`);
+    }
+
+    const lockedAccess = typeof lockedRaw.access === "string" ? lockedRaw.access.trim() : "";
+    const lockedExpires = typeof lockedRaw.expires === "number" ? lockedRaw.expires : 0;
+    // forceRefresh must refresh even when the token is still far from expiry.
+    // Do not fake this with minValidityMs:0 alone — that only refreshes expired tokens.
+    const stillNeedsRefresh =
+      opts.forceRefresh || !lockedAccess || epochNow() >= lockedExpires - opts.minValidityMs;
+
+    const rawStore = await getWebCredentialStore();
+    if (!stillNeedsRefresh) {
+      // A prior mirror write may have failed after the slot-first commit. A
+      // normal valid-token read is the safe recovery point: it only repairs
+      // this still-Active slot and never consumes another refresh token.
+      try {
+        await reconcileAntigravityActiveMirrorUnderLock({ rawStore, storageId });
+      } catch (error) {
+        // Valid AT is still usable even if mirror repair fails. Do not convert
+        // local storage/mirror issues into reauth for this request.
+        void error;
+      }
+      return { accessToken: lockedAccess, refreshed: false, expiresAt: lockedExpires };
+    }
+
+    opts.signal?.throwIfAborted();
+    return refreshAntigravityCredentialUnderLock(storageId, lockedRaw, rawStore);
+  });
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -346,11 +419,16 @@ async function refreshAntigravityCredential(
  * Resolve an access token for a specific Antigravity saved account.
  *
  * - Reads the credential file for `storageId`.
- * - If the token is still valid (expires > now + minValidityMs), returns it immediately.
- * - Otherwise, triggers a single-flight refresh through the registered Antigravity
- *   OAuth provider under the provider-level lock shared with Activate,
- *   atomically persists the updated credential (0600), and mirrors the active
- *   credential to auth.json only if this account is still active at completion (CAS).
+ * - If the token is still valid (expires > now + minValidityMs), returns it immediately
+ *   after optional Active-mirror reconciliation.
+ * - Otherwise, triggers a force-aware single-flight refresh through the registered
+ *   Antigravity OAuth provider under the provider-level lock shared with Activate,
+ *   atomically persists the updated credential via the shared slot-first transaction,
+ *   and mirrors the active credential to auth.json only if this account is still
+ *   active at completion (CAS).
+ *
+ * A forced caller cannot be satisfied by an ordinary flight that merely returned
+ * an unexpired token; concurrent forced callers share one forced flight.
  *
  * @throws if the saved account does not exist or refresh fails irrecoverably.
  */
@@ -358,67 +436,38 @@ export async function getAntigravityAccessToken(
   storageId: string,
   opts: AntigravityAccessTokenOptions = {},
 ): Promise<AntigravityAccessToken> {
-  const { minValidityMs = 120_000, forceRefresh = false, signal } = opts;
-
-  if (!storageId.trim()) {
+  const normalizedStorageId = storageId.trim();
+  if (!normalizedStorageId) {
     throw new AntigravityTokenError("missing_storage_id");
   }
 
-  const key = flightKey(storageId);
+  const options = {
+    minValidityMs: opts.minValidityMs ?? 120_000,
+    forceRefresh: opts.forceRefresh === true,
+    signal: opts.signal,
+  };
+  const key = flightKey(normalizedStorageId);
+  const existing = inflightRefreshes.get(key);
+  if (existing) {
+    if (!options.forceRefresh || existing.forceRefresh) return existing.promise;
+    // An ordinary flight may have only read a valid credential. Wait for it so
+    // it can finish its lock scope, then force a real refresh if it did not.
+    return existing.promise.then((result) =>
+      result.refreshed ? result : getAntigravityAccessToken(normalizedStorageId, options),
+    );
+  }
 
-  // Reuse in-flight refresh
-  const inflight = inflightRefreshes.get(key);
-  if (inflight) return inflight.promise;
-
-  const promise = (async (): Promise<AntigravityAccessToken> => {
-    try {
-      // Read saved credential
-      const credPath = credentialFilePath(storageId);
-      if (!(await pathExists(credPath))) {
-        throw new AntigravityTokenError("account_not_found", `Antigravity saved account not found: ${storageId}`);
-      }
-
-      const raw = JSON.parse(await readFile(credPath, "utf8")) as unknown;
-      if (!isRecord(raw)) {
-        throw new AntigravityTokenError("invalid_credential", `Antigravity saved account credential is invalid: ${storageId}`);
-      }
-
-      const access = typeof raw.access === "string" ? raw.access.trim() : "";
-      const expires = typeof raw.expires === "number" ? raw.expires : 0;
-      // forceRefresh must refresh even when the token is still far from expiry.
-      // Do not fake this with minValidityMs:0 alone — that only refreshes expired tokens.
-      const needsRefresh = forceRefresh || !access || epochNow() >= expires - minValidityMs;
-
-      if (!needsRefresh) {
-        return { accessToken: access, refreshed: false, expiresAt: expires };
-      }
-
-      // Check abort signal before blocking refresh
-      signal?.throwIfAborted();
-
-      // Provider lock serializes refresh + Active CAS against concurrent Activate.
-      return await withAntigravityProviderLock(async () => {
-        // Re-read under lock so we refresh the latest on-disk credential.
-        const lockedRaw = JSON.parse(await readFile(credPath, "utf8")) as unknown;
-        if (!isRecord(lockedRaw)) {
-          throw new AntigravityTokenError("invalid_credential", `Antigravity saved account credential is invalid: ${storageId}`);
-        }
-        const lockedAccess = typeof lockedRaw.access === "string" ? lockedRaw.access.trim() : "";
-        const lockedExpires = typeof lockedRaw.expires === "number" ? lockedRaw.expires : 0;
-        const stillNeedsRefresh =
-          forceRefresh || !lockedAccess || epochNow() >= lockedExpires - minValidityMs;
-        if (!stillNeedsRefresh) {
-          return { accessToken: lockedAccess, refreshed: false, expiresAt: lockedExpires };
-        }
-        return await refreshAntigravityCredential(storageId, lockedRaw);
-      });
-    } finally {
-      inflightRefreshes.delete(key);
-    }
-  })();
-
-  inflightRefreshes.set(key, { promise, storageId });
-  return promise;
+  const entry: FlightEntry = {
+    forceRefresh: options.forceRefresh,
+    storageId: normalizedStorageId,
+    promise: Promise.resolve({ accessToken: "", refreshed: false, expiresAt: 0 }),
+  };
+  entry.promise = createFlight(normalizedStorageId, options).finally(() => {
+    // Do not let an older flight erase a newer forced replacement.
+    if (inflightRefreshes.get(key) === entry) inflightRefreshes.delete(key);
+  });
+  inflightRefreshes.set(key, entry);
+  return entry.promise;
 }
 
 /**

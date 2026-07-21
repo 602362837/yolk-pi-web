@@ -11,8 +11,10 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { accessSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { createJiti } from "jiti";
 
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -254,30 +256,59 @@ test("Active-mirror compare-and-set happens after the slot commit", () => {
 });
 
 test("Refresh failure preserves existing credential", () => {
-  assertIncludes(tokenSource, "throw new Error(", "throws on refresh failure");
+  assertIncludes(tokenSource, "throw new GrokTokenError", "throws structured GrokTokenError on failure");
   // The caller must handle — credential file is not deleted on failure
+  assertNotIncludes(tokenSource, "unlink(", "does not delete credential on failure");
+  assertNotIncludes(tokenSource, "rm(", "does not remove credential on failure");
+});
+
+test("Token errors are credential-evidence-only structured codes", () => {
+  assertIncludes(tokenSource, "export type GrokTokenErrorCode", "exports fixed error codes");
+  assertIncludes(tokenSource, "export function mapGrokOAuthError", "exports oauth error mapper");
+  assertIncludes(tokenSource, '"missing_refresh"', "missing_refresh code");
+  assertIncludes(tokenSource, '"unauthorized"', "unauthorized code");
+  assertIncludes(tokenSource, '"refresh_failed"', "refresh_failed non-reauth code");
+  assertIncludes(tokenSource, '"provider_unavailable"', "provider_unavailable non-reauth code");
+  assertIncludes(tokenSource, '"network"', "network non-reauth code");
+  assertIncludes(tokenSource, '"unavailable"', "unavailable non-reauth code");
+  assertIncludes(tokenSource, "reloginRequired", "reads third-party reloginRequired evidence");
+  assertIncludes(tokenSource, 'code === "refresh_missing"', "maps Xai refresh_missing");
+  // Valid AT path must not be blocked by temporary Active mirror repair failure.
+  const validAtBlock = tokenSource.slice(
+    tokenSource.indexOf("if (!needsRefresh)"),
+    tokenSource.indexOf("return refreshGrokCredentialUnderLock"),
+  );
+  assertIncludes(validAtBlock, "reconcileGrokActiveMirrorUnderLock", "reconciles on valid AT path");
+  assertIncludes(validAtBlock, "catch (error)", "best-effort reconcile catch");
+  assertIncludes(validAtBlock, "void error", "swallows temporary reconcile failure");
+  assertIncludes(validAtBlock, "accessToken: access", "still returns valid AT after reconcile failure");
 });
 
 test("No credential material in log/error messages", () => {
-  // Error messages use storageId references, not credential keys.
+  // Error messages use fixed safe text, not credential keys or upstream bodies.
   // Comments may mention "access" and "refresh" for documentation;
   // the key invariant is that throw/error strings don't leak values.
   const throwLines = tokenSource.split('\n').filter(
-    (l) => l.includes('throw new Error') || l.includes('throw new OAuth')
+    (l) =>
+      l.includes('throw new Error')
+      || l.includes('throw new OAuth')
+      || l.includes('throw new GrokTokenError')
+      || l.includes('GROK_TOKEN_SAFE_MESSAGES')
   ).join('\n');
-  // Error messages should reference storageId, never credential values
   assert.ok(
-    throwLines.includes('storageId') || tokenSource.includes('storageId'),
-    "error messages use storageId"
+    tokenSource.includes('storageId') || throwLines.length > 0,
+    "token helper retains storageId handling",
   );
   // Error strings must not contain the literal pattern of a JWT or API key
   assertNotIncludes(throwLines, 'eyJ', "no JWT in error messages");
   assertNotIncludes(throwLines, 'sk-', "no API key in error messages");
+  assertNotIncludes(tokenSource, "access_token=", "no access_token leak");
+  assertNotIncludes(tokenSource, "refresh_token=", "no refresh_token leak");
 });
 
 test("getGrokAccessToken validates storageId is non-empty", () => {
   assertIncludes(tokenSource, "!normalizedStorageId", "validates non-empty storage id");
-  assertIncludes(tokenSource, "grokAccountStorageId is required", "error for empty id");
+  assertIncludes(tokenSource, 'throw new GrokTokenError("missing_storage_id")', "structured missing_storage_id");
 });
 
 test("invalidateGrokTokenFlight removes in-flight promise", () => {
@@ -734,8 +765,66 @@ test("bumpGrokQuotaGeneration clears in-memory cache entry", () => {
   assertIncludes(quotaSource, "quotaCache.delete(accountId)", "clears memory cache");
 });
 
+// ============================================================================
+// 15. Runtime tests via jiti (structured token evidence)
+// ============================================================================
+
+console.log("\n=== Runtime tests (jiti) ===");
+
+const jiti = createJiti(import.meta.url, {
+  alias: {
+    "@": root,
+  },
+});
+
+const runtimeTests = [
+  "lib/grok-account-token.test.ts",
+];
+
+for (const testPath of runtimeTests) {
+  const fullPath = join(root, testPath);
+  try {
+    accessSync(fullPath);
+  } catch {
+    test(`${testPath} exists`, () => {
+      throw new Error(`missing ${testPath}`);
+    });
+    continue;
+  }
+
+  test(`runtime: ${testPath}`, () => {
+    // executed below asynchronously
+  });
+}
+
+async function runRuntimeTests() {
+  let runtimeFailures = 0;
+  for (const testPath of runtimeTests) {
+    const fullPath = join(root, testPath);
+    try {
+      accessSync(fullPath);
+    } catch {
+      continue;
+    }
+    console.log(`\n▶ Running ${testPath} …`);
+    try {
+      await jiti.import(pathToFileURL(fullPath).href);
+      console.log(`✓ ${testPath} PASSED`);
+      passed += 1;
+    } catch (error) {
+      console.error(`✗ ${testPath} FAILED:`, error instanceof Error ? error.message : String(error));
+      console.error(error);
+      failed += 1;
+      runtimeFailures += 1;
+    }
+  }
+  return runtimeFailures;
+}
+
+const runtimeFailures = await runRuntimeTests();
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${"─".repeat(40)}`);
 console.log(`Passed: ${passed}  Failed: ${failed}`);
-if (failed > 0) process.exit(1);
+if (failed > 0 || runtimeFailures > 0) process.exit(1);

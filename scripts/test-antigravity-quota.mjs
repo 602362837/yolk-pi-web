@@ -11,15 +11,21 @@
  * 4. Safe projection — no token/refresh/projectId/raw body/URL/path
  * 5. Source contract: fixed host, cache TTLs, 401 retry once, POST 405, no-store
  * 6. Default project id is never a health shortcut in source
+ * 7. Runtime classification matrix: 401→force refresh→200, invalid_grant reauth,
+ *    provider/storage/network non-reauth (temp agent dir + mock fetch only)
  *
  * Run: npm run test:antigravity-quota
  */
 
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createJiti } from "jiti";
 
-const root = process.cwd();
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 
 // ─── Test harness ────────────────────────────────────────────────────────────
@@ -537,15 +543,37 @@ test("cache TTLs, timeout, single-flight, 401 retry once", () => {
 test("401 force-refresh retry is unconditional (same-token still retries once)", () => {
   const retryStart = quotaSource.indexOf("// 4. 401 only");
   assert.ok(retryStart >= 0, "401 retry block present");
-  const retryBlock = quotaSource.slice(retryStart, retryStart + 700);
+  const retryBlock = quotaSource.slice(retryStart, retryStart + 1200);
   assertIncludes(retryBlock, "forceRefresh: true", "force refresh call");
   assertIncludes(retryBlock, "fetchAvailableModelsData(accessToken, meta.projectId)", "retry fetch");
+  assertIncludes(retryBlock, "mapTokenErrorToQuotaError", "refresh failure classification");
   assert.ok(
     !retryBlock.includes("refreshed.accessToken !== accessToken"),
     "must not skip retry when token string is unchanged",
   );
   const forceRefreshCalls = quotaSource.split("forceRefresh: true").length - 1;
   assert.equal(forceRefreshCalls, 1, "exactly one forceRefresh:true site (single retry)");
+});
+
+test("token error mapping: only confirmed credential loss is reauth", () => {
+  assertIncludes(quotaSource, "export function mapTokenErrorToQuotaError", "exported mapper");
+  // Confirmed reauth codes
+  assertIncludes(quotaSource, 'code === "unauthorized" || code === "missing_refresh"', "reauth codes");
+  // refresh_failed / provider / unavailable are non-reauth
+  assertIncludes(quotaSource, 'code === "refresh_failed"', "refresh_failed classified");
+  assertIncludes(quotaSource, 'code === "provider_unavailable"', "provider_unavailable classified");
+  assertIncludes(quotaSource, 'code === "unavailable"', "unavailable classified");
+  // Default unknown is upstream, not unauthorized
+  assertIncludes(
+    quotaSource,
+    'return fixedError("upstream", SAFE_ERROR_MESSAGES.upstream, true);',
+    "unknown token errors default to non-reauth upstream",
+  );
+  // Must not blanket-map refresh_failed with unauthorized
+  assert.ok(
+    !/code === "unauthorized" \|\| code === "missing_refresh" \|\| code === "refresh_failed"/.test(quotaSource),
+    "refresh_failed must not share unauthorized branch",
+  );
 });
 
 test("403 invalid_project distinct from unauthorized reauth", () => {
@@ -621,6 +649,306 @@ test("wire type fields match design AntigravityQuotaResultV1", () => {
   assertIncludes(quotaSource, "usedPercent", "usedPercent field");
   assertIncludes(quotaSource, "publicModelIds", "publicModelIds field");
   assertIncludes(quotaSource, 'state: "live" | "fresh" | "stale" | "none"', "cache states");
+});
+
+// ============================================================================
+// Runtime classification matrix (temp dir + mock fetch, no Google network)
+// ============================================================================
+
+console.log("\n=== Runtime reauth classification matrix ===");
+
+async function testAsync(name, fn) {
+  try {
+    await fn();
+    console.log(`  \x1b[32m✓\x1b[0m ${name}`);
+    passed++;
+  } catch (err) {
+    console.log(`  \x1b[31m✗\x1b[0m ${name}: ${err instanceof Error ? err.message : String(err)}`);
+    failed++;
+  }
+}
+
+function jsonResponse(status, body) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+const jiti = createJiti(import.meta.url, { alias: { "@": root } });
+
+await testAsync("mapTokenErrorToQuotaError matrix + 401→refresh→200 / invalid_grant", async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "ypi-antigravity-quota-"));
+  const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const originalFetch = globalThis.fetch;
+
+  const oauth = await jiti.import(pathToFileURL(join(root, "lib/pi-ai-oauth-compat.ts")).href);
+  const {
+    registerOAuthProvider,
+    unregisterOAuthProvider,
+    getOAuthProvider,
+  } = oauth;
+  const previous = getOAuthProvider("google-antigravity");
+
+  /** @type {{ mode: "ok" | "invalid_grant" | "network" | "no_key", calls: number }} */
+  const refreshControl = { mode: "ok", calls: 0 };
+
+  registerOAuthProvider({
+    id: "google-antigravity",
+    name: "Antigravity (quota classification fixture)",
+    async login() {
+      throw new Error("login not used in quota classification test");
+    },
+    async refreshToken(credentials) {
+      refreshControl.calls += 1;
+      if (refreshControl.mode === "invalid_grant") {
+        throw new Error('{"error":"invalid_grant","error_description":"Token has been expired or revoked."}');
+      }
+      if (refreshControl.mode === "network") {
+        throw new Error("fetch failed: ECONNRESET");
+      }
+      if (refreshControl.mode === "no_key") {
+        // Force empty newCredentials path by returning partial; getOAuthApiKey
+        // still builds apiKey from getApiKey. Use a throw for refresh_failed-ish.
+        throw new Error("Antigravity token refresh failed: upstream 503");
+      }
+      const refresh = typeof credentials.refresh === "string" ? credentials.refresh : "";
+      return {
+        access: `quota-refreshed-access-${refreshControl.calls}`,
+        refresh,
+        expires: Date.now() + 3_600_000,
+        type: "oauth",
+      };
+    },
+    getApiKey(credentials) {
+      const access = typeof credentials.access === "string" ? credentials.access : "";
+      const projectId = typeof credentials.projectId === "string" ? credentials.projectId : "";
+      return JSON.stringify({ token: access, projectId });
+    },
+  });
+
+  try {
+    const { mapTokenErrorToQuotaError, getAntigravityAccountSubscriptionQuota, __resetAntigravityQuotaStateForTests } =
+      await jiti.import(pathToFileURL(join(root, "lib/antigravity-subscription-quota.ts")).href);
+    const { AntigravityTokenError } = await jiti.import(
+      pathToFileURL(join(root, "lib/antigravity-account-token.ts")).href,
+    );
+    const { ANTIGRAVITY_PROVIDER_ID, saveOAuthAccountCredential, activateOAuthAccount } =
+      await jiti.import(pathToFileURL(join(root, "lib/oauth-accounts.ts")).href);
+
+    // ── Pure mapper matrix (no network) ──
+    const matrix = [
+      ["unauthorized", "unauthorized", true],
+      ["missing_refresh", "unauthorized", true],
+      ["account_not_found", "unauthorized", true],
+      ["invalid_credential", "unauthorized", true],
+      ["refresh_failed", "upstream", false],
+      ["provider_unavailable", "upstream", false],
+      ["unavailable", "upstream", false],
+      ["network", "network", false],
+      ["missing_project", "invalid_project", false],
+    ];
+    for (const [tokenCode, quotaCode, reauth] of matrix) {
+      const mapped = mapTokenErrorToQuotaError(new AntigravityTokenError(/** @type {any} */ (tokenCode)));
+      assert.equal(mapped.code, quotaCode, `${tokenCode} → ${quotaCode}`);
+      // reauthRequired is derived from unauthorized only at result builders;
+      // mapper itself only returns the code.
+      if (reauth) assert.equal(mapped.code, "unauthorized", `${tokenCode} reauth code`);
+      else assert.notEqual(mapped.code, "unauthorized", `${tokenCode} non-reauth`);
+      assert.ok(!JSON.stringify(mapped).includes("project-"), "no project leakage");
+      assert.ok(!JSON.stringify(mapped).includes("refresh-"), "no refresh leakage");
+    }
+    // Unknown errors default to non-reauth upstream
+    const unknownMapped = mapTokenErrorToQuotaError(new Error("totally unknown boom"));
+    assert.equal(unknownMapped.code, "upstream");
+
+    // ── Live quota: expired AT + valid RT → success / non-reauth ──
+    __resetAntigravityQuotaStateForTests();
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    const account = await saveOAuthAccountCredential(ANTIGRAVITY_PROVIDER_ID, {
+      access: "quota-old-access",
+      refresh: "quota-valid-refresh",
+      expires: Date.now() - 60_000,
+      projectId: "project-quota-secret",
+      email: "quota@example.com",
+    });
+    await activateOAuthAccount(ANTIGRAVITY_PROVIDER_ID, account.accountId);
+
+    /** @type {number} */
+    let fetchCalls = 0;
+    globalThis.fetch = async (input, init) => {
+      fetchCalls += 1;
+      const url = String(input);
+      assert.ok(
+        url.includes("daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"),
+        "only fixed quota host",
+      );
+      const auth = /** @type {Record<string, string>} */ (init?.headers || {}).Authorization
+        || /** @type {Record<string, string>} */ (init?.headers || {}).authorization
+        || "";
+      // First call may use old or already-refreshed token depending on resolver timing.
+      // After force path, second call must succeed.
+      if (fetchCalls === 1 && auth.includes("quota-old-access")) {
+        return jsonResponse(401, { error: { message: "Request had invalid authentication credentials" } });
+      }
+      return jsonResponse(200, {
+        models: {
+          "gemini-2.5-pro": {
+            quotaInfo: { remainingFraction: 0.75, resetTime: "2026-08-01T00:00:00Z" },
+          },
+        },
+      });
+    };
+
+    const success = await getAntigravityAccountSubscriptionQuota(account.accountId, { forceRefresh: true });
+    assert.equal(success.success, true, "expired AT + valid RT yields success");
+    assert.equal(success.reauthRequired, false, "must not reauth when RT valid");
+    assert.equal(success.cache.state, "live");
+    assert.ok(success.models.length >= 1, "models present");
+    assert.ok(refreshControl.calls >= 1, "refresh invoked for expired credential");
+    // Slot written with new access (equality check only; no secret logging)
+    const slotPath = join(agentDir, "auth-accounts", "google-antigravity", `${encodeURIComponent(account.accountId)}.json`);
+    const slot = JSON.parse(await readFile(slotPath, "utf8"));
+    assert.ok(String(slot.access).startsWith("quota-refreshed-access-"), "slot updated after refresh");
+    assert.equal(slot.projectId, "project-quota-secret", "projectId retained");
+    assert.equal(slot.refresh, "quota-valid-refresh", "refresh retained");
+    const successJson = JSON.stringify(success);
+    assert.ok(!successJson.includes("quota-valid-refresh"), "wire omits refresh");
+    assert.ok(!successJson.includes("project-quota-secret"), "wire omits projectId");
+    assert.ok(!successJson.includes(agentDir), "wire omits absolute path");
+
+    // ── 401 → force refresh → 200 (explicit first-call 401) ──
+    __resetAntigravityQuotaStateForTests();
+    // Write a still-valid AT so initial getAntigravityAccessToken does not refresh,
+    // then force 401 on first fetchAvailableModels to exercise the single retry.
+    const stillValid = await saveOAuthAccountCredential(ANTIGRAVITY_PROVIDER_ID, {
+      access: "still-valid-access",
+      refresh: "quota-valid-refresh-2",
+      expires: Date.now() + 3_600_000,
+      projectId: "project-quota-secret-2",
+      email: "quota2@example.com",
+    });
+    await activateOAuthAccount(ANTIGRAVITY_PROVIDER_ID, stillValid.accountId);
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    fetchCalls = 0;
+    globalThis.fetch = async (_input, init) => {
+      fetchCalls += 1;
+      const headers = init?.headers;
+      let auth = "";
+      if (headers && typeof headers === "object" && !Array.isArray(headers)) {
+        auth = /** @type {Record<string, string>} */ (headers).Authorization
+          || /** @type {Record<string, string>} */ (headers).authorization
+          || "";
+      }
+      if (fetchCalls === 1) {
+        assert.ok(auth.includes("still-valid-access"), "first fetch uses current AT");
+        return jsonResponse(401, { error: "invalid authentication" });
+      }
+      assert.ok(auth.includes("quota-refreshed-access-"), "retry uses refreshed AT");
+      return jsonResponse(200, {
+        models: {
+          "claude-sonnet-4": { quotaInfo: { remainingFraction: 0.5 } },
+        },
+      });
+    };
+    const retryOk = await getAntigravityAccountSubscriptionQuota(stillValid.accountId, { forceRefresh: true });
+    assert.equal(retryOk.success, true, "401→refresh→200 success");
+    assert.equal(retryOk.reauthRequired, false);
+    assert.equal(fetchCalls, 2, "exactly one retry fetch");
+    assert.equal(refreshControl.calls, 1, "exactly one force refresh");
+
+    // ── invalid_grant → reauth ──
+    __resetAntigravityQuotaStateForTests();
+    const revoked = await saveOAuthAccountCredential(ANTIGRAVITY_PROVIDER_ID, {
+      access: "revoked-access",
+      refresh: "revoked-refresh",
+      expires: Date.now() - 10_000,
+      projectId: "project-revoked",
+      email: "revoked@example.com",
+    });
+    refreshControl.mode = "invalid_grant";
+    refreshControl.calls = 0;
+    fetchCalls = 0;
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      return jsonResponse(200, { models: { x: { quotaInfo: { remainingFraction: 1 } } } });
+    };
+    const reauthResult = await getAntigravityAccountSubscriptionQuota(revoked.accountId, { forceRefresh: true });
+    assert.equal(reauthResult.success, false);
+    assert.equal(reauthResult.reauthRequired, true, "invalid_grant must reauth");
+    assert.equal(reauthResult.error?.code, "unauthorized");
+    assert.equal(fetchCalls, 0, "no quota fetch when refresh fails with invalid_grant");
+
+    // ── generic refresh_failed / network → non-reauth ──
+    __resetAntigravityQuotaStateForTests();
+    const transient = await saveOAuthAccountCredential(ANTIGRAVITY_PROVIDER_ID, {
+      access: "transient-access",
+      refresh: "transient-refresh",
+      expires: Date.now() - 10_000,
+      projectId: "project-transient",
+      email: "transient@example.com",
+    });
+    refreshControl.mode = "no_key";
+    refreshControl.calls = 0;
+    const upstreamFail = await getAntigravityAccountSubscriptionQuota(transient.accountId, { forceRefresh: true });
+    assert.equal(upstreamFail.success, false);
+    assert.equal(upstreamFail.reauthRequired, false, "generic refresh failure must not reauth");
+    assert.notEqual(upstreamFail.error?.code, "unauthorized");
+
+    refreshControl.mode = "network";
+    refreshControl.calls = 0;
+    __resetAntigravityQuotaStateForTests();
+    const networkFail = await getAntigravityAccountSubscriptionQuota(transient.accountId, { forceRefresh: true });
+    assert.equal(networkFail.success, false);
+    assert.equal(networkFail.reauthRequired, false, "network refresh failure must not reauth");
+    assert.equal(networkFail.error?.code, "network");
+
+    // ── provider_unavailable structured error → non-reauth ──
+    __resetAntigravityQuotaStateForTests();
+    const mappedProvider = mapTokenErrorToQuotaError(new AntigravityTokenError("provider_unavailable"));
+    assert.equal(mappedProvider.code, "upstream");
+    assert.notEqual(mappedProvider.code, "unauthorized");
+
+    // ── 403 project remains non-reauth at HTTP mapper (source already covers);
+    // also verify live path surfaces invalid_project without reauth.
+    __resetAntigravityQuotaStateForTests();
+    const projectDenied = await saveOAuthAccountCredential(ANTIGRAVITY_PROVIDER_ID, {
+      access: "project-denied-access",
+      refresh: "project-denied-refresh",
+      expires: Date.now() + 3_600_000,
+      projectId: "project-denied",
+      email: "denied@example.com",
+    });
+    refreshControl.mode = "ok";
+    refreshControl.calls = 0;
+    globalThis.fetch = async () =>
+      jsonResponse(403, { error: { message: "Permission denied for project project-denied" } });
+    const denied = await getAntigravityAccountSubscriptionQuota(projectDenied.accountId, { forceRefresh: true });
+    assert.equal(denied.success, false);
+    assert.equal(denied.reauthRequired, false, "403 project is not reauth");
+    assert.equal(denied.error?.code, "invalid_project");
+    assert.ok(!JSON.stringify(denied).includes("project-denied"), "wire omits project id value");
+  } finally {
+    globalThis.fetch = originalFetch;
+    try {
+      unregisterOAuthProvider("google-antigravity");
+    } catch {
+      // ignore
+    }
+    if (previous) {
+      try {
+        registerOAuthProvider(previous);
+      } catch {
+        // ignore
+      }
+    }
+    if (prevAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = prevAgentDir;
+    await rm(agentDir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

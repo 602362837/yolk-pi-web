@@ -70,11 +70,13 @@ test("lock module has no proper-lockfile static resolve", () => {
   assert.ok(lockSource.includes("owner.json"));
 });
 
-test("token module uses production getOAuthApiKey + withAntigravityProviderLock", () => {
+test("token module uses production getOAuthApiKey + slot-first transaction + provider lock", () => {
   assert.ok(tokenSource.includes("getOAuthApiKey"));
   assert.ok(tokenSource.includes("withAntigravityProviderLock"));
-  assert.ok(tokenSource.includes("mirrorActiveCredentialIfActive"));
+  assert.ok(tokenSource.includes("commitAntigravityCredentialUnderLock"));
+  assert.ok(tokenSource.includes("reconcileAntigravityActiveMirrorUnderLock"));
   assert.ok(tokenSource.includes("mergeAntigravityCredential"));
+  assert.ok(tokenSource.includes("forceRefresh: true"));
 });
 
 test("race test script is registered", () => {
@@ -103,6 +105,7 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
     registerOAuthProvider,
     unregisterOAuthProvider,
     getOAuthProvider,
+    getOAuthApiKey,
   } = oauth;
 
   /** @type {{ calls: number, holdMs: number, releaseGate: Promise<void> | null, releaseGateResolve: (() => void) | null, barriers: Array<(info: {call: number, refresh: string}) => Promise<void>> }} */
@@ -303,6 +306,191 @@ await testAsync("refresh(A)+Activate(B) and refresh(B)+Activate(A) keep new Acti
       "project-b-secret",
       "final mirror must retain B projectId",
     );
+
+    // ── Active refresh: slot-first commit keeps slot and mirror equal ──
+    await activateOAuthAccount(ANTIGRAVITY_PROVIDER_ID, first.accountId);
+    const firstCredPath = join(antiDir, `${encodeURIComponent(first.accountId)}.json`);
+    {
+      const { writeFile, rename } = await import("node:fs/promises");
+      const cred = JSON.parse(await readFile(firstCredPath, "utf8"));
+      const next = {
+        ...cred,
+        access: "expired-active-access",
+        expires: Date.now() - 60_000,
+      };
+      const tmp = `${firstCredPath}.tmp.${process.pid}.active`;
+      await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+      await rename(tmp, firstCredPath);
+    }
+    refreshControl.calls = 0;
+    refreshControl.holdMs = 0;
+    refreshControl.releaseGate = null;
+    const activeRefresh = await getAntigravityAccessToken(first.accountId, { forceRefresh: true });
+    assert.equal(activeRefresh.refreshed, true);
+    assert.equal(refreshControl.calls, 1, "Active refresh invokes refreshToken once");
+    const activeSlot = JSON.parse(await readFile(firstCredPath, "utf8"));
+    const activeMirror = await readActiveMirror();
+    assert.ok(String(activeSlot.access).startsWith("refreshed-access-"));
+    assert.equal(
+      String(/** @type {Record<string, unknown>} */ (activeMirror).access ?? ""),
+      String(activeSlot.access),
+      "Active slot and auth.json access must converge",
+    );
+    assert.equal(
+      Number(/** @type {Record<string, unknown>} */ (activeMirror).expires ?? 0),
+      Number(activeSlot.expires),
+      "Active slot and auth.json expires must converge",
+    );
+    assert.equal(activeSlot.projectId, "project-a-secret", "server-only projectId retained on slot");
+    assert.equal(
+      String(/** @type {Record<string, unknown>} */ (activeMirror).projectId ?? ""),
+      "project-a-secret",
+      "server-only projectId retained on mirror",
+    );
+
+    // ── Non-Active refresh must not rewrite Active mirror ──
+    const mirrorBeforeNonActive = await readActiveMirror();
+    const mirrorBeforeHash = JSON.stringify(mirrorBeforeNonActive);
+    const secondCredPath = join(antiDir, `${encodeURIComponent(second.accountId)}.json`);
+    {
+      const { writeFile, rename } = await import("node:fs/promises");
+      const cred = JSON.parse(await readFile(secondCredPath, "utf8"));
+      const next = {
+        ...cred,
+        access: "expired-nonactive-access",
+        expires: Date.now() - 60_000,
+      };
+      const tmp = `${secondCredPath}.tmp.${process.pid}.nonactive`;
+      await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+      await rename(tmp, secondCredPath);
+    }
+    refreshControl.calls = 0;
+    const nonActiveRefresh = await getAntigravityAccessToken(second.accountId, { forceRefresh: true });
+    assert.equal(nonActiveRefresh.refreshed, true);
+    assert.equal(refreshControl.calls, 1, "non-Active refresh invokes refreshToken once");
+    const nonActiveSlot = JSON.parse(await readFile(secondCredPath, "utf8"));
+    assert.ok(String(nonActiveSlot.access).startsWith("refreshed-access-"));
+    const mirrorAfterNonActive = await readActiveMirror();
+    assert.equal(
+      JSON.stringify(mirrorAfterNonActive),
+      mirrorBeforeHash,
+      "non-Active refresh must leave Active auth.json unchanged",
+    );
+    listed = await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID);
+    assert.equal(listed.activeAccountId, first.accountId, "non-Active refresh must not change Active pointer");
+
+    // ── Forced caller is not satisfied by ordinary non-refresh flight ──
+    refreshControl.calls = 0;
+    const ordinary = getAntigravityAccessToken(first.accountId);
+    const forced = getAntigravityAccessToken(first.accountId, { forceRefresh: true });
+    const [ordinaryResult, forcedResult] = await Promise.all([ordinary, forced]);
+    assert.equal(ordinaryResult.refreshed, false, "ordinary flight only reads valid credential");
+    assert.equal(forcedResult.refreshed, true, "forced flight performs a real refresh");
+    assert.equal(refreshControl.calls, 1, "force performs exactly one refresh after ordinary read");
+
+    // ── Mirror failure retains slot; ordinary read repairs without second RT ──
+    const { createAntigravityCoordinatedCredentialStore } = await jiti.import(
+      pathToFileURL(join(root, "lib/antigravity-active-credential-store.ts")).href,
+    );
+    const rawStore = await getWebCredentialStore();
+    const failingRawStore = {
+      authPath: rawStore.authPath,
+      read: rawStore.read.bind(rawStore),
+      list: rawStore.list.bind(rawStore),
+      delete: rawStore.delete.bind(rawStore),
+      async modify() {
+        throw new Error("injected auth mirror failure");
+      },
+    };
+    const coordinatedFailing = createAntigravityCoordinatedCredentialStore(failingRawStore);
+    await assert.rejects(
+      () =>
+        coordinatedFailing.modify(ANTIGRAVITY_PROVIDER_ID, async (current) => ({
+          ...current,
+          access: "sdk-rotated-access",
+          refresh: "prod-refresh-a",
+          expires: Date.now() + 3_600_000,
+          projectId: "project-a-secret",
+          email: "a@example.com",
+          type: "oauth",
+        })),
+      /injected auth mirror failure/,
+    );
+    const slotAfterMirrorFailure = JSON.parse(await readFile(firstCredPath, "utf8"));
+    assert.equal(
+      slotAfterMirrorFailure.access,
+      "sdk-rotated-access",
+      "slot remains after mirror failure; never roll back rotated credential",
+    );
+    // Restore a stale mirror deliberately, then ordinary valid-token read reconciles.
+    await rawStore.modify(ANTIGRAVITY_PROVIDER_ID, async () => ({
+      access: "stale-mirror-access",
+      refresh: "prod-refresh-a",
+      expires: Date.now() + 3_600_000,
+      projectId: "project-a-secret",
+      email: "a@example.com",
+      type: "oauth",
+    }));
+    refreshControl.calls = 0;
+    const reconcileRead = await getAntigravityAccessToken(first.accountId);
+    assert.equal(reconcileRead.refreshed, false, "ordinary read must not consume another refresh token");
+    assert.equal(refreshControl.calls, 0, "reconciliation must not call refreshToken");
+    assert.equal(reconcileRead.accessToken, "sdk-rotated-access");
+    const repairedMirror = await readActiveMirror();
+    assert.equal(
+      String(/** @type {Record<string, unknown>} */ (repairedMirror).access ?? ""),
+      "sdk-rotated-access",
+      "ordinary read repairs still-Active mirror from slot",
+    );
+
+    // ── Coordinated store modify (ModelRuntime / resolveStoredOAuth path) ──
+    refreshControl.calls = 0;
+    {
+      const { writeFile, rename } = await import("node:fs/promises");
+      const cred = JSON.parse(await readFile(firstCredPath, "utf8"));
+      const next = {
+        ...cred,
+        access: "runtime-expired-access",
+        expires: Date.now() - 60_000,
+      };
+      const tmp = `${firstCredPath}.tmp.${process.pid}.runtime`;
+      await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+      await rename(tmp, firstCredPath);
+    }
+    const coordinated = createAntigravityCoordinatedCredentialStore(rawStore);
+    const runtimeCredential = await coordinated.modify(ANTIGRAVITY_PROVIDER_ID, async (current) => {
+      assert.ok(current && current.type === "oauth", "SDK callback receives lock-time Active slot");
+      const refreshed = await getOAuthApiKey(
+        ANTIGRAVITY_PROVIDER_ID,
+        /** @type {any} */ (current),
+        { forceRefresh: true },
+      );
+      assert.ok(refreshed?.newCredentials, "fixture refresh resolves for runtime path");
+      return {
+        ...current,
+        ...refreshed.newCredentials,
+        type: "oauth",
+      };
+    });
+    assert.ok(runtimeCredential);
+    assert.ok(
+      String(/** @type {Record<string, unknown>} */ (runtimeCredential).access ?? "").startsWith("refreshed-access-"),
+      "resolveStoredOAuth-style modify returns new credential to current request",
+    );
+    assert.equal(refreshControl.calls, 1, "runtime path performs one refresh");
+    const runtimeSlot = JSON.parse(await readFile(firstCredPath, "utf8"));
+    const runtimeMirror = await readActiveMirror();
+    assert.equal(
+      String(runtimeSlot.access),
+      String(/** @type {Record<string, unknown>} */ (runtimeCredential).access ?? ""),
+      "runtime path writes managed slot",
+    );
+    assert.equal(
+      String(/** @type {Record<string, unknown>} */ (runtimeMirror).access ?? ""),
+      String(/** @type {Record<string, unknown>} */ (runtimeCredential).access ?? ""),
+      "runtime path mirrors Active auth.json",
+    );
+    assert.equal(runtimeSlot.projectId, "project-a-secret", "runtime path preserves projectId");
   } finally {
     try {
       unregisterOAuthProvider("google-antigravity");

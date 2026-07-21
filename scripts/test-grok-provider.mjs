@@ -67,6 +67,29 @@ test("exports grokCliExtension with factory from pi-grok-cli", () => {
   assertIncludes(peSource, "await factory(api)", "invokes extension factory");
 });
 
+test("grok factory bridges public OAuth into compat without private imports", () => {
+  assertIncludes(peSource, "bridgePublicProviderOAuthToCompat", "bridges public oauth config");
+  assertIncludes(peSource, "GROK_CLI_PROVIDER_ID", "targets grok-cli id");
+  assertIncludes(peSource, "originalRegisterProvider", "wraps registerProvider");
+  assertNotIncludes(peSource, "pi-grok-cli/src", "no private package import");
+  assertNotIncludes(peSource, "client_secret", "does not copy client secret");
+  assertNotIncludes(peSource, "clientSecret", "does not copy client secret camelCase");
+});
+
+test("compat registry supports non-overwriting public OAuth bridge helpers", () => {
+  const compatSource = read("lib/pi-ai-oauth-compat.ts");
+  assertIncludes(compatSource, "export function registerOAuthProviderIfAbsent", "if-absent register");
+  assertIncludes(compatSource, "export function bridgePublicProviderOAuthToCompat", "public oauth bridge");
+  assertIncludes(compatSource, "Never overwrites an existing explicit registration", "documents non-overwrite");
+});
+
+test("token helper treats missing OAuth bridge as provider_unavailable", () => {
+  const tokenSource = read("lib/grok-account-token.ts");
+  assertIncludes(tokenSource, "provider_unavailable", "structured provider unavailable code");
+  assertIncludes(tokenSource, 'throw new GrokTokenError("provider_unavailable")', "throws provider_unavailable");
+  assertIncludes(tokenSource, "export class GrokTokenError", "exports GrokTokenError");
+});
+
 test("exports grokSessionAccountExtension as retired no-op", () => {
   assertIncludes(peSource, "export const grokSessionAccountExtension", "exports session-account extension");
   assertIncludes(peSource, 'name: "grok-session-account"', "extension name is grok-session-account");
@@ -364,6 +387,102 @@ test("retired pin extension is a no-op factory and cannot break non-grok provide
   assertIncludes(peSource, "Intentionally empty", "empty factory");
   assertNotIncludes(peSource, "before_provider_headers", "no header hook remains");
 });
+
+// ==============================================================================
+// 9. Real public package bootstrap → compat registry
+// ==============================================================================
+
+console.log("\n=== Real public package bootstrap → compat registry ===");
+
+async function runGrokBootstrapCompatRuntimeTest() {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { createJiti } = await import("jiti");
+
+  const agentDir = await mkdtemp(join(tmpdir(), "ypi-grok-oauth-bridge-"));
+  const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  // Load TS modules via jiti without path aliases.
+  const jiti = createJiti(import.meta.url, { interopDefault: true });
+  const compat = await jiti.import(join(root, "lib/pi-ai-oauth-compat.ts"));
+  const pe = await jiti.import(join(root, "lib/pi-provider-extensions.ts"));
+  const runtime = await jiti.import(join(root, "lib/web-model-runtime.ts"));
+
+  const previousGrok = compat.getOAuthProvider("grok-cli");
+  const previousAntigravity = compat.getOAuthProvider("google-antigravity");
+  const previousKiro = compat.getOAuthProvider("kiro");
+  // Start from a clean compat map so this proves the production bridge, not a
+  // leftover fixture from another test process.
+  compat.__resetPiAiOauthCompatForTests();
+  runtime.__resetWebModelRuntimeCacheForTests?.();
+
+  try {
+    // No credentials, no xAI network: only public extension registration.
+    // Do not pre-register a grok-cli fixture before bootstrap.
+    await pe.ensureWebProvidersBootstrapped();
+
+    const grok = compat.getOAuthProvider("grok-cli");
+    assert.ok(grok, "grok-cli compat provider available after real bootstrap");
+    assert.strictEqual(typeof grok.refreshToken, "function", "refreshToken present");
+    assert.strictEqual(typeof grok.getApiKey, "function", "getApiKey present");
+    assert.strictEqual(typeof grok.login, "function", "login present");
+
+    // Non-overwrite: explicit fixture must survive a second bridge attempt.
+    const fixtureRefreshCalls = { n: 0 };
+    compat.registerOAuthProvider({
+      id: "grok-cli",
+      name: "fixture-grok",
+      refreshToken: async (creds) => {
+        fixtureRefreshCalls.n += 1;
+        return creds;
+      },
+      getApiKey: () => "fixture-key",
+      login: async () => {
+        throw new Error("fixture login should not run");
+      },
+    });
+
+    // Re-run only the public oauth projection path to prove if-absent semantics.
+    const bridged = compat.bridgePublicProviderOAuthToCompat("grok-cli", {
+      name: "public-package-grok",
+      refreshToken: async (creds) => creds,
+      getApiKey: () => "public-key",
+      login: async () => {
+        throw new Error("public login should not run");
+      },
+    });
+    assert.strictEqual(bridged, false, "bridge reports no overwrite when fixture exists");
+
+    const after = compat.getOAuthProvider("grok-cli");
+    assert.strictEqual(after?.name, "fixture-grok", "bridge does not overwrite explicit fixture");
+    assert.strictEqual(typeof after?.getApiKey, "function");
+    assert.strictEqual(await after.getApiKey({}), "fixture-key");
+    void fixtureRefreshCalls;
+  } finally {
+    compat.__resetPiAiOauthCompatForTests();
+    if (previousGrok) compat.registerOAuthProvider(previousGrok);
+    if (previousAntigravity) compat.registerOAuthProvider(previousAntigravity);
+    if (previousKiro) compat.registerOAuthProvider(previousKiro);
+    runtime.__resetWebModelRuntimeCacheForTests?.();
+    if (prevAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = prevAgentDir;
+    await rm(agentDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+await (async () => {
+  try {
+    await runGrokBootstrapCompatRuntimeTest();
+    console.log(`  \x1b[32m✓\x1b[0m real public package bootstrap registers grok-cli in compat registry`);
+    passed++;
+  } catch (err) {
+    console.log(
+      `  \x1b[31m✗\x1b[0m real public package bootstrap registers grok-cli in compat registry: ${err.message}`,
+    );
+    failed++;
+  }
+})();
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 

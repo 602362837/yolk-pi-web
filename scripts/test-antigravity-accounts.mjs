@@ -149,16 +149,20 @@ test("Refresh uses getOAuthApiKey from pi-ai/oauth", () => {
   assertIncludes(tokenSource, "ANTIGRAVITY_PROVIDER_ID", "targets google-antigravity provider");
 });
 
-test("Refreshed credential written atomically and merges projectId", () => {
-  assertIncludes(tokenSource, "atomicWriteJson(", "atomic credential write");
+test("Refreshed credential written via shared slot-first transaction and merges projectId", () => {
+  assertIncludes(tokenSource, "commitAntigravityCredentialUnderLock", "uses coordinated transaction");
   assertIncludes(tokenSource, "mergeAntigravityCredential", "merges refresh with existing credential");
   assertIncludes(tokenSource, "projectId", "projectId merge/guard present");
+  assertIncludes(tokenSource, "forceRefresh: true", "compat helper forced after local decision");
 });
 
-test("Active-mirror compare-and-set before updating auth.json", () => {
-  assertIncludes(tokenSource, "mirrorActiveCredentialIfActive", "CAS before mirror update");
-  assertIncludes(tokenSource, "readActiveStorageId", "re-reads Active under lock");
-  assertIncludes(tokenSource, "currentActiveStorageId !== storageId", "checks if still active");
+test("Active-mirror compare-and-set uses slot-first commit + reconcile", () => {
+  assertIncludes(tokenSource, "commitAntigravityCredentialUnderLock", "slot-first commit before mirror");
+  assertIncludes(tokenSource, "reconcileAntigravityActiveMirrorUnderLock", "ordinary read repairs still-Active mirror");
+  assertIncludes(tokenSource, "./antigravity-credential-transaction", "shared transaction module");
+  const transactionSource = read("lib/antigravity-credential-transaction.ts");
+  assertIncludes(transactionSource, "activeChanged", "CAS result reports Active pointer change");
+  assertIncludes(transactionSource, "current.storageId !== input.storageId", "still-Active check before mirror");
 });
 
 test("Provider-level lock serializes refresh + Activate + CAS", () => {
@@ -182,16 +186,19 @@ test("Provider-level lock serializes refresh + Activate + CAS", () => {
   assertIncludes(lockSource, "ANTIGRAVITY_PROVIDER_ID", "lock scoped to antigravity store");
 });
 
-test("forceRefresh is real and not minValidityMs:0 fake", () => {
+test("forceRefresh is real and force-aware single-flight", () => {
   assertIncludes(tokenSource, "forceRefresh?: boolean", "option");
-  assertIncludes(tokenSource, "forceRefresh || !access || epochNow() >= expires - minValidityMs", "force path");
+  assertIncludes(tokenSource, "opts.forceRefresh || !lockedAccess || epochNow() >= lockedExpires - opts.minValidityMs", "force path");
+  assertIncludes(tokenSource, "existing.forceRefresh", "force-aware flight reuse");
+  assertIncludes(tokenSource, "result.refreshed ? result : getAntigravityAccessToken", "forced caller waits then re-forces");
 });
 
-test("Credentials stored at 0600 in 0700 directory", () => {
-  assertIncludes(tokenSource, "JSON_FILE_MODE = 0o600", "0600 constant");
-  assertIncludes(tokenSource, "ACCOUNT_DIR_MODE = 0o700", "0700 constant");
-  assertIncludes(tokenSource, "mode: ACCOUNT_DIR_MODE", "sets directory mode");
-  assertIncludes(tokenSource, "mode: JSON_FILE_MODE", "sets file mode");
+test("Credentials stored at 0600 in 0700 directory via transaction", () => {
+  const transactionSource = read("lib/antigravity-credential-transaction.ts");
+  assertIncludes(transactionSource, "JSON_FILE_MODE = 0o600", "0600 constant");
+  assertIncludes(transactionSource, "ACCOUNT_DIR_MODE = 0o700", "0700 constant");
+  assertIncludes(transactionSource, "mode: ACCOUNT_DIR_MODE", "sets directory mode");
+  assertIncludes(transactionSource, "JSON_FILE_MODE", "sets file mode");
 });
 
 test("API key JSON is parsed; projectId not returned to callers", () => {
@@ -209,6 +216,14 @@ test("Upstream errors map to fixed safe messages", () => {
   assertIncludes(tokenSource, "sanitizeAntigravityLoginError", "login sanitizer");
   assertIncludes(tokenSource, "SAFE_ERROR_MESSAGES", "fixed message table");
   assertIncludes(tokenSource, "Please re-authenticate", "safe reauth copy");
+  // Generic refresh_failed is temporary, not reauth copy.
+  assertIncludes(
+    tokenSource,
+    'refresh_failed: "Antigravity OAuth token refresh failed. Please try again."',
+    "refresh_failed non-reauth message",
+  );
+  assertIncludes(tokenSource, "provider_unavailable", "provider unavailable code");
+  assertIncludes(tokenSource, "mirror|reconciliation failed", "mirror/storage → unavailable");
 });
 
 test("No credential material in throw messages", () => {

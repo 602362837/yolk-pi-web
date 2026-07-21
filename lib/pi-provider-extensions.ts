@@ -21,6 +21,8 @@ import { dirname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createJiti, type Jiti } from "jiti";
 import type { ExtensionFactory, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { bridgePublicProviderOAuthToCompat } from "./pi-ai-oauth-compat";
+import { ANTIGRAVITY_PROVIDER_ID, GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
 
 // pi-grok-cli, pi-kiro-provider, and @yofriadi/pi-antigravity-oauth publish
 // TypeScript source with ESM-style `.js` / `.ts` specifiers. Loading them
@@ -301,6 +303,11 @@ export function loadAntigravityExtensionFactory(): Promise<ExtensionFactory> {
  * The extension registers `grok-cli` models, OAuth provider, tools, vision,
  * Imagine, and request hooks. It is the only publicly stable entry point the
  * package exports.
+ *
+ * After the public factory calls `pi.registerProvider`, the same public OAuth
+ * config is projected into `pi-ai-oauth-compat` (without overwriting fixtures)
+ * so cold saved-account token helpers can call refreshToken/getApiKey. This is
+ * not a ModelRuntime catalog substitute — it only bridges the legacy OAuth map.
  */
 export const grokCliExtension: InlineExtension = {
   name: "pi-grok-cli",
@@ -311,6 +318,15 @@ export const grokCliExtension: InlineExtension = {
       const loaded = await createRuntimeJiti().import("pi-grok-cli");
       const factory = (loaded as { default?: ExtensionFactory }).default;
       if (typeof factory !== "function") throw new Error("pi-grok-cli did not export an extension factory");
+      const originalRegisterProvider = api.registerProvider.bind(api);
+      api.registerProvider = ((name, config) => {
+        originalRegisterProvider(name, config);
+        if (name === GROK_CLI_PROVIDER_ID) {
+          // Bridge only the public oauth surface already registered on the
+          // target runtime. Never import private package modules or secrets.
+          bridgePublicProviderOAuthToCompat(name, config?.oauth);
+        }
+      }) as typeof api.registerProvider;
       await factory(api);
     } catch {
       // Best-effort per provider: a Grok load failure must not block Kiro or
@@ -351,12 +367,26 @@ export const kiroProviderExtension: InlineExtension = {
  * under a single-flight critical section. Remote Web users still use the
  * existing manual redirect URL paste path when browser localhost is not the
  * server.
+ *
+ * After the public factory calls `pi.registerProvider`, the same public OAuth
+ * config is projected into `pi-ai-oauth-compat` (without overwriting fixtures)
+ * so cold saved-account token helpers can call refreshToken/getApiKey. This is
+ * not a ModelRuntime catalog substitute — it only bridges the legacy OAuth map.
  */
 export const antigravityProviderExtension: InlineExtension = {
   name: "@yofriadi/pi-antigravity-oauth",
   factory: async (api) => {
     try {
       const factory = await loadAntigravityExtensionFactory();
+      const originalRegisterProvider = api.registerProvider.bind(api);
+      api.registerProvider = ((name, config) => {
+        originalRegisterProvider(name, config);
+        if (name === ANTIGRAVITY_PROVIDER_ID) {
+          // Bridge only the public oauth surface already registered on the
+          // target runtime. Never import private package modules or secrets.
+          bridgePublicProviderOAuthToCompat(name, config?.oauth);
+        }
+      }) as typeof api.registerProvider;
       await factory(api);
     } catch (err) {
       // Best-effort per provider: an Antigravity load failure must not block

@@ -323,6 +323,121 @@ test("resolveAntigravityPackageExtensionEntry returns package-declared index", (
   assert.ok(existsSync(join(root, "node_modules/@yofriadi/pi-antigravity-oauth/src/index.ts")), "entry file exists");
 });
 
+test("antigravity factory bridges public OAuth into compat without private imports", () => {
+  assertIncludes(peSource, "bridgePublicProviderOAuthToCompat", "bridges public oauth config");
+  assertIncludes(peSource, "ANTIGRAVITY_PROVIDER_ID", "targets google-antigravity id");
+  assertIncludes(peSource, "originalRegisterProvider", "wraps registerProvider");
+  assertNotIncludes(peSource, "pi-antigravity-oauth/src/google-antigravity-oauth", "no private oauth import");
+  assertNotIncludes(peSource, "client_secret", "does not copy client secret");
+});
+
+test("compat registry supports non-overwriting public OAuth bridge helpers", () => {
+  const compatSource = read("lib/pi-ai-oauth-compat.ts");
+  assertIncludes(compatSource, "export function registerOAuthProviderIfAbsent", "if-absent register");
+  assertIncludes(compatSource, "export function bridgePublicProviderOAuthToCompat", "public oauth bridge");
+  assertIncludes(compatSource, "Never overwrites an existing explicit registration", "documents non-overwrite");
+});
+
+test("token helper treats missing OAuth bridge as provider_unavailable", () => {
+  const tokenSource = read("lib/antigravity-account-token.ts");
+  assertIncludes(tokenSource, "provider_unavailable", "structured provider unavailable code");
+  assertIncludes(tokenSource, "throw new AntigravityTokenError(\"provider_unavailable\")", "throws provider_unavailable");
+  assertIncludes(tokenSource, "if (error instanceof AntigravityTokenError) throw error", "preserves structured errors");
+});
+
+// ============================================================================
+// 7. Real public package bootstrap → compat registry
+// ============================================================================
+
+console.log("\n=== Real public package bootstrap → compat registry ===");
+
+async function runBootstrapCompatRuntimeTest() {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { createJiti } = await import("jiti");
+  const { pathToFileURL } = await import("node:url");
+
+  const agentDir = await mkdtemp(join(tmpdir(), "ypi-ag-oauth-bridge-"));
+  const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  // Load TS modules via jiti without path aliases.
+  const jiti = createJiti(import.meta.url, { interopDefault: true });
+  const compat = await jiti.import(join(root, "lib/pi-ai-oauth-compat.ts"));
+  const pe = await jiti.import(join(root, "lib/pi-provider-extensions.ts"));
+  const runtime = await jiti.import(join(root, "lib/web-model-runtime.ts"));
+
+  const previousAntigravity = compat.getOAuthProvider("google-antigravity");
+  const previousKiro = compat.getOAuthProvider("kiro");
+  // Start from a clean compat map so this proves the production bridge, not a
+  // leftover fixture from another test process.
+  compat.__resetPiAiOauthCompatForTests();
+  runtime.__resetWebModelRuntimeCacheForTests?.();
+
+  try {
+    // No credentials, no Google network: only public extension registration.
+    await pe.ensureWebProvidersBootstrapped();
+
+    const antigravity = compat.getOAuthProvider("google-antigravity");
+    assert.ok(antigravity, "google-antigravity compat provider available after real bootstrap");
+    assert.strictEqual(typeof antigravity.refreshToken, "function", "refreshToken present");
+    assert.strictEqual(typeof antigravity.getApiKey, "function", "getApiKey present");
+    assert.strictEqual(typeof antigravity.login, "function", "login present");
+
+    // Non-overwrite: explicit fixture must survive a second bridge attempt.
+    const fixtureRefreshCalls = { n: 0 };
+    compat.registerOAuthProvider({
+      id: "google-antigravity",
+      name: "fixture-antigravity",
+      refreshToken: async (creds) => {
+        fixtureRefreshCalls.n += 1;
+        return creds;
+      },
+      getApiKey: () => "fixture-key",
+      login: async () => {
+        throw new Error("fixture login should not run");
+      },
+    });
+    // Re-run the public factory wrap path against a stub runtime API to prove
+    // bridgePublicProviderOAuthToCompat does not replace the fixture.
+    const factory = await pe.loadAntigravityExtensionFactory();
+    await factory({
+      registerProvider(name, config) {
+        if (name === "google-antigravity") {
+          compat.bridgePublicProviderOAuthToCompat(name, config?.oauth);
+        }
+      },
+    });
+    const after = compat.getOAuthProvider("google-antigravity");
+    assert.strictEqual(after?.name, "fixture-antigravity", "bridge does not overwrite explicit fixture");
+    assert.strictEqual(typeof after?.getApiKey, "function");
+    assert.strictEqual(await after.getApiKey({}), "fixture-key");
+    void fixtureRefreshCalls;
+    void pathToFileURL;
+  } finally {
+    compat.__resetPiAiOauthCompatForTests();
+    if (previousAntigravity) compat.registerOAuthProvider(previousAntigravity);
+    if (previousKiro) compat.registerOAuthProvider(previousKiro);
+    runtime.__resetWebModelRuntimeCacheForTests?.();
+    if (prevAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = prevAgentDir;
+    await rm(agentDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+await (async () => {
+  try {
+    await runBootstrapCompatRuntimeTest();
+    console.log(`  \x1b[32m✓\x1b[0m real public package bootstrap registers google-antigravity in compat registry`);
+    passed++;
+  } catch (err) {
+    console.log(
+      `  \x1b[31m✗\x1b[0m real public package bootstrap registers google-antigravity in compat registry: ${err.message}`,
+    );
+    failed++;
+  }
+})();
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${"─".repeat(40)}`);

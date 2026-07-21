@@ -629,14 +629,26 @@ function buildUnavailableResult(
   };
 }
 
-function mapTokenErrorToQuotaError(
+/**
+ * Map token-resolver failures to quota wire errors.
+ *
+ * Only confirmed credential problems become unauthorized/reauth:
+ * - unauthorized (invalid_grant / revoked / explicit 401)
+ * - missing_refresh when AT is unusable
+ * - missing/corrupt saved credential
+ *
+ * Provider bridge, storage/lock/mirror, network, and generic refresh failures
+ * stay non-reauth (upstream/network) so temporary infrastructure issues never
+ * prompt the user to re-login.
+ */
+export function mapTokenErrorToQuotaError(
   err: unknown,
 ): NonNullable<AntigravityQuotaResultV1["error"]> {
   const code =
     err && typeof err === "object" && "code" in err
       ? String((err as AntigravityTokenError).code)
       : "";
-  if (code === "unauthorized" || code === "missing_refresh" || code === "refresh_failed") {
+  if (code === "unauthorized" || code === "missing_refresh") {
     return fixedError("unauthorized", SAFE_ERROR_MESSAGES.unauthorized, true);
   }
   if (code === "missing_project") {
@@ -645,10 +657,30 @@ function mapTokenErrorToQuotaError(
   if (code === "network") {
     return fixedError("network", SAFE_ERROR_MESSAGES.network, true);
   }
+  // Provider bridge/load, storage/lock/mirror, and generic refresh failure are
+  // infrastructure/upstream — never reauth.
+  if (
+    code === "provider_unavailable"
+    || code === "unavailable"
+    || code === "refresh_failed"
+  ) {
+    return fixedError(
+      "upstream",
+      code === "provider_unavailable"
+        ? "Antigravity OAuth provider is temporarily unavailable"
+        : code === "refresh_failed"
+          ? "Antigravity OAuth token refresh failed temporarily"
+          : "Antigravity OAuth is temporarily unavailable",
+      true,
+    );
+  }
   if (code === "account_not_found" || code === "invalid_credential") {
+    // Missing/corrupt local credential still requires re-login to restore a slot.
     return fixedError("unauthorized", SAFE_ERROR_MESSAGES.missing_credential, false);
   }
-  return fixedError("unauthorized", SAFE_ERROR_MESSAGES.unauthorized, true);
+  // Unknown token errors default to non-reauth upstream. Confirmed unauthorized
+  // must already be tagged by the token resolver.
+  return fixedError("upstream", SAFE_ERROR_MESSAGES.upstream, true);
 }
 
 // ─── Core query ──────────────────────────────────────────────────────────────
@@ -722,13 +754,25 @@ async function queryAntigravityQuota(
       // Retry is unconditional after a successful force refresh, even when the
       // returned access token string is unchanged (metadata-only refresh).
       // Never loop beyond this single retry.
+      // If force refresh itself fails with a classified non-reauth error
+      // (provider/storage/network), surface that classification instead of
+      // keeping a false unauthorized reauth from the first 401.
       if (result.error?.code === "unauthorized" && result.statusCode === 401) {
         try {
           const refreshed = await getAntigravityAccessToken(accountId, { forceRefresh: true });
           accessToken = refreshed.accessToken;
           result = await fetchAvailableModelsData(accessToken, meta.projectId);
-        } catch {
-          // Refresh failed — keep original unauthorized result.
+        } catch (refreshErr) {
+          const mapped = mapTokenErrorToQuotaError(refreshErr);
+          if (mapped.code !== "unauthorized") {
+            result = {
+              models: null,
+              error: mapped,
+              statusCode: null,
+            };
+          }
+          // Confirmed unauthorized (invalid_grant / missing_refresh) keeps the
+          // original 401 unauthorized result so reauthRequired stays true.
         }
       }
 
