@@ -29,7 +29,9 @@ import type {
 import {
   createWebCredentialStore,
   getWebCredentialStore,
+  type WebCredentialStore,
 } from "./web-credential-store";
+import { createGrokCoordinatedCredentialStore } from "./grok-active-credential-store";
 import { webExtensionFactories, webProviderExtensions } from "./pi-provider-extensions";
 
 export interface CreateWebModelRuntimeOptions {
@@ -82,6 +84,10 @@ async function resolveAgentDir(agentDir?: string): Promise<string> {
   return resolve(getAgentDir());
 }
 
+function isWebCredentialStore(store: CredentialStore): store is WebCredentialStore {
+  return typeof (store as Partial<WebCredentialStore>).authPath === "string";
+}
+
 function adminCacheKey(agentDir: string, modelsPath: string | null | undefined): string {
   const modelsKey =
     modelsPath === undefined || modelsPath === null ? "<default>" : resolve(modelsPath);
@@ -103,12 +109,17 @@ export async function createWebModelRuntime(
     options.authPath && options.authPath.length > 0
       ? resolve(options.authPath)
       : join(agentDir, "auth.json");
-  const credentials =
+  const rawCredentials =
     options.credentials ??
     (await createWebCredentialStore({
       authPath,
       agentDir,
     }));
+  // Only the persistent Active auth store participates in Grok's managed-slot
+  // transaction. In-memory OAuth add/login stores must stay isolated.
+  const credentials = isWebCredentialStore(rawCredentials)
+    ? createGrokCoordinatedCredentialStore(rawCredentials)
+    : rawCredentials;
 
   const modelsPath =
     options.modelsPath === undefined

@@ -112,6 +112,7 @@ export function getOAuthProviders(): LegacyOAuthProvider[] {
 export async function getOAuthApiKey(
   providerId: string,
   credentials: OAuthCredentials | Record<string, unknown>,
+  options: { forceRefresh?: boolean } = {},
 ): Promise<OAuthApiKeyResult | null> {
   const provider = providers.get(providerId);
   if (!provider) return null;
@@ -120,7 +121,7 @@ export async function getOAuthApiKey(
   if (!current) return null;
 
   const expires = typeof current.expires === "number" ? current.expires : 0;
-  const needsRefresh = Date.now() >= expires;
+  const needsRefresh = options.forceRefresh === true || Date.now() >= expires;
 
   let nextCredentials = current;
   if (needsRefresh) {

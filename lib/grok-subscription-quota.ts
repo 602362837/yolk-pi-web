@@ -515,7 +515,10 @@ async function queryGrokBilling(
       if (result.error?.code === "unauthorized" && (result.statusCode === 401 || result.statusCode === 403)) {
         try {
           const refreshed = await getGrokAccessToken(accountId, { forceRefresh: true });
-          if (refreshed.accessToken !== accessToken) {
+          // A provider may rotate refresh state while retaining the same access
+          // string. Retry based on the real forced-refresh outcome, not a token
+          // string comparison, and do it exactly once.
+          if (refreshed.refreshed) {
             accessToken = refreshed.accessToken;
             result = await fetchBillingData(accessToken);
           }

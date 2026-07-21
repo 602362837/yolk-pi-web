@@ -4,26 +4,27 @@
  *
  * Refresh of a saved Grok account, Activate of another account, and
  * reauthentication of an existing slot must not interleave around the
- * auth.json Active mirror or the slot credential file.  A process-level
- * mutex serializes all three paths; an on-disk mkdir lock coordinates
- * cross-process writers using only Node fs primitives so Next/Turbopack
- * never traces third-party lock packages or unsupported package export
- * subpaths.
+ * auth.json Active mirror or the slot credential file. A process-level mutex
+ * serializes all three paths; an on-disk mkdir lock coordinates cross-process
+ * writers using only Node fs primitives.
  *
- * ## Invariants
- *
- * - One Grok provider critical section at a time in-process.
- * - Disk lock is `mkdir` of a lock directory + owner metadata; no third-party
- *   lock packages and no nested `package.json` resolution.
- * - Stale locks (owner age / lock-dir mtime > LOCK_STALE_MS) are removed and
- *   acquisition is retried with a bounded wait.
- * - Callers re-read Active under the lock before mirroring credentials.
- * - No credential material is logged.
- * - Independent from Kiro/Antigravity provider locks (no shared state).
+ * Lock ordering is always Grok provider lock → auth.json lock. Callers must
+ * never acquire this lock from within a WebCredentialStore.modify callback.
  */
 
-import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  rmdir,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
 
@@ -33,6 +34,7 @@ const ACCOUNT_DIR_MODE = 0o700;
 /** Lock directory under the Grok account store (not a plain file). */
 const LOCK_DIR_NAME = "provider.refresh-activate-reauth.lock";
 const LOCK_OWNER_FILE = "owner.json";
+const LOCK_OWNER_PREFIX = "owner.";
 const LOCK_STALE_MS = 30_000;
 const LOCK_RETRY_MIN_MS = 40;
 const LOCK_RETRY_MAX_MS = 120;
@@ -51,8 +53,8 @@ function providerLockDir(): string {
   return join(grokAccountDir(), LOCK_DIR_NAME);
 }
 
-function providerLockOwnerPath(lockDir: string): string {
-  return join(lockDir, LOCK_OWNER_FILE);
+function providerLockOwnerPath(lockDir: string, id?: string): string {
+  return join(lockDir, id ? `${LOCK_OWNER_PREFIX}${id}.json` : LOCK_OWNER_FILE);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -67,18 +69,26 @@ function jitteredRetryMs(): number {
   return LOCK_RETRY_MIN_MS + Math.floor(Math.random() * (LOCK_RETRY_MAX_MS - LOCK_RETRY_MIN_MS + 1));
 }
 
-async function pathExists(path: string): Promise<boolean> {
+function isLivePid(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
-    await access(path);
+    process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // EPERM means the PID exists but belongs to another user, so fail closed.
+    return (err as NodeJS.ErrnoException | undefined)?.code === "EPERM";
   }
 }
 
 async function readLockOwner(lockDir: string): Promise<LockOwner | null> {
+  let ownerFile = LOCK_OWNER_FILE;
   try {
-    const raw = JSON.parse(await readFile(providerLockOwnerPath(lockDir), "utf8")) as unknown;
+    const names = await readdir(lockDir);
+    const uniqueOwner = names.find(
+      (name) => name.startsWith(LOCK_OWNER_PREFIX) && name.endsWith(".json") && name !== LOCK_OWNER_FILE,
+    );
+    if (uniqueOwner) ownerFile = uniqueOwner;
+    const raw = JSON.parse(await readFile(join(lockDir, ownerFile), "utf8")) as unknown;
     if (!isRecord(raw)) return null;
     const pid = typeof raw.pid === "number" && Number.isFinite(raw.pid) ? raw.pid : null;
     const createdAt =
@@ -102,20 +112,25 @@ async function lockAgeMs(lockDir: string): Promise<number | null> {
 }
 
 async function tryRemoveStaleLock(lockDir: string): Promise<boolean> {
-  const age = await lockAgeMs(lockDir);
+  const owner = await readLockOwner(lockDir);
+  const age = owner ? Date.now() - owner.createdAt : await lockAgeMs(lockDir);
   if (age === null || age < LOCK_STALE_MS) return false;
+  // An aged refresh may still be running. Safety beats availability: never
+  // steal from a live owner; waiters will time out without entering.
+  if (owner && isLivePid(owner.pid)) return false;
+
+  const quarantineDir = `${lockDir}.stale-${randomUUID()}`;
   try {
-    await rm(lockDir, { recursive: true, force: true });
+    // Move before removal so a releasing old holder cannot remove a later lock.
+    await rename(lockDir, quarantineDir);
+    await rm(quarantineDir, { recursive: true, force: true });
     return true;
   } catch {
     return false;
   }
 }
 
-/**
- * Acquire the on-disk provider lock via exclusive mkdir.
- * Returns an async release that removes the lock directory (best-effort).
- */
+/** Acquire the on-disk provider lock via exclusive mkdir. */
 async function acquireFsDirLock(): Promise<() => Promise<void>> {
   const accountDir = grokAccountDir();
   const lockDir = providerLockDir();
@@ -124,10 +139,11 @@ async function acquireFsDirLock(): Promise<() => Promise<void>> {
   const startedAt = Date.now();
   while (true) {
     try {
-      // Exclusive create: fails with EEXIST when another holder owns the lock.
       await mkdir(lockDir, { recursive: false, mode: ACCOUNT_DIR_MODE });
-      const owner: LockOwner = { pid: process.pid, createdAt: Date.now() };
-      await writeFile(providerLockOwnerPath(lockDir), `${JSON.stringify(owner)}\n`, {
+      const id = randomUUID();
+      const owner = { pid: process.pid, createdAt: Date.now(), id };
+      const ownerPath = providerLockOwnerPath(lockDir, id);
+      await writeFile(ownerPath, `${JSON.stringify(owner)}\n`, {
         encoding: "utf8",
         mode: JSON_FILE_MODE,
       });
@@ -137,19 +153,13 @@ async function acquireFsDirLock(): Promise<() => Promise<void>> {
         if (released) return;
         released = true;
         try {
-          // Only remove if we still own it (best-effort; stale recovery may have cleaned).
-          const current = await readLockOwner(lockDir);
-          if (current && current.pid === process.pid && current.createdAt === owner.createdAt) {
-            await rm(lockDir, { recursive: true, force: true });
-            return;
-          }
-          if (!(await pathExists(lockDir))) return;
-          // Owner file missing or rewritten — still try force cleanup of our empty hold.
-          if (!current) {
-            await rm(lockDir, { recursive: true, force: true });
-          }
+          // Owner-specific filenames make an old release harmless after stale
+          // recovery: it can only unlink its own metadata, never a replacement.
+          await unlink(ownerPath);
+          await rmdir(lockDir);
         } catch {
-          // Best-effort unlock.
+          // A stale recovery/replacement may have already removed or replaced
+          // the directory. Never recursively remove a path during release.
         }
       };
     } catch (err) {
@@ -157,7 +167,6 @@ async function acquireFsDirLock(): Promise<() => Promise<void>> {
       if (code !== "EEXIST") throw err;
 
       await tryRemoveStaleLock(lockDir);
-
       if (Date.now() - startedAt > LOCK_MAX_WAIT_MS) {
         throw new Error("Grok provider refresh/Activate/reauth lock acquisition timed out");
       }
@@ -194,8 +203,8 @@ async function withFsDirLock<T>(fn: () => Promise<T>): Promise<T> {
 
 /**
  * Run `fn` under the Grok provider critical section shared by token refresh,
- * Activate, and reauthentication.  Process mutex is always applied; on-disk
- * mkdir lock adds cross-process safety without third-party lock packages.
+ * Activate, and reauthentication. The provider lock is acquired before any
+ * auth.json lock the callback may need.
  */
 export async function withGrokProviderLock<T>(fn: () => Promise<T>): Promise<T> {
   return withProcessLock(() => withFsDirLock(fn));

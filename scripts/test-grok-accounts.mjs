@@ -214,6 +214,7 @@ test("syncActiveOAuthAccountCredential clears active when credential missing", (
 console.log("\n=== grok-account-token.ts — resolver safety ===");
 
 const tokenSource = read("lib/grok-account-token.ts");
+const transactionSource = read("lib/grok-credential-transaction.ts");
 
 test("Single-flight keyed by grok-cli:storageId", () => {
   assertIncludes(tokenSource, 'flightKey(storageId)', "computes flight key");
@@ -228,13 +229,15 @@ test("Refresh retry uses getOAuthApiKey from pi-ai/oauth", () => {
   assertIncludes(tokenSource, "getOAuthApiKey", "uses pi-ai OAuth machinery");
 });
 
-test("Refreshed credential written atomically to storage id file", () => {
-  assertIncludes(tokenSource, "atomicWriteJson(", "atomic credential write");
+test("Refreshed credential uses the shared slot-first transaction", () => {
+  assertIncludes(tokenSource, "commitGrokCredentialUnderLock", "uses coordinated transaction");
+  assertIncludes(transactionSource, "atomicWriteSlot", "atomically writes authoritative slot");
 });
 
-test("Active-mirror compare-and-set before updating auth.json", () => {
-  assertIncludes(tokenSource, "mirrorActiveCredentialIfActive", "CAS before mirror update");
-  assertIncludes(tokenSource, "currentActiveStorageId !== storageId", "checks if still active");
+test("Active-mirror compare-and-set happens after the slot commit", () => {
+  assertIncludes(transactionSource, "await atomicWriteSlot", "commits slot first");
+  assertIncludes(transactionSource, "current.storageId !== input.storageId", "checks Active pointer before mirror");
+  assertIncludes(transactionSource, "rawStore.modify", "mirrors through raw credential store");
 });
 
 test("Refresh failure preserves existing credential", () => {
@@ -260,7 +263,7 @@ test("No credential material in log/error messages", () => {
 });
 
 test("getGrokAccessToken validates storageId is non-empty", () => {
-  assertIncludes(tokenSource, "!storageId.trim()", "validates non-empty storage id");
+  assertIncludes(tokenSource, "!normalizedStorageId", "validates non-empty storage id");
   assertIncludes(tokenSource, "grokAccountStorageId is required", "error for empty id");
 });
 
@@ -269,12 +272,10 @@ test("invalidateGrokTokenFlight removes in-flight promise", () => {
 });
 
 test("Credentials stored at 0600 in 0700 directory", () => {
-  assertIncludes(tokenSource, "JSON_FILE_MODE = 0o600", "0600 constant");
-  assertIncludes(tokenSource, "ACCOUNT_DIR_MODE = 0o700", "0700 constant");
-  // Permissions are set via mkdir({mode}) and writeFile({mode}),
-  // which sets the mode atomically at creation time.
-  assertIncludes(tokenSource, "mode: ACCOUNT_DIR_MODE", "sets directory mode");
-  assertIncludes(tokenSource, "mode: JSON_FILE_MODE", "sets file mode");
+  assertIncludes(transactionSource, "JSON_FILE_MODE = 0o600", "0600 constant");
+  assertIncludes(transactionSource, "ACCOUNT_DIR_MODE = 0o700", "0700 constant");
+  assertIncludes(transactionSource, "mode: ACCOUNT_DIR_MODE", "sets directory mode");
+  assertIncludes(transactionSource, "JSON_FILE_MODE", "sets file mode");
 });
 
 // ============================================================================
@@ -457,23 +458,20 @@ test("No module imports grok-cli adapter from oauth-accounts except via getAdapt
 console.log("\n=== Token resolver edge case coverage ===");
 
 test("getGrokAccessToken documents the single-flight contract", () => {
-  assertIncludes(tokenSource, "One in-flight refresh per storageId", "documents single-flight");
+  assertIncludes(tokenSource, "concurrent forced callers share one forced flight", "documents mode-aware single-flight");
 });
 
-test("getGrokAccessToken documents the secret write contract", () => {
-  assertIncludes(tokenSource, "Secret writes use tmp + rename", "documents atomic writes");
+test("getGrokAccessToken documents the slot-first commit contract", () => {
+  assertIncludes(tokenSource, "slot first", "documents transaction ordering");
+  assertIncludes(transactionSource, "write failure never rolls", "documents no rollback on mirror failure");
 });
 
-test("getGrokAccessToken documents active-mirror CAS", () => {
-  assertIncludes(tokenSource, "auth.json mirror is only updated", "documents CAS mirror");
-});
-
-test("getGrokAccessToken documents no-logging policy", () => {
-  assertIncludes(tokenSource, "No credential material is ever logged", "documents no-logging");
+test("getGrokAccessToken keeps credential data out of logs", () => {
+  assertNotIncludes(tokenSource, "console.log", "no credential logging");
 });
 
 test("minValidityMs default is 120_000 (2 min)", () => {
-  assertIncludes(tokenSource, "minValidityMs = 120_000", "default 2 min validity");
+  assertIncludes(tokenSource, "minValidityMs: opts.minValidityMs ?? 120_000", "default 2 min validity");
 });
 
 test("signal propagation for abort support", () => {
@@ -534,8 +532,7 @@ test("Credential store directory: auth-accounts/<provider>/", () => {
 });
 
 test("Grok credential directory includes auth-accounts/grok-cli/", () => {
-  // grok-account-token.ts should construct the same path
-  assertIncludes(tokenSource, 'ACCOUNT_STORE_DIR = "auth-accounts"', "uses same ACCOUNT_STORE_DIR");
+  assertIncludes(tokenSource, '"auth-accounts"', "uses same account-store directory");
   // Quota cache also uses the same directory
   const quotaSource = read("lib/grok-subscription-quota.ts");
   assertIncludes(quotaSource, '"auth-accounts"', "quota cache in auth-accounts dir");
@@ -587,7 +584,7 @@ test("grok-account-lock covers refresh + Activate + reauth", () => {
 });
 
 test("grok-account-lock uses atomic write for owner file", () => {
-  assertIncludes(grokLockSource, "writeFile(providerLockOwnerPath", "writes owner metadata");
+  assertIncludes(grokLockSource, "writeFile(ownerPath", "writes owner metadata");
   assertIncludes(grokLockSource, "JSON_FILE_MODE", "owner file has permission constant");
 });
 
@@ -674,7 +671,7 @@ console.log("\n=== grok-account-token.ts — lock integration ===");
 test("getGrokAccessToken refresh runs under Grok provider lock", () => {
   const tokenSource2 = read("lib/grok-account-token.ts");
   assertIncludes(tokenSource2, "withGrokProviderLock", "uses Grok provider lock");
-  assertIncludes(tokenSource2, "Re-read the credential file under the lock", "documents lock reason");
+  assertIncludes(tokenSource2, "return withGrokProviderLock", "runs the lock-time reread under the provider lock");
 });
 
 test("grok-account-token imports lock from grok-account-lock", () => {
