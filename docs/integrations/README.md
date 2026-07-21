@@ -19,6 +19,8 @@ See `package.json` for exact versions.
 | `@lobehub/icons` | Provider/model icon assets. |
 | `@xterm/xterm`, `@xterm/addon-fit` | Browser-side Web Terminal rendering and sizing. |
 | `@lydell/node-pty` | Server-side local PTY process for interactive Web Terminal sessions; selected because the original `node-pty` failed under the local Node 26 runtime. |
+| `sharp` | Exact pin `0.34.5`. Server-only image decoder/normalizer for Settings → 外观 background skins (`lib/appearance-image.ts`) and for video poster WebP encode after frame extract (`lib/appearance-video.ts`). Validates JPEG/PNG/static WebP signatures, rejects animation/oversized input, auto-orients, and emits metadata-free WebP full/thumbnail (or video poster) assets. Required for appearance image uploads and poster production; not used by general file upload and does **not** decode MP4. Keep the pin exact and ship lock/shrinkwrap so packaged installs resolve the same native binary set. |
+| `ffmpeg-static` | Exact pin `5.3.0`. Optional native ffmpeg binary resolved via `createRequire(process.cwd()/package.json)` for appearance video poster strategy A (`lib/appearance-video.ts` frame extract → `sharp` WebP). P0 does **not** re-encode uploaded MP4 streams. When the binary is missing, uploads may still succeed if an optional form `poster` image is supplied (strategy B); otherwise video poster production fails closed with a stable path-free code. Keep the pin exact with lock/shrinkwrap; platform binary absence is an ops concern, not a reason to trust client Content-Type. |
 
 ## pi SDK Documentation
 

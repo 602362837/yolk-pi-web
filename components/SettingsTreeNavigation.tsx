@@ -19,6 +19,7 @@ export type SettingsSection =
   | "yolk"
   | "worktree"
   | "studio"
+  | "appearance"
   | "links"
   | "usage"
   | "modelPrices"
@@ -101,6 +102,7 @@ export function ancestorGroupsForView(view: SettingsView): SettingsGroupId[] {
     case "worktree":
       return ["sessionWorkspace"];
     case "studio":
+    case "appearance":
     case "links":
       return [];
     case "usage":
@@ -185,6 +187,17 @@ export function flattenVisibleTreeNodes(expanded: SettingsExpandedGroups): Focus
       icon: "⑂",
     });
   }
+
+  // Root leaves before 模型与用量: 外观, then Studio, then Links (approved product order).
+  nodes.push({
+    focusId: "view:appearance",
+    kind: "view",
+    view: "appearance",
+    level: 0,
+    label: "外观",
+    description: "主题与网页背景皮肤",
+    icon: "◐",
+  });
 
   nodes.push({
     focusId: "view:studio",
@@ -675,6 +688,16 @@ export function SettingsTreeNavigation({
             })}
           </>,
         )}
+
+        {renderViewButton({
+          focusId: "view:appearance",
+          kind: "view",
+          view: "appearance",
+          level: 0,
+          label: "外观",
+          description: "主题与网页背景皮肤",
+          icon: "◐",
+        })}
 
         {renderViewButton({
           focusId: "view:studio",

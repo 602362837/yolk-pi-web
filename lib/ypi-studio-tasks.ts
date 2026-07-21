@@ -76,6 +76,7 @@ import type {
   YpiStudioImprovementArtifactUpdateBody,
   YpiStudioImprovementPlanUpdateBody,
   YpiStudioImprovementSubtaskClaimBody,
+  YpiStudioImprovementSubtaskUpdateBody,
   YpiStudioApprovalGrantSource,
   YpiStudioWidgetApprovePlanBody,
   YpiStudioWidgetRequestPlanChangesBody,
@@ -1114,14 +1115,31 @@ function isoAfter(baseline: string): string {
   return new Date(baselineMs + 1).toISOString();
 }
 
-const APPROVAL_TEXT_RE = /确认|批准|同意|可以实现|开始实现|按方案做|继续制作|approve|approved|go ahead|start implementation|proceed/i;
-const APPROVAL_REJECTION_RE = /不批准|不同意|先别|不要|不能|暂缓|修改|改一下|调整|change|changes|revise|revision|not approve|not approved|don't approve|do not approve|don't go ahead|do not go ahead|don't proceed|do not proceed|don't start implementation|do not start implementation|hold on|wait|not yet|not now/i;
+// Free-form chat is an authorization boundary. Keep this deliberately small and
+// anchored: never extract approval-looking fragments from discussion prose.
+const APPROVAL_TEXT_MAX_CODE_POINTS = 80;
+const APPROVAL_REJECTION_RE = /(?:不|别|不要|不能|暂缓|等等|先修改|需要修改|改一下|调整)|\b(?:no|not|don't|do not|wait|hold|revise|change|not yet|not now)\b/i;
+const CHINESE_APPROVAL_COMMAND_RE = /^(?:确认|批准|同意(?:该方案)?|按方案做|继续制作|可以开始实现|(?:确认|批准)[，,]?开始实现|(?:确认|批准)[，,]?批准开始实现)$/;
+const ENGLISH_APPROVAL_COMMANDS = new Set([
+  "approve",
+  "i approve this plan",
+  "go ahead",
+  "please proceed",
+  "proceed",
+  "start implementation",
+]);
+
+function normalizeYpiStudioApprovalText(text: unknown): string | null {
+  if (typeof text !== "string" || /[\r\n]/.test(text)) return null;
+  const normalized = text.normalize("NFKC").replace(/[\t\f\v \u00a0]+/g, " ").trim();
+  return normalized && Array.from(normalized).length <= APPROVAL_TEXT_MAX_CODE_POINTS ? normalized : null;
+}
 
 export function isExplicitYpiStudioApprovalText(text: string): boolean {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) return false;
-  if (APPROVAL_REJECTION_RE.test(normalized)) return false;
-  return APPROVAL_TEXT_RE.test(normalized);
+  const normalized = normalizeYpiStudioApprovalText(text);
+  if (!normalized || APPROVAL_REJECTION_RE.test(normalized)) return false;
+  return CHINESE_APPROVAL_COMMAND_RE.test(normalized)
+    || ENGLISH_APPROVAL_COMMANDS.has(normalized.toLowerCase());
 }
 
 function isApprovalImplementationEdge(from: string, to: string): boolean {
@@ -3921,6 +3939,54 @@ export function updateYpiStudioImplementationSubtask(taskIdOrKey: string, body: 
   });
 }
 
+export function updateYpiStudioImprovementSubtask(taskIdOrKey: string, body: YpiStudioImprovementSubtaskUpdateBody): YpiStudioTaskDetail {
+  const ctx = createContext(body.cwd);
+  return withTaskMutationLock(ctx, taskIdOrKey, () => {
+    const record = loadTaskRecord(ctx, taskIdOrKey);
+    if (!record?.raw) throw new Error("Task not found");
+    const instance = resolveImprovementInstanceForExecution(record, body.improvementId);
+    const plan = instance.implementationPlan!;
+    const progress = instance.implementationProgress!;
+    const item = progress.subtasks[body.subtaskId];
+    if (!item) throw new Error(`Unknown improvement implementation subtask: ${body.subtaskId}`);
+    if (body.status === "done" && item.status !== "running" && item.status !== "queued") throw new Error(`Improvement subtask ${body.subtaskId} is not active`);
+    const updatedAt = nowIso();
+    const from = item.status;
+    item.status = body.status;
+    item.updatedAt = updatedAt;
+    if (body.status === "running") {
+      item.startedAt = updatedAt;
+      item.finishedAt = undefined;
+      item.attempts += 1;
+      progress.activeSubtaskId = body.subtaskId;
+    } else if (["done", "skipped", "failed"].includes(body.status)) {
+      item.finishedAt = updatedAt;
+      if (progress.activeSubtaskId === body.subtaskId) progress.activeSubtaskId = undefined;
+    } else if (body.status === "blocked") item.finishedAt = undefined;
+    if (body.runId) {
+      item.runIds = Array.from(new Set([...item.runIds, body.runId]));
+      item.lastRunId = body.runId;
+      item.currentRunId = body.runId;
+    }
+    item.summary = body.message ?? item.summary;
+    item.validation = body.validation ?? item.validation;
+    item.blockedBy = body.blockedBy ?? item.blockedBy;
+    item.blockedReason = body.blockedReason ?? item.blockedReason;
+    item.skippedReason = body.skippedReason ?? item.skippedReason;
+    item.terminationReason = body.terminationReason ?? item.terminationReason;
+    progress.history = [...(progress.history ?? []), { at: updatedAt, subtaskId: body.subtaskId, from, to: body.status, runId: body.runId, message: body.message }].slice(-200);
+    refreshDerivedImplementation(plan, progress);
+    instance.implementationProgress = progress;
+    instance.updatedAt = updatedAt;
+    record.raw.updatedAt = updatedAt;
+    if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, { type: "note", at: updatedAt, taskId: record.raw.id, message: body.message ?? `Improvement subtask ${body.subtaskId} -> ${body.status}`, data: { improvementId: instance.id, subtaskId: body.subtaskId, from, to: body.status, runId: body.runId } });
+    if (body.contextId) writeRuntimePointer(ctx, body.contextId, record.raw.id);
+    return getYpiStudioTaskDetail(ctx.cwd, record.raw.id)!;
+  });
+}
+
 export function isYpiStudioTaskCreateBody(value: unknown): value is YpiStudioTaskCreateBody {
   return isRecord(value) && typeof value.cwd === "string" && typeof value.title === "string" && value.title.trim().length > 0;
 }
@@ -3970,8 +4036,18 @@ export function isYpiStudioImprovementSubtaskClaimBody(value: unknown): value is
     && (value.contextId === undefined || typeof value.contextId === "string");
 }
 
+export function isYpiStudioImprovementSubtaskUpdateBody(value: unknown): value is YpiStudioImprovementSubtaskUpdateBody {
+  return isRecord(value) && value.action === "update_implementation_subtask" && typeof value.cwd === "string"
+    && typeof value.improvementId === "string" && typeof value.subtaskId === "string" && isImplementationStatus(value.status)
+    && (value.runId === undefined || typeof value.runId === "string")
+    && (value.message === undefined || typeof value.message === "string")
+    && (value.validation === undefined || (Array.isArray(value.validation) && value.validation.every((item) => typeof item === "string")))
+    && (value.contextId === undefined || typeof value.contextId === "string");
+}
+
 export function isYpiStudioTaskImplementationSubtaskUpdateBody(value: unknown): value is YpiStudioTaskImplementationSubtaskUpdateBody {
   return isRecord(value) && value.action === "update_implementation_subtask" && typeof value.cwd === "string"
+    && value.improvementId === undefined
     && typeof value.subtaskId === "string" && isImplementationStatus(value.status)
     && (value.runId === undefined || typeof value.runId === "string")
     && (value.message === undefined || typeof value.message === "string")

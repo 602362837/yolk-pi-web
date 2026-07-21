@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>外观设置与网页背景适配原型 (YPI Studio)</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg-subtle: rgba(0, 0, 0, 0.03);
+      --accent-soft: rgba(37, 99, 235, 0.1);
+      --ok: #15803d;
+      --warn: #b45309;
+      --danger: #dc2626;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+      
+      /* Semantic panel transparency variables when background is active */
+      --active-bg-panel: rgba(245, 245, 245, 0.9);
+      --active-bg: rgba(255, 255, 255, 0.9);
+      --active-border: rgba(0, 0, 0, 0.1);
+    }
+    
+    html.dark {
+      color-scheme: dark;
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+      --accent-soft: rgba(96, 165, 250, 0.12);
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --danger: #fb7185;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      
+      /* Semantic panel transparency variables when background is active */
+      --active-bg-panel: rgba(36, 36, 36, 0.9);
+      --active-bg: rgba(26, 26, 26, 0.9);
+      --active-border: rgba(255, 255, 255, 0.1);
+    }
+    
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+      position: relative;
+      overflow-x: hidden;
+    }
+    
+    /* Simulated Background layers */
+    #bg-layer {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      background-repeat: no-repeat;
+      transition: background 0.25s ease, background-size 0.25s ease, background-position 0.25s ease;
+      display: none;
+    }
+    #bg-veil {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      transition: background-color 0.25s ease, opacity 0.25s ease;
+      display: none;
+    }
+
+    button, input, select { font: inherit; }
+    
+    /* Toolbar at top to control state of the prototype */
+    .prototype-toolbar {
+      position: fixed;
+      z-index: 100;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      color: #fff;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    .prototype-toolbar strong { padding-right: 6px; white-space: nowrap; font-size: 12px; color: var(--accent); }
+    .prototype-toolbar button {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .prototype-toolbar button:hover, .prototype-toolbar button:focus-visible {
+      background: rgba(255, 255, 255, 0.18);
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    
+    .stage {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 64px 20px 20px;
+      background: #111827; /* Dark background to see the container */
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* Modal simulating the AppShell and Settings layout */
+    .modal {
+      width: min(1040px, calc(100vw - 40px));
+      height: min(740px, calc(100vh - 90px));
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-panel);
+      box-shadow: var(--shadow);
+      position: relative;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    /* Style override when a skin is active inside the modal, replicating the translucent design */
+    .modal.has-skin {
+      background: var(--active-bg-panel);
+      backdrop-filter: blur(10px);
+      border-color: var(--active-border);
+    }
+
+    .modal-header {
+      flex: none;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      z-index: 10;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    .modal.has-skin .modal-header {
+      background: var(--active-bg);
+      border-bottom-color: var(--active-border);
+    }
+    .modal-header h1 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .modal-header p { margin: 2px 0 0; color: var(--text-muted); font-size: 11px; }
+    
+    .close {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 6px;
+      font-size: 18px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    .close:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    
+    .modal-body { min-height: 0; flex: 1; display: flex; position: relative; }
+    
+    /* Settings Left Navigation */
+    .tree-panel {
+      width: 200px;
+      flex: none;
+      padding: 10px 8px;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--bg);
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    .modal.has-skin .tree-panel {
+      background: var(--active-bg);
+      border-right-color: var(--active-border);
+    }
+    .tree-label {
+      padding: 4px 8px 6px;
+      color: var(--text-dim);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .tree { display: flex; flex-direction: column; gap: 2px; }
+    
+    .node-row {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 500;
+      gap: 8px;
+    }
+    .node-row:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    .node-row.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .node-row .icon {
+      width: 14px;
+      text-align: center;
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .node-row .label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Content Area (Settings Config layout) */
+    .content {
+      min-width: 0;
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg-panel);
+      transition: background-color 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal.has-skin .content {
+      background: transparent;
+    }
+
+    .view-container {
+      padding: 20px;
+      max-width: 800px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+    }
+
+    .eyebrow { color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h2 { margin: 2px 0 4px; font-size: 18px; font-weight: 600; }
+    .lead { margin: 0 0 16px; color: var(--text-muted); font-size: 12px; }
+
+    /* Split column layout for Appearance Config */
+    .appearance-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* Left Column: Skin List & Upload */
+    .skin-gallery-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .upload-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      background: var(--bg);
+      cursor: pointer;
+      transition: border-color 0.2s, background-color 0.2s;
+      position: relative;
+    }
+    .modal.has-skin .upload-zone {
+      background: var(--active-bg);
+      border-color: var(--active-border);
+    }
+    .upload-zone:hover {
+      border-color: var(--accent);
+      background: var(--bg-hover);
+    }
+    .upload-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .upload-zone .upload-icon {
+      font-size: 20px;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    .upload-zone p { margin: 0; font-size: 11px; color: var(--text-muted); }
+    .upload-zone .hint { font-size: 9px; color: var(--text-dim); margin-top: 4px; }
+    
+    .upload-input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    /* Skins Grid list */
+    .skins-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    /* Individual Skin Card */
+    .skin-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+    }
+    .modal.has-skin .skin-card {
+      background: var(--active-bg);
+      border-color: var(--active-border);
+    }
+    .skin-card:hover {
+      border-color: var(--accent-hover);
+      background: var(--bg-hover);
+    }
+    .skin-card.active {
+      border-color: var(--accent);
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    .skin-thumb {
+      width: 48px;
+      height: 32px;
+      border-radius: 4px;
+      background-size: cover;
+      background-position: center;
+      border: 1px solid var(--border);
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: var(--text-muted);
+      overflow: hidden;
+    }
+    .skin-thumb.default-thumb {
+      background: var(--bg-panel);
+    }
+
+    .skin-info {
+      min-width: 0;
+      flex: 1;
+    }
+    .skin-name-container {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .skin-name {
+      font-weight: 600;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .skin-name-input {
+      font-weight: 600;
+      font-size: 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 4px;
+      width: 100%;
+      color: var(--text);
+      outline: none;
+    }
+    .skin-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .active-badge {
+      display: inline-flex;
+      align-items: center;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 4px;
+      font-size: 8px;
+      padding: 1px 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Actions trigger on skin card hover */
+    .skin-actions {
+      display: none;
+      gap: 4px;
+      flex: none;
+    }
+    .skin-card:hover .skin-actions {
+      display: flex;
+    }
+    .action-btn {
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .action-btn:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+      border-color: var(--text-dim);
+    }
+    .action-btn.delete-btn:hover {
+      color: #fff;
+      background: var(--danger);
+      border-color: var(--danger);
+    }
+
+    /* Capacity usage indicator */
+    .capacity-indicator {
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .capacity-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .capacity-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 12%; /* Mock initial state */
+      transition: width 0.3s;
+    }
+
+    /* Right Column: Parameters and Live Preview Simulation */
+    .skin-params-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 16px;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    .modal.has-skin .skin-params-panel {
+      background: var(--active-bg);
+      border-color: var(--active-border);
+    }
+
+    /* Simulated layout preview to see translucent hierarchy */
+    .preview-canvas {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 160px;
+      position: relative;
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      flex-direction: column;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.15);
+      transition: background-image 0.2s;
+    }
+    .preview-veil {
+      position: absolute;
+      inset: 0;
+      transition: background-color 0.2s, opacity 0.2s;
+      z-index: 1;
+    }
+    /* Simulated UI elements on preview */
+    .preview-ui {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 6px;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    .preview-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .preview-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 45px 1fr 50px;
+      gap: 4px;
+      margin: 4px 0;
+      min-height: 0;
+    }
+    .preview-sidebar {
+      border-radius: 4px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .preview-chat {
+      border-radius: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .preview-bubble {
+      height: 10px;
+      border-radius: 3px;
+      background: var(--bg-hover);
+      width: 70%;
+      margin-bottom: 3px;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .preview-bubble.right {
+      background: var(--accent-soft);
+      align-self: flex-end;
+      width: 50%;
+    }
+    .preview-chat-input {
+      height: 12px;
+      border-radius: 3px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .preview-rightpane {
+      border-radius: 4px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .preview-monaco {
+      background: #1e1e1e !important; /* Always dark/solid to show code safety */
+      opacity: 1 !important;
+      border-color: #333 !important;
+      height: 36px;
+      margin-top: 4px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+    }
+    .preview-code-line {
+      height: 3px;
+      background: #4e4e4e;
+      border-radius: 1px;
+      width: 80%;
+    }
+
+    /* Controls Grid */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .control-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .control-value {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Segments Control */
+    .segment-control {
+      display: flex;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+      width: 100%;
+    }
+    .segment-btn {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      padding: 4px 6px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-muted);
+      text-align: center;
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .segment-btn.active {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+    }
+    .segment-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* 3x3 Position Grid Selector */
+    .position-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      width: 96px;
+    }
+    .pos-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .pos-btn::after {
+      content: "";
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: all 0.15s;
+    }
+    .pos-btn:hover {
+      border-color: var(--text-muted);
+      background: var(--bg-hover);
+    }
+    .pos-btn.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .pos-btn.active::after {
+      background: var(--accent);
+      transform: scale(1.5);
+    }
+    .pos-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Slider styling */
+    .slider-input {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: var(--border);
+      outline: none;
+      margin: 6px 0;
+    }
+    .slider-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.1s;
+    }
+    .slider-input::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* Toast Notification System */
+    .toast-container {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: var(--bg);
+      border-left: 4px solid var(--accent);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      color: var(--text);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 240px;
+      max-width: 320px;
+      pointer-events: auto;
+      animation: slideIn 0.2s forwards;
+    }
+    .toast.success { border-left-color: var(--ok); }
+    .toast.error { border-left-color: var(--danger); }
+    .toast.warning { border-left-color: var(--warn); }
+    
+    @keyframes slideIn {
+      from { transform: translateX(110%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Simulated AppPrompt Modal Dialog */
+    .dialog-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(2px);
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .dialog-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      width: 280px;
+      box-shadow: var(--shadow);
+      animation: scaleUp 0.15s ease-out;
+    }
+    .dialog-title { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+    .dialog-desc { color: var(--text-muted); font-size: 11px; margin-bottom: 14px; line-height: 1.4; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .btn {
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--bg-hover); color: var(--text); }
+    .btn.btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+    .btn.btn-accent:hover { background: var(--accent-hover); }
+    .btn.btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
+    .btn.btn-danger:hover { opacity: 0.9; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* Footer area simulation */
+    .settings-footer {
+      flex: none;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    .modal.has-skin .settings-footer {
+      background: var(--active-bg);
+      border-top-color: var(--active-border);
+    }
+    .settings-footer .note {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .settings-footer .note-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+    }
+    .settings-footer-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      .appearance-layout {
+        grid-template-columns: 1fr;
+      }
+      .tree-panel {
+        display: none; /* Emulating simple drawer sidebar or header switcher in mobile */
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PROTOTYPE STATE CONTROLLER -->
+  <div class="prototype-toolbar">
+    <strong>外观原型控制器:</strong>
+    <button onclick="toggleTheme()">🌓 切换亮暗模式</button>
+    <button onclick="triggerUploadConflict()">💥 模拟并发冲突</button>
+    <button onclick="triggerQuotaFull()">⚠️ 模拟配额已满</button>
+    <button onclick="triggerSwitchError()">❌ 模拟切换失败</button>
+    <button onclick="resetPrototype()">🔄 重置状态</button>
+  </div>
+
+  <div class="stage">
+
+    <!-- MAIN SETTINGS MODAL -->
+    <div id="settings-modal" class="modal">
+      
+      <!-- HEADER -->
+      <div class="modal-header">
+        <div>
+          <h1>⚙️ 全局设置</h1>
+          <p>个性化配置你的蛋黄派 YPI Web 客户端运行环境</p>
+        </div>
+        <button class="close" title="关闭设置">&times;</button>
+      </div>
+
+      <!-- MAIN FRAME -->
+      <div class="modal-body">
+        
+        <!-- LEFT TREE NAVIGATION -->
+        <div class="tree-panel">
+          <div class="tree-label">会话与工作区</div>
+          <div class="tree">
+            <div class="node-row"><span class="icon">🤖</span><span class="label">Yolk Chat</span></div>
+            <div class="node-row"><span class="icon">🌿</span><span class="label">Worktree</span></div>
+            <div class="node-row"><span class="icon">🎬</span><span class="label">Studio 工作流</span></div>
+          </div>
+          
+          <div class="tree-label" style="margin-top: 10px;">模型与用量</div>
+          <div class="tree">
+            <div class="node-row"><span class="icon">🔗</span><span class="label">Links 连接</span></div>
+            <div class="node-row"><span class="icon">📊</span><span class="label">用量总览</span></div>
+            <div class="node-row"><span class="icon">💰</span><span class="label">模型计费配置</span></div>
+          </div>
+
+          <div class="tree-label" style="margin-top: 10px;">系统设置</div>
+          <div class="tree">
+            <div class="node-row active"><span class="icon">🎨</span><span class="label">外观皮肤</span></div>
+            <div class="node-row"><span class="icon">💻</span><span class="label">终端配置</span></div>
+            <div class="node-row"><span class="icon">📝</span><span class="label">编辑器选项</span></div>
+            <div class="node-row"><span class="icon">🛠️</span><span class="label">Trellis 调度</span></div>
+            <div class="node-row"><span class="icon">🩺</span><span class="label">系统诊断</span></div>
+          </div>
+        </div>
+
+        <!-- RIGHT CONTENT AREA -->
+        <div class="content">
+          <div class="view-container">
+            <div class="eyebrow">SYSTEM APPEARANCE</div>
+            <h2>外观皮肤管理</h2>
+            <div class="lead">设置全局网页背景皮肤，调整面板的透明度与色彩veil，在确保文本可读性的同时享受美观工作台。</div>
+
+            <!-- Appearance Layout -->
+            <div class="appearance-layout">
+              
+              <!-- Skin Catalog List (Left) -->
+              <div class="skin-gallery-panel">
+                <span class="section-title">皮肤库 (最多30张)</span>
+                
+                <!-- Upload Drop Zone -->
+                <div class="upload-zone" id="dropzone">
+                  <div class="upload-icon">📤</div>
+                  <p><strong>选择图片文件</strong> 或 拖放到这里</p>
+                  <p class="hint">支持 JPEG, PNG, static WebP，不超过 20 MiB</p>
+                  <input type="file" id="file-uploader" class="upload-input" accept="image/jpeg,image/png,image/webp" />
+                </div>
+
+                <!-- Catalog Grid -->
+                <div class="skins-grid" id="skins-list">
+                  <!-- Fixed Default Appearance -->
+                  <div class="skin-card active" id="skin-default" onclick="selectSkin('default')">
+                    <div class="skin-thumb default-thumb">纯色</div>
+                    <div class="skin-info">
+                      <div class="skin-name-container">
+                        <span class="skin-name">默认外观 (纯色)</span>
+                        <span class="active-badge" id="badge-default">已激活</span>
+                      </div>
+                      <div class="skin-meta">系统默认 semantic color</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Dynamically Rendered / Static Sample Skins -->
+                  <div class="skin-card" id="skin-1" onclick="selectSkin('skin-1')">
+                    <div class="skin-thumb" style="background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&auto=format&fit=crop&q=60')"></div>
+                    <div class="skin-info">
+                      <div class="skin-name-container">
+                        <span class="skin-name" id="name-lbl-1">极简微光</span>
+                        <span class="active-badge" id="badge-1" style="display:none">已激活</span>
+                      </div>
+                      <div class="skin-meta">3840×2160 • 1.2 MiB</div>
+                    </div>
+                    <div class="skin-actions">
+                      <button class="action-btn" title="重命名" onclick="startRename(event, '1')">✏️</button>
+                      <button class="action-btn delete-btn" title="删除" onclick="confirmDelete(event, '1')">🗑️</button>
+                    </div>
+                  </div>
+
+                  <div class="skin-card" id="skin-2" onclick="selectSkin('skin-2')">
+                    <div class="skin-thumb" style="background-image: url('https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=120&auto=format&fit=crop&q=60')"></div>
+                    <div class="skin-info">
+                      <div class="skin-name-container">
+                        <span class="skin-name" id="name-lbl-2">赛博抽象</span>
+                        <span class="active-badge" id="badge-2" style="display:none">已激活</span>
+                      </div>
+                      <div class="skin-meta">2560×1440 • 850 KiB</div>
+                    </div>
+                    <div class="skin-actions">
+                      <button class="action-btn" title="重命名" onclick="startRename(event, '2')">✏️</button>
+                      <button class="action-btn delete-btn" title="删除" onclick="confirmDelete(event, '2')">🗑️</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Disk Capacity usage info -->
+                <div class="capacity-indicator">
+                  <span>总配额: <span id="capacity-txt">2.03 MiB</span> / 100 MiB (2 / 30 张)</span>
+                  <div class="capacity-bar" style="width: 100%;">
+                    <div class="capacity-fill" id="capacity-fill" style="width: 2%;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Parameter Settings Panel (Right) -->
+              <div class="skin-params-panel" id="params-panel">
+                <span class="section-title">布局呈现与可读性参数</span>
+
+                <!-- 16:9 Mini UI Preview Simulator -->
+                <div class="preview-canvas" id="preview-canvas">
+                  <div class="preview-veil" id="preview-canvas-veil"></div>
+                  <div class="preview-ui">
+                    <!-- topbar -->
+                    <div class="preview-topbar" id="preview-ui-topbar">
+                      <span>⚡ Session #128</span>
+                      <span>💰 $0.045 / 42.1K tkn</span>
+                    </div>
+                    
+                    <!-- body content split -->
+                    <div class="preview-body">
+                      <!-- sidebar -->
+                      <div class="preview-sidebar" id="preview-ui-sidebar"></div>
+                      
+                      <!-- chat content pane -->
+                      <div class="preview-chat" id="preview-ui-chat">
+                        <div style="display:flex; flex-direction:column;">
+                          <div class="preview-bubble" id="preview-ui-bubble-1"></div>
+                          <div class="preview-bubble right" id="preview-ui-bubble-2"></div>
+                        </div>
+                        
+                        <!-- Monaco editor panel simulation -->
+                        <div class="preview-monaco">
+                          <div class="preview-code-line"></div>
+                        </div>
+                        
+                        <div class="preview-chat-input" id="preview-ui-chat-input"></div>
+                      </div>
+                      
+                      <!-- right pane -->
+                      <div class="preview-rightpane" id="preview-ui-rightpane"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Parameters list -->
+                <div class="control-group">
+                  <div class="control-label-row">
+                    <span class="control-label">适应适配方式 (Fit Mode)</span>
+                  </div>
+                  <div class="segment-control" id="fit-control">
+                    <button class="segment-btn active" id="btn-fit-cover" onclick="setFit('cover')">覆盖裁剪</button>
+                    <button class="segment-btn" id="btn-fit-contain" onclick="setFit('contain')">完整显示</button>
+                    <button class="segment-btn" id="btn-fit-stretch" onclick="setFit('stretch')">拉伸铺满</button>
+                    <button class="segment-btn" id="btn-fit-original" onclick="setFit('original')">原始尺寸</button>
+                  </div>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-label-row">
+                    <span class="control-label">对齐对焦点 (Anchor Position)</span>
+                    <span class="control-value" id="val-pos">居中 (50% 50%)</span>
+                  </div>
+                  <div class="position-selector" id="pos-grid">
+                    <button class="pos-btn" onclick="setPosition(0, 0, '左上')" title="左上"></button>
+                    <button class="pos-btn" onclick="setPosition(50, 0, '中上')" title="中上"></button>
+                    <button class="pos-btn" onclick="setPosition(100, 0, '右上')" title="右上"></button>
+                    
+                    <button class="pos-btn" onclick="setPosition(0, 50, '左中')" title="左中"></button>
+                    <button class="pos-btn active" onclick="setPosition(50, 50, '居中')" title="居中"></button>
+                    <button class="pos-btn" onclick="setPosition(100, 50, '右中')" title="右中"></button>
+                    
+                    <button class="pos-btn" onclick="setPosition(0, 100, '左下')" title="左下"></button>
+                    <button class="pos-btn" onclick="setPosition(50, 100, '中下')" title="中下"></button>
+                    <button class="pos-btn" onclick="setPosition(100, 100, '右下')" title="右下"></button>
+                  </div>
+                  <span class="hint" id="stretch-hint" style="color:var(--text-muted); display:none;">⚠️ 拉伸铺满下，定位对焦被禁用并已完全铺满。</span>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-label-row">
+                    <span class="control-label">防眩光背景遮罩色 (Veil Tone)</span>
+                  </div>
+                  <div class="segment-control" id="tone-control">
+                    <button class="segment-btn active" onclick="setTone('auto')">随主题自动</button>
+                    <button class="segment-btn" onclick="setTone('light')">白色遮罩</button>
+                    <button class="segment-btn" onclick="setTone('dark')">黑色遮罩</button>
+                  </div>
+                </div>
+
+                <div class="control-group">
+                  <div class="control-label-row">
+                    <span class="control-label">背景遮罩强度 (Overlay Opacity)</span>
+                    <span class="control-value" id="val-overlay">18%</span>
+                  </div>
+                  <input type="range" class="slider-input" id="slide-overlay" min="0" max="80" value="18" oninput="updateOverlay(this.value)">
+                </div>
+
+                <div class="control-group">
+                  <div class="control-label-row">
+                    <span class="control-label">主面板不透明度 (Panel Opacity)</span>
+                    <span class="control-value" id="val-panel">90%</span>
+                  </div>
+                  <input type="range" class="slider-input" id="slide-panel" min="70" max="100" value="90" oninput="updatePanel(this.value)">
+                  <span class="hint">可调整侧栏与普通聊天面板的穿透程度。关键输入、弹窗及代码区始终保持实色高不透明以确保对比。</span>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <div class="settings-footer">
+        <div class="note">
+          <span class="note-dot"></span>
+          <span>外观皮肤设置即时写入生效，无需手动保存。</span>
+        </div>
+        <div class="settings-footer-actions">
+          <button class="btn btn-accent close-settings-btn" onclick="alert('原型演示：已关闭设置视图')">完成</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="toast-container" id="toast-box"></div>
+
+  <!-- MODAL CONFIRM DIALOG CONTAINER -->
+  <div id="confirm-overlay" class="dialog-overlay" style="display: none;">
+    <div class="dialog-box">
+      <div class="dialog-title" id="dialog-title">警告</div>
+      <div class="dialog-desc" id="dialog-desc">确定要执行此操作吗？</div>
+      <div class="dialog-actions">
+        <button class="btn" onclick="closeConfirm(false)">取消</button>
+        <button class="btn btn-danger" id="dialog-confirm-btn" onclick="closeConfirm(true)">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT STATE CONTROLLER -->
+  <script>
+    // In-memory mock states
+    let activeSkin = 'default';
+    let skins = {
+      'default': {
+        id: 'default',
+        name: '默认外观 (纯色)',
+        fit: 'cover',
+        posX: 50,
+        posY: 50,
+        tone: 'auto',
+        overlay: 18,
+        panel: 90,
+        img: ''
+      },
+      'skin-1': {
+        id: 'skin-1',
+        name: '极简微光',
+        fit: 'cover',
+        posX: 50,
+        posY: 50,
+        tone: 'auto',
+        overlay: 18,
+        panel: 90,
+        img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80'
+      },
+      'skin-2': {
+        id: 'skin-2',
+        name: '赛博抽象',
+        fit: 'cover',
+        posX: 50,
+        posY: 50,
+        tone: 'auto',
+        overlay: 18,
+        panel: 90,
+        img: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=1200&auto=format&fit=crop&q=80'
+      }
+    };
+    
+    let isDarkTheme = true;
+    let pendingDeleteId = null;
+    let deleteConfirmCallback = null;
+
+    // Toggle main app theme light/dark
+    function toggleTheme() {
+      const htmlEl = document.documentElement;
+      isDarkTheme = !isDarkTheme;
+      if (isDarkTheme) {
+        htmlEl.classList.add('dark');
+        showToast('🌗 切换为深色模式', 'success');
+      } else {
+        htmlEl.classList.remove('dark');
+        showToast('🌗 切换为浅色模式', 'success');
+      }
+      applySkinStyles();
+    }
+
+    // Reset back to initial default clean state
+    function resetPrototype() {
+      activeSkin = 'default';
+      isDarkTheme = true;
+      document.documentElement.classList.add('dark');
+      
+      // Reset variables
+      skins['skin-1'] = {
+        id: 'skin-1',
+        name: '极简微光',
+        fit: 'cover',
+        posX: 50,
+        posY: 50,
+        tone: 'auto',
+        overlay: 18,
+        panel: 90,
+        img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80'
+      };
+      
+      // Update Name Labels back
+      document.getElementById('name-lbl-1').innerText = '极简微光';
+      
+      // Rebuild skins UI list
+      const skin1El = document.getElementById('skin-1');
+      if (skin1El) skin1El.style.display = 'flex';
+      
+      selectSkin('default');
+      showToast('🔄 原型状态已完全重置', 'success');
+    }
+
+    // Trigger upload file interaction
+    const dropzone = document.getElementById('dropzone');
+    const fileUploader = document.getElementById('file-uploader');
+
+    fileUploader.addEventListener('change', function(e) {
+      if (e.target.files.length > 0) {
+        handleUploadFile(e.target.files[0]);
+      }
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        // Multi-file drag protection check
+        if (e.dataTransfer.files.length > 1) {
+          showToast('❌ 每次只能上传单个背景图片文件', 'error');
+          return;
+        }
+        handleUploadFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    function handleUploadFile(file) {
+      // Validate type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        showToast('❌ 上传失败: 只支持 JPEG, PNG 或静态 WebP 文件', 'error');
+        return;
+      }
+
+      // Check size limit: 20 MiB
+      const maxSize = 20 * 1024 * 1024;
+      if (file.size > maxSize) {
+        showToast('❌ 上传失败: 文件超过 20 MiB 限制', 'error');
+        return;
+      }
+
+      // Start simulating upload & server processing
+      showToast('📤 正在上传图片并剥离 EXIF 元数据...', 'info');
+      dropzone.style.opacity = '0.6';
+      dropzone.style.pointerEvents = 'none';
+
+      setTimeout(() => {
+        dropzone.style.opacity = '1';
+        dropzone.style.pointerEvents = 'auto';
+
+        const newId = 'skin-' + Date.now();
+        const cleanedName = file.name.replace(/\.[^/.]+$/, "").substring(0, 30);
+        
+        skins[newId] = {
+          id: newId,
+          name: cleanedName || '未命名背景',
+          fit: 'cover',
+          posX: 50,
+          posY: 50,
+          tone: 'auto',
+          overlay: 20,
+          panel: 88,
+          img: URL.createObjectURL(file) // Local object URL mapping
+        };
+
+        // Create new DOM card
+        const cardHtml = `
+          <div class="skin-card" id="${newId}" onclick="selectSkin('${newId}')">
+            <div class="skin-thumb" style="background-image: url('${skins[newId].img}')"></div>
+            <div class="skin-info">
+              <div class="skin-name-container">
+                <span class="skin-name" id="name-lbl-${newId}">${skins[newId].name}</span>
+                <span class="active-badge" id="badge-${newId}" style="display:none">已激活</span>
+              </div>
+              <div class="skin-meta">标准化 WebP • ${(file.size / 1024 / 1024).toFixed(2)} MiB</div>
+            </div>
+            <div class="skin-actions">
+              <button class="action-btn" title="重命名" onclick="startRename(event, '${newId}')">✏️</button>
+              <button class="action-btn delete-btn" title="删除" onclick="confirmDelete(event, '${newId}')">🗑️</button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('skins-list').insertAdjacentHTML('beforeend', cardHtml);
+        
+        // Product decision: Auto-activate after successful upload
+        selectSkin(newId);
+        showToast('✅ 皮肤上传成功，已自动规范化与激活。', 'success');
+        
+        // Update capacity values
+        document.getElementById('capacity-txt').innerText = `${(file.size / 1024 / 1024 + 2).toFixed(2)} MiB`;
+        document.getElementById('capacity-fill').style.width = '6%';
+      }, 1500);
+    }
+
+    // Rename capability
+    function startRename(event, id) {
+      event.stopPropagation();
+      const label = document.getElementById(`name-lbl-${id}`);
+      const oldVal = label.innerText;
+      
+      const input = document.createElement('input');
+      input.className = 'skin-name-input';
+      input.value = oldVal;
+      
+      input.onclick = (e) => e.stopPropagation();
+      
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          saveRename(id, input.value, label);
+        } else if (e.key === 'Escape') {
+          label.innerText = oldVal;
+        }
+      };
+      
+      input.onblur = () => {
+        saveRename(id, input.value, label);
+      };
+      
+      label.innerHTML = '';
+      label.appendChild(input);
+      input.focus();
+    }
+
+    function saveRename(id, newVal, label) {
+      const cleaned = newVal.trim().substring(0, 80);
+      if (cleaned.length === 0) {
+        showToast('⚠️ 背景名称不能为空', 'warning');
+        label.innerText = skins[id].name;
+        return;
+      }
+      skins[id].name = cleaned;
+      label.innerText = cleaned;
+      showToast('✏️ 皮肤已成功重命名', 'success');
+    }
+
+    // Delete flow triggers AppPrompt simulation
+    function confirmDelete(event, id) {
+      event.stopPropagation();
+      pendingDeleteId = id;
+      
+      const isCurrentlyActive = (activeSkin === id);
+      const titleEl = document.getElementById('dialog-title');
+      const descEl = document.getElementById('dialog-desc');
+      const confirmBtn = document.getElementById('dialog-confirm-btn');
+      
+      if (isCurrentlyActive) {
+        titleEl.innerText = '🔴 删除当前正在使用的皮肤';
+        descEl.innerText = '该皮肤目前处于激活状态。如果删除，系统将立即清除该背景文件，并自动切回【默认外观 (纯色)】。是否确认删除？';
+        confirmBtn.className = 'btn btn-danger';
+        confirmBtn.innerText = '确认切换并删除';
+      } else {
+        titleEl.innerText = '删除背景皮肤';
+        descEl.innerText = `确定要删除皮肤「${skins[id].name}」吗？该操作不可撤销。`;
+        confirmBtn.className = 'btn btn-danger';
+        confirmBtn.innerText = '确认删除';
+      }
+      
+      document.getElementById('confirm-overlay').style.display = 'flex';
+    }
+
+    function closeConfirm(approved) {
+      document.getElementById('confirm-overlay').style.display = 'none';
+      if (approved && pendingDeleteId) {
+        const idToDelete = pendingDeleteId;
+        
+        // Simulating busy states
+        const card = document.getElementById(idToDelete);
+        card.style.opacity = '0.5';
+        card.style.pointerEvents = 'none';
+        
+        setTimeout(() => {
+          if (activeSkin === idToDelete) {
+            // Atomic transaction: Switch back to default first
+            selectSkin('default');
+          }
+          
+          // Remove from memory and DOM
+          delete skins[idToDelete];
+          card.remove();
+          
+          showToast('🗑️ 背景皮肤已从服务器完全删除', 'success');
+        }, 600);
+      }
+      pendingDeleteId = null;
+    }
+
+    // Selection flow
+    function selectSkin(id) {
+      if (activeSkin === id && id === 'default') return;
+      
+      // Update UI active card states
+      document.querySelectorAll('.skin-card').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.active-badge').forEach(el => el.style.display = 'none');
+      
+      const selectedCard = document.getElementById(id);
+      if (selectedCard) {
+        selectedCard.classList.add('active');
+        const badge = document.getElementById(`badge-${id}`);
+        if (badge) badge.style.display = 'inline-flex';
+      }
+      
+      activeSkin = id;
+      
+      // Sync panel parameters with selected skin values
+      const skinData = skins[id];
+      
+      // Update fits control buttons state
+      document.querySelectorAll('#fit-control .segment-btn').forEach(btn => btn.classList.remove('active'));
+      const activeFitBtn = document.getElementById(`btn-fit-${skinData.fit}`);
+      if (activeFitBtn) activeFitBtn.classList.add('active');
+      
+      // Enable/Disable position buttons depending on stretch mode
+      togglePositionState(skinData.fit === 'stretch');
+
+      // Update position anchor active grid state
+      updatePositionGrid(skinData.posX, skinData.posY);
+      
+      // Update overlays & sliders values
+      document.getElementById('slide-overlay').value = skinData.overlay;
+      document.getElementById('val-overlay').innerText = `${skinData.overlay}%`;
+      
+      document.getElementById('slide-panel').value = skinData.panel;
+      document.getElementById('val-panel').innerText = `${skinData.panel}%`;
+      
+      // Update tone control segments
+      document.querySelectorAll('#tone-control .segment-btn').forEach((btn, index) => {
+        btn.classList.remove('active');
+        const tones = ['auto', 'light', 'dark'];
+        if (tones[index] === skinData.tone) btn.classList.add('active');
+      });
+
+      applySkinStyles();
+    }
+
+    // Toggle positions state based on fit
+    function togglePositionState(isStretch) {
+      document.querySelectorAll('#pos-grid .pos-btn').forEach(btn => btn.disabled = isStretch);
+      const hint = document.getElementById('stretch-hint');
+      if (isStretch) {
+        hint.style.display = 'block';
+        document.getElementById('val-pos').innerText = '拉伸铺满 (不适用)';
+      } else {
+        hint.style.display = 'none';
+        const activeSkinData = skins[activeSkin];
+        updatePositionGrid(activeSkinData.posX, activeSkinData.posY);
+      }
+    }
+
+    // Set parameters triggers
+    function setFit(fit) {
+      skins[activeSkin].fit = fit;
+      
+      document.querySelectorAll('#fit-control .segment-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`btn-fit-${fit}`).classList.add('active');
+      
+      togglePositionState(fit === 'stretch');
+      applySkinStyles();
+    }
+
+    function setPosition(x, y, label) {
+      if (skins[activeSkin].fit === 'stretch') return;
+      skins[activeSkin].posX = x;
+      skins[activeSkin].posY = y;
+      
+      document.getElementById('val-pos').innerText = `${label} (${x}% ${y}%)`;
+      updatePositionGrid(x, y);
+      applySkinStyles();
+    }
+
+    function updatePositionGrid(x, y) {
+      document.querySelectorAll('#pos-grid .pos-btn').forEach((btn, index) => {
+        btn.classList.remove('active');
+        const gridPositions = [
+          { x: 0, y: 0 }, { x: 50, y: 0 }, { x: 100, y: 0 },
+          { x: 0, y: 50 }, { x: 50, y: 50 }, { x: 100, y: 50 },
+          { x: 0, y: 100 }, { x: 50, y: 100 }, { x: 100, y: 100 }
+        ];
+        const pos = gridPositions[index];
+        if (pos.x === x && pos.y === y) btn.classList.add('active');
+      });
+    }
+
+    function setTone(tone) {
+      skins[activeSkin].tone = tone;
+      document.querySelectorAll('#tone-control .segment-btn').forEach((btn, index) => {
+        btn.classList.remove('active');
+        const tones = ['auto', 'light', 'dark'];
+        if (tones[index] === tone) btn.classList.add('active');
+      });
+      applySkinStyles();
+    }
+
+    function updateOverlay(val) {
+      skins[activeSkin].overlay = parseInt(val);
+      document.getElementById('val-overlay').innerText = `${val}%`;
+      applySkinStyles();
+    }
+
+    function updatePanel(val) {
+      skins[activeSkin].panel = parseInt(val);
+      document.getElementById('val-panel').innerText = `${val}%`;
+      applySkinStyles();
+    }
+
+    // Apply simulated skin styles to body background and local preview canvas
+    function applySkinStyles() {
+      const activeSkinData = skins[activeSkin];
+      const rootModal = document.getElementById('settings-modal');
+      const bgLayer = document.getElementById('bg-layer');
+      const bgVeil = document.getElementById('bg-veil');
+      
+      const previewCanvas = document.getElementById('preview-canvas');
+      const previewVeil = document.getElementById('preview-canvas-veil');
+      
+      if (activeSkin === 'default') {
+        // pure default solid theme styles
+        rootModal.classList.remove('has-skin');
+        bgLayer.style.display = 'none';
+        bgVeil.style.display = 'none';
+        
+        // Reset local preview too
+        previewCanvas.style.backgroundImage = 'none';
+        previewCanvas.style.backgroundColor = 'var(--bg-panel)';
+        previewVeil.style.display = 'none';
+        
+        // Reset preview panels translucency variables
+        resetTranslucentStyles(previewCanvas);
+        
+      } else {
+        // skin activated
+        rootModal.classList.add('has-skin');
+        
+        // Apply background layers to main prototype body for maximum fidelity
+        bgLayer.style.display = 'block';
+        bgLayer.style.backgroundImage = `url('${activeSkinData.img}')`;
+        bgVeil.style.display = 'block';
+        
+        // Setup fits layout
+        if (activeSkinData.fit === 'cover') {
+          bgLayer.style.backgroundSize = 'cover';
+        } else if (activeSkinData.fit === 'contain') {
+          bgLayer.style.backgroundSize = 'contain';
+          bgLayer.style.backgroundColor = 'var(--bg)';
+        } else if (activeSkinData.fit === 'stretch') {
+          bgLayer.style.backgroundSize = '100% 100%';
+        } else {
+          bgLayer.style.backgroundSize = 'auto';
+        }
+        
+        // Position
+        bgLayer.style.backgroundPosition = `${activeSkinData.posX}% ${activeSkinData.posY}%`;
+        
+        // Overlay veil tone color selection
+        let veilColor = 'rgba(0,0,0,';
+        if (activeSkinData.tone === 'light' || (activeSkinData.tone === 'auto' && !isDarkTheme)) {
+          veilColor = 'rgba(255,255,255,';
+        }
+        bgVeil.style.backgroundColor = veilColor + (activeSkinData.overlay / 100) + ')';
+
+        // Apply same rules on simulated Settings Preview widget
+        previewCanvas.style.backgroundImage = `url('${activeSkinData.img}')`;
+        previewVeil.style.display = 'block';
+        
+        if (activeSkinData.fit === 'cover') previewCanvas.style.backgroundSize = 'cover';
+        else if (activeSkinData.fit === 'contain') previewCanvas.style.backgroundSize = 'contain';
+        else if (activeSkinData.fit === 'stretch') previewCanvas.style.backgroundSize = '100% 100%';
+        else previewCanvas.style.backgroundSize = 'auto';
+        
+        previewCanvas.style.backgroundPosition = `${activeSkinData.posX}% ${activeSkinData.posY}%`;
+        previewVeil.style.backgroundColor = veilColor + (activeSkinData.overlay / 100) + ')';
+        
+        // Apply translucency variables based on panelOpacity slider
+        applyTranslucentStyles(previewCanvas, activeSkinData.panel / 100);
+      }
+    }
+
+    function applyTranslucentStyles(container, opacity) {
+      const isDark = document.documentElement.classList.contains('dark');
+      
+      // Calculate panel translucent background colors
+      const bgOpacity = isDark ? `rgba(26, 26, 26, ${opacity})` : `rgba(255, 255, 255, ${opacity})`;
+      const panelOpacity = isDark ? `rgba(36, 36, 36, ${opacity})` : `rgba(245, 245, 245, ${opacity})`;
+      
+      // Inject local variables to simulate semantic tokens override inside the preview canvas
+      container.style.setProperty('--bg', bgOpacity);
+      container.style.setProperty('--bg-panel', panelOpacity);
+      container.style.setProperty('--bg-hover', isDark ? `rgba(46, 46, 46, ${opacity})` : `rgba(238, 238, 238, ${opacity})`);
+      container.style.setProperty('--assistant-bg', bgOpacity);
+      container.style.setProperty('--user-bg', isDark ? `rgba(30, 41, 59, ${opacity})` : `rgba(239, 246, 255, ${opacity})`);
+    }
+
+    function resetTranslucentStyles(container) {
+      container.style.removeProperty('--bg');
+      container.style.removeProperty('--bg-panel');
+      container.style.removeProperty('--bg-hover');
+      container.style.removeProperty('--assistant-bg');
+      container.style.removeProperty('--user-bg');
+    }
+
+    // Prototype interactive conflict mock triggers
+    function triggerUploadConflict() {
+      showToast('⚠️ 保存冲突: 外观配置已在其他标签页变化。系统已刷新，请重新调整！', 'warning');
+      // Force simulate revision reload by selecting defaults
+      selectSkin('default');
+    }
+
+    function triggerQuotaFull() {
+      showToast('❌ 上传失败: 外观存储容量已达上限 (配额限制 100 MiB / 最多 30 张背景图片)。', 'error');
+    }
+
+    function triggerSwitchError() {
+      showToast('❌ 切换失败: 浏览器图片解码出错，已自动恢复旧外观背景。', 'error');
+    }
+
+    // Toast manager helper
+    function showToast(message, type = 'info') {
+      const box = document.getElementById('toast-box');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      let icon = 'ℹ️';
+      if (type === 'success') icon = '✅';
+      else if (type === 'error') icon = '❌';
+      else if (type === 'warning') icon = '⚠️';
+      
+      toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+      box.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.2s forwards';
+        setTimeout(() => toast.remove(), 200);
+      }, 3500);
+    }
+  </script>
+  
+  <style>
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(110%); opacity: 0; }
+    }
+  </style>
+
+</body>
+</html>

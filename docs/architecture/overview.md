@@ -85,6 +85,29 @@ the status row, while the plain frame is a no-op.
 - Client state and SSE streaming behavior are centralized in `hooks/useAgentSession.ts`.
 - File viewing and workspace metadata use explicit API routes under `app/api/files/`, `app/api/cwd/`, and `app/api/git/`.
 
+## Appearance skins
+
+Appearance is an independent, service-instance-wide background-skin domain; it is not a full color-theme system and does not use `pi-web.json` or the generic file-upload route. Browser light/dark preference remains the existing local `pi-theme` setting. Skins are either **image** (static WebP full) or **video** (local MP4 full + WebP poster/thumb); GIF/animation WebP, WebM/MOV, remote URL, and audio playback are out of scope. Its durable layout is:
+
+```text
+<getAgentDir()>/appearance/
+  index.json                      # schema-v1 metadata only (kind optional; missing => image)
+  skins/<opaque-id>.webp          # image full only
+  skins/<opaque-id>.mp4           # video full only (original validated bytes; P0 no re-encode)
+  skins/<opaque-id>.thumb.webp    # image thumbnail OR video poster
+  .tmp/ .trash/ .mutation.lock/
+```
+
+`lib/appearance-store.ts` reads a missing catalog as the current default appearance. It treats malformed/unknown catalog data (including unknown `kind` / mime pairings) as fail-closed and never repairs it during a read. Mutations use an opaque catalog revision and `If-Match` CAS, a process queue plus cross-process mkdir lock, atomic metadata replacement, and rollback-capable asset staging/quarantine. An active skin deletion is one transaction that clears `activeSkinId` before committing asset removal for the kind-specific full file plus shared `.thumb.webp`; a failed transaction must leave the last valid catalog and assets usable. Catalog and wire projections contain opaque ids, cleaned names, `kind`, dimensions, optional `durationMs` (video), bounded presentation values, and app-local asset URLs only—never paths, hashes, source bytes, source metadata, or decoder/probe diagnostics.
+
+Uploads are handled only by `POST /api/appearance/skins` (form allowlist `file` / `name` / `revision` / optional `poster`). The server sniffs content rather than trusting filename or Content-Type: JPEG/PNG/static WebP go through `lib/appearance-image.ts` (`sharp`); MP4 goes through `lib/appearance-video.ts` (bounded ftyp/moov parse, size/duration/resolution caps, no stream re-encode). Video poster prefers ffmpeg frame extract via exact-pinned `ffmpeg-static` (strategy A) with optional form `poster` image fallback (strategy B) when a frame cannot be produced. Successful uploads currently auto-activate. Public limits keep image `maxUploadBytes` at 20 MiB and add video-specific `maxVideoUploadBytes` (50 MiB), `maxVideoDurationMs` (30s), `maxVideoLongEdge` (1920), shared `maxSkins` (30) and `maxTotalBytes` (250 MiB). Asset reads resolve a catalog-referenced opaque id plus fixed `full|thumbnail` variant: image full and all thumbnails are `image/webp`; video full is `video/mp4` with byte `Range` support. Responses use private immutable caching, ETag, and `nosniff`; catalog/mutation responses are `no-store`.
+
+`app/layout.tsx` is `force-dynamic` and reads a safe active-skin bootstrap before rendering. For image skins it emits app-local full-asset CSS vars; for video skins it bootstraps **poster/thumbnail URL only**, `data-appearance-kind="video"`, and an inert host `#appearance-bg-video` **without** `src` (no SSR autoplay). Absent/corrupt/missing assets fall back to the original opaque surfaces without blocking Chat. `app/globals.css` keeps fixed inert `body::before` (image or poster fallback) + veil `body::after`, styles the single fixed video layer with `object-fit` / `object-position` mapped from presentation, and applies translucent semantic surface tokens only under `html[data-appearance="skin"]`; elevated dialogs and high-density tool surfaces retain solid/high-opacity tokens. Playback tokens (`data-appearance-playback`) drive playing vs poster/hidden/error paint. No active skin must preserve the pre-feature light/dark rendering.
+
+The client store (`hooks/useAppearance.ts` + pure `lib/appearance-playback-policy.ts`) re-fetches catalog metadata, applies image skins only after `Image.decode` of the full asset, and applies video skins by painting poster first then attaching at most one muted/loop/`playsInline` background `<video>` when policy allows. Policy pauses/detaches on `prefers-reduced-motion`, hidden document, optional Save-Data, and browser-local poster-only preference (`localStorage` key `pi-appearance-poster-only`); only the visible tab plays. Generation guards prevent stale apply races; switch/unmount releases prior `src`. Same-tab subscribers, `BroadcastChannel("pi-web-appearance-v1")`, and focus/visibility revalidate remain; there is no polling and no media bytes in React state. A failed fetch, decode, or autoplay retains poster/previous effective background. Settings → 外观 is an immediate-save mixed image/video manager (kind badges, duration, poster-only toggle, processing copy); it must not mark, save, or reset the `pi-web.json` draft.
+
+**Stop-bleed / rollback:** hide video upload or ignore `kind=video` (poster-only or default surfaces); keep on-disk mp4/poster assets; do not rewrite sessions, models, auth, or `pi-web.json`.
+
 ## Project Registry
 
 Project records are stored at:
@@ -119,6 +142,10 @@ When a Git WorkTree is archived or deleted (via UI/API, CLI, or direct filesyste
 `SessionSidebar.confirmWorktreeAction()` optimistically merges the API response's `archivedSpaces` into local project state so the worktree space disappears immediately, then refreshes projects in the background. If the currently-selected space was the archived one, fallback preference: (1) `main` space of the same project, (2) any other active non-missing space, (3) API-provided `fallbackCwd`, (4) null.
 
 ## Project Invariants
+
+### YPI Studio free-text approval boundary
+
+`lib/ypi-studio-tasks.ts` uses the same pure `isExplicitYpiStudioApprovalText()` gate before writing a free-text `user-input` approval grant for either a main plan or an improvement plan. The gate normalizes Unicode NFKC and horizontal whitespace, rejects newline input and strings over 80 code points, rejects negation/wait/revision intent, then accepts only a small anchored Chinese/English command allowlist. It must not search for approval keywords inside discussion, questions, quotations, diagnostics (for example `排查浮窗批准问题`), or longer text. Passing this parser is not authorization by itself: existing awaiting status, bound context, material/UI evidence, revision, and temporal gates still apply. Typed user-widget approval actions remain structured actions and do not pass through free-text classification. Historical grants are not migrated.
 
 ### AgentSession lifecycle
 

@@ -1124,6 +1124,27 @@ export interface YpiStudioImprovementSubtaskClaimBody {
   contextId?: string;
 }
 
+export interface YpiStudioImprovementSubtaskUpdateBody {
+  cwd: string;
+  action: "update_implementation_subtask";
+  improvementId: string;
+  subtaskId: string;
+  status: YpiStudioImplementationSubtaskStatus;
+  runId?: string;
+  message?: string;
+  validation?: string[];
+  blockedBy?: string[];
+  blockedReason?: string;
+  skippedReason?: string;
+  terminationReason?: string;
+  localReview?: {
+    status?: YpiStudioImplementationLocalReviewStatus;
+    runId?: string;
+    summary?: string;
+  };
+  contextId?: string;
+}
+
 export interface YpiStudioTaskImplementationSubtaskUpdateBody {
   cwd: string;
   action: "update_implementation_subtask";
