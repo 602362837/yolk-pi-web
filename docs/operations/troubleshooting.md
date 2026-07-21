@@ -168,6 +168,15 @@ Bare HTTP status alone, fuzzy help text that merely mentions limit/rate, network
 
 If `GROK_CLI_OAUTH_TOKEN` (or related fixed env tokens) override managed OAuth for actual requests, auto-failover refuses to report a fake switch and surfaces a display-safe notice without leaking the token.
 
+### Grok refresh / mirror recovery
+
+Grok's managed Active slot is the refresh authority; `auth.json` is a Pi-compatible mirror. SDK refresh and managed quota refresh share the Grok provider lock and commit in this order: **provider lock → Active slot atomic write → Active-pointer recheck → auth.json mirror**.
+
+- If a refresh reports a safe storage/lock error after a successful remote rotation, do **not** copy the old `auth.json` credential back to the slot and do not delete credentials. A later coordinated request or explicit account reconciliation repairs the mirror from the slot.
+- An aged provider lock with a live owner PID is intentionally not stolen. A second process may time out instead; stop the stuck owner or wait for it to finish rather than bypassing the lock.
+- `401`/`403` from Grok billing makes one true forced refresh and one retry. Persistent reauth states still require the user to reauthenticate; an entitlement-only `403` is not proof that credentials should be erased.
+- Never inspect, log, or paste token values, token hashes, raw upstream errors, account identity fields, or credential paths while diagnosing. Record only safe error categories and whether slot/mirror reconciliation succeeded.
+
 ## Kiro Provider, Quota, Auto Failover & Compact Top-bar
 
 Kiro is a fixed Web provider (`pi-kiro-provider@0.2.2` via jiti) with independent OAuth multi-account, AWS GetUsageLimits quota, and Path B auto-failover. It does **not** share Grok/ChatGPT classifier or quota modules.

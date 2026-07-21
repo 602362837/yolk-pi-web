@@ -1,5 +1,6 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { isSupportedOAuthAccountProvider, listOAuthAccounts, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
+import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider, listOAuthAccounts, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
+import { withGrokProviderLock } from "@/lib/grok-account-lock";
 import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,12 @@ export async function GET() {
         let activeAccountDisplayName: string | null = null;
 
         if (isSupportedOAuthAccountProvider(p.id)) {
-          await syncActiveOAuthAccountCredential(p.id).catch(() => {});
+          const reconcile = () => syncActiveOAuthAccountCredential(p.id).catch(() => {});
+          if (p.id === GROK_CLI_PROVIDER_ID) {
+            await withGrokProviderLock(reconcile);
+          } else {
+            await reconcile();
+          }
           try {
             const accounts = await listOAuthAccounts(p.id);
             accountCount = accounts.accounts.length;

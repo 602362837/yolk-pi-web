@@ -59,7 +59,7 @@ test("grok.autoFailover defaults off with GPT-aligned budgets", () => {
 
 test("forceRefresh:true is real, not minValidityMs:0 fake", () => {
   assertIncludes(token, "forceRefresh?: boolean", "option");
-  assertIncludes(token, "forceRefresh || !access || epochNow() >= expires - minValidityMs", "force path");
+  assertIncludes(token, "opts.forceRefresh || !access || epochNow() >= expires - opts.minValidityMs", "force path");
   assertIncludes(quota, "forceRefresh: true", "quota uses forceRefresh");
   assertIncludes(quota, "(result.statusCode === 401 || result.statusCode === 403)", "parenthesized 401/403");
 });

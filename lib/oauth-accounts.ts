@@ -587,6 +587,14 @@ export async function syncActiveOAuthAccountCredential(
   const activeStorageId = metadata.activeAccountId && await pathExists(credentialPath(provider, metadata.activeAccountId))
     ? metadata.activeAccountId
     : undefined;
+
+  // Grok's managed Active slot is authoritative once it exists. Never let an
+  // auth.json reconciliation overwrite a rotated slot with a stale mirror.
+  // First provider-wide login still creates a slot when no Active slot exists.
+  if (provider === GROK_CLI_PROVIDER_ID && activeStorageId) {
+    const activeEntry = metadata.accounts.find((entry) => entry.accountId === activeStorageId);
+    return activeEntry ? accountSummary(metadata, activeEntry) : null;
+  }
   return saveOAuthAccountCredential(provider, credential, { markActive: true, storageId: activeStorageId });
 }
 
@@ -655,7 +663,12 @@ export async function importOAuthAccountCredential(
  */
 export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {
   const adapter = getAdapter(provider);
-  await syncActiveOAuthAccountCredential(provider);
+  // Grok listing is metadata-only. Reconciliation is explicit (first login or
+  // a lock-held recovery path), because syncing a stale auth.json mirror here
+  // could overwrite a newly rotated authoritative slot.
+  if (provider !== GROK_CLI_PROVIDER_ID) {
+    await syncActiveOAuthAccountCredential(provider);
+  }
 
   const metadata = await readMetadata(provider);
   const existingAccounts: OAuthAccountMetadataEntry[] = [];
