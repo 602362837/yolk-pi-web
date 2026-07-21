@@ -41,6 +41,7 @@
     "lint": "eslint .",
     "test:appearance": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-appearance.mjs && node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-appearance-video.mjs",
     "test:appearance-video": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-appearance-video.mjs",
+    "test:file-upload": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-file-upload.mjs",
     "test:studio-policy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-policy.mjs",
     "test:studio-message-display": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-message-display.mjs",
     "test:studio-extension-sci": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-extension-sci.mjs",

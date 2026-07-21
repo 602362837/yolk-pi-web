@@ -240,7 +240,7 @@ All GitHub calls use fixed allowlisted hosts and paths:
 2. **Token polling**: `POST https://github.com/login/oauth/access_token` — respects `interval`, `slow_down`, `authorization_pending`, `access_denied`, `expired_token`
 3. **Identity validation**: `GET https://api.github.com/user` — Bearer token, `Accept: application/vnd.github+json`
 
-Enforced: 10s timeout, 64 KiB response cap, reject redirects, JSON Accept. Raw upstream bodies never leak into errors.
+Enforced: each request combines caller cancellation with an independent 15-second deadline that covers both fetch and bounded body reads; only the internal deadline maps to `github_timeout`. The cap remains 64 KiB, redirects are rejected, and JSON is required. Raw upstream bodies never leak into errors.
 
 ### Key Modules
 

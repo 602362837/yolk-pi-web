@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "maxConcurrency": 3,
+  "subtasks": [
+    {
+      "id": "FIX-01",
+      "title": "Harden general file upload storage against path traversal and overwrite",
+      "phase": "upload-security",
+      "order": 1,
+      "dependsOn": [],
+      "files": ["app/api/files/upload/route.ts", "lib/file-upload-storage.ts", "scripts/test-file-upload.mjs", "package.json"],
+      "instructions": "Add a server-only upload storage helper and make the route persist bytes only through it. Generate full opaque UUID upload directories and storage basenames; optionally retain only a strictly allowlisted short ASCII alphanumeric extension. Never use the client basename as a path. Before writing, resolve the candidate and require it to be a strict child of the new upload directory; create directories 0700 and files 0600 with exclusive wx semantics and bounded collision retries. Preserve response {name,path,size}, size/quota/retention, and old upload cleanup compatibility. Harden cleanup to use lstat and skip symlink entries. Return a fixed path-free failure. Add isolated temp-root tests for traversal, absolute paths, collision, permissions, symlinks, compatibility and outside sentinels.",
+      "acceptance": ["Client filenames cannot affect paths outside the strict optional extension allowlist", "Containment and wx prevent escape/overwrite", "Traversal/collision/symlink tests preserve outside sentinels", "API shape and limits remain compatible", "Errors are path-free", "test:file-upload passes"],
+      "validation": ["npm run test:file-upload", "Static path-write scan", "Manual ordinary attachment smoke"],
+      "risks": ["Extension compatibility", "Collision fallback", "Symlink cleanup"],
+      "parallelizable": true,
+      "localReview": true
+    },
+    {
+      "id": "FIX-02",
+      "title": "Enforce GitHub OAuth upstream deadline with caller cancellation and body cleanup",
+      "phase": "oauth-deadline",
+      "order": 1,
+      "dependsOn": [],
+      "files": ["lib/github-link-oauth.ts", "scripts/test-links.mjs"],
+      "instructions": "Always create and compose a 15-second internal deadline with the optional caller signal without depending on AbortSignal.any. Track the first abort source, pass the combined signal to fetch, race bounded reader.read calls, cancel/release readers, and dispose timers/listeners. Map only deadline expiry to github_timeout; preserve caller cancellation. Keep fixed endpoints, redirects, 64 KiB cap, stable codes and secret-safe errors. Add a resettable test timeout and hang/cancel/cleanup regressions.",
+      "acceptance": ["All three GitHub calls retain deadline with caller signal", "Fetch/body hangs become github_timeout", "Caller cancel is not timeout/network", "Resources are cleaned", "No secret/raw data leaks", "test:links passes"],
+      "validation": ["npm run test:links", "npm run test:web-credential-store", "Authorization-manager abort review"],
+      "risks": ["Custom stream ignores signal", "Late timer", "Abort race classification"],
+      "parallelizable": true,
+      "localReview": true
+    },
+    {
+      "id": "FIX-03",
+      "title": "Parse bounded MP4 metadata when moov is located after large media payloads",
+      "phase": "mp4-parser",
+      "order": 1,
+      "dependsOn": [],
+      "files": ["lib/appearance-video.ts", "scripts/test-appearance-video.mjs", "scripts/test-appearance.mjs"],
+      "instructions": "Traverse top-level MP4 boxes across the full buffer by validated declared sizes and jump over payloads. Parse only a real top-level moov under an 8 MiB metadata budget, depth 6 and one global 2048-box budget. Preserve encrypted rejection and numeric metadata. Do not raw-search or add ffprobe. Add real MP4 fixtures with free padding before moov around/after 8 MiB plus false-positive and malformed/budget tests. Preserve current size confirmation/hard ceilings and duration/resolution policy.",
+      "acceptance": ["Head/tail moov clips parse", "mdat payload moov is rejected", "Malformed/budget cases are bounded", "No public contract or process dependency changes", "Existing Appearance tests pass", "test:appearance-video passes"],
+      "validation": ["npm run test:appearance-video", "npm run test:appearance", "Raw-search/ffprobe scan"],
+      "risks": ["Fixture offsets", "Counter not global", "Metadata budget removed"],
+      "parallelizable": true,
+      "localReview": true
+    },
+    {
+      "id": "FIX-04",
+      "title": "Integrate contracts and align upload, Links, and Appearance documentation",
+      "phase": "docs-integration",
+      "order": 2,
+      "dependsOn": ["FIX-01", "FIX-02", "FIX-03"],
+      "files": ["docs/architecture/overview.md", "docs/modules/api.md", "docs/modules/library.md", "docs/integrations/README.md", "docs/standards/code-style.md"],
+      "instructions": "Document upload containment, GitHub 15-second composed deadline through body read, and MP4 full top-level header-chain with bounded metadata. Correct related stale Appearance limits to current source. Do not change AGENTS or add UI docs/prototype. Search all consumers for contract drift.",
+      "acceptance": ["Docs match implementation", "Timeout/tail support is accurate", "Appearance limits match source", "UI gate remains inapplicable", "No unrelated docs rewrite"],
+      "validation": ["Relevant docs rg", "git diff --check", "Docs/source constant review"],
+      "risks": ["Docs imply product policy change", "AGENTS bloat", "Contradictory limits remain"],
+      "parallelizable": false,
+      "localReview": true
+    },
+    {
+      "id": "FIX-05",
+      "title": "Run integrated validation and checker security review",
+      "phase": "validation",
+      "order": 3,
+      "dependsOn": ["FIX-04"],
+      "files": [],
+      "instructions": "Install dependencies if absent; run focused tests, lint, tsc and smoke checks. Review upload escape/overwrite/symlink boundaries, OAuth abort classification/resource cleanup, MP4 false-positive/budgets, API compatibility, docs and scope. Report blockers exactly and do not commit, push or merge.",
+      "acceptance": ["Focused suites pass", "lint/tsc pass or unrelated failures are isolated", "Security sentinels pass", "No frontend/schema/migration changes", "Checker records no blocker"],
+      "validation": ["npm run test:file-upload", "npm run test:links", "npm run test:appearance-video", "npm run test:appearance", "npm run lint", "node_modules/.bin/tsc --noEmit", "git diff --check"],
+      "risks": ["Dependencies unavailable", "ffmpeg unavailable", "Platform-specific path/permission gap"],
+      "parallelizable": false,
+      "localReview": true
+    }
+  ],
+  "execution": {
+    "maxConcurrency": 3,
+    "groups": [
+      {"id": "parallel-fixes", "subtaskIds": ["FIX-01", "FIX-02", "FIX-03"]},
+      {"id": "integration-docs", "subtaskIds": ["FIX-04"]},
+      {"id": "closeout", "subtaskIds": ["FIX-05"]}
+    ]
+  }
+}

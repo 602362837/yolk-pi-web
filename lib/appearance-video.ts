@@ -29,8 +29,8 @@ import {
 
 const FILE_MODE = 0o600;
 const MAX_CONCURRENT_PROCESSING = 2;
-/** Cap how much of a file we walk for top-level ISO BMFF boxes. */
-const MAX_BOX_SCAN_BYTES = 8 * 1024 * 1024;
+/** A selected `moov` subtree must remain small even when media payloads are large. */
+const MAX_METADATA_BYTES = 8 * 1024 * 1024;
 const MAX_BOX_DEPTH = 6;
 const MAX_BOX_COUNT = 2_048;
 const FFMPEG_TIMEOUT_MS = 20_000;
@@ -171,29 +171,51 @@ interface BoxVisit {
   start: number;
   headerSize: number;
   size: number;
-  depth: number;
 }
 
-function* iterateBoxes(bytes: Buffer, start: number, end: number, depth: number): Generator<BoxVisit> {
-  if (depth > MAX_BOX_DEPTH) return;
+interface BoxWalkBudget {
+  remaining: number;
+}
+
+/**
+ * Walk a declared box chain. This deliberately reads only headers at the top
+ * level, so a large `mdat` is skipped rather than scanned. Returning false is
+ * fail-closed for truncated, overflowing, or budget-exhausting containers.
+ */
+function visitBoxes(
+  bytes: Buffer,
+  start: number,
+  end: number,
+  depth: number,
+  budget: BoxWalkBudget,
+  visit: (box: BoxVisit) => boolean,
+): boolean {
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end > bytes.length) {
+    return false;
+  }
+  if (depth > MAX_BOX_DEPTH) return false;
+
   let offset = start;
-  let count = 0;
-  while (offset + 8 <= end && offset < MAX_BOX_SCAN_BYTES && count < MAX_BOX_COUNT) {
-    count += 1;
+  while (offset < end) {
+    if (end - offset < 8 || budget.remaining <= 0) return false;
+    budget.remaining -= 1;
+
     let size = readU32(bytes, offset);
     const type = fourcc(bytes, offset + 4);
     let headerSize = 8;
     if (size === 1) {
-      if (offset + 16 > end) return;
+      if (end - offset < 16) return false;
       size = readU64(bytes, offset + 8);
       headerSize = 16;
     } else if (size === 0) {
       size = end - offset;
     }
-    if (!Number.isFinite(size) || size < headerSize || offset + size > end) return;
-    yield { type, start: offset, headerSize, size, depth };
+    if (!Number.isSafeInteger(size) || size < headerSize || size > end - offset) return false;
+    const box = { type, start: offset, headerSize, size };
+    if (!visit(box)) return false;
     offset += size;
   }
+  return true;
 }
 
 function parseMvhdDurationMs(payload: Buffer): number | null {
@@ -242,40 +264,55 @@ function walkForMetadata(bytes: Buffer): ParsedMp4Metadata {
   let height = 0;
   let foundMoov = false;
   let foundEncryptedSample = false;
+  const budget: BoxWalkBudget = { remaining: MAX_BOX_COUNT };
 
-  const visitContainer = (start: number, end: number, depth: number): void => {
-    for (const box of iterateBoxes(bytes, start, end, depth)) {
-      const payloadStart = box.start + box.headerSize;
-      const payloadEnd = box.start + box.size;
-      if (box.type === "moov" || box.type === "trak" || box.type === "mdia" || box.type === "minf" || box.type === "stbl") {
-        if (box.type === "moov") foundMoov = true;
-        visitContainer(payloadStart, payloadEnd, depth + 1);
-        continue;
-      }
-      if (box.type === "mvhd" && durationMs === null) {
-        durationMs = parseMvhdDurationMs(bytes.subarray(payloadStart, payloadEnd));
-        continue;
-      }
-      if (box.type === "tkhd") {
-        const dims = parseTkhdDimensions(bytes.subarray(payloadStart, payloadEnd));
-        if (dims && dims.width * dims.height > width * height) {
-          width = dims.width;
-          height = dims.height;
+  function visitContainer(start: number, end: number, depth: number): boolean {
+    return visitBoxes(
+      bytes,
+      start,
+      end,
+      depth,
+      budget,
+      (box) => {
+        const payloadStart = box.start + box.headerSize;
+        const payloadEnd = box.start + box.size;
+        if (box.type === "trak" || box.type === "mdia" || box.type === "minf" || box.type === "stbl") {
+          return visitContainer(payloadStart, payloadEnd, depth + 1);
         }
-        continue;
-      }
-      if (box.type === "stsd") {
-        // Look for common encrypted sample entry fourccs inside stsd without deep codec decode.
-        const body = bytes.subarray(payloadStart, payloadEnd);
-        if (body.includes(Buffer.from("encv")) || body.includes(Buffer.from("enca"))) {
-          foundEncryptedSample = true;
+        if (box.type === "mvhd" && durationMs === null) {
+          durationMs = parseMvhdDurationMs(bytes.subarray(payloadStart, payloadEnd));
+          return true;
         }
-      }
-    }
-  };
+        if (box.type === "tkhd") {
+          const dims = parseTkhdDimensions(bytes.subarray(payloadStart, payloadEnd));
+          if (dims && dims.width * dims.height > width * height) {
+            width = dims.width;
+            height = dims.height;
+          }
+          return true;
+        }
+        if (box.type === "stsd") {
+          // This is bounded by the selected moov metadata budget, not file size.
+          const body = bytes.subarray(payloadStart, payloadEnd);
+          if (body.includes(Buffer.from("encv")) || body.includes(Buffer.from("enca"))) {
+            foundEncryptedSample = true;
+          }
+        }
+        return true;
+      },
+    );
+  }
 
-  visitContainer(0, Math.min(bytes.length, MAX_BOX_SCAN_BYTES), 0);
+  const topLevelValid = visitBoxes(bytes, 0, bytes.length, 0, budget, (box) => {
+    if (box.type !== "moov") return true;
+    // A real top-level moov can occur after arbitrary media payloads, but its
+    // metadata tree itself remains strictly bounded.
+    if (foundMoov || box.size > MAX_METADATA_BYTES) return false;
+    foundMoov = true;
+    return visitContainer(box.start + box.headerSize, box.start + box.size, 1);
+  });
 
+  if (!topLevelValid) throw new AppearanceVideoError("invalid_media");
   if (foundEncryptedSample) throw new AppearanceVideoError("unsupported_media");
   if (!foundMoov || durationMs === null || durationMs <= 0) throw new AppearanceVideoError("invalid_media");
   if (!width || !height) throw new AppearanceVideoError("invalid_media");

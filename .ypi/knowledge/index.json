@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-21T00:46:31.156Z",
+  "updatedAt": "2026-07-21T03:39:52.180Z",
   "entries": [
+    {
+      "id": "20260721-113952-修复-github-issues-9-10-11-上传路径穿越-oauth-超时与-mp4-尾部",
+      "title": "修复 GitHub Issues #9、#10、#11：上传路径穿越、OAuth 超时与 MP4 尾部 moov 解析",
+      "taskId": "20260721-110132-修复-github-issues-9-10-11-上传路径穿越-oauth-超时与-mp4-尾部",
+      "taskKey": "archived:2026-07:20260721-110132-修复-github-issues-9-10-11-上传路径穿越-oauth-超时与-mp4-尾部",
+      "workflowId": "feature-dev",
+      "summary": "## 已完成 - 读取并核对 Issues #9/#10/#11、`AGENTS.md`、architecture/API/frontend/library/integration/style docs，以及相关 route/library/test consumer。 - 产出 `brief.md`、`prd.md`、`ui.md`、`design.md`、`implement.md`、`implementation-plan.json`、`checks.md`、`plan-review.md`。 - UI gate 判定不适用：无前端/文案/信息结构变化，无需 HTML prototype。 - 设计 5 项 schemaVersion 2 DAG，`FIX-01/02/03` 可并行，`maxConcurrency=3`。 - 未修改生产代码，未 commit/push/merge。 ## 关键决策 - 上传：服务端 opaque UUID path，原名仅展示；final containment + 0700/0600 + `wx`；cleanup 跳过 symlink。 - OAuth：caller abort 与独立 15 秒 deadline 始终组合；deadline覆盖 body read；主动 cancel 不映射 timeout。 - MP4：完整 top-level box-chain header walk，跳过 payload；`moov` metadata 保留 8 MiB/depth 6/global count 2048；不 raw-search、不加 ffprobe。 - 保持当前源码 Appearance 策略，不借修复改变大小/duration/resolution政策。 ## 验证情况 尝试 `test:links`、`test:appearance-video`、lint、tsc，均因未安装完整依赖而未执行：缺 `jiti`、`sharp`、`eslint`、`tsc`。实施前先 `npm install`。 ## 主会话下…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260721-110132-修复-github-issues-9-10-11-上传路径穿越-oauth-超时与-mp4-尾部",
+      "knowledgePath": ".ypi/knowledge/20260721-113952-修复-github-issues-9-10-11-上传路径穿越-oauth-超时与-mp4-尾部.md",
+      "createdAt": "2026-07-21T03:39:52.180Z",
+      "archivedAt": "2026-07-21T03:39:52.180Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260721-084631-设计外观模块-皮肤管理与网页背景适配",
       "title": "设计外观模块：皮肤管理与网页背景适配",

@@ -304,6 +304,88 @@ async function main() {
       assert.ok(grant.interval >= 5);
     });
 
+    await test("request deadline terminates a stalled fetch without a caller signal", async () => {
+      setClientId("test-client-id-123");
+      githubOAuth._testOverrideGithubRequestTimeoutMs(20);
+      setMockFetchHandler((url) => {
+        if (url === types.GITHUB_DEVICE_CODE_URL) return new Promise(() => {});
+      });
+      await assert.rejects(
+        () => githubOAuth.requestDeviceCode(),
+        (err) => err.code === "github_timeout",
+      );
+      githubOAuth._testOverrideGithubRequestTimeoutMs(undefined);
+    });
+
+    await test("caller signal does not disable the request deadline", async () => {
+      setClientId("test-client-id-123");
+      githubOAuth._testOverrideGithubRequestTimeoutMs(20);
+      const caller = new AbortController();
+      setMockFetchHandler((url) => {
+        if (url === types.GITHUB_DEVICE_CODE_URL) return new Promise(() => {});
+      });
+      await assert.rejects(
+        () => githubOAuth.requestDeviceCode(caller.signal),
+        (err) => err.code === "github_timeout",
+      );
+      githubOAuth._testOverrideGithubRequestTimeoutMs(undefined);
+    });
+
+    await test("request deadline terminates a stalled response body", async () => {
+      setClientId("test-client-id-123");
+      githubOAuth._testOverrideGithubRequestTimeoutMs(20);
+      let cancelled = false;
+      setMockFetchHandler((url) => {
+        if (url !== types.GITHUB_DEVICE_CODE_URL) return undefined;
+        const body = new ReadableStream({
+          pull() {
+            return new Promise(() => {});
+          },
+          cancel() {
+            cancelled = true;
+          },
+        });
+        return new Response(body, { status: 200 });
+      });
+      await assert.rejects(
+        () => githubOAuth.requestDeviceCode(),
+        (err) => err.code === "github_timeout",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert.equal(cancelled, true);
+      githubOAuth._testOverrideGithubRequestTimeoutMs(undefined);
+    });
+
+    await test("caller cancellation remains AbortError rather than a timeout", async () => {
+      setClientId("test-client-id-123");
+      githubOAuth._testOverrideGithubRequestTimeoutMs(100);
+      const caller = new AbortController();
+      setMockFetchHandler((url) => {
+        if (url === types.GITHUB_DEVICE_CODE_URL) return new Promise(() => {});
+      });
+      setTimeout(() => caller.abort(), 10);
+      await assert.rejects(
+        () => githubOAuth.requestDeviceCode(caller.signal),
+        (err) => err.name === "AbortError" && err.code !== "github_timeout" && err.code !== "github_network_error",
+      );
+      githubOAuth._testOverrideGithubRequestTimeoutMs(undefined);
+    });
+
+    await test("attemptPollAccessToken rethrows caller cancellation instead of mapping network failure", async () => {
+      setClientId("test-client-id-123");
+      githubOAuth._testOverrideGithubRequestTimeoutMs(100);
+      const caller = new AbortController();
+      setMockFetchHandler((url) => {
+        if (url === types.GITHUB_ACCESS_TOKEN_URL) return new Promise(() => {});
+      });
+      setTimeout(() => caller.abort(), 10);
+      await assert.rejects(
+        () => githubOAuth.attemptPollAccessToken(DEVICE_CODE_SENTINEL, caller.signal),
+        (err) => err.name === "AbortError" && err.code !== "github_timeout" && err.code !== "github_network_error",
+      );
+      githubOAuth._testOverrideGithubRequestTimeoutMs(undefined);
+    });
+
     await test("requestDeviceCode throws when not configured", async () => {
       setClientId(null);
       await assert.rejects(
