@@ -20,6 +20,7 @@
 import {
   activateOAuthAccount,
   listOAuthAccounts,
+  readOAuthActiveAccountId,
 } from "./oauth-accounts";
 import { KIRO_PROVIDER_ID } from "./oauth-account-providers";
 import { getKiroAccountSubscriptionQuota, type KiroQuotaResultV1 } from "./kiro-subscription-quota";
@@ -309,7 +310,7 @@ async function chooseNextUsableAccount(
 }
 
 export async function getActiveKiroFailoverAccountId(): Promise<string | null> {
-  return (await listOAuthAccounts(KIRO_PROVIDER_ID)).activeAccountId;
+  return readOAuthActiveAccountId(KIRO_PROVIDER_ID);
 }
 
 /**
@@ -369,7 +370,7 @@ export async function attemptKiroAccountFailover(options: {
   return withFailoverLock<KiroAccountFailoverResult>(async () => {
     state.exhaustedUntil.set(triggerAccountId, now() + config.exhaustedCooldownMs);
 
-    const activeAfterLock = (await listOAuthAccounts(KIRO_PROVIDER_ID)).activeAccountId;
+    const activeAfterLock = await readOAuthActiveAccountId(KIRO_PROVIDER_ID);
     if (activeAfterLock && activeAfterLock !== triggerAccountId) {
       options.budget.attempts += 1;
       return {
@@ -399,7 +400,7 @@ export async function attemptKiroAccountFailover(options: {
       };
     }
 
-    const activeBeforeActivate = (await listOAuthAccounts(KIRO_PROVIDER_ID)).activeAccountId;
+    const activeBeforeActivate = await readOAuthActiveAccountId(KIRO_PROVIDER_ID);
     if (activeBeforeActivate && activeBeforeActivate !== triggerAccountId) {
       options.budget.attempts += 1;
       return {

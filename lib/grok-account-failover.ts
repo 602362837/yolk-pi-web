@@ -19,6 +19,7 @@
 import {
   activateOAuthAccount,
   listOAuthAccounts,
+  readOAuthActiveAccountId,
 } from "./oauth-accounts";
 import { GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
 import { getGrokAccountSubscriptionQuota, type GrokQuotaResultV1 } from "./grok-subscription-quota";
@@ -248,7 +249,7 @@ async function chooseNextUsableAccount(
 }
 
 export async function getActiveGrokFailoverAccountId(): Promise<string | null> {
-  return (await listOAuthAccounts(GROK_CLI_PROVIDER_ID)).activeAccountId;
+  return readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);
 }
 
 /**
@@ -310,7 +311,7 @@ export async function attemptGrokAccountFailover(options: {
   return withFailoverLock<GrokAccountFailoverResult>(async () => {
     state.exhaustedUntil.set(triggerAccountId, now() + config.exhaustedCooldownMs);
 
-    const activeAfterLock = (await listOAuthAccounts(GROK_CLI_PROVIDER_ID)).activeAccountId;
+    const activeAfterLock = await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);
     if (activeAfterLock && activeAfterLock !== triggerAccountId) {
       return {
         status: "already_switched_by_other_session",
@@ -339,7 +340,7 @@ export async function attemptGrokAccountFailover(options: {
       };
     }
 
-    const activeBeforeActivate = (await listOAuthAccounts(GROK_CLI_PROVIDER_ID)).activeAccountId;
+    const activeBeforeActivate = await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);
     if (activeBeforeActivate && activeBeforeActivate !== triggerAccountId) {
       return {
         status: "already_switched_by_other_session",

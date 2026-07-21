@@ -22,7 +22,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { SessionHeader } from "./types";
 import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
-import { listOAuthAccounts } from "./oauth-accounts";
+import { readOAuthActiveAccountId } from "./oauth-accounts";
 import { invalidateGrokTokenFlight } from "./grok-account-token";
 
 // ─── Runtime registry ────────────────────────────────────────────────────────
@@ -119,8 +119,7 @@ export function readGrokSessionAccountFromHeader(filePath: string): string | und
 export async function getActiveGrokAccountId(): Promise<string | null> {
   if (!isSupportedOAuthAccountProvider(GROK_CLI_PROVIDER_ID)) return null;
   try {
-    const list = await listOAuthAccounts(GROK_CLI_PROVIDER_ID);
-    return list.activeAccountId;
+    return await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);
   } catch {
     return null;
   }

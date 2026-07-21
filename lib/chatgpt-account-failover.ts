@@ -1,4 +1,4 @@
-import { activateOAuthAccount, listOAuthAccounts, OPENAI_CODEX_PROVIDER_ID, type OAuthAccountSummary } from "./oauth-accounts";
+import { activateOAuthAccount, listOAuthAccounts, OPENAI_CODEX_PROVIDER_ID, readOAuthActiveAccountId, type OAuthAccountSummary } from "./oauth-accounts";
 import { readPiWebConfig, type PiWebChatGptAutoFailoverConfig } from "./pi-web-config";
 import { getOAuthAccountSubscriptionQuota } from "./subscription-quota";
 
@@ -120,7 +120,7 @@ async function chooseNextUsableAccount(triggerAccountId: string, config: PiWebCh
 }
 
 export async function getActiveOpenAICodexAccountId(): Promise<string | null> {
-  return (await listOAuthAccounts(OPENAI_CODEX_PROVIDER_ID)).activeAccountId;
+  return readOAuthActiveAccountId(OPENAI_CODEX_PROVIDER_ID);
 }
 
 export async function attemptChatGptAccountFailover(options: {
@@ -150,7 +150,7 @@ export async function attemptChatGptAccountFailover(options: {
   return withFailoverLock<ChatGptAccountFailoverResult>(async () => {
     state.exhaustedUntil.set(triggerAccountId, now() + config.exhaustedCooldownMs);
 
-    const activeAfterLock = (await listOAuthAccounts(OPENAI_CODEX_PROVIDER_ID)).activeAccountId;
+    const activeAfterLock = await readOAuthActiveAccountId(OPENAI_CODEX_PROVIDER_ID);
     if (activeAfterLock && activeAfterLock !== triggerAccountId) {
       return {
         status: "already_switched_by_other_session",
@@ -169,7 +169,7 @@ export async function attemptChatGptAccountFailover(options: {
     const nextAccountId = await chooseNextUsableAccount(triggerAccountId, config);
     if (!nextAccountId) return { status: "no_usable_account", reason, provider, triggerAccountId, activeAccountId: triggerAccountId, retry: false };
 
-    const activeBeforeActivate = (await listOAuthAccounts(OPENAI_CODEX_PROVIDER_ID)).activeAccountId;
+    const activeBeforeActivate = await readOAuthActiveAccountId(OPENAI_CODEX_PROVIDER_ID);
     if (activeBeforeActivate && activeBeforeActivate !== triggerAccountId) {
       return {
         status: "already_switched_by_other_session",

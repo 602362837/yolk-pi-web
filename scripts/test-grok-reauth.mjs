@@ -228,8 +228,10 @@ test("Route still accepts accountMode=add", () => {
   assertIncludes(routeSource, 'Account saved successfully', "add success message unchanged");
 });
 
-test("Route still syncs active for provider-wide login", () => {
-  assertIncludes(routeSource, "syncActiveOAuthAccountCredential", "provider-wide sync preserved");
+test("provider-wide login explicitly adopts a successful canonical credential", () => {
+  assertIncludes(routeSource, "adoptOAuthActiveAccountCredential(provider)", "provider-wide login adopts managed Active credential");
+  assertIncludes(routeSource, "Failed to save the active OAuth credential.", "adoption failure cannot report login success");
+  assertNotIncludes(routeSource, "syncActiveOAuthAccountCredential", "old ambiguous sync is not used");
 });
 
 test("Route POST callback unchanged", () => {

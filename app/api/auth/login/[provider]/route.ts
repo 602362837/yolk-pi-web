@@ -5,13 +5,12 @@ import {
   ANTIGRAVITY_PROVIDER_ID,
   GROK_CLI_PROVIDER_ID,
   isSupportedOAuthAccountProvider,
+  adoptOAuthActiveAccountCredential,
   saveOAuthAccountCredential,
-  syncActiveOAuthAccountCredential,
   listOAuthAccounts,
   reauthenticateOAuthAccount,
 } from "@/lib/oauth-accounts";
 import { sanitizeGrokLoginError, isGrokLoginCancelled } from "@/lib/grok-login-errors";
-import { withGrokProviderLock } from "@/lib/grok-account-lock";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { createInMemoryWebCredentialStore } from "@/lib/web-credential-store";
 import { createWebModelRuntime, getWebModelRuntime } from "@/lib/web-model-runtime";
@@ -299,12 +298,8 @@ export async function GET(
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {
           if (isSupportedOAuthAccountProvider(provider)) {
-            const reconcile = () => syncActiveOAuthAccountCredential(provider).catch(() => {});
-            if (provider === GROK_CLI_PROVIDER_ID) {
-              await withGrokProviderLock(reconcile);
-            } else {
-              await reconcile();
-            }
+            const adopted = await adoptOAuthActiveAccountCredential(provider);
+            if (!adopted) throw new Error("Failed to save the active OAuth credential.");
           }
           await Promise.resolve(reloadRpcAuthState());
           send(controller, { type: "success" });

@@ -23,7 +23,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { KIRO_PROVIDER_ID } from "./oauth-account-providers";
-import { listOAuthAccounts } from "./oauth-accounts";
+import { readOAuthActiveAccountId } from "./oauth-accounts";
 import { getKiroAccessToken } from "./kiro-account-token";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -911,8 +911,7 @@ export async function getKiroActiveSubscriptionQuota(
 ): Promise<KiroQuotaResultV1> {
   let activeId: string | null = null;
   try {
-    const list = await listOAuthAccounts(KIRO_PROVIDER_ID);
-    activeId = list.activeAccountId;
+    activeId = await readOAuthActiveAccountId(KIRO_PROVIDER_ID);
   } catch {
     activeId = null;
   }

@@ -1,4 +1,5 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { clearOAuthActiveAccount, isSupportedOAuthAccountProvider } from "@/lib/oauth-accounts";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
@@ -18,7 +19,11 @@ export async function POST(
   if (!providers.find((p) => p.id === provider && providerHasOAuth(p))) {
     return Response.json({ error: `Unknown provider: ${provider}` }, { status: 400 });
   }
-  await runtime.logout(provider);
+  if (isSupportedOAuthAccountProvider(provider)) {
+    await clearOAuthActiveAccount(provider, () => runtime.logout(provider));
+  } else {
+    await runtime.logout(provider);
+  }
   await Promise.resolve(reloadRpcAuthState());
   return Response.json({ ok: true });
 }

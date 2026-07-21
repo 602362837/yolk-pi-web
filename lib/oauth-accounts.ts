@@ -4,7 +4,7 @@
  * Manages multiple saved OAuth accounts per provider.  Provider-specific
  * behaviour (credential shape, account-id derivation, label backfill, import)
  * lives in `oauth-account-providers.ts`; this module only implements the
- * shared storage, metadata, activation, and lifecycle logic.
+ * shared storage, metadata, activation, and explicit Active lifecycle logic.
  */
 
 import { createHash, randomUUID } from "node:crypto";
@@ -141,7 +141,11 @@ interface SaveAccountOptions {
   recordActivation?: boolean;
   /** Preserve the path of an existing saved account, including legacy v1 paths. */
   storageId?: string;
+  /** Safe local display hint derived during an explicit credential mutation. */
+  displayHint?: string | null;
 }
+
+type OAuthCredentialReader = Pick<WebCredentialStore, "read">;
 
 // ─── Error ───────────────────────────────────────────────────────────────────
 
@@ -310,6 +314,20 @@ async function readMetadata(provider: string): Promise<OAuthAccountStoreMetadata
   return normalizeMetadata(await readJsonFile(metadataPath(provider), "OAuth account metadata"));
 }
 
+/** Active-pointer reads must not turn malformed metadata into a new empty state. */
+async function readMetadataForActivePointer(provider: string): Promise<OAuthAccountStoreMetadata> {
+  const raw = await readJsonFile(metadataPath(provider), "OAuth account metadata");
+  if (raw === null) return { version: 1, accounts: [] };
+  if (!isRecord(raw) || !Array.isArray(raw.accounts)) {
+    throw new OAuthAccountStoreError("OAuth account metadata is invalid", 500);
+  }
+  const metadata = normalizeMetadata(raw);
+  if (metadata.accounts.length !== raw.accounts.length) {
+    throw new OAuthAccountStoreError("OAuth account metadata is invalid", 500);
+  }
+  return metadata;
+}
+
 async function writeMetadata(provider: string, metadata: OAuthAccountStoreMetadata): Promise<void> {
   await writeJsonFile(provider, metadataPath(provider), metadata);
 }
@@ -361,6 +379,9 @@ function upsertMetadataAccount(
     ? { ...existing, chatgptAccountId: realAccountId, updatedAt: now }
     : { accountId: storageId, chatgptAccountId: realAccountId, createdAt: now, updatedAt: now };
 
+  if (!nextEntry.label && !nextEntry.labelBackfillDisabledAt && options.displayHint?.trim()) {
+    nextEntry.label = options.displayHint.trim();
+  }
   if (options.markActive && (options.recordActivation || !nextEntry.lastActivatedAt)) {
     nextEntry.lastActivatedAt = now;
   }
@@ -402,54 +423,27 @@ function sortAccountSummaries(accounts: OAuthAccountSummary[]): OAuthAccountSumm
   });
 }
 
-// ─── Label backfill ──────────────────────────────────────────────────────────
+// ─── Active lifecycle boundaries ─────────────────────────────────────────────
 
-async function backfillMissingAccountLabels(
-  provider: string,
-  adapter: OAuthAccountProviderAdapter,
-  accounts: OAuthAccountMetadataEntry[],
-): Promise<{ accounts: OAuthAccountMetadataEntry[]; changed: boolean }> {
-  if (!adapter.backfillLabel) return { accounts, changed: false };
-
-  let changed = false;
-  const nextAccounts: OAuthAccountMetadataEntry[] = [];
-
-  for (const entry of accounts) {
-    if (entry.label || entry.labelBackfillDisabledAt) {
-      nextAccounts.push(entry);
-      continue;
-    }
-
-    const credential = await readJsonFile(credentialPath(provider, entry.accountId), "OAuth account credential");
-    if (!adapter.isCredential(credential)) {
-      nextAccounts.push(entry);
-      continue;
-    }
-
-    const cred = credential as Record<string, unknown>;
-    const label = await adapter.backfillLabel(
-      typeof cred.access === "string" ? cred.access : "",
-      entry.chatgptAccountId ?? entry.accountId,
-    );
-    if (!label) {
-      nextAccounts.push(entry);
-      continue;
-    }
-
-    nextAccounts.push({ ...entry, label, updatedAt: new Date().toISOString() });
-    changed = true;
+async function withProviderAccountLock<T>(provider: string, run: () => Promise<T>): Promise<T> {
+  switch (provider) {
+    case GROK_CLI_PROVIDER_ID:
+      return withGrokProviderLock(run);
+    case KIRO_PROVIDER_ID:
+      return withKiroProviderLock(run);
+    case ANTIGRAVITY_PROVIDER_ID:
+      return withAntigravityProviderLock(run);
+    default:
+      return run();
   }
-
-  return { accounts: nextAccounts, changed };
 }
 
-async function clearActiveAccount(provider: string): Promise<void> {
+async function clearOAuthActiveAccountUnlocked(provider: string): Promise<void> {
   const path = metadataPath(provider);
   if (!(await pathExists(path))) return;
 
   const metadata = await readMetadata(provider);
   if (!metadata.activeAccountId) return;
-
   await writeMetadata(provider, { ...metadata, activeAccountId: undefined });
 }
 
@@ -556,7 +550,10 @@ export async function saveOAuthAccountCredential(
   // metadata only, never injected into the credential file.
   await writeJsonFile(provider, credentialPath(provider, storageId), cred);
 
-  const metadata = upsertMetadataAccount(await readMetadata(provider), storageId, realAccountId, options);
+  const metadata = upsertMetadataAccount(await readMetadata(provider), storageId, realAccountId, {
+    ...options,
+    displayHint: options.displayHint ?? adapter.deriveDisplayHint(cred),
+  });
   await writeMetadata(provider, metadata);
 
   const entry = metadata.accounts.find((account) => account.accountId === storageId);
@@ -565,37 +562,89 @@ export async function saveOAuthAccountCredential(
 }
 
 /**
- * Sync the active credential from auth.json (via CredentialStore) into the
- * saved-account store.  Returns the active account summary, or null if
- * no valid credential exists.
+ * Read only the managed Active pointer. Credential bodies and `auth.json` are
+ * intentionally outside this boundary; a stale/missing slot fails closed.
  */
-export async function syncActiveOAuthAccountCredential(
-  provider: string,
-  credentials?: WebCredentialStore | { read(providerId: string): Promise<Credential | undefined> },
-): Promise<OAuthAccountSummary | null> {
-  const adapter = getAdapter(provider);
-  const store = credentials ?? await getWebCredentialStore();
-  const credential = await store.read(provider);
-  if (!adapter.isCredential(credential)) {
-    await clearActiveAccount(provider);
+export async function readOAuthActiveAccountId(provider: string): Promise<string | null> {
+  getAdapter(provider);
+  const metadata = await readMetadataForActivePointer(provider);
+  const activeAccountId = metadata.activeAccountId;
+  if (!activeAccountId || !metadata.accounts.some((entry) => entry.accountId === activeAccountId)) {
     return null;
   }
+  return await pathExists(credentialPath(provider, activeAccountId)) ? activeAccountId : null;
+}
 
-  // Active auth.json holds a plain Pi credential without a storage id.
-  // The active metadata pointer is authoritative for an existing managed account.
-  const metadata = await readMetadata(provider);
-  const activeStorageId = metadata.activeAccountId && await pathExists(credentialPath(provider, metadata.activeAccountId))
-    ? metadata.activeAccountId
-    : undefined;
+async function readValidOAuthActiveAccountUnlocked(
+  provider: string,
+  adapter: OAuthAccountProviderAdapter,
+  metadata: OAuthAccountStoreMetadata,
+): Promise<OAuthAccountSummary | null> {
+  const activeAccountId = metadata.activeAccountId;
+  const entry = activeAccountId && metadata.accounts.find((account) => account.accountId === activeAccountId);
+  if (!entry) return null;
 
-  // Grok's managed Active slot is authoritative once it exists. Never let an
-  // auth.json reconciliation overwrite a rotated slot with a stale mirror.
-  // First provider-wide login still creates a slot when no Active slot exists.
-  if (provider === GROK_CLI_PROVIDER_ID && activeStorageId) {
-    const activeEntry = metadata.accounts.find((entry) => entry.accountId === activeStorageId);
-    return activeEntry ? accountSummary(metadata, activeEntry) : null;
-  }
-  return saveOAuthAccountCredential(provider, credential, { markActive: true, storageId: activeStorageId });
+  const credential = await readJsonFile(credentialPath(provider, activeAccountId), "OAuth account credential");
+  return adapter.isCredential(credential) ? accountSummary(metadata, entry) : null;
+}
+
+/**
+ * Initialize a managed Active slot from the canonical mirror for legacy users.
+ * A valid managed slot is authoritative and is never overwritten by the mirror.
+ */
+export async function bootstrapOAuthActiveAccountCredential(
+  provider: string,
+  credentials?: OAuthCredentialReader,
+): Promise<OAuthAccountSummary | null> {
+  const adapter = getAdapter(provider);
+  return withProviderAccountLock(provider, async () => {
+    const metadata = await readMetadata(provider);
+    const existing = await readValidOAuthActiveAccountUnlocked(provider, adapter, metadata);
+    if (existing) return existing;
+
+    const store = credentials ?? await getWebCredentialStore();
+    const credential = await store.read(provider);
+    if (!adapter.isCredential(credential)) return null;
+    return saveOAuthAccountCredential(provider, credential, { markActive: true });
+  });
+}
+
+/**
+ * Adopt a canonical credential only after a successful provider-wide login or
+ * runtime refresh. Unlike bootstrap, this may replace an existing Active slot.
+ */
+export async function adoptOAuthActiveAccountCredential(
+  provider: string,
+  credentials?: OAuthCredentialReader,
+): Promise<OAuthAccountSummary | null> {
+  const adapter = getAdapter(provider);
+  return withProviderAccountLock(provider, async () => {
+    const store = credentials ?? await getWebCredentialStore();
+    const credential = await store.read(provider);
+    if (!adapter.isCredential(credential)) return null;
+
+    const metadata = await readMetadata(provider);
+    const existing = await readValidOAuthActiveAccountUnlocked(provider, adapter, metadata);
+    return saveOAuthAccountCredential(provider, credential, {
+      markActive: true,
+      storageId: existing?.accountId,
+    });
+  });
+}
+
+/**
+ * Disconnect the runtime mirror and clear only the managed Active pointer in
+ * one provider critical section. Saved credential slots are deliberately kept.
+ */
+export async function clearOAuthActiveAccount(
+  provider: string,
+  logout: () => Promise<void>,
+): Promise<void> {
+  getAdapter(provider);
+  await withProviderAccountLock(provider, async () => {
+    await logout();
+    await clearOAuthActiveAccountUnlocked(provider);
+  });
 }
 
 /**
@@ -646,7 +695,9 @@ export async function importOAuthAccountCredential(
 
     let metadata = await readMetadata(provider);
     for (let index = 0; index < normalizedCredentials.length; index += 1) {
-      metadata = upsertMetadataAccount(metadata, storageIds[index], normalizedCredentials[index].realAccountId, {});
+      metadata = upsertMetadataAccount(metadata, storageIds[index], normalizedCredentials[index].realAccountId, {
+        displayHint: adapter.deriveDisplayHint(normalizedCredentials[index].credential),
+      });
     }
     await writeMetadata(provider, metadata);
   } catch (error) {
@@ -658,45 +709,34 @@ export async function importOAuthAccountCredential(
 }
 
 /**
- * List all saved OAuth accounts for a provider, sorted active-first then by
- * last-activated / updated-at descending.
+ * List saved-account metadata without reconciling credentials. This read model
+ * deliberately never opens `auth.json` or credential bodies, writes files, or
+ * asks a provider for labels.
  */
 export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {
-  const adapter = getAdapter(provider);
-  // Grok listing is metadata-only. Reconciliation is explicit (first login or
-  // a lock-held recovery path), because syncing a stale auth.json mirror here
-  // could overwrite a newly rotated authoritative slot.
-  if (provider !== GROK_CLI_PROVIDER_ID) {
-    await syncActiveOAuthAccountCredential(provider);
-  }
-
+  getAdapter(provider);
   const metadata = await readMetadata(provider);
   const existingAccounts: OAuthAccountMetadataEntry[] = [];
-  let changed = false;
 
   for (const entry of metadata.accounts) {
     if (await pathExists(credentialPath(provider, entry.accountId))) {
       existingAccounts.push(entry);
-    } else {
-      changed = true;
     }
   }
 
-  const backfilled = await backfillMissingAccountLabels(provider, adapter, existingAccounts);
-  if (backfilled.changed) changed = true;
-
-  const activeAccountId = metadata.activeAccountId && backfilled.accounts.some((entry) => entry.accountId === metadata.activeAccountId)
+  const activeAccountId = metadata.activeAccountId && existingAccounts.some((entry) => entry.accountId === metadata.activeAccountId)
     ? metadata.activeAccountId
     : undefined;
-  if (activeAccountId !== metadata.activeAccountId) changed = true;
-
-  const nextMetadata: OAuthAccountStoreMetadata = { version: metadata.version, activeAccountId, accounts: backfilled.accounts };
-  if (changed) await writeMetadata(provider, nextMetadata);
+  const projectionMetadata: OAuthAccountStoreMetadata = {
+    version: metadata.version,
+    activeAccountId,
+    accounts: existingAccounts,
+  };
 
   return {
     provider,
     activeAccountId: activeAccountId ?? null,
-    accounts: sortAccountSummaries(backfilled.accounts.map((entry) => accountSummary(nextMetadata, entry))),
+    accounts: sortAccountSummaries(existingAccounts.map((entry) => accountSummary(projectionMetadata, entry))),
   };
 }
 
@@ -785,7 +825,6 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P
   if (!normalizedAccountId) throw new OAuthAccountStoreError("accountId is required", 400);
 
   const run = async (): Promise<OAuthAccountsList> => {
-    await syncActiveOAuthAccountCredential(provider);
     const metadata = await readMetadata(provider);
     if (metadata.activeAccountId === normalizedAccountId) {
       throw new OAuthAccountStoreError("Active OAuth account cannot be deleted", 409);
@@ -825,8 +864,6 @@ export async function activateOAuthAccount(provider: string, accountId: string):
 
   const run = async (): Promise<OAuthAccountsList> => {
     const store = await getWebCredentialStore();
-    await syncActiveOAuthAccountCredential(provider, store);
-
     const credential = await readOAuthAccountCredential(provider, normalizedAccountId);
     // CredentialStore expects type:"oauth" for OAuth entries. grok-cli / kiro /
     // antigravity credentials from their providers lack this sentinel but are

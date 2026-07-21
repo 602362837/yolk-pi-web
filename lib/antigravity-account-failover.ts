@@ -27,6 +27,7 @@
 import {
   activateOAuthAccount,
   listOAuthAccounts,
+  readOAuthActiveAccountId,
   readOAuthAccountCredential,
 } from "./oauth-accounts";
 import { ANTIGRAVITY_PROVIDER_ID } from "./oauth-account-providers";
@@ -336,7 +337,7 @@ async function chooseNextUsableAccount(
 }
 
 export async function getActiveAntigravityFailoverAccountId(): Promise<string | null> {
-  return (await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID)).activeAccountId;
+  return readOAuthActiveAccountId(ANTIGRAVITY_PROVIDER_ID);
 }
 
 /**
@@ -412,7 +413,7 @@ export async function attemptAntigravityAccountFailover(options: {
   return withFailoverLock<AntigravityAccountFailoverResult>(async () => {
     state.exhaustedUntil.set(triggerAccountId, now() + config.exhaustedCooldownMs);
 
-    const activeAfterLock = (await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID)).activeAccountId;
+    const activeAfterLock = await readOAuthActiveAccountId(ANTIGRAVITY_PROVIDER_ID);
     if (activeAfterLock && activeAfterLock !== triggerAccountId) {
       // Reuse only when the new Active still has fresh matching-model quota.
       const reusable = await isUsableAntigravityAccount(activeAfterLock, publicModelId, config);
@@ -458,7 +459,7 @@ export async function attemptAntigravityAccountFailover(options: {
       };
     }
 
-    const activeBeforeActivate = (await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID)).activeAccountId;
+    const activeBeforeActivate = await readOAuthActiveAccountId(ANTIGRAVITY_PROVIDER_ID);
     if (activeBeforeActivate && activeBeforeActivate !== triggerAccountId) {
       const reusable = await isUsableAntigravityAccount(activeBeforeActivate, publicModelId, config);
       if (!reusable) {

@@ -29,7 +29,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { ANTIGRAVITY_PROVIDER_ID } from "./oauth-account-providers";
-import { listOAuthAccounts } from "./oauth-accounts";
+import { readOAuthActiveAccountId } from "./oauth-accounts";
 import {
   getAntigravityAccessToken,
   type AntigravityTokenError,
@@ -819,8 +819,7 @@ export async function getAntigravityActiveSubscriptionQuota(
 ): Promise<AntigravityQuotaResultV1> {
   let activeId: string | null = null;
   try {
-    const list = await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID);
-    activeId = list.activeAccountId;
+    activeId = await readOAuthActiveAccountId(ANTIGRAVITY_PROVIDER_ID);
   } catch {
     activeId = null;
   }

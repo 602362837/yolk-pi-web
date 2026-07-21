@@ -554,10 +554,11 @@ test("403 invalid_project distinct from unauthorized reauth", () => {
   assertIncludes(quotaSource, "mapAntigravityQuotaHttpError", "http error mapper");
 });
 
-test("uses getAntigravityAccessToken and listOAuthAccounts", () => {
+test("uses getAntigravityAccessToken and metadata-only Active reader", () => {
   assertIncludes(quotaSource, "getAntigravityAccessToken", "token resolver");
   assertIncludes(quotaSource, "./antigravity-account-token", "token module import");
-  assertIncludes(quotaSource, "listOAuthAccounts", "active account via list");
+  assertIncludes(quotaSource, "readOAuthActiveAccountId", "active account via pure metadata reader");
+  assertNotIncludes(quotaSource, "listOAuthAccounts", "quota does not enumerate accounts just to read Active");
   assertIncludes(quotaSource, "ANTIGRAVITY_PROVIDER_ID", "provider id");
 });
 
