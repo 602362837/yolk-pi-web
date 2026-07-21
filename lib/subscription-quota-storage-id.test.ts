@@ -48,4 +48,6 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+// The aggregate runner awaits exported completion promises before changing its
+// temporary PI_CODING_AGENT_DIR for the next isolated test.
+export const subscriptionQuotaStorageIdTestCompletion = main();

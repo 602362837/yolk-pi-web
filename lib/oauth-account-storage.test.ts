@@ -9,9 +9,13 @@ async function main(): Promise<void> {
 
   const {
     OPENAI_CODEX_PROVIDER_ID,
+    adoptOAuthActiveAccountCredential,
+    bootstrapOAuthActiveAccountCredential,
+    clearOAuthActiveAccount,
     importOAuthAccountCredential,
     listOAuthAccounts,
     readOAuthAccountCredential,
+    readOAuthActiveAccountId,
     saveOAuthAccountCredential,
   } = await import("./oauth-accounts");
 
@@ -110,7 +114,45 @@ async function main(): Promise<void> {
   );
   strictEqual((await listOAuthAccounts(OPENAI_CODEX_PROVIDER_ID)).accounts.length, countBeforeInvalidBatch, "invalid batch leaves no partial imports");
 
-  console.log("OAuth account storage identity and CPA import tests passed");
+  const active = await saveOAuthAccountCredential(OPENAI_CODEX_PROVIDER_ID, {
+    type: "oauth",
+    access: "active-access",
+    refresh: "active-refresh",
+    expires: 1_800_000_000_000,
+    accountId: "active-account",
+  }, { markActive: true });
+  const staleMirror = {
+    type: "oauth" as const,
+    access: "stale-access",
+    refresh: "stale-refresh",
+    expires: 1_800_000_000_000,
+    accountId: "stale-account",
+  };
+  const staleReader = { read: async () => staleMirror };
+  const metadataBeforeRead = await readFile(join(providerDir, "accounts.json"), "utf8");
+  const slotBeforeRead = await readFile(join(providerDir, `${encodeURIComponent(active.accountId)}.json`), "utf8");
+  const listedActive = await listOAuthAccounts(OPENAI_CODEX_PROVIDER_ID);
+  strictEqual(listedActive.activeAccountId, active.accountId, "pure list retains an addressable Active pointer");
+  strictEqual(await readFile(join(providerDir, "accounts.json"), "utf8"), metadataBeforeRead, "list does not rewrite metadata");
+  strictEqual(await readFile(join(providerDir, `${encodeURIComponent(active.accountId)}.json`), "utf8"), slotBeforeRead, "list does not rewrite slots");
+  strictEqual(await readOAuthActiveAccountId(OPENAI_CODEX_PROVIDER_ID), active.accountId, "Active reader returns only the opaque storage id");
+
+  const bootstrapped = await bootstrapOAuthActiveAccountCredential(OPENAI_CODEX_PROVIDER_ID, staleReader);
+  strictEqual(bootstrapped?.accountId, active.accountId, "bootstrap prefers a valid managed Active slot");
+  strictEqual((await readOAuthAccountCredential(OPENAI_CODEX_PROVIDER_ID, active.accountId)).access, "active-access", "bootstrap never overwrites a managed slot from a stale mirror");
+
+  const adoptedMirror = { ...staleMirror, access: "adopted-access", refresh: "adopted-refresh" };
+  const adopted = await adoptOAuthActiveAccountCredential(OPENAI_CODEX_PROVIDER_ID, { read: async () => adoptedMirror });
+  strictEqual(adopted?.accountId, active.accountId, "adopt preserves the opaque Active id");
+  strictEqual((await readOAuthAccountCredential(OPENAI_CODEX_PROVIDER_ID, active.accountId)).access, "adopted-access", "adopt explicitly updates the Active slot");
+
+  let logoutCalls = 0;
+  await clearOAuthActiveAccount(OPENAI_CODEX_PROVIDER_ID, async () => { logoutCalls += 1; });
+  strictEqual(logoutCalls, 1, "clear invokes runtime logout before clearing Active metadata");
+  strictEqual(await readOAuthActiveAccountId(OPENAI_CODEX_PROVIDER_ID), null, "clear removes the Active pointer");
+  strictEqual((await readOAuthAccountCredential(OPENAI_CODEX_PROVIDER_ID, active.accountId)).access, "adopted-access", "clear retains saved slots");
+
+  console.log("OAuth account storage identity and lifecycle tests passed");
   } finally {
     await rm(agentDir, { recursive: true, force: true }).catch(() => {});
   }

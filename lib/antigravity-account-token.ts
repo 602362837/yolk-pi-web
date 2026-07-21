@@ -30,7 +30,7 @@ import type { Credential, OAuthCredentials } from "@earendil-works/pi-ai";
 import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
 import { getWebCredentialStore } from "@/lib/web-credential-store";
 import { ANTIGRAVITY_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
-import { listOAuthAccounts } from "./oauth-accounts";
+import { readOAuthActiveAccountId } from "./oauth-accounts";
 import { withAntigravityProviderLock } from "./antigravity-account-lock";
 
 // ─── Fixed safe error codes / messages ───────────────────────────────────────
@@ -127,10 +127,6 @@ function antigravityAccountDir(): string {
 
 function credentialFilePath(storageId: string): string {
   return join(antigravityAccountDir(), `${encodeURIComponent(storageId)}.json`);
-}
-
-function accountsMetadataPath(): string {
-  return join(antigravityAccountDir(), "accounts.json");
 }
 
 // ─── In-flight registry (single-flight) ──────────────────────────────────────
@@ -237,26 +233,12 @@ async function atomicWriteJson(dir: string, filename: string, data: unknown): Pr
 // ─── Active-mirror compare-and-set ───────────────────────────────────────────
 
 /**
- * Read the current active storage id from accounts.json (preferred) or the
- * listOAuthAccounts projection. Called under the provider lock so Activate
- * races are observed before the auth.json mirror write.
+ * Read the current Active pointer under the provider lock before writing the
+ * mirror. The reader is metadata-only and has no reconciliation side effects.
  */
 async function readActiveStorageId(): Promise<string | null> {
   try {
-    const metaPath = accountsMetadataPath();
-    if (await pathExists(metaPath)) {
-      const raw = JSON.parse(await readFile(metaPath, "utf8")) as unknown;
-      if (isRecord(raw) && typeof raw.activeAccountId === "string" && raw.activeAccountId.trim()) {
-        return raw.activeAccountId.trim();
-      }
-    }
-  } catch {
-    // Fall through to listOAuthAccounts.
-  }
-
-  try {
-    const accounts = await listOAuthAccounts(ANTIGRAVITY_PROVIDER_ID);
-    return accounts.activeAccountId;
+    return await readOAuthActiveAccountId(ANTIGRAVITY_PROVIDER_ID);
   } catch {
     return null;
   }

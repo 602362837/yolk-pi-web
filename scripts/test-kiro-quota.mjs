@@ -639,10 +639,11 @@ test("ValidationException fallback at most once", () => {
   assertIncludes(kiroQuotaSource, "buildPrimaryBody", "primary body helper");
 });
 
-test("uses getKiroAccessToken and listOAuthAccounts", () => {
+test("uses getKiroAccessToken and metadata-only Active reader", () => {
   assertIncludes(kiroQuotaSource, "getKiroAccessToken", "token resolver");
   assertIncludes(kiroQuotaSource, "./kiro-account-token", "token module import");
-  assertIncludes(kiroQuotaSource, "listOAuthAccounts", "active account via list");
+  assertIncludes(kiroQuotaSource, "readOAuthActiveAccountId", "active account via pure metadata reader");
+  assertNotIncludes(kiroQuotaSource, "listOAuthAccounts", "quota does not enumerate accounts just to read Active");
   assertIncludes(kiroQuotaSource, "KIRO_PROVIDER_ID", "provider id");
 });
 

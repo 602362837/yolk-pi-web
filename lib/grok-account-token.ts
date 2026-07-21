@@ -13,7 +13,10 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { Credential } from "@earendil-works/pi-ai";
 import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
 import { withGrokProviderLock } from "./grok-account-lock";
-import { commitGrokCredentialUnderLock } from "./grok-credential-transaction";
+import {
+  commitGrokCredentialUnderLock,
+  reconcileGrokActiveMirrorUnderLock,
+} from "./grok-credential-transaction";
 import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
 import { getWebCredentialStore } from "./web-credential-store";
 
@@ -129,10 +132,16 @@ async function createFlight(
     const access = typeof raw.access === "string" ? raw.access.trim() : "";
     const expires = typeof raw.expires === "number" ? raw.expires : 0;
     const needsRefresh = opts.forceRefresh || !access || epochNow() >= expires - opts.minValidityMs;
-    if (!needsRefresh) return { accessToken: access, refreshed: false, expiresAt: expires };
+    const rawStore = await getWebCredentialStore();
+    if (!needsRefresh) {
+      // A prior mirror write may have failed after the slot-first commit. A
+      // normal valid-token read is the safe recovery point: it only repairs
+      // this still-Active slot and never consumes another refresh token.
+      await reconcileGrokActiveMirrorUnderLock({ rawStore, storageId });
+      return { accessToken: access, refreshed: false, expiresAt: expires };
+    }
 
     opts.signal?.throwIfAborted();
-    const rawStore = await getWebCredentialStore();
     return refreshGrokCredentialUnderLock(storageId, raw, rawStore);
   });
 }

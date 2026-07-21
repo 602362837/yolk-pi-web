@@ -118,8 +118,8 @@ export interface OAuthAccountProviderAdapter {
   normalizeImportCredential(mode: OAuthAccountImportMode, credential: unknown): Record<string, unknown>[];
 
   /**
-   * Optional async label backfill.  Called during `listOAuthAccounts()` when an
-   * account has no user-set label.  Must not throw — failures are silently ignored.
+   * Optional async label backfill reserved for an explicit mutation/scheduler.
+   * It must never run from `listOAuthAccounts()`.
    */
   backfillLabel?(accessToken: string, realAccountId: string): Promise<string | null>;
 

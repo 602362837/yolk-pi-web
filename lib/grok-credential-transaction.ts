@@ -9,6 +9,7 @@
 import { chmod, mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import type { Credential } from "@earendil-works/pi-ai";
 import { GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
 import type { WebCredentialStore } from "./web-credential-store";
@@ -122,6 +123,21 @@ export type CommitGrokCredentialResult = {
   activeChanged: boolean;
 };
 
+function comparableCredential(credential: Credential): Record<string, unknown> {
+  // Managed slots intentionally omit Pi's auth.json-only type sentinel.
+  const { type: _type, ...rest } = credential as Credential & Record<string, unknown>;
+  return rest;
+}
+
+function credentialsMatch(left: Credential, right: Credential): boolean {
+  return isDeepStrictEqual(comparableCredential(left), comparableCredential(right));
+}
+
+function mirrorReconcileError(): Error {
+  // Do not leak auth-file paths or credential values through this recovery path.
+  return new Error("Grok Active credential mirror reconciliation failed");
+}
+
 /**
  * Persist a refreshed slot first, then re-read the Active pointer and mirror
  * auth.json only if that exact slot is still Active. This function deliberately
@@ -142,5 +158,39 @@ export async function commitGrokCredentialUnderLock(input: {
 
   // Provider lock is held before this obtains WebCredentialStore's auth lock.
   await input.rawStore.modify(GROK_CLI_PROVIDER_ID, async () => input.credential);
+  return { mirrored: true, activeChanged: false };
+}
+
+/**
+ * Repair a missing or stale auth.json mirror from the authoritative Active
+ * slot. Callers must already hold the Grok provider lock. This is deliberately
+ * one-way: the mirror is never used to update a managed slot here.
+ */
+export async function reconcileGrokActiveMirrorUnderLock(input: {
+  rawStore: WebCredentialStore;
+  storageId: string;
+}): Promise<CommitGrokCredentialResult> {
+  const current = await readGrokActiveSnapshotUnderLock(input.rawStore);
+  if (!current || current.storageId !== input.storageId) {
+    return { mirrored: false, activeChanged: true };
+  }
+
+  let mirror: Credential | undefined;
+  try {
+    mirror = await input.rawStore.read(GROK_CLI_PROVIDER_ID);
+  } catch {
+    throw mirrorReconcileError();
+  }
+  if (mirror && credentialsMatch(current.credential, mirror)) {
+    return { mirrored: false, activeChanged: false };
+  }
+
+  try {
+    // Provider lock is held before this obtains WebCredentialStore's auth lock.
+    await input.rawStore.modify(GROK_CLI_PROVIDER_ID, async () => current.credential);
+  } catch {
+    // The slot has not been touched, so callers can safely retry a later read.
+    throw mirrorReconcileError();
+  }
   return { mirrored: true, activeChanged: false };
 }

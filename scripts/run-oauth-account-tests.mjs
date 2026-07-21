@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Runner for lib/oauth-account-storage.test.ts and
- * lib/oauth-account-grok.test.ts.
+ * Runner for OAuth account-store and OpenAI quota storage-identity tests.
  *
  * Uses jiti so TypeScript sources load under plain Node.  Each test file
  * manages its own PI_CODING_AGENT_DIR to a temporary path.
@@ -27,6 +26,9 @@ const tests = [
   "lib/oauth-account-grok.test.ts",
   "lib/oauth-account-kiro.test.ts",
   "lib/kiro-account-token.test.ts",
+  "lib/oauth-account-antigravity.test.ts",
+  "lib/antigravity-account-token.test.ts",
+  "lib/subscription-quota-storage-id.test.ts",
 ];
 
 let failures = 0;
@@ -39,10 +41,10 @@ for (const testPath of tests) {
     // Some TypeScript test modules intentionally launch an async completion
     // promise instead of using top-level await (which jiti may transpile to
     // CommonJS). Await it before the next test changes PI_CODING_AGENT_DIR.
-    const completion = testModule?.oauthAccountGrokTestCompletion;
-    if (completion && typeof completion.then === "function") {
-      await completion;
-    }
+    const completions = Object.values(testModule ?? {}).filter(
+      (value) => value && typeof value === "object" && typeof value.then === "function",
+    );
+    await Promise.all(completions);
     console.log(`✓ ${testPath} PASSED`);
   } catch (error) {
     console.error(`✗ ${testPath} FAILED:`, error instanceof Error ? error.message : String(error));

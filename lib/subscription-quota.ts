@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { extractOpenAICodexAccountId, getOAuthAccountAccessToken, listOAuthAccounts, readOAuthAccountCredential, syncActiveOAuthAccountCredential, updateOAuthAccountQuotaCache } from "@/lib/oauth-accounts";
+import { adoptOAuthActiveAccountCredential, extractOpenAICodexAccountId, getOAuthAccountAccessToken, readOAuthAccountCredential, readOAuthActiveAccountId, updateOAuthAccountQuotaCache } from "@/lib/oauth-accounts";
 import { getWebCredentialStore } from "@/lib/web-credential-store";
 import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
@@ -403,11 +403,12 @@ async function resolveActiveOpenAICodexCredential(provider: string): Promise<Res
 
   if (!accessToken) return quotaError(provider, "expired", "OAuth token unavailable. Please re-login.");
 
-  await syncActiveOAuthAccountCredential(provider, store).catch(() => {});
+  const adopted = await adoptOAuthActiveAccountCredential(provider, store);
+  if (!adopted) return quotaError(provider, "expired", "OAuth token unavailable. Please re-login.");
   const refreshedCredential = await store.read(provider) as StoredOAuthCredential | undefined;
   // The active entry is the saved-account identity. The credential account id remains
   // the real ChatGPT id and must never be used as a metadata/cache key.
-  const activeStorageId = (await listOAuthAccounts(provider)).activeAccountId;
+  const activeStorageId = await readOAuthActiveAccountId(provider);
   const chatgptAccountId = refreshedCredential?.accountId ?? storedCredential.accountId ?? extractOpenAICodexAccountId(accessToken);
 
   return { accessToken, storageId: activeStorageId, chatgptAccountId };

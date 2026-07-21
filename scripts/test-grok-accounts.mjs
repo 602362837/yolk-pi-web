@@ -203,8 +203,21 @@ test("Metadata accounts array only contains opaque accountId, not credential", (
   assertNotIncludes(normalizeFn, '"refresh"', "metadata does not store refresh token");
 });
 
-test("syncActiveOAuthAccountCredential clears active when credential missing", () => {
-  assertIncludes(oaSource, "clearActiveAccount(provider)", "clears active when missing");
+test("explicit Active lifecycle APIs replace ambiguous sync", () => {
+  assertIncludes(oaSource, "export async function readOAuthActiveAccountId", "exports metadata-only Active reader");
+  assertIncludes(oaSource, "export async function bootstrapOAuthActiveAccountCredential", "exports legacy bootstrap command");
+  assertIncludes(oaSource, "export async function adoptOAuthActiveAccountCredential", "exports explicit adoption command");
+  assertIncludes(oaSource, "export async function clearOAuthActiveAccount", "exports lock-held logout clear command");
+  assertNotIncludes(oaSource, "syncActiveOAuthAccountCredential", "old ambiguous sync is removed");
+});
+
+test("list is a pure metadata projection", () => {
+  const listStart = oaSource.indexOf("export async function listOAuthAccounts");
+  const listEnd = oaSource.indexOf("export async function updateOAuthAccountMetadata", listStart);
+  const listSource = oaSource.slice(listStart, listEnd);
+  assertNotIncludes(listSource, "getWebCredentialStore", "list does not read auth.json");
+  assertNotIncludes(listSource, "backfillLabel", "list does not perform remote label backfill");
+  assertNotIncludes(listSource, "writeMetadata", "list does not rewrite metadata");
 });
 
 // ============================================================================
@@ -312,9 +325,10 @@ test("unbindGrokSessionAccount invalidates token flight", () => {
   assertIncludes(sessionSource, "invalidateGrokTokenFlight(storageId)", "cleans up token flight");
 });
 
-test("getActiveGrokAccountId checks provider support first", () => {
+test("getActiveGrokAccountId reads only the Active metadata pointer", () => {
   assertIncludes(sessionSource, "isSupportedOAuthAccountProvider", "checks provider support");
-  assertIncludes(sessionSource, "listOAuthAccounts", "reads from account store");
+  assertIncludes(sessionSource, "readOAuthActiveAccountId", "uses metadata-only Active reader");
+  assertNotIncludes(sessionSource, "listOAuthAccounts", "does not enumerate accounts just to read Active");
 });
 
 test("restoreGrokSessionAccountBinding only reads, does not write", () => {
@@ -518,6 +532,17 @@ test("quota route POST returns 405 for grok-cli", () => {
 test("quota route GET for grok-cli returns 401 on reauthRequired", () => {
   const source = read("app/api/auth/quota/[provider]/route.ts");
   assertIncludes(source, "result.reauthRequired ? 401", "returns 401 for reauth");
+});
+
+test("managed OAuth routes use explicit lifecycle commands", () => {
+  const accountsRoute = read("app/api/auth/accounts/[provider]/route.ts");
+  const providersRoute = read("app/api/auth/providers/route.ts");
+  const logoutRoute = read("app/api/auth/logout/[provider]/route.ts");
+  assertIncludes(accountsRoute, "bootstrapOAuthActiveAccountCredential(provider)", "account GET bootstraps legacy mirror before pure list");
+  assertIncludes(providersRoute, "bootstrapOAuthActiveAccountCredential(p.id).catch", "provider GET isolates bootstrap failures");
+  assertIncludes(logoutRoute, "clearOAuthActiveAccount(provider, () => runtime.logout(provider))", "logout clears the pointer inside the lifecycle command");
+  assertIncludes(logoutRoute, "reloadRpcAuthState", "logout reloads live runtime only after clear");
+  assertNotIncludes(logoutRoute, "listOAuthAccounts", "logout never enumerates accounts to clear Active");
 });
 
 // ============================================================================
